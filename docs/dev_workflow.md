@@ -5,6 +5,15 @@ You must also ensure this instance of WSL is connected to Docker Desktop on Wind
 
 Come back to this document once you've properly setup your environment.
 
+## Glossary
+
+- Application container
+  - Container named baander-app in [docker-compose](/docker-compose.yml)
+- Scheduler container
+  - Container named baander-scheduler in [docker-compose](/docker-compose.yml)
+- Frontend
+  - React application in [resources/app](/resources/app)
+
 ## Starting the environment
 
 First run `make build` this will build the application container defined in [Dockerfile](/Dockerfile). Then you'll
@@ -16,8 +25,18 @@ Once you've seen all services start up without error, you can ssh into the appli
 
 `composer install`
 
-After you've completed that, type `exit`
+To ease the setup of the application in development mode, you can run the artisan script from within the app container:
+
+`php artisan setup:dev`
 
 ### Start frontend
 
 While the backend services are running, run `vite` or `yarn dev` then visit `https://baander.test`
+
+### Start websocket
+
+To broadcast events via the websocket, you must open a new terminal, ssh into the application container and then type
+
+`php artisan reverb:start`
+
+This will start the [Laravel Reverb](https://reverb.laravel.com/) websocket server.

@@ -50,7 +50,8 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
       libavif-dev \
       libxpm-dev \
       libpq-dev \
-      liblz4-dev
+      liblz4-dev \
+      iputils-ping
 
 RUN set -xe \
     && docker-php-ext-configure gd --with-webp --with-jpeg --with-xpm --with-freetype \
