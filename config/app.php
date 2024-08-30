@@ -195,7 +195,6 @@ return [
     */
 
     'aliases' => Facade::defaultAliases()->merge([
-        'Auth2Fa' => \App\Packages\TwoFactor\Auth2Fa::class,
     ])->toArray(),
 
 ];
