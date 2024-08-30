@@ -34,7 +34,7 @@ class SetupDevCommand extends Command
     private function envFile()
     {
         $examplePath = config('setup.env_files.example_path');
-        $destPath = config('setup.env_files.dest_path');
+        $destPath = config('setup.env_files.app_env');
 
         if (!File::exists($destPath)) {
             $this->info('Copying .env.example to .env');
