@@ -1,0 +1,15 @@
+<?php
+
+namespace {{ namespace }};
+
+use App\Filters\Contracts\Filterable;
+use App\Filters\QueryFilter;
+use Tpetry\PostgresqlEnhanced\Query\Builder;
+
+class {{ class }} extends QueryFilter implements Filterable
+{
+    public function handle($value): void
+    {
+
+    }
+}

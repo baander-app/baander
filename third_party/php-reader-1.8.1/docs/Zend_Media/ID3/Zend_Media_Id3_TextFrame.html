@@ -1,0 +1,1207 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+  <html xmlns="http://www.w3.org/1999/xhtml">
+		<head>
+			<!-- template designed by Marco Von Ballmoos -->
+			<title>Docs For Class Zend_Media_Id3_TextFrame</title>
+			<link rel="stylesheet" href="../../media/stylesheet.css" />
+			<meta http-equiv='Content-Type' content='text/html; charset=iso-8859-1'/>
+		</head>
+		<body>
+			<div class="page-body">			
+<h2 class="class-name"><img src="../../media/images/AbstractClass_logo.png"
+														alt="Abstract Class"
+														title="Abstract Class"
+														style="vertical-align: middle"> Zend_Media_Id3_TextFrame</h2>
+
+<a name="sec-description"></a>
+<div class="info-box">
+	<div class="info-box-title">Description</div>
+	<div class="nav-bar">
+					<span class="disabled">Description</span> |
+							<a href="#sec-descendents">Descendents</a>
+			|											<a href="#sec-var-summary">Vars</a> (<a href="#sec-vars">details</a>)
+						|											<a href="#sec-method-summary">Methods</a> (<a href="#sec-methods">details</a>)
+						
+											<a href="#sec-consts">Constants</a>
+						
+			</div>
+	<div class="info-box-body">
+                <p class="implements">
+            Implements interfaces:
+            <ul>
+                <li><a href="../../Zend_Media/ID3/Zend_Media_Id3_Encoding.html">Zend_Media_Id3_Encoding</a></li>            </ul>
+        </p>
+        		<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">A base class for all the text frames.</p>
+	<ul class="tags">
+				<li><span class="field">author:</span> Ryan Butterfield &lt;<a href="mailto:buttza@gmail.com">buttza@gmail.com</a>&gt;</li>
+				<li><span class="field">author:</span> Sven Vollbehr &lt;<a href="mailto:sven@vollbehr.eu">sven@vollbehr.eu</a>&gt;</li>
+				<li><span class="field">version:</span> $Id: TextFrame.php 203 2010-10-14 05:42:20Z svollbehr $</li>
+				<li><span class="field">copyright:</span> Copyright (c) 2005-2009 Zend Technologies USA Inc. (http://www.zend.com)</li>
+				<li><span class="field">abstract:</span> </li>
+				<li><span class="field">license:</span> <a href="http://framework.zend.com/license/new-bsd">New BSD License</a></li>
+			</ul>
+		<p class="notes">
+			Located in <a class="field" href="_Media---Id3---TextFrame.php.html">/Media/Id3/TextFrame.php</a> (line <span class="field">40</span>)
+		</p>
+		
+				
+		<pre><a href="../../Zend_Media/ID3/Zend_Media_Id3_Object.html">Zend_Media_Id3_Object</a>
+   |
+   --<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame.html">Zend_Media_Id3_Frame</a>
+      |
+      --Zend_Media_Id3_TextFrame</pre>
+	
+			</div>
+</div>
+
+	<a name="sec-descendents"></a>
+	<div class="info-box">
+		<div class="info-box-title">Direct descendents</div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+			<span class="disabled">Descendents</span>
+			|												<a href="#sec-var-summary">Vars</a> (<a href="#sec-vars">details</a>)
+								|															<a href="#sec-method-summary">Methods</a> (<a href="#sec-methods">details</a>)
+							
+															<a href="#sec-consts">Constants</a>
+							
+					</div>
+		<div class="info-box-body">
+			<table cellpadding="2" cellspacing="0" class="class-table">
+				<tr>
+					<th class="class-table-header">Class</th>
+					<th class="class-table-header">Description</th>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/AbstractClass.png"
+								 alt="Abstract class"
+								 title="Abstract class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_DateFrame.html">Zend_Media_Id3_DateFrame</a>
+					</td>
+					<td>
+											A base class for all the text frames representing a date or parts of it.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Talb.html">Zend_Media_Id3_Frame_Talb</a>
+					</td>
+					<td>
+											The <em>Album/Movie/Show title</em> frame is intended for the title of the  recording (or source of sound) from which the audio in the file is taken.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tcom.html">Zend_Media_Id3_Frame_Tcom</a>
+					</td>
+					<td>
+											The <em>Composer</em> frame is intended for the name of the composer.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tcon.html">Zend_Media_Id3_Frame_Tcon</a>
+					</td>
+					<td>
+											The <em>Content type</em>, which ID3v1 was stored as a one byte numeric value  only, is now a string. You may use one or several of the ID3v1 types as  numerical strings, or, since the category list would be impossible to  maintain with accurate and up to date categories, define your own.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tcop.html">Zend_Media_Id3_Frame_Tcop</a>
+					</td>
+					<td>
+											The <em>Copyright message</em> frame, in which the string must begin with a
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tdat.html">Zend_Media_Id3_Frame_Tdat</a>
+					</td>
+					<td>
+											The <em>Date</em> frame is a numeric string in the DDMM format containing the  date for the recording. This field is always four characters long.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tenc.html">Zend_Media_Id3_Frame_Tenc</a>
+					</td>
+					<td>
+											The <em>Encoded by</em> frame contains the name of the person or organisation  that encoded the audio file. This field may contain a copyright message, if  the audio file also is copyrighted by the encoder.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Text.html">Zend_Media_Id3_Frame_Text</a>
+					</td>
+					<td>
+											The <em>Lyricist/Text writer</em> frame is intended for the writer of the text  or lyrics in the recording.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tflt.html">Zend_Media_Id3_Frame_Tflt</a>
+					</td>
+					<td>
+											The <em>File type</em> frame indicates which type of audio this tag defines.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tipl.html">Zend_Media_Id3_Frame_Tipl</a>
+					</td>
+					<td>
+											The <em>Involved people list</em> is very similar to the musician credits list,  but maps between functions, like producer, and names.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tit1.html">Zend_Media_Id3_Frame_Tit1</a>
+					</td>
+					<td>
+											The <em>Content group description</em> frame is used if the sound belongs to a  larger category of sounds/music. For example, classical music is often sorted  in different musical sections (e.g. 'Piano Concerto', 'Weather - Hurricane').
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tit2.html">Zend_Media_Id3_Frame_Tit2</a>
+					</td>
+					<td>
+											The <em>Title/Songname/Content description</em> frame is the actual name of the  piece (e.g. 'Adagio', 'Hurricane Donna').
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tit3.html">Zend_Media_Id3_Frame_Tit3</a>
+					</td>
+					<td>
+											The <em>Subtitle/Description refinement</em> frame is used for information  directly related to the contents title (e.g. 'Op. 16' or 'Performed live at  Wembley').
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tkey.html">Zend_Media_Id3_Frame_Tkey</a>
+					</td>
+					<td>
+											The <em>Initial key</em> frame contains the musical key in which the sound
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tlan.html">Zend_Media_Id3_Frame_Tlan</a>
+					</td>
+					<td>
+											The <em>Language</em> frame should contain the languages of the text or lyrics
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tmcl.html">Zend_Media_Id3_Frame_Tmcl</a>
+					</td>
+					<td>
+											The <em>Musician credits list</em> is intended as a mapping between instruments  and the musician that played it. Every odd field is an instrument and every  even is an artist or a comma delimited list of artists.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tmed.html">Zend_Media_Id3_Frame_Tmed</a>
+					</td>
+					<td>
+											The <em>Media type</em> frame describes from which media the sound originated.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tmoo.html">Zend_Media_Id3_Frame_Tmoo</a>
+					</td>
+					<td>
+											The <em>Mood</em> frame is intended to reflect the mood of the audio with a few  keywords, e.g. 'Romantic' or 'Sad'.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Toal.html">Zend_Media_Id3_Frame_Toal</a>
+					</td>
+					<td>
+											The <em>Original album/movie/show title</em> frame is intended for the title of  the original recording (or source of sound), if for example the music in the  file should be a cover of a previously released song.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tofn.html">Zend_Media_Id3_Frame_Tofn</a>
+					</td>
+					<td>
+											The <em>Original filename</em> frame contains the preferred filename for the  file, since some media doesn't allow the desired length of the filename. The  filename is case sensitive and includes its suffix.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Toly.html">Zend_Media_Id3_Frame_Toly</a>
+					</td>
+					<td>
+											The <em>Original lyricist/text writer</em> frame is intended for the text  writer of the original recording, if for example the music in the file should  be a cover of a previously released song.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tope.html">Zend_Media_Id3_Frame_Tope</a>
+					</td>
+					<td>
+											The <em>Original artist/performer</em> frame is intended for the performer of  the original recording, if for example the music in the file should be a  cover of a previously released song.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Town.html">Zend_Media_Id3_Frame_Town</a>
+					</td>
+					<td>
+											The <em>File owner/licensee</em> frame contains the name of the owner or  licensee of the file and it's contents.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tpe1.html">Zend_Media_Id3_Frame_Tpe1</a>
+					</td>
+					<td>
+											The <em>Lead artist/Lead performer/Soloist/Performing group</em> is used for  the main artist.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tpe2.html">Zend_Media_Id3_Frame_Tpe2</a>
+					</td>
+					<td>
+											The <em>Band/Orchestra/Accompaniment</em> frame is used for additional  information about the performers in the recording.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tpe3.html">Zend_Media_Id3_Frame_Tpe3</a>
+					</td>
+					<td>
+											The <em>Conductor</em> frame is used for the name of the conductor.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tpe4.html">Zend_Media_Id3_Frame_Tpe4</a>
+					</td>
+					<td>
+											The <em>Interpreted, remixed, or otherwise modified by</em> frame contains more  information about the people behind a remix and similar interpretations of  another existing piece.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tpos.html">Zend_Media_Id3_Frame_Tpos</a>
+					</td>
+					<td>
+											The <em>Number of a set</em> frame is a numeric string that describes which part
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tpro.html">Zend_Media_Id3_Frame_Tpro</a>
+					</td>
+					<td>
+											The <em>Produced notice</em> frame, in which the string must begin with a year  and a space character (making five characters), is intended for the  production copyright holder of the original sound, not the audio file itself.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tpub.html">Zend_Media_Id3_Frame_Tpub</a>
+					</td>
+					<td>
+											The <em>Publisher</em> frame simply contains the name of the label or  publisher.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Trck.html">Zend_Media_Id3_Frame_Trck</a>
+					</td>
+					<td>
+											The <em>Track number/Position in set</em> frame is a numeric string containing  the order number of the audio-file on its original recording. This may be  extended with a '/' character and a numeric string containing the total  number of tracks/elements on the original recording. E.g. '4/9'.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Trda.html">Zend_Media_Id3_Frame_Trda</a>
+					</td>
+					<td>
+											The <em>Recording dates</em> frame is intended to be used as complement to
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_TRSN.html">Zend_Media_Id3_Frame_TRSN</a>
+					</td>
+					<td>
+											The <em>Internet radio station name</em> frame contains the name of the  internet radio station from which the audio is streamed.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_TRSO.html">Zend_Media_Id3_Frame_TRSO</a>
+					</td>
+					<td>
+											The <em>Internet radio station owner</em> frame contains the name of the owner  of the internet radio station from which the audio is streamed.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tso2.html">Zend_Media_Id3_Frame_Tso2</a>
+					</td>
+					<td>
+											This non-standard frame is used by iTunes in ID3v2.3.0 for sorting the names of the  Album Artist(s) of a track, that specified in the &quot;TPE1&quot; frame.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tsoa.html">Zend_Media_Id3_Frame_Tsoa</a>
+					</td>
+					<td>
+											The <em>Album sort order</em> frame defines a string which should be used  instead of the <a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Talb.html">TALB</a> album name frame for  sorting purposes.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tsoc.html">Zend_Media_Id3_Frame_Tsoc</a>
+					</td>
+					<td>
+											This non-standard frame is used by iTunes in ID3v2.3.0 for sorting the names of the  Composer(s) of a track, which is/are specified in the &quot;TCOM&quot; frame.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tsop.html">Zend_Media_Id3_Frame_Tsop</a>
+					</td>
+					<td>
+											The <em>Performer sort order</em> frame defines a string which should be used  instead of the <a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tpe2.html">TPE2</a> performer frame for  sorting purposes.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tsot.html">Zend_Media_Id3_Frame_Tsot</a>
+					</td>
+					<td>
+											The <em>Title sort order</em> frame defines a string which should be used  instead of the <a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tit2.html">TIT2</a> title frame for sorting  purposes.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tsrc.html">Zend_Media_Id3_Frame_Tsrc</a>
+					</td>
+					<td>
+											The <em>TSRC</em> frame should contain the International Standard Recording  Code or ISRC (12 characters).
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tsse.html">Zend_Media_Id3_Frame_Tsse</a>
+					</td>
+					<td>
+											The <em>Software/Hardware and settings used for encoding</em> frame includes  the used audio encoder and its settings when the file was encoded. Hardware  refers to hardware encoders, not the computer on which a program was run.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tsst.html">Zend_Media_Id3_Frame_Tsst</a>
+					</td>
+					<td>
+											The <em>Set subtitle</em> frame is intended for the subtitle of the part of a  set this track belongs to.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Txxx.html">Zend_Media_Id3_Frame_Txxx</a>
+					</td>
+					<td>
+											This frame is intended for one-string text information concerning the audio  file in a similar way to the other T-frames. The frame consists of a  description of the string followed by the actual string. There may be more  than one TXXX frame in each tag, but only one with the same description.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/AbstractClass.png"
+								 alt="Abstract class"
+								 title="Abstract class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ID3/Zend_Media_Id3_NumberFrame.html">Zend_Media_Id3_NumberFrame</a>
+					</td>
+					<td>
+											A base class for all the text frames representing an unsigned integer.
+										</td>
+				</tr>
+							</table>
+		</div>
+	</div>
+
+
+	<a name="sec-var-summary"></a>
+	<div class="info-box">
+		<div class="info-box-title">Variable Summary</span></div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+							<a href="#sec-descendents">Descendants</a> |
+						<span class="disabled">Vars</span> (<a href="#sec-vars">details</a>)
+							| 
+									<a href="#sec-method-summary">Methods</a> (<a href="#sec-methods">details</a>)
+							
+															<a href="#sec-consts">Constants</a>
+							
+					</div>
+		<div class="info-box-body">
+			<div class="var-summary">
+																																<div class="var-title">
+					<img src="../../media/images/Variable.png" alt=" " />
+					<span class="var-type">integer</span>
+					<a href="#$_encoding" title="details" class="var-name">$_encoding</a>
+				</div>
+																<div class="var-title">
+					<img src="../../media/images/Variable.png" alt=" " />
+					<span class="var-type">string</span>
+					<a href="#$_text" title="details" class="var-name">$_text</a>
+				</div>
+											</div>
+		</div>
+	</div>
+
+	<a name="sec-method-summary"></a>
+	<div class="info-box">
+		<div class="info-box-title">Method Summary</span></div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+							<a href="#sec-descendents">Descendants</a> |
+															<a href="#sec-consts">Constants</a>
+							
+															<a href="#sec-var-summary">Vars</a> (<a href="#sec-vars">details</a>)
+				 
+				|
+						<span class="disabled">Methods</span> (<a href="#sec-methods">details</a>)
+		</div>
+		<div class="info-box-body">			
+			<div class="method-summary">
+																																																																								<div class="method-definition">
+					<img src="../../media/images/Constructor.png" alt=" "/>
+											<span class="method-result">Zend_Media_Id3_TextFrame</span>
+										<a href="#__construct" title="details" class="method-name">__construct</a>
+											([<span class="var-type"><a href="../../Zend_Io/Zend_Io_Reader.html">Zend_Io_Reader</a></span>&nbsp;<span class="var-name">$reader</span> = <span class="var-default">null</span>], [<span class="var-type"></span>&nbsp;<span class="var-name">&$options</span> = <span class="var-default">array()</span>], <span class="var-type">Array</span>&nbsp;<span class="var-name">$options</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getEncoding" title="details" class="method-name">getEncoding</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">string</span>
+										<a href="#getText" title="details" class="method-name">getText</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">Array</span>
+										<a href="#getTexts" title="details" class="method-name">getTexts</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#setEncoding" title="details" class="method-name">setEncoding</a>
+											(<span class="var-type">integer</span>&nbsp;<span class="var-name">$encoding</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#setText" title="details" class="method-name">setText</a>
+											(<span class="var-type">mixed</span>&nbsp;<span class="var-name">$text</span>, [<span class="var-type">integer</span>&nbsp;<span class="var-name">$encoding</span> = <span class="var-default">null</span>])
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#_writeData" title="details" class="method-name">_writeData</a>
+											(<span class="var-type"><a href="../../Zend_Io/Zend_Io_Writer.html">Zend_Io_Writer</a></span>&nbsp;<span class="var-name">$writer</span>)
+									</div>
+											</div>
+		</div>
+	</div>		
+
+	<a name="sec-vars"></a>
+	<div class="info-box">
+		<div class="info-box-title">Variables</div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+							<a href="#sec-descendents">Descendents</a> |
+										<a href="#sec-var-summary">Vars</a> (<span class="disabled">details</span>)
+						
+			
+												<a href="#sec-consts">Constants</a>
+							
+										| 
+									<a href="#sec-method-summary">Methods</a> (<a href="#sec-methods">details</a>)
+							
+					</div>
+		<div class="info-box-body">
+			
+<a name="var$_encoding" id="$_encoding"><!-- --></A>
+<div class="oddrow">
+
+	<div class="var-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="var-title">
+			<span class="var-type">integer</span>
+			<span class="var-name">$_encoding</span>
+						(line <span class="line-number">48</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">The text encoding.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> protected</li>
+			</ul>
+	
+	
+		
+		
+
+</div>
+<a name="var$_text" id="$_text"><!-- --></A>
+<div class="evenrow">
+
+	<div class="var-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="var-title">
+			<span class="var-type">string</span>
+			<span class="var-name">$_text</span>
+						(line <span class="line-number">55</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">The text array.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> protected</li>
+			</ul>
+	
+	
+		
+		
+
+</div>
+							<h4>Inherited Variables</h4>
+				<A NAME='inherited_vars'><!-- --></A>
+									<p>Inherited from <span class="classname"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Object.html">Zend_Media_Id3_Object</a></span></p>
+					<blockquote>
+													<img src="../../media/images/Variable.png" />
+							<span class="var-title">
+								<span class="var-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Object.html#var$_reader">Zend_Media_Id3_Object::$_reader</a></span><br>
+							</span>
+											</blockquote> 
+										
+		</div>
+	</div>
+	
+	<a name="sec-methods"></a>
+	<div class="info-box">
+		<div class="info-box-title">Methods</div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+							<a href="#sec-descendents">Descendents</a> |
+															<a href="#sec-var-summary">Vars</a> (<a href="#sec-vars">details</a>)
+														<a href="#sec-method-summary">Methods</a> (<span class="disabled">details</span>)
+						
+		</div>
+		<div class="info-box-body">
+			<A NAME='method_detail'></A>
+<a name="method__construct" id="__construct"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Constructor.png" />
+		<span class="method-title">Constructor __construct</span> (line <span class="line-number">64</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Constructs the class with given parameters and parses object related  data.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">Zend_Media_Id3_TextFrame</span>
+		<span class="method-name">
+			__construct
+		</span>
+					([<span class="var-type"><a href="../../Zend_Io/Zend_Io_Reader.html">Zend_Io_Reader</a></span>&nbsp;<span class="var-name">$reader</span> = <span class="var-default">null</span>], [<span class="var-type"></span>&nbsp;<span class="var-name">&$options</span> = <span class="var-default">array()</span>], <span class="var-type">Array</span>&nbsp;<span class="var-name">$options</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type"><a href="../../Zend_Io/Zend_Io_Reader.html">Zend_Io_Reader</a></span>
+				<span class="var-name">$reader</span><span class="var-description">: The reader object.</span>			</li>
+					<li>
+				<span class="var-type">Array</span>
+				<span class="var-name">$options</span><span class="var-description">: The options array.</span>			</li>
+					<li>
+				<span class="var-type"></span>
+				<span class="var-name">&$options</span>			</li>
+				</ul>
+		
+			<hr class="separator" />
+		<div class="notes">Redefinition of:</div>
+		<dl>
+			<dt><a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame.html#method__construct">Zend_Media_Id3_Frame::__construct()</a></dt>
+						<dd>Constructs the class with given parameters and reads object related data  from the ID3v2 tag.</dd>
+					</dl>
+			
+			<hr class="separator" />
+		<div class="notes">Redefined in descendants as:</div>
+		<ul class="redefinitions">
+					<li>
+				<a href="../../Zend_Media/ID3/Zend_Media_Id3_DateFrame.html#method__construct">Zend_Media_Id3_DateFrame::__construct()</a>
+								: Constructs the class with given parameters and parses object related  data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Time.html#method__construct">Zend_Media_Id3_Frame_Time::__construct()</a>
+								: Constructs the class with given parameters and parses object related  data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tory.html#method__construct">Zend_Media_Id3_Frame_Tory::__construct()</a>
+								: Constructs the class with given parameters and parses object related  data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tyer.html#method__construct">Zend_Media_Id3_Frame_Tyer::__construct()</a>
+								: Constructs the class with given parameters and parses object related  data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tpos.html#method__construct">Zend_Media_Id3_Frame_Tpos::__construct()</a>
+								: Constructs the class with given parameters and parses object related  data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Trck.html#method__construct">Zend_Media_Id3_Frame_Trck::__construct()</a>
+								: Constructs the class with given parameters and parses object related  data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tsrc.html#method__construct">Zend_Media_Id3_Frame_Tsrc::__construct()</a>
+								: Constructs the class with given parameters and parses object related  data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Txxx.html#method__construct">Zend_Media_Id3_Frame_Txxx::__construct()</a>
+								: Constructs the class with given parameters and parses object related  data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ID3/Zend_Media_Id3_NumberFrame.html#method__construct">Zend_Media_Id3_NumberFrame::__construct()</a>
+								: Constructs the class with given parameters and parses object related  data.
+							</li>
+				</ul>
+	</div>
+<a name="methodgetEncoding" id="getEncoding"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getEncoding</span> (line <span class="line-number">108</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the text encoding.</p>
+<p class="description"><p>All the strings read from a file are automatically converted to the  character encoding specified with the <var>encoding</var> option. See  <a href="../../Zend_Media/ID3/Zend_Media_Id3v2.html">Zend_Media_Id3v2</a> for details. This method returns that character  encoding, or any value set after read, translated into a string form  regardless if it was set using a <a href="../../Zend_Media/ID3/Zend_Media_Id3_Encoding.html">Zend_Media_Id3_Encoding</a> constant  or a string.</p></p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getEncoding
+		</span>
+				()
+			</div>
+	
+		
+				<hr class="separator" />
+		<div class="notes">Implementation of:</div>
+			<dl>
+			<dt><a href="../../Zend_Media/ID3/Zend_Media_Id3_Encoding.html#methodgetEncoding">Zend_Media_Id3_Encoding::getEncoding()</a></dt>
+						<dd>Returns the text encoding.</dd>
+					</dl>
+			
+	</div>
+<a name="methodgetText" id="getText"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getText</span> (line <span class="line-number">138</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the first text chunk the frame contains.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">string</span>
+		<span class="method-name">
+			getText
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetTexts" id="getTexts"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getTexts</span> (line <span class="line-number">148</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns an array of texts the frame contains.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">Array</span>
+		<span class="method-name">
+			getTexts
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodsetEncoding" id="setEncoding"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">setEncoding</span> (line <span class="line-number">128</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Sets the text encoding.</p>
+<p class="description"><p>All the string written to the frame are done so using given character  encoding. No conversions of existing data take place upon the call to  this method thus all texts must be given in given character encoding.</p><p>The character encoding parameter takes either a  <a href="../../Zend_Media/ID3/Zend_Media_Id3_Encoding.html">Zend_Media_Id3_Encoding</a> constant or a character set name string  in the form accepted by iconv. The default character encoding used to  write the frame is 'utf-8'.</p></p>
+	<ul class="tags">
+				<li><span class="field">see:</span> <a href="../../Zend_Media/ID3/Zend_Media_Id3_Encoding.html">Zend_Media_Id3_Encoding</a></li>
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			setEncoding
+		</span>
+					(<span class="var-type">integer</span>&nbsp;<span class="var-name">$encoding</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type">integer</span>
+				<span class="var-name">$encoding</span><span class="var-description">: The text encoding.</span>			</li>
+				</ul>
+		
+				<hr class="separator" />
+		<div class="notes">Implementation of:</div>
+			<dl>
+			<dt><a href="../../Zend_Media/ID3/Zend_Media_Id3_Encoding.html#methodsetEncoding">Zend_Media_Id3_Encoding::setEncoding()</a></dt>
+						<dd>Sets the text encoding.</dd>
+					</dl>
+			
+	</div>
+<a name="methodsetText" id="setText"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">setText</span> (line <span class="line-number">159</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Sets the text using given encoding.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			setText
+		</span>
+					(<span class="var-type">mixed</span>&nbsp;<span class="var-name">$text</span>, [<span class="var-type">integer</span>&nbsp;<span class="var-name">$encoding</span> = <span class="var-default">null</span>])
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type">mixed</span>
+				<span class="var-name">$text</span><span class="var-description">: The text string or an array of strings.</span>			</li>
+					<li>
+				<span class="var-type">integer</span>
+				<span class="var-name">$encoding</span><span class="var-description">: The text encoding.</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="method_writeData" id="_writeData"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">_writeData</span> (line <span class="line-number">173</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Writes the frame raw data without the header.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> protected</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			_writeData
+		</span>
+					(<span class="var-type"><a href="../../Zend_Io/Zend_Io_Writer.html">Zend_Io_Writer</a></span>&nbsp;<span class="var-name">$writer</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type"><a href="../../Zend_Io/Zend_Io_Writer.html">Zend_Io_Writer</a></span>
+				<span class="var-name">$writer</span><span class="var-description">: The writer object.</span>			</li>
+				</ul>
+		
+			<hr class="separator" />
+		<div class="notes">Redefinition of:</div>
+		<dl>
+			<dt><a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame.html#method_writeData">Zend_Media_Id3_Frame::_writeData()</a></dt>
+						<dd>Writes the frame raw data without the header.</dd>
+					</dl>
+			
+			<hr class="separator" />
+		<div class="notes">Redefined in descendants as:</div>
+		<ul class="redefinitions">
+					<li>
+				<a href="../../Zend_Media/ID3/Zend_Media_Id3_DateFrame.html#method_writeData">Zend_Media_Id3_DateFrame::_writeData()</a>
+								: Writes the frame raw data without the header.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Tsrc.html#method_writeData">Zend_Media_Id3_Frame_Tsrc::_writeData()</a>
+								: Writes the frame raw data without the header.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame_Txxx.html#method_writeData">Zend_Media_Id3_Frame_Txxx::_writeData()</a>
+								: Writes the frame raw data without the header.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ID3/Zend_Media_Id3_NumberFrame.html#method_writeData">Zend_Media_Id3_NumberFrame::_writeData()</a>
+								: Writes the frame raw data without the header.
+							</li>
+				</ul>
+	</div>
+							<h4>Inherited Methods</h4>
+				<a name='inherited_methods'><!-- --></a>	
+									<!-- =========== Summary =========== -->
+					<p>Inherited From <span class="classname"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame.html">Zend_Media_Id3_Frame</a></span></p>
+					<blockquote>
+													<img src="../../media/images/Constructor.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame.html#method__construct">Zend_Media_Id3_Frame::__construct()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame.html#methodgetFlags">Zend_Media_Id3_Frame::getFlags()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame.html#methodgetIdentifier">Zend_Media_Id3_Frame::getIdentifier()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame.html#methodgetSize">Zend_Media_Id3_Frame::getSize()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame.html#methodhasFlag">Zend_Media_Id3_Frame::hasFlag()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame.html#methodsetFlags">Zend_Media_Id3_Frame::setFlags()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame.html#methodsetIdentifier">Zend_Media_Id3_Frame::setIdentifier()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame.html#methodwrite">Zend_Media_Id3_Frame::write()</a></span><br>
+													<img src="../../media/images/AbstractMethod.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame.html#method_writeData">Zend_Media_Id3_Frame::_writeData()</a></span><br>
+											</blockquote>
+									<!-- =========== Summary =========== -->
+					<p>Inherited From <span class="classname"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Object.html">Zend_Media_Id3_Object</a></span></p>
+					<blockquote>
+													<img src="../../media/images/Constructor.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Object.html#method__construct">Zend_Media_Id3_Object::__construct()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Object.html#methodclearOption">Zend_Media_Id3_Object::clearOption()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Object.html#methodgetOption">Zend_Media_Id3_Object::getOption()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Object.html#methodgetOptions">Zend_Media_Id3_Object::getOptions()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Object.html#methodsetOption">Zend_Media_Id3_Object::setOption()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Object.html#methodsetOptions">Zend_Media_Id3_Object::setOptions()</a></span><br>
+													<img src="../../media/images/AbstractMethod.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Object.html#methodwrite">Zend_Media_Id3_Object::write()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Object.html#method_convertString">Zend_Media_Id3_Object::_convertString()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Object.html#method_decodeSynchsafe32">Zend_Media_Id3_Object::_decodeSynchsafe32()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Object.html#method_decodeUnsynchronisation">Zend_Media_Id3_Object::_decodeUnsynchronisation()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Object.html#method_encodeSynchsafe32">Zend_Media_Id3_Object::_encodeSynchsafe32()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Object.html#method_encodeUnsynchronisation">Zend_Media_Id3_Object::_encodeUnsynchronisation()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Object.html#method_explodeString8">Zend_Media_Id3_Object::_explodeString8()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Object.html#method_explodeString16">Zend_Media_Id3_Object::_explodeString16()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Object.html#method_translateEncodingToInt">Zend_Media_Id3_Object::_translateEncodingToInt()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Object.html#method_translateIntToEncoding">Zend_Media_Id3_Object::_translateIntToEncoding()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Object.html#method__get">Zend_Media_Id3_Object::__get()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Object.html#method__set">Zend_Media_Id3_Object::__set()</a></span><br>
+											</blockquote>
+										
+		</div>
+	</div>
+
+	<a name="sec-consts"></a>
+	<div class="info-box">
+		<div class="info-box-title">Class Constants</div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+							<a href="#sec-descendents">Descendants</a> |
+										<a href="#sec-var-summary">Constants</a> (<span class="disabled">details</span>)
+						
+			
+												<a href="#sec-var-summary">Vars</a> (<a href="#sec-vars">details</a>)
+														| 
+									<a href="#sec-method-summary">Methods</a> (<a href="#sec-methods">details</a>)
+							
+					</div>
+		<div class="info-box-body">
+										<h4>Inherited Constants</h4>
+				<A NAME='inherited_consts'><!-- --></A>
+									<p>Inherited from <span class="classname"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame.html">Zend_Media_Id3_Frame</a></span></p>
+					<blockquote>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame.html#constCOMPRESSION">Zend_Media_Id3_Frame::COMPRESSION</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame.html#constDATA_LENGTH_INDICATOR">Zend_Media_Id3_Frame::DATA_LENGTH_INDICATOR</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame.html#constDISCARD_ON_FILECHANGE">Zend_Media_Id3_Frame::DISCARD_ON_FILECHANGE</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame.html#constDISCARD_ON_TAGCHANGE">Zend_Media_Id3_Frame::DISCARD_ON_TAGCHANGE</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame.html#constENCRYPTION">Zend_Media_Id3_Frame::ENCRYPTION</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame.html#constGROUPING_IDENTITY">Zend_Media_Id3_Frame::GROUPING_IDENTITY</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame.html#constREAD_ONLY">Zend_Media_Id3_Frame::READ_ONLY</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ID3/Zend_Media_Id3_Frame.html#constUNSYNCHRONISATION">Zend_Media_Id3_Frame::UNSYNCHRONISATION</a></span><br>
+							</span>
+											</blockquote> 
+										
+		</div>
+	</div>
+	
+	<p class="notes" id="credit">
+		Documentation generated on Wed, 04 May 2011 08:36:59 +0300 by <a href="http://www.phpdoc.org" target="_blank">phpDocumentor 1.4.3</a>
+	</p>
+	</div></body>
+</html>

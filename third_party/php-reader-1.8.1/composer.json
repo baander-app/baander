@@ -1,0 +1,12 @@
+{
+    "name": "zend/php-reader",
+    "version": "1.8.1",
+    "type": "library",
+    "description": "The best PHP library for Object-Oriented media file information reading and writing.",
+    "homepage": "https://code.google.com/p/php-reader/",
+    "autoload": {
+        "psr-0" : {
+            "Zend_" : "lib/"
+        }
+    }
+}

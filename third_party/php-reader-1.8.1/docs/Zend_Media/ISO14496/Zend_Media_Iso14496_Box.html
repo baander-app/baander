@@ -1,0 +1,2362 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+  <html xmlns="http://www.w3.org/1999/xhtml">
+		<head>
+			<!-- template designed by Marco Von Ballmoos -->
+			<title>Docs For Class Zend_Media_Iso14496_Box</title>
+			<link rel="stylesheet" href="../../media/stylesheet.css" />
+			<meta http-equiv='Content-Type' content='text/html; charset=iso-8859-1'/>
+		</head>
+		<body>
+			<div class="page-body">			
+<h2 class="class-name"><img src="../../media/images/Class_logo.png"
+														alt=" Class"
+														title=" Class"
+														style="vertical-align: middle"> Zend_Media_Iso14496_Box</h2>
+
+<a name="sec-description"></a>
+<div class="info-box">
+	<div class="info-box-title">Description</div>
+	<div class="nav-bar">
+					<span class="disabled">Description</span> |
+							<a href="#sec-descendents">Descendents</a>
+			|											<a href="#sec-var-summary">Vars</a> (<a href="#sec-vars">details</a>)
+						|											<a href="#sec-method-summary">Methods</a> (<a href="#sec-methods">details</a>)
+						
+					</div>
+	<div class="info-box-body">
+        		<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">A base class for all ISO 14496-12 boxes.</p>
+	<ul class="tags">
+				<li><span class="field">author:</span> Sven Vollbehr &lt;<a href="mailto:sven@vollbehr.eu">sven@vollbehr.eu</a>&gt;</li>
+				<li><span class="field">version:</span> $Id: Box.php 177 2010-03-09 13:13:34Z svollbehr $</li>
+				<li><span class="field">copyright:</span> Copyright (c) 2005-2009 Zend Technologies USA Inc. (http://www.zend.com)</li>
+				<li><span class="field">license:</span> <a href="http://framework.zend.com/license/new-bsd">New BSD License</a></li>
+			</ul>
+		<p class="notes">
+			Located in <a class="field" href="_Media---Iso14496---Box.php.html">/Media/Iso14496/Box.php</a> (line <span class="field">46</span>)
+		</p>
+		
+				
+		<pre></pre>
+	
+			</div>
+</div>
+
+	<a name="sec-descendents"></a>
+	<div class="info-box">
+		<div class="info-box-title">Direct descendents</div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+			<span class="disabled">Descendents</span>
+			|												<a href="#sec-var-summary">Vars</a> (<a href="#sec-vars">details</a>)
+								|															<a href="#sec-method-summary">Methods</a> (<a href="#sec-methods">details</a>)
+							
+								</div>
+		<div class="info-box-body">
+			<table cellpadding="2" cellspacing="0" class="class-table">
+				<tr>
+					<th class="class-table-header">Class</th>
+					<th class="class-table-header">Description</th>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496.html">Zend_Media_Iso14496</a>
+					</td>
+					<td>
+											This class represents a file in ISO base media file format as described in  ISO/IEC 14496 Part 12 standard.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Cdsc.html">Zend_Media_Iso14496_Box_Cdsc</a>
+					</td>
+					<td>
+											This box provides a reference from the containing track to another track in  the presentation. This track describes the referenced track.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Dinf.html">Zend_Media_Iso14496_Box_Dinf</a>
+					</td>
+					<td>
+											The <em>Data Information Box</em> contains objects that declare the location  of the media information in a track.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Edts.html">Zend_Media_Iso14496_Box_Edts</a>
+					</td>
+					<td>
+											The <em>Edit Box</em> maps the presentation time-line to the media time-line as  it is stored in the file. The Edit Box is a container for the edit lists.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Free.html">Zend_Media_Iso14496_Box_Free</a>
+					</td>
+					<td>
+											The contents of a <em>Free Space Box</em> are irrelevant and may be ignored, or  the object deleted, without affecting the presentation. (Care should be  exercised when deleting the object, as this may invalidate the offsets used  in the sample table, unless this object is after all the media data).
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Frma.html">Zend_Media_Iso14496_Box_Frma</a>
+					</td>
+					<td>
+											The <em>Original Format Box</em> contains the four-character-code of the  original un-transformed sample description.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Ftyp.html">Zend_Media_Iso14496_Box_Ftyp</a>
+					</td>
+					<td>
+											The <em>File Type Box</em> is placed as early as possible in the file (e.g.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Hint.html">Zend_Media_Iso14496_Box_Hint</a>
+					</td>
+					<td>
+											This box provides a reference from the containing track to another track in  the presentation. The referenced track(s) contain the original media for this  hint track.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Iinf.html">Zend_Media_Iso14496_Box_Iinf</a>
+					</td>
+					<td>
+											The <em>Item Information Box</em> provides extra information about selected
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Iloc.html">Zend_Media_Iso14496_Box_Iloc</a>
+					</td>
+					<td>
+											The <em>The Item Location Box</em> provides a directory of resources in this or
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Ilst.html">Zend_Media_Iso14496_Box_Ilst</a>
+					</td>
+					<td>
+											A container box for all the iTunes/iPod specific boxes. A list of well known  boxes is provided in the following table. The value for each box is contained  in a nested <a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Data.html">Data Box</a>.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Imif.html">Zend_Media_Iso14496_Box_Imif</a>
+					</td>
+					<td>
+											The <em>IPMP Information Box</em> contains IPMP Descriptors which document the  protection applied to the stream.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Ipro.html">Zend_Media_Iso14496_Box_Ipro</a>
+					</td>
+					<td>
+											The <em>Item Protection Box</em> provides an array of item protection  information, for use by the  <a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Iinf.html">Item Information Box</a>.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mdia.html">Zend_Media_Iso14496_Box_Mdia</a>
+					</td>
+					<td>
+											The <em>Media Box</em> contains all the objects that declare information about  the media data within a track.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mfra.html">Zend_Media_Iso14496_Box_Mfra</a>
+					</td>
+					<td>
+											The <em>Movie Fragment Random Access Box</em> provides a table which may assist
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Minf.html">Zend_Media_Iso14496_Box_Minf</a>
+					</td>
+					<td>
+											The <em>Media Information Box</em> contains all the objects that declare  characteristic information of the media in the track.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Moof.html">Zend_Media_Iso14496_Box_Moof</a>
+					</td>
+					<td>
+											The <em>Movie Fragment Box</em> extend the presentation in time. They provide
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Moov.html">Zend_Media_Iso14496_Box_Moov</a>
+					</td>
+					<td>
+											The metadata for a presentation is stored in the single <em>Movie Box</em>  which occurs at the top-level of a file. Normally this box is close to the  beginning or end of the file, though this is not required.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mvex.html">Zend_Media_Iso14496_Box_Mvex</a>
+					</td>
+					<td>
+											The <em>Movie Extends Box</em> warns readers that there might be
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Schi.html">Zend_Media_Iso14496_Box_Schi</a>
+					</td>
+					<td>
+											The <em>Scheme Information Box</em> is a container Box that is only interpreted
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Sinf.html">Zend_Media_Iso14496_Box_Sinf</a>
+					</td>
+					<td>
+											The <em>Protection Scheme Information Box</em> contains all the information
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Skip.html">Zend_Media_Iso14496_Box_Skip</a>
+					</td>
+					<td>
+											The contents of a <em>Free Space Box</em> are irrelevant and may be ignored, or  the object deleted, without affecting the presentation. (Care should be  exercised when deleting the object, as this may invalidate the offsets used  in the sample table, unless this object is after all the media data).
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stbl.html">Zend_Media_Iso14496_Box_Stbl</a>
+					</td>
+					<td>
+											The <em>Sample Table Box</em> contains all the time and data indexing of the  media samples in a track. Using the tables here, it is possible to locate  samples in time, determine their type (e.g. I-frame or not), and determine  their size, container, and offset into that container.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Traf.html">Zend_Media_Iso14496_Box_Traf</a>
+					</td>
+					<td>
+											Within the <em>Track Fragment Box</em> there is a set of track fragments, zero  or more per track. The track fragments in turn contain zero or more track  runs, each of which document a contiguous run of samples for that track.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Trak.html">Zend_Media_Iso14496_Box_Trak</a>
+					</td>
+					<td>
+											The <em>Track Box</em> is a container box for a single track of a presentation.
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Tref.html">Zend_Media_Iso14496_Box_Tref</a>
+					</td>
+					<td>
+											The <em>Track Reference Box</em> provides a reference from the containing track
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/Class.png"
+								 alt=" class"
+								 title=" class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Udta.html">Zend_Media_Iso14496_Box_Udta</a>
+					</td>
+					<td>
+											The <em>User Data Box</em> contains objects that declare user information about  the containing box and its data (presentation or track).
+										</td>
+				</tr>
+								<tr>
+					<td style="padding-right: 2em; white-space: nowrap">
+						<img src="../../media/images/AbstractClass.png"
+								 alt="Abstract class"
+								 title="Abstract class"
+								 style="vertical-align: center"/>
+						<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_FullBox.html">Zend_Media_Iso14496_FullBox</a>
+					</td>
+					<td>
+											A base class for objects that also contain a version number and flags field.
+										</td>
+				</tr>
+							</table>
+		</div>
+	</div>
+
+
+	<a name="sec-var-summary"></a>
+	<div class="info-box">
+		<div class="info-box-title">Variable Summary</span></div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+							<a href="#sec-descendents">Descendants</a> |
+						<span class="disabled">Vars</span> (<a href="#sec-vars">details</a>)
+							| 
+									<a href="#sec-method-summary">Methods</a> (<a href="#sec-methods">details</a>)
+							
+								</div>
+		<div class="info-box-body">
+			<div class="var-summary">
+																								<div class="var-title">
+					<img src="../../media/images/Variable.png" alt=" " />
+					<span class="var-type">Reader</span>
+					<a href="#$_reader" title="details" class="var-name">$_reader</a>
+				</div>
+											</div>
+		</div>
+	</div>
+
+	<a name="sec-method-summary"></a>
+	<div class="info-box">
+		<div class="info-box-title">Method Summary</span></div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+							<a href="#sec-descendents">Descendants</a> |
+																		<a href="#sec-var-summary">Vars</a> (<a href="#sec-vars">details</a>)
+				 
+				|
+						<span class="disabled">Methods</span> (<a href="#sec-methods">details</a>)
+		</div>
+		<div class="info-box-body">			
+			<div class="method-summary">
+																																																																																																																																																																																																																																																																																								<div class="method-definition">
+					<img src="../../media/images/Constructor.png" alt=" "/>
+											<span class="method-result">Zend_Media_Iso14496_Box</span>
+										<a href="#__construct" title="details" class="method-name">__construct</a>
+											(<span class="var-type"><a href="../../Zend_Io/Zend_Io_Reader.html">Zend_Io_Reader</a></span>&nbsp;<span class="var-name">$reader</span>, [<span class="var-type"></span>&nbsp;<span class="var-name">&$options</span> = <span class="var-default">array()</span>], <span class="var-type">Array</span>&nbsp;<span class="var-name">$options</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Destructor.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#__destruct" title="details" class="method-name">__destruct</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result"><a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box.html">Zend_Media_Iso14496_Box</a></span>
+										<a href="#addBox" title="details" class="method-name">addBox</a>
+											(<span class="var-type"></span>&nbsp;<span class="var-name">&$box</span>, <span class="var-type"><a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box.html">Zend_Media_Iso14496_Box</a></span>&nbsp;<span class="var-name">$box</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#clearOption" title="details" class="method-name">clearOption</a>
+											(<span class="var-type">string</span>&nbsp;<span class="var-name">$option</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#constructBoxes" title="details" class="method-name">constructBoxes</a>
+											([<span class="var-type"></span>&nbsp;<span class="var-name">$defaultclassname</span> = <span class="var-default">'Zend_Media_Iso14496_Box'</span>])
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getBoxCount" title="details" class="method-name">getBoxCount</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">Array</span>
+										<a href="#getBoxes" title="details" class="method-name">getBoxes</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">Array</span>
+										<a href="#getBoxesByIdentifier" title="details" class="method-name">getBoxesByIdentifier</a>
+											(<span class="var-type">string</span>&nbsp;<span class="var-name">$identifier</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">boolean</span>
+										<a href="#getContainer" title="details" class="method-name">getContainer</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getHeapSize" title="details" class="method-name">getHeapSize</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getOffset" title="details" class="method-name">getOffset</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#getOption" title="details" class="method-name">getOption</a>
+											(<span class="var-type">string</span>&nbsp;<span class="var-name">$option</span>, [<span class="var-type">mixed</span>&nbsp;<span class="var-name">$defaultValue</span> = <span class="var-default">null</span>])
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">Array</span>
+										<a href="#getOptions" title="details" class="method-name">&amp;getOptions</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result"><a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box.html">Zend_Media_Iso14496_Box</a></span>
+										<a href="#getParent" title="details" class="method-name">getParent</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getSize" title="details" class="method-name">getSize</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">string</span>
+										<a href="#getType" title="details" class="method-name">getType</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">boolean</span>
+										<a href="#hasBox" title="details" class="method-name">hasBox</a>
+											(<span class="var-type">string</span>&nbsp;<span class="var-name">$identifier</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">boolean</span>
+										<a href="#isContainer" title="details" class="method-name">isContainer</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#removeBox" title="details" class="method-name">removeBox</a>
+											(<span class="var-type"><a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box.html">Zend_Media_Iso14496_Box</a></span>&nbsp;<span class="var-name">$box</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#removeBoxesByIdentifier" title="details" class="method-name">removeBoxesByIdentifier</a>
+											(<span class="var-type">string</span>&nbsp;<span class="var-name">$identifier</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#setContainer" title="details" class="method-name">setContainer</a>
+											(<span class="var-type">boolean</span>&nbsp;<span class="var-name">$container</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#setOffset" title="details" class="method-name">setOffset</a>
+											(<span class="var-type">integer</span>&nbsp;<span class="var-name">$offset</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#setOption" title="details" class="method-name">setOption</a>
+											(<span class="var-type">string</span>&nbsp;<span class="var-name">$option</span>, <span class="var-type">mixed</span>&nbsp;<span class="var-name">$value</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#setOptions" title="details" class="method-name">setOptions</a>
+											(<span class="var-type"></span>&nbsp;<span class="var-name">&$options</span>, <span class="var-type">Array</span>&nbsp;<span class="var-name">$options</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#setParent" title="details" class="method-name">setParent</a>
+											(<span class="var-type"></span>&nbsp;<span class="var-name">&$parent</span>, <span class="var-type"><a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box.html">Zend_Media_Iso14496_Box</a></span>&nbsp;<span class="var-name">$parent</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#setSize" title="details" class="method-name">setSize</a>
+											(<span class="var-type">integer</span>&nbsp;<span class="var-name">$size</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#setType" title="details" class="method-name">setType</a>
+											(<span class="var-type">string</span>&nbsp;<span class="var-name">$type</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#write" title="details" class="method-name">write</a>
+											(<span class="var-type"><a href="../../Zend_Io/Zend_Io_Writer.html">Zend_Io_Writer</a></span>&nbsp;<span class="var-name">$writer</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#_writeData" title="details" class="method-name">_writeData</a>
+											(<span class="var-type"><a href="../../Zend_Io/Zend_Io_Writer.html">Zend_Io_Writer</a></span>&nbsp;<span class="var-name">$writer</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">mixed</span>
+										<a href="#__get" title="details" class="method-name">__get</a>
+											(<span class="var-type">string</span>&nbsp;<span class="var-name">$name</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">boolean</span>
+										<a href="#__isset" title="details" class="method-name">__isset</a>
+											(<span class="var-type">string</span>&nbsp;<span class="var-name">$name</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">mixed</span>
+										<a href="#__set" title="details" class="method-name">__set</a>
+											(<span class="var-type">string</span>&nbsp;<span class="var-name">$name</span>, <span class="var-type">string</span>&nbsp;<span class="var-name">$value</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#__unset" title="details" class="method-name">__unset</a>
+											(<span class="var-type">string</span>&nbsp;<span class="var-name">$name</span>)
+									</div>
+											</div>
+		</div>
+	</div>		
+
+	<a name="sec-vars"></a>
+	<div class="info-box">
+		<div class="info-box-title">Variables</div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+							<a href="#sec-descendents">Descendents</a> |
+										<a href="#sec-var-summary">Vars</a> (<span class="disabled">details</span>)
+						
+			
+										| 
+									<a href="#sec-method-summary">Methods</a> (<a href="#sec-methods">details</a>)
+							
+					</div>
+		<div class="info-box-body">
+			
+<a name="var$_reader" id="$_reader"><!-- --></A>
+<div class="oddrow">
+
+	<div class="var-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="var-title">
+			<span class="var-type">Reader</span>
+			<span class="var-name">$_reader</span>
+						(line <span class="line-number">53</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">The reader object.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> protected</li>
+			</ul>
+	
+	
+		
+		
+
+</div>
+						
+		</div>
+	</div>
+	
+	<a name="sec-methods"></a>
+	<div class="info-box">
+		<div class="info-box-title">Methods</div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+							<a href="#sec-descendents">Descendents</a> |
+															<a href="#sec-var-summary">Vars</a> (<a href="#sec-vars">details</a>)
+														<a href="#sec-method-summary">Methods</a> (<span class="disabled">details</span>)
+						
+		</div>
+		<div class="info-box-body">
+			<A NAME='method_detail'></A>
+<a name="method__construct" id="__construct"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Constructor.png" />
+		<span class="method-title">Constructor __construct</span> (line <span class="line-number">85</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Constructs the class with given parameters and options.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">Zend_Media_Iso14496_Box</span>
+		<span class="method-name">
+			__construct
+		</span>
+					(<span class="var-type"><a href="../../Zend_Io/Zend_Io_Reader.html">Zend_Io_Reader</a></span>&nbsp;<span class="var-name">$reader</span>, [<span class="var-type"></span>&nbsp;<span class="var-name">&$options</span> = <span class="var-default">array()</span>], <span class="var-type">Array</span>&nbsp;<span class="var-name">$options</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type"><a href="../../Zend_Io/Zend_Io_Reader.html">Zend_Io_Reader</a></span>
+				<span class="var-name">$reader</span><span class="var-description">: The reader object.</span>			</li>
+					<li>
+				<span class="var-type">Array</span>
+				<span class="var-name">$options</span><span class="var-description">: The options array.</span>			</li>
+					<li>
+				<span class="var-type"></span>
+				<span class="var-name">&$options</span>			</li>
+				</ul>
+		
+			
+			<hr class="separator" />
+		<div class="notes">Redefined in descendants as:</div>
+		<ul class="redefinitions">
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496.html#method__construct">Zend_Media_Iso14496::__construct()</a>
+								: Constructs the Zend_Media_Iso14496 class with given file and options.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Cdsc.html#method__construct">Zend_Media_Iso14496_Box_Cdsc::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Dinf.html#method__construct">Zend_Media_Iso14496_Box_Dinf::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Edts.html#method__construct">Zend_Media_Iso14496_Box_Edts::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Free.html#method__construct">Zend_Media_Iso14496_Box_Free::__construct()</a>
+								: Constructs the class with given parameters.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Frma.html#method__construct">Zend_Media_Iso14496_Box_Frma::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Ftyp.html#method__construct">Zend_Media_Iso14496_Box_Ftyp::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Hint.html#method__construct">Zend_Media_Iso14496_Box_Hint::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Iinf.html#method__construct">Zend_Media_Iso14496_Box_Iinf::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Iloc.html#method__construct">Zend_Media_Iso14496_Box_Iloc::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Ilst.html#method__construct">Zend_Media_Iso14496_Box_Ilst::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Imif.html#method__construct">Zend_Media_Iso14496_Box_Imif::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Ipro.html#method__construct">Zend_Media_Iso14496_Box_Ipro::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mdia.html#method__construct">Zend_Media_Iso14496_Box_Mdia::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mfra.html#method__construct">Zend_Media_Iso14496_Box_Mfra::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Minf.html#method__construct">Zend_Media_Iso14496_Box_Minf::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Moof.html#method__construct">Zend_Media_Iso14496_Box_Moof::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Moov.html#method__construct">Zend_Media_Iso14496_Box_Moov::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mvex.html#method__construct">Zend_Media_Iso14496_Box_Mvex::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Schi.html#method__construct">Zend_Media_Iso14496_Box_Schi::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Sinf.html#method__construct">Zend_Media_Iso14496_Box_Sinf::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Skip.html#method__construct">Zend_Media_Iso14496_Box_Skip::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stbl.html#method__construct">Zend_Media_Iso14496_Box_Stbl::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Traf.html#method__construct">Zend_Media_Iso14496_Box_Traf::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Trak.html#method__construct">Zend_Media_Iso14496_Box_Trak::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Tref.html#method__construct">Zend_Media_Iso14496_Box_Tref::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Udta.html#method__construct">Zend_Media_Iso14496_Box_Udta::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_FullBox.html#method__construct">Zend_Media_Iso14496_FullBox::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Bxml.html#method__construct">Zend_Media_Iso14496_Box_Bxml::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Chpl.html#method__construct">Zend_Media_Iso14496_Box_Chpl::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Co64.html#method__construct">Zend_Media_Iso14496_Box_Co64::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Cprt.html#method__construct">Zend_Media_Iso14496_Box_Cprt::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Ctts.html#method__construct">Zend_Media_Iso14496_Box_Ctts::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Dref.html#method__construct">Zend_Media_Iso14496_Box_Dref::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Elst.html#method__construct">Zend_Media_Iso14496_Box_Elst::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Hdlr.html#method__construct">Zend_Media_Iso14496_Box_Hdlr::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Hmhd.html#method__construct">Zend_Media_Iso14496_Box_Hmhd::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Id32.html#method__construct">Zend_Media_Iso14496_Box_Id32::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Data.html#method__construct">Zend_Media_Iso14496_Box_Data::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Infe.html#method__construct">Zend_Media_Iso14496_Box_Infe::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mdhd.html#method__construct">Zend_Media_Iso14496_Box_Mdhd::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mehd.html#method__construct">Zend_Media_Iso14496_Box_Mehd::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Meta.html#method__construct">Zend_Media_Iso14496_Box_Meta::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mfhd.html#method__construct">Zend_Media_Iso14496_Box_Mfhd::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mfro.html#method__construct">Zend_Media_Iso14496_Box_Mfro::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mvhd.html#method__construct">Zend_Media_Iso14496_Box_Mvhd::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Ndrm.html#method__construct">Zend_Media_Iso14496_Box_Ndrm::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Pdin.html#method__construct">Zend_Media_Iso14496_Box_Pdin::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Pitm.html#method__construct">Zend_Media_Iso14496_Box_Pitm::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Sbgp.html#method__construct">Zend_Media_Iso14496_Box_Sbgp::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Schm.html#method__construct">Zend_Media_Iso14496_Box_Schm::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Sdtp.html#method__construct">Zend_Media_Iso14496_Box_Sdtp::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Smhd.html#method__construct">Zend_Media_Iso14496_Box_Smhd::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stco.html#method__construct">Zend_Media_Iso14496_Box_Stco::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stdp.html#method__construct">Zend_Media_Iso14496_Box_Stdp::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stsc.html#method__construct">Zend_Media_Iso14496_Box_Stsc::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stsd.html#method__construct">Zend_Media_Iso14496_Box_Stsd::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stsh.html#method__construct">Zend_Media_Iso14496_Box_Stsh::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stss.html#method__construct">Zend_Media_Iso14496_Box_Stss::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stsz.html#method__construct">Zend_Media_Iso14496_Box_Stsz::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stts.html#method__construct">Zend_Media_Iso14496_Box_Stts::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Tfra.html#method__construct">Zend_Media_Iso14496_Box_Tfra::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Tkhd.html#method__construct">Zend_Media_Iso14496_Box_Tkhd::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Trex.html#method__construct">Zend_Media_Iso14496_Box_Trex::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Url.html#method__construct">Zend_Media_Iso14496_Box_Url::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Urn.html#method__construct">Zend_Media_Iso14496_Box_Urn::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Vmhd.html#method__construct">Zend_Media_Iso14496_Box_Vmhd::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Xml.html#method__construct">Zend_Media_Iso14496_Box_Xml::__construct()</a>
+								: Constructs the class with given parameters and reads box related data  from the ISO Base Media file.
+							</li>
+				</ul>
+	</div>
+<a name="method__destruct" id="__destruct"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Destructor.png" />
+		<span class="method-title">Destructor __destruct</span> (line <span class="line-number">110</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Releases any references to contained boxes and the parent.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			__destruct
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodaddBox" id="addBox"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">addBox</span> (line <span class="line-number">457</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Adds a new box into the current box and returns it.</p>
+	<ul class="tags">
+				<li><span class="field">throws:</span> Zend_Media_Iso14496_Exception if called on a non-container box</li>
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result"><a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box.html">Zend_Media_Iso14496_Box</a></span>
+		<span class="method-name">
+			addBox
+		</span>
+					(<span class="var-type"></span>&nbsp;<span class="var-name">&$box</span>, <span class="var-type"><a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box.html">Zend_Media_Iso14496_Box</a></span>&nbsp;<span class="var-name">$box</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type"><a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box.html">Zend_Media_Iso14496_Box</a></span>
+				<span class="var-name">$box</span><span class="var-description">: The box to add</span>			</li>
+					<li>
+				<span class="var-type"></span>
+				<span class="var-name">&$box</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="methodclearOption" id="clearOption"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">clearOption</span> (line <span class="line-number">168</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Clears the given option value.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			clearOption
+		</span>
+					(<span class="var-type">string</span>&nbsp;<span class="var-name">$option</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type">string</span>
+				<span class="var-name">$option</span><span class="var-description">: The name of the option.</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="methodconstructBoxes" id="constructBoxes"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">constructBoxes</span> (line <span class="line-number">300</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Reads and constructs the boxes found within this box.</p>
+	<ul class="tags">
+				<li><span class="field">todo:</span> Does not parse iTunes internal ---- boxes.</li>
+				<li><span class="field">access:</span> protected</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			constructBoxes
+		</span>
+					([<span class="var-type"></span>&nbsp;<span class="var-name">$defaultclassname</span> = <span class="var-default">'Zend_Media_Iso14496_Box'</span>])
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type"></span>
+				<span class="var-name">$defaultclassname</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="methodgetBoxCount" id="getBoxCount"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getBoxCount</span> (line <span class="line-number">497</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the number of boxes this box contains.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getBoxCount
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetBoxes" id="getBoxes"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getBoxes</span> (line <span class="line-number">378</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns all the boxes the file contains as an associate array. The box  identifiers work as keys having an array of boxes as associated value.</p>
+	<ul class="tags">
+				<li><span class="field">throws:</span> Zend_Media_Iso14496_Exception if called on a non-container box</li>
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">Array</span>
+		<span class="method-name">
+			getBoxes
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetBoxesByIdentifier" id="getBoxesByIdentifier"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getBoxesByIdentifier</span> (line <span class="line-number">403</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns an array of boxes matching the given identifier or an empty array  if no boxes matched the identifier.</p>
+<p class="description"><p>The identifier may contain wildcard characters '*' and '?'. The asterisk  matches against zero or more characters, and the question mark matches  any single character.</p><p>Please note that one may also use the shorthand $obj-&gt;identifier to  access the first box with the identifier given. Wildcards cannot be used  with the shorthand and they will not work with user defined uuid types.</p></p>
+	<ul class="tags">
+				<li><span class="field">throws:</span> Zend_Media_Iso14496_Exception if called on a non-container box</li>
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">Array</span>
+		<span class="method-name">
+			getBoxesByIdentifier
+		</span>
+					(<span class="var-type">string</span>&nbsp;<span class="var-name">$identifier</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type">string</span>
+				<span class="var-name">$identifier</span><span class="var-description">: The box identifier.</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="methodgetContainer" id="getContainer"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getContainer</span> (line <span class="line-number">280</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns a boolean value corresponding to whether the box is a container.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">boolean</span>
+		<span class="method-name">
+			getContainer
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetHeapSize" id="getHeapSize"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getHeapSize</span> (line <span class="line-number">591</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the box heap size in bytes, including the size and</p>
+<p class="description"><p>type header, fields, and all contained boxes. The box size is updated to  reflect that of the heap size upon write. Subclasses should overwrite  this method and call the parent method to get the calculated header and  subbox sizes and then add their own bytes to that.</p></p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getHeapSize
+		</span>
+				()
+			</div>
+	
+		
+			
+			<hr class="separator" />
+		<div class="notes">Redefined in descendants as:</div>
+		<ul class="redefinitions">
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Cdsc.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Cdsc::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Free.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Free::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Frma.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Frma::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Ftyp.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Ftyp::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Hint.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Hint::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Iinf.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Iinf::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Iloc.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Iloc::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Ipro.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Ipro::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_FullBox.html#methodgetHeapSize">Zend_Media_Iso14496_FullBox::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Bxml.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Bxml::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Chpl.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Chpl::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Co64.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Co64::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Cprt.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Cprt::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Ctts.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Ctts::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Dref.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Dref::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Elst.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Elst::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Hdlr.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Hdlr::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Hmhd.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Hmhd::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Id32.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Id32::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Data.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Data::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Infe.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Infe::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mdhd.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Mdhd::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mehd.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Mehd::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mfhd.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Mfhd::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mfro.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Mfro::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mvhd.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Mvhd::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Ndrm.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Ndrm::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Pdin.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Pdin::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Pitm.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Pitm::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Sbgp.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Sbgp::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Schm.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Schm::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Sdtp.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Sdtp::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Smhd.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Smhd::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stco.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Stco::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stdp.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Stdp::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stsc.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Stsc::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stsd.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Stsd::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stsh.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Stsh::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stss.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Stss::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stsz.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Stsz::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stts.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Stts::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Tfra.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Tfra::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Tkhd.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Tkhd::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Trex.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Trex::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Url.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Url::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Urn.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Urn::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Vmhd.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Vmhd::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Xml.html#methodgetHeapSize">Zend_Media_Iso14496_Box_Xml::getHeapSize()</a>
+								: Returns the box heap size in bytes.
+							</li>
+				</ul>
+	</div>
+<a name="methodgetOffset" id="getOffset"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getOffset</span> (line <span class="line-number">179</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the file offset to box start, or <var>false</var> if the box was  created on heap.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getOffset
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetOption" id="getOption"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getOption</span> (line <span class="line-number">133</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the given option value, or the default value if the option is not  defined.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			getOption
+		</span>
+					(<span class="var-type">string</span>&nbsp;<span class="var-name">$option</span>, [<span class="var-type">mixed</span>&nbsp;<span class="var-name">$defaultValue</span> = <span class="var-default">null</span>])
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type">string</span>
+				<span class="var-name">$option</span><span class="var-description">: The name of the option.</span>			</li>
+					<li>
+				<span class="var-type">mixed</span>
+				<span class="var-name">$defaultValue</span><span class="var-description">: The default value to be returned.</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="methodgetOptions" id="getOptions"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getOptions</span> (line <span class="line-number">121</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the options array.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">Array</span>
+		<span class="method-name">
+			&amp;getOptions
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetParent" id="getParent"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getParent</span> (line <span class="line-number">250</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the parent box containing this box.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result"><a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box.html">Zend_Media_Iso14496_Box</a></span>
+		<span class="method-name">
+			getParent
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetSize" id="getSize"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getSize</span> (line <span class="line-number">201</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the box size in bytes read from the file, including the size and  type header, fields, and all contained boxes, or <var>false</var> if the  box was created on heap.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getSize
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetType" id="getType"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getType</span> (line <span class="line-number">230</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the box type.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">string</span>
+		<span class="method-name">
+			getType
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodhasBox" id="hasBox"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">hasBox</span> (line <span class="line-number">362</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Checks whether the box given as an argument is present in the file. Returns  <var>true</var> if one or more boxes are present, <var>false</var>  otherwise.</p>
+	<ul class="tags">
+				<li><span class="field">throws:</span> Zend_Media_Iso14496_Exception if called on a non-container box</li>
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">boolean</span>
+		<span class="method-name">
+			hasBox
+		</span>
+					(<span class="var-type">string</span>&nbsp;<span class="var-name">$identifier</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type">string</span>
+				<span class="var-name">$identifier</span><span class="var-description">: The box identifier.</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="methodisContainer" id="isContainer"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">isContainer</span> (line <span class="line-number">270</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns a boolean value corresponding to whether the box is a container.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">boolean</span>
+		<span class="method-name">
+			isContainer
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodremoveBox" id="removeBox"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">removeBox</span> (line <span class="line-number">477</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Removes the given box.</p>
+	<ul class="tags">
+				<li><span class="field">throws:</span> Zend_Media_Iso14496_Exception if called on a non-container box</li>
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			removeBox
+		</span>
+					(<span class="var-type"><a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box.html">Zend_Media_Iso14496_Box</a></span>&nbsp;<span class="var-name">$box</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type"><a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box.html">Zend_Media_Iso14496_Box</a></span>
+				<span class="var-name">$box</span><span class="var-description">: The box to remove</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="methodremoveBoxesByIdentifier" id="removeBoxesByIdentifier"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">removeBoxesByIdentifier</span> (line <span class="line-number">435</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Removes any boxes matching the given box identifier.</p>
+<p class="description"><p>The identifier may contain wildcard characters '*' and '?'. The asterisk  matches against zero or more characters, and the question mark matches any  single character.</p><p>One may also use the shorthand unset($obj-&gt;identifier) to achieve the same  result. Wildcards cannot be used with the shorthand method.</p></p>
+	<ul class="tags">
+				<li><span class="field">throws:</span> Zend_Media_Iso14496_Exception if called on a non-container box</li>
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			removeBoxesByIdentifier
+		</span>
+					(<span class="var-type">string</span>&nbsp;<span class="var-name">$identifier</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type">string</span>
+				<span class="var-name">$identifier</span><span class="var-description">: The box identifier.</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="methodsetContainer" id="setContainer"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">setContainer</span> (line <span class="line-number">290</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Sets whether the box is a container.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> protected</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			setContainer
+		</span>
+					(<span class="var-type">boolean</span>&nbsp;<span class="var-name">$container</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type">boolean</span>
+				<span class="var-name">$container</span><span class="var-description">: Whether the box is a container.</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="methodsetOffset" id="setOffset"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">setOffset</span> (line <span class="line-number">189</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Sets the file offset where the box starts.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			setOffset
+		</span>
+					(<span class="var-type">integer</span>&nbsp;<span class="var-name">$offset</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type">integer</span>
+				<span class="var-name">$offset</span><span class="var-description">: The file offset to box start.</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="methodsetOption" id="setOption"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">setOption</span> (line <span class="line-number">158</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Sets the given option the given value.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			setOption
+		</span>
+					(<span class="var-type">string</span>&nbsp;<span class="var-name">$option</span>, <span class="var-type">mixed</span>&nbsp;<span class="var-name">$value</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type">string</span>
+				<span class="var-name">$option</span><span class="var-description">: The name of the option.</span>			</li>
+					<li>
+				<span class="var-type">mixed</span>
+				<span class="var-name">$value</span><span class="var-description">: The value to set for the option.</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="methodsetOptions" id="setOptions"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">setOptions</span> (line <span class="line-number">147</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Sets the options array. See <a href="../../Zend_Media/ID3/Zend_Media_Id3v2.html">Zend_Media_Id3v2</a> class for available  options.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			setOptions
+		</span>
+					(<span class="var-type"></span>&nbsp;<span class="var-name">&$options</span>, <span class="var-type">Array</span>&nbsp;<span class="var-name">$options</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type">Array</span>
+				<span class="var-name">$options</span><span class="var-description">: The options array.</span>			</li>
+					<li>
+				<span class="var-type"></span>
+				<span class="var-name">&$options</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="methodsetParent" id="setParent"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">setParent</span> (line <span class="line-number">260</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Sets the parent containing box.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			setParent
+		</span>
+					(<span class="var-type"></span>&nbsp;<span class="var-name">&$parent</span>, <span class="var-type"><a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box.html">Zend_Media_Iso14496_Box</a></span>&nbsp;<span class="var-name">$parent</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type"><a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box.html">Zend_Media_Iso14496_Box</a></span>
+				<span class="var-name">$parent</span><span class="var-description">: The parent box.</span>			</li>
+					<li>
+				<span class="var-type"></span>
+				<span class="var-name">&$parent</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="methodsetSize" id="setSize"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">setSize</span> (line <span class="line-number">214</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Sets the box size. The size must include the size and type header,  fields, and all contained boxes.</p>
+<p class="description"><p>The method will propagate size change to box parents.</p></p>
+	<ul class="tags">
+				<li><span class="field">access:</span> protected</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			setSize
+		</span>
+					(<span class="var-type">integer</span>&nbsp;<span class="var-name">$size</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type">integer</span>
+				<span class="var-name">$size</span><span class="var-description">: The box size.</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="methodsetType" id="setType"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">setType</span> (line <span class="line-number">240</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Sets the box type.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			setType
+		</span>
+					(<span class="var-type">string</span>&nbsp;<span class="var-name">$type</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type">string</span>
+				<span class="var-name">$type</span><span class="var-description">: The box type.</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="methodwrite" id="write"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">write</span> (line <span class="line-number">650</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Writes the frame data with the header.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			write
+		</span>
+					(<span class="var-type"><a href="../../Zend_Io/Zend_Io_Writer.html">Zend_Io_Writer</a></span>&nbsp;<span class="var-name">$writer</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type"><a href="../../Zend_Io/Zend_Io_Writer.html">Zend_Io_Writer</a></span>
+				<span class="var-name">$writer</span><span class="var-description">: The writer object.</span>			</li>
+				</ul>
+		
+			
+			<hr class="separator" />
+		<div class="notes">Redefined in descendants as:</div>
+		<ul class="redefinitions">
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496.html#methodwrite">Zend_Media_Iso14496::write()</a>
+								: Writes the changes back to given media file.
+							</li>
+				</ul>
+	</div>
+<a name="method_writeData" id="_writeData"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">_writeData</span> (line <span class="line-number">617</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Writes the box header. Subclasses should overwrite this method and call  the parent method first and then write the box related data.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> protected</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			_writeData
+		</span>
+					(<span class="var-type"><a href="../../Zend_Io/Zend_Io_Writer.html">Zend_Io_Writer</a></span>&nbsp;<span class="var-name">$writer</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type"><a href="../../Zend_Io/Zend_Io_Writer.html">Zend_Io_Writer</a></span>
+				<span class="var-name">$writer</span><span class="var-description">: The writer object.</span>			</li>
+				</ul>
+		
+			
+			<hr class="separator" />
+		<div class="notes">Redefined in descendants as:</div>
+		<ul class="redefinitions">
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Cdsc.html#method_writeData">Zend_Media_Iso14496_Box_Cdsc::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Free.html#method_writeData">Zend_Media_Iso14496_Box_Free::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Frma.html#method_writeData">Zend_Media_Iso14496_Box_Frma::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Ftyp.html#method_writeData">Zend_Media_Iso14496_Box_Ftyp::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Hint.html#method_writeData">Zend_Media_Iso14496_Box_Hint::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Iinf.html#method_writeData">Zend_Media_Iso14496_Box_Iinf::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Iloc.html#method_writeData">Zend_Media_Iso14496_Box_Iloc::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Ipro.html#method_writeData">Zend_Media_Iso14496_Box_Ipro::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_FullBox.html#method_writeData">Zend_Media_Iso14496_FullBox::_writeData()</a>
+								: Writes the box data without the header.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Bxml.html#method_writeData">Zend_Media_Iso14496_Box_Bxml::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Chpl.html#method_writeData">Zend_Media_Iso14496_Box_Chpl::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Co64.html#method_writeData">Zend_Media_Iso14496_Box_Co64::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Cprt.html#method_writeData">Zend_Media_Iso14496_Box_Cprt::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Ctts.html#method_writeData">Zend_Media_Iso14496_Box_Ctts::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Dref.html#method_writeData">Zend_Media_Iso14496_Box_Dref::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Elst.html#method_writeData">Zend_Media_Iso14496_Box_Elst::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Hdlr.html#method_writeData">Zend_Media_Iso14496_Box_Hdlr::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Hmhd.html#method_writeData">Zend_Media_Iso14496_Box_Hmhd::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Id32.html#method_writeData">Zend_Media_Iso14496_Box_Id32::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Data.html#method_writeData">Zend_Media_Iso14496_Box_Data::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Infe.html#method_writeData">Zend_Media_Iso14496_Box_Infe::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mdhd.html#method_writeData">Zend_Media_Iso14496_Box_Mdhd::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mehd.html#method_writeData">Zend_Media_Iso14496_Box_Mehd::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mfhd.html#method_writeData">Zend_Media_Iso14496_Box_Mfhd::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mfro.html#method_writeData">Zend_Media_Iso14496_Box_Mfro::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mvhd.html#method_writeData">Zend_Media_Iso14496_Box_Mvhd::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Ndrm.html#method_writeData">Zend_Media_Iso14496_Box_Ndrm::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Pdin.html#method_writeData">Zend_Media_Iso14496_Box_Pdin::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Pitm.html#method_writeData">Zend_Media_Iso14496_Box_Pitm::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Sbgp.html#method_writeData">Zend_Media_Iso14496_Box_Sbgp::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Schm.html#method_writeData">Zend_Media_Iso14496_Box_Schm::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Sdtp.html#method_writeData">Zend_Media_Iso14496_Box_Sdtp::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Smhd.html#method_writeData">Zend_Media_Iso14496_Box_Smhd::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stco.html#method_writeData">Zend_Media_Iso14496_Box_Stco::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stdp.html#method_writeData">Zend_Media_Iso14496_Box_Stdp::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stsc.html#method_writeData">Zend_Media_Iso14496_Box_Stsc::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stsd.html#method_writeData">Zend_Media_Iso14496_Box_Stsd::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stsh.html#method_writeData">Zend_Media_Iso14496_Box_Stsh::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stss.html#method_writeData">Zend_Media_Iso14496_Box_Stss::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stsz.html#method_writeData">Zend_Media_Iso14496_Box_Stsz::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stts.html#method_writeData">Zend_Media_Iso14496_Box_Stts::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Tfra.html#method_writeData">Zend_Media_Iso14496_Box_Tfra::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Tkhd.html#method_writeData">Zend_Media_Iso14496_Box_Tkhd::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Trex.html#method_writeData">Zend_Media_Iso14496_Box_Trex::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Url.html#method_writeData">Zend_Media_Iso14496_Box_Url::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Urn.html#method_writeData">Zend_Media_Iso14496_Box_Urn::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Vmhd.html#method_writeData">Zend_Media_Iso14496_Box_Vmhd::_writeData()</a>
+								: Writes the box data.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Xml.html#method_writeData">Zend_Media_Iso14496_Box_Xml::_writeData()</a>
+								: Writes the box data.
+							</li>
+				</ul>
+	</div>
+<a name="method__get" id="__get"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">__get</span> (line <span class="line-number">518</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Magic function so that $obj-&gt;value will work. If called on a container box,  the method will first attempt to return the first contained box that  matches the identifier, and if not found, invoke a getter method.</p>
+<p class="description"><p>If there are no boxes or getter methods with given name, the method  attempts to create a frame with given identifier.</p><p>If none of these work, an exception is thrown.</p></p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">mixed</span>
+		<span class="method-name">
+			__get
+		</span>
+					(<span class="var-type">string</span>&nbsp;<span class="var-name">$name</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type">string</span>
+				<span class="var-name">$name</span><span class="var-description">: The box or field name.</span>			</li>
+				</ul>
+		
+			
+			<hr class="separator" />
+		<div class="notes">Redefined in descendants as:</div>
+		<ul class="redefinitions">
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Ilst.html#method__get">Zend_Media_Iso14496_Box_Ilst::__get()</a>
+								: Override magic function so that $obj-&gt;value on a box will return the data  box instead of the data container box.
+							</li>
+					<li>
+				<a href="../../Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Data.html#method__get">Zend_Media_Iso14496_Box_Data::__get()</a>
+								: Override magic function so that $obj-&gt;data will return the current box  instead of an error. For other values the method will attempt to call a  getter method.
+							</li>
+				</ul>
+	</div>
+<a name="method__isset" id="__isset"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">__isset</span> (line <span class="line-number">564</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Magic function so that isset($obj-&gt;value) will work. This method checks  whether the box is a container and contains a box that matches the  identifier.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">boolean</span>
+		<span class="method-name">
+			__isset
+		</span>
+					(<span class="var-type">string</span>&nbsp;<span class="var-name">$name</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type">string</span>
+				<span class="var-name">$name</span><span class="var-description">: The box name.</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="method__set" id="__set"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">__set</span> (line <span class="line-number">546</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Magic function so that assignments with $obj-&gt;value will work.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">mixed</span>
+		<span class="method-name">
+			__set
+		</span>
+					(<span class="var-type">string</span>&nbsp;<span class="var-name">$name</span>, <span class="var-type">string</span>&nbsp;<span class="var-name">$value</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type">string</span>
+				<span class="var-name">$name</span><span class="var-description">: The field name.</span>			</li>
+					<li>
+				<span class="var-type">string</span>
+				<span class="var-name">$value</span><span class="var-description">: The field value.</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="method__unset" id="__unset"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">__unset</span> (line <span class="line-number">575</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Magic function so that unset($obj-&gt;value) will work. This method removes  all the boxes from this container that match the identifier.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			__unset
+		</span>
+					(<span class="var-type">string</span>&nbsp;<span class="var-name">$name</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type">string</span>
+				<span class="var-name">$name</span><span class="var-description">: The box name.</span>			</li>
+				</ul>
+		
+			
+	</div>
+						
+		</div>
+	</div>
+
+	
+	<p class="notes" id="credit">
+		Documentation generated on Wed, 04 May 2011 08:36:39 +0300 by <a href="http://www.phpdoc.org" target="_blank">phpDocumentor 1.4.3</a>
+	</p>
+	</div></body>
+</html>

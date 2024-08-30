@@ -1,0 +1,15 @@
+.albumsLayout {
+    padding: 12px 0 90px 12px;
+    display: flex;
+    flex-direction: row;
+
+    .grid {
+        flex: 1;
+    }
+
+    .album {
+        margin-right: 6px;
+    }
+}
+
+

@@ -1,0 +1,33 @@
+.loginContainer {
+  min-height: rem(900px);
+  width: 100%;
+  padding-top: rem(20px);
+}
+
+.form {
+  border-right: rem(1px) solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-7));
+  min-height: rem(900px);
+  min-width: rem(450px);
+  max-width: rem(650px);
+  padding-top: rem(80px);
+
+  @media (max-width: $mantine-breakpoint-md) {
+    max-width: 100%;
+  }
+}
+
+.title {
+  color: light-dark(var(--mantine-color-black), var(--mantine-color-white));
+  font-family:
+          Greycliff CF,
+          var(--mantine-font-family);
+}
+
+.animation {
+  height: rem(200px);
+  width: rem(200px);
+
+  @media screen and (max-width: $mantine-breakpoint-md) {
+    display: none;
+  }
+}

@@ -1,0 +1,12 @@
+@use "@picocss/pico/scss/pico" with (
+  $theme-color: "orange"
+);
+
+.mx-auto {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.center {
+  text-align: center;
+}
