@@ -19,7 +19,7 @@ class SetupDevCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Command description';
+    protected $description = 'Migrates database, generates secret and seeds test users.';
 
     /**
      * Execute the console command.

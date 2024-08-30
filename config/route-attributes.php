@@ -18,11 +18,6 @@ return [
             'middleware' => 'api',
             'patterns'   => ['*Controller.php'],
         ],
-        app_path('Http/Controllers/PublicApi') => [
-            'prefix'     => 'public-api',
-            'middleware' => 'public-api',
-            'patterns'   => ['*Controller.php'],
-        ],
         app_path('Http/Controllers/Web') => [
             'middleware' => 'web',
             'patterns'   => ['*Controller.php'],

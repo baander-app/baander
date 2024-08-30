@@ -1,45 +1,40 @@
-# baander
-
-Media server project
-
-## Development setup
-
-To develop on this project you need:
-
-- [docker](https://www.docker.com/)
-- [node.js](https://nodejs.org/en)
-- [yarn 1.xx](https://yarnpkg.com/)
-
-### Configuring ddev
+<div align="center">
+    <a href="https://baander.app" target="_blank">
+        <img src="/docs/assets/baander-logo.svg" width="200" alt="Baander Logo">
+        <p style="font-weight:bold;font-size:48px">Bånder</p>
+    </a>
+</div>
 
 
-## Directory structure
+<h4 align="center">Media server for the modern generation</h4>
 
-```
-.ddev
-app/ 
-  - Packages
-config/
-  - Backend configuration
-database/
-  - factories/
-     * Model fakers
-  - migrations/
-  - seeders/
-graphql/
-public/
-resources/
-  app/
-    * Frontend source
-  views/
-    * Blade views
-routes/
-storage/
-stubs/
-  * Backend code generation templates
-tests/
-  * Backend tests
-third_party/
-  * Third party libraries (usually contains patches)
-```
-_Generated with https://tree.nathanfriend.io/_
+<div>
+    <img alt="GitHub License" src="https://img.shields.io/github/license/baander-app/baander">
+    <img alt="GitHub top language" src="https://img.shields.io/github/languages/top/baander-app/baander">
+
+</div>
+
+## Table of Contents
+
+<!-- TOC -->
+  * [Table of Contents](#table-of-contents)
+  * [Development](#development)
+  * [License](#license)
+  * [Copyright](#copyright)
+<!-- TOC -->
+
+## Development
+
+- [Configure host](/docs/dev_setup_host.md)
+- [Platform development](/docs/dev_workflow.md)
+- [Docker services](/docs/dev_docker_services.md)
+- [Phpstorm configuration](/docs/phpstorm.md)
+- [Using XDebug](/docs/xdebug.md)
+
+## License
+
+Apache 2.0 See [LICENSE](/LICENSE)
+
+## Copyright
+
+Copyright 2024 <a href="https://www.juul.xyz/">Martin Christiansen</a>
