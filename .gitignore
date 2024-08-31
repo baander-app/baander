@@ -19,7 +19,6 @@ yarn-error.log
 /.vscode
 
 # Project exclude paths
-/storage/app/
 /storage/testlibrary/
 /storage/framework/
 /storage/muzak
