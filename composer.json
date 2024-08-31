@@ -21,6 +21,7 @@
         "hidehalo/nanoid-php": "^1.1",
         "intervention/image": "^3.5",
         "itsgoingd/clockwork": "^5.2",
+        "justinrainbow/json-schema": "^6.0",
         "laragear/webauthn": "^3.0",
         "laravel/fortify": "^1.23",
         "laravel/framework": "^11.0",
