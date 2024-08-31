@@ -4,8 +4,8 @@ import { EchoContextProvider } from '@/providers/echo-provider.tsx';
 import { Suspense } from 'react';
 import { LibraryMusicRoutes } from '@/features/library-music/routes/routes.tsx';
 import { DashboardLayout } from '@/layouts/dashboard-layout/dasbhard-layout.tsx';
-import { DashboardRoutes } from '@/features/dashboard/routes/routes.tsx';
 import { AccountRoutes } from '@/features/account/routes/routes.tsx';
+import { DashboardRoutes } from '@/features/dashboard/routes.tsx';
 
 const App = () => {
   return (
