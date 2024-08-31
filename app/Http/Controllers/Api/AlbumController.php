@@ -42,11 +42,7 @@ class AlbumController extends Controller
 
                 return $query->select($fields);
             })->when($genres, function (BaseBuilder $q) use ($genres) {
-                $q->whereHas('songs', function ($q) use ($genres) {
-                    $q->whereHas('genres', function ($q) use ($genres) {
-                        $q->whereIn('name', $genres);
-                    });
-                });
+                $q->whereGenreNames($genres);
             })
             ->paginate($request->query('perPage', 60));
 
