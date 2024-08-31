@@ -2,8 +2,7 @@
 
 namespace App\Filters;
 
-use App\Support\BaseBuilder;
-use Tpetry\PostgresqlEnhanced\Query\Builder;
+use App\Extensions\BaseBuilder;
 
 class FilterBuilder
 {

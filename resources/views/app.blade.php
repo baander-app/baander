@@ -13,7 +13,9 @@
     <meta name="theme-color" content="#ffffff">
     <meta property="csp-nonce" content="{{ Vite::cspNonce() }}">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    @viteReactRefresh
+    @if(app()->isLocal())
+        @viteReactRefresh
+    @endif
     @vite("resources/app/index.tsx")
     @routes(nonce: Vite::cspNonce())
     <script nonce="{{ Vite::cspNonce() }}">

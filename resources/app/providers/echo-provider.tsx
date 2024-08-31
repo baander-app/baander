@@ -1,18 +1,24 @@
 import React, { useContext, useEffect, useState } from 'react';
-import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 import { notifications } from '@mantine/notifications';
 import { Token } from '@/services/auth/token.ts';
+import Echo from 'laravel-echo';
+import { PusherPrivateChannel } from 'laravel-echo/dist/channel/pusher-private-channel';
 
 interface EchoContextType {
-  echo?: Echo;
+  echo: Echo | undefined;
+  playerStateChannel: PusherPrivateChannel | undefined;
 }
 
-export const EchoContext = React.createContext<EchoContextType>({});
+export const EchoContext = React.createContext<EchoContextType>({
+  echo: undefined,
+  playerStateChannel: undefined,
+});
 EchoContext.displayName = 'EchoContext';
 
-export function EchoContextProvider({children}: { children: React.ReactNode }) {
+export function EchoContextProvider({ children }: { children: React.ReactNode }) {
   const [echo, setEcho] = useState<Echo>();
+  const [playerStateChannel, setPlayerStateChannel] = useState<PusherPrivateChannel | undefined>(undefined);
 
   useEffect(() => {
     window.Pusher = Pusher;
@@ -30,9 +36,9 @@ export function EchoContextProvider({children}: { children: React.ReactNode }) {
       cluster: 'Redis',
       auth: {
         headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
+          Authorization: `Bearer ${token}`,
+        },
+      },
     });
 
     setEcho(instance);
@@ -48,16 +54,21 @@ export function EchoContextProvider({children}: { children: React.ReactNode }) {
             message: data.notification.body,
           });
         });
+
+      const token = Token.get()?.accessToken.token;
+
+      const psc = echo.private(`playerState.${token}`);
+      setPlayerStateChannel(psc);
     }
   }, [echo]);
 
   return (
-    <EchoContext.Provider value={{echo}}>
+    <EchoContext.Provider value={{ echo, playerStateChannel }}>
       {children}
     </EchoContext.Provider>
   );
 }
 
-export function useEcho(): Echo {
-  return useContext(EchoContext).echo!;
+export function useEcho() {
+  return useContext(EchoContext);
 }

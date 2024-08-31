@@ -23,4 +23,5 @@ yarn-error.log
 /storage/framework/
 /storage/muzak
 /storage/muzak/
+/storage/clockwork/*
 .env.sentry-build-plugin

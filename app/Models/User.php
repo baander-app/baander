@@ -2,15 +2,19 @@
 
 namespace App\Models;
 
+use App\Models\Player\PlayerQueue;
+use App\Models\Player\PlayerState;
 use DateTimeInterface;
 use DeviceDetector\DeviceDetector;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\{HasApiTokens, NewAccessToken};
+use Illuminate\Support\Str;
 use Laragear\WebAuthn\Contracts\WebAuthnAuthenticatable;
 use Laragear\WebAuthn\WebAuthnAuthentication;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Sanctum\{HasApiTokens, NewAccessToken};
+use Ramsey\Uuid\Uuid;
 
 class User extends Authenticatable implements WebAuthnAuthenticatable
 {
@@ -71,12 +75,14 @@ class User extends Authenticatable implements WebAuthnAuthenticatable
     public function createToken(string $name, array $abilities = ['*'], DateTimeInterface $expiresAt = null, array $device = [])
     {
         $plainTextToken = $this->generateTokenString();
+        $broadcastToken = Str::replace('-', '', Uuid::uuid4()->toString());
 
         $attributes = [
-            'name'       => $name,
-            'token'      => hash('sha256', $plainTextToken),
-            'abilities'  => $abilities,
-            'expires_at' => $expiresAt,
+            'name'            => $name,
+            'token'           => hash('sha256', $plainTextToken),
+            'broadcast_token' => $broadcastToken,
+            'abilities'       => $abilities,
+            'expires_at'      => $expiresAt,
         ];
 
         $attributes += $device;
@@ -84,6 +90,16 @@ class User extends Authenticatable implements WebAuthnAuthenticatable
         $token = $this->tokens()->create($attributes);
 
         return new NewAccessToken($token, $token->getKey() . '|' . $plainTextToken);
+    }
+
+    public function playerStates()
+    {
+        return $this->hasMany(PlayerState::class);
+    }
+
+    public function playerQueues()
+    {
+        return $this->hasMany(PlayerQueue::class);
     }
 
     public function userMediaActivities()

@@ -10,12 +10,14 @@ import {
   PreviousButton,
 } from '@/features/library-music-player/components/player-controls/player-controls.tsx';
 import { useMusicSource } from '@/providers';
-import { Token } from '@/services/auth/token.ts';
 import { ProgressBar } from '@/features/library-music-player/components/progress-bar/progress-bar.tsx';
 import { formatDuration } from '@/support/time';
+import { useEcho } from '@/providers/echo-provider.tsx';
+import { PlayerStateInput } from '@/services/libraries/player-state.ts';
 import { useStreamToken } from '@/hooks/use-stream-token.ts';
 
 export function InlinePlayer() {
+  const echo = useEcho();
   const musicSource = useMusicSource();
   const { streamToken } = useStreamToken();
 
@@ -104,6 +106,22 @@ export function InlinePlayer() {
   const durationDisplay = formatDuration(duration);
   const elapsedDisplay = formatDuration(currentProgress);
 
+  useEffect(() => {
+    let timerId = setInterval(() => {
+      const data: PlayerStateInput = {
+        isPlaying,
+        volumePercent: 100,
+        progressMs: currentProgress,
+      };
+
+      echo.playerStateChannel?.whisper('playerState', data);
+    }, 5000);
+
+    return () => {
+      clearInterval(timerId);
+    };
+  }, [echo]);
+
   return (
     <Grid>
       <Grid.Col mt="6px" span={2}>
@@ -144,8 +162,8 @@ export function InlinePlayer() {
             <PreviousButton onClick={noop}/>
 
             {isPlaying
-              ? <PauseButton onClick={() => togglePlayPause()}/>
-              : <PlayButton onClick={() => togglePlayPause()}/>
+             ? <PauseButton onClick={() => togglePlayPause()}/>
+             : <PlayButton onClick={() => togglePlayPause()}/>
             }
 
             <NextButton onClick={noop}/>

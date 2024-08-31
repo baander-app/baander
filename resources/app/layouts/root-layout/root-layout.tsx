@@ -37,15 +37,15 @@ export function RootLayout(props: { children?: ReactNode }) {
           <NavLink variant="light" to="/library/music/albums" label="Albums" />
           <NavLink variant="light" to="/library/music/songs" label="Songs" />
           <NavLink variant="light" to="/library/music/genres" label="Genres" />
-
-          <div>
-            <NavLink to="/dashboard" label="Dashboard" />
-
-            {mainNav?.footer && (
-              <NavbarLinksGroup {...mainNav.footer} />
-            )}
-          </div>
         </div>
+
+        <NavLink to="/dashboard" label="Dashboard" />
+
+        {mainNav?.footer && (
+          <div className={styles.container}>
+            <NavbarLinksGroup {...mainNav.footer} />
+          </div>
+        )}
 
         <UserMenu />
       </AppShell.Navbar>

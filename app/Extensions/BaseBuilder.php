@@ -1,10 +1,9 @@
 <?php
 
-namespace App\Support;
+namespace App\Extensions;
 
 use Illuminate\Container\Container;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Pagination\LengthAwarePaginator;
 
 class BaseBuilder extends Builder
 {

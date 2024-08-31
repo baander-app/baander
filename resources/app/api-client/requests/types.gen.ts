@@ -15,11 +15,6 @@ export type AlbumResource = {
 export type ArtistResource = {
     name: string;
     slug: string;
-    /**
-     * $this->mergeWhen($this->whenLoaded('portrait') && $this->portrait, [
-     * 'portrait' => route('api.image.serve', ['image' => $this->portrait]),
-     * ]),
-     */
     createdAt: string | null;
     updatedAt: string | null;
 };
@@ -65,6 +60,7 @@ export type LibraryType = 'music' | 'podcast' | 'audiobook' | 'movie' | 'tv_show
 export type LoginRequest = {
     email: string;
     password: string;
+    remember?: boolean;
 };
 
 export type NewAccessTokenResource = {
@@ -142,6 +138,10 @@ export type WidgetListItemResource = {
 
 export type AlbumsIndexData = {
     fields?: string;
+    genres?: string;
+    /**
+     * The library slug
+     */
     library: string;
     page?: number;
     perPage?: number;
@@ -338,10 +338,8 @@ export type JobLibraryScanData = {
 };
 
 export type JobLibraryScanResponse = {
-    status: number;
     message: string;
-    jobStatusId: string;
-} | string;
+};
 
 export type LibrariesIndexData = {
     page?: number;
@@ -388,8 +386,86 @@ export type LibraryUpdateResponse = LibraryResource;
 
 export type LibraryDeleteResponse = null;
 
-export type LogsFilesResponse = {
-    fileName: string;
+export type SchemasModelResponse = string;
+
+export type OpCacheGetStatusResponse = {
+    opcache_enabled: boolean;
+    file_cache: string;
+    file_cache_only: boolean;
+    cache_full: boolean;
+    restart_pending: boolean;
+    ''?: {
+        [key: string]: unknown;
+    };
+    memory_usage: {
+        used_memory: number;
+        free_memory: number;
+        wasted_memory: number;
+        current_wasted_percentage: number;
+    };
+    interned_strings_usage: {
+        buffer_size: number;
+        used_memory: number;
+        free_memory: number;
+        number_of_strings: number;
+    };
+    opcache_statistics: {
+        num_cached_scripts: number;
+        num_cached_keys: number;
+        max_cached_keys: number;
+        hits: number;
+        start_time: number;
+        last_restart_time: number;
+        oom_restarts: number;
+        hash_restarts: number;
+        manual_restarts: number;
+        misses: number;
+        blacklist_misses: number;
+        blacklist_miss_ratio: number;
+        opcache_hit_rate: number;
+    };
+    jit: {
+        enabled: boolean;
+        on: boolean;
+        kind: number;
+        opt_level: number;
+        opt_flags: number;
+        buffer_size: number;
+        buffer_free: number;
+    };
+};
+
+export type OpcacheGetConfigResponse = {
+    directives: {
+        property: number | boolean | string;
+    };
+    version: {
+        version: string;
+        opcache_product_name: string;
+    };
+    blacklist: Array<(string)>;
+};
+
+export type OpcacheClearData = {
+    requestBody?: {
+        [key: string]: unknown;
+    };
+};
+
+export type OpcacheClearResponse = {
+    success: boolean;
+};
+
+export type OpcacheCompileData = {
+    force?: string;
+    requestBody?: {
+        [key: string]: unknown;
+    };
+};
+
+export type OpcacheCompileResponse = {
+    totalFiles: number;
+    compiled: number;
 };
 
 export type SongsIndexData = {
@@ -445,6 +521,9 @@ export type SongsShowData = {
 export type SongsShowResponse = SongResource;
 
 export type SongsStreamData = {
+    /**
+     * The library slug
+     */
     library: string;
     /**
      * The song public id
@@ -519,7 +598,7 @@ export type WidgetsGetWidgetData = {
     name: string;
 };
 
-export type WidgetsGetWidgetResponse = string;
+export type WidgetsGetWidgetResponse = null;
 
 export type WidgetSchemaGetWidgetsResponse = Array<WidgetListItemResource>;
 
@@ -579,6 +658,15 @@ export type $OpenApiTs = {
                  * Authorization error
                  */
                 403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
                     /**
                      * Error overview.
                      */
@@ -1008,14 +1096,21 @@ export type $OpenApiTs = {
             req: JobLibraryScanData;
             res: {
                 200: {
-    status: number;
-    message: string;
-    jobStatusId: string;
-} | string;
+                    message: string;
+                };
                 /**
                  * Unauthenticated
                  */
                 401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
                     /**
                      * Error overview.
                      */
@@ -1195,11 +1290,134 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/logs/files': {
+    '/schemas/models': {
+        get: {
+            res: {
+                200: string;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/opcache/status': {
         get: {
             res: {
                 200: {
-                    fileName: string;
+                    opcache_enabled: boolean;
+                    file_cache: string;
+                    file_cache_only: boolean;
+                    cache_full: boolean;
+                    restart_pending: boolean;
+                    ''?: {
+                        [key: string]: unknown;
+                    };
+                    memory_usage: {
+                        used_memory: number;
+                        free_memory: number;
+                        wasted_memory: number;
+                        current_wasted_percentage: number;
+                    };
+                    interned_strings_usage: {
+                        buffer_size: number;
+                        used_memory: number;
+                        free_memory: number;
+                        number_of_strings: number;
+                    };
+                    opcache_statistics: {
+                        num_cached_scripts: number;
+                        num_cached_keys: number;
+                        max_cached_keys: number;
+                        hits: number;
+                        start_time: number;
+                        last_restart_time: number;
+                        oom_restarts: number;
+                        hash_restarts: number;
+                        manual_restarts: number;
+                        misses: number;
+                        blacklist_misses: number;
+                        blacklist_miss_ratio: number;
+                        opcache_hit_rate: number;
+                    };
+                    jit: {
+                        enabled: boolean;
+                        on: boolean;
+                        kind: number;
+                        opt_level: number;
+                        opt_flags: number;
+                        buffer_size: number;
+                        buffer_free: number;
+                    };
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/opcache/config': {
+        get: {
+            res: {
+                200: {
+                    directives: {
+                        property: number | boolean | string;
+                    };
+                    version: {
+                        version: string;
+                        opcache_product_name: string;
+                    };
+                    blacklist: Array<(string)>;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/opcache/clear': {
+        post: {
+            req: OpcacheClearData;
+            res: {
+                200: {
+                    success: boolean;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/opcache/compile': {
+        post: {
+            req: OpcacheCompileData;
+            res: {
+                200: {
+                    totalFiles: number;
+                    compiled: number;
                 };
                 /**
                  * Unauthenticated
@@ -1553,7 +1771,7 @@ export type $OpenApiTs = {
         get: {
             req: WidgetsGetWidgetData;
             res: {
-                200: string;
+                200: null;
                 /**
                  * Unauthenticated
                  */

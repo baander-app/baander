@@ -85,10 +85,10 @@ export interface NavbarLinksGroupProps {
 
 export function NavbarLinksGroup(props: NavbarLinksGroupProps) {
   return (
-    <Box p="md">
+    <>
       {props && (
         <LinksGroup {...props} />
       )}
-    </Box>
+    </>
   );
 }

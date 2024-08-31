@@ -3,16 +3,17 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { AlbumsIndexData, AlbumsIndexResponse, AlbumsShowData, AlbumsShowResponse, ArtistsIndexData, ArtistsIndexResponse, ArtistsShowData, ArtistsShowResponse, AuthLoginData, AuthLoginResponse, AuthRefreshTokenData, AuthRefreshTokenResponse, AuthStreamTokenData, AuthStreamTokenResponse, AuthRegisterData, AuthRegisterResponse, AuthForgotPasswordData, AuthForgotPasswordResponse, AuthResetPasswordData, AuthResetPasswordResponse, AuthVerifyData, AuthVerifyResponse, GenresIndexData, GenresIndexResponse, ImageServeData, ImageServeResponse, JobLibraryScanData, JobLibraryScanResponse, LibrariesIndexData, LibrariesIndexResponse, LibraryCreateData, LibraryCreateResponse, LibraryUpdateData, LibraryUpdateResponse, LibraryDeleteResponse, LogsFilesResponse, SongsIndexData, SongsIndexResponse, SongsShowData, SongsShowResponse, SongsStreamData, SongsStreamResponse, UsersIndexResponse, UsersStoreData, UsersStoreResponse, UsersUpdateData, UsersUpdateResponse, UsersShowData, UsersShowResponse, UsersDestroyData, UsersDestroyResponse, UsersMeResponse, WidgetsGetWidgetData, WidgetsGetWidgetResponse, WidgetSchemaGetWidgetsResponse, WidgetSchemaGetWidgetData, WidgetSchemaGetWidgetResponse } from './types.gen';
+import type { AlbumsIndexData, AlbumsIndexResponse, AlbumsShowData, AlbumsShowResponse, ArtistsIndexData, ArtistsIndexResponse, ArtistsShowData, ArtistsShowResponse, AuthLoginData, AuthLoginResponse, AuthRefreshTokenData, AuthRefreshTokenResponse, AuthStreamTokenData, AuthStreamTokenResponse, AuthRegisterData, AuthRegisterResponse, AuthForgotPasswordData, AuthForgotPasswordResponse, AuthResetPasswordData, AuthResetPasswordResponse, AuthVerifyData, AuthVerifyResponse, GenresIndexData, GenresIndexResponse, ImageServeData, ImageServeResponse, JobLibraryScanData, JobLibraryScanResponse, LibrariesIndexData, LibrariesIndexResponse, LibraryCreateData, LibraryCreateResponse, LibraryUpdateData, LibraryUpdateResponse, LibraryDeleteResponse, SchemasModelResponse, OpCacheGetStatusResponse, OpcacheGetConfigResponse, OpcacheClearData, OpcacheClearResponse, OpcacheCompileData, OpcacheCompileResponse, SongsIndexData, SongsIndexResponse, SongsShowData, SongsShowResponse, SongsStreamData, SongsStreamResponse, UsersIndexResponse, UsersStoreData, UsersStoreResponse, UsersUpdateData, UsersUpdateResponse, UsersShowData, UsersShowResponse, UsersDestroyData, UsersDestroyResponse, UsersMeResponse, WidgetsGetWidgetData, WidgetsGetWidgetResponse, WidgetSchemaGetWidgetsResponse, WidgetSchemaGetWidgetData, WidgetSchemaGetWidgetResponse } from './types.gen';
 
 export class AlbumService {
     /**
      * @param data The data for the request.
-     * @param data.library
+     * @param data.library The library slug
      * @param data.page
      * @param data.perPage
      * @param data.fields
      * @param data.relations
+     * @param data.genres
      * @returns unknown Json paginated set of `AlbumResource`
      * @throws ApiError
      */
@@ -27,11 +28,13 @@ export class AlbumService {
                 page: data.page,
                 perPage: data.perPage,
                 fields: data.fields,
-                relations: data.relations
+                relations: data.relations,
+                genres: data.genres
             },
             errors: {
                 401: 'Unauthenticated',
                 403: 'Authorization error',
+                404: 'Not found',
                 422: 'Validation error'
             }
         });
@@ -321,7 +324,8 @@ export class JobService {
             body: data.requestBody,
             mediaType: 'application/json',
             errors: {
-                401: 'Unauthenticated'
+                401: 'Unauthenticated',
+                404: 'Not found'
             }
         });
     }
@@ -408,16 +412,86 @@ export class LibraryService {
     
 }
 
-export class LogsService {
+export class ModelSchemaService {
     /**
-     * Get a list of log files
+     * @returns string
+     * @throws ApiError
+     */
+    public static schemasModel(): CancelablePromise<SchemasModelResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/schemas/models',
+            errors: {
+                401: 'Unauthenticated'
+            }
+        });
+    }
+    
+}
+
+export class OpCacheService {
+    /**
      * @returns unknown
      * @throws ApiError
      */
-    public static logsFiles(): CancelablePromise<LogsFilesResponse> {
+    public static opCacheGetStatus(): CancelablePromise<OpCacheGetStatusResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/logs/files',
+            url: '/opcache/status',
+            errors: {
+                401: 'Unauthenticated'
+            }
+        });
+    }
+    
+    /**
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static opcacheGetConfig(): CancelablePromise<OpcacheGetConfigResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/opcache/config',
+            errors: {
+                401: 'Unauthenticated'
+            }
+        });
+    }
+    
+    /**
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static opcacheClear(data: OpcacheClearData = {}): CancelablePromise<OpcacheClearResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/opcache/clear',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthenticated'
+            }
+        });
+    }
+    
+    /**
+     * @param data The data for the request.
+     * @param data.force
+     * @param data.requestBody
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static opcacheCompile(data: OpcacheCompileData = {}): CancelablePromise<OpcacheCompileResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/opcache/compile',
+            query: {
+                force: data.force
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
             errors: {
                 401: 'Unauthenticated'
             }
@@ -489,7 +563,7 @@ export class SongService {
      * Direct stream the song
      * Requires token with "access-stream"
      * @param data The data for the request.
-     * @param data.library
+     * @param data.library The library slug
      * @param data.song The song public id
      * @returns unknown
      * @throws ApiError
@@ -638,7 +712,7 @@ export class WidgetService {
      * Get a widget for the user
      * @param data The data for the request.
      * @param data.name
-     * @returns string
+     * @returns null
      * @throws ApiError
      */
     public static widgetsGetWidget(data: WidgetsGetWidgetData): CancelablePromise<WidgetsGetWidgetResponse> {
