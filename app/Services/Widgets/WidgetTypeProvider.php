@@ -2,7 +2,14 @@
 
 namespace App\Services\Widgets;
 
-use App\Services\Widgets\Types\{MainNavBar, MainNavBarLink, MainNavBarSection, Widget};
+use App\Services\Widgets\Types\{
+    DashboardNavigationFeature,
+    DashboardNavigationLink,
+    MainNavBar,
+    MainNavBarLink,
+    MainNavBarSection,
+    Widget
+};
 
 class WidgetTypeProvider
 {
@@ -10,6 +17,8 @@ class WidgetTypeProvider
      * @var Widget[]
      */
     protected array $types = [
+        DashboardNavigationFeature::class,
+        DashboardNavigationLink::class,
         MainNavBar::class,
         MainNavBarLink::class,
         MainNavBarSection::class,

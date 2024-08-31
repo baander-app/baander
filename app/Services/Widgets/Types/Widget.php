@@ -29,8 +29,9 @@ abstract class Widget implements WidgetInterface
     public static function getSchema(): array
     {
         return [
-            'id'   => static::getId(),
-            'type' => static::getType(),
+            'schema' => 'https://json-schema.org/draft/2020-12',
+            'id'     => static::getId(),
+            'type'   => static::getType(),
         ];
     }
 }
