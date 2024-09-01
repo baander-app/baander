@@ -1,5 +1,5 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { RootState } from '@/store';
+import { createAppSlice } from '@/store/create-app-slice.ts';
+import { PayloadAction } from '@reduxjs/toolkit';
 import { Token } from '@/services/auth/token.ts';
 import { NewAccessTokenResource } from '@/api-client/requests';
 
@@ -25,7 +25,7 @@ const initialState: UserSliceState = {
   user: null,
 };
 
-export const authSlice = createSlice({
+export const authSlice = createAppSlice({
   name: 'users-auth',
   initialState,
   reducers: {
@@ -49,9 +49,18 @@ export const authSlice = createSlice({
     },
     logoutUser(state) {
       state.authenticated = false;
+      state.accessToken = null;
+      state.refreshToken = null;
+      state.streamToken = null;
       state.user = null;
       Token.clear();
     },
+  },
+  selectors: {
+    selectIsAuthenticated: state => state.authenticated,
+    selectRefreshToken: state => state.refreshToken,
+    selectStreamToken: state => state.streamToken,
+    selectUser: state => state.user,
   },
 });
 
@@ -65,8 +74,9 @@ export const {
   logoutUser,
 } = authSlice.actions;
 
-export const selectIsAuthenticated = (state: RootState) => state.authSlice.authenticated;
-export const selectStreamToken = (state: RootState) => state.streamToken;
-export const selectUser = (state: RootState) => state.authSlice.user;
-
-export default authSlice.reducer;
+export const {
+  selectIsAuthenticated,
+  selectRefreshToken,
+  selectStreamToken,
+  selectUser,
+} = authSlice.selectors;

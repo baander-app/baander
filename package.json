@@ -55,10 +55,12 @@
         "react-hook-form": "^7.50.0",
         "react-lottie-player": "^2.1.0",
         "react-redux": "^9.1.2",
+        "react-rnd": "^10.4.12",
         "react-router-dom": "^6.26.0",
         "react-toastify": "^10.0.4",
         "react-virtuoso": "^4.7.8",
         "redux-persist": "^6.0.0",
+        "wavesurfer.js": "^7.8.4",
         "ziggy-js": "^2.3.0"
     },
     "devDependencies": {

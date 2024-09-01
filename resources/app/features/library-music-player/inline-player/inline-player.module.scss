@@ -8,13 +8,27 @@
 }
 
 .trackInfo {
+    flex: 1;
+}
 
+.trackTitle {
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
 }
 
 .controls {
     flex: 1;
 }
 
+.playerControls {
+    flex: 1;
+}
+
 .buttonGroup {
 
+}
+
+.waveform {
+    width: 150px;
 }

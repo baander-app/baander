@@ -1,5 +1,5 @@
-import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { RootState } from "@/store";
+import { createAppSlice } from '@/store/create-app-slice.ts';
+import { PayloadAction } from '@reduxjs/toolkit';
 
 export interface MusicPlayerSlice {
   currentSongId: string | null;
@@ -9,9 +9,9 @@ export interface MusicPlayerSlice {
 const initialState: MusicPlayerSlice = {
   currentSongId: null,
   isPlaying: false,
-}
+};
 
-export const musicPlayerSlice = createSlice({
+export const musicPlayerSlice = createAppSlice({
   name: 'music-player',
   initialState,
   reducers: {
@@ -21,7 +21,11 @@ export const musicPlayerSlice = createSlice({
     setIsPlaying(state, action: PayloadAction<boolean>) {
       state.isPlaying = action.payload;
     },
-  }
+  },
+  selectors: {
+    selectCurrentSongId: state => state.currentSongId,
+    selectIsPlaying: state => state.isPlaying,
+  },
 });
 
 export const {
@@ -29,8 +33,7 @@ export const {
   setIsPlaying,
 } = musicPlayerSlice.actions;
 
-
-export const selectCurrentSongId = (state: RootState) => state.musicPlayerSlice.currentSongId;
-export const selectIsPlaying = (state: RootState) => state.musicPlayerSlice.isPlaying;
-
-export default musicPlayerSlice.reducer;
+export const {
+  selectCurrentSongId,
+  selectIsPlaying,
+} = musicPlayerSlice.selectors;

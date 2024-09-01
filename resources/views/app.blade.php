@@ -24,6 +24,11 @@
     <script nonce="{{ Vite::cspNonce() }}">
       BaanderAppInfo = @js($appInfo)
     </script>
+    <style>
+        .clockwork-toolbar {
+            display: none !important;
+        }
+    </style>
 </head>
 <body>
 <div id="baanderapproot"></div>

@@ -1,15 +1,14 @@
 import { Token } from '@/services/auth/token.ts';
 import { AuthService, OpenAPI } from '@/api-client/requests';
-import { useAppDispatch } from '@/store/hooks.ts';
-import { setAccessToken, setRefreshToken, setStreamToken } from '@/store/users/auth-slice.ts';
+import { useAppDispatch, useAppSelector } from '@/store/hooks.ts';
+import { selectRefreshToken, setAccessToken, setRefreshToken, setStreamToken } from '@/store/users/auth-slice.ts';
 
 export async function refreshToken(type: 'access' | 'stream') {
   const dispatch = useAppDispatch();
+  const refreshToken = useAppSelector(state => state.auth)
 
-  const token = Token.get();
-
-  if (token?.refreshToken.token) {
-    OpenAPI.TOKEN = token.refreshToken.token;
+  if (refreshToken) {
+    OpenAPI.TOKEN = refreshToken.refreshToken.token;
   } else {
     throw new Error('Refresh token not found');
   }

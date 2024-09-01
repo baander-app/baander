@@ -1,41 +1,40 @@
 import { ReactEventHandler, useEffect, useRef, useState } from 'react';
-import { Flex, Grid, Group, Text } from '@mantine/core';
-import styles from './inline-player.module.scss';
+import { Flex, Grid, Text } from '@mantine/core';
 import { noop } from '@/support/noop.ts';
 import { Cover } from '@/features/library-music/components/artwork/cover';
 import {
   NextButton,
   PauseButton,
   PlayButton,
-  PreviousButton,
+  PreviousButton, VisualizerButton,
 } from '@/features/library-music-player/components/player-controls/player-controls.tsx';
 import { useMusicSource } from '@/providers';
 import { ProgressBar } from '@/features/library-music-player/components/progress-bar/progress-bar.tsx';
 import { formatDuration } from '@/support/time';
 import { useEcho } from '@/providers/echo-provider.tsx';
 import { PlayerStateInput } from '@/services/libraries/player-state.ts';
-import { useStreamToken } from '@/hooks/use-stream-token.ts';
+import { useDisclosure } from '@mantine/hooks';
+import { Waveform } from '@/components/waveform/waveform.tsx';
+import styles from './inline-player.module.scss';
 
 export function InlinePlayer() {
   const echo = useEcho();
   const musicSource = useMusicSource();
-  const { streamToken } = useStreamToken();
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [isReady, setIsReady] = useState(false);
   const [currentProgress, setCurrentProgress] = useState<number>(0);
   const [buffered, setBuffered] = useState(0);
+  const [showWaveform, waveformHandlers] = useDisclosure(false);
 
   const audioRef = useRef<HTMLAudioElement>(new Audio());
   const intervalRef = useRef();
 
   const togglePlayPause = () => {
     if (isPlaying) {
-      audioRef.current.pause();
       setIsPlaying(false);
     } else if (isReady) {
-      audioRef.current.play();
       setIsPlaying(true);
     }
   };
@@ -61,11 +60,17 @@ export function InlinePlayer() {
   const handleTimeUpdate: ReactEventHandler<HTMLAudioElement> = (e) => {
     const audio = e.currentTarget;
 
-    console.log('timeupdate', audio.currentTime);
+    // console.log('timeupdate', audio.currentTime);
 
     setCurrentProgress(audio.currentTime);
     handleBufferProgress(e);
   };
+
+  useEffect(() => {
+    if (audioRef) {
+      musicSource.setAudioRef(audioRef);
+    }
+  }, [audioRef, musicSource.setAudioRef]);
 
   useEffect(() => {
     if (isPlaying) {
@@ -84,12 +89,20 @@ export function InlinePlayer() {
   }, []);
 
   useEffect(() => {
-    if (!musicSource.source) {
+    if (!musicSource.authenticatedSource) {
       return;
     }
 
+    // const wavesurfer = WaveSurfer.create({
+    //   container: '#waveform',
+    //   waveColor: '#4F4A85',
+    //   progressColor: '#383351',
+    //   url: source,
+    // })
+
+
     audioRef.current.pause();
-    audioRef.current = new Audio(`${musicSource.source}?_token=${streamToken}`);
+    audioRef.current = new Audio(musicSource.authenticatedSource);
     audioRef.current.preload = 'auto';
     audioRef.current.oncanplay = () => setIsReady(true);
     // @ts-ignore
@@ -123,18 +136,18 @@ export function InlinePlayer() {
   }, [echo]);
 
   return (
-    <Grid>
-      <Grid.Col mt="6px" span={2}>
-        <Flex align="center" ml="sm">
-          <Cover imgSrc={musicSource.details?.coverUrl} size={72}/>
+    <>
+      <Grid>
+        <Grid.Col mt="6px" span={3}>
+          <Flex align="center" ml="sm">
+            <Cover imgSrc={musicSource.details?.coverUrl} size={72}/>
 
-          <Text ml="sm">{musicSource.details?.title}</Text>
-        </Flex>
-      </Grid.Col>
+            <Text ml="sm" className={styles.trackTitle}>{musicSource.details?.title}</Text>
+          </Flex>
+        </Grid.Col>
 
-      <Grid.Col span={8} mt="10px">
-        <Flex className={styles.controls} direction="column" justify="center">
-          <Flex justify="center">
+        <Grid.Col span={8} mt="10px">
+          <Flex className={styles.controls} direction="column" justify="center">
             <Flex align="center" w="70%">
               <Text pr="sm">{elapsedDisplay}</Text>
 
@@ -144,8 +157,6 @@ export function InlinePlayer() {
                 buffered={buffered}
 
                 setProgress={(e) => {
-                  console.log(e);
-
                   if (!audioRef.current) return;
 
                   audioRef.current.currentTime = e;
@@ -156,21 +167,34 @@ export function InlinePlayer() {
 
               <Text pl="sm">{durationDisplay}</Text>
             </Flex>
+
+            <Grid grow>
+              <Grid.Col span={2}>
+                <VisualizerButton
+                  style={{ marginTop: '3px' }}
+                  isActive={showWaveform}
+                  onClick={() => waveformHandlers.toggle()}/>
+              </Grid.Col>
+
+              <Grid.Col span={8}>
+                <PreviousButton onClick={noop}/>
+
+                {isPlaying
+                 ? <PauseButton onClick={() => togglePlayPause()}/>
+                 : <PlayButton onClick={() => togglePlayPause()}/>
+                }
+
+                <NextButton onClick={noop}/>
+              </Grid.Col>
+
+            </Grid>
           </Flex>
-
-          <Group className={styles.buttonGroup} justify="center">
-            <PreviousButton onClick={noop}/>
-
-            {isPlaying
-             ? <PauseButton onClick={() => togglePlayPause()}/>
-             : <PlayButton onClick={() => togglePlayPause()}/>
-            }
-
-            <NextButton onClick={noop}/>
-          </Group>
-        </Flex>
-      </Grid.Col>
-    </Grid>
+        </Grid.Col>
+      </Grid>
+      {showWaveform && (
+        <Waveform />
+      )}
+    </>
   );
 }
 
