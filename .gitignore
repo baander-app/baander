@@ -17,6 +17,7 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
+bundle-visualization.html
 
 # Project exclude paths
 /storage/testlibrary/

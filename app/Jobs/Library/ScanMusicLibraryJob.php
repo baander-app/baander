@@ -43,9 +43,6 @@ class ScanMusicLibraryJob implements ShouldQueue, ShouldBeUnique
     {
         $this->queueProgress(0);
 
-        Album::truncate();
-        Genre::truncate();
-
         $this->library->update(['last_scan' => now()]);
         $path = $this->library->path;
 
@@ -155,7 +152,6 @@ class ScanMusicLibraryJob implements ShouldQueue, ShouldBeUnique
             $this->processGenres($meta, $song);
 
             $artists = array_map(fn(string $artist) => $artist, \Safe\preg_split('#([;\\\/])#', $meta->getArtist()));
-            dump($artists);
 
             $this->processArtists($artists, $song);
 
@@ -222,7 +218,7 @@ class ScanMusicLibraryJob implements ShouldQueue, ShouldBeUnique
         foreach ($artists as $artist) {
             $artistModel = Artist::whereName($artist)->first();
 
-            if (!$artistModel) {
+            if (!$artistModel && Str::length($artist) > 0) {
                 $artistModel = Artist::create([
                     'name' => $artist,
                 ]);

@@ -12,8 +12,16 @@ return new class extends Migration {
     {
         Schema::create('genreables', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('genre_id');
+
+            $table->foreignId('genre_id')
+                ->references('id')
+                ->on('genres')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
+
             $table->morphs('genreables');
+
+            $table->index('genre_id');
         });
     }
 

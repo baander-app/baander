@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import styles from './albums.module.scss';
 import { AlbumDetail } from '@/features/library-music/components/album-detail/album-detail.tsx';
@@ -6,21 +6,10 @@ import { CoverGrid } from '@/features/library-music/components/cover-grid';
 import { Album } from '@/features/library-music/components/album';
 import { useAlbumServiceAlbumsIndex } from '@/api-client/queries';
 import { Box, Flex, Skeleton } from '@mantine/core';
-import { nprogress } from '@mantine/nprogress';
 
 export default function Albums() {
   const [showAlbumDetail, setShowAlbumDetail] = useState<string | null>(null);
-  const {data, isLoading, isFetching} = useAlbumServiceAlbumsIndex({library: 'music', relations: 'cover'});
-
-  useEffect(() => {
-    nprogress.set(50);
-  }, [isFetching]);
-
-  useEffect(() => {
-    if (!isLoading) {
-      nprogress.complete();
-    }
-  }, [isLoading]);
+  const {data, isLoading} = useAlbumServiceAlbumsIndex({library: 'music', relations: 'cover'});
 
   return (
     <Flex justify="space-between">

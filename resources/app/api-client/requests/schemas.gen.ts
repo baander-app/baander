@@ -43,6 +43,39 @@ export const $AlbumResourceResource = {
     title: 'AlbumResourceResource'
 } as const;
 
+export const $AlbumWithoutSongsResource = {
+    type: 'object',
+    properties: {
+        title: {
+            type: 'string'
+        },
+        slug: {
+            type: 'string'
+        },
+        year: {
+            type: 'string'
+        },
+        directory: {
+            type: 'string'
+        },
+        coverUrl: {
+            type: 'string'
+        },
+        createdAt: {
+            type: 'string'
+        },
+        updatedAt: {
+            type: 'string'
+        },
+        albumArtist: {
+            description: 'Album artist relation',
+            '$ref': '#/components/schemas/ArtistResource'
+        }
+    },
+    required: ['title', 'slug', 'year', 'directory', 'createdAt', 'updatedAt'],
+    title: 'AlbumWithoutSongsResource'
+} as const;
+
 export const $ArtistResource = {
     type: 'object',
     properties: {
@@ -297,14 +330,9 @@ export const $PersonalAccessTokenViewResource = {
         deviceName: {
             type: ['string', 'null']
         },
-        deviceBrandName: {
-            type: ['string', 'null']
-        },
-        deviceModel: {
-            type: ['string', 'null']
-        },
-        deviceType: {
-            type: ['string', 'null']
+        lastUsedAt: {
+            type: ['string', 'null'],
+            format: 'date-time'
         },
         expiresAt: {
             type: ['string', 'null'],
@@ -319,7 +347,7 @@ export const $PersonalAccessTokenViewResource = {
             format: 'date-time'
         }
     },
-    required: ['id', 'name', 'abilities', 'userAgent', 'clientName', 'clientVersion', 'clientType', 'deviceOperatingSystem', 'deviceName', 'deviceBrandName', 'deviceModel', 'deviceType', 'expiresAt', 'createdAt', 'updatedAt'],
+    required: ['id', 'name', 'abilities', 'userAgent', 'clientName', 'clientVersion', 'clientType', 'deviceOperatingSystem', 'deviceName', 'lastUsedAt', 'expiresAt', 'createdAt', 'updatedAt'],
     title: 'PersonalAccessTokenViewResource'
 } as const;
 
@@ -424,15 +452,13 @@ export const $SongResource = {
         updatedAt: {
             type: ['string', 'null'],
             format: 'date-time'
+        },
+        album: {
+            '$ref': '#/components/schemas/AlbumWithoutSongsResource'
         }
     },
     required: ['public_id', 'title', 'year', 'comment', 'disc', 'length', 'durationHuman', 'lyrics', 'modifiedTime', 'path', 'track', 'size', 'sizeHuman', 'mimeType', 'hash', 'createdAt', 'updatedAt'],
     title: 'SongResource'
-} as const;
-
-export const $SongWithAlbumResource = {
-    type: 'string',
-    title: 'SongWithAlbumResource'
 } as const;
 
 export const $UpdateGenreRequest = {

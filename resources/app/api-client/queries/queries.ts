@@ -152,30 +152,28 @@ export const useOpCacheServiceOpcacheGetConfig = <TData = Common.OpCacheServiceO
 * Get a collection of songs
 * @param data The data for the request.
 * @param data.library The library slug
-* @param data.albumArtist
-* @param data.genreIds
-* @param data.title
-* @param data.albumId
-* @param data.page
-* @param data.perPage
-* @returns unknown Json paginated set of `SongWithAlbumResource`
+* @param data.page Current page
+* @param data.perPage Items per page
+* @param data.genreNames Comma seperated list of genre names You can only search for names or slugs. Not both.
+* @param data.genreSlugs Comma seperated list of genre slugs
+* @param data.relations
+* @returns unknown Json paginated set of `SongResource`
 * @throws ApiError
 */
-export const useSongServiceSongsIndex = <TData = Common.SongServiceSongsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ albumArtist, albumId, genreIds, library, page, perPage, title }: {
-  albumArtist?: string;
-  albumId?: number;
-  genreIds?: string;
+export const useSongServiceSongsIndex = <TData = Common.SongServiceSongsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ genreNames, genreSlugs, library, page, perPage, relations }: {
+  genreNames?: string;
+  genreSlugs?: string;
   library: string;
   page?: number;
   perPage?: number;
-  title?: string;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSongServiceSongsIndexKeyFn({ albumArtist, albumId, genreIds, library, page, perPage, title }, queryKey), queryFn: () => SongService.songsIndex({ albumArtist, albumId, genreIds, library, page, perPage, title }) as TData, ...options });
+  relations?: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSongServiceSongsIndexKeyFn({ genreNames, genreSlugs, library, page, perPage, relations }, queryKey), queryFn: () => SongService.songsIndex({ genreNames, genreSlugs, library, page, perPage, relations }) as TData, ...options });
 /**
 * Get a song
 * @param data The data for the request.
 * @param data.library The library slug
 * @param data.song The song public id
-* @returns SongWithAlbumResource `SongWithAlbumResource`
+* @returns SongResource `SongResource`
 * @throws ApiError
 */
 export const useSongServiceSongsShow = <TData = Common.SongServiceSongsShowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ library, song }: {

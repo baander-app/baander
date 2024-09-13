@@ -1,4 +1,4 @@
-import { Container, Paper, Title, Text, PasswordInput, Button } from '@mantine/core';
+import { Button, Container, Paper, PasswordInput, Text, Title } from '@mantine/core';
 import { useForm } from '@mantine/form';
 
 type PasswordForm = {
@@ -15,10 +15,6 @@ export function ConfirmPassword() {
       password: (val) => (val.length <= 6 ? 'Password should include at least 6 characters' : null),
     }
   });
-
-  const onSubmit = async (formData: PasswordForm) => {
-
-  }
 
   return (
     <Container>

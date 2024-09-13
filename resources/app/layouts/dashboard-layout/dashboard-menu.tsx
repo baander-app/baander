@@ -1,8 +1,12 @@
 import { ScrollArea, Text, Divider, Flex } from '@mantine/core';
 import { LinksGroup, LinksGroupProps } from '@/components/nav-bar-links-group/nav-bar-links-group.tsx';
-import { BaanderLogo } from '@/components/branding/baander-logo/baander-logo.tsx';
 import { NavLink } from '@/components/nav-link.tsx';
+import { lazyImport } from '@/utils/lazy-import.ts';
+
+const {BaanderLogo} = lazyImport(() => import('@/components/branding/baander-logo/baander-logo.tsx'), 'BaanderLogo');
+
 import styles from './dashboard-menu.module.scss';
+
 
 const menu: LinksGroupProps[] = [
   {

@@ -14,7 +14,11 @@ return new class extends Migration
         Schema::create('player_states', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('user_id')->constrained('users');
+            $table->foreignId('user_id')
+                ->references('id')
+                ->on('users')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
 
             $table->boolean('is_active')->default(false);
 

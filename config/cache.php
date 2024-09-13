@@ -80,6 +80,12 @@ return [
             'lock_connection' => 'default',
         ],
 
+        'redis-secret' => [
+            'driver'        => 'redis',
+            'connection'    => 'secret',
+            'lock_connection' => 'default',
+        ],
+
         'dynamodb' => [
             'driver'   => 'dynamodb',
             'key'      => env('AWS_ACCESS_KEY_ID'),

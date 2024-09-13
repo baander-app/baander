@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Auth\Role;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -14,20 +15,22 @@ class UsersSeed extends Seeder
      */
     public function run(): void
     {
-        User::factory()->create([
+        $adminUser = User::factory()->create([
             'name'              => 'Test admin',
             'email'             => 'admin@baander.test',
             'password'          => Hash::make('password'),
             'email_verified_at' => now(),
-            'is_admin'          => true,
         ]);
 
-        User::factory()->create([
+        $adminUser->assignRole(Role::Admin->value);
+
+        $normalUser = User::factory()->create([
             'name'              => 'Test user',
             'email'             => 'user@baander.test',
             'password'          => Hash::make('password'),
             'email_verified_at' => now(),
-            'is_admin'          => false,
         ]);
+
+        $normalUser->assignRole(Role::User->value);
     }
 }

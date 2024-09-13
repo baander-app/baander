@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Packages\DeviceDetector\Device;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use JetBrains\PhpStorm\ArrayShape;
@@ -21,15 +22,12 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
         'client_type',
         'device_operating_system',
         'device_name',
-        'device_brand_name',
-        'device_model',
-        'device_type',
     ];
 
     /**
      * Find the token instance matching the given token.
      *
-     * @param  string  $token
+     * @param string $token
      * @return static|null
      */
     public static function findToken($token)
@@ -52,9 +50,6 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
         'client_version'          => "array|null|string",
         'device_operating_system' => "null|string",
         'device_name'             => "null|string",
-        'device_brand_name'       => "null|string",
-        'device_model'            => "null|string",
-        'device_type'             => "int|null",
     ])]
     public static function prepareDeviceFromRequest(Request $request)
     {
@@ -69,9 +64,6 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
             $osVersion = null;
         }
         $deviceName = $deviceDetector->getDeviceName();
-        $brandName = $deviceDetector->getBrandName();
-        $model = $deviceDetector->getModel();
-        $type = $deviceDetector->getDevice();
 
         return [
             'user_agent'              => $request->userAgent(),
@@ -80,9 +72,14 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
             'client_version'          => $deviceDetector->getClient('version'),
             'device_operating_system' => $osName || $osVersion ? implode('|', [$osName, $osVersion]) : null,
             'device_name'             => $deviceName ?: null,
-            'device_brand_name'       => $brandName ?: null,
-            'device_model'            => $model ?: null,
-            'device_type'             => $type ?: null,
         ];
+    }
+
+    /**
+     * @param Builder $q
+     */
+    protected function scopeWhereExpired($q)
+    {
+        return $q->where('expires_at', '<', now());
     }
 }

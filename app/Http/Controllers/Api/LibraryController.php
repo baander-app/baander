@@ -28,7 +28,7 @@ class LibraryController extends Controller
     #[Get('/', 'api.libraries.index')]
     public function index(LibraryIndexRequest $request)
     {
-        $libraries = Library::paginate($request->query('perPage', 15));
+        $libraries = Library::paginate();
 
         return LibraryResource::collection($libraries);
     }

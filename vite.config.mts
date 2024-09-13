@@ -1,16 +1,17 @@
 import { defineConfig, loadEnv } from 'vite';
 import laravel from 'laravel-vite-plugin';
-// import react from '@vitejs/plugin-react-swc';
 import { fileURLToPath } from 'url';
 import { resolve } from 'path';
 import richSvg from 'vite-plugin-react-rich-svg';
 import manifestSRI from 'vite-plugin-manifest-sri';
 import filterReplace from 'vite-plugin-filter-replace';
-// import inspect from 'vite-plugin-inspect';
-import react from "@vitejs/plugin-react";
+import react from '@vitejs/plugin-react';
+import { optimizeCssModules } from 'vite-plugin-optimize-css-modules';
+import Info from 'unplugin-info/vite';
+import { visualizer } from 'rollup-plugin-visualizer';
+import laravelTranslations from 'vite-plugin-laravel-translations';
 
 const ReactCompilerConfig = {};
-
 
 const lottieScopeVariables = [
   'value',
@@ -103,7 +104,11 @@ export default defineConfig(config => {
       __APP_ENV__: JSON.stringify(env.APP_ENV),
     },
     build: {
-      sourcemap: true,
+      sourcemap: false,
+      target: ['chrome128', 'firefox128', 'safari16', 'esnext'],
+      rollupOptions: {
+        treeshake: true,
+      },
     },
     plugins: [
       laravel({
@@ -114,9 +119,14 @@ export default defineConfig(config => {
       }),
       react({
         babel: {
-          plugins: [["babel-plugin-react-compiler", ReactCompilerConfig]],
+          plugins: [['babel-plugin-react-compiler', ReactCompilerConfig]],
         },
       }),
+      // @ts-ignore - wrongly typed
+      laravelTranslations.default({ namespace: 'translation' }),
+      visualizer({ open: false, template: 'flamegraph', filename: 'bundle-visualization.html' }),
+      optimizeCssModules(),
+      Info(),
       richSvg(),
       manifestSRI(),
       // workaround for a warning with lottie https://github.com/airbnb/lottie-web/issues/2927
@@ -124,7 +134,7 @@ export default defineConfig(config => {
         {
           filter: ['node_modules/lottie-web/build/player/lottie.js'],
           replace: {
-            from: "eval('[function _expression_function(){' + val + ';scoped_bm_rt=$bm_rt}]')[0]",
+            from: 'eval(\'[function _expression_function(){\' + val + \';scoped_bm_rt=$bm_rt}]\')[0]',
             to: `
           function _expression_function() {
             var valToEval = val;

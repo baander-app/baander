@@ -6,7 +6,7 @@ export function LibraryNav() {
 
   return (
     <>
-      {data && data.data.map(item => (<LibraryMusicNav slug={item.slug} />))}
+      {data && data.data.map(item => (<LibraryMusicNav key={item.slug} slug={item.slug} />))}
     </>
   )
 }

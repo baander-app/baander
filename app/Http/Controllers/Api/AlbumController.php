@@ -45,7 +45,7 @@ class AlbumController extends Controller
                 return $query->select($fields);
             })->when($genres, function (BaseBuilder $q) use ($genres) {
                 $q->whereGenreNames($genres);
-            })->paginate($request->query('perPage', 60));
+            })->paginate();
 
         $albums->each(function (Album $album) use ($library) {
             $album->setRelation('library', $library);

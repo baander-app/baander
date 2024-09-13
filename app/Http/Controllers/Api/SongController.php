@@ -6,8 +6,9 @@ use App\Extensions\JsonPaginator;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Song\SongIndexRequest;
 use App\Models\{Album, Library, Song, TokenAbility};
-use App\Http\Resources\Song\SongWithAlbumResource;
+use App\Http\Resources\Song\SongResource;
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 #[Middleware(['force.json'])]
 #[Prefix('/libraries/{library}/songs')]
@@ -19,29 +20,35 @@ class SongController extends Controller
      * @param SongIndexRequest $request
      * @param Library $library
      * @param Album $album
-     * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection<JsonPaginator<SongWithAlbumResource>>
+     * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection<JsonPaginator<SongResource>>
      */
     #[Get('', 'api.songs.index', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
     public function index(SongIndexRequest $request, Library $library)
     {
-        $genres = $request->query('genreIds');
-        $albumId = $request->query('albumId');
+        $relations = $request->query('relations');
 
-        $songs = Song::when($albumId, function ($query) use ($library, $albumId) {
-            return $query->where('album_id', $albumId);
-        })->when($genres, function ($query) use ($library, $genres) {
-            return $query->whereHas('genres', function ($query) use ($genres) {
-                return $query->whereIn('genreables_id', explode(',', $genres));
-            });
-        });
+        $genreNames = $request->query('genreNames');
+        $genreSlugs = $request->query('genreSlugs');
 
-        $songs = $songs->filterBy($request->query())->paginate($request->integer('perPage', 30));
+        abort_if(
+            $genreNames && $genreSlugs,
+            400,
+            'You cannot search for genre names and slugs at the same time',
+        );
+
+        $songs = Song::query()
+            ->withRelations(Song::$filterRelations, $relations)
+            ->when($genreSlugs, function ($query) use ($library, $genreSlugs) {
+                return $query->whereGenreSlugs($genreSlugs);
+            })->when($genreNames, function ($query) use ($library, $genreNames) {
+                return $query->whereGenreNames($genreNames);
+            })->paginate();
 
         $songs->each(function (Song $song) use ($library) {
             $song->librarySlug = $library->slug;
         });
 
-        return SongWithAlbumResource::collection($songs);
+        return SongResource::collection($songs);
     }
 
     /**
@@ -49,7 +56,7 @@ class SongController extends Controller
      *
      * @param Library $library
      * @param Song $song
-     * @return SongWithAlbumResource
+     * @return SongResource
      */
     #[Get('{song}', 'api.songs.show', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
     public function show(Library $library, Song $song)
@@ -59,7 +66,7 @@ class SongController extends Controller
         $song->libraryId = $library->id;
         $song->librarySlug = $library->slug;
 
-        return new SongWithAlbumResource($song);
+        return new SongResource($song);
     }
 
     /**
@@ -67,8 +74,9 @@ class SongController extends Controller
      *
      * Requires token with "access-stream"
      *
+     * @param Library $library
      * @param Song $song
-     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     * @return BinaryFileResponse
      */
     #[Get('/stream/song/{song}/direct', 'api.songs.stream', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_STREAM->value])]
     public function directStream(Library $library, Song $song)

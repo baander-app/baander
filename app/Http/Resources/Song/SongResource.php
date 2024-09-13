@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Song;
 
+use App\Http\Resources\Album\AlbumWithoutSongsResource;
 use App\Models\Song;
 use App\Packages\Humanize\HumanDuration;
 use Illuminate\Http\Request;
@@ -43,6 +44,7 @@ class SongResource extends JsonResource
             ]),
             'createdAt'     => $this->created_at,
             'updatedAt'     => $this->updated_at,
+            'album' => AlbumWithoutSongsResource::make($this->whenLoaded('album')),
         ];
     }
 

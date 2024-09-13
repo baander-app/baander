@@ -13,14 +13,23 @@ return new class extends Migration {
         Schema::create('user_media_activities', function (Blueprint $table) {
             $table->id();
             $table->text('public_id')->unique();
-            $table->foreignId('user_id')->constrained('users');
+
+            $table->foreignId('user_id')
+                ->references('id')
+                ->on('users')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
 
             $table->morphs('user_media_activityable');
 
-            $table->bigInteger('play_count')->nullable();
+            $table->unsignedBigInteger('play_count')->nullable();
+
             $table->boolean('love')->default(false);
+
             $table->timestampTz('last_played_at')->nullable();
+
             $table->text('last_platform')->nullable();
+
             $table->text('last_player')->nullable();
 
             $table->timestampsTz();

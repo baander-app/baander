@@ -1,11 +1,27 @@
-import Lottie, { LottieProps } from 'react-lottie-player';
-import lottieJson from './vinyl-spin-animation.json';
+import { useLayoutEffect, createRef } from 'react';
+import lazyLottie from '@/utils/lazy-lottie.ts';
 
-export function VinylSpinAnimation({...rest}: LottieProps) {
+interface VinylSpinAnimationProps extends React.HTMLProps<HTMLElement> {}
+export function VinylSpinAnimation({...rest}: VinylSpinAnimationProps) {
+  const ref = createRef<HTMLElement>();
+
+  useLayoutEffect(() => {
+    if (ref.current) {
+      lazyLottie.loadAnimation({
+        container: ref.current!,
+        path: new URL(`./vinyl-spin-animation.json`, import.meta.url).href,
+        autoplay: true,
+        renderer: 'svg',
+        loop: true,
+      });
+    }
+  }, []);
+
   return (
-    <Lottie
-      animationData={lottieJson}
+    <div
+      // @ts-ignore
+      ref={ref}
       {...rest}
     />
-  )
+  );
 }

@@ -81,15 +81,14 @@ export const UseOpCacheServiceOpcacheGetConfigKeyFn = (queryKey?: Array<unknown>
 export type SongServiceSongsIndexDefaultResponse = Awaited<ReturnType<typeof SongService.songsIndex>>;
 export type SongServiceSongsIndexQueryResult<TData = SongServiceSongsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSongServiceSongsIndexKey = "SongServiceSongsIndex";
-export const UseSongServiceSongsIndexKeyFn = ({ albumArtist, albumId, genreIds, library, page, perPage, title }: {
-  albumArtist?: string;
-  albumId?: number;
-  genreIds?: string;
+export const UseSongServiceSongsIndexKeyFn = ({ genreNames, genreSlugs, library, page, perPage, relations }: {
+  genreNames?: string;
+  genreSlugs?: string;
   library: string;
   page?: number;
   perPage?: number;
-  title?: string;
-}, queryKey?: Array<unknown>) => [useSongServiceSongsIndexKey, ...(queryKey ?? [{ albumArtist, albumId, genreIds, library, page, perPage, title }])];
+  relations?: string;
+}, queryKey?: Array<unknown>) => [useSongServiceSongsIndexKey, ...(queryKey ?? [{ genreNames, genreSlugs, library, page, perPage, relations }])];
 export type SongServiceSongsShowDefaultResponse = Awaited<ReturnType<typeof SongService.songsShow>>;
 export type SongServiceSongsShowQueryResult<TData = SongServiceSongsShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSongServiceSongsShowKey = "SongServiceSongsShow";

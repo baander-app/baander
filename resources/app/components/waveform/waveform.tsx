@@ -1,8 +1,9 @@
-import { createRef, startTransition, useEffect, useState } from 'react';
+import { createRef, useEffect, useState } from 'react';
 import { Rnd } from 'react-rnd';
 import WaveSurfer from 'wavesurfer.js';
+// @ts-ignore
 import Hover from 'wavesurfer.js/dist/plugins/hover.esm.js'
-import { useMusicSource } from '@/providers';
+import { useMusicSource } from '@/providers/music-source-provider';
 import { CloseButton, Loader, Text } from '@mantine/core';
 import styles from './waveform.module.scss';
 
@@ -74,9 +75,11 @@ export function Waveform({ onClose }: WaveformProps) {
       size={size}
       position={position}
       enableResizing
+      // @ts-ignore
       onDragStop={(e, d) => {
         updatePosition({ x: d.x, y: d.y });
       }}
+      // @ts-ignore
       onResizeStop={(e, direction, ref, delta, position) => {
         updateSize({
           width: Number(ref.style.width),

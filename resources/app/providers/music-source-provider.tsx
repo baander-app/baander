@@ -1,46 +1,36 @@
 import React, { MutableRefObject, useContext, useMemo, useState } from 'react';
-import { noop } from '@/support/noop.ts';
+import { noop } from '@/utils/noop.ts';
 import { useStreamToken } from '@/hooks/use-stream-token.ts';
-
-interface SongDetails {
-  coverUrl?: string;
-  title: string;
-}
+import { SongResource } from '@/api-client/requests';
 
 interface MusicSourceContextType {
-  authenticatedSource: string | null;
-  audioRef: MutableRefObject<HTMLAudioElement> | null;
-  setAudioRef: (audioRef: MutableRefObject<HTMLAudioElement> | null) => void;
-  source: string | null;
-  setSource: (source: string | null) => void;
-  details: SongDetails | null;
-  setDetails: (details: SongDetails) => void;
+  authenticatedSource: string | undefined;
+  audioRef: MutableRefObject<HTMLAudioElement> | undefined;
+  setAudioRef: (audioRef: MutableRefObject<HTMLAudioElement>) => void;
+  song: SongResource | null;
+  setSong: (song: SongResource | null) => void;
 }
 
 export const MusicSourceContext = React.createContext<MusicSourceContextType>({
-  authenticatedSource: null,
-  audioRef: null,
+  authenticatedSource: undefined,
+  audioRef: undefined,
   setAudioRef: () => noop(),
-  source: null,
-  setSource: () => noop(),
-  details: null,
-  setDetails: () => noop(),
+  song: null,
+  setSong: () => noop(),
 });
 MusicSourceContext.displayName = 'MusicSourceContext';
 
 export function MusicSourceProvider({ children }: { children: React.ReactNode }) {
-  const [audioRef, setAudioRef] = useState<MutableRefObject<HTMLAudioElement>>(null);
+  const [audioRef, setAudioRef] = useState<MutableRefObject<HTMLAudioElement>>();
 
   const { streamToken } = useStreamToken();
-
-  const [source, setSource] = useState<string | null>(null);
-  const [details, setDetails] = useState<SongDetails | null>(null);
+  const [song, setSong] = useState<SongResource | null>(null);
 
   const authenticatedSource = useMemo(() => {
-    if (source && streamToken) {
-      return `${source}?_token=${streamToken}`;
+    if (song?.stream && streamToken) {
+      return `${song.stream}?_token=${streamToken}`;
     }
-  }, [source, streamToken]);
+  }, [song?.stream, streamToken]);
 
 
   return (
@@ -49,10 +39,8 @@ export function MusicSourceProvider({ children }: { children: React.ReactNode })
         authenticatedSource,
         audioRef,
         setAudioRef,
-        source,
-        setSource,
-        details,
-        setDetails,
+        song,
+        setSong
       }}
     >{children}</MusicSourceContext.Provider>
   );

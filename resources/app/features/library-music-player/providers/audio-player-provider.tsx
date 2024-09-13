@@ -1,6 +1,6 @@
 import React, { MutableRefObject, ReactEventHandler, useContext, useEffect, useRef, useState } from 'react';
-import { noop } from '@/support/noop.ts';
-import { useMusicSource } from '@/providers';
+import { noop } from '@/utils/noop.ts';
+import { useMusicSource } from '@/providers/music-source-provider';
 import { notifications } from '@mantine/notifications';
 
 interface AudioPlayerContextType {

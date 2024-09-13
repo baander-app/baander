@@ -18,6 +18,8 @@ return new class extends Migration
             $table->text('slug')->unique();
 
             $table->timestampsTz();
+
+            $table->index('name');
         });
     }
 

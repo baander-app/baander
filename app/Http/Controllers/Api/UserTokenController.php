@@ -23,7 +23,7 @@ class UserTokenController extends Controller
     /**
      * Get a collection of tokens
      *
-     * @param Request $request The HTTP request instance.
+     * @param UserTokenIndexRequest $request The HTTP request instance.
      *
      * @return AnonymousResourceCollection<JsonPaginator<PersonalAccessTokenViewResource>> The collection of personal access tokens.
      */

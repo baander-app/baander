@@ -13,8 +13,20 @@ return new class extends Migration {
         Schema::create('artist_song', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('artist_id')->index()->constrained()->cascadeOnDelete();
-            $table->foreignId('song_id')->index()->constrained()->cascadeOnDelete();
+            $table->foreignId('artist_id')
+                ->references('id')
+                ->on('artists')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
+
+            $table->foreignId('song_id')
+                ->references('id')
+                ->on('songs')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
+
+            $table->index('artist_id');
+            $table->index('song_id');
         });
     }
 

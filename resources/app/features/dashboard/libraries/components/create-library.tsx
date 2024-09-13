@@ -1,4 +1,3 @@
-import React from 'react';
 import { FloatingLabelInput } from '@/components/forms/floating-label-input/floating-label-input.tsx';
 import { Select } from '@mantine/core';
 import { getLibraryTypesForSelect } from '@/services/libraries/support.ts';

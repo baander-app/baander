@@ -614,13 +614,12 @@ export class SongService {
      * Get a collection of songs
      * @param data The data for the request.
      * @param data.library The library slug
-     * @param data.albumArtist
-     * @param data.genreIds
-     * @param data.title
-     * @param data.albumId
-     * @param data.page
-     * @param data.perPage
-     * @returns unknown Json paginated set of `SongWithAlbumResource`
+     * @param data.page Current page
+     * @param data.perPage Items per page
+     * @param data.genreNames Comma seperated list of genre names You can only search for names or slugs. Not both.
+     * @param data.genreSlugs Comma seperated list of genre slugs
+     * @param data.relations
+     * @returns unknown Json paginated set of `SongResource`
      * @throws ApiError
      */
     public static songsIndex(data: SongsIndexData): CancelablePromise<SongsIndexResponse> {
@@ -631,14 +630,14 @@ export class SongService {
                 library: data.library
             },
             query: {
-                albumArtist: data.albumArtist,
-                genreIds: data.genreIds,
-                title: data.title,
-                albumId: data.albumId,
                 page: data.page,
-                perPage: data.perPage
+                perPage: data.perPage,
+                genreNames: data.genreNames,
+                genreSlugs: data.genreSlugs,
+                relations: data.relations
             },
             errors: {
+                400: 'An error',
                 401: 'Unauthenticated',
                 403: 'Authorization error',
                 404: 'Not found',
@@ -652,7 +651,7 @@ export class SongService {
      * @param data The data for the request.
      * @param data.library The library slug
      * @param data.song The song public id
-     * @returns SongWithAlbumResource `SongWithAlbumResource`
+     * @returns SongResource `SongResource`
      * @throws ApiError
      */
     public static songsShow(data: SongsShowData): CancelablePromise<SongsShowResponse> {

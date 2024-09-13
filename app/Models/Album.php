@@ -3,12 +3,13 @@
 namespace App\Models;
 
 use App\Extensions\BaseBuilder;
+use App\Models\Concerns\HasLibraryAccess;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Spatie\Sluggable\{HasSlug, SlugOptions};
 
 class Album extends BaseModel
 {
-    use HasFactory, HasSlug;
+    use HasFactory, HasLibraryAccess, HasSlug;
 
     public static array $filterFields = [
       'title',
@@ -34,6 +35,8 @@ class Album extends BaseModel
         'year',
         'directory',
     ];
+
+    protected $perPage = 60;
 
     /**
      * Get the options for generating the slug.

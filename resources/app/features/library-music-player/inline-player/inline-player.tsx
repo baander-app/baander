@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Flex, Grid, Group, Text } from '@mantine/core';
-import { noop } from '@/support/noop.ts';
+import { noop } from '@/utils/noop.ts';
 import { Cover } from '@/features/library-music/components/artwork/cover';
 import {
   LyricsButton,
@@ -9,9 +9,9 @@ import {
   PreviousButton,
   VisualizerButton,
 } from '@/features/library-music-player/components/player-controls/player-controls.tsx';
-import { useMusicSource } from '@/providers';
+import { useMusicSource } from '@/providers/music-source-provider';
 import { ProgressBar } from '@/features/library-music-player/components/progress-bar/progress-bar.tsx';
-import { formatDuration } from '@/support/time';
+import { formatDuration } from '@/utils/time/format-duration.ts';
 import { useEcho } from '@/providers/echo-provider.tsx';
 import { PlayerStateInput } from '@/services/libraries/player-state.ts';
 import { useDisclosure } from '@mantine/hooks';
@@ -21,7 +21,10 @@ import { useAudioPlayer } from '@/features/library-music-player/providers/audio-
 
 export function InlinePlayer() {
   const echo = useEcho();
-  const musicSource = useMusicSource();
+  const {
+    authenticatedSource,
+    song,
+  } = useMusicSource();
   const {
     audioRef,
     isPlaying,
@@ -38,7 +41,7 @@ export function InlinePlayer() {
 
   useEffect(() => {
     let timerId = setInterval(() => {
-      if (!musicSource.authenticatedSource) {
+      if (!authenticatedSource) {
         return;
       }
 
@@ -61,9 +64,9 @@ export function InlinePlayer() {
       <Grid>
         <Grid.Col mt="6px" span={3}>
           <Flex align="center" ml="sm">
-            <Cover imgSrc={musicSource.details?.coverUrl} size={72}/>
+            <Cover imgSrc={song?.album?.coverUrl} size={72}/>
 
-            <Text ml="sm" className={styles.trackTitle}>{musicSource.details?.title}</Text>
+            <Text ml="sm" className={styles.trackTitle}>{song?.title}</Text>
           </Flex>
         </Grid.Col>
 

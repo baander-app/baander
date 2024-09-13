@@ -14,7 +14,14 @@ return new class extends Migration
         Schema::create('songs', function (Blueprint $table) {
             $table->id();
             $table->text('public_id')->unique();
-            $table->foreignId('album_id')->index()->constrained()->cascadeOnDelete();
+
+            $table->foreignId('album_id')
+                ->references('id')
+                ->on('albums')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
+
+            $table->index('album_id');
 
             $table->caseInsensitiveText('title');
             $table->text('path');

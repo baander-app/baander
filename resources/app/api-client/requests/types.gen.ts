@@ -21,6 +21,20 @@ export type AlbumResourceResource = {
     songs?: Array<SongResource>;
 };
 
+export type AlbumWithoutSongsResource = {
+    title: string;
+    slug: string;
+    year: string;
+    directory: string;
+    coverUrl?: string;
+    createdAt: string;
+    updatedAt: string;
+    /**
+     * Album artist relation
+     */
+    albumArtist?: ArtistResource;
+};
+
 export type ArtistResource = {
     name: string;
     slug: string;
@@ -107,9 +121,7 @@ export type PersonalAccessTokenViewResource = {
     clientType: string | null;
     deviceOperatingSystem: string | null;
     deviceName: string | null;
-    deviceBrandName: string | null;
-    deviceModel: string | null;
-    deviceType: string | null;
+    lastUsedAt: string | null;
     expiresAt: string | null;
     createdAt: string | null;
     updatedAt: string | null;
@@ -148,9 +160,8 @@ export type SongResource = {
     stream?: string | null;
     createdAt: string | null;
     updatedAt: string | null;
+    album?: AlbumWithoutSongsResource;
 };
-
-export type SongWithAlbumResource = string;
 
 export type UpdateGenreRequest = {
     name: string;
@@ -582,20 +593,31 @@ export type OpcacheCompileResponse = {
 };
 
 export type SongsIndexData = {
-    albumArtist?: string;
-    albumId?: number;
-    genreIds?: string;
+    /**
+     * Comma seperated list of genre names You can only search for names or slugs. Not both.
+     */
+    genreNames?: string;
+    /**
+     * Comma seperated list of genre slugs
+     */
+    genreSlugs?: string;
     /**
      * The library slug
      */
     library: string;
+    /**
+     * Current page
+     */
     page?: number;
+    /**
+     * Items per page
+     */
     perPage?: number;
-    title?: string;
+    relations?: string;
 };
 
 export type SongsIndexResponse = {
-    data: Array<SongWithAlbumResource>;
+    data: Array<SongResource>;
     meta: {
         /**
          * Total number of items being paginated.
@@ -631,7 +653,7 @@ export type SongsShowData = {
     song: string;
 };
 
-export type SongsShowResponse = SongWithAlbumResource;
+export type SongsShowResponse = SongResource;
 
 export type SongsStreamData = {
     /**
@@ -1688,10 +1710,10 @@ export type $OpenApiTs = {
             req: SongsIndexData;
             res: {
                 /**
-                 * Json paginated set of `SongWithAlbumResource`
+                 * Json paginated set of `SongResource`
                  */
                 200: {
-                    data: Array<SongWithAlbumResource>;
+                    data: Array<SongResource>;
                     meta: {
                         /**
                          * Total number of items being paginated.
@@ -1714,6 +1736,15 @@ export type $OpenApiTs = {
                          */
                         lastPage?: number;
                     };
+                };
+                /**
+                 * An error
+                 */
+                400: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
                 };
                 /**
                  * Unauthenticated
@@ -1765,9 +1796,9 @@ export type $OpenApiTs = {
             req: SongsShowData;
             res: {
                 /**
-                 * `SongWithAlbumResource`
+                 * `SongResource`
                  */
-                200: SongWithAlbumResource;
+                200: SongResource;
                 /**
                  * Unauthenticated
                  */

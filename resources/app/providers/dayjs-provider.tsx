@@ -16,10 +16,13 @@ const getLocalizedFormat = (locale: string): string => {
   return localeFormatMap[locale] || 'YYYY-MM-DD HH:mm'; // Default to ISO format
 };
 
+type Formattable = dayjs.Dayjs | string | number | undefined | null;
+
 interface DateFormatterContextProps {
   locale: string;
   setLocale: (locale: string) => void;
-  formatDate: (date: dayjs.Dayjs) => string;
+  formatDate: (date: Formattable) => string;
+  fromNow: (date: Formattable, withoutSuffix?: boolean) => string;
 }
 
 const DateFormatterContext = createContext<DateFormatterContextProps | undefined>(undefined);
@@ -35,14 +38,26 @@ const DateFormatterProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   }, [locale, localeFormatMap]);
 
-  const formatDate = (date: dayjs.Dayjs): string => {
+  const formatDate = (date: Formattable): string => {
+    if (!date) {
+      return '';
+    }
+
     const formatString = getLocalizedFormat(locale);
 
     return dayjs(date).format(formatString);
   };
 
+  const fromNow = (date: Formattable, withoutSuffix?: boolean): string => {
+    if (!date) {
+      return '';
+    }
+
+    return dayjs(date).fromNow(withoutSuffix);
+  }
+
   return (
-    <DateFormatterContext.Provider value={{ formatDate, locale, setLocale }}>
+    <DateFormatterContext.Provider value={{ formatDate, fromNow, locale, setLocale }}>
       {children}
     </DateFormatterContext.Provider>
   );

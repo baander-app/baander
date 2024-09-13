@@ -8,7 +8,7 @@ import { TableProps } from '@mantine/core/lib/components/Table/Table';
 import { SongResource } from '@/api-client/requests';
 import { SongDetail } from '@/features/library-music/components/song-detail/song-detail.tsx';
 import styles from './song-list.module.scss';
-import { useMusicSource } from '@/providers';
+import { useMusicSource } from '@/providers/music-source-provider';
 
 const perPage = 30;
 
@@ -19,7 +19,7 @@ export function SongList() {
   const [openedSong, setOpenedSong] = useState<SongResource>();
   const [opened, {open, close}] = useDisclosure(false);
   const {showContextMenu} = useContextMenu();
-  const {setSource, setDetails} = useMusicSource();
+  const {setSong} = useMusicSource();
 
   const getContextMenuTemplate = useCallback((data: SongResource) => {
     const contextMenuTemplate: ContextMenuContent = [
@@ -48,11 +48,8 @@ export function SongList() {
   const onSongClick = useCallback((index: number, song: SongResource) => {
     setActiveIndex(index);
 
-    setSource(song.stream ?? null);
-    setDetails({
-      title: song.title,
-    });
-  }, [setActiveIndex, setSource, setDetails]);
+    setSong(song);
+  }, [setActiveIndex, setSong]);
 
   const loadMore = useCallback(() => {
     const lastPage = songData?.meta?.lastPage;
@@ -62,6 +59,7 @@ export function SongList() {
       console.log('currentPage', currentPage)
     }
   }, [songData])
+
 
   return (
     <>
@@ -82,7 +80,8 @@ export function SongList() {
             <Table.Td w="5%">Track</Table.Td>
           </Table.Tr>
         )}
-        itemContent={(index, data) => {
+        // @ts-ignore
+        itemContent={(index, data: SongResource) => {
           return (
             <React.Fragment
               key={data.public_id}
@@ -101,7 +100,10 @@ export function SongList() {
                 style={{backgroundColor: activeIndex === index ? '#ccc' : 'unset'}}
                 onClick={() => onSongClick(index, data)}
               >
-                <Text size="sm">{data?.album?.title}</Text>
+                <Text size="sm">{
+                  // @ts-ignore
+                  data?.album?.title
+                }</Text>
               </Table.Td>
 
               <Table.Td
