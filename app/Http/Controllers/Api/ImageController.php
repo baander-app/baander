@@ -12,7 +12,7 @@ use Spatie\RouteAttributes\Attributes\Prefix;
 class ImageController extends Controller
 {
     /**
-     * Get image asset
+     * Get an image asset
      *
      * @unauthenticated
      */

@@ -12,7 +12,7 @@ const menu: LinksGroupProps[] = [
       {label: 'Two factor', to: 'account/two-factor'},
       {label: 'Passkey', to: ''},
       {label: 'Password', to: ''},
-      {label: 'Sessions', to: ''},
+      {label: 'Sessions', to: 'account/sessions'},
     ],
   },
 ];

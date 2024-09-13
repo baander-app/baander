@@ -2,11 +2,9 @@ import { Action, combineSlices, configureStore, ThunkAction } from '@reduxjs/too
 import { persistReducer, persistStore } from 'redux-persist';
 import storage from 'redux-persist/lib/storage';
 import { authSlice } from '@/store/users/auth-slice.ts';
-import { musicPlayerSlice } from '@/store/music-player/music-player-slice.ts';
 
 const rootReducer = combineSlices(
   authSlice,
-  musicPlayerSlice,
 );
 export type RootState = ReturnType<typeof rootReducer>
 

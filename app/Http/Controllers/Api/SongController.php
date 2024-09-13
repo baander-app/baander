@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Extensions\JsonPaginator;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Song\SongIndexRequest;
-use App\Http\Resources\Song\SongResource;
 use App\Models\{Album, Library, Song, TokenAbility};
+use App\Http\Resources\Song\SongWithAlbumResource;
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
 
 #[Middleware(['force.json'])]
@@ -14,10 +14,12 @@ use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
 class SongController extends Controller
 {
     /**
+     * Get a collection of songs
+     *
      * @param SongIndexRequest $request
      * @param Library $library
      * @param Album $album
-     * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection<JsonPaginator<SongResource>>
+     * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection<JsonPaginator<SongWithAlbumResource>>
      */
     #[Get('', 'api.songs.index', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
     public function index(SongIndexRequest $request, Library $library)
@@ -39,16 +41,25 @@ class SongController extends Controller
             $song->librarySlug = $library->slug;
         });
 
-        return SongResource::collection($songs);
+        return SongWithAlbumResource::collection($songs);
     }
 
+    /**
+     * Get a song
+     *
+     * @param Library $library
+     * @param Song $song
+     * @return SongWithAlbumResource
+     */
     #[Get('{song}', 'api.songs.show', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
     public function show(Library $library, Song $song)
     {
+        $song->with('album');
+
         $song->libraryId = $library->id;
         $song->librarySlug = $library->slug;
 
-        return new SongResource($song);
+        return new SongWithAlbumResource($song);
     }
 
     /**

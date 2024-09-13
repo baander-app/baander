@@ -6,14 +6,12 @@ import { AppRoutes } from '@/routes';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { MusicSourceProvider } from '@/providers';
 import { ColorSchemeScript, MantineProvider } from '@mantine/core';
-import { notifications, Notifications } from '@mantine/notifications';
+import { Notifications } from '@mantine/notifications';
 import { NavigationProgress } from '@mantine/nprogress';
 import { ModalsProvider } from '@mantine/modals';
 import { DatesProvider } from '@mantine/dates';
 import { ContextMenuProvider } from 'mantine-contextmenu';
 import { HelmetProvider } from 'react-helmet-async';
-import { useIsOnline } from '@/hooks/use-is-online.ts';
-import { useEffect } from 'react';
 
 function App() {
   return (

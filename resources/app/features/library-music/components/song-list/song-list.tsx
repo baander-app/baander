@@ -10,8 +10,11 @@ import { SongDetail } from '@/features/library-music/components/song-detail/song
 import styles from './song-list.module.scss';
 import { useMusicSource } from '@/providers';
 
+const perPage = 30;
+
 export function SongList() {
-  const {data: songData} = useSongServiceSongsIndex({library: 'music'});
+  const [currentPage, setCurrentPage] = useState(0);
+  const {data: songData} = useSongServiceSongsIndex({library: 'music', page: currentPage, perPage});
   const [activeIndex, setActiveIndex] = useState(0);
   const [openedSong, setOpenedSong] = useState<SongResource>();
   const [opened, {open, close}] = useDisclosure(false);
@@ -45,11 +48,20 @@ export function SongList() {
   const onSongClick = useCallback((index: number, song: SongResource) => {
     setActiveIndex(index);
 
-    setSource(song.stream);
+    setSource(song.stream ?? null);
     setDetails({
       title: song.title,
     });
   }, [setActiveIndex, setSource, setDetails]);
+
+  const loadMore = useCallback(() => {
+    const lastPage = songData?.meta?.lastPage;
+    if (lastPage && lastPage > currentPage) {
+      console.log(currentPage)
+      setCurrentPage(currentPage + 1);
+      console.log('currentPage', currentPage)
+    }
+  }, [songData])
 
   return (
     <>
@@ -60,9 +72,11 @@ export function SongList() {
         // @ts-ignore
         components={TableComponents}
         useWindowScroll={true}
+        endReached={loadMore}
         fixedHeaderContent={() => (
           <Table.Tr>
-            <Table.Td w="60%">Title</Table.Td>
+            <Table.Td w="50%">Title</Table.Td>
+            <Table.Td w="10%">Album</Table.Td>
             <Table.Td w="5%">Year</Table.Td>
             <Table.Td w="5%">Length</Table.Td>
             <Table.Td w="5%">Track</Table.Td>
@@ -80,6 +94,14 @@ export function SongList() {
                 onContextMenu={showContextMenu(getContextMenuTemplate(data))}
               >
                 <Text size="sm">{data.title}</Text>
+              </Table.Td>
+
+              <Table.Td
+                className={styles.listItem}
+                style={{backgroundColor: activeIndex === index ? '#ccc' : 'unset'}}
+                onClick={() => onSongClick(index, data)}
+              >
+                <Text size="sm">{data?.album?.title}</Text>
               </Table.Td>
 
               <Table.Td
@@ -105,7 +127,6 @@ export function SongList() {
             </React.Fragment>
           );
         }}
-
       />
 
       <Modal

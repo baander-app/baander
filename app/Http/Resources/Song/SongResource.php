@@ -59,5 +59,7 @@ class SongResource extends JsonResource
         if ($value) {
             return $value;
         }
+
+        return null;
     }
 }

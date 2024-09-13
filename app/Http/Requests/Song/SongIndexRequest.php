@@ -25,15 +25,15 @@ class SongIndexRequest extends FormRequest
             /** @query */
             'albumArtist' => 'string',
             /** @query */
-            'genreIds'       => 'string',
+            'genreIds'    => 'string',
             /** @query */
             'title'       => 'string',
             /** @query */
-            'albumId' => 'integer',
+            'albumId'     => 'integer',
             /** @query */
-            'page' => 'int',
+            'page'        => 'int',
             /** @query */
-            'perPage' => 'int',
+            'perPage'     => 'int',
         ];
     }
 }

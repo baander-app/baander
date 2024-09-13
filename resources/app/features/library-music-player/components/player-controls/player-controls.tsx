@@ -29,12 +29,16 @@ export function PreviousButton({ onClick }: PlayerControlProps) {
   return <BaseControl iconName="entypo:controller-jump-to-start" onClick={onClick}/>;
 }
 
-export function PlayButton({ onClick }: PlayerControlProps) {
-  return <BaseControl iconName="entypo:controller-play" iconSize={32} onClick={onClick}/>;
+export interface PlayPauseButtonProps extends PlayerControlProps {
+  isPlaying: boolean;
 }
-
-export function PauseButton({ onClick }: PlayerControlProps) {
-  return <BaseControl iconName="entypo:controller-paus" onClick={onClick}/>;
+export function PlayPauseButton({ onClick, isPlaying, ...props }: PlayPauseButtonProps) {
+  return <BaseControl
+    iconName={isPlaying ? 'entypo:controller-paus' : 'entypo:controller-play'}
+    iconSize={32}
+    onClick={onClick}
+    {...props}
+  />;
 }
 
 interface VisualizerButtonProps extends PlayerControlProps {
@@ -43,8 +47,22 @@ interface VisualizerButtonProps extends PlayerControlProps {
 
 export function VisualizerButton({ onClick, isActive, ...props }: VisualizerButtonProps) {
   return <BaseControl
-    title="Enable/Disable visualizer"
+    title={`${isActive ? 'Hide' : 'Show'} visualizer`}
     iconName={isActive ? 'ph:waveform' : 'ph:waveform-slash'}
+    iconSize={26}
+    onClick={onClick}
+    {...props}
+  />;
+}
+
+interface LyricsButtonProps extends PlayerControlProps {
+  isActive?: boolean;
+}
+
+export function LyricsButton({ onClick, isActive, ...props }: LyricsButtonProps) {
+  return <BaseControl
+    title={`${isActive ? 'Hide' : 'Show'} lyrics`}
+    iconName="maki:karaoke"
     iconSize={26}
     onClick={onClick}
     {...props}

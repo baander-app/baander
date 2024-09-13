@@ -19,7 +19,8 @@ use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Patch, Post, Pre
 class UserController
 {
     /**
-     * Display a collection of users
+     * Get a collection of users
+     *
      * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection<JsonPaginator<UserResource>>
      */
     #[Get('/', 'api.users.index')]
@@ -44,7 +45,7 @@ class UserController
     }
 
     /**
-     * Update user details
+     * Update a user
      */
     #[Patch('/{user}', 'api.users.update')]
     public function update(User $user, UpdateUserRequest $request)
@@ -63,8 +64,9 @@ class UserController
         return new UserResource($request->user());
     }
 
+
     /**
-     * Display a user
+     * Get small user detail info
      */
     #[Get('/{user}', 'api.users.show')]
     public function show(User $user)

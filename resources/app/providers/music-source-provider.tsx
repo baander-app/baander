@@ -37,7 +37,9 @@ export function MusicSourceProvider({ children }: { children: React.ReactNode })
   const [details, setDetails] = useState<SongDetails | null>(null);
 
   const authenticatedSource = useMemo(() => {
-    return `${source}?_token=${streamToken}`;
+    if (source && streamToken) {
+      return `${source}?_token=${streamToken}`;
+    }
   }, [source, streamToken]);
 
 

@@ -8,6 +8,7 @@ use App\Http\Requests\Library\{CreateLibraryRequest, LibraryIndexRequest, Update
 use App\Http\Resources\Library\LibraryResource;
 use App\Models\Library;
 use App\Models\TokenAbility;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Patch, Post, Prefix};
 
@@ -20,8 +21,9 @@ use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Patch, Post, Pre
 class LibraryController extends Controller
 {
     /**
-     * @param LibraryIndexRequest $request
-     * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection<JsonPaginator<LibraryResource>>
+     * Get a collection of media libraries
+     *
+     * @return AnonymousResourceCollection<JsonPaginator<LibraryResource>>
      */
     #[Get('/', 'api.libraries.index')]
     public function index(LibraryIndexRequest $request)
@@ -31,6 +33,9 @@ class LibraryController extends Controller
         return LibraryResource::collection($libraries);
     }
 
+    /**
+     * Create a library
+     */
     #[Post('/', 'api.library.create')]
     public function create(CreateLibraryRequest $request)
     {
@@ -41,6 +46,9 @@ class LibraryController extends Controller
         return new LibraryResource($library);
     }
 
+    /**
+     * Update a library specified by the provided slug.
+     */
     #[Patch('/:slug', 'api.library.update')]
     public function update(string $slug, UpdateLibraryRequest $request)
     {
@@ -51,6 +59,9 @@ class LibraryController extends Controller
         return new LibraryResource($library);
     }
 
+    /**
+     * Delete a library
+     */
     #[Delete('/:slug', 'api.library.delete')]
     public function destroy(string $slug)
     {

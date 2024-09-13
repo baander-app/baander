@@ -1,9 +1,8 @@
 import { UnstyledButton, Group, Text } from '@mantine/core';
 import styles from './user-button.module.scss';
-import { useUserServiceUsersMeSuspense } from '@/api-client/queries/suspense.ts';
-import { Suspense } from 'react';
 import { Icon } from '@iconify/react';
 import { useUserServiceUsersMe } from '@/api-client/queries';
+import { SocketConnection } from '@/components/socket-connection/socket-connection.tsx';
 
 export function UserButton() {
   const {data} = useUserServiceUsersMe();
@@ -21,6 +20,7 @@ export function UserButton() {
             </Text>
           </div>
 
+          <SocketConnection />
           <Icon icon="mdi:user" />
         </Group>
     </UnstyledButton>

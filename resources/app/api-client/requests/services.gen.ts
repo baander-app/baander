@@ -3,18 +3,27 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { AlbumsIndexData, AlbumsIndexResponse, AlbumsShowData, AlbumsShowResponse, ArtistsIndexData, ArtistsIndexResponse, ArtistsShowData, ArtistsShowResponse, AuthLoginData, AuthLoginResponse, AuthRefreshTokenData, AuthRefreshTokenResponse, AuthStreamTokenData, AuthStreamTokenResponse, AuthRegisterData, AuthRegisterResponse, AuthForgotPasswordData, AuthForgotPasswordResponse, AuthResetPasswordData, AuthResetPasswordResponse, AuthVerifyData, AuthVerifyResponse, GenresIndexData, GenresIndexResponse, ImageServeData, ImageServeResponse, JobLibraryScanData, JobLibraryScanResponse, LibrariesIndexData, LibrariesIndexResponse, LibraryCreateData, LibraryCreateResponse, LibraryUpdateData, LibraryUpdateResponse, LibraryDeleteResponse, SchemasModelResponse, OpCacheGetStatusResponse, OpcacheGetConfigResponse, OpcacheClearData, OpcacheClearResponse, OpcacheCompileData, OpcacheCompileResponse, SongsIndexData, SongsIndexResponse, SongsShowData, SongsShowResponse, SongsStreamData, SongsStreamResponse, UsersIndexResponse, UsersStoreData, UsersStoreResponse, UsersUpdateData, UsersUpdateResponse, UsersShowData, UsersShowResponse, UsersDestroyData, UsersDestroyResponse, UsersMeResponse, WidgetsGetWidgetData, WidgetsGetWidgetResponse, WidgetSchemaGetWidgetsResponse, WidgetSchemaGetWidgetData, WidgetSchemaGetWidgetResponse } from './types.gen';
+import type { AlbumsIndexData, AlbumsIndexResponse, AlbumsShowData, AlbumsShowResponse, ArtistsIndexData, ArtistsIndexResponse, ArtistsShowData, ArtistsShowResponse, AuthLoginData, AuthLoginResponse, AuthRefreshTokenData, AuthRefreshTokenResponse, AuthStreamTokenData, AuthStreamTokenResponse, AuthRegisterData, AuthRegisterResponse, AuthForgotPasswordData, AuthForgotPasswordResponse, AuthResetPasswordData, AuthResetPasswordResponse, AuthVerifyData, AuthVerifyResponse, GenresIndexData, GenresIndexResponse, GenresShowData, GenresShowResponse, GenresUpdateData, GenresUpdateResponse, GenresDestroyData, GenresDestroyResponse, ImageServeData, ImageServeResponse, JobLibraryScanData, JobLibraryScanResponse, LibrariesIndexData, LibrariesIndexResponse, LibraryCreateData, LibraryCreateResponse, LibraryUpdateData, LibraryUpdateResponse, LibraryDeleteResponse, SchemasModelResponse, OpCacheGetStatusResponse, OpcacheGetConfigResponse, OpcacheClearData, OpcacheClearResponse, OpcacheCompileData, OpcacheCompileResponse, SongsIndexData, SongsIndexResponse, SongsShowData, SongsShowResponse, SongsStreamData, SongsStreamResponse, UsersIndexResponse, UsersStoreData, UsersStoreResponse, UsersUpdateData, UsersUpdateResponse, UsersShowData, UsersShowResponse, UsersDestroyData, UsersDestroyResponse, UsersMeResponse, UserTokenGetUserTokensData, UserTokenGetUserTokensResponse, UserTokenRevokeTokenData, UserTokenRevokeTokenResponse, WidgetsGetWidgetData, WidgetsGetWidgetResponse, WidgetSchemaGetWidgetsResponse, WidgetSchemaGetWidgetData, WidgetSchemaGetWidgetResponse } from './types.gen';
 
 export class AlbumService {
     /**
+     * Get a collection of albums
      * @param data The data for the request.
      * @param data.library The library slug
-     * @param data.page
-     * @param data.perPage
-     * @param data.fields
-     * @param data.relations
-     * @param data.genres
-     * @returns unknown Json paginated set of `AlbumResource`
+     * @param data.fields Comma seperated string of fields you want to select. If nothing is defined `select *` is default.
+     * - title
+     * - slug
+     * - year
+     * - directory
+     * @param data.relations Comma seperated string of relations
+     * - albumArist
+     * - cover
+     * - library
+     * - songs
+     * @param data.page Current page
+     * @param data.perPage Items per page
+     * @param data.genres _Extension_ Comma seperated list of genres
+     * @returns unknown Json paginated set of `AlbumResourceResource`
      * @throws ApiError
      */
     public static albumsIndex(data: AlbumsIndexData): CancelablePromise<AlbumsIndexResponse> {
@@ -25,10 +34,10 @@ export class AlbumService {
                 library: data.library
             },
             query: {
-                page: data.page,
-                perPage: data.perPage,
                 fields: data.fields,
                 relations: data.relations,
+                page: data.page,
+                perPage: data.perPage,
                 genres: data.genres
             },
             errors: {
@@ -41,10 +50,11 @@ export class AlbumService {
     }
     
     /**
+     * Get an album
      * @param data The data for the request.
      * @param data.library The library slug
      * @param data.album The album slug
-     * @returns AlbumResource `AlbumResource`
+     * @returns AlbumResourceResource `AlbumResourceResource`
      * @throws ApiError
      */
     public static albumsShow(data: AlbumsShowData): CancelablePromise<AlbumsShowResponse> {
@@ -66,8 +76,18 @@ export class AlbumService {
 
 export class ArtistService {
     /**
+     * Get a collection of artists
      * @param data The data for the request.
      * @param data.library
+     * @param data.fields Comma seperated string of fields you want to select. If nothing is defined `select *` is default.
+     * - title
+     * - slug
+     * @param data.relations Comma seperated string of relations
+     * - portrait
+     * - songs
+     * @param data.page Current page
+     * @param data.perPage Items per page
+     * @param data.genres _Extension_ Comma seperated list of genres
      * @returns unknown Json paginated set of `ArtistResource`
      * @throws ApiError
      */
@@ -78,13 +98,23 @@ export class ArtistService {
             path: {
                 library: data.library
             },
+            query: {
+                fields: data.fields,
+                relations: data.relations,
+                page: data.page,
+                perPage: data.perPage,
+                genres: data.genres
+            },
             errors: {
-                401: 'Unauthenticated'
+                401: 'Unauthenticated',
+                403: 'Authorization error',
+                422: 'Validation error'
             }
         });
     }
     
     /**
+     * Get an artist
      * @param data The data for the request.
      * @param data.library
      * @param data.artist The artist slug
@@ -254,21 +284,25 @@ export class AuthService {
 
 export class GenreService {
     /**
+     * Get a collection of genres
      * @param data The data for the request.
-     * @param data.library
+     * @param data.fields Comma seperated string of fields you want to select. If nothing is defined `select *` is default.
+     * - name
+     * - slug
+     * @param data.relations Comma seperated string of relations
+     * - songs
      * @param data.page
      * @param data.perPage
-     * @returns unknown Json paginated set of `GenreResource`
+     * @returns GenreResource Array of `GenreResource`
      * @throws ApiError
      */
-    public static genresIndex(data: GenresIndexData): CancelablePromise<GenresIndexResponse> {
+    public static genresIndex(data: GenresIndexData = {}): CancelablePromise<GenresIndexResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/libraries/{library}/genres',
-            path: {
-                library: data.library
-            },
+            url: '/genres',
             query: {
+                fields: data.fields,
+                relations: data.relations,
                 page: data.page,
                 perPage: data.perPage
             },
@@ -280,11 +314,79 @@ export class GenreService {
         });
     }
     
+    /**
+     * Get a genre
+     * @param data The data for the request.
+     * @param data.genre The genre slug
+     * @returns GenreResource `GenreResource`
+     * @throws ApiError
+     */
+    public static genresShow(data: GenresShowData): CancelablePromise<GenresShowResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/genres/{genre}',
+            path: {
+                genre: data.genre
+            },
+            errors: {
+                401: 'Unauthenticated',
+                404: 'Not found'
+            }
+        });
+    }
+    
+    /**
+     * Update a genre
+     * @param data The data for the request.
+     * @param data.genre The genre slug
+     * @param data.requestBody
+     * @returns GenreResource `GenreResource`
+     * @throws ApiError
+     */
+    public static genresUpdate(data: GenresUpdateData): CancelablePromise<GenresUpdateResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/genres/{genre}',
+            path: {
+                genre: data.genre
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthenticated',
+                403: 'Authorization error',
+                404: 'Not found',
+                422: 'Validation error'
+            }
+        });
+    }
+    
+    /**
+     * Delete a genre
+     * @param data The data for the request.
+     * @param data.genre The genre slug
+     * @returns null No content
+     * @throws ApiError
+     */
+    public static genresDestroy(data: GenresDestroyData): CancelablePromise<GenresDestroyResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/genres/{genre}',
+            path: {
+                genre: data.genre
+            },
+            errors: {
+                401: 'Unauthenticated',
+                404: 'Not found'
+            }
+        });
+    }
+    
 }
 
 export class ImageService {
     /**
-     * Get image asset
+     * Get an image asset
      * @param data The data for the request.
      * @param data.image The image public id
      * @returns string
@@ -324,8 +426,7 @@ export class JobService {
             body: data.requestBody,
             mediaType: 'application/json',
             errors: {
-                401: 'Unauthenticated',
-                404: 'Not found'
+                401: 'Unauthenticated'
             }
         });
     }
@@ -334,6 +435,7 @@ export class JobService {
 
 export class LibraryService {
     /**
+     * Get a collection of media libraries
      * @param data The data for the request.
      * @param data.page
      * @param data.perPage
@@ -357,6 +459,7 @@ export class LibraryService {
     }
     
     /**
+     * Create a library
      * @param data The data for the request.
      * @param data.requestBody
      * @returns LibraryResource `LibraryResource`
@@ -377,6 +480,7 @@ export class LibraryService {
     }
     
     /**
+     * Update a library specified by the provided slug
      * @param data The data for the request.
      * @param data.requestBody
      * @returns LibraryResource `LibraryResource`
@@ -397,6 +501,7 @@ export class LibraryService {
     }
     
     /**
+     * Delete a library
      * @returns null No content
      * @throws ApiError
      */
@@ -431,6 +536,7 @@ export class ModelSchemaService {
 
 export class OpCacheService {
     /**
+     * Get status
      * @returns unknown
      * @throws ApiError
      */
@@ -445,6 +551,7 @@ export class OpCacheService {
     }
     
     /**
+     * Get config
      * @returns unknown
      * @throws ApiError
      */
@@ -459,6 +566,7 @@ export class OpCacheService {
     }
     
     /**
+     * Clear
      * @param data The data for the request.
      * @param data.requestBody
      * @returns unknown
@@ -477,6 +585,7 @@ export class OpCacheService {
     }
     
     /**
+     * Compile cache
      * @param data The data for the request.
      * @param data.force
      * @param data.requestBody
@@ -502,6 +611,7 @@ export class OpCacheService {
 
 export class SongService {
     /**
+     * Get a collection of songs
      * @param data The data for the request.
      * @param data.library The library slug
      * @param data.albumArtist
@@ -510,7 +620,7 @@ export class SongService {
      * @param data.albumId
      * @param data.page
      * @param data.perPage
-     * @returns unknown Json paginated set of `SongResource`
+     * @returns unknown Json paginated set of `SongWithAlbumResource`
      * @throws ApiError
      */
     public static songsIndex(data: SongsIndexData): CancelablePromise<SongsIndexResponse> {
@@ -538,10 +648,11 @@ export class SongService {
     }
     
     /**
+     * Get a song
      * @param data The data for the request.
      * @param data.library The library slug
      * @param data.song The song public id
-     * @returns SongResource `SongResource`
+     * @returns SongWithAlbumResource `SongWithAlbumResource`
      * @throws ApiError
      */
     public static songsShow(data: SongsShowData): CancelablePromise<SongsShowResponse> {
@@ -587,7 +698,7 @@ export class SongService {
 
 export class UserService {
     /**
-     * Display a collection of users
+     * Get a collection of users
      * @returns unknown Json paginated set of `UserResource`
      * @throws ApiError
      */
@@ -624,7 +735,7 @@ export class UserService {
     }
     
     /**
-     * Update user details
+     * Update a user
      * @param data The data for the request.
      * @param data.user The user ID
      * @param data.requestBody
@@ -650,7 +761,7 @@ export class UserService {
     }
     
     /**
-     * Display a user
+     * Get small user detail info
      * @param data The data for the request.
      * @param data.user The user ID
      * @returns UserResource `UserResource`
@@ -701,6 +812,58 @@ export class UserService {
             url: '/users/me',
             errors: {
                 401: 'Unauthenticated'
+            }
+        });
+    }
+    
+}
+
+export class UserTokenService {
+    /**
+     * Get a collection of tokens
+     * @param data The data for the request.
+     * @param data.user
+     * @param data.page
+     * @param data.perPage
+     * @returns unknown Json paginated set of `PersonalAccessTokenViewResource`
+     * @throws ApiError
+     */
+    public static userTokenGetUserTokens(data: UserTokenGetUserTokensData): CancelablePromise<UserTokenGetUserTokensResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/users/tokens/{user}',
+            path: {
+                user: data.user
+            },
+            query: {
+                page: data.page,
+                perPage: data.perPage
+            },
+            errors: {
+                401: 'Unauthenticated',
+                403: 'Authorization error',
+                422: 'Validation error'
+            }
+        });
+    }
+    
+    /**
+     * Revoke a given token
+     * @param data The data for the request.
+     * @param data.token The token ID
+     * @returns null No content
+     * @throws ApiError
+     */
+    public static userTokenRevokeToken(data: UserTokenRevokeTokenData): CancelablePromise<UserTokenRevokeTokenResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/users/tokens/{token}',
+            path: {
+                token: data.token
+            },
+            errors: {
+                401: 'Unauthenticated',
+                404: 'Not found'
             }
         });
     }

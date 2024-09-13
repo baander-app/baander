@@ -1,12 +1,16 @@
 import { defineConfig, loadEnv } from 'vite';
 import laravel from 'laravel-vite-plugin';
-import react from '@vitejs/plugin-react-swc';
+// import react from '@vitejs/plugin-react-swc';
 import { fileURLToPath } from 'url';
 import { resolve } from 'path';
 import richSvg from 'vite-plugin-react-rich-svg';
 import manifestSRI from 'vite-plugin-manifest-sri';
 import filterReplace from 'vite-plugin-filter-replace';
-import inspect from 'vite-plugin-inspect';
+// import inspect from 'vite-plugin-inspect';
+import react from "@vitejs/plugin-react";
+
+const ReactCompilerConfig = {};
+
 
 const lottieScopeVariables = [
   'value',
@@ -108,7 +112,11 @@ export default defineConfig(config => {
         ],
         refresh: true,
       }),
-      react(),
+      react({
+        babel: {
+          plugins: [["babel-plugin-react-compiler", ReactCompilerConfig]],
+        },
+      }),
       richSvg(),
       manifestSRI(),
       // workaround for a warning with lottie https://github.com/airbnb/lottie-web/issues/2927
@@ -134,7 +142,7 @@ export default defineConfig(config => {
           },
         },
       ]),
-      inspect(),
+      // inspect(),
     ],
     resolve: {
       alias: {

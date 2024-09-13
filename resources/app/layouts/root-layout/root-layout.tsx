@@ -1,14 +1,14 @@
 import { ReactNode } from 'react';
 import styles from './root-layout.module.scss';
 import { InlinePlayer } from '@/features/library-music-player/inline-player/inline-player.tsx';
-import { AppShell, Box, Burger, Group, Text } from '@mantine/core';
+import { AppShell, Burger, Group, Text } from '@mantine/core';
 import { NavLink } from '@/components/nav-link.tsx';
-import { useAppDispatch } from '@/store/hooks.ts';
 import { useDisclosure } from '@mantine/hooks';
 import { NavbarLinksGroup } from '@/components/nav-bar-links-group/nav-bar-links-group.tsx';
 import { useWidgetServiceWidgetsGetWidget } from '@/api-client/queries';
 import { BaanderLogo } from '@/components/branding/baander-logo/baander-logo.tsx';
 import { UserMenu } from '@/layouts/root-layout/user-menu.tsx';
+import { LibraryNav } from '@/layouts/root-layout/library-nav/library-nav.tsx';
 
 export function RootLayout(props: { children?: ReactNode }) {
   const [opened, { toggle }] = useDisclosure();
@@ -28,15 +28,12 @@ export function RootLayout(props: { children?: ReactNode }) {
           <Group h="100%" px="md">
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
             <BaanderLogo />
-            <Text>Bånder</Text>
+            <Text>{import.meta.env.VITE_APP_NAME}</Text>
           </Group>
         </Group>
 
         <div className={styles.navbarMain}>
-          <NavLink variant="light" to="/library/music/artists" label="Artists" />
-          <NavLink variant="light" to="/library/music/albums" label="Albums" />
-          <NavLink variant="light" to="/library/music/songs" label="Songs" />
-          <NavLink variant="light" to="/library/music/genres" label="Genres" />
+          <LibraryNav />
         </div>
 
         <NavLink to="/dashboard" label="Dashboard" />

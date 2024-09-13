@@ -22,10 +22,23 @@ class GenreIndexRequest extends FormRequest
     public function rules(): array
     {
         return [
+            /**
+             * @query
+             * Comma seperated string of fields you want to select. If nothing is defined `select *` is default.
+             * - name
+             * - slug
+             */
+            'fields'    => 'string',
+            /**
+             * @query
+             * Comma seperated string of relations
+             * - songs
+             */
+            'relations' => 'string',
             /** @query */
-            'page' => 'optional|int',
+            'page' => 'int',
             /** @query */
-            'perPage' => 'optional|int',
+            'perPage' => 'int',
         ];
     }
 }

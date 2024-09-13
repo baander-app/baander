@@ -4,21 +4,25 @@ import { notifications } from '@mantine/notifications';
 import { Token } from '@/services/auth/token.ts';
 import Echo from 'laravel-echo';
 import { PusherPrivateChannel } from 'laravel-echo/dist/channel/pusher-private-channel';
+import { PusherConnectionState } from '@/providers/echo-provider.types.ts';
 
 interface EchoContextType {
   echo: Echo | undefined;
+  connectionState: string;
   playerStateChannel: PusherPrivateChannel | undefined;
 }
 
 export const EchoContext = React.createContext<EchoContextType>({
   echo: undefined,
+  connectionState: '',
   playerStateChannel: undefined,
 });
 EchoContext.displayName = 'EchoContext';
 
 export function EchoContextProvider({ children }: { children: React.ReactNode }) {
   const [echo, setEcho] = useState<Echo>();
-  const [playerStateChannel, setPlayerStateChannel] = useState<PusherPrivateChannel | undefined>(undefined);
+  const [connectionState, setConnectionState] = useState<PusherConnectionState>('initialized');
+  const [playerStateChannel, setPlayerStateChannel] = useState<Channel | undefined>(undefined);
 
   useEffect(() => {
     window.Pusher = Pusher;
@@ -59,11 +63,22 @@ export function EchoContextProvider({ children }: { children: React.ReactNode })
 
       const psc = echo.private(`playerState.${token}`);
       setPlayerStateChannel(psc);
+
+      echo.connector.pusher.connection.bind('connected', () => {
+        const state = echo.connector.pusher.connection.state;
+
+        setConnectionState(state);
+      });
     }
   }, [echo]);
 
   return (
-    <EchoContext.Provider value={{ echo, playerStateChannel }}>
+    <EchoContext.Provider
+      value={{
+        echo,
+        connectionState,
+        playerStateChannel,
+      }}>
       {children}
     </EchoContext.Provider>
   );

@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.0 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, GenreService, ImageService, JobService, LibraryService, ModelSchemaService, OpCacheService, SongService, UserService, WidgetSchemaService, WidgetService } from "../requests/services.gen";
+import { AlbumService, ArtistService, AuthService, GenreService, ImageService, JobService, LibraryService, ModelSchemaService, OpCacheService, SongService, UserService, UserTokenService, WidgetSchemaService, WidgetService } from "../requests/services.gen";
 export type AlbumServiceAlbumsIndexDefaultResponse = Awaited<ReturnType<typeof AlbumService.albumsIndex>>;
 export type AlbumServiceAlbumsIndexQueryResult<TData = AlbumServiceAlbumsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAlbumServiceAlbumsIndexKey = "AlbumServiceAlbumsIndex";
@@ -23,9 +23,14 @@ export const UseAlbumServiceAlbumsShowKeyFn = ({ album, library }: {
 export type ArtistServiceArtistsIndexDefaultResponse = Awaited<ReturnType<typeof ArtistService.artistsIndex>>;
 export type ArtistServiceArtistsIndexQueryResult<TData = ArtistServiceArtistsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useArtistServiceArtistsIndexKey = "ArtistServiceArtistsIndex";
-export const UseArtistServiceArtistsIndexKeyFn = ({ library }: {
+export const UseArtistServiceArtistsIndexKeyFn = ({ fields, genres, library, page, perPage, relations }: {
+  fields?: string;
+  genres?: string;
   library: string;
-}, queryKey?: Array<unknown>) => [useArtistServiceArtistsIndexKey, ...(queryKey ?? [{ library }])];
+  page?: number;
+  perPage?: number;
+  relations?: string;
+}, queryKey?: Array<unknown>) => [useArtistServiceArtistsIndexKey, ...(queryKey ?? [{ fields, genres, library, page, perPage, relations }])];
 export type ArtistServiceArtistsShowDefaultResponse = Awaited<ReturnType<typeof ArtistService.artistsShow>>;
 export type ArtistServiceArtistsShowQueryResult<TData = ArtistServiceArtistsShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useArtistServiceArtistsShowKey = "ArtistServiceArtistsShow";
@@ -36,11 +41,18 @@ export const UseArtistServiceArtistsShowKeyFn = ({ artist, library }: {
 export type GenreServiceGenresIndexDefaultResponse = Awaited<ReturnType<typeof GenreService.genresIndex>>;
 export type GenreServiceGenresIndexQueryResult<TData = GenreServiceGenresIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useGenreServiceGenresIndexKey = "GenreServiceGenresIndex";
-export const UseGenreServiceGenresIndexKeyFn = ({ library, page, perPage }: {
-  library: string;
+export const UseGenreServiceGenresIndexKeyFn = ({ fields, page, perPage, relations }: {
+  fields?: string;
   page?: number;
   perPage?: number;
-}, queryKey?: Array<unknown>) => [useGenreServiceGenresIndexKey, ...(queryKey ?? [{ library, page, perPage }])];
+  relations?: string;
+} = {}, queryKey?: Array<unknown>) => [useGenreServiceGenresIndexKey, ...(queryKey ?? [{ fields, page, perPage, relations }])];
+export type GenreServiceGenresShowDefaultResponse = Awaited<ReturnType<typeof GenreService.genresShow>>;
+export type GenreServiceGenresShowQueryResult<TData = GenreServiceGenresShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useGenreServiceGenresShowKey = "GenreServiceGenresShow";
+export const UseGenreServiceGenresShowKeyFn = ({ genre }: {
+  genre: string;
+}, queryKey?: Array<unknown>) => [useGenreServiceGenresShowKey, ...(queryKey ?? [{ genre }])];
 export type ImageServiceImageServeDefaultResponse = Awaited<ReturnType<typeof ImageService.imageServe>>;
 export type ImageServiceImageServeQueryResult<TData = ImageServiceImageServeDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useImageServiceImageServeKey = "ImageServiceImageServe";
@@ -106,6 +118,14 @@ export type UserServiceUsersMeDefaultResponse = Awaited<ReturnType<typeof UserSe
 export type UserServiceUsersMeQueryResult<TData = UserServiceUsersMeDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useUserServiceUsersMeKey = "UserServiceUsersMe";
 export const UseUserServiceUsersMeKeyFn = (queryKey?: Array<unknown>) => [useUserServiceUsersMeKey, ...(queryKey ?? [])];
+export type UserTokenServiceUserTokenGetUserTokensDefaultResponse = Awaited<ReturnType<typeof UserTokenService.userTokenGetUserTokens>>;
+export type UserTokenServiceUserTokenGetUserTokensQueryResult<TData = UserTokenServiceUserTokenGetUserTokensDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useUserTokenServiceUserTokenGetUserTokensKey = "UserTokenServiceUserTokenGetUserTokens";
+export const UseUserTokenServiceUserTokenGetUserTokensKeyFn = ({ page, perPage, user }: {
+  page?: number;
+  perPage?: number;
+  user: string;
+}, queryKey?: Array<unknown>) => [useUserTokenServiceUserTokenGetUserTokensKey, ...(queryKey ?? [{ page, perPage, user }])];
 export type WidgetServiceWidgetsGetWidgetDefaultResponse = Awaited<ReturnType<typeof WidgetService.widgetsGetWidget>>;
 export type WidgetServiceWidgetsGetWidgetQueryResult<TData = WidgetServiceWidgetsGetWidgetDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useWidgetServiceWidgetsGetWidgetKey = "WidgetServiceWidgetsGetWidget";
@@ -135,7 +155,10 @@ export type LibraryServiceLibraryCreateMutationResult = Awaited<ReturnType<typeo
 export type OpCacheServiceOpcacheClearMutationResult = Awaited<ReturnType<typeof OpCacheService.opcacheClear>>;
 export type OpCacheServiceOpcacheCompileMutationResult = Awaited<ReturnType<typeof OpCacheService.opcacheCompile>>;
 export type UserServiceUsersStoreMutationResult = Awaited<ReturnType<typeof UserService.usersStore>>;
+export type GenreServiceGenresUpdateMutationResult = Awaited<ReturnType<typeof GenreService.genresUpdate>>;
 export type LibraryServiceLibraryUpdateMutationResult = Awaited<ReturnType<typeof LibraryService.libraryUpdate>>;
 export type UserServiceUsersUpdateMutationResult = Awaited<ReturnType<typeof UserService.usersUpdate>>;
+export type GenreServiceGenresDestroyMutationResult = Awaited<ReturnType<typeof GenreService.genresDestroy>>;
 export type LibraryServiceLibraryDeleteMutationResult = Awaited<ReturnType<typeof LibraryService.libraryDelete>>;
 export type UserServiceUsersDestroyMutationResult = Awaited<ReturnType<typeof UserService.usersDestroy>>;
+export type UserTokenServiceUserTokenRevokeTokenMutationResult = Awaited<ReturnType<typeof UserTokenService.userTokenRevokeToken>>;
