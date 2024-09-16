@@ -53,7 +53,7 @@ export const $AlbumWithoutSongsResource = {
             type: 'string'
         },
         year: {
-            type: 'string'
+            type: ['integer', 'null']
         },
         directory: {
             type: 'string'
@@ -62,10 +62,12 @@ export const $AlbumWithoutSongsResource = {
             type: 'string'
         },
         createdAt: {
-            type: 'string'
+            type: ['string', 'null'],
+            format: 'date-time'
         },
         updatedAt: {
-            type: 'string'
+            type: ['string', 'null'],
+            format: 'date-time'
         },
         albumArtist: {
             description: 'Album artist relation',

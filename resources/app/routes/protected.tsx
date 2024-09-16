@@ -2,7 +2,7 @@ import { RootLayout } from '@/layouts/root-layout/root-layout.tsx';
 import { Navigate, Outlet, RouteObject } from 'react-router-dom';
 import { EchoContextProvider } from '@/providers/echo-provider.tsx';
 import { Suspense } from 'react';
-import { LibraryMusicRoutes } from '@/features/library-music/routes/routes.tsx';
+import { LibraryMusicRoutes } from '@/features/library-music/routes/_routes.tsx';
 import { DashboardLayout } from '@/layouts/dashboard-layout/dasbhard-layout.tsx';
 import { AccountRoutes } from '@/features/account/pages/routes.tsx';
 import { DashboardRoutes } from '@/features/dashboard/routes.tsx';

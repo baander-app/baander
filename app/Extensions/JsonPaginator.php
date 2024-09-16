@@ -7,8 +7,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 class JsonPaginator extends LengthAwarePaginator
 {
     protected array $queryParams = [
-        'page'    => 'currentPage',
-        'perPage' => 'perPage',
+        'page'  => 'page',
     ];
 
     public function toArray(): array
@@ -17,8 +16,9 @@ class JsonPaginator extends LengthAwarePaginator
             'data'        => $this->items->toArray(),
             'total'       => $this->total(),
             'count'       => $this->count(),
-            'perPage'     => $this->perPage(),
+            'limit'       => $this->perPage(),
             'currentPage' => $this->currentPage(),
+            'nextPage'    => $this->nextPage(),
             'lastPage'    => $this->lastPage(),
         ];
     }
@@ -52,11 +52,12 @@ class JsonPaginator extends LengthAwarePaginator
         return $this->isValidPageNumber($page) ? $page : $defaultPage;
     }
 
-    public function perPage(): int
+    public function nextPage()
     {
-        $perPageName = $this->queryParams['perPage'];
-        $defaultPerPage = $this->perPage;
+        if ($this->hasMorePages()) {
+            return $this->currentPage() + 1;
+        }
 
-        return (int)LengthAwarePaginator::resolveCurrentPage($perPageName, $defaultPerPage);
+        return null;
     }
 }

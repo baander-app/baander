@@ -49,7 +49,7 @@ class AlbumIndexRequest extends FormRequest
              * @query
              * Items per page
              */
-            'perPage'   => 'int',
+            'limit'     => 'int',
             /**
              * @query
              * _Extension_ Comma seperated list of genres

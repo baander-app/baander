@@ -21,7 +21,7 @@ export class AlbumService {
      * - library
      * - songs
      * @param data.page Current page
-     * @param data.perPage Items per page
+     * @param data.limit Items per page
      * @param data.genres _Extension_ Comma seperated list of genres
      * @returns unknown Json paginated set of `AlbumResourceResource`
      * @throws ApiError
@@ -37,7 +37,7 @@ export class AlbumService {
                 fields: data.fields,
                 relations: data.relations,
                 page: data.page,
-                perPage: data.perPage,
+                limit: data.limit,
                 genres: data.genres
             },
             errors: {
@@ -86,7 +86,7 @@ export class ArtistService {
      * - portrait
      * - songs
      * @param data.page Current page
-     * @param data.perPage Items per page
+     * @param data.limit Items per page
      * @param data.genres _Extension_ Comma seperated list of genres
      * @returns unknown Json paginated set of `ArtistResource`
      * @throws ApiError
@@ -102,7 +102,7 @@ export class ArtistService {
                 fields: data.fields,
                 relations: data.relations,
                 page: data.page,
-                perPage: data.perPage,
+                limit: data.limit,
                 genres: data.genres
             },
             errors: {
@@ -291,9 +291,10 @@ export class GenreService {
      * - slug
      * @param data.relations Comma seperated string of relations
      * - songs
-     * @param data.page
-     * @param data.perPage
-     * @returns GenreResource Array of `GenreResource`
+     * @param data.librarySlug Constrain the query to only fetch genres that are contained within the given library
+     * @param data.page Current page
+     * @param data.limit Items per page
+     * @returns unknown Json paginated set of `GenreResource`
      * @throws ApiError
      */
     public static genresIndex(data: GenresIndexData = {}): CancelablePromise<GenresIndexResponse> {
@@ -303,8 +304,9 @@ export class GenreService {
             query: {
                 fields: data.fields,
                 relations: data.relations,
+                librarySlug: data.librarySlug,
                 page: data.page,
-                perPage: data.perPage
+                limit: data.limit
             },
             errors: {
                 401: 'Unauthenticated',
@@ -437,8 +439,8 @@ export class LibraryService {
     /**
      * Get a collection of media libraries
      * @param data The data for the request.
-     * @param data.page
-     * @param data.perPage
+     * @param data.page Current page
+     * @param data.limit Items per page
      * @returns unknown Json paginated set of `LibraryResource`
      * @throws ApiError
      */
@@ -448,7 +450,7 @@ export class LibraryService {
             url: '/libraries',
             query: {
                 page: data.page,
-                perPage: data.perPage
+                limit: data.limit
             },
             errors: {
                 401: 'Unauthenticated',
@@ -615,10 +617,14 @@ export class SongService {
      * @param data The data for the request.
      * @param data.library The library slug
      * @param data.page Current page
-     * @param data.perPage Items per page
+     * @param data.limit Items per page
      * @param data.genreNames Comma seperated list of genre names You can only search for names or slugs. Not both.
      * @param data.genreSlugs Comma seperated list of genre slugs
-     * @param data.relations
+     * @param data.relations Comma seperated string of relations
+     * - album
+     * - artists
+     * - albumArtist
+     * - genres
      * @returns unknown Json paginated set of `SongResource`
      * @throws ApiError
      */
@@ -631,7 +637,7 @@ export class SongService {
             },
             query: {
                 page: data.page,
-                perPage: data.perPage,
+                limit: data.limit,
                 genreNames: data.genreNames,
                 genreSlugs: data.genreSlugs,
                 relations: data.relations

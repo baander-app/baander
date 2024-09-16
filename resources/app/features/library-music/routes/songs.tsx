@@ -7,16 +7,15 @@ import {
 } from '@/api-client/queries';
 import { useEffect, useState } from 'react';
 import { SongList } from '@/features/library-music/components/song-list/song-list.tsx';
-import { useParams } from 'react-router-dom';
 import styles from './songs.module.scss';
 import { GenreResource } from '@/api-client/requests';
+import { usePathParam } from '@/hooks/use-path-param.ts';
+import { LibraryParams } from '@/features/library-music/routes/_routes.tsx';
 
 export default function Songs() {
-  const { library } = useParams();
-  if (!library) return <>Error no library</>;
+  const { library } = usePathParam<LibraryParams>();
 
-  // @ts-ignore
-  const { data: genreData, isFetching: isGenresFetching } = useGenreServiceGenresIndex<any>({ library });
+  const { data: genreData } = useGenreServiceGenresIndex({ librarySlug: library });
   const [genres, setGenres] = useState<ScrollListItem[]>([]);
   const [selectedGenres, setSelectedGenres] = useState<ScrollListItem | undefined>();
 
@@ -33,7 +32,6 @@ export default function Songs() {
 
   const { data: albumData } = useAlbumServiceAlbumsIndex({
     library,
-    fields: 'title,slug',
     genres: selectedGenres?.key ?? undefined,
   });
   const [albums, setAlbums] = useState<ScrollListItem[]>([]);

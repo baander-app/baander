@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Extensions\JsonAnonymousResourceCollection;
 use App\Extensions\JsonPaginator;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Song\SongIndexRequest;
@@ -20,7 +21,7 @@ class SongController extends Controller
      * @param SongIndexRequest $request
      * @param Library $library
      * @param Album $album
-     * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection<JsonPaginator<SongResource>>
+     * @return JsonAnonymousResourceCollection<JsonPaginator<SongResource>>
      */
     #[Get('', 'api.songs.index', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
     public function index(SongIndexRequest $request, Library $library)

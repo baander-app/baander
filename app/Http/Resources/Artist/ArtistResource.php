@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Artist;
 
+use App\Http\Resources\HasJsonCollection;
 use App\Http\Resources\Image\ImageResource;
 use App\Models\Artist;
 use Illuminate\Http\Request;
@@ -12,6 +13,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class ArtistResource extends JsonResource
 {
+    use HasJsonCollection;
+
     /**
      * Transform the resource into an array.
      *

@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\UserToken;
 
+use App\Http\Resources\HasJsonCollection;
 use App\Models\PersonalAccessToken;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -11,6 +12,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class PersonalAccessTokenViewResource extends JsonResource
 {
+    use HasJsonCollection;
+
     /**
      * Transform the resource into an array.
      *

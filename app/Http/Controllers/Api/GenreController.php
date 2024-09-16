@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Extensions\BaseBuilder;
+use App\Extensions\JsonPaginator;
 use App\Http\Requests\Genre\{GenreIndexRequest, UpdateGenreRequest};
 use App\Http\Resources\Genre\GenreResource;
 use App\Models\{Genre, TokenAbility};
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Patch, Prefix};
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 #[Prefix('/genres')]
 #[Middleware([
@@ -17,14 +20,18 @@ class GenreController
 {
     /**
      * Get a collection of genres
+     *
+     * @param GenreIndexRequest $request
+     * @return AnonymousResourceCollection<JsonPaginator<GenreResource>>
      */
     #[Get('/', 'api.genres.index')]
     public function index(GenreIndexRequest $request)
     {
         $fields = $request->query('fields');
+        $librarySlug = $request->query('librarySlug');
 
         $genres = Genre::query()
-            ->selectFields(Genre::$filterFields, $fields)
+//            ->selectFields(Genre::$filterFields, $fields)
             ->withRelations(Genre::$filterFields, $fields)
             ->paginate();
 

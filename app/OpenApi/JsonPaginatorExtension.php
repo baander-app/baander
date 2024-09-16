@@ -34,19 +34,23 @@ class JsonPaginatorExtension extends TypeToSchemaExtension
 
         $type = new OpenApiObjectType;
 
-        $type->addProperty('data', (new ArrayType())->setItems($collectingType));
+        $type->addProperty('data', (new ArrayType())->setItems($collectingType))
+            ->addProperty('total', (new IntegerType)->setDescription('Total number of items being paginated.'))
+            ->addProperty('count', (new IntegerType)->setDescription('The number of items for the current page'))
+            ->addProperty('limit', (new IntegerType)->setDescription('The number of items per page'))
+            ->addProperty('currentPage', (new IntegerType)->setDescription('The number of current page'))
+            ->addProperty('nextPage', (new IntegerType)->setDescription('The number of next page'))
+            ->addProperty('lastPage', (new IntegerType)->setDescription('The number of last page'));
 
-        $type->addProperty(
-            'meta',
-            (new OpenApiObjectType())
-                ->addProperty('total', (new IntegerType)->setDescription('Total number of items being paginated.'))
-                ->addProperty('count', (new IntegerType)->setDescription('The number of items for the current page'))
-                ->addProperty('perPage', (new IntegerType)->setDescription('The number of items per page'))
-                ->addProperty('currentPage', (new IntegerType)->setDescription('The number of current page'))
-                ->addProperty('lastPage', (new IntegerType)->setDescription('The number of last page'))
-        );
-
-        $type->setRequired(['data', 'meta']);
+        $type->setRequired([
+            'data',
+            'total',
+            'count',
+            'limit',
+            'currentPage',
+            'nextPage',
+            'lastPage',
+        ]);
 
         return Response::make(200)
             ->description('Json paginated set of `' . $this->components->uniqueSchemaName($collectingClassType->name) . '`')

@@ -19,19 +19,19 @@ import * as Common from "./common";
 * - library
 * - songs
 * @param data.page Current page
-* @param data.perPage Items per page
+* @param data.limit Items per page
 * @param data.genres _Extension_ Comma seperated list of genres
 * @returns unknown Json paginated set of `AlbumResourceResource`
 * @throws ApiError
 */
-export const useAlbumServiceAlbumsIndex = <TData = Common.AlbumServiceAlbumsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fields, genres, library, page, perPage, relations }: {
+export const useAlbumServiceAlbumsIndex = <TData = Common.AlbumServiceAlbumsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fields, genres, library, limit, page, relations }: {
   fields?: string;
   genres?: string;
   library: string;
+  limit?: number;
   page?: number;
-  perPage?: number;
   relations?: string;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAlbumServiceAlbumsIndexKeyFn({ fields, genres, library, page, perPage, relations }, queryKey), queryFn: () => AlbumService.albumsIndex({ fields, genres, library, page, perPage, relations }) as TData, ...options });
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAlbumServiceAlbumsIndexKeyFn({ fields, genres, library, limit, page, relations }, queryKey), queryFn: () => AlbumService.albumsIndex({ fields, genres, library, limit, page, relations }) as TData, ...options });
 /**
 * Get an album
 * @param data The data for the request.
@@ -55,19 +55,19 @@ export const useAlbumServiceAlbumsShow = <TData = Common.AlbumServiceAlbumsShowD
 * - portrait
 * - songs
 * @param data.page Current page
-* @param data.perPage Items per page
+* @param data.limit Items per page
 * @param data.genres _Extension_ Comma seperated list of genres
 * @returns unknown Json paginated set of `ArtistResource`
 * @throws ApiError
 */
-export const useArtistServiceArtistsIndex = <TData = Common.ArtistServiceArtistsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fields, genres, library, page, perPage, relations }: {
+export const useArtistServiceArtistsIndex = <TData = Common.ArtistServiceArtistsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fields, genres, library, limit, page, relations }: {
   fields?: string;
   genres?: string;
   library: string;
+  limit?: number;
   page?: number;
-  perPage?: number;
   relations?: string;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseArtistServiceArtistsIndexKeyFn({ fields, genres, library, page, perPage, relations }, queryKey), queryFn: () => ArtistService.artistsIndex({ fields, genres, library, page, perPage, relations }) as TData, ...options });
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseArtistServiceArtistsIndexKeyFn({ fields, genres, library, limit, page, relations }, queryKey), queryFn: () => ArtistService.artistsIndex({ fields, genres, library, limit, page, relations }) as TData, ...options });
 /**
 * Get an artist
 * @param data The data for the request.
@@ -88,17 +88,19 @@ export const useArtistServiceArtistsShow = <TData = Common.ArtistServiceArtistsS
 * - slug
 * @param data.relations Comma seperated string of relations
 * - songs
-* @param data.page
-* @param data.perPage
-* @returns GenreResource Array of `GenreResource`
+* @param data.librarySlug Constrain the query to only fetch genres that are contained within the given library
+* @param data.page Current page
+* @param data.limit Items per page
+* @returns unknown Json paginated set of `GenreResource`
 * @throws ApiError
 */
-export const useGenreServiceGenresIndex = <TData = Common.GenreServiceGenresIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fields, page, perPage, relations }: {
+export const useGenreServiceGenresIndex = <TData = Common.GenreServiceGenresIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fields, librarySlug, limit, page, relations }: {
   fields?: string;
+  librarySlug?: string;
+  limit?: number;
   page?: number;
-  perPage?: number;
   relations?: string;
-} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseGenreServiceGenresIndexKeyFn({ fields, page, perPage, relations }, queryKey), queryFn: () => GenreService.genresIndex({ fields, page, perPage, relations }) as TData, ...options });
+} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseGenreServiceGenresIndexKeyFn({ fields, librarySlug, limit, page, relations }, queryKey), queryFn: () => GenreService.genresIndex({ fields, librarySlug, limit, page, relations }) as TData, ...options });
 /**
 * Get a genre
 * @param data The data for the request.
@@ -122,15 +124,15 @@ export const useImageServiceImageServe = <TData = Common.ImageServiceImageServeD
 /**
 * Get a collection of media libraries
 * @param data The data for the request.
-* @param data.page
-* @param data.perPage
+* @param data.page Current page
+* @param data.limit Items per page
 * @returns unknown Json paginated set of `LibraryResource`
 * @throws ApiError
 */
-export const useLibraryServiceLibrariesIndex = <TData = Common.LibraryServiceLibrariesIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ page, perPage }: {
+export const useLibraryServiceLibrariesIndex = <TData = Common.LibraryServiceLibrariesIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, page }: {
+  limit?: number;
   page?: number;
-  perPage?: number;
-} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLibraryServiceLibrariesIndexKeyFn({ page, perPage }, queryKey), queryFn: () => LibraryService.librariesIndex({ page, perPage }) as TData, ...options });
+} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLibraryServiceLibrariesIndexKeyFn({ limit, page }, queryKey), queryFn: () => LibraryService.librariesIndex({ limit, page }) as TData, ...options });
 /**
 * @returns string
 * @throws ApiError
@@ -153,21 +155,25 @@ export const useOpCacheServiceOpcacheGetConfig = <TData = Common.OpCacheServiceO
 * @param data The data for the request.
 * @param data.library The library slug
 * @param data.page Current page
-* @param data.perPage Items per page
+* @param data.limit Items per page
 * @param data.genreNames Comma seperated list of genre names You can only search for names or slugs. Not both.
 * @param data.genreSlugs Comma seperated list of genre slugs
-* @param data.relations
+* @param data.relations Comma seperated string of relations
+* - album
+* - artists
+* - albumArtist
+* - genres
 * @returns unknown Json paginated set of `SongResource`
 * @throws ApiError
 */
-export const useSongServiceSongsIndex = <TData = Common.SongServiceSongsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ genreNames, genreSlugs, library, page, perPage, relations }: {
+export const useSongServiceSongsIndex = <TData = Common.SongServiceSongsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ genreNames, genreSlugs, library, limit, page, relations }: {
   genreNames?: string;
   genreSlugs?: string;
   library: string;
+  limit?: number;
   page?: number;
-  perPage?: number;
   relations?: string;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSongServiceSongsIndexKeyFn({ genreNames, genreSlugs, library, page, perPage, relations }, queryKey), queryFn: () => SongService.songsIndex({ genreNames, genreSlugs, library, page, perPage, relations }) as TData, ...options });
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSongServiceSongsIndexKeyFn({ genreNames, genreSlugs, library, limit, page, relations }, queryKey), queryFn: () => SongService.songsIndex({ genreNames, genreSlugs, library, limit, page, relations }) as TData, ...options });
 /**
 * Get a song
 * @param data The data for the request.

@@ -10,7 +10,7 @@
         "clean": "rimraf public/build",
         "build": "yarn clean && tsc && vite build",
         "dev": "yarn clean && vite",
-        "generate-api-client": " openapi-rq -i ./api.json -c axios -o resources/app/api-client"
+        "generate-api-client": "openapi-rq -i ./api.json -c axios -o resources/app/api-client"
     },
     "dependencies": {
         "@fontsource/open-sans": "^5.1.0",

@@ -57,6 +57,18 @@ class BaseBuilder extends Builder
         return $this;
     }
 
+    public function paginate($perPage = null, $columns = ['*'], $pageName = 'page', $page = null, $total = null)
+    {
+        if ($page === null) {
+            $qs = request()->query('limit');
+            if ($qs && filter_var($qs, FILTER_VALIDATE_INT)) {
+                $perPage = $qs;
+            }
+        }
+
+        return parent::paginate($perPage, $columns, $pageName, $page, $total);
+    }
+
 
     protected function paginator($items, $total, $perPage, $currentPage, $options)
     {

@@ -44,7 +44,7 @@ class Album extends BaseModel
     public function getSlugOptions(): SlugOptions
     {
         return SlugOptions::create()
-            ->generateSlugsFrom('title')
+            ->generateSlugsFrom(['title', 'year'])
             ->saveSlugsTo('slug');
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Auth;
 
+use App\Http\Resources\HasJsonCollection;
 use App\Models\PersonalAccessToken;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -11,6 +12,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class PersonalAccessTokenResource extends JsonResource
 {
+    use HasJsonCollection;
+
     /**
      * Transform the resource into an array.
      *
@@ -27,9 +30,6 @@ class PersonalAccessTokenResource extends JsonResource
             'clientType'            => $this->client_type,
             'deviceOperatingSystem' => $this->device_operating_system,
             'deviceName'            => $this->device_name,
-            'deviceBrandName'       => $this->device_brand_name,
-            'deviceModel'           => $this->device_model,
-            'deviceType'            => $this->device_type,
             'expiresAt'             => $this->expires_at,
             'createdAt'             => $this->created_at,
             'updatedAt'             => $this->updated_at,
