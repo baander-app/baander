@@ -6,7 +6,11 @@
     "require": {
         "php": "^8.3",
         "ext-curl": "*",
+        "ext-dom": "*",
         "ext-fileinfo": "*",
+        "ext-libxml": "*",
+        "ext-mbstring": "*",
+        "ext-pcntl": "*",
         "ext-gd": "*",
         "ext-iconv": "*",
         "ext-redis": "*",
@@ -19,12 +23,12 @@
         "guzzlehttp/guzzle": "^7.2",
         "hidehalo/nanoid-php": "^1.1",
         "intervention/image": "^3.5",
-        "itsgoingd/clockwork": "^5.2",
         "justinrainbow/json-schema": "^6.0",
         "laragear/webauthn": "^3.0",
         "laravel/fortify": "^1.23",
         "laravel/framework": "^11.0",
         "laravel/horizon": "^5.25",
+        "laravel/octane": "^2.4",
         "laravel/pail": "^1.1",
         "laravel/pulse": "^1.0@beta",
         "laravel/reverb": "^1.0",
@@ -35,9 +39,10 @@
         "matomo/device-detector": "^6.3",
         "opcodesio/log-viewer": "^3.10",
         "php-ffmpeg/php-ffmpeg": "^1.2",
-        "romanzipp/laravel-queue-monitor": "^5.3",
+        "saloonphp/cache-plugin": "^3.0",
         "saloonphp/laravel-plugin": "^3.0",
         "saloonphp/saloon": "^3.0",
+        "spatie/laravel-data": "^4.9",
         "spatie/laravel-permission": "^6.9",
         "spatie/laravel-route-attributes": "^1.22",
         "spatie/laravel-sluggable": "^3.6",
@@ -46,19 +51,20 @@
         "symfony/string": "^7.1",
         "thecodingmachine/safe": "^2.5",
         "tightenco/ziggy": "^2.2",
-        "tpetry/laravel-postgresql-enhanced": "1.0.0",
+        "tpetry/laravel-postgresql-enhanced": "2.0.0",
         "zend/php-reader": "@dev"
     },
     "require-dev": {
         "doctrine/dbal": "^3.8",
         "fakerphp/faker": "^1.9.1",
         "laracraft-tech/laravel-schema-rules": "^1.4",
-        "laradumps/laradumps": "^3.0",
         "larastan/larastan": "^2.0",
         "mockery/mockery": "^1.4.4",
         "nunomaduro/collision": "^8.1",
+        "phpstan/phpstan": "^1.12",
         "phpunit/phpunit": "^10.1",
         "spatie/laravel-ignition": "^2.0",
+        "swoole/ide-helper": "~5.0.0",
         "xammie/mailbook": "^1.8"
     },
     "autoload": {
@@ -89,6 +95,9 @@
         ],
         "post-create-project-cmd": [
             "@php artisan key:generate --ansi"
+        ],
+        "phpstan": [
+            "vendor/bin/phpstan analyse -c phpstan.neon"
         ]
     },
     "extra": {

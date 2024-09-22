@@ -4,26 +4,20 @@ namespace App\Jobs\Library;
 
 use App\Models\{Album, Artist, Genre, Library, Song};
 use App\Events\LibraryScanCompleted;
-use App\Jobs\Concerns\HasJobsLogger;
+use App\Jobs\BaseJob;
 use App\Packages\StrExt;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\File;
 use App\Packages\MetaAudio\{MetaAudio, Mp3, Tagger};
 use App\Support\Logger\StdOutLogger;
-use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\{InteractsWithQueue, SerializesModels};
 use Illuminate\Support\LazyCollection;
 use Illuminate\Support\Str;
 use Safe\Exceptions\{MbstringException, StringsException};
-use romanzipp\QueueMonitor\Traits\IsMonitored;
 
-class ScanMusicLibraryJob implements ShouldQueue, ShouldBeUnique
+class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, IsMonitored, HasJobsLogger;
-
     private Library $library;
     private Tagger $tagger;
     private StdOutLogger $logger;

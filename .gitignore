@@ -26,3 +26,4 @@ bundle-visualization.html
 /storage/muzak/
 /storage/clockwork/*
 .env.sentry-build-plugin
+/api.json

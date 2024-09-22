@@ -127,7 +127,7 @@ return [
 
     'previous_keys' => [
         ...array_filter(
-            explode(',', env('APP_PREVIOUS_KEYS', ''))
+            explode(',', env('APP_PREVIOUS_KEYS', '')),
         ),
     ],
 
@@ -151,10 +151,10 @@ return [
     ],
 
     'csp' => [
-      'disable_paths' => [
-          'docs',
-          'system/log-viewer',
-      ]
+        'disable_paths' => [
+            'docs',
+            'system/log-viewer',
+        ],
     ],
 
     /*
@@ -180,13 +180,14 @@ return [
          * Application Service Providers...
          */
         App\Providers\AppServiceProvider::class,
+        App\Providers\LogConfigurationServiceProvider::class,
         App\Providers\AuthServiceProvider::class,
         App\Providers\BroadcastServiceProvider::class,
         App\Providers\EventServiceProvider::class,
+        App\Providers\QueueMonitorProvider::class,
         App\Providers\HorizonServiceProvider::class,
         App\Providers\RouteServiceProvider::class,
         App\Providers\ScrambleServiceProvider::class,
-        App\Providers\WidgetProvider::class,
     ])->toArray(),
 
     /*

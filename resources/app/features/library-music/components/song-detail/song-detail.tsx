@@ -1,65 +1,91 @@
 import { useSongServiceSongsShow } from '@/api-client/queries';
-import { Box, NumberInput, SimpleGrid, Text, Textarea, TextInput } from '@mantine/core';
+import { Box, NumberInput, SimpleGrid, Text, Textarea, TextInput, Loader, Alert } from '@mantine/core';
 import { DateTime } from '@/components/dates/date-time.tsx';
+import { useEffect, useState } from 'react';
 
 export interface SongDetailProps {
   publicId: string;
 }
 
-export function SongDetail({publicId}: SongDetailProps) {
-  const {data} = useSongServiceSongsShow({library: 'music', song: publicId});
+export function SongDetail({ publicId }: SongDetailProps) {
+  const { data, error, isLoading } = useSongServiceSongsShow({ library: 'music', publicId });
 
+  const [title, setTitle] = useState('');
+  const [year, setYear] = useState<number | ''>('');
+  const [disc, setDisc] = useState<number | ''>('');
+  const [track, setTrack] = useState<number | ''>('');
+  const [comment, setComment] = useState('');
 
-  if (!data) return (
-    <>Loading</>
-  );
+  // Synchronize state with data
+  useEffect(() => {
+    if (data) {
+      setTitle(data.title || '');
+      setYear(data.year ?? '');
+      setDisc(data.disc ?? '');
+      setTrack(data.track ?? '');
+      setComment(data.comment ?? '');
+    }
+  }, [data]);
+
+  if (isLoading) return <Loader />;
+
+  if (error) return <Alert color="red">{error?.message}</Alert>;
+
+  if (!data) return <Text>No data available</Text>;
+
+  const { public_id, path, durationHuman, sizeHuman, createdAt, updatedAt } = data;
+
   return (
-    <>
-      <SimpleGrid cols={2}>
-        <Box>
-          <TextInput
-            label="Title"
-            defaultValue={data.title}
-          />
+    <SimpleGrid cols={2}>
+      <Box>
+        <TextInput
+          label="Title"
+          value={title}
+          onChange={(event) => setTitle(event.currentTarget.value)}
+        />
 
-          <NumberInput
-            label="Year"
-            defaultValue={data.year ?? ''}
-            allowNegative={false}
-            min={0}
-            max={9999}
-          />
+        <NumberInput
+          label="Year"
+          value={year}
+          onChange={(value) => setYear(value)}
+          allowNegative={false}
+          min={0}
+          max={9999}
+        />
 
-          <NumberInput
-            label="Disc number"
-            defaultValue={data.disc ?? ''}
-            allowNegative={false}
-            min={0}
-            max={9999}
-          />
+        <NumberInput
+          label="Disc number"
+          value={disc}
+          onChange={(value) => setDisc(value)}
+          allowNegative={false}
+          min={0}
+          max={9999}
+        />
 
-          <NumberInput
-            label="Track number"
-            defaultValue={data.track ?? ''}
-            allowNegative={false}
-            min={0}
-            max={9999}
-          />
-          <Textarea
-            label="Comment"
-            defaultValue={data.comment ?? ''}
-          />
-        </Box>
+        <NumberInput
+          label="Track number"
+          value={track}
+          onChange={(value) => setTrack(value)}
+          allowNegative={false}
+          min={0}
+          max={9999}
+        />
 
-        <Box>
-          <Text>{data.public_id}</Text>
-          <Text>{data.path}</Text>
-          <Text>{data.durationHuman}</Text>
-          <Text>{data.sizeHuman}</Text>
-          <Text><DateTime time={data.createdAt!} /></Text>
-          <Text>{data.updatedAt}</Text>
-        </Box>
-      </SimpleGrid>
-    </>
+        <Textarea
+          label="Comment"
+          value={comment}
+          onChange={(event) => setComment(event.currentTarget.value)}
+        />
+      </Box>
+
+      <Box>
+        <Text>{public_id}</Text>
+        <Text>{path}</Text>
+        <Text>{durationHuman}</Text>
+        <Text>{sizeHuman}</Text>
+        <Text><DateTime time={createdAt!} /></Text>
+        <Text>{updatedAt}</Text>
+      </Box>
+    </SimpleGrid>
   );
 }

@@ -1,0 +1,14 @@
+.playerControl {
+    border: 0;
+    background: transparent;
+
+    .icon {
+        color: #645b58;
+        cursor: pointer;
+        transition: all 0.15ms ease-in-out;
+
+        &:hover {
+            color: #958e8b;
+        }
+    }
+}

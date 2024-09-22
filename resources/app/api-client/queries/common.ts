@@ -1,7 +1,7 @@
-// generated with @7nohe/openapi-react-query-codegen@1.6.0 
+// generated with @7nohe/openapi-react-query-codegen@1.6.1 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, GenreService, ImageService, JobService, LibraryService, ModelSchemaService, OpCacheService, SongService, UserService, UserTokenService, WidgetSchemaService, WidgetService } from "../requests/services.gen";
+import { AlbumService, ArtistService, AuthService, GenreService, ImageService, JobService, LibraryService, OpCacheService, QueueService, SongService, SystemInfoService, UserService, UserTokenService } from "../requests/services.gen";
 export type AlbumServiceAlbumsIndexDefaultResponse = Awaited<ReturnType<typeof AlbumService.albumsIndex>>;
 export type AlbumServiceAlbumsIndexQueryResult<TData = AlbumServiceAlbumsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAlbumServiceAlbumsIndexKey = "AlbumServiceAlbumsIndex";
@@ -67,10 +67,6 @@ export const UseLibraryServiceLibrariesIndexKeyFn = ({ limit, page }: {
   limit?: number;
   page?: number;
 } = {}, queryKey?: Array<unknown>) => [useLibraryServiceLibrariesIndexKey, ...(queryKey ?? [{ limit, page }])];
-export type ModelSchemaServiceSchemasModelDefaultResponse = Awaited<ReturnType<typeof ModelSchemaService.schemasModel>>;
-export type ModelSchemaServiceSchemasModelQueryResult<TData = ModelSchemaServiceSchemasModelDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useModelSchemaServiceSchemasModelKey = "ModelSchemaServiceSchemasModel";
-export const UseModelSchemaServiceSchemasModelKeyFn = (queryKey?: Array<unknown>) => [useModelSchemaServiceSchemasModelKey, ...(queryKey ?? [])];
 export type OpCacheServiceOpCacheGetStatusDefaultResponse = Awaited<ReturnType<typeof OpCacheService.opCacheGetStatus>>;
 export type OpCacheServiceOpCacheGetStatusQueryResult<TData = OpCacheServiceOpCacheGetStatusDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useOpCacheServiceOpCacheGetStatusKey = "OpCacheServiceOpCacheGetStatus";
@@ -79,6 +75,20 @@ export type OpCacheServiceOpcacheGetConfigDefaultResponse = Awaited<ReturnType<t
 export type OpCacheServiceOpcacheGetConfigQueryResult<TData = OpCacheServiceOpcacheGetConfigDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useOpCacheServiceOpcacheGetConfigKey = "OpCacheServiceOpcacheGetConfig";
 export const UseOpCacheServiceOpcacheGetConfigKeyFn = (queryKey?: Array<unknown>) => [useOpCacheServiceOpcacheGetConfigKey, ...(queryKey ?? [])];
+export type QueueServiceQueueMetricsShowDefaultResponse = Awaited<ReturnType<typeof QueueService.queueMetricsShow>>;
+export type QueueServiceQueueMetricsShowQueryResult<TData = QueueServiceQueueMetricsShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useQueueServiceQueueMetricsShowKey = "QueueServiceQueueMetricsShow";
+export const UseQueueServiceQueueMetricsShowKeyFn = (queryKey?: Array<unknown>) => [useQueueServiceQueueMetricsShowKey, ...(queryKey ?? [])];
+export type QueueServiceQueueMetricsQueuesDefaultResponse = Awaited<ReturnType<typeof QueueService.queueMetricsQueues>>;
+export type QueueServiceQueueMetricsQueuesQueryResult<TData = QueueServiceQueueMetricsQueuesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useQueueServiceQueueMetricsQueuesKey = "QueueServiceQueueMetricsQueues";
+export const UseQueueServiceQueueMetricsQueuesKeyFn = (queryKey?: Array<unknown>) => [useQueueServiceQueueMetricsQueuesKey, ...(queryKey ?? [])];
+export type QueueServiceQueueMetricsMetricsDefaultResponse = Awaited<ReturnType<typeof QueueService.queueMetricsMetrics>>;
+export type QueueServiceQueueMetricsMetricsQueryResult<TData = QueueServiceQueueMetricsMetricsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useQueueServiceQueueMetricsMetricsKey = "QueueServiceQueueMetricsMetrics";
+export const UseQueueServiceQueueMetricsMetricsKeyFn = ({ aggregateDays }: {
+  aggregateDays?: number;
+} = {}, queryKey?: Array<unknown>) => [useQueueServiceQueueMetricsMetricsKey, ...(queryKey ?? [{ aggregateDays }])];
 export type SongServiceSongsIndexDefaultResponse = Awaited<ReturnType<typeof SongService.songsIndex>>;
 export type SongServiceSongsIndexQueryResult<TData = SongServiceSongsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSongServiceSongsIndexKey = "SongServiceSongsIndex";
@@ -93,10 +103,11 @@ export const UseSongServiceSongsIndexKeyFn = ({ genreNames, genreSlugs, library,
 export type SongServiceSongsShowDefaultResponse = Awaited<ReturnType<typeof SongService.songsShow>>;
 export type SongServiceSongsShowQueryResult<TData = SongServiceSongsShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSongServiceSongsShowKey = "SongServiceSongsShow";
-export const UseSongServiceSongsShowKeyFn = ({ library, song }: {
+export const UseSongServiceSongsShowKeyFn = ({ library, publicId, relations }: {
   library: string;
-  song: string;
-}, queryKey?: Array<unknown>) => [useSongServiceSongsShowKey, ...(queryKey ?? [{ library, song }])];
+  publicId: string;
+  relations?: string;
+}, queryKey?: Array<unknown>) => [useSongServiceSongsShowKey, ...(queryKey ?? [{ library, publicId, relations }])];
 export type SongServiceSongsStreamDefaultResponse = Awaited<ReturnType<typeof SongService.songsStream>>;
 export type SongServiceSongsStreamQueryResult<TData = SongServiceSongsStreamDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSongServiceSongsStreamKey = "SongServiceSongsStream";
@@ -104,10 +115,21 @@ export const UseSongServiceSongsStreamKeyFn = ({ library, song }: {
   library: string;
   song: string;
 }, queryKey?: Array<unknown>) => [useSongServiceSongsStreamKey, ...(queryKey ?? [{ library, song }])];
+export type SystemInfoServiceSystemInfoShowDefaultResponse = Awaited<ReturnType<typeof SystemInfoService.systemInfoShow>>;
+export type SystemInfoServiceSystemInfoShowQueryResult<TData = SystemInfoServiceSystemInfoShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSystemInfoServiceSystemInfoShowKey = "SystemInfoServiceSystemInfoShow";
+export const UseSystemInfoServiceSystemInfoShowKeyFn = (queryKey?: Array<unknown>) => [useSystemInfoServiceSystemInfoShowKey, ...(queryKey ?? [])];
 export type UserServiceUsersIndexDefaultResponse = Awaited<ReturnType<typeof UserService.usersIndex>>;
 export type UserServiceUsersIndexQueryResult<TData = UserServiceUsersIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useUserServiceUsersIndexKey = "UserServiceUsersIndex";
-export const UseUserServiceUsersIndexKeyFn = (queryKey?: Array<unknown>) => [useUserServiceUsersIndexKey, ...(queryKey ?? [])];
+export const UseUserServiceUsersIndexKeyFn = ({ filterModes, filters, globalFilter, limit, page, sorting }: {
+  filterModes?: string;
+  filters?: string;
+  globalFilter?: string;
+  limit?: number;
+  page?: number;
+  sorting?: string;
+} = {}, queryKey?: Array<unknown>) => [useUserServiceUsersIndexKey, ...(queryKey ?? [{ filterModes, filters, globalFilter, limit, page, sorting }])];
 export type UserServiceUsersShowDefaultResponse = Awaited<ReturnType<typeof UserService.usersShow>>;
 export type UserServiceUsersShowQueryResult<TData = UserServiceUsersShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useUserServiceUsersShowKey = "UserServiceUsersShow";
@@ -126,23 +148,6 @@ export const UseUserTokenServiceUserTokenGetUserTokensKeyFn = ({ page, perPage, 
   perPage?: number;
   user: string;
 }, queryKey?: Array<unknown>) => [useUserTokenServiceUserTokenGetUserTokensKey, ...(queryKey ?? [{ page, perPage, user }])];
-export type WidgetServiceWidgetsGetWidgetDefaultResponse = Awaited<ReturnType<typeof WidgetService.widgetsGetWidget>>;
-export type WidgetServiceWidgetsGetWidgetQueryResult<TData = WidgetServiceWidgetsGetWidgetDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useWidgetServiceWidgetsGetWidgetKey = "WidgetServiceWidgetsGetWidget";
-export const UseWidgetServiceWidgetsGetWidgetKeyFn = ({ name }: {
-  name: string;
-}, queryKey?: Array<unknown>) => [useWidgetServiceWidgetsGetWidgetKey, ...(queryKey ?? [{ name }])];
-export type WidgetSchemaServiceWidgetSchemaGetWidgetsDefaultResponse = Awaited<ReturnType<typeof WidgetSchemaService.widgetSchemaGetWidgets>>;
-export type WidgetSchemaServiceWidgetSchemaGetWidgetsQueryResult<TData = WidgetSchemaServiceWidgetSchemaGetWidgetsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useWidgetSchemaServiceWidgetSchemaGetWidgetsKey = "WidgetSchemaServiceWidgetSchemaGetWidgets";
-export const UseWidgetSchemaServiceWidgetSchemaGetWidgetsKeyFn = (queryKey?: Array<unknown>) => [useWidgetSchemaServiceWidgetSchemaGetWidgetsKey, ...(queryKey ?? [])];
-export type WidgetSchemaServiceWidgetSchemaGetWidgetDefaultResponse = Awaited<ReturnType<typeof WidgetSchemaService.widgetSchemaGetWidget>>;
-export type WidgetSchemaServiceWidgetSchemaGetWidgetQueryResult<TData = WidgetSchemaServiceWidgetSchemaGetWidgetDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useWidgetSchemaServiceWidgetSchemaGetWidgetKey = "WidgetSchemaServiceWidgetSchemaGetWidget";
-export const UseWidgetSchemaServiceWidgetSchemaGetWidgetKeyFn = ({ id, name }: {
-  id: string;
-  name: string;
-}, queryKey?: Array<unknown>) => [useWidgetSchemaServiceWidgetSchemaGetWidgetKey, ...(queryKey ?? [{ id, name }])];
 export type AuthServiceAuthLoginMutationResult = Awaited<ReturnType<typeof AuthService.authLogin>>;
 export type AuthServiceAuthRefreshTokenMutationResult = Awaited<ReturnType<typeof AuthService.authRefreshToken>>;
 export type AuthServiceAuthStreamTokenMutationResult = Awaited<ReturnType<typeof AuthService.authStreamToken>>;
@@ -154,11 +159,14 @@ export type JobServiceJobLibraryScanMutationResult = Awaited<ReturnType<typeof J
 export type LibraryServiceLibraryCreateMutationResult = Awaited<ReturnType<typeof LibraryService.libraryCreate>>;
 export type OpCacheServiceOpcacheClearMutationResult = Awaited<ReturnType<typeof OpCacheService.opcacheClear>>;
 export type OpCacheServiceOpcacheCompileMutationResult = Awaited<ReturnType<typeof OpCacheService.opcacheCompile>>;
+export type QueueServiceQueueMetricsRetryJobMutationResult = Awaited<ReturnType<typeof QueueService.queueMetricsRetryJob>>;
 export type UserServiceUsersStoreMutationResult = Awaited<ReturnType<typeof UserService.usersStore>>;
 export type GenreServiceGenresUpdateMutationResult = Awaited<ReturnType<typeof GenreService.genresUpdate>>;
 export type LibraryServiceLibraryUpdateMutationResult = Awaited<ReturnType<typeof LibraryService.libraryUpdate>>;
 export type UserServiceUsersUpdateMutationResult = Awaited<ReturnType<typeof UserService.usersUpdate>>;
 export type GenreServiceGenresDestroyMutationResult = Awaited<ReturnType<typeof GenreService.genresDestroy>>;
 export type LibraryServiceLibraryDeleteMutationResult = Awaited<ReturnType<typeof LibraryService.libraryDelete>>;
+export type QueueServiceQueueMetricsDeleteMutationResult = Awaited<ReturnType<typeof QueueService.queueMetricsDelete>>;
+export type QueueServiceQueueMetricsPurgeMutationResult = Awaited<ReturnType<typeof QueueService.queueMetricsPurge>>;
 export type UserServiceUsersDestroyMutationResult = Awaited<ReturnType<typeof UserService.usersDestroy>>;
 export type UserTokenServiceUserTokenRevokeTokenMutationResult = Awaited<ReturnType<typeof UserTokenService.userTokenRevokeToken>>;

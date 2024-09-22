@@ -1,70 +1,38 @@
-import React from 'react';
-import { Icon } from '@iconify/react';
+import {
+  NextButton,
+  PlayPauseButton,
+  PreviousButton,
+} from '@/features/library-music-player/components/player-buttons/player-buttons.tsx';
+import { useAppDispatch } from '@/store/hooks.ts';
+import { playNextSong, playPreviousSong } from '@/store/music/music-player-slice.ts';
 
 import styles from './player-controls.module.scss';
 
-interface BaseControlProps extends React.HTMLAttributes<HTMLButtonElement> {
-  iconName: string;
-  iconSize?: number;
-}
-
-function BaseControl({ iconName, iconSize = 32, ...props }: BaseControlProps) {
-  return (
-    <button className={styles.playerControl} {...props}>
-      <Icon icon={iconName} fontSize={iconSize} className={styles.icon}/>
-    </button>
-  );
-}
-
-export interface PlayerControlProps extends Omit<BaseControlProps, 'iconName'> {
-  onClick: () => void;
-  iconSize?: number;
-}
-
-export function NextButton({ onClick }: PlayerControlProps) {
-  return <BaseControl iconName="entypo:controller-next" onClick={onClick}/>;
-}
-
-export function PreviousButton({ onClick }: PlayerControlProps) {
-  return <BaseControl iconName="entypo:controller-jump-to-start" onClick={onClick}/>;
-}
-
-export interface PlayPauseButtonProps extends PlayerControlProps {
+export interface PlayerControlsProps {
   isPlaying: boolean;
+  togglePlayPause: () => void;
 }
-export function PlayPauseButton({ onClick, isPlaying, ...props }: PlayPauseButtonProps) {
-  return <BaseControl
-    iconName={isPlaying ? 'entypo:controller-paus' : 'entypo:controller-play'}
-    iconSize={32}
-    onClick={onClick}
-    {...props}
-  />;
-}
+export function PlayerControls({ isPlaying, togglePlayPause }: PlayerControlsProps) {
+  const dispatch = useAppDispatch();
 
-interface VisualizerButtonProps extends PlayerControlProps {
-  isActive?: boolean;
-}
+  const onPlayNextSong = () => {
+    dispatch(playNextSong());
+  }
 
-export function VisualizerButton({ onClick, isActive, ...props }: VisualizerButtonProps) {
-  return <BaseControl
-    title={`${isActive ? 'Hide' : 'Show'} visualizer`}
-    iconName={isActive ? 'ph:waveform' : 'ph:waveform-slash'}
-    iconSize={26}
-    onClick={onClick}
-    {...props}
-  />;
-}
+  const onPlayPreviousSong = () => {
+    dispatch(playPreviousSong());
+  }
 
-interface LyricsButtonProps extends PlayerControlProps {
-  isActive?: boolean;
-}
+  return (
+    <div className={styles.playerControls}>
+      <PreviousButton onClick={() => onPlayPreviousSong()}/>
 
-export function LyricsButton({ onClick, isActive, ...props }: LyricsButtonProps) {
-  return <BaseControl
-    title={`${isActive ? 'Hide' : 'Show'} lyrics`}
-    iconName="maki:karaoke"
-    iconSize={26}
-    onClick={onClick}
-    {...props}
-  />;
+      <PlayPauseButton
+        isPlaying={isPlaying}
+        onClick={() => togglePlayPause()}
+      />
+
+      <NextButton onClick={() => onPlayNextSong()}/>
+    </div>
+  )
 }

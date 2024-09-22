@@ -12,7 +12,7 @@ export function Cover({imgSrc, size, interactive = false}: CoverProps) {
 
   return (
     <>
-      <div>
+      <div style={{ height: `${size}px`, width: `${size}px` }}>
         {imgSrc
           ? <Image src={imgSrc} h={size} w={size} className={`${interactive ? styles.interactive : undefined}`} radius="sm" alt=""/>
           : <FallbackImage size={size} interactive={interactive}/>

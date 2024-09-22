@@ -2,11 +2,10 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Extensions\JsonAnonymousResourceCollection;
-use App\Extensions\JsonPaginator;
+use App\Extensions\{JsonAnonymousResourceCollection, JsonPaginator};
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Song\SongIndexRequest;
 use App\Models\{Album, Library, Song, TokenAbility};
+use App\Http\Requests\Song\{SongIndexRequest, SongShowRequest};
 use App\Http\Resources\Song\SongResource;
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -27,7 +26,6 @@ class SongController extends Controller
     public function index(SongIndexRequest $request, Library $library)
     {
         $relations = $request->query('relations');
-
         $genreNames = $request->query('genreNames');
         $genreSlugs = $request->query('genreSlugs');
 
@@ -53,18 +51,22 @@ class SongController extends Controller
     }
 
     /**
-     * Get a song
+     * Get a song by public id
      *
+     * @param SongShowRequest $request
      * @param Library $library
-     * @param Song $song
+     * @param string $publicId
      * @return SongResource
      */
-    #[Get('{song}', 'api.songs.show', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
-    public function show(Library $library, Song $song)
+    #[Get('{publicId}', 'api.songs.show', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
+    public function show(SongShowRequest $request, Library $library, string $publicId)
     {
-        $song->with('album');
+        $relations = $request->query('relations');
 
-        $song->libraryId = $library->id;
+        $song = Song::query()->wherePublicId($publicId)
+            ->withRelations(Song::$filterRelations, $relations)
+            ->firstOrFail();
+
         $song->librarySlug = $library->slug;
 
         return new SongResource($song);

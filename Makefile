@@ -76,13 +76,6 @@ else
 	$(ERROR_ONLY_FOR_HOST)
 endif
 
-ssh-supervisord: ## Get bash inside supervisord docker container (cron jobs running there, etc...)
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@HOST_UID=$(HOST_UID) HOST_GID=$(HOST_GID) WEB_PORT_HTTP=$(WEB_PORT_HTTP) WEB_PORT_SSL=$(WEB_PORT_SSL) XDEBUG_CONFIG=$(XDEBUG_CONFIG) XDEBUG_VERSION=$(XDEBUG_VERSION) docker-compose  exec supervisord bash
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
-
 exec:
 ifeq ($(INSIDE_DOCKER_CONTAINER), 1)
 	@$$cmd
@@ -132,13 +125,6 @@ endif
 logs-nginx: ## Shows logs from the nginx container. Use ctrl+c in order to exit
 ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
 	@docker logs -f baander-nginx
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
-
-logs-supervisord: ## Shows logs from the supervisord container. Use ctrl+c in order to exit
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@docker logs -f baander-supervisord
 else
 	$(ERROR_ONLY_FOR_HOST)
 endif

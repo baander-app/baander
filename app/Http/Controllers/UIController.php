@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Integrations\Github\BaanderGhApi;
+use App\Packages\PhpInfoParser\Info;
 use Illuminate\Http\Request;
 
 class UIController
@@ -15,6 +17,14 @@ class UIController
                 'debug'       => config('app.debug'),
                 'locale'      => config('app.locale'),
             ],
+        ]);
+    }
+
+    public function dbg()
+    {
+        $modules = Info::getModules();
+
+        return view('dbg', [
         ]);
     }
 }

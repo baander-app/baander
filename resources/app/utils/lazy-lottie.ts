@@ -2,13 +2,13 @@ import type {
   AnimationConfigWithPath,
   AnimationItem,
   LottiePlayer,
-} from "lottie-web";
+} from 'lottie-web';
 
 let cachedLottie: LottiePlayer | null = null;
 
 export type LazyAnimationItem = Pick<
   AnimationItem,
-  "play" | "addEventListener" | "destroy" | "goToAndStop"
+  'play' | 'addEventListener' | 'destroy' | 'goToAndStop'
 >;
 
 const lazyLottie = {
@@ -32,13 +32,13 @@ const lazyLottie = {
 
     const abortController = new AbortController();
     const queuedCommands: Array<{
-      commandName: "play" | "addEventListener" | "goToAndStop";
+      commandName: 'play' | 'addEventListener' | 'goToAndStop';
       // TODO: Fix this the next time the file is edited
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       args: any[];
     }> = [];
 
-    import("lottie-web").then(({ default: lottie }) => {
+    import('lottie-web').then(({ default: lottie }) => {
       if (abortController.signal.aborted) {
         return;
       }
@@ -55,17 +55,17 @@ const lazyLottie = {
 
     return {
       play(...args) {
-        queuedCommands.push({ commandName: "play", args });
+        queuedCommands.push({ commandName: 'play', args });
       },
       addEventListener(...args) {
-        queuedCommands.push({ commandName: "addEventListener", args });
+        queuedCommands.push({ commandName: 'addEventListener', args });
 
         return () => {
-          throw new Error("Not implemented");
+          throw new Error('Not implemented');
         };
       },
       goToAndStop(...args) {
-        queuedCommands.push({ commandName: "goToAndStop", args });
+        queuedCommands.push({ commandName: 'goToAndStop', args });
       },
       destroy() {
         abortController.abort();

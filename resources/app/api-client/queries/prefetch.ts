@@ -1,7 +1,7 @@
-// generated with @7nohe/openapi-react-query-codegen@1.6.0 
+// generated with @7nohe/openapi-react-query-codegen@1.6.1 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AlbumService, ArtistService, GenreService, ImageService, LibraryService, ModelSchemaService, OpCacheService, SongService, UserService, UserTokenService, WidgetSchemaService, WidgetService } from "../requests/services.gen";
+import { AlbumService, ArtistService, GenreService, ImageService, LibraryService, OpCacheService, QueueService, SongService, SystemInfoService, UserService, UserTokenService } from "../requests/services.gen";
 import * as Common from "./common";
 /**
 * Get a collection of albums
@@ -133,11 +133,6 @@ export const prefetchUseLibraryServiceLibrariesIndex = (queryClient: QueryClient
   page?: number;
 } = {}) => queryClient.prefetchQuery({ queryKey: Common.UseLibraryServiceLibrariesIndexKeyFn({ limit, page }), queryFn: () => LibraryService.librariesIndex({ limit, page }) });
 /**
-* @returns string
-* @throws ApiError
-*/
-export const prefetchUseModelSchemaServiceSchemasModel = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseModelSchemaServiceSchemasModelKeyFn(), queryFn: () => ModelSchemaService.schemasModel() });
-/**
 * Get status
 * @returns unknown
 * @throws ApiError
@@ -150,6 +145,29 @@ export const prefetchUseOpCacheServiceOpCacheGetStatus = (queryClient: QueryClie
 */
 export const prefetchUseOpCacheServiceOpcacheGetConfig = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseOpCacheServiceOpcacheGetConfigKeyFn(), queryFn: () => OpCacheService.opcacheGetConfig() });
 /**
+* Get a collection of monitor entries
+* ⚠️Cannot generate request documentation: Class "romanzipp\QueueMonitor\Enums\MonitorStatus" not found
+* @returns unknown Json paginated set of `QueueMonitorResource`
+* @throws ApiError
+*/
+export const prefetchUseQueueServiceQueueMetricsShow = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseQueueServiceQueueMetricsShowKeyFn(), queryFn: () => QueueService.queueMetricsShow() });
+/**
+* Get a list of queue names
+* @returns unknown
+* @throws ApiError
+*/
+export const prefetchUseQueueServiceQueueMetricsQueues = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseQueueServiceQueueMetricsQueuesKeyFn(), queryFn: () => QueueService.queueMetricsQueues() });
+/**
+* Get a metrics collection
+* @param data The data for the request.
+* @param data.aggregateDays Days to aggregate
+* @returns unknown
+* @throws ApiError
+*/
+export const prefetchUseQueueServiceQueueMetricsMetrics = (queryClient: QueryClient, { aggregateDays }: {
+  aggregateDays?: number;
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseQueueServiceQueueMetricsMetricsKeyFn({ aggregateDays }), queryFn: () => QueueService.queueMetricsMetrics({ aggregateDays }) });
+/**
 * Get a collection of songs
 * @param data The data for the request.
 * @param data.library The library slug
@@ -160,7 +178,7 @@ export const prefetchUseOpCacheServiceOpcacheGetConfig = (queryClient: QueryClie
 * @param data.relations Comma seperated string of relations
 * - album
 * - artists
-* - albumArtist
+* - album.albumArtist
 * - genres
 * @returns unknown Json paginated set of `SongResource`
 * @throws ApiError
@@ -174,17 +192,23 @@ export const prefetchUseSongServiceSongsIndex = (queryClient: QueryClient, { gen
   relations?: string;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseSongServiceSongsIndexKeyFn({ genreNames, genreSlugs, library, limit, page, relations }), queryFn: () => SongService.songsIndex({ genreNames, genreSlugs, library, limit, page, relations }) });
 /**
-* Get a song
+* Get a song by public id
 * @param data The data for the request.
 * @param data.library The library slug
-* @param data.song The song public id
+* @param data.publicId
+* @param data.relations Comma seperated string of relations
+* - album
+* - artists
+* - albumArtist
+* - genres
 * @returns SongResource `SongResource`
 * @throws ApiError
 */
-export const prefetchUseSongServiceSongsShow = (queryClient: QueryClient, { library, song }: {
+export const prefetchUseSongServiceSongsShow = (queryClient: QueryClient, { library, publicId, relations }: {
   library: string;
-  song: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseSongServiceSongsShowKeyFn({ library, song }), queryFn: () => SongService.songsShow({ library, song }) });
+  publicId: string;
+  relations?: string;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseSongServiceSongsShowKeyFn({ library, publicId, relations }), queryFn: () => SongService.songsShow({ library, publicId, relations }) });
 /**
 * Direct stream the song
 * Requires token with "access-stream"
@@ -199,11 +223,30 @@ export const prefetchUseSongServiceSongsStream = (queryClient: QueryClient, { li
   song: string;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseSongServiceSongsStreamKeyFn({ library, song }), queryFn: () => SongService.songsStream({ library, song }) });
 /**
+* @returns unknown
+* @throws ApiError
+*/
+export const prefetchUseSystemInfoServiceSystemInfoShow = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSystemInfoServiceSystemInfoShowKeyFn(), queryFn: () => SystemInfoService.systemInfoShow() });
+/**
 * Get a collection of users
+* @param data The data for the request.
+* @param data.page Current page
+* @param data.limit Items per page
+* @param data.globalFilter
+* @param data.filters JSON object
+* @param data.filterModes JSON object
+* @param data.sorting JSON object
 * @returns unknown Json paginated set of `UserResource`
 * @throws ApiError
 */
-export const prefetchUseUserServiceUsersIndex = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseUserServiceUsersIndexKeyFn(), queryFn: () => UserService.usersIndex() });
+export const prefetchUseUserServiceUsersIndex = (queryClient: QueryClient, { filterModes, filters, globalFilter, limit, page, sorting }: {
+  filterModes?: string;
+  filters?: string;
+  globalFilter?: string;
+  limit?: number;
+  page?: number;
+  sorting?: string;
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseUserServiceUsersIndexKeyFn({ filterModes, filters, globalFilter, limit, page, sorting }), queryFn: () => UserService.usersIndex({ filterModes, filters, globalFilter, limit, page, sorting }) });
 /**
 * Get small user detail info
 * @param data The data for the request.
@@ -234,31 +277,3 @@ export const prefetchUseUserTokenServiceUserTokenGetUserTokens = (queryClient: Q
   perPage?: number;
   user: string;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseUserTokenServiceUserTokenGetUserTokensKeyFn({ page, perPage, user }), queryFn: () => UserTokenService.userTokenGetUserTokens({ page, perPage, user }) });
-/**
-* Get a widget for the user
-* @param data The data for the request.
-* @param data.name
-* @returns null
-* @throws ApiError
-*/
-export const prefetchUseWidgetServiceWidgetsGetWidget = (queryClient: QueryClient, { name }: {
-  name: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseWidgetServiceWidgetsGetWidgetKeyFn({ name }), queryFn: () => WidgetService.widgetsGetWidget({ name }) });
-/**
-* Get a list of widgets
-* @returns WidgetListItemResource Array of `WidgetListItemResource`
-* @throws ApiError
-*/
-export const prefetchUseWidgetSchemaServiceWidgetSchemaGetWidgets = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseWidgetSchemaServiceWidgetSchemaGetWidgetsKeyFn(), queryFn: () => WidgetSchemaService.widgetSchemaGetWidgets() });
-/**
-* Get widget schema
-* @param data The data for the request.
-* @param data.name Name of the schema
-* @param data.id
-* @returns string
-* @throws ApiError
-*/
-export const prefetchUseWidgetSchemaServiceWidgetSchemaGetWidget = (queryClient: QueryClient, { id, name }: {
-  id: string;
-  name: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseWidgetSchemaServiceWidgetSchemaGetWidgetKeyFn({ id, name }), queryFn: () => WidgetSchemaService.widgetSchemaGetWidget({ id, name }) });

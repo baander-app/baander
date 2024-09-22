@@ -127,11 +127,31 @@ export type PersonalAccessTokenViewResource = {
     updatedAt: string | null;
 };
 
+export type QueueMonitorResource = {
+    id: number;
+    job_id: string;
+    name: string | null;
+    queue: string | null;
+    started_at: string | null;
+    started_at_exact: string | null;
+    finished_at: string | null;
+    finished_at_exact: string | null;
+    attempt: number;
+    progress: number | null;
+    exception: string | null;
+    exception_message: string;
+    exception_class: string | null;
+    data: string | null;
+    status: string;
+    job_uuid: string | null;
+    retried: boolean;
+    queued_at: string | null;
+};
+
 export type RegisterRequest = {
     email: string;
     password: string;
     password_confirmation: string;
-    name?: string;
 };
 
 export type ResetPasswordRequest = {
@@ -139,6 +159,10 @@ export type ResetPasswordRequest = {
     token: string;
     password: string;
     password_confirmation: string;
+};
+
+export type RetryJobRequest = {
+    id?: number;
 };
 
 export type SongResource = {
@@ -150,6 +174,7 @@ export type SongResource = {
     length: string | null;
     durationHuman: string;
     lyrics: string | null;
+    lyricsExist: boolean;
     modifiedTime: number | null;
     path: string;
     track: number | null;
@@ -158,9 +183,11 @@ export type SongResource = {
     mimeType: string;
     hash: string | null;
     stream?: string | null;
+    librarySlug?: string;
     createdAt: string | null;
     updatedAt: string | null;
     album?: AlbumWithoutSongsResource;
+    artists?: Array<ArtistResource>;
 };
 
 export type UpdateGenreRequest = {
@@ -185,18 +212,6 @@ export type UserResource = {
     isAdmin: boolean;
     createdAt: string | null;
     updatedAt: string | null;
-};
-
-export type WidgetListItemResource = {
-    /**
-     * Id of the widget.
-     * Use this to query the schema.
-     */
-    id: string;
-    /**
-     * Name of the schema.
-     */
-    name: string;
 };
 
 export type AlbumsIndexData = {
@@ -350,20 +365,8 @@ export type AuthLoginResponse = {
     refreshToken: NewAccessTokenResource;
 };
 
-export type AuthRefreshTokenData = {
-    requestBody?: {
-        [key: string]: unknown;
-    };
-};
-
 export type AuthRefreshTokenResponse = {
     accessToken: NewAccessTokenResource;
-};
-
-export type AuthStreamTokenData = {
-    requestBody?: {
-        [key: string]: unknown;
-    };
 };
 
 export type AuthStreamTokenResponse = {
@@ -371,7 +374,9 @@ export type AuthStreamTokenResponse = {
 };
 
 export type AuthRegisterData = {
-    requestBody?: RegisterRequest;
+    requestBody?: RegisterRequest & {
+    name?: string;
+};
 };
 
 export type AuthRegisterResponse = {
@@ -393,12 +398,6 @@ export type AuthResetPasswordData = {
 
 export type AuthResetPasswordResponse = {
     message: string;
-};
-
-export type AuthVerifyData = {
-    requestBody?: {
-        [key: string]: unknown;
-    };
 };
 
 export type AuthVerifyResponse = UserResource;
@@ -495,9 +494,6 @@ export type ImageServeData = {
 export type ImageServeResponse = string;
 
 export type JobLibraryScanData = {
-    requestBody?: {
-        [key: string]: unknown;
-    };
     slug: string;
 };
 
@@ -558,8 +554,6 @@ export type LibraryUpdateResponse = LibraryResource;
 
 export type LibraryDeleteResponse = null;
 
-export type SchemasModelResponse = string;
-
 export type OpCacheGetStatusResponse = {
     opcache_enabled: boolean;
     file_cache: string;
@@ -618,12 +612,6 @@ export type OpcacheGetConfigResponse = {
     blacklist: Array<(string)>;
 };
 
-export type OpcacheClearData = {
-    requestBody?: {
-        [key: string]: unknown;
-    };
-};
-
 export type OpcacheClearResponse = {
     success: boolean;
 };
@@ -639,6 +627,72 @@ export type OpcacheCompileResponse = {
     totalFiles: number;
     compiled: number;
 };
+
+export type QueueMetricsShowResponse = {
+    data: Array<QueueMonitorResource>;
+    /**
+     * Total number of items being paginated.
+     */
+    total: number;
+    /**
+     * The number of items for the current page
+     */
+    count: number;
+    /**
+     * The number of items per page
+     */
+    limit: number;
+    /**
+     * The number of current page
+     */
+    currentPage: number;
+    /**
+     * The number of next page
+     */
+    nextPage: number;
+    /**
+     * The number of last page
+     */
+    lastPage: number;
+};
+
+export type QueueMetricsQueuesResponse = Array<{
+    name: string;
+}>;
+
+export type QueueMetricsMetricsData = {
+    /**
+     * Days to aggregate
+     */
+    aggregateDays?: number;
+};
+
+export type QueueMetricsMetricsResponse = Array<{
+    title: string;
+    value: number;
+    previousValue: number | null;
+    format: string;
+    formattedValue: string;
+    formattedPreviousValue: string | null;
+}>;
+
+export type QueueMetricsRetryJobData = {
+    id: string;
+    requestBody?: RetryJobRequest;
+};
+
+export type QueueMetricsRetryJobResponse = {
+    status: string;
+    message: string;
+};
+
+export type QueueMetricsDeleteData = {
+    id: string;
+};
+
+export type QueueMetricsDeleteResponse = null;
+
+export type QueueMetricsPurgeResponse = null;
 
 export type SongsIndexData = {
     /**
@@ -665,7 +719,7 @@ export type SongsIndexData = {
      * Comma seperated string of relations
      * - album
      * - artists
-     * - albumArtist
+     * - album.albumArtist
      * - genres
      */
     relations?: string;
@@ -704,10 +758,15 @@ export type SongsShowData = {
      * The library slug
      */
     library: string;
+    publicId: string;
     /**
-     * The song public id
+     * Comma seperated string of relations
+     * - album
+     * - artists
+     * - albumArtist
+     * - genres
      */
-    song: string;
+    relations?: string;
 };
 
 export type SongsShowResponse = SongResource;
@@ -725,6 +784,38 @@ export type SongsStreamData = {
 
 export type SongsStreamResponse = {
     [key: string]: unknown;
+};
+
+export type SystemInfoShowResponse = Array<{
+    section: string;
+    values: Array<{
+        name: string;
+        value: string | number | boolean | null;
+    }>;
+}>;
+
+export type UsersIndexData = {
+    /**
+     * JSON object
+     */
+    filterModes?: string;
+    /**
+     * JSON object
+     */
+    filters?: string;
+    globalFilter?: string;
+    /**
+     * Items per page
+     */
+    limit?: number;
+    /**
+     * Current page
+     */
+    page?: number;
+    /**
+     * JSON object
+     */
+    sorting?: string;
 };
 
 export type UsersIndexResponse = {
@@ -830,24 +921,6 @@ export type UserTokenRevokeTokenData = {
 };
 
 export type UserTokenRevokeTokenResponse = null;
-
-export type WidgetsGetWidgetData = {
-    name: string;
-};
-
-export type WidgetsGetWidgetResponse = null;
-
-export type WidgetSchemaGetWidgetsResponse = Array<WidgetListItemResource>;
-
-export type WidgetSchemaGetWidgetData = {
-    id: string;
-    /**
-     * Name of the schema
-     */
-    name: string;
-};
-
-export type WidgetSchemaGetWidgetResponse = string;
 
 export type $OpenApiTs = {
     '/libraries/{library}/albums': {
@@ -1103,7 +1176,6 @@ export type $OpenApiTs = {
     };
     '/auth/refreshToken': {
         post: {
-            req: AuthRefreshTokenData;
             res: {
                 200: {
                     accessToken: NewAccessTokenResource;
@@ -1122,7 +1194,6 @@ export type $OpenApiTs = {
     };
     '/auth/streamToken': {
         post: {
-            req: AuthStreamTokenData;
             res: {
                 200: {
                     streamToken: NewAccessTokenResource;
@@ -1253,7 +1324,6 @@ export type $OpenApiTs = {
     };
     '/auth/verify/:id/:hash': {
         post: {
-            req: AuthVerifyData;
             res: {
                 /**
                  * `UserResource`
@@ -1657,22 +1727,6 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/schemas/models': {
-        get: {
-            res: {
-                200: string;
-                /**
-                 * Unauthenticated
-                 */
-                401: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-            };
-        };
-    };
     '/opcache/status': {
         get: {
             res: {
@@ -1761,7 +1815,6 @@ export type $OpenApiTs = {
     };
     '/opcache/clear': {
         post: {
-            req: OpcacheClearData;
             res: {
                 200: {
                     success: boolean;
@@ -1786,6 +1839,233 @@ export type $OpenApiTs = {
                     totalFiles: number;
                     compiled: number;
                 };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/queue-metrics': {
+        get: {
+            res: {
+                /**
+                 * Json paginated set of `QueueMonitorResource`
+                 */
+                200: {
+                    data: Array<QueueMonitorResource>;
+                    /**
+                     * Total number of items being paginated.
+                     */
+                    total: number;
+                    /**
+                     * The number of items for the current page
+                     */
+                    count: number;
+                    /**
+                     * The number of items per page
+                     */
+                    limit: number;
+                    /**
+                     * The number of current page
+                     */
+                    currentPage: number;
+                    /**
+                     * The number of next page
+                     */
+                    nextPage: number;
+                    /**
+                     * The number of last page
+                     */
+                    lastPage: number;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+            };
+        };
+    };
+    '/queue-metrics/queues': {
+        get: {
+            res: {
+                200: Array<{
+                    name: string;
+                }>;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/queue-metrics/metrics': {
+        get: {
+            req: QueueMetricsMetricsData;
+            res: {
+                200: Array<{
+                    title: string;
+                    value: number;
+                    previousValue: number | null;
+                    format: string;
+                    formattedValue: string;
+                    formattedPreviousValue: string | null;
+                }>;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+            };
+        };
+    };
+    '/queue-metrics/retry/{id}': {
+        post: {
+            req: QueueMetricsRetryJobData;
+            res: {
+                200: {
+    status: string;
+    message: string;
+};
+                /**
+                 * An error
+                 */
+                400: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+            };
+        };
+    };
+    '/queue-metrics/{id}': {
+        delete: {
+            req: QueueMetricsDeleteData;
+            res: {
+                /**
+                 * No content
+                 */
+                204: null;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/queue-metrics/purge': {
+        delete: {
+            res: {
+                /**
+                 * No content
+                 */
+                204: null;
                 /**
                  * Unauthenticated
                  */
@@ -1886,7 +2166,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/libraries/{library}/songs/{song}': {
+    '/libraries/{library}/songs/{publicId}': {
         get: {
             req: SongsShowData;
             res: {
@@ -1904,6 +2184,15 @@ export type $OpenApiTs = {
                     message: string;
                 };
                 /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
                  * Not found
                  */
                 404: {
@@ -1911,6 +2200,21 @@ export type $OpenApiTs = {
                      * Error overview.
                      */
                     message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
                 };
             };
         };
@@ -1943,8 +2247,31 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/system-info': {
+        get: {
+            res: {
+                200: Array<{
+                    section: string;
+                    values: Array<{
+                        name: string;
+                        value: string | number | boolean | null;
+                    }>;
+                }>;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
     '/users': {
         get: {
+            req: UsersIndexData;
             res: {
                 /**
                  * Json paginated set of `UserResource`
@@ -1984,6 +2311,30 @@ export type $OpenApiTs = {
                      * Error overview.
                      */
                     message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
                 };
             };
         };
@@ -2242,83 +2593,6 @@ export type $OpenApiTs = {
                      * Error overview.
                      */
                     message: string;
-                };
-            };
-        };
-    };
-    '/widgets/{name}': {
-        get: {
-            req: WidgetsGetWidgetData;
-            res: {
-                200: null;
-                /**
-                 * Unauthenticated
-                 */
-                401: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-            };
-        };
-    };
-    '/schemas/widgets': {
-        get: {
-            res: {
-                /**
-                 * Array of `WidgetListItemResource`
-                 */
-                200: Array<WidgetListItemResource>;
-                /**
-                 * Unauthenticated
-                 */
-                401: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-            };
-        };
-    };
-    '/schemas/widgets/{name}': {
-        get: {
-            req: WidgetSchemaGetWidgetData;
-            res: {
-                200: string;
-                /**
-                 * Unauthenticated
-                 */
-                401: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
-                 * Authorization error
-                 */
-                403: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
-                 * Validation error
-                 */
-                422: {
-                    /**
-                     * Errors overview.
-                     */
-                    message: string;
-                    /**
-                     * A detailed description of each field that failed validation.
-                     */
-                    errors: {
-                        [key: string]: Array<(string)>;
-                    };
                 };
             };
         };

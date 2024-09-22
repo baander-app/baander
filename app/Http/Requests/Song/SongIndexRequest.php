@@ -49,7 +49,7 @@ class SongIndexRequest extends FormRequest
              * Comma seperated string of relations
              * - album
              * - artists
-             * - albumArtist
+             * - album.albumArtist
              * - genres
              */
             'relations' => 'string',

@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Song;
 
 use App\Http\Resources\Album\AlbumWithoutSongsResource;
+use App\Http\Resources\Artist\ArtistResource;
 use App\Http\Resources\HasJsonCollection;
 use App\Models\Song;
 use App\Packages\Humanize\HumanDuration;
@@ -35,6 +36,7 @@ class SongResource extends JsonResource
             'length'        => $this->length,
             'durationHuman' => (new HumanDuration)->humanize($this->length),
             'lyrics'        => $this->lyrics,
+            'lyricsExist'   => (bool)$this->lyrics,
             'modifiedTime'  => $this->modified_time,
             'path'          => $this->path,
             'track'         => $this->track,
@@ -45,9 +47,13 @@ class SongResource extends JsonResource
             $this->mergeWhen($streamUrl, [
                 'stream' => $streamUrl,
             ]),
+            $this->mergeWhen($this->librarySlug, [
+                'librarySlug' => $this->librarySlug,
+            ]),
             'createdAt'     => $this->created_at,
             'updatedAt'     => $this->updated_at,
-            'album' => AlbumWithoutSongsResource::make($this->whenLoaded('album')),
+            'album'         => AlbumWithoutSongsResource::make($this->whenLoaded('album')),
+            'artists'       => ArtistResource::collection($this->whenLoaded('artists')),
         ];
     }
 

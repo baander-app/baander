@@ -1,37 +1,46 @@
-import React, { MutableRefObject, useContext, useMemo, useState } from 'react';
+import React, { MutableRefObject, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { noop } from '@/utils/noop.ts';
 import { useStreamToken } from '@/hooks/use-stream-token.ts';
-import { SongResource } from '@/api-client/requests';
+import { useAppDispatch, useAppSelector } from '@/store/hooks.ts';
+import { playNextSong, selectSong } from '@/store/music/music-player-slice.ts';
 
 interface MusicSourceContextType {
   authenticatedSource: string | undefined;
-  audioRef: MutableRefObject<HTMLAudioElement> | undefined;
-  setAudioRef: (audioRef: MutableRefObject<HTMLAudioElement>) => void;
-  song: SongResource | null;
-  setSong: (song: SongResource | null) => void;
+  audioRef: MutableRefObject<HTMLAudioElement | null> | undefined;
+  setAudioRef: (audioRef: MutableRefObject<HTMLAudioElement | null>) => void;
 }
 
 export const MusicSourceContext = React.createContext<MusicSourceContextType>({
   authenticatedSource: undefined,
   audioRef: undefined,
   setAudioRef: () => noop(),
-  song: null,
-  setSong: () => noop(),
 });
 MusicSourceContext.displayName = 'MusicSourceContext';
 
 export function MusicSourceProvider({ children }: { children: React.ReactNode }) {
-  const [audioRef, setAudioRef] = useState<MutableRefObject<HTMLAudioElement>>();
-
+  const dispatch = useAppDispatch();
   const { streamToken } = useStreamToken();
-  const [song, setSong] = useState<SongResource | null>(null);
+
+  const currentSong = useAppSelector(selectSong);
+  const [audioRef, setAudioRef] = useState<MutableRefObject<HTMLAudioElement | null>>();
 
   const authenticatedSource = useMemo(() => {
-    if (song?.stream && streamToken) {
-      return `${song.stream}?_token=${streamToken}`;
+    if (currentSong?.stream && streamToken) {
+      return `${currentSong.stream}?_token=${streamToken}`;
     }
-  }, [song?.stream, streamToken]);
+    return undefined;
+  }, [currentSong, streamToken]);
 
+  const onSongEnd = useCallback(() => {
+    dispatch(playNextSong());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (audioRef?.current) {
+      audioRef.current.addEventListener('ended', onSongEnd);
+      return () => audioRef.current?.removeEventListener('ended', onSongEnd);
+    }
+  }, [audioRef, onSongEnd]);
 
   return (
     <MusicSourceContext.Provider
@@ -39,10 +48,10 @@ export function MusicSourceProvider({ children }: { children: React.ReactNode })
         authenticatedSource,
         audioRef,
         setAudioRef,
-        song,
-        setSong
       }}
-    >{children}</MusicSourceContext.Provider>
+    >
+      {children}
+    </MusicSourceContext.Provider>
   );
 }
 

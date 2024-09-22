@@ -2,21 +2,16 @@
 
 namespace App\Jobs\Library;
 
-use App\Jobs\Concerns\HasJobsLogger;
+use App\Jobs\BaseJob;
 use App\Models\Album;
-use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\{InteractsWithQueue, Middleware\WithoutOverlapping, SerializesModels};
-use romanzipp\QueueMonitor\Traits\IsMonitored;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Safe\Exceptions\ImageException;
 use Zend_Media_Id3_Frame_Apic;
 use Zend_Media_Id3v2;
 
-class SaveAlbumCoverJob implements ShouldQueue
+class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, IsMonitored, HasJobsLogger;
-
     private Album $album;
 
     /**
@@ -34,7 +29,7 @@ class SaveAlbumCoverJob implements ShouldQueue
      */
     public function middleware(): array
     {
-        return [(new WithoutOverlapping($this->album->id))->dontRelease()];
+        return [(new WithoutOverlapping("album_cover_{$this->album->id}"))->dontRelease()];
     }
 
     /**

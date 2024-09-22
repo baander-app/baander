@@ -173,7 +173,7 @@ class Id3v2 extends AbstractModule
                 $value = "\xFE\xFF" . $value;
                 break;
             default:
-                $value = utf8_encode($value);
+                $value = mb_convert_encoding($value, 'UTF-8');
         }
 
         $value = Bom::removeBom($value);

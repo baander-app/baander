@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Extensions\JsonPaginator;
-use App\Http\Requests\Users\{CreateUserRequest, UpdateUserRequest};
+use App\Http\Concerns\Filterable;
+use App\Http\Requests\User\{CreateUserRequest, UpdateUserRequest, UserIndexRequest};
 use App\Http\Resources\User\UserResource;
 use App\Models\TokenAbility;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Patch, Post, Prefix};
+use Illuminate\Support\Str;
 
 #[Prefix('users')]
 #[Middleware([
@@ -18,15 +20,18 @@ use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Patch, Post, Pre
 ])]
 class UserController
 {
+    use Filterable;
+
     /**
      * Get a collection of users
      *
      * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection<JsonPaginator<UserResource>>
      */
     #[Get('/', 'api.users.index')]
-    public function index()
+    public function index(UserIndexRequest $request)
     {
-        $users = User::paginate();
+        $columnsForGlobalFilter = ['name', 'email'];
+        $users = $this->applyFilters($request, User::class, $columnsForGlobalFilter);
 
         return UserResource::collection($users);
     }

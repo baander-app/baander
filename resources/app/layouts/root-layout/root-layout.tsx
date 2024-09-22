@@ -3,8 +3,6 @@ import styles from './root-layout.module.scss';
 import { AppShell, Burger, Group, Text } from '@mantine/core';
 import { NavLink } from '@/components/nav-link.tsx';
 import { useDisclosure } from '@mantine/hooks';
-import { NavbarLinksGroup } from '@/components/nav-bar-links-group/nav-bar-links-group.tsx';
-import { useWidgetServiceWidgetsGetWidget } from '@/api-client/queries';
 import { UserMenu } from '@/layouts/root-layout/user-menu.tsx';
 import { LibraryNav } from '@/layouts/root-layout/library-nav/library-nav.tsx';
 import { lazyImport } from '@/utils/lazy-import.ts';
@@ -14,7 +12,6 @@ const { InlinePlayer } = lazyImport(() => import('@/features/library-music-playe
 
 export function RootLayout(props: { children?: ReactNode }) {
   const [opened, { toggle }] = useDisclosure();
-  const { data: mainNav } = useWidgetServiceWidgetsGetWidget<any>({ name: 'MainNavBar' });
 
   return (
     <AppShell
@@ -40,11 +37,6 @@ export function RootLayout(props: { children?: ReactNode }) {
 
         <NavLink to="/dashboard" label="Dashboard"/>
 
-        {mainNav?.footer && (
-          <div className={styles.container}>
-            <NavbarLinksGroup {...mainNav.footer} />
-          </div>
-        )}
 
         <UserMenu/>
       </AppShell.Navbar>
