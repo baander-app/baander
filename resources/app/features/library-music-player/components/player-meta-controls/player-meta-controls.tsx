@@ -4,7 +4,6 @@ import {
 } from '@/features/library-music-player/components/player-buttons/player-buttons.tsx';
 import { useDisclosure } from '@mantine/hooks';
 import { Waveform } from '@/components/waveform/waveform.tsx';
-
 import styles from './player-meta-controls.module.scss';
 import { SongResource } from '@/api-client/requests';
 import { VolumeSlider } from '@/features/library-music-player/components/volume-slider/volume-slider.tsx';
@@ -31,7 +30,7 @@ export function PlayerMetaControls({ song }: PlayerMetaControlsProps) {
   return (
     <>
       <div className={styles.playerMetaControls}>
-        <VolumeSlider/>
+        <VolumeSlider />
 
         <VisualizerButton
           isActive={showWaveform}
@@ -48,12 +47,12 @@ export function PlayerMetaControls({ song }: PlayerMetaControlsProps) {
       </div>
 
       {showWaveform && (
-        <Waveform key="waveform" onClose={() => waveformHandlers.close()}/>
+        <Waveform key="waveform" onClose={() => waveformHandlers.close()} />
       )}
 
       {showLyrics && (
         <Affix position={{ right: 20, bottom: 90 }}>
-          <LyricsViewer key="lyrics"  />
+          <LyricsViewer key="lyrics" />
         </Affix>
       )}
     </>

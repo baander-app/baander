@@ -2,16 +2,17 @@
   width: 100%;
   text-align: center;
   position: absolute;
-  padding-left: 3px;
-  padding-right: 3px;
+  padding: 12px;
+  background-color: rgba(0, 0, 0, .33);
+  border-radius: 12px;
 }
 
 .currentLyric {
-  top: 50%; /* Center the current lyric */
+  top: 40%; /* Center the current lyric */
   transform: translateY(-50%);
 }
 
 .nextLyric {
-  top: 60%; /* Place next lyric below current lyric */
+  top: 75%; /* Place next lyric below current lyric */
   transform: translateY(-50%);
 }
