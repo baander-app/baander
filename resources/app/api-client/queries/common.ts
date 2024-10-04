@@ -122,10 +122,10 @@ export const UseSongServiceSongsStreamKeyFn = ({ library, song }: {
   library: string;
   song: string;
 }, queryKey?: Array<unknown>) => [useSongServiceSongsStreamKey, ...(queryKey ?? [{ library, song }])];
-export type SystemInfoServiceSystemInfoShowDefaultResponse = Awaited<ReturnType<typeof SystemInfoService.systemInfoShow>>;
-export type SystemInfoServiceSystemInfoShowQueryResult<TData = SystemInfoServiceSystemInfoShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useSystemInfoServiceSystemInfoShowKey = "SystemInfoServiceSystemInfoShow";
-export const UseSystemInfoServiceSystemInfoShowKeyFn = (queryKey?: Array<unknown>) => [useSystemInfoServiceSystemInfoShowKey, ...(queryKey ?? [])];
+export type SystemInfoServiceSystemInfoPhpDefaultResponse = Awaited<ReturnType<typeof SystemInfoService.systemInfoPhp>>;
+export type SystemInfoServiceSystemInfoPhpQueryResult<TData = SystemInfoServiceSystemInfoPhpDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSystemInfoServiceSystemInfoPhpKey = "SystemInfoServiceSystemInfoPhp";
+export const UseSystemInfoServiceSystemInfoPhpKeyFn = (queryKey?: Array<unknown>) => [useSystemInfoServiceSystemInfoPhpKey, ...(queryKey ?? [])];
 export type UserServiceUsersIndexDefaultResponse = Awaited<ReturnType<typeof UserService.usersIndex>>;
 export type UserServiceUsersIndexQueryResult<TData = UserServiceUsersIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useUserServiceUsersIndexKey = "UserServiceUsersIndex";

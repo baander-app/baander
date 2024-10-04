@@ -29,9 +29,10 @@ const menu: LinksGroupProps[] = [
     label: 'System',
     iconName: 'heroicons:cog',
     links: [
-      {label: 'Logs', to: 'log-viewer'},
+      {label: 'Logs', to: 'system/log-viewer'},
       {label: 'OpCache', to: ''},
-      {label: 'Queue monitor', to: 'queue-monitor'},
+      {label: 'Queue monitor', to: 'system/queue-monitor'},
+      {label: 'Php', to: 'system/php'}
     ],
   },
   {

@@ -241,10 +241,11 @@ export const useSongServiceSongsStreamSuspense = <TData = Common.SongServiceSong
   song: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseSongServiceSongsStreamKeyFn({ library, song }, queryKey), queryFn: () => SongService.songsStream({ library, song }) as TData, ...options });
 /**
+* Get php info
 * @returns unknown
 * @throws ApiError
 */
-export const useSystemInfoServiceSystemInfoShowSuspense = <TData = Common.SystemInfoServiceSystemInfoShowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseSystemInfoServiceSystemInfoShowKeyFn(queryKey), queryFn: () => SystemInfoService.systemInfoShow() as TData, ...options });
+export const useSystemInfoServiceSystemInfoPhpSuspense = <TData = Common.SystemInfoServiceSystemInfoPhpDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseSystemInfoServiceSystemInfoPhpKeyFn(queryKey), queryFn: () => SystemInfoService.systemInfoPhp() as TData, ...options });
 /**
 * Get a collection of users
 * @param data The data for the request.

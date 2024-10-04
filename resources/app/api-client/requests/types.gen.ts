@@ -19,7 +19,7 @@ export type AlbumResource = {
      * Songs relation
      */
     songs?: Array<SongResource>;
-    genres: Array<{
+    genres?: Array<{
         slug: string;
         name: string;
     }>;
@@ -822,10 +822,10 @@ export type SongsStreamResponse = {
     [key: string]: unknown;
 };
 
-export type SystemInfoShowResponse = Array<{
+export type SystemInfoPhpResponse = Array<{
     section: string;
     values: Array<{
-        name: string;
+        key: string;
         value: string | number | boolean | null;
     }>;
 }>;
@@ -2290,7 +2290,7 @@ export type $OpenApiTs = {
                 200: Array<{
                     section: string;
                     values: Array<{
-                        name: string;
+                        key: string;
                         value: string | number | boolean | null;
                     }>;
                 }>;
