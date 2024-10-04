@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Controller;
 use App\Models\TokenAbility;
 use App\Packages\PhpInfoParser\Info;
+use App\Services\SystemMetricsCollectorService;
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
 
 #[Prefix('/system-info')]
@@ -12,7 +14,7 @@ use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
     'ability:' . TokenAbility::ACCESS_API->value,
     'force.json',
 ])]
-class SystemInfoController
+class SystemInfoController extends Controller
 {
     /**
      * Get php info
@@ -28,8 +30,32 @@ class SystemInfoController
     #[Get('/', 'api.system-info.php')]
     public function php()
     {
+        $this->gateCheckViewDashboard();
+
         return response()->json(Info::getModules());
     }
 
+    /**
+     * @response array{
+     *   memoryUsage: int,
+     *   systemLoadAverage: int[],
+     *   swooleVm: array{
+     *     object_num: int,
+     *     resource_num: int
+     *   }
+     * }
+     */
+    #[Get('/sys', 'api.system-info.sys')]
+    public function system()
+    {
+        $this->gateCheckViewDashboard();
 
+        $service = app(SystemMetricsCollectorService::class);
+
+        return response()->json([
+            'memoryUsage'       => $service->memoryUsage(),
+            'systemLoadAverage' => $service->systemLoadAverage(),
+            'swooleVm'          => $service->swooleVm(),
+        ]);
+    }
 }

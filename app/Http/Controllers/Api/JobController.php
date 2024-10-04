@@ -28,6 +28,8 @@ class JobController extends Controller
     #[Post('/scanLibrary/{slug}', 'api.job.library-scan')]
     public function startLibraryScan(Request $request)
     {
+        $this->gateCheckExecuteJob();
+
         $slug = $request->route('slug');
 
         try {
