@@ -1,21 +1,29 @@
-import styles from './album-detail.module.scss';
 import { Cover } from '@/features/library-music/components/artwork/cover';
 import { useAlbumServiceAlbumsShow } from '@/api-client/queries';
 import { SongResource } from '@/api-client/requests';
-import { useMusicSource } from '@/providers/music-source-provider';
-import { Table, Title, Text, Card, Group, Flex, Box, ScrollArea, Skeleton } from '@mantine/core';
+import { Table, Title, Text, Card, Group, Flex, Box, ScrollArea, Skeleton, BoxProps } from '@mantine/core';
 import { AlertLoadingError } from '@/components/alerts/alert-loading-error.tsx';
-import { formatDuration } from '@/utils/time/format-duration.ts';
+import { useAppDispatch } from '@/store/hooks.ts';
+import { setQueueAndSong } from '@/store/music/music-player-slice.ts';
+import { TrackRow } from '@/components/music/track-row/track-row.tsx';
 
-interface AlbumDetailProps {
+import styles from './album-detail.module.scss';
+import { usePathParam } from '@/hooks/use-path-param.ts';
+import { LibraryParams } from '@/features/library-music/routes/_routes.tsx';
+
+interface AlbumDetailProps extends BoxProps {
   albumSlug: string;
 }
 
-export function AlbumDetail({albumSlug}: AlbumDetailProps) {
-  const {data, isFetching, isLoadingError, refetch} = useAlbumServiceAlbumsShow({album: albumSlug, library: 'music'});
+export function AlbumDetail({ albumSlug, ...rest }: AlbumDetailProps) {
+  const { library } = usePathParam<LibraryParams>();
+  const { data, isFetching, isLoadingError, refetch } = useAlbumServiceAlbumsShow({
+    album: albumSlug,
+    library: library,
+  });
 
   return (
-    <>
+    <Box {...rest}>
       {isFetching && <AlbumDetailSkeleton/>}
       {isLoadingError && <AlertLoadingError retry={async () => {
         await refetch();
@@ -45,7 +53,7 @@ export function AlbumDetail({albumSlug}: AlbumDetailProps) {
           </Group>
         </Card>
       )}
-    </>
+    </Box>
   );
 }
 
@@ -55,31 +63,26 @@ interface AlbumSongProps {
   songs: SongResource[];
 }
 
-function AlbumSongs({title, coverUrl, songs}: AlbumSongProps) {
-  const musicSource = useMusicSource();
+function AlbumSongs({ songs }: AlbumSongProps) {
+  const dispatch = useAppDispatch();
 
-  const playSong = (streamUrl: string) => {
-    musicSource.setSource(streamUrl);
-    musicSource.setDetails({
-      title,
-      coverUrl,
-    });
+  const onSongClick = (song: SongResource, songs: SongResource[]) => {
+    dispatch(setQueueAndSong({
+      queue: songs,
+      playPublicId: song.public_id,
+    }));
   };
 
-  const rows = songs.map(song => (
-    <Table.Tr
-      key={song.public_id}
+  const rows = songs.map((song) => (
+    <TrackRow
       className={styles.trackRow}
+      song={song}
+      key={song.public_id}
       onClick={() => {
-        if (song.stream) {
-          playSong(song.stream)
-        }
+        console.log('row clicked')
+        onSongClick(song, songs);
       }}
-    >
-      <Table.Td>{song.track}</Table.Td>
-      <Table.Td>{song.title}</Table.Td>
-      <Table.Td>{formatDuration(song.length!)}</Table.Td>
-    </Table.Tr>
+    />
   ));
 
   return (

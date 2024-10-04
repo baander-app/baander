@@ -28,6 +28,10 @@ export const musicPlayerSlice = createSlice({
     setQueue(state, action: PayloadAction<SongResource[]>) {
       state.queue = action.payload;
     },
+    setQueueAndSong(state, action: PayloadAction<{ queue: SongResource[], playPublicId: string }>) {
+      state.queue = action.payload.queue;
+      state.currentSongIndex = state.queue.findIndex(song => song.public_id === action.payload.playPublicId);
+    },
     removeSongFromQueue: (state, action: PayloadAction<number>) => {
       state.queue.splice(action.payload, 1);
     },
@@ -75,6 +79,7 @@ export const {
   setProgress,
   setIsPlaying,
   setQueue,
+  setQueueAndSong,
 } = musicPlayerSlice.actions;
 
 export const {

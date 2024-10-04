@@ -10,9 +10,10 @@ import { Ziggy } from './ziggy.js';
 // @ts-ignore
 globalThis.Ziggy = Ziggy;
 import './bootstrap.ts';
-import './services/i18n.ts';
+import './common/i18n.ts';
 import { DateFormatterProvider } from '@/providers/dayjs-provider.tsx';
-import { queryClient, createIDBPersister } from '@/services/react-query.ts';
+import { queryClient, createIDBPersister } from '@/common/react-query.ts';
+
 
 const reactQueryPersister = createIDBPersister();
 

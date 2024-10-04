@@ -25,7 +25,6 @@ export default function Albums() {
                     primaryArtist={album.albumArtist?.name}
                     imgSrc={album.coverUrl ?? undefined}
                     onClick={() => setShowAlbumDetail(album.slug)}
-
                   />
                 </div>
               ))}
@@ -35,9 +34,7 @@ export default function Albums() {
       </Box>
 
       {showAlbumDetail && (
-        <Box maw="40%">
-          <AlbumDetail albumSlug={showAlbumDetail}/>
-        </Box>
+        <AlbumDetail miw="35%" albumSlug={showAlbumDetail}/>
       )}
     </Flex>
   );
