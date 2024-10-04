@@ -19,10 +19,11 @@ class Album extends BaseModel
     ];
 
     public static array $filterRelations = [
-      'albumArist',
+      'albumArtist',
       'cover',
       'library',
-      'songs'
+      'songs',
+      'songs.genres',
     ];
 
     public static array $advancedFilters = [

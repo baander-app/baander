@@ -4,13 +4,14 @@ use Illuminate\Database\Migrations\Migration;
 use Tpetry\PostgresqlEnhanced\Schema\Blueprint;
 use Tpetry\PostgresqlEnhanced\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     /**
      * Run the migrations.
      */
     public function up(): void
     {
-        Schema::create('genreables', function (Blueprint $table) {
+        Schema::create('genre_song', function (Blueprint $table) {
             $table->id();
 
             $table->foreignId('genre_id')
@@ -19,8 +20,14 @@ return new class extends Migration {
                 ->cascadeOnDelete()
                 ->cascadeOnUpdate();
 
-            $table->morphs('genreables');
+            $table->foreignId('song_id')
+                ->references('id')
+                ->on('songs')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
 
+            $table->unique(['genre_id', 'song_id']);
+            $table->index('song_id');
             $table->index('genre_id');
         });
     }
@@ -30,6 +37,6 @@ return new class extends Migration {
      */
     public function down(): void
     {
-        Schema::dropIfExists('genreable');
+        Schema::dropIfExists('genre_song');
     }
 };

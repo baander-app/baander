@@ -41,6 +41,7 @@ class Genre extends BaseModel
 
     public function songs()
     {
-        return $this->morphedByMany(Song::class, 'genreable');
+        return $this->belongsTo(Song::class)
+            ->using(GenreSong::class);
     }
 }

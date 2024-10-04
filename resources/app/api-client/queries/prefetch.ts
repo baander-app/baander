@@ -20,7 +20,7 @@ import * as Common from "./common";
 * @param data.page Current page
 * @param data.limit Items per page
 * @param data.genres _Extension_ Comma seperated list of genres
-* @returns unknown Json paginated set of `AlbumResourceResource`
+* @returns unknown Json paginated set of `AlbumResource`
 * @throws ApiError
 */
 export const prefetchUseAlbumServiceAlbumsIndex = (queryClient: QueryClient, { fields, genres, library, limit, page, relations }: {
@@ -36,7 +36,7 @@ export const prefetchUseAlbumServiceAlbumsIndex = (queryClient: QueryClient, { f
 * @param data The data for the request.
 * @param data.library The library slug
 * @param data.album The album slug
-* @returns AlbumResourceResource `AlbumResourceResource`
+* @returns AlbumResource `AlbumResource`
 * @throws ApiError
 */
 export const prefetchUseAlbumServiceAlbumsShow = (queryClient: QueryClient, { album, library }: {
@@ -146,11 +146,29 @@ export const prefetchUseOpCacheServiceOpCacheGetStatus = (queryClient: QueryClie
 export const prefetchUseOpCacheServiceOpcacheGetConfig = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseOpCacheServiceOpcacheGetConfigKeyFn(), queryFn: () => OpCacheService.opcacheGetConfig() });
 /**
 * Get a collection of monitor entries
-* ⚠️Cannot generate request documentation: Class "romanzipp\QueueMonitor\Enums\MonitorStatus" not found
+* @param data The data for the request.
+* @param data.page Current page
+* @param data.limit Items per page
+* @param data.status MonitorStatus
+* - 0=RUNNING
+* - 1=SUCCEEDED
+* - 2=FAILED
+* - 3=STALE
+* - 4=QUEUED
+* @param data.queue Name of the queue
+* @param data.name Name of the job
+* @param data.queuedFirst Order queued jobs first
 * @returns unknown Json paginated set of `QueueMonitorResource`
 * @throws ApiError
 */
-export const prefetchUseQueueServiceQueueMetricsShow = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseQueueServiceQueueMetricsShowKeyFn(), queryFn: () => QueueService.queueMetricsShow() });
+export const prefetchUseQueueServiceQueueMetricsShow = (queryClient: QueryClient, { limit, name, page, queue, queuedFirst, status }: {
+  limit?: number;
+  name?: string;
+  page?: number;
+  queue?: string;
+  queuedFirst?: boolean;
+  status?: "running" | "succeeded" | "failed" | "stale" | "queued";
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseQueueServiceQueueMetricsShowKeyFn({ limit, name, page, queue, queuedFirst, status }), queryFn: () => QueueService.queueMetricsShow({ limit, name, page, queue, queuedFirst, status }) });
 /**
 * Get a list of queue names
 * @returns unknown

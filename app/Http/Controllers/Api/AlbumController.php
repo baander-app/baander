@@ -7,7 +7,7 @@ use App\Extensions\{JsonPaginator};
 use App\Extensions\BaseBuilder;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Album\AlbumIndexRequest;
-use App\Http\Resources\Album\AlbumResourceResource;
+use App\Http\Resources\Album\AlbumResource;
 use App\Models\{Album, Library, TokenAbility};
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
@@ -25,7 +25,7 @@ class AlbumController extends Controller
      *
      * @param Library $library
      * @param AlbumIndexRequest $request
-     * @return AnonymousResourceCollection<JsonPaginator<AlbumResourceResource>>
+     * @return AnonymousResourceCollection<JsonPaginator<AlbumResource>>
      */
     #[Get('/', 'api.albums.index')]
     public function index(Library $library, AlbumIndexRequest $request)
@@ -45,13 +45,14 @@ class AlbumController extends Controller
                 return $query->select($fields);
             })->when($genres, function (BaseBuilder $q) use ($genres) {
                 $q->whereGenreNames($genres);
-            })->paginate();
+            })
+            ->paginate();
 
         $albums->each(function (Album $album) use ($library) {
             $album->setRelation('library', $library);
         });
 
-        return AlbumResourceResource::collection($albums);
+        return AlbumResource::collection($albums);
     }
 
     /**
@@ -59,7 +60,7 @@ class AlbumController extends Controller
      *
      * @param Library $library
      * @param Album $album
-     * @return AlbumResourceResource
+     * @return AlbumResource
      */
     #[Get('{album}', 'api.albums.show')]
     public function show(Library $library, Album $album)
@@ -67,6 +68,6 @@ class AlbumController extends Controller
         $album->setRelation('library', $library);
         $album->loadMissing(['albumArtist', 'cover', 'songs']);
 
-        return new AlbumResourceResource($album);
+        return new AlbumResource($album);
     }
 }

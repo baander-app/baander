@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Extensions\BaseBuilder;
 use App\Http\Integrations\Github\BaanderGhApi;
+use App\Http\Resources\Album\AlbumResource;
+use App\Models\Album;
 use App\Packages\PhpInfoParser\Info;
 use Illuminate\Http\Request;
 
@@ -22,7 +25,16 @@ class UIController
 
     public function dbg()
     {
-        $modules = Info::getModules();
+        $relations = implode(',', Album::$filterRelations);
+
+        $albums = Album::query()
+            ->withRelations(Album::$filterRelations, $relations)
+            ->when($relations, function (BaseBuilder $q) use ($relations) {
+                return $q->with(explode(',', $relations));
+            })->with('songs.genres')
+            ->paginate();
+
+        dd((new AlbumResource($albums->items()[1]))->toArray(request()));
 
         return view('dbg', [
         ]);

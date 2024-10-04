@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.1 
 
 import { InfiniteData, useInfiniteQuery, UseInfiniteQueryOptions } from "@tanstack/react-query";
-import { AlbumService, ArtistService, GenreService, LibraryService, SongService, UserService, UserTokenService } from "../requests/services.gen";
+import { AlbumService, ArtistService, GenreService, LibraryService, QueueService, SongService, UserService, UserTokenService } from "../requests/services.gen";
 import * as Common from "./common";
 /**
 * Get a collection of albums
@@ -20,7 +20,7 @@ import * as Common from "./common";
 * @param data.page Current page
 * @param data.limit Items per page
 * @param data.genres _Extension_ Comma seperated list of genres
-* @returns unknown Json paginated set of `AlbumResourceResource`
+* @returns unknown Json paginated set of `AlbumResource`
 * @throws ApiError
 */
 export const useAlbumServiceAlbumsIndexInfinite = <TData = InfiniteData<Common.AlbumServiceAlbumsIndexDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fields, genres, library, limit, relations }: {
@@ -97,6 +97,34 @@ export const useLibraryServiceLibrariesIndexInfinite = <TData = InfiniteData<Com
   limit?: number;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
   queryKey: Common.UseLibraryServiceLibrariesIndexKeyFn({ limit }, queryKey), queryFn: ({ pageParam }) => LibraryService.librariesIndex({ limit, page: pageParam as number }) as TData, initialPageParam: "1", getNextPageParam: response => (response as {
+    nextPage: number;
+  }).nextPage, ...options
+});
+/**
+* Get a collection of monitor entries
+* @param data The data for the request.
+* @param data.page Current page
+* @param data.limit Items per page
+* @param data.status MonitorStatus
+* - 0=RUNNING
+* - 1=SUCCEEDED
+* - 2=FAILED
+* - 3=STALE
+* - 4=QUEUED
+* @param data.queue Name of the queue
+* @param data.name Name of the job
+* @param data.queuedFirst Order queued jobs first
+* @returns unknown Json paginated set of `QueueMonitorResource`
+* @throws ApiError
+*/
+export const useQueueServiceQueueMetricsShowInfinite = <TData = InfiniteData<Common.QueueServiceQueueMetricsShowDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, name, queue, queuedFirst, status }: {
+  limit?: number;
+  name?: string;
+  queue?: string;
+  queuedFirst?: boolean;
+  status?: "running" | "succeeded" | "failed" | "stale" | "queued";
+} = {}, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
+  queryKey: Common.UseQueueServiceQueueMetricsShowKeyFn({ limit, name, queue, queuedFirst, status }, queryKey), queryFn: ({ pageParam }) => QueueService.queueMetricsShow({ limit, name, page: pageParam as number, queue, queuedFirst, status }) as TData, initialPageParam: "1", getNextPageParam: response => (response as {
     nextPage: number;
   }).nextPage, ...options
 });
