@@ -16,6 +16,13 @@ const menu: LinksGroupProps[] = [
       { label: 'Sessions', to: 'account/sessions' },
     ],
   },
+  {
+    label: 'Settings',
+    iconName: 'ion:cog',
+    links: [
+      { label: 'EQ', to: 'user/settings/equalizer' }
+    ],
+  }
 ];
 
 export function UserMenu() {

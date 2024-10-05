@@ -248,6 +248,11 @@ export const useSongServiceSongsStream = <TData = Common.SongServiceSongsStreamD
 */
 export const useSystemInfoServiceSystemInfoPhp = <TData = Common.SystemInfoServiceSystemInfoPhpDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSystemInfoServiceSystemInfoPhpKeyFn(queryKey), queryFn: () => SystemInfoService.systemInfoPhp() as TData, ...options });
 /**
+* @returns unknown
+* @throws ApiError
+*/
+export const useSystemInfoServiceSystemInfoSys = <TData = Common.SystemInfoServiceSystemInfoSysDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSystemInfoServiceSystemInfoSysKeyFn(queryKey), queryFn: () => SystemInfoService.systemInfoSys() as TData, ...options });
+/**
 * Get a collection of users
 * @param data The data for the request.
 * @param data.page Current page

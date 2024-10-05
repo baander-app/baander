@@ -247,6 +247,11 @@ export const prefetchUseSongServiceSongsStream = (queryClient: QueryClient, { li
 */
 export const prefetchUseSystemInfoServiceSystemInfoPhp = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSystemInfoServiceSystemInfoPhpKeyFn(), queryFn: () => SystemInfoService.systemInfoPhp() });
 /**
+* @returns unknown
+* @throws ApiError
+*/
+export const prefetchUseSystemInfoServiceSystemInfoSys = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSystemInfoServiceSystemInfoSysKeyFn(), queryFn: () => SystemInfoService.systemInfoSys() });
+/**
 * Get a collection of users
 * @param data The data for the request.
 * @param data.page Current page

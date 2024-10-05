@@ -1,0 +1,53 @@
+.spectrumColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25em;
+  width: 1.5em;
+
+  &.channel-column {
+    width: 2.5em;
+  }
+}
+
+.spectrumBar {
+  width: 100%;
+  height: 0.25em;
+  background-color: #062626;
+  box-shadow: none;
+
+  &.active {
+    background-color: #1caeae;
+    box-shadow: 0 0 10px #1caeae;
+  }
+}
+
+.spectrumBarRed {
+  width: 100%;
+  height: 0.25em;
+  background-color: #250c06;
+  box-shadow: none;
+
+  &.active {
+    background-color: #9c341a;
+    box-shadow: 0 0 10px #9c341a;
+  }
+}
+
+.barFrequencyDescription {
+  color: #062626;
+  font-size: 0.75em;
+  font-weight: bold;
+  text-shadow: none;
+  margin: 0.25em 0;
+  text-align: center;
+
+  &.active {
+    color: #1caeae;
+    text-shadow: 0 0 10px #1caeae;
+  }
+}
+
+.vfdSpectrum {
+  display: flex;
+  gap: 0.5em;
+}

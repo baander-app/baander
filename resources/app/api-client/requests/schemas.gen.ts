@@ -409,9 +409,6 @@ export const $QueueMonitorResource = {
                 type: 'string'
             }
         },
-        exception_message: {
-            type: 'string'
-        },
         exception_class: {
             type: ['string', 'null']
         },
@@ -432,7 +429,7 @@ export const $QueueMonitorResource = {
             format: 'date-time'
         }
     },
-    required: ['id', 'job_id', 'name', 'queue', 'started_at', 'started_at_exact', 'finished_at', 'finished_at_exact', 'attempt', 'progress', 'exception', 'exception_message', 'exception_class', 'data', 'status', 'job_uuid', 'retried', 'queued_at'],
+    required: ['id', 'job_id', 'name', 'queue', 'started_at', 'started_at_exact', 'finished_at', 'finished_at_exact', 'attempt', 'progress', 'exception', 'exception_class', 'data', 'status', 'job_uuid', 'retried', 'queued_at'],
     title: 'QueueMonitorResource'
 } as const;
 

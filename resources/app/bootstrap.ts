@@ -7,11 +7,6 @@ import '@mantine/dropzone/styles.css';
 import '@mantine/notifications/styles.css';
 import 'overlayscrollbars/overlayscrollbars.css';
 import 'mantine-react-table/styles.css';
-import '@vidstack/react/player/styles/base.css';
-
-// External JS imports
-import 'clockwork-browser/metrics';
-import 'clockwork-browser/toolbar';
 
 // dayjs and its plugins
 import dayjs from 'dayjs';

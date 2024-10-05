@@ -7,16 +7,17 @@ import { DashboardLayout } from '@/layouts/dashboard-layout/dasbhard-layout.tsx'
 import { AccountRoutes } from '@/features/account/pages/routes.tsx';
 import { DashboardRoutes } from '@/features/dashboard/routes.tsx';
 import { AudioPlayerContextProvider } from '@/features/library-music-player/providers/audio-player-provider.tsx';
+import { UserSettingsRoutes } from '@/features/feature-user-settings/routes/routes.tsx';
 
 const App = () => {
   return (
     <EchoContextProvider>
       <AudioPlayerContextProvider>
-      <RootLayout>
+        <RootLayout>
           <Suspense>
             <Outlet/>
           </Suspense>
-      </RootLayout>
+        </RootLayout>
       </AudioPlayerContextProvider>
     </EchoContextProvider>
   );
@@ -44,6 +45,10 @@ export const protectedRoutes: RouteObject[] = [
       {
         path: '/account/*',
         element: <AccountRoutes/>,
+      },
+      {
+        path: '/user/settings/*',
+        element: <UserSettingsRoutes/>,
       },
       {
         path: '*',

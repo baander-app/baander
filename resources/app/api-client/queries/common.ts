@@ -126,6 +126,10 @@ export type SystemInfoServiceSystemInfoPhpDefaultResponse = Awaited<ReturnType<t
 export type SystemInfoServiceSystemInfoPhpQueryResult<TData = SystemInfoServiceSystemInfoPhpDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSystemInfoServiceSystemInfoPhpKey = "SystemInfoServiceSystemInfoPhp";
 export const UseSystemInfoServiceSystemInfoPhpKeyFn = (queryKey?: Array<unknown>) => [useSystemInfoServiceSystemInfoPhpKey, ...(queryKey ?? [])];
+export type SystemInfoServiceSystemInfoSysDefaultResponse = Awaited<ReturnType<typeof SystemInfoService.systemInfoSys>>;
+export type SystemInfoServiceSystemInfoSysQueryResult<TData = SystemInfoServiceSystemInfoSysDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSystemInfoServiceSystemInfoSysKey = "SystemInfoServiceSystemInfoSys";
+export const UseSystemInfoServiceSystemInfoSysKeyFn = (queryKey?: Array<unknown>) => [useSystemInfoServiceSystemInfoSysKey, ...(queryKey ?? [])];
 export type UserServiceUsersIndexDefaultResponse = Awaited<ReturnType<typeof UserService.usersIndex>>;
 export type UserServiceUsersIndexQueryResult<TData = UserServiceUsersIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useUserServiceUsersIndexKey = "UserServiceUsersIndex";
