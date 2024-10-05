@@ -137,6 +137,16 @@ return [
             'channel' => env('LOG_DEPRECATIONS_CHANNEL', 'php_deprecations'),
             'trace'   => env('LOG_DEPRECATIONS_TRACE', false),
         ],
+
+        'buggregator' => [
+            'driver' => 'monolog',
+            'level' => env('LOG_LEVEL', 'debug'),
+            'handler' => \Monolog\Handler\SocketHandler::class,
+            'formatter' => \Monolog\Formatter\JsonFormatter::class,
+            'handler_with' => [
+                'connectionString' => env('LOG_SOCKET_URL', 'buggregator:9913'),
+            ],
+        ]
     ],
 
 ];

@@ -42,16 +42,6 @@ services:
     networks:
       - baander-backtier
 
-  mail:
-    image: axllent/mailpit:latest
-    container_name: baander-mail
-    restart: always
-    ports:
-      - "8025:8025"
-      - "1025:1025"
-    networks:
-      - baander-backtier
-
   postgres:
     image: postgres:16.3-bookworm
     container_name: baander-postgres
@@ -73,6 +63,18 @@ services:
       - baander-backtier
     ports:
       - "127.0.0.1:6379:6379"
+
+  buggregator:
+    image: ghcr.io/buggregator/server:latest
+    container_name: baander-buggregator
+    restart: unless-stopped
+    networks:
+      - baander-backtier
+    ports:
+      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:9912:9912"
+      - "127.0.0.1:9913:9913"
 
 networks:
   baander-backtier:

@@ -23,7 +23,7 @@ export default function Albums() {
                   <Album
                     title={album.title}
                     primaryArtist={album.albumArtist?.name}
-                    imgSrc={album.coverUrl ?? undefined}
+                    imgSrc={album?.cover?.url ?? undefined}
                     onClick={() => setShowAlbumDetail(album.slug)}
                   />
                 </div>

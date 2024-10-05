@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Observers\ImageObserver;
 use App\Packages\Http\Concerns\DirectStreamableFile;
 use App\Packages\Nanoid\Concerns\HasNanoPublicId;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
+#[ObservedBy(ImageObserver::class)]
 class Image extends BaseModel implements DirectStreamableFile
 {
     use HasFactory, HasNanoPublicId;

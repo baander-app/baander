@@ -33,7 +33,7 @@ class AlbumResource extends AlbumWithoutSongsResource
             /**
              * Cover relation
              */
-            'coverUrl'    => $this->whenLoaded('cover', fn() => route('api.image.serve', ['image' => $this->cover])),
+            'cover'    => ImageResource::make($this->whenLoaded('cover')),
             /**
              * Album artist relation
              */

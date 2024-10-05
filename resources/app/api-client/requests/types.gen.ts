@@ -10,7 +10,7 @@ export type AlbumResource = {
     /**
      * Cover relation
      */
-    coverUrl?: string;
+    cover?: ImageResource;
     /**
      * Album artist relation
      */
@@ -87,6 +87,7 @@ export type ImageResource = {
     mime_type: string;
     width: number;
     height: number;
+    blurhash: string;
     url: string;
 };
 

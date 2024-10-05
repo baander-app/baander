@@ -29,7 +29,8 @@ class ImageResource extends JsonResource
             'mime_type' => $this->mime_type,
             'width'     => $this->width,
             'height'    => $this->height,
-            'url'       => route('api.image.serve', ['public_id' => $this->public_id]),
+            'blurhash'  => $this->blurhash,
+            'url'       => route('api.image.serve', ['image' => $this->public_id]),
         ];
     }
 }
