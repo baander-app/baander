@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import styles from './knob.module.scss';
-import { useHover } from '@mantine/hooks';
 
 export interface KnobProps {
   [key: string]: any;
@@ -28,8 +27,6 @@ export function Knob(props: KnobProps) {
   } = props;
   const [deg, setDeg] = useState(0);
 
-  const {hovered, ref} = useHover();
-
   const handleOnWheelChange = (e: React.WheelEvent<HTMLDivElement>) => {
     const { deltaY } = e;
 
@@ -52,19 +49,8 @@ export function Knob(props: KnobProps) {
     setDeg(newRotate);
   }, [value]);
 
-  useEffect(() => {
-    if (hovered) {
-      const overflow =  window.getComputedStyle(document.body).overflow;
-      document.body.style.overflow = 'hidden';
-
-      return () => {
-        document.body.style.overflow = overflow;
-      }
-    }
-  }, [hovered])
-
   return (
-    <div className={styles.eqKnob} {...rest} ref={ref}>
+    <div className={styles.eqKnob} {...rest}>
       <p className={styles.eqKnobName}>{name}</p>
       <div className={styles.eqKnobControl}>
         <div className={styles.eqKnobRevolveControlContainer}>
