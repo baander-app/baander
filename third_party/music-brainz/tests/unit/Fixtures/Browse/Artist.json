@@ -1,0 +1,1430 @@
+{
+  "artists": [
+    {
+      "sort-name": "$1 Bin",
+      "disambiguation": "US EDM/trap producer",
+      "end_area": null,
+      "name": "$1 Bin",
+      "user-rating": {
+        "value": null
+      },
+      "country": "US",
+      "ipis": [],
+      "life-span": {
+        "begin": null,
+        "end": null,
+        "ended": false
+      },
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "id": "03b70c70-94fc-46fd-961e-ab72d730ff71",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "user-tags": [],
+      "isnis": [],
+      "end-area": null,
+      "begin-area": {
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type": null,
+        "disambiguation": "",
+        "sort-name": "New York",
+        "type-id": null,
+        "name": "New York"
+      },
+      "area": {
+        "name": "United States",
+        "type-id": null,
+        "sort-name": "United States",
+        "disambiguation": "",
+        "iso-3166-1-codes": [
+          "US"
+        ],
+        "type": null,
+        "id": "489ce91b-6658-3307-9877-795b68554c98"
+      },
+      "tags": [],
+      "user-genres": [],
+      "type": "Person",
+      "gender": "Male",
+      "begin_area": {
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type": null,
+        "disambiguation": "",
+        "sort-name": "New York",
+        "type-id": null,
+        "name": "New York"
+      },
+      "annotation": null,
+      "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+      "genres": [],
+      "aliases": [
+        {
+          "primary": null,
+          "end": null,
+          "locale": null,
+          "sort-name": "Dollar Bin",
+          "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+          "type": "Search hint",
+          "begin": null,
+          "ended": false,
+          "name": "Dollar Bin"
+        }
+      ]
+    },
+    {
+      "begin-area": {
+        "name": "Queens",
+        "sort-name": "Queens",
+        "type-id": null,
+        "disambiguation": "",
+        "id": "431a085b-9f4c-4fbb-82de-2ca7ce735da8",
+        "type": null
+      },
+      "tags": [],
+      "area": null,
+      "gender": "Male",
+      "type": "Person",
+      "user-genres": [],
+      "genres": [],
+      "aliases": [
+        {
+          "begin": "1997-07-27",
+          "type": "Legal name",
+          "sort-name": "Isaac Gutierrez",
+          "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+          "locale": "en",
+          "end": null,
+          "primary": true,
+          "name": "Isaac Gutierrez",
+          "ended": false
+        }
+      ],
+      "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+      "annotation": null,
+      "begin_area": {
+        "name": "Queens",
+        "sort-name": "Queens",
+        "type-id": null,
+        "disambiguation": "",
+        "id": "431a085b-9f4c-4fbb-82de-2ca7ce735da8",
+        "type": null
+      },
+      "end_area": null,
+      "disambiguation": "",
+      "sort-name": ".irg",
+      "user-rating": {
+        "value": null
+      },
+      "country": null,
+      "name": ".irg",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "id": "04fa6b10-2d47-42a9-b12e-f7fbf41489cf",
+      "ipis": [
+        "00866140235"
+      ],
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "life-span": {
+        "end": null,
+        "ended": false,
+        "begin": "1997-07-27"
+      },
+      "end-area": null,
+      "isnis": [],
+      "user-tags": []
+    },
+    {
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "id": "1ed2bc02-11c4-4bb1-8e75-cdd728c33c33",
+      "ipis": [],
+      "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+      "life-span": {
+        "ended": false,
+        "end": null,
+        "begin": null
+      },
+      "end-area": null,
+      "isnis": [],
+      "user-tags": [],
+      "end_area": null,
+      "disambiguation": "",
+      "sort-name": "'Lagos Pepper Soup' String Orchestra",
+      "country": null,
+      "user-rating": {
+        "value": null
+      },
+      "name": "'Lagos Pepper Soup' String Orchestra",
+      "gender": null,
+      "type": "Group",
+      "user-genres": [],
+      "genres": [],
+      "aliases": [],
+      "gender-id": null,
+      "annotation": null,
+      "begin_area": null,
+      "begin-area": null,
+      "tags": [],
+      "area": {
+        "name": "New York",
+        "disambiguation": "",
+        "type-id": null,
+        "sort-name": "New York",
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type": null
+      }
+    },
+    {
+      "aliases": [],
+      "genres": [],
+      "gender-id": null,
+      "annotation": null,
+      "begin_area": null,
+      "gender": null,
+      "type": null,
+      "user-genres": [],
+      "tags": [],
+      "area": {
+        "name": "Ithaca",
+        "sort-name": "Ithaca",
+        "type-id": null,
+        "disambiguation": "city",
+        "type": null,
+        "id": "68d8f243-fd55-4ca1-b511-48fa93575476"
+      },
+      "begin-area": null,
+      "end-area": null,
+      "isnis": [],
+      "user-tags": [],
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "id": "2f4c81aa-78b4-432a-acdb-d85f2e53de62",
+      "type-id": null,
+      "life-span": {
+        "end": null,
+        "ended": false,
+        "begin": null
+      },
+      "ipis": [],
+      "country": null,
+      "user-rating": {
+        "value": null
+      },
+      "name": "¡Viva Mayhem!",
+      "end_area": null,
+      "disambiguation": "",
+      "sort-name": "¡Viva Mayhem!"
+    },
+    {
+      "sort-name": "$windlaaa",
+      "disambiguation": "",
+      "end_area": null,
+      "name": "$windlaaa",
+      "user-rating": {
+        "value": null
+      },
+      "country": null,
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "life-span": {
+        "begin": "2000-02-09",
+        "ended": false,
+        "end": null
+      },
+      "ipis": [],
+      "id": "416cc295-b99e-4996-9401-e42c23bf7f0a",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "user-tags": [],
+      "isnis": [],
+      "end-area": null,
+      "begin-area": {
+        "name": "New York",
+        "type-id": null,
+        "sort-name": "New York",
+        "disambiguation": "",
+        "type": null,
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f"
+      },
+      "area": {
+        "disambiguation": "",
+        "sort-name": "New York",
+        "type-id": null,
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type": null,
+        "name": "New York"
+      },
+      "tags": [],
+      "user-genres": [],
+      "type": "Person",
+      "gender": "Male",
+      "begin_area": {
+        "name": "New York",
+        "type-id": null,
+        "sort-name": "New York",
+        "disambiguation": "",
+        "type": null,
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f"
+      },
+      "annotation": null,
+      "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+      "aliases": [],
+      "genres": []
+    },
+    {
+      "type": "Group",
+      "gender": null,
+      "user-genres": [],
+      "gender-id": null,
+      "genres": [],
+      "aliases": [],
+      "begin_area": {
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type": null,
+        "sort-name": "New York",
+        "type-id": null,
+        "disambiguation": "",
+        "name": "New York"
+      },
+      "annotation": null,
+      "begin-area": {
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type": null,
+        "sort-name": "New York",
+        "type-id": null,
+        "disambiguation": "",
+        "name": "New York"
+      },
+      "tags": [],
+      "area": {
+        "name": "United States",
+        "iso-3166-1-codes": [
+          "US"
+        ],
+        "disambiguation": "",
+        "type-id": null,
+        "sort-name": "United States",
+        "type": null,
+        "id": "489ce91b-6658-3307-9877-795b68554c98"
+      },
+      "id": "41f82fb6-d3a3-4fa5-a00a-1f16df494706",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "ipis": [],
+      "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+      "life-span": {
+        "begin": "2005",
+        "end": null,
+        "ended": false
+      },
+      "isnis": [],
+      "end-area": null,
+      "user-tags": [],
+      "end_area": null,
+      "sort-name": "...Nous Non Plus",
+      "disambiguation": "",
+      "name": "...Nous Non Plus",
+      "country": "US",
+      "user-rating": {
+        "value": null
+      }
+    },
+    {
+      "user-genres": [],
+      "gender": null,
+      "type": "Person",
+      "annotation": null,
+      "begin_area": null,
+      "aliases": [],
+      "genres": [
+        {
+          "count": 1,
+          "id": "103a65bb-35d9-4d27-9c9b-f35a458621ba",
+          "name": "chiptune",
+          "disambiguation": ""
+        }
+      ],
+      "gender-id": null,
+      "begin-area": null,
+      "area": {
+        "name": "Poughkeepsie",
+        "disambiguation": "",
+        "type-id": null,
+        "sort-name": "Poughkeepsie",
+        "type": null,
+        "id": "1c21104f-2f29-4de1-9b1b-a8290a0e8942"
+      },
+      "tags": [
+        {
+          "name": "chiptune",
+          "count": 1
+        }
+      ],
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "life-span": {
+        "end": null,
+        "ended": false,
+        "begin": null
+      },
+      "ipis": [],
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "id": "42d9a512-5fc6-4223-99b8-0b2172fe18f9",
+      "user-tags": [],
+      "end-area": null,
+      "isnis": [],
+      "disambiguation": "",
+      "sort-name": "_NetNomad",
+      "end_area": null,
+      "user-rating": {
+        "value": null
+      },
+      "country": null,
+      "name": "_NetNomad"
+    },
+    {
+      "begin-area": {
+        "name": "Ithaca",
+        "type": null,
+        "id": "68d8f243-fd55-4ca1-b511-48fa93575476",
+        "disambiguation": "city",
+        "sort-name": "Ithaca",
+        "type-id": null
+      },
+      "tags": [],
+      "area": {
+        "iso-3166-1-codes": [
+          "US"
+        ],
+        "disambiguation": "",
+        "sort-name": "United States",
+        "type-id": null,
+        "type": null,
+        "id": "489ce91b-6658-3307-9877-795b68554c98",
+        "name": "United States"
+      },
+      "gender": "Male",
+      "type": "Person",
+      "user-genres": [],
+      "aliases": [],
+      "genres": [],
+      "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+      "annotation": null,
+      "begin_area": {
+        "name": "Ithaca",
+        "type": null,
+        "id": "68d8f243-fd55-4ca1-b511-48fa93575476",
+        "disambiguation": "city",
+        "sort-name": "Ithaca",
+        "type-id": null
+      },
+      "end_area": null,
+      "disambiguation": "Vii Caso's noise/drone/industrial/glitch/speedcore side project",
+      "sort-name": "(<0>)",
+      "user-rating": {
+        "value": null
+      },
+      "country": "US",
+      "name": "(<0>)",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "id": "6b310391-d9b6-49da-8183-16066afb00fa",
+      "life-span": {
+        "begin": null,
+        "end": null,
+        "ended": false
+      },
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "ipis": [],
+      "end-area": null,
+      "isnis": [],
+      "user-tags": []
+    },
+    {
+      "begin_area": null,
+      "annotation": null,
+      "gender-id": null,
+      "aliases": [],
+      "genres": [
+        {
+          "disambiguation": "",
+          "id": "8cc9b280-230b-4a3a-b1e2-8acab0744dd3",
+          "count": 1,
+          "name": "punk"
+        }
+      ],
+      "user-genres": [],
+      "type": "Group",
+      "gender": null,
+      "area": {
+        "name": "New York",
+        "disambiguation": "",
+        "type-id": null,
+        "sort-name": "New York",
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type": null
+      },
+      "tags": [
+        {
+          "count": 1,
+          "name": "punk"
+        }
+      ],
+      "begin-area": null,
+      "user-tags": [],
+      "isnis": [],
+      "end-area": null,
+      "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+      "life-span": {
+        "ended": false,
+        "end": null,
+        "begin": null
+      },
+      "ipis": [],
+      "id": "731f1960-012b-4c78-81c6-212ce78efb03",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "name": "(A) T.R.U.T.H.",
+      "user-rating": {
+        "value": null
+      },
+      "country": null,
+      "sort-name": "(A) T.R.U.T.H.",
+      "disambiguation": "",
+      "end_area": null
+    },
+    {
+      "country": null,
+      "user-rating": {
+        "value": null
+      },
+      "name": "$.99 Dreams",
+      "end_area": null,
+      "disambiguation": "",
+      "sort-name": "$.99 Dreams",
+      "end-area": null,
+      "isnis": [],
+      "user-tags": [],
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "id": "7b7f9365-45fc-43b0-a8c3-83f7451ddbd5",
+      "life-span": {
+        "end": null,
+        "ended": false,
+        "begin": null
+      },
+      "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+      "ipis": [],
+      "tags": [],
+      "area": {
+        "type": null,
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "sort-name": "New York",
+        "type-id": null,
+        "disambiguation": "",
+        "name": "New York"
+      },
+      "begin-area": null,
+      "aliases": [],
+      "genres": [],
+      "gender-id": null,
+      "annotation": null,
+      "begin_area": null,
+      "gender": null,
+      "type": "Group",
+      "user-genres": []
+    },
+    {
+      "isnis": [],
+      "end-area": {
+        "sort-name": "New York",
+        "type-id": null,
+        "disambiguation": "",
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type": null,
+        "name": "New York"
+      },
+      "user-tags": [],
+      "id": "80241c32-da47-428a-b8cb-7e7b1bda0f5f",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "ipis": [],
+      "life-span": {
+        "begin": "1988-05-26",
+        "end": "2010-09-01",
+        "ended": true
+      },
+      "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+      "name": "!JP",
+      "user-rating": {
+        "value": null
+      },
+      "country": null,
+      "end_area": {
+        "sort-name": "New York",
+        "type-id": null,
+        "disambiguation": "",
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type": null,
+        "name": "New York"
+      },
+      "sort-name": "!JP",
+      "disambiguation": "",
+      "gender-id": null,
+      "genres": [],
+      "aliases": [],
+      "begin_area": {
+        "name": "Zaandam",
+        "disambiguation": "",
+        "type-id": null,
+        "sort-name": "Zaandam",
+        "id": "d424f63c-9fa2-4278-af70-02b91b9191d2",
+        "type": null
+      },
+      "annotation": null,
+      "type": "Group",
+      "gender": null,
+      "user-genres": [],
+      "tags": [],
+      "area": {
+        "name": "Amsterdam",
+        "type": null,
+        "id": "e8e317a1-268c-4e46-9db1-f10af959ffca",
+        "type-id": null,
+        "sort-name": "Amsterdam",
+        "disambiguation": ""
+      },
+      "begin-area": {
+        "name": "Zaandam",
+        "disambiguation": "",
+        "type-id": null,
+        "sort-name": "Zaandam",
+        "id": "d424f63c-9fa2-4278-af70-02b91b9191d2",
+        "type": null
+      }
+    },
+    {
+      "user-genres": [],
+      "type": "Group",
+      "gender": null,
+      "begin_area": null,
+      "annotation": null,
+      "gender-id": null,
+      "genres": [],
+      "aliases": [],
+      "begin-area": null,
+      "area": {
+        "name": "Brooklyn",
+        "disambiguation": "",
+        "type-id": null,
+        "sort-name": "Brooklyn",
+        "id": "a71b0d32-7752-49e9-8594-2247ad6ac12c",
+        "type": null
+      },
+      "tags": [],
+      "ipis": [],
+      "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+      "life-span": {
+        "begin": null,
+        "end": null,
+        "ended": false
+      },
+      "id": "86f351b6-8608-46b6-9844-c94e40a8fedc",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "user-tags": [],
+      "isnis": [],
+      "end-area": null,
+      "sort-name": ".michael.",
+      "disambiguation": "clarinet/guitar duo",
+      "end_area": null,
+      "name": ".michael.",
+      "user-rating": {
+        "value": null
+      },
+      "country": null
+    },
+    {
+      "end_area": null,
+      "sort-name": "[<>]",
+      "disambiguation": "a capella artist",
+      "name": "[<>]",
+      "country": null,
+      "user-rating": {
+        "value": null
+      },
+      "id": "8f363b5c-89e1-4e2a-bb1e-871e50bc2d92",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "type-id": null,
+      "life-span": {
+        "end": null,
+        "ended": false,
+        "begin": null
+      },
+      "ipis": [],
+      "isnis": [],
+      "end-area": null,
+      "user-tags": [],
+      "begin-area": null,
+      "tags": [
+        {
+          "count": 1,
+          "name": "!hyperfocus"
+        },
+        {
+          "name": "sillyname",
+          "count": 1
+        }
+      ],
+      "area": {
+        "name": "New York",
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type": null,
+        "disambiguation": "",
+        "type-id": null,
+        "sort-name": "New York"
+      },
+      "type": null,
+      "gender": null,
+      "user-genres": [],
+      "gender-id": null,
+      "aliases": [
+        {
+          "name": "bracketsfaggots",
+          "ended": false,
+          "begin": null,
+          "type": "Search hint",
+          "sort-name": "bracketsfaggots",
+          "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+          "locale": null,
+          "end": null,
+          "primary": null
+        }
+      ],
+      "genres": [],
+      "begin_area": null,
+      "annotation": null
+    },
+    {
+      "id": "9468a665-4196-4a84-8535-906f975d9e92",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "life-span": {
+        "begin": "1997",
+        "ended": true,
+        "end": "2000"
+      },
+      "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+      "ipis": [],
+      "isnis": [],
+      "end-area": null,
+      "user-tags": [],
+      "end_area": null,
+      "sort-name": "1 Life 2 Live",
+      "disambiguation": "",
+      "name": "1 Life 2 Live",
+      "user-rating": {
+        "value": null
+      },
+      "country": "US",
+      "type": "Group",
+      "gender": null,
+      "user-genres": [],
+      "gender-id": null,
+      "aliases": [],
+      "genres": [],
+      "begin_area": {
+        "name": "The Bronx",
+        "disambiguation": "",
+        "sort-name": "The Bronx",
+        "type-id": null,
+        "id": "eb4a386e-1178-4e3a-a371-30418dd6fd2e",
+        "type": null
+      },
+      "annotation": null,
+      "begin-area": {
+        "name": "The Bronx",
+        "disambiguation": "",
+        "sort-name": "The Bronx",
+        "type-id": null,
+        "id": "eb4a386e-1178-4e3a-a371-30418dd6fd2e",
+        "type": null
+      },
+      "tags": [],
+      "area": {
+        "disambiguation": "",
+        "iso-3166-1-codes": [
+          "US"
+        ],
+        "sort-name": "United States",
+        "type-id": null,
+        "type": null,
+        "id": "489ce91b-6658-3307-9877-795b68554c98",
+        "name": "United States"
+      }
+    },
+    {
+      "name": "Aurelia",
+      "user-rating": {
+        "value": null
+      },
+      "country": null,
+      "sort-name": "(Electronic artist, singer, songwriter and producer)",
+      "disambiguation": "Electronic artist, singer, songwriter and producer",
+      "end_area": null,
+      "user-tags": [],
+      "isnis": [],
+      "end-area": null,
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "life-span": {
+        "end": null,
+        "ended": false,
+        "begin": "1998-06-25"
+      },
+      "ipis": [],
+      "id": "b00d424d-3cf7-474e-a761-db2abc3bb3e0",
+      "rating": {
+        "votes-count": 1,
+        "value": 5
+      },
+      "area": {
+        "sort-name": "New York",
+        "type-id": null,
+        "disambiguation": "",
+        "type": null,
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "name": "New York"
+      },
+      "tags": [],
+      "begin-area": {
+        "type": null,
+        "id": "75e398a3-5f3f-4224-9cd8-0fe44715bc95",
+        "sort-name": "New York",
+        "type-id": null,
+        "disambiguation": "",
+        "name": "New York",
+        "iso-3166-2-codes": [
+          "US-NY"
+        ]
+      },
+      "begin_area": {
+        "type": null,
+        "id": "75e398a3-5f3f-4224-9cd8-0fe44715bc95",
+        "sort-name": "New York",
+        "type-id": null,
+        "disambiguation": "",
+        "name": "New York",
+        "iso-3166-2-codes": [
+          "US-NY"
+        ]
+      },
+      "annotation": null,
+      "gender-id": "b239bbd8-aa84-4f11-8bdb-c4159e730ee5",
+      "aliases": [],
+      "genres": [],
+      "user-genres": [],
+      "type": "Person",
+      "gender": "Non-binary"
+    },
+    {
+      "end-area": null,
+      "isnis": [],
+      "user-tags": [],
+      "rating": {
+        "votes-count": 1,
+        "value": 5
+      },
+      "id": "b0d6108a-3dd5-479d-b518-803f54b3ba45",
+      "ipis": [],
+      "life-span": {
+        "begin": null,
+        "end": null,
+        "ended": false
+      },
+      "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+      "user-rating": {
+        "value": null
+      },
+      "country": null,
+      "name": "1 Mile North",
+      "end_area": null,
+      "disambiguation": "",
+      "sort-name": "1 Mile North",
+      "genres": [
+        {
+          "disambiguation": "",
+          "name": "post-rock",
+          "id": "0bfffa19-4e4a-4bf7-bf53-6ec44f0a2f8e",
+          "count": 1
+        }
+      ],
+      "aliases": [
+        {
+          "end": null,
+          "primary": null,
+          "sort-name": "One Mile North",
+          "type-id": null,
+          "locale": null,
+          "begin": null,
+          "type": null,
+          "ended": false,
+          "name": "One Mile North"
+        }
+      ],
+      "gender-id": null,
+      "annotation": null,
+      "begin_area": null,
+      "gender": null,
+      "type": "Group",
+      "user-genres": [],
+      "tags": [
+        {
+          "name": "post-rock",
+          "count": 1
+        }
+      ],
+      "area": {
+        "name": "New York",
+        "iso-3166-2-codes": [
+          "US-NY"
+        ],
+        "type": null,
+        "id": "75e398a3-5f3f-4224-9cd8-0fe44715bc95",
+        "disambiguation": "",
+        "sort-name": "New York",
+        "type-id": null
+      },
+      "begin-area": null
+    },
+    {
+      "isnis": [],
+      "end-area": null,
+      "user-tags": [],
+      "id": "bf7d93f8-f3d4-491f-a85d-569bd1ec4248",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "life-span": {
+        "end": null,
+        "ended": false,
+        "begin": "1994-08-22"
+      },
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "ipis": [],
+      "name": "'Zel",
+      "user-rating": {
+        "value": null
+      },
+      "country": null,
+      "end_area": null,
+      "sort-name": "'Zel",
+      "disambiguation": "",
+      "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+      "aliases": [],
+      "genres": [],
+      "begin_area": {
+        "name": "The Bronx",
+        "id": "eb4a386e-1178-4e3a-a371-30418dd6fd2e",
+        "type": null,
+        "type-id": null,
+        "sort-name": "The Bronx",
+        "disambiguation": ""
+      },
+      "annotation": null,
+      "type": "Person",
+      "gender": "Male",
+      "user-genres": [],
+      "tags": [],
+      "area": null,
+      "begin-area": {
+        "name": "The Bronx",
+        "id": "eb4a386e-1178-4e3a-a371-30418dd6fd2e",
+        "type": null,
+        "type-id": null,
+        "sort-name": "The Bronx",
+        "disambiguation": ""
+      }
+    },
+    {
+      "area": {
+        "id": "a71b0d32-7752-49e9-8594-2247ad6ac12c",
+        "type": null,
+        "disambiguation": "",
+        "type-id": null,
+        "sort-name": "Brooklyn",
+        "name": "Brooklyn"
+      },
+      "tags": [],
+      "begin-area": null,
+      "annotation": null,
+      "begin_area": null,
+      "aliases": [],
+      "genres": [],
+      "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+      "user-genres": [],
+      "gender": "Male",
+      "type": "Person",
+      "user-rating": {
+        "value": null
+      },
+      "country": null,
+      "name": ".thejass.",
+      "disambiguation": "",
+      "sort-name": ".thejass.",
+      "end_area": null,
+      "user-tags": [],
+      "end-area": null,
+      "isnis": [],
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "life-span": {
+        "ended": false,
+        "end": null,
+        "begin": null
+      },
+      "ipis": [],
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "id": "cc8d7728-f9c9-4bd2-8bb5-29b6dc510e28"
+    },
+    {
+      "gender": null,
+      "type": null,
+      "user-genres": [],
+      "aliases": [],
+      "genres": [],
+      "gender-id": null,
+      "annotation": null,
+      "begin_area": null,
+      "begin-area": null,
+      "tags": [],
+      "area": {
+        "name": "The Bronx",
+        "sort-name": "The Bronx",
+        "type-id": null,
+        "disambiguation": "",
+        "type": null,
+        "id": "eb4a386e-1178-4e3a-a371-30418dd6fd2e"
+      },
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "id": "d141db99-aec5-4167-af74-1dc0e293f385",
+      "type-id": null,
+      "life-span": {
+        "end": null,
+        "ended": false,
+        "begin": null
+      },
+      "ipis": [],
+      "end-area": null,
+      "isnis": [],
+      "user-tags": [],
+      "end_area": null,
+      "disambiguation": "",
+      "sort-name": "#1Gunna",
+      "country": null,
+      "user-rating": {
+        "value": null
+      },
+      "name": "#1Gunna"
+    },
+    {
+      "end_area": null,
+      "sort-name": "[Royal T.] Crown Jewels",
+      "disambiguation": "Hip-Hop Artist",
+      "name": "Crown Jewels",
+      "user-rating": {
+        "value": null
+      },
+      "country": "US",
+      "id": "d508cd94-68d7-4bb8-be4a-abb199a88cd4",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "ipis": [],
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "life-span": {
+        "begin": "1984-06-06",
+        "ended": false,
+        "end": null
+      },
+      "isnis": [],
+      "end-area": null,
+      "user-tags": [],
+      "begin-area": {
+        "name": "East Meadow",
+        "type-id": null,
+        "sort-name": "East Meadow",
+        "disambiguation": "",
+        "type": null,
+        "id": "8ef2ca9b-9cef-437c-b732-d1aff58ed0d8"
+      },
+      "tags": [],
+      "area": {
+        "name": "United States",
+        "iso-3166-1-codes": [
+          "US"
+        ],
+        "disambiguation": "",
+        "sort-name": "United States",
+        "type-id": null,
+        "type": null,
+        "id": "489ce91b-6658-3307-9877-795b68554c98"
+      },
+      "type": "Person",
+      "gender": "Male",
+      "user-genres": [],
+      "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+      "genres": [],
+      "aliases": [
+        {
+          "name": "Anthony Rashon Taylor",
+          "ended": false,
+          "type": "Legal name",
+          "begin": null,
+          "locale": null,
+          "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+          "sort-name": "Anthony Rashon Taylor",
+          "primary": null,
+          "end": null
+        },
+        {
+          "locale": null,
+          "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+          "sort-name": "Crown Jewels",
+          "primary": null,
+          "end": null,
+          "type": "Artist name",
+          "begin": null,
+          "ended": false,
+          "name": "[Royal T.] Crown Jewels"
+        }
+      ],
+      "begin_area": {
+        "name": "East Meadow",
+        "type-id": null,
+        "sort-name": "East Meadow",
+        "disambiguation": "",
+        "type": null,
+        "id": "8ef2ca9b-9cef-437c-b732-d1aff58ed0d8"
+      },
+      "annotation": null
+    },
+    {
+      "gender": "Male",
+      "type": "Person",
+      "user-genres": [],
+      "genres": [],
+      "aliases": [],
+      "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+      "annotation": null,
+      "begin_area": {
+        "disambiguation": "",
+        "type-id": null,
+        "sort-name": "New York",
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type": null,
+        "name": "New York"
+      },
+      "begin-area": {
+        "disambiguation": "",
+        "type-id": null,
+        "sort-name": "New York",
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type": null,
+        "name": "New York"
+      },
+      "tags": [],
+      "area": {
+        "name": "United States",
+        "type-id": null,
+        "sort-name": "United States",
+        "iso-3166-1-codes": [
+          "US"
+        ],
+        "disambiguation": "",
+        "id": "489ce91b-6658-3307-9877-795b68554c98",
+        "type": null
+      },
+      "rating": {
+        "votes-count": 1,
+        "value": 4
+      },
+      "id": "d993169f-2033-4810-bae8-564d4aab89cd",
+      "ipis": [],
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "life-span": {
+        "end": null,
+        "ended": false,
+        "begin": "1997-12-16"
+      },
+      "end-area": null,
+      "isnis": [],
+      "user-tags": [],
+      "end_area": null,
+      "disambiguation": "",
+      "sort-name": "$NOT",
+      "user-rating": {
+        "value": null
+      },
+      "country": "US",
+      "name": "$NOT"
+    },
+    {
+      "user-rating": {
+        "value": null
+      },
+      "country": null,
+      "name": "(青Tux)",
+      "disambiguation": "",
+      "sort-name": "(青Tux)",
+      "end_area": null,
+      "user-tags": [],
+      "end-area": null,
+      "isnis": [],
+      "type-id": null,
+      "life-span": {
+        "begin": null,
+        "end": null,
+        "ended": false
+      },
+      "ipis": [],
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "id": "de73f322-cc43-4b58-83bc-ae7ab6b31bc1",
+      "area": {
+        "name": "Manhattan",
+        "type": null,
+        "id": "261962ea-d8c2-4eaf-a80c-f14376ffadb0",
+        "disambiguation": "",
+        "type-id": null,
+        "sort-name": "Manhattan"
+      },
+      "tags": [],
+      "begin-area": null,
+      "annotation": null,
+      "begin_area": null,
+      "aliases": [],
+      "genres": [],
+      "gender-id": null,
+      "user-genres": [],
+      "gender": null,
+      "type": null
+    },
+    {
+      "name": "$hock Medusa",
+      "country": "US",
+      "user-rating": {
+        "value": null
+      },
+      "end_area": null,
+      "sort-name": "$hock Medusa",
+      "disambiguation": "",
+      "isnis": [],
+      "end-area": null,
+      "user-tags": [],
+      "id": "e79bc11b-18ec-4663-b076-87d82d5216a2",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "life-span": {
+        "begin": "1995-01-26",
+        "end": null,
+        "ended": false
+      },
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "ipis": [
+        "00550616289"
+      ],
+      "tags": [
+        {
+          "name": "hip hop",
+          "count": 1
+        }
+      ],
+      "area": {
+        "name": "United States",
+        "disambiguation": "",
+        "iso-3166-1-codes": [
+          "US"
+        ],
+        "sort-name": "United States",
+        "type-id": null,
+        "id": "489ce91b-6658-3307-9877-795b68554c98",
+        "type": null
+      },
+      "begin-area": {
+        "type": null,
+        "id": "a71b0d32-7752-49e9-8594-2247ad6ac12c",
+        "type-id": null,
+        "sort-name": "Brooklyn",
+        "disambiguation": "",
+        "name": "Brooklyn"
+      },
+      "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+      "aliases": [
+        {
+          "type": "Legal name",
+          "begin": null,
+          "locale": null,
+          "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+          "sort-name": "Stancil, Shakor",
+          "primary": null,
+          "end": null,
+          "name": "Shakor Stancil",
+          "ended": false
+        }
+      ],
+      "genres": [
+        {
+          "disambiguation": "",
+          "name": "hip hop",
+          "id": "52faa157-6bad-4d86-a0ab-d4dec7d2513c",
+          "count": 1
+        }
+      ],
+      "begin_area": {
+        "type": null,
+        "id": "a71b0d32-7752-49e9-8594-2247ad6ac12c",
+        "type-id": null,
+        "sort-name": "Brooklyn",
+        "disambiguation": "",
+        "name": "Brooklyn"
+      },
+      "annotation": null,
+      "type": "Person",
+      "gender": "Male",
+      "user-genres": []
+    },
+    {
+      "area": null,
+      "tags": [],
+      "begin-area": {
+        "name": "Elmira",
+        "sort-name": "Elmira",
+        "type-id": null,
+        "disambiguation": "",
+        "type": null,
+        "id": "3a1fee6d-7299-41d8-8256-99a7c2095562"
+      },
+      "begin_area": {
+        "name": "Elmira",
+        "sort-name": "Elmira",
+        "type-id": null,
+        "disambiguation": "",
+        "type": null,
+        "id": "3a1fee6d-7299-41d8-8256-99a7c2095562"
+      },
+      "annotation": null,
+      "gender-id": null,
+      "genres": [],
+      "aliases": [],
+      "user-genres": [],
+      "type": "Group",
+      "gender": null,
+      "name": "'sabella",
+      "country": null,
+      "user-rating": {
+        "value": null
+      },
+      "sort-name": "'sabella",
+      "disambiguation": "",
+      "end_area": null,
+      "user-tags": [],
+      "isnis": [],
+      "end-area": null,
+      "ipis": [],
+      "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+      "life-span": {
+        "ended": false,
+        "end": null,
+        "begin": "2013-01-01"
+      },
+      "id": "e87d17be-0f42-44b5-98b0-ad45ae484daf",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      }
+    },
+    {
+      "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+      "genres": [],
+      "aliases": [],
+      "begin_area": null,
+      "annotation": null,
+      "type": "Person",
+      "gender": "Male",
+      "user-genres": [],
+      "tags": [],
+      "area": {
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type": null,
+        "sort-name": "New York",
+        "type-id": null,
+        "disambiguation": "",
+        "name": "New York"
+      },
+      "begin-area": null,
+      "isnis": [],
+      "end-area": null,
+      "user-tags": [],
+      "id": "fbf802db-9445-4dde-9140-5eb8fde03d41",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "ipis": [],
+      "life-span": {
+        "ended": false,
+        "end": null,
+        "begin": null
+      },
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "name": "&Friends",
+      "user-rating": {
+        "value": null
+      },
+      "country": null,
+      "end_area": null,
+      "sort-name": "&friends",
+      "disambiguation": ""
+    }
+  ],
+  "artist-offset": 0,
+  "artist-count": 21206
+}

@@ -1,0 +1,510 @@
+{
+  "event-offset": 0,
+  "events": [
+    {
+      "cancelled": false,
+      "genres": [],
+      "tags": [],
+      "user-tags": [],
+      "name": "Late Show with David Letterman",
+      "aliases": [],
+      "type": null,
+      "annotation": null,
+      "life-span": {
+        "ended": true,
+        "end": "2015-05-14",
+        "begin": "2015-05-14"
+      },
+      "disambiguation": "",
+      "setlist": "@ Tom Waits\r\n* Take One Last Look",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "type-id": null,
+      "user-rating": {
+        "value": null
+      },
+      "user-genres": [],
+      "time": "",
+      "id": "0165a62b-eda2-4641-baed-716a60f63394"
+    },
+    {
+      "id": "191b42f0-1a99-4378-9173-b471611600f7",
+      "time": "",
+      "user-genres": [],
+      "type-id": "ef55e8d7-3d00-394a-8012-f5506a29ff0b",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "user-rating": {
+        "value": null
+      },
+      "life-span": {
+        "begin": "2008-07-25",
+        "ended": true,
+        "end": "2008-07-25"
+      },
+      "annotation": null,
+      "disambiguation": "second night",
+      "setlist": "",
+      "name": "Tom Waits at Le Grand Rex",
+      "type": "Concert",
+      "aliases": [],
+      "cancelled": false,
+      "user-tags": [],
+      "tags": [],
+      "genres": []
+    },
+    {
+      "user-tags": [],
+      "tags": [],
+      "genres": [],
+      "cancelled": false,
+      "disambiguation": "",
+      "setlist": "",
+      "life-span": {
+        "end": "2008-06-28",
+        "ended": true,
+        "begin": "2008-06-28"
+      },
+      "annotation": null,
+      "type": "Concert",
+      "aliases": [],
+      "name": "Tom Waits at Ohio Theatre",
+      "user-rating": {
+        "value": null
+      },
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "type-id": "ef55e8d7-3d00-394a-8012-f5506a29ff0b",
+      "id": "1e9beb00-72c2-4fba-80dd-7e34728e9c17",
+      "time": "",
+      "user-genres": []
+    },
+    {
+      "cancelled": false,
+      "tags": [],
+      "user-tags": [],
+      "genres": [],
+      "name": "Tom Waits at Edinburgh Playhouse",
+      "aliases": [],
+      "type": "Concert",
+      "life-span": {
+        "ended": true,
+        "end": "2008-07-27",
+        "begin": "2008-07-27"
+      },
+      "annotation": null,
+      "setlist": "",
+      "disambiguation": "first night",
+      "type-id": "ef55e8d7-3d00-394a-8012-f5506a29ff0b",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "user-rating": {
+        "value": null
+      },
+      "time": "",
+      "user-genres": [],
+      "id": "2cab88c5-ea21-4aa9-88fc-b78e7491a6d6"
+    },
+    {
+      "type-id": null,
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "user-rating": {
+        "value": null
+      },
+      "user-genres": [],
+      "time": "",
+      "id": "32cbeec2-6696-4f3c-83fe-8d2bfbfa1e14",
+      "cancelled": false,
+      "genres": [],
+      "user-tags": [],
+      "tags": [],
+      "name": "1990-04-14: Michael’s Restaurant, Santa Monica, CA, USA",
+      "aliases": [],
+      "type": null,
+      "annotation": null,
+      "life-span": {
+        "begin": "1990-04-14",
+        "end": "1990-04-14",
+        "ended": true
+      },
+      "setlist": "@ [70248960-cb53-4ea4-943a-edb18f7d336f|Bruce Springsteen]\r\n# with\r\n@ [f09aa40c-b613-4ea2-a8cf-6056c2657a9a|Patti Scialfa]\r\n@ [10876f5a-9ac7-49c7-a2b6-46a3f1ac3523|Andrew Gold]\r\n@ [8b76d64a-923b-4c0f-b04f-f0f9f6a2c6c2|Karla Bonoff]\r\n\r\n* [e497263c-4f15-36c0-b27c-dca99482962c|The Fever] (with Tom Waits)\r\n* [8c806b4e-edb4-3101-bc58-2605ec309a2e|Jersey Girl] (with Tom Waits)\r\n* [54d6831c-4447-3087-a71e-3f92aa1fad27|Stand by Me] (with Tom Waits)\r\n* [453dd62c-072c-3b5a-9704-c0a82ab196be|It’s Gonna Work Out Fine] (with Jimmie Wood)\r\n* [e59ca323-dd32-3a0b-80a9-d42746362213|Glory Days]",
+      "disambiguation": "Chuck Plotkin wedding reception"
+    },
+    {
+      "cancelled": false,
+      "user-tags": [],
+      "tags": [],
+      "genres": [],
+      "name": "Tom Waits at Le Grand Rex",
+      "aliases": [],
+      "type": "Concert",
+      "life-span": {
+        "end": "2008-07-24",
+        "ended": true,
+        "begin": "2008-07-24"
+      },
+      "annotation": null,
+      "setlist": "",
+      "disambiguation": "first night",
+      "type-id": "ef55e8d7-3d00-394a-8012-f5506a29ff0b",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "user-rating": {
+        "value": null
+      },
+      "time": "",
+      "user-genres": [],
+      "id": "3af31cf2-3ac2-49a5-88c2-e7e5e4a01895"
+    },
+    {
+      "type-id": "ef55e8d7-3d00-394a-8012-f5506a29ff0b",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "user-rating": {
+        "value": null
+      },
+      "id": "581e508b-48b9-4095-b21e-9687b7e20766",
+      "time": "",
+      "user-genres": [],
+      "cancelled": false,
+      "user-tags": [],
+      "tags": [],
+      "genres": [],
+      "life-span": {
+        "begin": "2008-06-25",
+        "end": "2008-06-25",
+        "ended": true
+      },
+      "annotation": null,
+      "disambiguation": "",
+      "setlist": "",
+      "name": "Tom Waits at Brady Theater",
+      "aliases": [],
+      "type": "Concert"
+    },
+    {
+      "aliases": [],
+      "type": "Concert",
+      "name": "1981-08-24: Los Angeles Memorial Sports Arena, Los Angeles, CA, USA",
+      "setlist": "@ [70248960-cb53-4ea4-943a-edb18f7d336f|Bruce Springsteen]\r\n# &\r\n@ [d6652e7b-33fe-49ef-8336-4c863b4f996f|The E Street Band]\r\n\r\n* [e8a5fe99-0aff-3e7b-840c-7ab96cb702be|Badlands]\r\n* [59d022ee-d140-3bcd-b885-593c22e3f779|Who’ll Stop the Rain]\r\n* [35fdc4a9-fd0a-3a68-a539-5b377464a3ac|Out in the Street]\r\n* [d3cbf5a8-c80a-3273-a405-e756cf11e9ca|Darkness on the Edge of Town]\r\n* [921bbefd-62d6-465c-a2ae-aeb61ada82ee|Follow That Dream]\r\n* [588f5e54-97ad-3450-9849-dab3438483cb|Independence Day]\r\n* [16d30577-b539-3c38-b440-06a210d02325|Jackson Cage]\r\n* [58976436-655f-4cda-8aa7-2b3f45dc1bf2|Trapped]\r\n* [fa36af81-2bd8-3436-bf94-7df8e818d99d|Two Hearts]\r\n* [13411c83-ddd8-31ca-b968-79e4cf6db8fb|The Promised Land]\r\n* [fe0f14e5-de68-3aa6-bf48-80c4cbe2a1f7|The River]\r\n* [ca8235c6-1891-4d31-b55e-49f51ba3e613|This Land Is Your Land]\r\n* [872604b3-15d2-44fd-8631-0903b0ddb858|Prove It All Night]\r\n* [cc8d858a-38ef-35b0-b83c-a5d26f04207b|Thunder Road]\r\n* [db8f3060-b101-3877-9805-ce054f923302|Hungry Heart]\r\n* [7f44c910-49f8-35f5-bb65-4c6d790ad685|Cadillac Ranch]\r\n* [6b68afb7-d508-3cdb-8b41-687de4773d72|Sherry Darling]\r\n* [b1528b3f-0c0e-3977-ba98-5cb5b38108db|Growin’ Up]\r\n* [2e672a08-aa64-3ab1-9bcf-ab93b19ab5e4|Point Blank]\r\n* [e2c39ab9-be7b-4248-af0f-383883d2714d|Johnny Bye-Bye]\r\n* [5f9f38a1-f3fe-36ab-8a1e-b650f52e5acf|Candy’s Room]\r\n* [9915e1a9-13ff-3ea0-823d-56fe45f7535d|Ramrod]\r\n* [66969327-8735-37eb-aaa1-a4b638d446b0|Rosalita (Come Out Tonight)] / [7a4e4a26-acd7-45e4-bbc9-34875404daaa|Sweet Soul Music]\r\n* [8c806b4e-edb4-3101-bc58-2605ec309a2e|Jersey Girl] (with Tom Waits)\r\n* [6ee4ff85-be1a-4f50-b6ec-e8caa1e9fd5c|Jungleland]\r\n* [9893a23c-f282-3b07-a2db-b4f2f3b9f4b2|Born to Run]\r\n* [da1f36f5-dcdd-4a56-8d92-4b3527fd1291|Detroit Medley] / [2e5bff10-df66-4760-8df4-38a95d917d2a|You Can’t Sit Down] / [7a4e4a26-acd7-45e4-bbc9-34875404daaa|Sweet Soul Music] / [5740e2cf-979d-32ca-8ff3-7036e0bf4cef|Shake]\r\n* [7e2dedbb-5be0-32d4-8985-079d6df1e78b|Twist and Shout]",
+      "disambiguation": "",
+      "life-span": {
+        "begin": "1981-08-24",
+        "ended": true,
+        "end": "1981-08-24"
+      },
+      "annotation": null,
+      "user-tags": [],
+      "tags": [],
+      "genres": [],
+      "cancelled": false,
+      "time": "",
+      "user-genres": [],
+      "id": "59370b19-5071-4000-a896-1d458b45cf56",
+      "user-rating": {
+        "value": null
+      },
+      "type-id": "ef55e8d7-3d00-394a-8012-f5506a29ff0b",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      }
+    },
+    {
+      "cancelled": false,
+      "genres": [],
+      "user-tags": [],
+      "tags": [],
+      "annotation": null,
+      "life-span": {
+        "begin": "2008-07-01",
+        "end": "2008-07-01",
+        "ended": true
+      },
+      "setlist": "",
+      "disambiguation": "",
+      "name": "Tom Waits at Moran Theater",
+      "aliases": [],
+      "type": "Concert",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "type-id": "ef55e8d7-3d00-394a-8012-f5506a29ff0b",
+      "user-rating": {
+        "value": null
+      },
+      "id": "66eef6b6-c17d-4beb-ab48-095f0e1b93c2",
+      "user-genres": [],
+      "time": ""
+    },
+    {
+      "type-id": "ef55e8d7-3d00-394a-8012-f5506a29ff0b",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "user-rating": {
+        "value": null
+      },
+      "id": "6de012e4-9650-4b86-9ba7-86ae97f589d9",
+      "user-genres": [],
+      "time": "",
+      "cancelled": false,
+      "genres": [],
+      "tags": [],
+      "user-tags": [],
+      "annotation": null,
+      "life-span": {
+        "ended": true,
+        "end": "1987-09-30",
+        "begin": "1987-09-30"
+      },
+      "disambiguation": "Roy Orbison’s Black & White Night",
+      "setlist": "@ [0bbbc496-c7b5-4b3f-bb6d-bd312827d6e5|Roy Orbison]\r\n# with\r\n@ [70248960-cb53-4ea4-943a-edb18f7d336f|Bruce Springsteen]\r\n@ [0f0da09c-3940-4cb5-879f-4cea28907810|Bonnie Raitt]\r\n@ [8a338e06-d182-46f2-bd16-30a09bc840ba|Elvis Costello]\r\n@ [81e2f4b1-4b48-4bdb-9717-4180e0f1ebc2|J.D. Souther]\r\n@ [88527d26-7496-47c5-8358-ebdb1868a90f|Jackson Browne]\r\n@ [2f140aa6-b99b-4f79-ae33-96018af87fa3|Jennifer Warnes]\r\n@ [675c1c5e-5625-4a5e-97a2-b02aab5db2fc|k.d. lang]\r\n@ [c3aeb863-7b26-4388-94e8-5a240f2be21b|Tom Waits]\r\n@ [b821dd8c-4583-4385-9293-6f1015b74ef9|T‐Bone Burnett]\r\n\r\n# Rehearsal\r\n* [41188891-81da-3ec6-8b37-137ae2b13833|Mean Woman Blues]\r\n* [27ea9789-d41f-3924-9ed0-20e87cc82cde|The Comedians]\r\n* [a9aa8366-e55a-3df5-a61a-050fbb189d10|Blue Angel]\r\n* [653769c3-7a78-3b1b-9bcc-be7a6c335a1b|Blue Bayou]\r\n* [8f6d1d5a-7d59-3dee-bafc-ea5c8d71f760|Candy Man]\r\n* [8e95a967-31e5-3839-9290-e9d30af110d8|It’s Over]\r\n* [c4e9c110-e548-37e9-8961-8d762797edf3|Ooby Dooby]\r\n* [21017d9d-584a-30b6-9ba3-d94f9e662f4b|Running Scared]\r\n* [80bdccf0-b216-40b2-8521-eee9108f0092|(All I Can Do Is) Dream You]\r\n* [21482f32-0d9e-45b5-9415-e49ca5ae0332|Uptown]\r\n* [3a4272a2-5a50-3a91-80ec-92147b863edb|Dream Baby (How Long Must I Dream)]\r\n\r\n# Concert\r\n* [a7e8fc9e-f457-370c-ab68-4b9d336cdb91|Only the Lonely]\r\n* [528c846b-e3fb-4db0-b591-bb507bf95706|Leah]\r\n* [660e9c82-497b-307b-8374-1f5489becdaf|In Dreams]\r\n* [773af48a-e550-3885-b575-1590dcb15dfa|Crying]\r\n* [21482f32-0d9e-45b5-9415-e49ca5ae0332|Uptown]\r\n* [27ea9789-d41f-3924-9ed0-20e87cc82cde|The Comedians]\r\n* [a9aa8366-e55a-3df5-a61a-050fbb189d10|Blue Angel]\r\n* [8e95a967-31e5-3839-9290-e9d30af110d8|It’s Over]\r\n* [21017d9d-584a-30b6-9ba3-d94f9e662f4b|Running Scared]\r\n* [3a4272a2-5a50-3a91-80ec-92147b863edb|Dream Baby (How Long Must I Dream)]\r\n* [41188891-81da-3ec6-8b37-137ae2b13833|Mean Woman Blues]\r\n* [8f6d1d5a-7d59-3dee-bafc-ea5c8d71f760|Candy Man]\r\n* [c4e9c110-e548-37e9-8961-8d762797edf3|Ooby Dooby]\r\n* [dec5eb02-6d51-385d-bbe5-864a51b09511|Go Go Go (Down the Line)]\r\n* [80bdccf0-b216-40b2-8521-eee9108f0092|(All I Can Do Is) Dream You]\r\n* [8c1bb4d2-95e7-405b-8ec0-a21989c3f9cc|Claudette]\r\n* [73a3f4b3-29c7-389a-a778-43cccd7be945|Oh, Pretty Woman]\r\n* [73a3f4b3-29c7-389a-a778-43cccd7be945|Oh, Pretty Woman]\r\n\r\n# Post show\r\n* [80bdccf0-b216-40b2-8521-eee9108f0092|(All I Can Do Is) Dream You]\r\n* [27ea9789-d41f-3924-9ed0-20e87cc82cde|The Comedians]\r\n* [8f6d1d5a-7d59-3dee-bafc-ea5c8d71f760|Candy Man]\r\n* [8c1bb4d2-95e7-405b-8ec0-a21989c3f9cc|Claudette]\r\n* [21482f32-0d9e-45b5-9415-e49ca5ae0332|Uptown]",
+      "name": "1987-09-30: Cocoanut Grove, Ambassador Hotel, Los Angeles, CA, USA",
+      "type": "Concert",
+      "aliases": []
+    },
+    {
+      "cancelled": false,
+      "tags": [],
+      "user-tags": [],
+      "genres": [],
+      "life-span": {
+        "begin": "2008-07-28",
+        "end": "2008-07-28",
+        "ended": true
+      },
+      "annotation": null,
+      "setlist": "",
+      "disambiguation": "second night",
+      "name": "Tom Waits at Edinburgh Playhouse",
+      "type": "Concert",
+      "aliases": [],
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "type-id": "ef55e8d7-3d00-394a-8012-f5506a29ff0b",
+      "user-rating": {
+        "value": null
+      },
+      "id": "75aae028-70d9-4ce8-a498-f5c0ad83370f",
+      "time": "",
+      "user-genres": []
+    },
+    {
+      "id": "766f5d38-b796-49e6-b123-583273aa2bca",
+      "time": "",
+      "user-genres": [],
+      "user-rating": {
+        "value": null
+      },
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "type-id": "ef55e8d7-3d00-394a-8012-f5506a29ff0b",
+      "disambiguation": "",
+      "setlist": "",
+      "life-span": {
+        "begin": "2008-07-05",
+        "end": "2008-07-05",
+        "ended": true
+      },
+      "annotation": null,
+      "type": "Concert",
+      "aliases": [],
+      "name": "Tom Waits at Fox Theatre",
+      "user-tags": [],
+      "tags": [],
+      "genres": [],
+      "cancelled": false
+    },
+    {
+      "setlist": "* Lucinda / Ain’t Goin’ Down to the Well\r\n* Hoist That Rag\r\n* Come On Up to the House\r\n* Jesus Gonna Be Here\r\n* November\r\n* Black Market Baby\r\n* Rain Dogs\r\n* Trampled Rose\r\n* Goin' Out West\r\n* Murder in the Red Barn\r\n* Anywhere I Lay My Head\r\n* Cemetery Polka\r\n* Get Behind the Mule\r\n* Eyeball Kid\r\n* Christmas Card from a Hooker in Minneapolis\r\n* Picture in a Frame\r\n* Invitation to the Blues\r\n* Innocent When You Dream\r\n* Lie to Me\r\n* Chocolate Jesus\r\n* Make It Rain \r\n# Encore\r\n* Way Down in the Hole\r\n* God's Away on Business\r\n* Time",
+      "disambiguation": "first night",
+      "life-span": {
+        "begin": "2008-06-17",
+        "end": "2008-06-17",
+        "ended": true
+      },
+      "annotation": "This was the first night of the tour, and Ticketmaster's first paperlessly/digitally ticketed concert in the world. Tom and his band played a second, shorter set here on 2008-06-18. Three distinct high-quality bootleg recordings of this show have been circulated in the past.",
+      "aliases": [],
+      "type": "Concert",
+      "name": "Tom Waits at the Orpheum Theatre",
+      "tags": [],
+      "user-tags": [],
+      "genres": [],
+      "cancelled": false,
+      "id": "843348e8-8a83-4a23-8804-042c659a52dd",
+      "time": "08:30",
+      "user-genres": [],
+      "user-rating": {
+        "value": null
+      },
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "type-id": "ef55e8d7-3d00-394a-8012-f5506a29ff0b"
+    },
+    {
+      "id": "8575c08f-330a-45f2-a03d-988c73d8691d",
+      "time": "",
+      "user-genres": [],
+      "user-rating": {
+        "value": null
+      },
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "type-id": "ef55e8d7-3d00-394a-8012-f5506a29ff0b",
+      "disambiguation": "second night",
+      "setlist": "",
+      "life-span": {
+        "end": "2008-07-19",
+        "ended": true,
+        "begin": "2008-07-19"
+      },
+      "annotation": null,
+      "type": "Concert",
+      "aliases": [],
+      "name": "Tom Waits at Teatro degli Arcimboldi",
+      "user-tags": [],
+      "tags": [],
+      "genres": [],
+      "cancelled": false
+    },
+    {
+      "setlist": "",
+      "disambiguation": "",
+      "life-span": {
+        "end": "2008-07-03",
+        "ended": true,
+        "begin": "2008-07-03"
+      },
+      "annotation": null,
+      "aliases": [],
+      "type": "Concert",
+      "name": "Tom Waits at Alabama Theatre",
+      "user-tags": [],
+      "tags": [],
+      "genres": [],
+      "cancelled": false,
+      "id": "88f8a60e-8d57-4bff-a5e5-6a1fe1d1d903",
+      "time": "",
+      "user-genres": [],
+      "user-rating": {
+        "value": null
+      },
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "type-id": "ef55e8d7-3d00-394a-8012-f5506a29ff0b"
+    },
+    {
+      "annotation": null,
+      "life-span": {
+        "begin": "2008-06-29",
+        "ended": true,
+        "end": "2008-06-29"
+      },
+      "disambiguation": "",
+      "setlist": "",
+      "name": "Tom Waits at Knoxville Civic Coliseum",
+      "aliases": [],
+      "type": "Concert",
+      "cancelled": false,
+      "genres": [],
+      "tags": [],
+      "user-tags": [],
+      "id": "8c6ab232-24cc-4221-8425-cc98aa94504b",
+      "user-genres": [],
+      "time": "",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "type-id": "ef55e8d7-3d00-394a-8012-f5506a29ff0b",
+      "user-rating": {
+        "value": null
+      }
+    },
+    {
+      "aliases": [],
+      "type": "Concert",
+      "name": "Tom Waits at Teatro degli Arcimboldi",
+      "setlist": "",
+      "disambiguation": "first night",
+      "annotation": null,
+      "life-span": {
+        "end": "2008-07-18",
+        "ended": true,
+        "begin": "2008-07-18"
+      },
+      "genres": [],
+      "user-tags": [],
+      "tags": [],
+      "cancelled": false,
+      "user-genres": [],
+      "time": "",
+      "id": "9655f67b-652f-487e-b532-305c5a87eb6e",
+      "user-rating": {
+        "value": null
+      },
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "type-id": "ef55e8d7-3d00-394a-8012-f5506a29ff0b"
+    },
+    {
+      "user-genres": [],
+      "time": "",
+      "id": "c7a00993-1c3f-466d-9fbd-a8313239b492",
+      "type-id": "ef55e8d7-3d00-394a-8012-f5506a29ff0b",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "user-rating": {
+        "value": null
+      },
+      "name": "Tom Waits at Phoenix Park",
+      "aliases": [],
+      "type": "Concert",
+      "annotation": null,
+      "life-span": {
+        "begin": "2008-08-01",
+        "ended": true,
+        "end": "2008-08-01"
+      },
+      "disambiguation": "",
+      "setlist": "",
+      "cancelled": false,
+      "genres": [],
+      "user-tags": [],
+      "tags": []
+    }
+  ],
+  "event-count": 18
+}

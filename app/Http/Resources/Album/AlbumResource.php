@@ -35,9 +35,9 @@ class AlbumResource extends AlbumWithoutSongsResource
              */
             'cover'    => ImageResource::make($this->whenLoaded('cover')),
             /**
-             * Album artist relation
+             * Album artists relation
              */
-            'albumArtist' => ArtistResource::make($this->whenLoaded('albumArtist')),
+            'artists' => ArtistResource::collection($this->whenLoaded('artists')),
             /**
              * Songs relation
              */

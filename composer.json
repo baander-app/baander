@@ -25,7 +25,6 @@
         "hidehalo/nanoid-php": "^1.1",
         "intervention/image": "^3.5",
         "justinrainbow/json-schema": "^6.0",
-        "laragear/webauthn": "^3.0",
         "laravel/fortify": "^1.23",
         "laravel/framework": "^11.0",
         "laravel/horizon": "^5.25",
@@ -39,6 +38,7 @@
         "league/mime-type-detection": "^1.15",
         "matomo/device-detector": "^6.3",
         "maxakawizard/json-collection-parser": "^1.10",
+        "xenos/musicbrainz": "@dev",
         "opcodesio/log-viewer": "^3.10",
         "php-ffmpeg/php-ffmpeg": "^1.2",
         "saloonphp/cache-plugin": "^3.0",
@@ -53,6 +53,7 @@
         "symfony/string": "^7.1",
         "thecodingmachine/safe": "^2.5",
         "tightenco/ziggy": "^2.2",
+        "timokoerber/laravel-one-time-operations": "^1.4",
         "tpetry/laravel-postgresql-enhanced": "2.0.0",
         "zend/php-reader": "@dev"
     },
@@ -124,6 +125,13 @@
         {
             "type": "path",
             "url": "./third_party/php-reader-1.8.1",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "./third_party/music-brainz",
             "options": {
                 "symlink": true
             }

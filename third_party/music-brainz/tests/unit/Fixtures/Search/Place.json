@@ -1,0 +1,678 @@
+{
+  "created": "2019-03-17T12:21:30.645Z",
+  "count": 78,
+  "offset": 0,
+  "places": [
+    {
+      "id": "9612a7a1-6973-4778-963c-8cb1f4dbfd2d",
+      "type": "Venue",
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "score": 100,
+      "name": "Opernhaus Leipzig",
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "36c3f5fe-e83a-4c2a-b3bb-bd8e5350003d",
+      "type": "Venue",
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "score": 100,
+      "name": "Felsenkeller Leipzig",
+      "address": "Karl-Heine-Straße 32, 04229 Leipzig",
+      "coordinates": {
+        "latitude": "51.332767",
+        "longitude": "12.338521"
+      },
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "15cc795e-3d18-47d5-a0d2-9d939db32c31",
+      "type": "Other",
+      "type-id": "a0df5ead-0bd6-33d8-8444-855a9f3e9970",
+      "score": 100,
+      "name": "Planetarium Leipzig",
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "9be7e699-8d48-4680-a09a-e22e78172de3",
+      "type": "Indoor arena",
+      "type-id": "a77c11f6-82fa-3cc0-9041-ac60e5f6e024",
+      "score": 100,
+      "name": "Arena Leipzig",
+      "address": "Am Sportforum 2, 04105 Leipzig, Germany",
+      "coordinates": {
+        "latitude": "51.342778",
+        "longitude": "12.355278"
+      },
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "begin": "2002-05-11",
+        "ended": null
+      }
+    },
+    {
+      "id": "0e5c9c52-e374-460b-8a44-500ec7875ec4",
+      "score": 100,
+      "name": "CineStar Leipzig",
+      "address": "Petersstraße 44, 04109 Leipzig, Germany",
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "2b789f93-e6f2-4f0c-925d-d09419e1bce8",
+      "type": "Venue",
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "score": 100,
+      "name": "Pantheon Leipzig",
+      "address": "Puschstraße 10, Alte Messe, Halle 16, 04103 Leipzig",
+      "coordinates": {
+        "latitude": "51.315975",
+        "longitude": "12.400045"
+      },
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      },
+      "aliases": [
+        {
+          "sort-name": "Eventpalast Leipzig",
+          "name": "Eventpalast Leipzig",
+          "locale": null,
+          "type": null,
+          "primary": null,
+          "begin-date": null,
+          "end-date": null
+        },
+        {
+          "sort-name": "Volkspalast Leipzig",
+          "name": "Volkspalast Leipzig",
+          "locale": null,
+          "type": null,
+          "primary": null,
+          "begin-date": null,
+          "end-date": null
+        }
+      ]
+    },
+    {
+      "id": "5c57a6bb-38c7-43d1-920a-c5d9a91619a2",
+      "type": "Venue",
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "score": 100,
+      "name": "Schauspiel Leipzig",
+      "address": "Bosestraße 1, 04109",
+      "coordinates": {
+        "latitude": "51.340754",
+        "longitude": "12.369613"
+      },
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "2759c97c-6cf3-4511-8ea4-39697b16d2d6",
+      "type": "Venue",
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "score": 100,
+      "name": "Peterskirche Leipzig",
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "f557c623-c4e0-4a93-90bc-abaf25b78114",
+      "type": "Venue",
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "score": 100,
+      "name": "Kohlrabizirkus Leipzig",
+      "address": "An den Tierkliniken 42, 04109 Leipzig",
+      "coordinates": {
+        "latitude": "51.32022",
+        "longitude": "12.38893"
+      },
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "eca66757-ce73-4072-9ee0-8f61a3b15d72",
+      "type": "Venue",
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "score": 100,
+      "name": "Parkbühne Leipzig",
+      "coordinates": {
+        "latitude": "51.329247",
+        "longitude": "12.361116"
+      },
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "e0d31bb4-daef-43e4-9a1e-e86a182868b1",
+      "type": "Venue",
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "score": 100,
+      "name": "Haus Leipzig",
+      "address": "Elsterstraße 22-24, 04109 Leipzig, Germany",
+      "coordinates": {
+        "latitude": "51.34063",
+        "longitude": "12.362471"
+      },
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "0427cec6-aeba-4800-87e4-4323372fde1a",
+      "type": "Venue",
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "score": 100,
+      "name": "Hellraiser Leipzig",
+      "address": "Werkstättenstraße 4, 04319 Leipzig, Germany",
+      "coordinates": {
+        "latitude": "51.339643",
+        "longitude": "12.460427"
+      },
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "begin": "1992",
+        "ended": null
+      }
+    },
+    {
+      "id": "69a35a89-9995-4df7-baba-86d622a9f2f6",
+      "type": "Studio",
+      "type-id": "05fa6a09-ff92-3d34-bdbb-5141d3c24f38",
+      "score": 85,
+      "name": "FWL Studios Leipzig",
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "f2ecf8b2-1752-4670-949b-bcfb511891e2",
+      "type": "Venue",
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "score": 85,
+      "name": "Pantheon Leipzig, Kantine",
+      "address": "Puschstraße 10, Alte Messe, Halle 16, 04103 Leipzig",
+      "coordinates": {
+        "latitude": "51.315421",
+        "longitude": "12.400078"
+      },
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      },
+      "aliases": [
+        {
+          "sort-name": "Volkspalast Leipzig, Kantine",
+          "name": "Volkspalast Leipzig, Kantine",
+          "locale": null,
+          "type": null,
+          "primary": null,
+          "begin-date": null,
+          "end-date": null
+        }
+      ]
+    },
+    {
+      "id": "90c0848e-4c9b-425a-bf5c-2b6a62c10f1c",
+      "type": "Venue",
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "score": 85,
+      "name": "agra Veranstaltungsgelände Leipzig",
+      "address": "Bornaische Straße 210, 04279 Leipzig",
+      "coordinates": {
+        "latitude": "51.280547",
+        "longitude": "12.389102"
+      },
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "108bff88-cc3c-402e-a964-386efd3166dc",
+      "type": "Venue",
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "score": 85,
+      "name": "Pantheon Leipzig, Kuppelhalle",
+      "address": "Puschstraße 10, Alte Messe, Halle 16, 04103 Leipzig",
+      "coordinates": {
+        "latitude": "51.315975",
+        "longitude": "12.400045"
+      },
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      },
+      "aliases": [
+        {
+          "sort-name": "Volkspalast Leipzig, Kuppelhalle",
+          "name": "Volkspalast Leipzig, Kuppelhalle",
+          "locale": null,
+          "type": null,
+          "primary": null,
+          "begin-date": null,
+          "end-date": null
+        }
+      ]
+    },
+    {
+      "id": "2158d48c-865d-4478-b648-0f4267313373",
+      "type": "Educational institution",
+      "type-id": "882d46c9-625c-4061-891c-22dd412744db",
+      "score": 80,
+      "name": "Hochschule für Musik und Theater »Felix Mendelssohn Bartholdy« Leipzig",
+      "address": "Grassistraße 8, 04107 Leipzig, Germany",
+      "coordinates": {
+        "latitude": "51.333333",
+        "longitude": "12.368056"
+      },
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "begin": "1843",
+        "ended": null
+      },
+      "aliases": [
+        {
+          "sort-name": "Hochschule für Musik und Theater Leipzig",
+          "type-id": "fb68f9a2-622c-319b-83b0-bbff4127cdc5",
+          "name": "Hochschule für Musik und Theater Leipzig",
+          "locale": "de",
+          "type": "Place name",
+          "primary": null,
+          "begin-date": null,
+          "end-date": null
+        },
+        {
+          "sort-name": "University of Music and Theatre Leipzig",
+          "type-id": "fb68f9a2-622c-319b-83b0-bbff4127cdc5",
+          "name": "University of Music and Theatre Leipzig",
+          "locale": "en",
+          "type": "Place name",
+          "primary": null,
+          "begin-date": null,
+          "end-date": null
+        },
+        {
+          "sort-name": "Leipzig Conservatory",
+          "type-id": "fb68f9a2-622c-319b-83b0-bbff4127cdc5",
+          "name": "Leipzig Conservatory",
+          "locale": null,
+          "type": "Place name",
+          "primary": null,
+          "begin-date": null,
+          "end-date": null
+        }
+      ]
+    },
+    {
+      "id": "21ba5a21-cff5-4856-ad30-51fc09c889f7",
+      "score": 71,
+      "name": "Leipziger Stadtbad",
+      "address": "Eutritzscher Straße 21, 04105 Leipzig",
+      "coordinates": {
+        "latitude": "51.352152",
+        "longitude": "12.375948"
+      },
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "6bfdcfda-504c-484a-a576-0afa68af9670",
+      "type": "Other",
+      "type-id": "a0df5ead-0bd6-33d8-8444-855a9f3e9970",
+      "score": 71,
+      "name": "Leipziger Festwiese",
+      "coordinates": {
+        "latitude": "51.3428",
+        "longitude": "12.35"
+      },
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "cb733c40-f8f1-4d86-ada4-129c3710a6a4",
+      "type": "Other",
+      "type-id": "a0df5ead-0bd6-33d8-8444-855a9f3e9970",
+      "score": 71,
+      "name": "Leipziger Messe",
+      "coordinates": {
+        "latitude": "51.396667",
+        "longitude": "12.402778"
+      },
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "begin": "1996",
+        "ended": null
+      }
+    },
+    {
+      "id": "4b35cd46-72a0-4670-9c04-e8c4c201332f",
+      "type": "Venue",
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "score": 70,
+      "name": "WERK 2 - Kulturfabrik Leipzig",
+      "address": "Kochstraße 132, 04277 Leipzig",
+      "coordinates": {
+        "latitude": "51.310194",
+        "longitude": "12.371806"
+      },
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "01a1d751-0b3c-4536-b958-d861a4fdc891",
+      "type": "Venue",
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "score": 35,
+      "name": "Gewandhaus",
+      "disambiguation": "1884-1944",
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "begin": "1884",
+        "end": "1944",
+        "ended": true
+      }
+    },
+    {
+      "id": "a2644800-1ff3-4d6b-aaa1-ca506bee29bd",
+      "type": "Other",
+      "type-id": "a0df5ead-0bd6-33d8-8444-855a9f3e9970",
+      "score": 35,
+      "name": "Versohnungskirche",
+      "address": "Viertelsweg, 04157 Leipzig, Germany",
+      "coordinates": {
+        "latitude": "51.371867",
+        "longitude": "12.368564"
+      },
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "begin": "1932",
+        "ended": null
+      }
+    },
+    {
+      "id": "28118289-c0c1-4a9e-aad6-6ee37a4547ad",
+      "type": "Indoor arena",
+      "type-id": "a77c11f6-82fa-3cc0-9041-ac60e5f6e024",
+      "score": 35,
+      "name": "Messehalle 7",
+      "address": "Alte Messehalle 7, 04103 Leipzig",
+      "coordinates": {
+        "latitude": "51.320974",
+        "longitude": "12.399907"
+      },
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "5c1f8e77-b447-4b09-be58-971118a2ce22",
+      "type": "Venue",
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "score": 35,
+      "name": "Altes Theater",
+      "disambiguation": "1766-1943",
+      "coordinates": {
+        "latitude": "51.343889",
+        "longitude": "12.372222"
+      },
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      }
+    }
+  ]
+}

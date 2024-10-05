@@ -8,6 +8,6 @@ trait HasJobsLogger
 {
     protected function logger()
     {
-        return Log::channel('jobs_stack');
+        return Log::channel('jobs_file');
     }
 }

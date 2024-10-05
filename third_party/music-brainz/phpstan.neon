@@ -1,0 +1,8 @@
+parameters:
+    level: 9
+    paths:
+        - src
+    checkGenericClassInNonGenericObjectType: false
+    ignoreErrors:
+        - '#Call to function is_null\(\) with array\|null will always evaluate to false.#'
+        - '#no value type specified in iterable type array#'

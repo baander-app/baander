@@ -1,0 +1,116 @@
+{
+  "area-count": 2,
+  "area-offset": 0,
+  "areas": [
+    {
+      "life-span": {
+        "end": null,
+        "begin": null,
+        "ended": false
+      },
+      "disambiguation": "",
+      "type": "City",
+      "genres": [],
+      "sort-name": "Leipzig",
+      "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+      "name": "Leipzig",
+      "user-genres": [],
+      "aliases": [
+        {
+          "sort-name": "Leipzig",
+          "type-id": "0b5b3497-d5d9-34e7-a61b-9a6c18aa7b29",
+          "begin": null,
+          "name": "Leipzig",
+          "end": null,
+          "primary": true,
+          "ended": false,
+          "type": "Area name",
+          "locale": "de"
+        },
+        {
+          "ended": false,
+          "locale": "en",
+          "type": "Area name",
+          "begin": null,
+          "name": "Leipzig",
+          "type-id": "0b5b3497-d5d9-34e7-a61b-9a6c18aa7b29",
+          "sort-name": "Leipzig",
+          "primary": true,
+          "end": null
+        },
+        {
+          "type": "Area name",
+          "locale": "ja",
+          "ended": false,
+          "end": null,
+          "primary": true,
+          "sort-name": "ライプツィヒ",
+          "type-id": "0b5b3497-d5d9-34e7-a61b-9a6c18aa7b29",
+          "name": "ライプツィヒ",
+          "begin": null
+        }
+      ],
+      "annotation": null,
+      "tags": [
+        {
+          "count": 1,
+          "name": "hypezig"
+        }
+      ],
+      "user-tags": [
+        {
+          "name": "hypezig"
+        }
+      ],
+      "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41"
+    },
+    {
+      "annotation": null,
+      "tags": [
+        {
+          "name": "place",
+          "count": 1
+        },
+        {
+          "count": 2,
+          "name": "post-rock"
+        }
+      ],
+      "id": "75e398a3-5f3f-4224-9cd8-0fe44715bc95",
+      "user-tags": [
+        {
+          "name": "post-rock"
+        }
+      ],
+      "aliases": [],
+      "type-id": "fd3d44c5-80a1-3842-9745-2c4972d35afa",
+      "sort-name": "New York",
+      "name": "New York",
+      "iso-3166-2-codes": [
+        "US-NY"
+      ],
+      "user-genres": [
+        {
+          "id": "0bfffa19-4e4a-4bf7-bf53-6ec44f0a2f8e",
+          "disambiguation": "",
+          "name": "post-rock"
+        }
+      ],
+      "disambiguation": "",
+      "life-span": {
+        "end": null,
+        "ended": false,
+        "begin": null
+      },
+      "type": "Subdivision",
+      "genres": [
+        {
+          "id": "0bfffa19-4e4a-4bf7-bf53-6ec44f0a2f8e",
+          "count": 2,
+          "disambiguation": "",
+          "name": "post-rock"
+        }
+      ]
+    }
+  ]
+}

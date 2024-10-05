@@ -1,0 +1,706 @@
+{
+  "type": "Festival",
+  "disambiguation": "",
+  "life-span": {
+    "begin": "2002-05-17",
+    "end": "2002-05-19",
+    "ended": true
+  },
+  "type-id": "b6ded574-b592-3f0e-b56e-5b5f06aa0678",
+  "cancelled": false,
+  "relations": [
+    {
+      "attributes": [],
+      "target-credit": "",
+      "attribute-values": {},
+      "type-id": "e2c6f697-07dc-38b1-be0b-83d740165532",
+      "type": "held at",
+      "target-type": "place",
+      "direction": "forward",
+      "source-credit": "",
+      "ended": false,
+      "end": null,
+      "begin": null,
+      "place": {
+        "id": "7643f13a-dcda-4db4-8196-3ffcc1b99ab7",
+        "area": {
+          "name": "Nürburg",
+          "id": "6aa10c09-024d-4bbe-8478-99a66ac39d30",
+          "disambiguation": "",
+          "sort-name": "Nürburg"
+        },
+        "address": "Nürburgring Boulevard 1, 53520 Nürburg",
+        "type-id": null,
+        "disambiguation": "",
+        "type": null,
+        "name": "Nürburgring",
+        "coordinates": {
+          "latitude": "50.33556",
+          "longitude": "6.9475"
+        }
+      }
+    },
+    {
+      "end": null,
+      "source-credit": "",
+      "ended": false,
+      "artist": {
+        "sort-name": "4LYN",
+        "disambiguation": "",
+        "id": "03df376e-f696-4df0-a8e4-3bbc9c8c1c5d",
+        "name": "4LYN"
+      },
+      "direction": "backward",
+      "begin": null,
+      "target-credit": "",
+      "attributes": [],
+      "target-type": "artist",
+      "type": "main performer",
+      "attribute-values": {},
+      "type-id": "936c7c95-3156-3889-a062-8a0cd57f8946"
+    },
+    {
+      "target-credit": "",
+      "attributes": [],
+      "attribute-values": {},
+      "type-id": "936c7c95-3156-3889-a062-8a0cd57f8946",
+      "type": "main performer",
+      "target-type": "artist",
+      "direction": "backward",
+      "artist": {
+        "disambiguation": "",
+        "sort-name": "Kravitz, Lenny",
+        "name": "Lenny Kravitz",
+        "id": "0ef3f425-9bd2-4216-9dd2-219d2fe90f1f"
+      },
+      "source-credit": "",
+      "ended": false,
+      "end": null,
+      "begin": null
+    },
+    {
+      "source-credit": "",
+      "artist": {
+        "name": "Bad Religion",
+        "id": "149e6720-4e4a-41a4-afca-6d29083fc091",
+        "disambiguation": "",
+        "sort-name": "Bad Religion"
+      },
+      "ended": false,
+      "end": null,
+      "direction": "backward",
+      "begin": null,
+      "attributes": [],
+      "target-credit": "",
+      "type": "main performer",
+      "target-type": "artist",
+      "attribute-values": {},
+      "type-id": "936c7c95-3156-3889-a062-8a0cd57f8946"
+    },
+    {
+      "target-credit": "",
+      "attributes": [],
+      "attribute-values": {},
+      "type-id": "936c7c95-3156-3889-a062-8a0cd57f8946",
+      "target-type": "artist",
+      "type": "main performer",
+      "direction": "backward",
+      "end": null,
+      "source-credit": "",
+      "ended": false,
+      "artist": {
+        "sort-name": "Urlaub, Farin",
+        "disambiguation": "",
+        "id": "23620454-4dca-45b7-8496-066e94d99826",
+        "name": "Farin Urlaub"
+      },
+      "begin": null
+    },
+    {
+      "target-type": "artist",
+      "type": "main performer",
+      "attribute-values": {},
+      "type-id": "936c7c95-3156-3889-a062-8a0cd57f8946",
+      "target-credit": "",
+      "attributes": [],
+      "begin": null,
+      "end": null,
+      "source-credit": "",
+      "ended": false,
+      "artist": {
+        "name": "The Offspring",
+        "id": "23a03e33-a603-404e-bcbf-2c00159d7067",
+        "disambiguation": "American punk",
+        "sort-name": "Offspring, The"
+      },
+      "direction": "backward"
+    },
+    {
+      "begin": null,
+      "direction": "backward",
+      "artist": {
+        "disambiguation": "",
+        "sort-name": "Faithless",
+        "name": "Faithless",
+        "id": "23d9d74d-c95e-46a6-be26-a6075c49747a"
+      },
+      "source-credit": "",
+      "ended": false,
+      "end": null,
+      "attribute-values": {},
+      "type-id": "936c7c95-3156-3889-a062-8a0cd57f8946",
+      "type": "main performer",
+      "target-type": "artist",
+      "target-credit": "",
+      "attributes": []
+    },
+    {
+      "type-id": "936c7c95-3156-3889-a062-8a0cd57f8946",
+      "attribute-values": {},
+      "type": "main performer",
+      "target-type": "artist",
+      "attributes": [],
+      "target-credit": "",
+      "begin": null,
+      "direction": "backward",
+      "artist": {
+        "sort-name": "H-Blockx",
+        "disambiguation": "",
+        "id": "36b7da58-858c-44e2-b3bd-d2e88bf02f7c",
+        "name": "H-Blockx"
+      },
+      "source-credit": "",
+      "ended": false,
+      "end": null
+    },
+    {
+      "begin": null,
+      "source-credit": "",
+      "artist": {
+        "sort-name": "Jean, Wyclef",
+        "disambiguation": "Haitian rapper, musician and actor",
+        "id": "4f29ecd7-21a5-4c03-b9ba-d0cfe9488f8c",
+        "name": "Wyclef Jean"
+      },
+      "ended": false,
+      "end": null,
+      "direction": "backward",
+      "type": "main performer",
+      "target-type": "artist",
+      "attribute-values": {},
+      "type-id": "936c7c95-3156-3889-a062-8a0cd57f8946",
+      "target-credit": "",
+      "attributes": []
+    },
+    {
+      "target-credit": "",
+      "attributes": [],
+      "type": "main performer",
+      "target-type": "artist",
+      "attribute-values": {},
+      "type-id": "936c7c95-3156-3889-a062-8a0cd57f8946",
+      "source-credit": "",
+      "ended": false,
+      "artist": {
+        "sort-name": "P.O.D.",
+        "disambiguation": "American metal band - Payable on Death",
+        "id": "57e79d57-b795-475e-9fa2-5dd9d5513b8c",
+        "name": "P.O.D."
+      },
+      "end": null,
+      "direction": "backward",
+      "begin": null
+    },
+    {
+      "direction": "backward",
+      "end": null,
+      "source-credit": "",
+      "ended": false,
+      "artist": {
+        "sort-name": "Young, Neil",
+        "disambiguation": "Canadian singer, songwriter & musician",
+        "id": "75167b8b-44e4-407b-9d35-effe87b223cf",
+        "name": "Neil Young"
+      },
+      "begin": null,
+      "target-credit": "",
+      "attributes": [],
+      "attribute-values": {},
+      "type-id": "936c7c95-3156-3889-a062-8a0cd57f8946",
+      "target-type": "artist",
+      "type": "main performer"
+    },
+    {
+      "begin": null,
+      "direction": "backward",
+      "end": null,
+      "ended": false,
+      "source-credit": "",
+      "artist": {
+        "sort-name": "Drowning Pool",
+        "disambiguation": "US alternative metal band",
+        "id": "87a73cf0-ebdf-483d-8b5a-3db1e5e72122",
+        "name": "Drowning Pool"
+      },
+      "attribute-values": {},
+      "type-id": "936c7c95-3156-3889-a062-8a0cd57f8946",
+      "target-type": "artist",
+      "type": "main performer",
+      "target-credit": "",
+      "attributes": []
+    },
+    {
+      "target-credit": "",
+      "attributes": [],
+      "type": "main performer",
+      "target-type": "artist",
+      "attribute-values": {},
+      "type-id": "936c7c95-3156-3889-a062-8a0cd57f8946",
+      "source-credit": "",
+      "ended": false,
+      "artist": {
+        "sort-name": "Osbourne, Ozzy",
+        "disambiguation": "",
+        "id": "8aa5b65a-5b3c-4029-92bf-47a544356934",
+        "name": "Ozzy Osbourne"
+      },
+      "end": null,
+      "direction": "backward",
+      "begin": null
+    },
+    {
+      "attributes": [],
+      "target-credit": "",
+      "type-id": "936c7c95-3156-3889-a062-8a0cd57f8946",
+      "attribute-values": {},
+      "target-type": "artist",
+      "type": "main performer",
+      "direction": "backward",
+      "end": null,
+      "source-credit": "",
+      "ended": false,
+      "artist": {
+        "disambiguation": "",
+        "sort-name": "Alien Ant Farm",
+        "name": "Alien Ant Farm",
+        "id": "8ac6cc32-8ddf-43b1-9ac4-4b04f9053176"
+      },
+      "begin": null
+    },
+    {
+      "target-credit": "",
+      "attributes": [],
+      "target-type": "artist",
+      "type": "main performer",
+      "type-id": "936c7c95-3156-3889-a062-8a0cd57f8946",
+      "attribute-values": {},
+      "end": null,
+      "artist": {
+        "id": "9c9f1380-2516-4fc9-a3e6-f9f61941d090",
+        "name": "Muse",
+        "sort-name": "Muse",
+        "disambiguation": "UK rock band"
+      },
+      "source-credit": "",
+      "ended": false,
+      "direction": "backward",
+      "begin": null
+    },
+    {
+      "end": null,
+      "ended": false,
+      "source-credit": "",
+      "artist": {
+        "name": "Beatsteaks",
+        "id": "a9b88ebb-83aa-4ef7-b674-fabeb572c14e",
+        "disambiguation": "",
+        "sort-name": "Beatsteaks"
+      },
+      "direction": "backward",
+      "begin": null,
+      "target-credit": "",
+      "attributes": [],
+      "target-type": "artist",
+      "type": "main performer",
+      "type-id": "936c7c95-3156-3889-a062-8a0cd57f8946",
+      "attribute-values": {}
+    },
+    {
+      "type-id": "936c7c95-3156-3889-a062-8a0cd57f8946",
+      "attribute-values": {},
+      "type": "main performer",
+      "target-type": "artist",
+      "target-credit": "",
+      "attributes": [],
+      "begin": null,
+      "direction": "backward",
+      "source-credit": "",
+      "ended": false,
+      "artist": {
+        "sort-name": "System of a Down",
+        "disambiguation": "",
+        "id": "cc0b7089-c08d-4c10-b6b0-873582c17fd6",
+        "name": "System of a Down"
+      },
+      "end": null
+    },
+    {
+      "target-credit": "",
+      "attributes": [],
+      "type": "main performer",
+      "target-type": "artist",
+      "attribute-values": {},
+      "type-id": "936c7c95-3156-3889-a062-8a0cd57f8946",
+      "source-credit": "",
+      "ended": false,
+      "artist": {
+        "disambiguation": "",
+        "sort-name": "Jamiroquai",
+        "name": "Jamiroquai",
+        "id": "f4857fb9-e255-4dc6-bd01-e4ca7cc68544"
+      },
+      "end": null,
+      "direction": "backward",
+      "begin": null
+    },
+    {
+      "begin": null,
+      "source-credit": "",
+      "ended": false,
+      "artist": {
+        "sort-name": "Santana, Carlos",
+        "disambiguation": "",
+        "id": "f7fda030-0ba1-42e9-a385-3deebc939bc9",
+        "name": "Carlos Santana"
+      },
+      "end": null,
+      "direction": "backward",
+      "type": "main performer",
+      "target-type": "artist",
+      "attribute-values": {},
+      "type-id": "936c7c95-3156-3889-a062-8a0cd57f8946",
+      "target-credit": "",
+      "attributes": []
+    },
+    {
+      "target-credit": "",
+      "attributes": [],
+      "url": {
+        "id": "8f058d72-beab-4a51-a9bc-0d8784c09f48",
+        "resource": "https://www.rock-am-ring.com/history/2002"
+      },
+      "target-type": "url",
+      "type": "official homepage",
+      "attribute-values": {},
+      "type-id": "c26808b0-4e67-31a7-a587-913720dfb3f3",
+      "end": null,
+      "ended": false,
+      "source-credit": "",
+      "direction": "forward",
+      "begin": null
+    },
+    {
+      "end": null,
+      "ended": false,
+      "source-credit": "",
+      "direction": "forward",
+      "ordering-key": 3,
+      "begin": null,
+      "attributes": [],
+      "target-credit": "",
+      "target-type": "series",
+      "type": "part of",
+      "series": {
+        "disambiguation": "",
+        "id": "ca3e512b-4156-46f8-893f-2d87a89d0141",
+        "name": "Rock am Ring"
+      },
+      "attribute-values": {},
+      "type-id": "707d947d-9563-328a-9a7d-0c5b9c3a9791"
+    },
+    {
+      "target-credit": "",
+      "attributes": [],
+      "type-id": "b06e6732-2603-47d3-8a49-9f589b430483",
+      "attribute-values": {},
+      "target-type": "recording",
+      "recording": {
+        "disambiguation": "live, 2002-05-17: Rock am Ring, Nürburgring, Germany",
+        "video": false,
+        "length": 262080,
+        "title": "Let Love Rule",
+        "id": "0edd978a-736b-4a8e-b608-571024b8bca2"
+      },
+      "type": "recorded at",
+      "direction": "forward",
+      "end": null,
+      "ended": false,
+      "source-credit": "",
+      "begin": null
+    },
+    {
+      "target-type": "recording",
+      "recording": {
+        "disambiguation": "live, 2002-05-17: Rock am Ring, Nürburgring, Germany",
+        "video": false,
+        "title": "Are You Gonna Go My Way",
+        "length": 346014,
+        "id": "2239227d-fa79-482e-add4-af7933557231"
+      },
+      "type": "recorded at",
+      "attribute-values": {},
+      "type-id": "b06e6732-2603-47d3-8a49-9f589b430483",
+      "attributes": [],
+      "target-credit": "",
+      "begin": null,
+      "end": null,
+      "source-credit": "",
+      "ended": false,
+      "direction": "forward"
+    },
+    {
+      "target-credit": "",
+      "attributes": [],
+      "type": "recorded at",
+      "target-type": "recording",
+      "recording": {
+        "video": false,
+        "disambiguation": "live, 2002-05-17: Rock am Ring, Nürburgring, Germany",
+        "id": "235a4f84-c87a-40b1-9777-5bd2aa955172",
+        "title": "Dig In",
+        "length": 219213
+      },
+      "attribute-values": {},
+      "type-id": "b06e6732-2603-47d3-8a49-9f589b430483",
+      "ended": false,
+      "source-credit": "",
+      "end": null,
+      "direction": "forward",
+      "begin": null
+    },
+    {
+      "attributes": [],
+      "target-credit": "",
+      "attribute-values": {},
+      "type-id": "b06e6732-2603-47d3-8a49-9f589b430483",
+      "recording": {
+        "disambiguation": "live, 2002-05-17: Rock am Ring, Nürburgring, Germany",
+        "video": false,
+        "length": 305840,
+        "title": "Is There Any Love",
+        "id": "396974ab-26d9-43ea-8b48-6ea2f2ccc792"
+      },
+      "target-type": "recording",
+      "type": "recorded at",
+      "direction": "forward",
+      "end": null,
+      "source-credit": "",
+      "ended": false,
+      "begin": null
+    },
+    {
+      "attributes": [],
+      "target-credit": "",
+      "target-type": "recording",
+      "recording": {
+        "video": false,
+        "disambiguation": "live, 2002-05-17: Rock am Ring, Nürburgring, Germany",
+        "id": "3a0fee4a-9e1a-4349-8231-080818e5c728",
+        "title": "Pay to Play",
+        "length": 335906
+      },
+      "type": "recorded at",
+      "type-id": "b06e6732-2603-47d3-8a49-9f589b430483",
+      "attribute-values": {},
+      "end": null,
+      "source-credit": "",
+      "ended": false,
+      "direction": "forward",
+      "begin": null
+    },
+    {
+      "ended": false,
+      "source-credit": "",
+      "end": null,
+      "direction": "forward",
+      "begin": null,
+      "target-credit": "",
+      "attributes": [],
+      "type": "recorded at",
+      "target-type": "recording",
+      "recording": {
+        "disambiguation": "live, 2002-05-17: Rock am Ring, Nürburgring, Germany",
+        "video": false,
+        "length": 262306,
+        "title": "American Woman",
+        "id": "4d9aba9a-e971-442f-87e3-b1e310c723fb"
+      },
+      "attribute-values": {},
+      "type-id": "b06e6732-2603-47d3-8a49-9f589b430483"
+    },
+    {
+      "begin": null,
+      "direction": "forward",
+      "end": null,
+      "ended": false,
+      "source-credit": "",
+      "attribute-values": {},
+      "type-id": "b06e6732-2603-47d3-8a49-9f589b430483",
+      "target-type": "recording",
+      "recording": {
+        "disambiguation": "live, 2002-05-17: Rock am Ring, Nürburgring, Germany",
+        "video": false,
+        "title": "Bank Robber Man",
+        "length": 216893,
+        "id": "5cfde75f-5e74-4138-afdd-5b0c9c66dc45"
+      },
+      "type": "recorded at",
+      "target-credit": "",
+      "attributes": []
+    },
+    {
+      "target-credit": "",
+      "attributes": [],
+      "type": "recorded at",
+      "recording": {
+        "id": "64f05351-98dd-4639-bb5a-313787688cbb",
+        "title": "Beyond the 7th Sky",
+        "length": 413986,
+        "video": false,
+        "disambiguation": "live, 2002-05-17: Rock am Ring, Nürburgring, Germany"
+      },
+      "target-type": "recording",
+      "type-id": "b06e6732-2603-47d3-8a49-9f589b430483",
+      "attribute-values": {},
+      "ended": false,
+      "source-credit": "",
+      "end": null,
+      "direction": "forward",
+      "begin": null
+    },
+    {
+      "target-credit": "",
+      "attributes": [],
+      "attribute-values": {},
+      "type-id": "b06e6732-2603-47d3-8a49-9f589b430483",
+      "type": "recorded at",
+      "target-type": "recording",
+      "recording": {
+        "video": false,
+        "disambiguation": "live, 2002-05-17: Rock am Ring, Nürburgring, Germany",
+        "id": "aa3e142a-c936-4906-afcb-d4841a60ed2f",
+        "length": 552893,
+        "title": "Stillness of the Heart"
+      },
+      "direction": "forward",
+      "ended": false,
+      "source-credit": "",
+      "end": null,
+      "begin": null
+    },
+    {
+      "attributes": [],
+      "target-credit": "",
+      "attribute-values": {},
+      "type-id": "b06e6732-2603-47d3-8a49-9f589b430483",
+      "recording": {
+        "length": 262653,
+        "title": "If I Could Fall in Love",
+        "id": "bbcb68c5-fe63-4799-afa7-37b05cd61fc4",
+        "disambiguation": "live, 2002-05-17: Rock am Ring, Nürburgring, Germany",
+        "video": false
+      },
+      "target-type": "recording",
+      "type": "recorded at",
+      "direction": "forward",
+      "end": null,
+      "source-credit": "",
+      "ended": false,
+      "begin": null
+    },
+    {
+      "attribute-values": {},
+      "type-id": "b06e6732-2603-47d3-8a49-9f589b430483",
+      "type": "recorded at",
+      "recording": {
+        "disambiguation": "live, 2002-05-17: Rock am Ring, Nürburgring, Germany",
+        "video": false,
+        "length": 281026,
+        "title": "Fields of Joy",
+        "id": "d19f2569-f0c5-46f2-8b72-1fd4717eb871"
+      },
+      "target-type": "recording",
+      "attributes": [],
+      "target-credit": "",
+      "begin": null,
+      "direction": "forward",
+      "ended": false,
+      "source-credit": "",
+      "end": null
+    },
+    {
+      "begin": null,
+      "source-credit": "",
+      "ended": false,
+      "end": null,
+      "direction": "forward",
+      "type": "recorded at",
+      "recording": {
+        "title": "Blues for Sister Someone",
+        "length": 410186,
+        "id": "e2ddfb03-4fa0-4239-a003-284143a73137",
+        "disambiguation": "live, 2002-05-17: Rock am Ring, Nürburgring, Germany",
+        "video": false
+      },
+      "target-type": "recording",
+      "type-id": "b06e6732-2603-47d3-8a49-9f589b430483",
+      "attribute-values": {},
+      "attributes": [],
+      "target-credit": ""
+    },
+    {
+      "attributes": [],
+      "target-credit": "",
+      "type-id": "b06e6732-2603-47d3-8a49-9f589b430483",
+      "attribute-values": {},
+      "target-type": "recording",
+      "recording": {
+        "video": false,
+        "disambiguation": "live, 2002-05-17: Rock am Ring, Nürburgring, Germany",
+        "id": "f242e68e-2266-4261-8f1a-ece99e3272a2",
+        "title": "Rock and Roll Is Dead",
+        "length": 247840
+      },
+      "type": "recorded at",
+      "direction": "forward",
+      "end": null,
+      "source-credit": "",
+      "ended": false,
+      "begin": null
+    },
+    {
+      "target-credit": "",
+      "attributes": [],
+      "type": "recorded at",
+      "recording": {
+        "length": 458160,
+        "title": "Mate Than Anything in This World",
+        "id": "f415d1a8-6177-4205-9544-fc7fd758bd73",
+        "disambiguation": "live, 2002-05-17: Rock am Ring, Nürburgring, Germany",
+        "video": false
+      },
+      "target-type": "recording",
+      "attribute-values": {},
+      "type-id": "b06e6732-2603-47d3-8a49-9f589b430483",
+      "source-credit": "",
+      "ended": false,
+      "end": null,
+      "direction": "forward",
+      "begin": null
+    }
+  ],
+  "id": "9e94c410-54e6-4f32-981d-ae49642a3721",
+  "time": "",
+  "setlist": "",
+  "name": "Rock am Ring 2002"
+}

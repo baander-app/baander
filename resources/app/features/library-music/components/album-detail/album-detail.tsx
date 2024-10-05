@@ -1,7 +1,7 @@
 import { Cover } from '@/features/library-music/components/artwork/cover';
 import { useAlbumServiceAlbumsShow } from '@/api-client/queries';
 import { SongResource } from '@/api-client/requests';
-import { Table, Title, Text, Card, Group, Flex, Box, ScrollArea, Skeleton, BoxProps } from '@mantine/core';
+import { Table, Text, Card, Group, Flex, Box, ScrollArea, Skeleton, BoxProps } from '@mantine/core';
 import { AlertLoadingError } from '@/components/alerts/alert-loading-error.tsx';
 import { useAppDispatch } from '@/store/hooks.ts';
 import { setQueueAndSong } from '@/store/music/music-player-slice.ts';
@@ -10,6 +10,7 @@ import { TrackRow } from '@/components/music/track-row/track-row.tsx';
 import styles from './album-detail.module.scss';
 import { usePathParam } from '@/hooks/use-path-param.ts';
 import { LibraryParams } from '@/features/library-music/routes/_routes.tsx';
+import { generateBlurhashBackgroundImage } from '@/lib/blurhash/generate-bg-image.ts';
 
 interface AlbumDetailProps extends BoxProps {
   albumSlug: string;
@@ -23,6 +24,7 @@ export function AlbumDetail({ albumSlug, ...rest }: AlbumDetailProps) {
   });
 
   const genres = data?.genres?.map((genre) => genre.name).join(', ');
+  const blurhash = data?.cover && generateBlurhashBackgroundImage(data.cover.blurhash, 128, 128);
 
   return (
     <Box {...rest}>
@@ -32,27 +34,40 @@ export function AlbumDetail({ albumSlug, ...rest }: AlbumDetailProps) {
       }}/>}
 
       {data && (
-        <Card>
-          <Card.Section withBorder>
-            <Flex>
-              <Box p="sm">
-                <Cover imgSrc={data?.cover?.url} size={180}/>
-              </Box>
+        <Card className={styles.card}>
+          {blurhash && (
+            <div
+              className={styles.image}
+              style={{
+                backgroundImage: blurhash.backgroundUrl,
+              }}
+            />
+          )}
 
-              <Box p="sm">
-                <Title>{data?.title}</Title>
-                {data?.albumArtist && (
-                  <Text>{data.albumArtist.name}</Text>
-                )}
+          <div className={styles.content}>
+            <div>
+              <Flex align="stretch">
+                <Box p="sm">
+                  <Cover imgSrc={data?.cover?.url} size={180}/>
+                </Box>
 
-                <Text>{genres} - {data?.year}</Text>
-              </Box>
-            </Flex>
-          </Card.Section>
+                <Flex p="sm" align="start" direction="column" justify="center">
+                  <Text size="lg" fw="600">{data?.title}</Text>
+                  {data?.artists && (
+                    <Text >{data.artists.map(x => x.name).join(', ')}</Text>
+                  )}
 
-          <Group>
-            {data?.songs && <AlbumSongs title={data.title} coverUrl={data.cover?.url} songs={data.songs}/>}
-          </Group>
+                  <Text>{genres} - {data?.year}</Text>
+                </Flex>
+
+                <Box></Box>
+              </Flex>
+
+              <Group>
+                {data?.songs && <AlbumSongs title={data.title} coverUrl={data.cover?.url} songs={data.songs}/>}
+              </Group>
+            </div>
+          </div>
         </Card>
       )}
     </Box>
@@ -81,7 +96,7 @@ function AlbumSongs({ songs }: AlbumSongProps) {
       song={song}
       key={song.public_id}
       onClick={() => {
-        console.log('row clicked')
+        console.log('row clicked');
         onSongClick(song, songs);
       }}
     />
@@ -89,7 +104,7 @@ function AlbumSongs({ songs }: AlbumSongProps) {
 
   return (
     <>
-      <ScrollArea h={600} w="100%">
+      <ScrollArea mih="inherit" w="100%">
         <Table highlightOnHover>
           <Table.Thead>
             <Table.Tr>

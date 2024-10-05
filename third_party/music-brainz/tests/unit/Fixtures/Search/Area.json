@@ -1,0 +1,98 @@
+{
+  "created": "2017-07-09T17:54:44.186Z",
+  "count": 2,
+  "offset": 0,
+  "areas": [
+    {
+      "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+      "type": "City",
+      "score": "100",
+      "name": "Leipzig",
+      "sort-name": "Leipzig",
+      "life-span": {
+        "ended": null
+      },
+      "aliases": [
+        {
+          "sort-name": "ライプツィヒ",
+          "name": "ライプツィヒ",
+          "locale": "ja",
+          "type": "Area name",
+          "primary": true,
+          "begin-date": null,
+          "end-date": null
+        },
+        {
+          "sort-name": "Leipzig",
+          "name": "Leipzig",
+          "locale": "en",
+          "type": "Area name",
+          "primary": true,
+          "begin-date": null,
+          "end-date": null
+        },
+        {
+          "sort-name": "Leipzig",
+          "name": "Leipzig",
+          "locale": "de",
+          "type": "Area name",
+          "primary": true,
+          "begin-date": null,
+          "end-date": null
+        }
+      ],
+      "relation-list": [
+        {
+          "relations": [
+            {
+              "type": "part of",
+              "type-id": "de7cc874-8b1b-3a05-8272-f3834c968fb7",
+              "target": "2b568f1a-0bbc-4416-86ad-ced6ef6d56f4",
+              "direction": "backward",
+              "area": {
+                "id": "2b568f1a-0bbc-4416-86ad-ced6ef6d56f4",
+                "type": "Subdivision",
+                "name": "Sachsen",
+                "sort-name": "Sachsen",
+                "life-span": {
+                  "ended": null
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5dd931d9-0167-4205-9dd6-3ec68ce19863",
+      "type": "City",
+      "score": "62",
+      "name": "New Leipzig",
+      "sort-name": "New Leipzig",
+      "life-span": {
+        "ended": null
+      },
+      "relation-list": [
+        {
+          "relations": [
+            {
+              "type": "part of",
+              "type-id": "de7cc874-8b1b-3a05-8272-f3834c968fb7",
+              "target": "f6f0b86b-3b42-4419-bef4-b84123d09d97",
+              "direction": "backward",
+              "area": {
+                "id": "f6f0b86b-3b42-4419-bef4-b84123d09d97",
+                "type": "County",
+                "name": "Grant County",
+                "sort-name": "Grant County",
+                "life-span": {
+                  "ended": null
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -4,6 +4,7 @@ namespace App\Http\Resources\Album;
 
 use App\Http\Resources\Artist\ArtistResource;
 use App\Http\Resources\HasJsonCollection;
+use App\Http\Resources\Image\ImageResource;
 use App\Models\Album;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -27,13 +28,16 @@ class AlbumWithoutSongsResource extends JsonResource
             'slug'        => $this->slug,
             'year'        => $this->year,
             'directory'   => $this->directory,
-            'coverUrl'    => $this->whenLoaded('cover', fn() => route('api.image.serve', ['image' => $this->cover])),
             'createdAt'   => $this->created_at,
             'updatedAt'   => $this->updated_at,
             /**
+             * Cover relation
+             */
+            'cover'    => ImageResource::make($this->whenLoaded('cover')),
+            /**
              * Album artist relation
              */
-            'albumArtist' => ArtistResource::make($this->whenLoaded('albumArtist')),
+            'artists' => ArtistResource::make($this->whenLoaded('artists')),
         ];
     }
 }

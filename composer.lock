@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "376a18de7a4b61c284951358701456c0",
+    "content-hash": "22797ff1530d15c42cfdc7cea8fc2845",
     "packages": [
         {
             "name": "amphp/amp",
@@ -3499,159 +3499,6 @@
                 }
             ],
             "time": "2024-09-11T00:55:07+00:00"
-        },
-        {
-            "name": "laragear/meta-model",
-            "version": "v1.1.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/Laragear/MetaModel.git",
-                "reference": "86aa8bbd0e1b9d03467a0257f0cd5815b6836a34"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/Laragear/MetaModel/zipball/86aa8bbd0e1b9d03467a0257f0cd5815b6836a34",
-                "reference": "86aa8bbd0e1b9d03467a0257f0cd5815b6836a34",
-                "shasum": ""
-            },
-            "require": {
-                "illuminate/database": "10.*|11.*",
-                "php": "^8.1"
-            },
-            "require-dev": {
-                "mockery/mockery": "^1.6",
-                "phpunit/phpunit": "^10.5|11.*"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Laragear\\MetaModel\\": "src"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Italo Israel Baeza Cabrera",
-                    "email": "DarkGhostHunter@Gmail.com",
-                    "homepage": "https://github.com/sponsors/DarkGhostHunter",
-                    "role": "Developer"
-                }
-            ],
-            "description": "Let other developers customize your package model and migrations",
-            "keywords": [
-                "database",
-                "eloquent",
-                "laravel",
-                "model"
-            ],
-            "support": {
-                "issues": "https://github.com/Laragear/MetaModel/issues",
-                "source": "https://github.com/Laragear/MetaModel"
-            },
-            "funding": [
-                {
-                    "url": "https://github.com/sponsors/DarkGhostHunter",
-                    "type": "Github Sponsorship"
-                },
-                {
-                    "url": "https://paypal.me/darkghosthunter",
-                    "type": "Paypal"
-                }
-            ],
-            "time": "2024-03-15T23:27:56+00:00"
-        },
-        {
-            "name": "laragear/webauthn",
-            "version": "v3.1.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/Laragear/WebAuthn.git",
-                "reference": "5136b8fee90abb5c0b50b644594fb3142191f3b9"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/Laragear/WebAuthn/zipball/5136b8fee90abb5c0b50b644594fb3142191f3b9",
-                "reference": "5136b8fee90abb5c0b50b644594fb3142191f3b9",
-                "shasum": ""
-            },
-            "require": {
-                "ext-json": "*",
-                "ext-openssl": "*",
-                "illuminate/auth": "10.*|11.*",
-                "illuminate/config": "10.*|11.*",
-                "illuminate/database": "10.*|11.*",
-                "illuminate/encryption": "10.*|11.*",
-                "illuminate/http": "10.*|11.*",
-                "illuminate/session": "10.*|11.*",
-                "illuminate/support": "10.*|11.*",
-                "laragear/meta-model": "^1.1",
-                "php": "^8.1"
-            },
-            "require-dev": {
-                "ext-sodium": "*",
-                "orchestra/testbench": "8.*|9.*"
-            },
-            "suggest": {
-                "paragonie/sodium_compat": "To enable EdDSA 25519 keys from authenticators, if `ext-sodium` is unavailable."
-            },
-            "type": "library",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Laragear\\WebAuthn\\WebAuthnServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Laragear\\WebAuthn\\": "src"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Lukas Buchs",
-                    "role": "Original developer"
-                },
-                {
-                    "name": "Italo Israel Baeza Cabrera",
-                    "email": "DarkGhostHunter@Gmail.com",
-                    "homepage": "https://github.com/sponsors/DarkGhostHunter",
-                    "role": "Developer"
-                }
-            ],
-            "description": "Authenticate users with Passkeys: fingerprints, patterns and biometric data.",
-            "homepage": "https://github.com/laragear/webauthn",
-            "keywords": [
-                "Authentication",
-                "faceid",
-                "laravel",
-                "passkeys",
-                "touchid",
-                "webauthn",
-                "windows hello"
-            ],
-            "support": {
-                "issues": "https://github.com/Laragear/WebAuthn/issues",
-                "source": "https://github.com/Laragear/WebAuthn"
-            },
-            "funding": [
-                {
-                    "url": "https://github.com/sponsors/DarkGhostHunter",
-                    "type": "Github Sponsorship"
-                },
-                {
-                    "url": "https://paypal.me/darkghosthunter",
-                    "type": "Paypal"
-                }
-            ],
-            "time": "2024-08-15T07:50:06+00:00"
         },
         {
             "name": "laravel/fortify",
@@ -12268,6 +12115,70 @@
             "time": "2023-12-08T13:03:43+00:00"
         },
         {
+            "name": "timokoerber/laravel-one-time-operations",
+            "version": "1.4.2",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/TimoKoerber/laravel-one-time-operations.git",
+                "reference": "33292b8606ff51b8bebe2d6f62fe057621e56942"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/TimoKoerber/laravel-one-time-operations/zipball/33292b8606ff51b8bebe2d6f62fe057621e56942",
+                "reference": "33292b8606ff51b8bebe2d6f62fe057621e56942",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/contracts": "^9.0|^10.0|^11.0",
+                "illuminate/support": "^9.0|^10.0|^11.0",
+                "php": "^8.0"
+            },
+            "require-dev": {
+                "orchestra/testbench": "7|^9.0",
+                "phpunit/phpunit": "^9.4|^10.5"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "TimoKoerber\\LaravelOneTimeOperations\\Providers\\OneTimeOperationsServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "TimoKoerber\\LaravelOneTimeOperations\\": "src/",
+                    "TimoKoerber\\LaravelOneTimeOperations\\Database\\Factories\\": "database/factories/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "timo.koerber",
+                    "email": "koerber.timo@gmail.com",
+                    "homepage": "https://www.timokoerber.com",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Run operations once after deployment - just like you do it with migrations!",
+            "homepage": "https://github.com/timokoerber/laravel-one-time-operations",
+            "keywords": [
+                "deployment",
+                "jobs",
+                "laravel",
+                "migrations",
+                "operations"
+            ],
+            "support": {
+                "issues": "https://github.com/TimoKoerber/laravel-one-time-operations/issues",
+                "source": "https://github.com/TimoKoerber/laravel-one-time-operations/tree/1.4.2"
+            },
+            "time": "2024-04-04T11:16:58+00:00"
+        },
+        {
             "name": "tpetry/laravel-postgresql-enhanced",
             "version": "2.0.0",
             "source": {
@@ -12556,6 +12467,117 @@
                 "source": "https://github.com/webmozarts/assert/tree/1.11.0"
             },
             "time": "2022-06-03T18:03:27+00:00"
+        },
+        {
+            "name": "xenos/asklucy",
+            "version": "v2.0.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/XenosEleatikos/AskLucy.git",
+                "reference": "4f9c739e6acabffb4fc1c6818b971966ac3281dc"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/XenosEleatikos/AskLucy/zipball/4f9c739e6acabffb4fc1c6818b971966ac3281dc",
+                "reference": "4f9c739e6acabffb4fc1c6818b971966ac3281dc",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=7.1.0"
+            },
+            "require-dev": {
+                "infection/infection": "0.10",
+                "phpro/grumphp": "0.14.2",
+                "phpstan/phpstan": "0.10.5",
+                "phpstan/phpstan-phpunit": "0.10",
+                "phpunit/phpunit": "^7"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "AskLucy\\": "src",
+                    "AskLucy\\Test\\": "tests"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "authors": [
+                {
+                    "name": "Christoph Hochholzer",
+                    "email": "christoph@hochholzer.info",
+                    "homepage": "https://github.com/XenosEleatikos",
+                    "role": "Developer"
+                }
+            ],
+            "description": "AskLucy – A PHP library for creating Lucene search queries",
+            "homepage": "https://github.com/XenosEleatikos/AskLucy",
+            "keywords": [
+                "lucene",
+                "php",
+                "query",
+                "search"
+            ],
+            "support": {
+                "issues": "https://github.com/XenosEleatikos/AskLucy/issues",
+                "source": "https://github.com/XenosEleatikos/AskLucy/tree/v2.0.1"
+            },
+            "time": "2019-03-17T17:35:26+00:00"
+        },
+        {
+            "name": "xenos/musicbrainz",
+            "version": "dev-master",
+            "dist": {
+                "type": "path",
+                "url": "./third_party/music-brainz",
+                "reference": "e62eb28b234f09532ca54e18ed746486eaf4a94d"
+            },
+            "require": {
+                "php": ">=8.1.0",
+                "psr/log": "^3.0",
+                "xenos/asklucy": "^2"
+            },
+            "require-dev": {
+                "friendsofphp/php-cs-fixer": "^3.48",
+                "guzzlehttp/guzzle": "^7",
+                "phpstan/phpstan": "^1.10",
+                "phpunit/phpunit": "^10",
+                "squizlabs/php_codesniffer": "*",
+                "symfony/dom-crawler": "^7.0"
+            },
+            "suggest": {
+                "guzzle/guzzle": "Allows you to use the GuzzleHttpAdapter.",
+                "monolog/monolog": "Allows logging of the application flow."
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "MusicBrainz\\": "src",
+                    "MusicBrainz\\Test\\": "tests/unit",
+                    "MusicBrainz\\SpecificationTest\\": "tests/specification"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Christoph Hochholzer",
+                    "email": "christoph@hochholzer.info",
+                    "homepage": "https://github.com/XenosEleatikos",
+                    "role": "Developer"
+                }
+            ],
+            "description": "A PHP library for accessing the MusicBrainz API",
+            "homepage": "https://github.com/XenosEleatikos/MusicBrainz",
+            "keywords": [
+                "api",
+                "library",
+                "musicbrainz",
+                "php"
+            ],
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
         },
         {
             "name": "zend/php-reader",
@@ -15428,6 +15450,7 @@
     "minimum-stability": "dev",
     "stability-flags": {
         "laravel/pulse": 10,
+        "xenos/musicbrainz": 20,
         "zend/php-reader": 20
     },
     "prefer-stable": true,

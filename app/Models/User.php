@@ -6,26 +6,22 @@ use App\Auth\Role;
 use App\Models\Player\PlayerQueue;
 use App\Models\Player\PlayerState;
 use DateTimeInterface;
-use DeviceDetector\DeviceDetector;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
-use Laragear\WebAuthn\Contracts\WebAuthnAuthenticatable;
-use Laragear\WebAuthn\WebAuthnAuthentication;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\{HasApiTokens, NewAccessToken};
 use Ramsey\Uuid\Uuid;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable implements WebAuthnAuthenticatable
+class User extends Authenticatable
 {
     use HasFactory,
         HasApiTokens,
         HasRoles,
         Notifiable,
-        TwoFactorAuthenticatable,
-        WebAuthnAuthentication;
+        TwoFactorAuthenticatable;
 
     protected $dateFormat = 'Y-m-d H:i:sO';
 

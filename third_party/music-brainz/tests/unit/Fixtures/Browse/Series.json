@@ -1,0 +1,40 @@
+{
+  "series-count": 2,
+  "series": [
+    {
+      "aliases": [
+        {
+          "ended": false,
+          "name": "Acústico MTV",
+          "sort-name": "Acústico MTV",
+          "primary": true,
+          "begin": null,
+          "locale": "pt_BR",
+          "end": null,
+          "type-id": "0c615dbc-c7d6-39b3-b8da-bef465ce3046",
+          "type": "Series name"
+        }
+      ],
+      "annotation": null,
+      "user-tags": [],
+      "name": "MTV Unplugged",
+      "id": "1df4b695-967a-4294-8bb2-856a22f0c726",
+      "tags": [],
+      "type": "Release group series",
+      "type-id": "4c1c4949-7b6c-3a2d-9d54-a50a27e4fa77",
+      "disambiguation": ""
+    },
+    {
+      "tags": [],
+      "type": "Release series",
+      "disambiguation": "",
+      "type-id": "52b90f1e-ff62-3bd0-b254-5d91ced5d757",
+      "aliases": [],
+      "name": "Blue Note Commemorative 75th Anniversary Series",
+      "id": "6363aee4-eab3-4ead-89fb-fc2a03cbe06c",
+      "user-tags": [],
+      "annotation": null
+    }
+  ],
+  "series-offset": 0
+}

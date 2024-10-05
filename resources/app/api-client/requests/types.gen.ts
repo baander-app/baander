@@ -12,9 +12,9 @@ export type AlbumResource = {
      */
     cover?: ImageResource;
     /**
-     * Album artist relation
+     * Album artists relation
      */
-    albumArtist?: ArtistResource;
+    artists?: Array<ArtistResource>;
     /**
      * Songs relation
      */
@@ -30,13 +30,16 @@ export type AlbumWithoutSongsResource = {
     slug: string;
     year: number | null;
     directory: string;
-    coverUrl?: string;
     createdAt: string | null;
     updatedAt: string | null;
     /**
+     * Cover relation
+     */
+    cover?: ImageResource;
+    /**
      * Album artist relation
      */
-    albumArtist?: ArtistResource;
+    artists?: ArtistResource;
 };
 
 export type ArtistResource = {
@@ -245,7 +248,7 @@ export type AlbumsIndexData = {
     page?: number;
     /**
      * Comma seperated string of relations
-     * - albumArist
+     * - artists
      * - cover
      * - library
      * - songs

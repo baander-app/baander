@@ -19,12 +19,6 @@ return new class extends Migration {
                 ->cascadeOnDelete()
                 ->cascadeOnUpdate();
 
-            $table->foreignId('artist_id')
-                ->references('id')
-                ->on('artists')
-                ->cascadeOnDelete()
-                ->cascadeOnUpdate();
-
             $table->caseInsensitiveText('title');
             $table->text('slug')->unique();
             $table->text('directory');
@@ -34,7 +28,6 @@ return new class extends Migration {
             $table->timestampsTz();
 
             $table->index('library_id');
-            $table->index('artist_id');
         });
     }
 
