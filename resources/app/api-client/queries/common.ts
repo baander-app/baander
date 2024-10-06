@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.1 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, GenreService, ImageService, JobService, LibraryService, OpCacheService, QueueService, SongService, SystemInfoService, UserService, UserTokenService } from "../requests/services.gen";
+import { AlbumService, ArtistService, AuthService, GenreService, ImageService, JobService, LibraryService, OpCacheService, PasskeyService, QueueService, SongService, SystemInfoService, UserService, UserTokenService } from "../requests/services.gen";
 export type AlbumServiceAlbumsIndexDefaultResponse = Awaited<ReturnType<typeof AlbumService.albumsIndex>>;
 export type AlbumServiceAlbumsIndexQueryResult<TData = AlbumServiceAlbumsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAlbumServiceAlbumsIndexKey = "AlbumServiceAlbumsIndex";
@@ -38,6 +38,22 @@ export const UseArtistServiceArtistsShowKeyFn = ({ artist, library }: {
   artist: string;
   library: string;
 }, queryKey?: Array<unknown>) => [useArtistServiceArtistsShowKey, ...(queryKey ?? [{ artist, library }])];
+export type AuthServiceAuthPasskeyOptionsDefaultResponse = Awaited<ReturnType<typeof AuthService.authPasskeyOptions>>;
+export type AuthServiceAuthPasskeyOptionsQueryResult<TData = AuthServiceAuthPasskeyOptionsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAuthServiceAuthPasskeyOptionsKey = "AuthServiceAuthPasskeyOptions";
+export const UseAuthServiceAuthPasskeyOptionsKeyFn = (queryKey?: Array<unknown>) => [useAuthServiceAuthPasskeyOptionsKey, ...(queryKey ?? [])];
+export type AuthServiceAuthPasskeyRegisterOptionsDefaultResponse = Awaited<ReturnType<typeof AuthService.authPasskeyRegisterOptions>>;
+export type AuthServiceAuthPasskeyRegisterOptionsQueryResult<TData = AuthServiceAuthPasskeyRegisterOptionsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAuthServiceAuthPasskeyRegisterOptionsKey = "AuthServiceAuthPasskeyRegisterOptions";
+export const UseAuthServiceAuthPasskeyRegisterOptionsKeyFn = (queryKey?: Array<unknown>) => [useAuthServiceAuthPasskeyRegisterOptionsKey, ...(queryKey ?? [])];
+export type PasskeyServiceAuthPasskeyOptionsDefaultResponse = Awaited<ReturnType<typeof PasskeyService.authPasskeyOptions>>;
+export type PasskeyServiceAuthPasskeyOptionsQueryResult<TData = PasskeyServiceAuthPasskeyOptionsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const usePasskeyServiceAuthPasskeyOptionsKey = "PasskeyServiceAuthPasskeyOptions";
+export const UsePasskeyServiceAuthPasskeyOptionsKeyFn = (queryKey?: Array<unknown>) => [usePasskeyServiceAuthPasskeyOptionsKey, ...(queryKey ?? [])];
+export type PasskeyServiceAuthPasskeyRegisterOptionsDefaultResponse = Awaited<ReturnType<typeof PasskeyService.authPasskeyRegisterOptions>>;
+export type PasskeyServiceAuthPasskeyRegisterOptionsQueryResult<TData = PasskeyServiceAuthPasskeyRegisterOptionsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const usePasskeyServiceAuthPasskeyRegisterOptionsKey = "PasskeyServiceAuthPasskeyRegisterOptions";
+export const UsePasskeyServiceAuthPasskeyRegisterOptionsKeyFn = (queryKey?: Array<unknown>) => [usePasskeyServiceAuthPasskeyRegisterOptionsKey, ...(queryKey ?? [])];
 export type GenreServiceGenresIndexDefaultResponse = Awaited<ReturnType<typeof GenreService.genresIndex>>;
 export type GenreServiceGenresIndexQueryResult<TData = GenreServiceGenresIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useGenreServiceGenresIndexKey = "GenreServiceGenresIndex";
@@ -166,6 +182,10 @@ export type AuthServiceAuthRegisterMutationResult = Awaited<ReturnType<typeof Au
 export type AuthServiceAuthForgotPasswordMutationResult = Awaited<ReturnType<typeof AuthService.authForgotPassword>>;
 export type AuthServiceAuthResetPasswordMutationResult = Awaited<ReturnType<typeof AuthService.authResetPassword>>;
 export type AuthServiceAuthVerifyMutationResult = Awaited<ReturnType<typeof AuthService.authVerify>>;
+export type AuthServiceAuthPasskeyLoginMutationResult = Awaited<ReturnType<typeof AuthService.authPasskeyLogin>>;
+export type AuthServiceAuthPasskeyRegisterMutationResult = Awaited<ReturnType<typeof AuthService.authPasskeyRegister>>;
+export type PasskeyServiceAuthPasskeyLoginMutationResult = Awaited<ReturnType<typeof PasskeyService.authPasskeyLogin>>;
+export type PasskeyServiceAuthPasskeyRegisterMutationResult = Awaited<ReturnType<typeof PasskeyService.authPasskeyRegister>>;
 export type JobServiceJobLibraryScanMutationResult = Awaited<ReturnType<typeof JobService.jobLibraryScan>>;
 export type LibraryServiceLibraryCreateMutationResult = Awaited<ReturnType<typeof LibraryService.libraryCreate>>;
 export type OpCacheServiceOpcacheClearMutationResult = Awaited<ReturnType<typeof OpCacheService.opcacheClear>>;

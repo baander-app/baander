@@ -53,6 +53,10 @@ export type ArtistResource = {
     portrait?: ImageResource;
 };
 
+export type AuthenticateUsingPasskeyRequest = {
+    start_authentication_response: string;
+};
+
 export type CreateLibraryRequest = {
     name: string;
     path: string;
@@ -195,6 +199,11 @@ export type SongResource = {
     updatedAt: string | null;
     album?: AlbumWithoutSongsResource;
     artists?: Array<ArtistResource>;
+};
+
+export type StorePasskeyRequest = {
+    name: string;
+    passkey: string;
 };
 
 export type UpdateGenreRequest = {
@@ -408,6 +417,37 @@ export type AuthResetPasswordResponse = {
 };
 
 export type AuthVerifyResponse = UserResource;
+
+export type AuthPasskeyOptionsResponse = {
+    challenge: string;
+    rpId: string;
+    allowCredentials: Array<(string)>;
+};
+
+export type AuthPasskeyLoginData = {
+    requestBody?: AuthenticateUsingPasskeyRequest;
+};
+
+export type AuthPasskeyLoginResponse = {
+    accessToken: {
+        [key: string]: unknown;
+    };
+    refreshToken: {
+        [key: string]: unknown;
+    };
+} | string;
+
+export type AuthPasskeyRegisterOptionsResponse = string | {
+    [key: string]: unknown;
+};
+
+export type AuthPasskeyRegisterData = {
+    requestBody?: StorePasskeyRequest;
+};
+
+export type AuthPasskeyRegisterResponse = {
+    message: string;
+};
 
 export type GenresIndexData = {
     /**
@@ -1377,6 +1417,74 @@ export type $OpenApiTs = {
                  * `UserResource`
                  */
                 200: UserResource;
+            };
+        };
+    };
+    '/passkey': {
+        get: {
+            res: {
+                200: {
+                    challenge: string;
+                    rpId: string;
+                    allowCredentials: Array<(string)>;
+                };
+            };
+        };
+        post: {
+            req: AuthPasskeyLoginData;
+            res: {
+                200: {
+    accessToken: {
+        [key: string]: unknown;
+    };
+    refreshToken: {
+        [key: string]: unknown;
+    };
+} | string;
+                401: {
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+            };
+        };
+    };
+    '/passkey/register': {
+        get: {
+            res: {
+                200: string | {
+    [key: string]: unknown;
+};
+                /**
+                 * An error
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+        post: {
+            req: AuthPasskeyRegisterData;
+            res: {
+                200: {
+                    message: string;
+                };
                 /**
                  * Authorization error
                  */
@@ -1385,6 +1493,24 @@ export type $OpenApiTs = {
                      * Error overview.
                      */
                     message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+                500: {
+                    error: string;
                 };
             };
         };

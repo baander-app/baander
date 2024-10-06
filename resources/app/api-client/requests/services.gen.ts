@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { AlbumsIndexData, AlbumsIndexResponse, AlbumsShowData, AlbumsShowResponse, ArtistsIndexData, ArtistsIndexResponse, ArtistsShowData, ArtistsShowResponse, AuthLoginData, AuthLoginResponse, AuthRefreshTokenResponse, AuthStreamTokenResponse, AuthRegisterData, AuthRegisterResponse, AuthForgotPasswordData, AuthForgotPasswordResponse, AuthResetPasswordData, AuthResetPasswordResponse, AuthVerifyResponse, GenresIndexData, GenresIndexResponse, GenresShowData, GenresShowResponse, GenresUpdateData, GenresUpdateResponse, GenresDestroyData, GenresDestroyResponse, ImageServeData, ImageServeResponse, JobLibraryScanData, JobLibraryScanResponse, LibrariesIndexData, LibrariesIndexResponse, LibraryCreateData, LibraryCreateResponse, LibraryUpdateData, LibraryUpdateResponse, LibraryDeleteResponse, OpCacheGetStatusResponse, OpcacheGetConfigResponse, OpcacheClearResponse, OpcacheCompileData, OpcacheCompileResponse, QueueMetricsShowData, QueueMetricsShowResponse, QueueMetricsQueuesResponse, QueueMetricsMetricsData, QueueMetricsMetricsResponse, QueueMetricsRetryJobData, QueueMetricsRetryJobResponse, QueueMetricsDeleteData, QueueMetricsDeleteResponse, QueueMetricsPurgeResponse, SongsIndexData, SongsIndexResponse, SongsShowData, SongsShowResponse, SongsStreamData, SongsStreamResponse, SystemInfoPhpResponse, SystemInfoSysResponse, UsersIndexData, UsersIndexResponse, UsersStoreData, UsersStoreResponse, UsersUpdateData, UsersUpdateResponse, UsersShowData, UsersShowResponse, UsersDestroyData, UsersDestroyResponse, UsersMeResponse, UserTokenGetUserTokensData, UserTokenGetUserTokensResponse, UserTokenRevokeTokenData, UserTokenRevokeTokenResponse } from './types.gen';
+import type { AlbumsIndexData, AlbumsIndexResponse, AlbumsShowData, AlbumsShowResponse, ArtistsIndexData, ArtistsIndexResponse, ArtistsShowData, ArtistsShowResponse, AuthLoginData, AuthLoginResponse, AuthRefreshTokenResponse, AuthStreamTokenResponse, AuthRegisterData, AuthRegisterResponse, AuthForgotPasswordData, AuthForgotPasswordResponse, AuthResetPasswordData, AuthResetPasswordResponse, AuthVerifyResponse, AuthPasskeyOptionsResponse, AuthPasskeyLoginData, AuthPasskeyLoginResponse, AuthPasskeyRegisterOptionsResponse, AuthPasskeyRegisterData, AuthPasskeyRegisterResponse, GenresIndexData, GenresIndexResponse, GenresShowData, GenresShowResponse, GenresUpdateData, GenresUpdateResponse, GenresDestroyData, GenresDestroyResponse, ImageServeData, ImageServeResponse, JobLibraryScanData, JobLibraryScanResponse, LibrariesIndexData, LibrariesIndexResponse, LibraryCreateData, LibraryCreateResponse, LibraryUpdateData, LibraryUpdateResponse, LibraryDeleteResponse, OpCacheGetStatusResponse, OpcacheGetConfigResponse, OpcacheClearResponse, OpcacheCompileData, OpcacheCompileResponse, QueueMetricsShowData, QueueMetricsShowResponse, QueueMetricsQueuesResponse, QueueMetricsMetricsData, QueueMetricsMetricsResponse, QueueMetricsRetryJobData, QueueMetricsRetryJobResponse, QueueMetricsDeleteData, QueueMetricsDeleteResponse, QueueMetricsPurgeResponse, SongsIndexData, SongsIndexResponse, SongsShowData, SongsShowResponse, SongsStreamData, SongsStreamResponse, SystemInfoPhpResponse, SystemInfoSysResponse, UsersIndexData, UsersIndexResponse, UsersStoreData, UsersStoreResponse, UsersUpdateData, UsersUpdateResponse, UsersShowData, UsersShowResponse, UsersDestroyData, UsersDestroyResponse, UsersMeResponse, UserTokenGetUserTokensData, UserTokenGetUserTokensResponse, UserTokenRevokeTokenData, UserTokenRevokeTokenResponse } from './types.gen';
 
 export class AlbumService {
     /**
@@ -261,9 +261,145 @@ export class AuthService {
     public static authVerify(): CancelablePromise<AuthVerifyResponse> {
         return __request(OpenAPI, {
             method: 'POST',
-            url: '/auth/verify/:id/:hash',
+            url: '/auth/verify/:id/:hash'
+        });
+    }
+    
+    /**
+     * Get a passkey challenge
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static authPasskeyOptions(): CancelablePromise<AuthPasskeyOptionsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/passkey'
+        });
+    }
+    
+    /**
+     * Login with a passkey
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static authPasskeyLogin(data: AuthPasskeyLoginData = {}): CancelablePromise<AuthPasskeyLoginResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/passkey',
+            body: data.requestBody,
+            mediaType: 'application/json',
             errors: {
-                403: 'Authorization error'
+                401: '',
+                422: 'Validation error'
+            }
+        });
+    }
+    
+    /**
+     * Get passkey registration options
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static authPasskeyRegisterOptions(): CancelablePromise<AuthPasskeyRegisterOptionsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/passkey/register',
+            errors: {
+                401: 'An error'
+            }
+        });
+    }
+    
+    /**
+     * Register passkey
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static authPasskeyRegister(data: AuthPasskeyRegisterData = {}): CancelablePromise<AuthPasskeyRegisterResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/passkey/register',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                403: 'Authorization error',
+                422: 'Validation error',
+                500: ''
+            }
+        });
+    }
+    
+}
+
+export class PasskeyService {
+    /**
+     * Get a passkey challenge
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static authPasskeyOptions(): CancelablePromise<AuthPasskeyOptionsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/passkey'
+        });
+    }
+    
+    /**
+     * Login with a passkey
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static authPasskeyLogin(data: AuthPasskeyLoginData = {}): CancelablePromise<AuthPasskeyLoginResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/passkey',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: '',
+                422: 'Validation error'
+            }
+        });
+    }
+    
+    /**
+     * Get passkey registration options
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static authPasskeyRegisterOptions(): CancelablePromise<AuthPasskeyRegisterOptionsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/passkey/register',
+            errors: {
+                401: 'An error'
+            }
+        });
+    }
+    
+    /**
+     * Register passkey
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static authPasskeyRegister(data: AuthPasskeyRegisterData = {}): CancelablePromise<AuthPasskeyRegisterResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/passkey/register',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                403: 'Authorization error',
+                422: 'Validation error',
+                500: ''
             }
         });
     }

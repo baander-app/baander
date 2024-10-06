@@ -4,7 +4,7 @@ import { EchoContextProvider } from '@/providers/echo-provider.tsx';
 import { Suspense } from 'react';
 import { LibraryMusicRoutes } from '@/features/library-music/routes/_routes.tsx';
 import { DashboardLayout } from '@/layouts/dashboard-layout/dasbhard-layout.tsx';
-import { AccountRoutes } from '@/features/account/pages/routes.tsx';
+import { AccountRoutes } from '@/features/account/routes/routes.tsx';
 import { DashboardRoutes } from '@/features/dashboard/routes.tsx';
 import { AudioPlayerContextProvider } from '@/features/library-music-player/providers/audio-player-provider.tsx';
 import { UserSettingsRoutes } from '@/features/feature-user-settings/routes/routes.tsx';
