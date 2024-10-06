@@ -6,6 +6,7 @@ use App\Auth\Webauthn\WebauthnService;
 use Database\Factories\PasskeyFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\{Factory, HasFactory};
+use ParagonIE\ConstantTime\Base64UrlSafe;
 use Webauthn\PublicKeyCredentialSource;
 
 class Passkey extends BaseModel
@@ -17,6 +18,7 @@ class Passkey extends BaseModel
         'credential_id',
         'data',
         'last_used_at',
+        'counter',
     ];
 
     protected $casts = [
@@ -35,17 +37,26 @@ class Passkey extends BaseModel
         return new Attribute(
             get: fn(string $value)
                 => $service->deserialize(
-                $value,
+                self::decodeBase64($value),
                 PublicKeyCredentialSource::class,
             ),
             set: fn(PublicKeyCredentialSource $value)
                 => [
-                'credential_id' => $value->publicKeyCredentialId,
+                'credential_id' => self::encodeBase64($value->publicKeyCredentialId),
                 'data'          => $service->serialize($value),
             ],
         );
     }
 
+    public static function encodeBase64(string $data)
+    {
+        return Base64UrlSafe::encodeUnpadded($data);
+    }
+
+    public static function decodeBase64(string $data)
+    {
+        return Base64UrlSafe::decodeNoPadding($data);
+    }
 
     protected static function newFactory(): Factory
     {

@@ -30,6 +30,7 @@
         "laravel/horizon": "^5.25",
         "laravel/octane": "^2.4",
         "laravel/pail": "^1.1",
+        "laravel/passport": "@dev",
         "laravel/pulse": "^1.0@beta",
         "laravel/reverb": "^1.0",
         "laravel/sanctum": "^4.0",

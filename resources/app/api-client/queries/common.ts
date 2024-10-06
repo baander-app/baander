@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.1 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, GenreService, ImageService, JobService, LibraryService, OpCacheService, PasskeyService, QueueService, SongService, SystemInfoService, UserService, UserTokenService } from "../requests/services.gen";
+import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, OpCacheService, PasskeyService, PendingJobsService, QueueMetricsService, QueueService, RetryService, SilencedJobsService, SongService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
 export type AlbumServiceAlbumsIndexDefaultResponse = Awaited<ReturnType<typeof AlbumService.albumsIndex>>;
 export type AlbumServiceAlbumsIndexQueryResult<TData = AlbumServiceAlbumsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAlbumServiceAlbumsIndexKey = "AlbumServiceAlbumsIndex";
@@ -54,6 +54,70 @@ export type PasskeyServiceAuthPasskeyRegisterOptionsDefaultResponse = Awaited<Re
 export type PasskeyServiceAuthPasskeyRegisterOptionsQueryResult<TData = PasskeyServiceAuthPasskeyRegisterOptionsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const usePasskeyServiceAuthPasskeyRegisterOptionsKey = "PasskeyServiceAuthPasskeyRegisterOptions";
 export const UsePasskeyServiceAuthPasskeyRegisterOptionsKeyFn = (queryKey?: Array<unknown>) => [usePasskeyServiceAuthPasskeyRegisterOptionsKey, ...(queryKey ?? [])];
+export type BatchesServiceHorizonJobsBatchesIndexDefaultResponse = Awaited<ReturnType<typeof BatchesService.horizonJobsBatchesIndex>>;
+export type BatchesServiceHorizonJobsBatchesIndexQueryResult<TData = BatchesServiceHorizonJobsBatchesIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useBatchesServiceHorizonJobsBatchesIndexKey = "BatchesServiceHorizonJobsBatchesIndex";
+export const UseBatchesServiceHorizonJobsBatchesIndexKeyFn = (queryKey?: Array<unknown>) => [useBatchesServiceHorizonJobsBatchesIndexKey, ...(queryKey ?? [])];
+export type BatchesServiceHorizonJobsBatchesShowDefaultResponse = Awaited<ReturnType<typeof BatchesService.horizonJobsBatchesShow>>;
+export type BatchesServiceHorizonJobsBatchesShowQueryResult<TData = BatchesServiceHorizonJobsBatchesShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useBatchesServiceHorizonJobsBatchesShowKey = "BatchesServiceHorizonJobsBatchesShow";
+export const UseBatchesServiceHorizonJobsBatchesShowKeyFn = ({ id }: {
+  id: string;
+}, queryKey?: Array<unknown>) => [useBatchesServiceHorizonJobsBatchesShowKey, ...(queryKey ?? [{ id }])];
+export type CompletedJobsServiceHorizonCompletedJobsIndexDefaultResponse = Awaited<ReturnType<typeof CompletedJobsService.horizonCompletedJobsIndex>>;
+export type CompletedJobsServiceHorizonCompletedJobsIndexQueryResult<TData = CompletedJobsServiceHorizonCompletedJobsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useCompletedJobsServiceHorizonCompletedJobsIndexKey = "CompletedJobsServiceHorizonCompletedJobsIndex";
+export const UseCompletedJobsServiceHorizonCompletedJobsIndexKeyFn = ({ startingAt }: {
+  startingAt?: string;
+} = {}, queryKey?: Array<unknown>) => [useCompletedJobsServiceHorizonCompletedJobsIndexKey, ...(queryKey ?? [{ startingAt }])];
+export type DashboardStatsServiceHorizonStatsIndexDefaultResponse = Awaited<ReturnType<typeof DashboardStatsService.horizonStatsIndex>>;
+export type DashboardStatsServiceHorizonStatsIndexQueryResult<TData = DashboardStatsServiceHorizonStatsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useDashboardStatsServiceHorizonStatsIndexKey = "DashboardStatsServiceHorizonStatsIndex";
+export const UseDashboardStatsServiceHorizonStatsIndexKeyFn = (queryKey?: Array<unknown>) => [useDashboardStatsServiceHorizonStatsIndexKey, ...(queryKey ?? [])];
+export type FailedJobsServiceHorizonFailedJobsIndexDefaultResponse = Awaited<ReturnType<typeof FailedJobsService.horizonFailedJobsIndex>>;
+export type FailedJobsServiceHorizonFailedJobsIndexQueryResult<TData = FailedJobsServiceHorizonFailedJobsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useFailedJobsServiceHorizonFailedJobsIndexKey = "FailedJobsServiceHorizonFailedJobsIndex";
+export const UseFailedJobsServiceHorizonFailedJobsIndexKeyFn = ({ tag }: {
+  tag?: string;
+} = {}, queryKey?: Array<unknown>) => [useFailedJobsServiceHorizonFailedJobsIndexKey, ...(queryKey ?? [{ tag }])];
+export type FailedJobsServiceHorizonFailedJobsShowDefaultResponse = Awaited<ReturnType<typeof FailedJobsService.horizonFailedJobsShow>>;
+export type FailedJobsServiceHorizonFailedJobsShowQueryResult<TData = FailedJobsServiceHorizonFailedJobsShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useFailedJobsServiceHorizonFailedJobsShowKey = "FailedJobsServiceHorizonFailedJobsShow";
+export const UseFailedJobsServiceHorizonFailedJobsShowKeyFn = ({ id }: {
+  id: string;
+}, queryKey?: Array<unknown>) => [useFailedJobsServiceHorizonFailedJobsShowKey, ...(queryKey ?? [{ id }])];
+export type FilesServiceLogViewerFilesDefaultResponse = Awaited<ReturnType<typeof FilesService.logViewerFiles>>;
+export type FilesServiceLogViewerFilesQueryResult<TData = FilesServiceLogViewerFilesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useFilesServiceLogViewerFilesKey = "FilesServiceLogViewerFiles";
+export const UseFilesServiceLogViewerFilesKeyFn = (queryKey?: Array<unknown>) => [useFilesServiceLogViewerFilesKey, ...(queryKey ?? [])];
+export type FilesServiceLogViewerFilesRequestDownloadDefaultResponse = Awaited<ReturnType<typeof FilesService.logViewerFilesRequestDownload>>;
+export type FilesServiceLogViewerFilesRequestDownloadQueryResult<TData = FilesServiceLogViewerFilesRequestDownloadDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useFilesServiceLogViewerFilesRequestDownloadKey = "FilesServiceLogViewerFilesRequestDownload";
+export const UseFilesServiceLogViewerFilesRequestDownloadKeyFn = ({ fileIdentifier }: {
+  fileIdentifier: string;
+}, queryKey?: Array<unknown>) => [useFilesServiceLogViewerFilesRequestDownloadKey, ...(queryKey ?? [{ fileIdentifier }])];
+export type FilesServiceLogViewerFilesDownloadDefaultResponse = Awaited<ReturnType<typeof FilesService.logViewerFilesDownload>>;
+export type FilesServiceLogViewerFilesDownloadQueryResult<TData = FilesServiceLogViewerFilesDownloadDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useFilesServiceLogViewerFilesDownloadKey = "FilesServiceLogViewerFilesDownload";
+export const UseFilesServiceLogViewerFilesDownloadKeyFn = ({ fileIdentifier }: {
+  fileIdentifier: string;
+}, queryKey?: Array<unknown>) => [useFilesServiceLogViewerFilesDownloadKey, ...(queryKey ?? [{ fileIdentifier }])];
+export type FoldersServiceLogViewerFoldersDefaultResponse = Awaited<ReturnType<typeof FoldersService.logViewerFolders>>;
+export type FoldersServiceLogViewerFoldersQueryResult<TData = FoldersServiceLogViewerFoldersDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useFoldersServiceLogViewerFoldersKey = "FoldersServiceLogViewerFolders";
+export const UseFoldersServiceLogViewerFoldersKeyFn = (queryKey?: Array<unknown>) => [useFoldersServiceLogViewerFoldersKey, ...(queryKey ?? [])];
+export type FoldersServiceLogViewerFoldersRequestDownloadDefaultResponse = Awaited<ReturnType<typeof FoldersService.logViewerFoldersRequestDownload>>;
+export type FoldersServiceLogViewerFoldersRequestDownloadQueryResult<TData = FoldersServiceLogViewerFoldersRequestDownloadDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useFoldersServiceLogViewerFoldersRequestDownloadKey = "FoldersServiceLogViewerFoldersRequestDownload";
+export const UseFoldersServiceLogViewerFoldersRequestDownloadKeyFn = ({ folderIdentifier }: {
+  folderIdentifier: string;
+}, queryKey?: Array<unknown>) => [useFoldersServiceLogViewerFoldersRequestDownloadKey, ...(queryKey ?? [{ folderIdentifier }])];
+export type FoldersServiceLogViewerFoldersDownloadDefaultResponse = Awaited<ReturnType<typeof FoldersService.logViewerFoldersDownload>>;
+export type FoldersServiceLogViewerFoldersDownloadQueryResult<TData = FoldersServiceLogViewerFoldersDownloadDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useFoldersServiceLogViewerFoldersDownloadKey = "FoldersServiceLogViewerFoldersDownload";
+export const UseFoldersServiceLogViewerFoldersDownloadKeyFn = ({ folderIdentifier }: {
+  folderIdentifier: string;
+}, queryKey?: Array<unknown>) => [useFoldersServiceLogViewerFoldersDownloadKey, ...(queryKey ?? [{ folderIdentifier }])];
 export type GenreServiceGenresIndexDefaultResponse = Awaited<ReturnType<typeof GenreService.genresIndex>>;
 export type GenreServiceGenresIndexQueryResult<TData = GenreServiceGenresIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useGenreServiceGenresIndexKey = "GenreServiceGenresIndex";
@@ -70,12 +134,32 @@ export const useGenreServiceGenresShowKey = "GenreServiceGenresShow";
 export const UseGenreServiceGenresShowKeyFn = ({ genre }: {
   genre: string;
 }, queryKey?: Array<unknown>) => [useGenreServiceGenresShowKey, ...(queryKey ?? [{ genre }])];
+export type HostsServiceLogViewerHostsDefaultResponse = Awaited<ReturnType<typeof HostsService.logViewerHosts>>;
+export type HostsServiceLogViewerHostsQueryResult<TData = HostsServiceLogViewerHostsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useHostsServiceLogViewerHostsKey = "HostsServiceLogViewerHosts";
+export const UseHostsServiceLogViewerHostsKeyFn = (queryKey?: Array<unknown>) => [useHostsServiceLogViewerHostsKey, ...(queryKey ?? [])];
 export type ImageServiceImageServeDefaultResponse = Awaited<ReturnType<typeof ImageService.imageServe>>;
 export type ImageServiceImageServeQueryResult<TData = ImageServiceImageServeDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useImageServiceImageServeKey = "ImageServiceImageServe";
 export const UseImageServiceImageServeKeyFn = ({ image }: {
   image: string;
 }, queryKey?: Array<unknown>) => [useImageServiceImageServeKey, ...(queryKey ?? [{ image }])];
+export type JobMetricsServiceHorizonJobsMetricsIndexDefaultResponse = Awaited<ReturnType<typeof JobMetricsService.horizonJobsMetricsIndex>>;
+export type JobMetricsServiceHorizonJobsMetricsIndexQueryResult<TData = JobMetricsServiceHorizonJobsMetricsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useJobMetricsServiceHorizonJobsMetricsIndexKey = "JobMetricsServiceHorizonJobsMetricsIndex";
+export const UseJobMetricsServiceHorizonJobsMetricsIndexKeyFn = (queryKey?: Array<unknown>) => [useJobMetricsServiceHorizonJobsMetricsIndexKey, ...(queryKey ?? [])];
+export type JobMetricsServiceHorizonJobsMetricsShowDefaultResponse = Awaited<ReturnType<typeof JobMetricsService.horizonJobsMetricsShow>>;
+export type JobMetricsServiceHorizonJobsMetricsShowQueryResult<TData = JobMetricsServiceHorizonJobsMetricsShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useJobMetricsServiceHorizonJobsMetricsShowKey = "JobMetricsServiceHorizonJobsMetricsShow";
+export const UseJobMetricsServiceHorizonJobsMetricsShowKeyFn = ({ id }: {
+  id: string;
+}, queryKey?: Array<unknown>) => [useJobMetricsServiceHorizonJobsMetricsShowKey, ...(queryKey ?? [{ id }])];
+export type JobsServiceHorizonJobsShowDefaultResponse = Awaited<ReturnType<typeof JobsService.horizonJobsShow>>;
+export type JobsServiceHorizonJobsShowQueryResult<TData = JobsServiceHorizonJobsShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useJobsServiceHorizonJobsShowKey = "JobsServiceHorizonJobsShow";
+export const UseJobsServiceHorizonJobsShowKeyFn = ({ id }: {
+  id: string;
+}, queryKey?: Array<unknown>) => [useJobsServiceHorizonJobsShowKey, ...(queryKey ?? [{ id }])];
 export type LibraryServiceLibrariesIndexDefaultResponse = Awaited<ReturnType<typeof LibraryService.librariesIndex>>;
 export type LibraryServiceLibrariesIndexQueryResult<TData = LibraryServiceLibrariesIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useLibraryServiceLibrariesIndexKey = "LibraryServiceLibrariesIndex";
@@ -83,6 +167,34 @@ export const UseLibraryServiceLibrariesIndexKeyFn = ({ limit, page }: {
   limit?: number;
   page?: number;
 } = {}, queryKey?: Array<unknown>) => [useLibraryServiceLibrariesIndexKey, ...(queryKey ?? [{ limit, page }])];
+export type LogsServiceLogViewerLogsDefaultResponse = Awaited<ReturnType<typeof LogsService.logViewerLogs>>;
+export type LogsServiceLogViewerLogsQueryResult<TData = LogsServiceLogViewerLogsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useLogsServiceLogViewerLogsKey = "LogsServiceLogViewerLogs";
+export const UseLogsServiceLogViewerLogsKeyFn = ({ direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }: {
+  direction?: string;
+  excludeFileTypes?: string;
+  excludeLevels?: string;
+  file?: string;
+  log?: string;
+  perPage?: string;
+  query?: string;
+  shorterStackTraces?: boolean;
+} = {}, queryKey?: Array<unknown>) => [useLogsServiceLogViewerLogsKey, ...(queryKey ?? [{ direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }])];
+export type MasterSupervisorServiceHorizonMastersIndexDefaultResponse = Awaited<ReturnType<typeof MasterSupervisorService.horizonMastersIndex>>;
+export type MasterSupervisorServiceHorizonMastersIndexQueryResult<TData = MasterSupervisorServiceHorizonMastersIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useMasterSupervisorServiceHorizonMastersIndexKey = "MasterSupervisorServiceHorizonMastersIndex";
+export const UseMasterSupervisorServiceHorizonMastersIndexKeyFn = (queryKey?: Array<unknown>) => [useMasterSupervisorServiceHorizonMastersIndexKey, ...(queryKey ?? [])];
+export type MonitoringServiceHorizonMonitoringIndexDefaultResponse = Awaited<ReturnType<typeof MonitoringService.horizonMonitoringIndex>>;
+export type MonitoringServiceHorizonMonitoringIndexQueryResult<TData = MonitoringServiceHorizonMonitoringIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useMonitoringServiceHorizonMonitoringIndexKey = "MonitoringServiceHorizonMonitoringIndex";
+export const UseMonitoringServiceHorizonMonitoringIndexKeyFn = (queryKey?: Array<unknown>) => [useMonitoringServiceHorizonMonitoringIndexKey, ...(queryKey ?? [])];
+export type MonitoringServiceHorizonMonitoringTagPaginateDefaultResponse = Awaited<ReturnType<typeof MonitoringService.horizonMonitoringTagPaginate>>;
+export type MonitoringServiceHorizonMonitoringTagPaginateQueryResult<TData = MonitoringServiceHorizonMonitoringTagPaginateDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useMonitoringServiceHorizonMonitoringTagPaginateKey = "MonitoringServiceHorizonMonitoringTagPaginate";
+export const UseMonitoringServiceHorizonMonitoringTagPaginateKeyFn = ({ limit, tag }: {
+  limit?: string;
+  tag?: string;
+} = {}, queryKey?: Array<unknown>) => [useMonitoringServiceHorizonMonitoringTagPaginateKey, ...(queryKey ?? [{ limit, tag }])];
 export type OpCacheServiceOpCacheGetStatusDefaultResponse = Awaited<ReturnType<typeof OpCacheService.opCacheGetStatus>>;
 export type OpCacheServiceOpCacheGetStatusQueryResult<TData = OpCacheServiceOpCacheGetStatusDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useOpCacheServiceOpCacheGetStatusKey = "OpCacheServiceOpCacheGetStatus";
@@ -91,6 +203,12 @@ export type OpCacheServiceOpcacheGetConfigDefaultResponse = Awaited<ReturnType<t
 export type OpCacheServiceOpcacheGetConfigQueryResult<TData = OpCacheServiceOpcacheGetConfigDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useOpCacheServiceOpcacheGetConfigKey = "OpCacheServiceOpcacheGetConfig";
 export const UseOpCacheServiceOpcacheGetConfigKeyFn = (queryKey?: Array<unknown>) => [useOpCacheServiceOpcacheGetConfigKey, ...(queryKey ?? [])];
+export type PendingJobsServiceHorizonPendingJobsIndexDefaultResponse = Awaited<ReturnType<typeof PendingJobsService.horizonPendingJobsIndex>>;
+export type PendingJobsServiceHorizonPendingJobsIndexQueryResult<TData = PendingJobsServiceHorizonPendingJobsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const usePendingJobsServiceHorizonPendingJobsIndexKey = "PendingJobsServiceHorizonPendingJobsIndex";
+export const UsePendingJobsServiceHorizonPendingJobsIndexKeyFn = ({ startingAt }: {
+  startingAt?: string;
+} = {}, queryKey?: Array<unknown>) => [usePendingJobsServiceHorizonPendingJobsIndexKey, ...(queryKey ?? [{ startingAt }])];
 export type QueueServiceQueueMetricsShowDefaultResponse = Awaited<ReturnType<typeof QueueService.queueMetricsShow>>;
 export type QueueServiceQueueMetricsShowQueryResult<TData = QueueServiceQueueMetricsShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useQueueServiceQueueMetricsShowKey = "QueueServiceQueueMetricsShow";
@@ -112,6 +230,22 @@ export const useQueueServiceQueueMetricsMetricsKey = "QueueServiceQueueMetricsMe
 export const UseQueueServiceQueueMetricsMetricsKeyFn = ({ aggregateDays }: {
   aggregateDays?: number;
 } = {}, queryKey?: Array<unknown>) => [useQueueServiceQueueMetricsMetricsKey, ...(queryKey ?? [{ aggregateDays }])];
+export type QueueMetricsServiceHorizonQueuesMetricsIndexDefaultResponse = Awaited<ReturnType<typeof QueueMetricsService.horizonQueuesMetricsIndex>>;
+export type QueueMetricsServiceHorizonQueuesMetricsIndexQueryResult<TData = QueueMetricsServiceHorizonQueuesMetricsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useQueueMetricsServiceHorizonQueuesMetricsIndexKey = "QueueMetricsServiceHorizonQueuesMetricsIndex";
+export const UseQueueMetricsServiceHorizonQueuesMetricsIndexKeyFn = (queryKey?: Array<unknown>) => [useQueueMetricsServiceHorizonQueuesMetricsIndexKey, ...(queryKey ?? [])];
+export type QueueMetricsServiceHorizonQueuesMetricsShowDefaultResponse = Awaited<ReturnType<typeof QueueMetricsService.horizonQueuesMetricsShow>>;
+export type QueueMetricsServiceHorizonQueuesMetricsShowQueryResult<TData = QueueMetricsServiceHorizonQueuesMetricsShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useQueueMetricsServiceHorizonQueuesMetricsShowKey = "QueueMetricsServiceHorizonQueuesMetricsShow";
+export const UseQueueMetricsServiceHorizonQueuesMetricsShowKeyFn = ({ id }: {
+  id: string;
+}, queryKey?: Array<unknown>) => [useQueueMetricsServiceHorizonQueuesMetricsShowKey, ...(queryKey ?? [{ id }])];
+export type SilencedJobsServiceHorizonSilencedJobsIndexDefaultResponse = Awaited<ReturnType<typeof SilencedJobsService.horizonSilencedJobsIndex>>;
+export type SilencedJobsServiceHorizonSilencedJobsIndexQueryResult<TData = SilencedJobsServiceHorizonSilencedJobsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSilencedJobsServiceHorizonSilencedJobsIndexKey = "SilencedJobsServiceHorizonSilencedJobsIndex";
+export const UseSilencedJobsServiceHorizonSilencedJobsIndexKeyFn = ({ startingAt }: {
+  startingAt?: string;
+} = {}, queryKey?: Array<unknown>) => [useSilencedJobsServiceHorizonSilencedJobsIndexKey, ...(queryKey ?? [{ startingAt }])];
 export type SongServiceSongsIndexDefaultResponse = Awaited<ReturnType<typeof SongService.songsIndex>>;
 export type SongServiceSongsIndexQueryResult<TData = SongServiceSongsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSongServiceSongsIndexKey = "SongServiceSongsIndex";
@@ -175,6 +309,10 @@ export const UseUserTokenServiceUserTokenGetUserTokensKeyFn = ({ page, perPage, 
   perPage?: number;
   user: string;
 }, queryKey?: Array<unknown>) => [useUserTokenServiceUserTokenGetUserTokensKey, ...(queryKey ?? [{ page, perPage, user }])];
+export type WorkloadServiceHorizonWorkloadIndexDefaultResponse = Awaited<ReturnType<typeof WorkloadService.horizonWorkloadIndex>>;
+export type WorkloadServiceHorizonWorkloadIndexQueryResult<TData = WorkloadServiceHorizonWorkloadIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useWorkloadServiceHorizonWorkloadIndexKey = "WorkloadServiceHorizonWorkloadIndex";
+export const UseWorkloadServiceHorizonWorkloadIndexKeyFn = (queryKey?: Array<unknown>) => [useWorkloadServiceHorizonWorkloadIndexKey, ...(queryKey ?? [])];
 export type AuthServiceAuthLoginMutationResult = Awaited<ReturnType<typeof AuthService.authLogin>>;
 export type AuthServiceAuthRefreshTokenMutationResult = Awaited<ReturnType<typeof AuthService.authRefreshToken>>;
 export type AuthServiceAuthStreamTokenMutationResult = Awaited<ReturnType<typeof AuthService.authStreamToken>>;
@@ -186,17 +324,27 @@ export type AuthServiceAuthPasskeyLoginMutationResult = Awaited<ReturnType<typeo
 export type AuthServiceAuthPasskeyRegisterMutationResult = Awaited<ReturnType<typeof AuthService.authPasskeyRegister>>;
 export type PasskeyServiceAuthPasskeyLoginMutationResult = Awaited<ReturnType<typeof PasskeyService.authPasskeyLogin>>;
 export type PasskeyServiceAuthPasskeyRegisterMutationResult = Awaited<ReturnType<typeof PasskeyService.authPasskeyRegister>>;
+export type BatchesServiceHorizonJobsBatchesRetryMutationResult = Awaited<ReturnType<typeof BatchesService.horizonJobsBatchesRetry>>;
+export type FilesServiceLogViewerFilesClearCacheMutationResult = Awaited<ReturnType<typeof FilesService.logViewerFilesClearCache>>;
+export type FilesServiceLogViewerFilesClearCacheAllMutationResult = Awaited<ReturnType<typeof FilesService.logViewerFilesClearCacheAll>>;
+export type FilesServiceLogViewerFilesDeleteMultipleFilesMutationResult = Awaited<ReturnType<typeof FilesService.logViewerFilesDeleteMultipleFiles>>;
+export type FoldersServiceLogViewerFoldersClearCacheMutationResult = Awaited<ReturnType<typeof FoldersService.logViewerFoldersClearCache>>;
 export type JobServiceJobLibraryScanMutationResult = Awaited<ReturnType<typeof JobService.jobLibraryScan>>;
 export type LibraryServiceLibraryCreateMutationResult = Awaited<ReturnType<typeof LibraryService.libraryCreate>>;
+export type MonitoringServiceHorizonMonitoringStoreMutationResult = Awaited<ReturnType<typeof MonitoringService.horizonMonitoringStore>>;
 export type OpCacheServiceOpcacheClearMutationResult = Awaited<ReturnType<typeof OpCacheService.opcacheClear>>;
 export type OpCacheServiceOpcacheCompileMutationResult = Awaited<ReturnType<typeof OpCacheService.opcacheCompile>>;
 export type QueueServiceQueueMetricsRetryJobMutationResult = Awaited<ReturnType<typeof QueueService.queueMetricsRetryJob>>;
+export type RetryServiceHorizonRetryJobsShowMutationResult = Awaited<ReturnType<typeof RetryService.horizonRetryJobsShow>>;
 export type UserServiceUsersStoreMutationResult = Awaited<ReturnType<typeof UserService.usersStore>>;
 export type GenreServiceGenresUpdateMutationResult = Awaited<ReturnType<typeof GenreService.genresUpdate>>;
 export type LibraryServiceLibraryUpdateMutationResult = Awaited<ReturnType<typeof LibraryService.libraryUpdate>>;
 export type UserServiceUsersUpdateMutationResult = Awaited<ReturnType<typeof UserService.usersUpdate>>;
+export type FilesServiceLogViewerFilesDeleteMutationResult = Awaited<ReturnType<typeof FilesService.logViewerFilesDelete>>;
+export type FoldersServiceLogViewerFoldersDeleteMutationResult = Awaited<ReturnType<typeof FoldersService.logViewerFoldersDelete>>;
 export type GenreServiceGenresDestroyMutationResult = Awaited<ReturnType<typeof GenreService.genresDestroy>>;
 export type LibraryServiceLibraryDeleteMutationResult = Awaited<ReturnType<typeof LibraryService.libraryDelete>>;
+export type MonitoringServiceHorizonMonitoringTagDestroyMutationResult = Awaited<ReturnType<typeof MonitoringService.horizonMonitoringTagDestroy>>;
 export type QueueServiceQueueMetricsDeleteMutationResult = Awaited<ReturnType<typeof QueueService.queueMetricsDelete>>;
 export type QueueServiceQueueMetricsPurgeMutationResult = Awaited<ReturnType<typeof QueueService.queueMetricsPurge>>;
 export type UserServiceUsersDestroyMutationResult = Awaited<ReturnType<typeof UserService.usersDestroy>>;

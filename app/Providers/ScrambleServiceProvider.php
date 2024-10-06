@@ -6,7 +6,9 @@ use App\Packages\Humanize\HumanDuration;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecurityScheme;
+use Illuminate\Routing\Route;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 
 class ScrambleServiceProvider extends ServiceProvider
 {
@@ -42,6 +44,17 @@ DESC;
                 (SecurityScheme::http('bearer'))
                     ->setDescription($desc),
             );
+        });
+
+        Scramble::routes(function (Route $route) {
+            $whitelist = ['api/', 'webauthn'];
+
+
+            foreach ($whitelist as $str) {
+                if (Str::contains($route->uri, $str)) {
+                    return true;
+                }
+            }
         });
     }
 }

@@ -257,6 +257,29 @@ export const $ImageResource = {
     title: 'ImageResource'
 } as const;
 
+export const $LevelCountResource = {
+    type: 'object',
+    properties: {
+        level: {
+            type: 'string'
+        },
+        level_name: {
+            type: 'string'
+        },
+        level_class: {
+            type: 'string'
+        },
+        count: {
+            type: 'string'
+        },
+        selected: {
+            type: 'string'
+        }
+    },
+    required: ['level', 'level_name', 'level_class', 'count', 'selected'],
+    title: 'LevelCountResource'
+} as const;
+
 export const $LibraryResource = {
     type: 'object',
     properties: {
@@ -295,6 +318,189 @@ export const $LibraryType = {
     type: 'string',
     enum: ['music', 'podcast', 'audiobook', 'movie', 'tv_show'],
     title: 'LibraryType'
+} as const;
+
+export const $LogFileResource = {
+    type: 'object',
+    properties: {
+        type: {
+            type: 'object',
+            properties: {
+                value: {
+                    type: 'string'
+                },
+                name: {
+                    type: 'string'
+                }
+            },
+            required: ['value', 'name']
+        },
+        identifier: {
+            type: 'string'
+        },
+        sub_folder: {
+            type: 'string'
+        },
+        sub_folder_identifier: {
+            type: 'string'
+        },
+        path: {
+            type: 'string'
+        },
+        name: {
+            type: 'string'
+        },
+        size: {
+            type: 'string'
+        },
+        size_in_mb: {
+            type: 'string'
+        },
+        size_formatted: {
+            type: 'string'
+        },
+        download_url: {
+            type: 'string'
+        },
+        earliest_timestamp: {
+            type: 'string'
+        },
+        latest_timestamp: {
+            type: 'string'
+        },
+        can_download: {
+            type: 'string'
+        },
+        can_delete: {
+            type: 'string'
+        },
+        loading: {
+            type: 'boolean'
+        },
+        selected_for_deletion: {
+            type: 'boolean',
+            description: 'helper for frontend'
+        }
+    },
+    required: ['type', 'identifier', 'sub_folder', 'sub_folder_identifier', 'path', 'name', 'size', 'size_in_mb', 'size_formatted', 'download_url', 'earliest_timestamp', 'latest_timestamp', 'can_download', 'can_delete', 'loading', 'selected_for_deletion'],
+    title: 'LogFileResource'
+} as const;
+
+export const $LogFolderResource = {
+    type: 'object',
+    properties: {
+        identifier: {
+            type: 'string'
+        },
+        path: {
+            type: 'string'
+        },
+        clean_path: {
+            type: 'string'
+        },
+        is_root: {
+            type: 'string'
+        },
+        earliest_timestamp: {
+            type: 'string'
+        },
+        latest_timestamp: {
+            type: 'string'
+        },
+        download_url: {
+            type: 'string'
+        },
+        files: {
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/LogFileResource'
+            }
+        },
+        can_download: {
+            type: 'string'
+        },
+        can_delete: {
+            type: 'string'
+        },
+        loading: {
+            type: 'boolean'
+        }
+    },
+    required: ['identifier', 'path', 'clean_path', 'is_root', 'earliest_timestamp', 'latest_timestamp', 'download_url', 'files', 'can_download', 'can_delete', 'loading'],
+    title: 'LogFolderResource'
+} as const;
+
+export const $LogResource = {
+    type: 'object',
+    properties: {
+        index: {
+            type: 'string'
+        },
+        file_identifier: {
+            type: 'string'
+        },
+        file_position: {
+            type: 'string'
+        },
+        level: {
+            type: 'string'
+        },
+        level_name: {
+            type: 'string'
+        },
+        level_class: {
+            type: 'string'
+        },
+        datetime: {
+            type: 'string'
+        },
+        time: {
+            type: 'string'
+        },
+        message: {
+            type: 'string'
+        },
+        context: {
+            type: 'string'
+        },
+        extra: {
+            type: 'string'
+        },
+        full_text: {
+            type: 'string'
+        },
+        url: {
+            type: 'string'
+        }
+    },
+    required: ['index', 'file_identifier', 'file_position', 'level', 'level_name', 'level_class', 'datetime', 'time', 'message', 'context', 'extra', 'full_text', 'url'],
+    title: 'LogResource'
+} as const;
+
+export const $LogViewerHostResource = {
+    type: 'object',
+    properties: {
+        identifier: {
+            type: 'string'
+        },
+        name: {
+            type: 'string'
+        },
+        host: {
+            type: 'string'
+        },
+        headers: {
+            type: 'string'
+        },
+        auth: {
+            type: 'string'
+        },
+        is_remote: {
+            type: 'string'
+        }
+    },
+    required: ['identifier', 'name', 'host', 'headers', 'auth', 'is_remote'],
+    title: 'LogViewerHostResource'
 } as const;
 
 export const $LoginRequest = {

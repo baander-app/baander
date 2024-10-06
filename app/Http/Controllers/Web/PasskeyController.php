@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api\Auth;
+namespace App\Http\Controllers\Web;
 
 use App\Auth\Webauthn\Actions\FindPasskeyToAuthenticateAction;
 use App\Auth\Webauthn\Actions\GeneratePasskeyAuthenticationOptionsAction;
@@ -17,17 +17,18 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Spatie\RouteAttributes\Attributes\Get;
-use Spatie\RouteAttributes\Attributes\Group;
 use Spatie\RouteAttributes\Attributes\Post;
 use Spatie\RouteAttributes\Attributes\Prefix;
 
 /**
  * @tags Auth
  */
-#[Prefix('passkey')]
+#[Prefix('/webauthn/passkey')]
 class PasskeyController extends Controller
 {
     use HandlesUserTokens;
+
+    public const string REGISTER_OPTIONS_SESSION_KEY = 'passkey-registration-options';
 
     /**
      * Get a passkey challenge
@@ -159,6 +160,6 @@ class PasskeyController extends Controller
 
     protected function previouslyGeneratedPasskeyOptions(): ?string
     {
-        return session()->pull('passkey-registration-options');
+        return Session::pull(self::REGISTER_OPTIONS_SESSION_KEY);
     }
 }
