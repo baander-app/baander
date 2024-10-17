@@ -13,8 +13,8 @@ class ModelSchema
     private int $cacheDuration = 0;
 
     public function __construct(
-        CacheRepositoryInterface $cacheRepository,
-        ValidationRuleProviderInterface $validationRuleProvider
+        CacheRepositoryInterface        $cacheRepository,
+        ValidationRuleProviderInterface $validationRuleProvider,
     )
     {
         $this->cacheRepository = $cacheRepository;

@@ -8,8 +8,9 @@ use Illuminate\Cache\Repository;
 class CacheRepository implements CacheInterface
 {
     public function __construct(
-        protected Repository $cache
-    ) {
+        protected Repository $cache,
+    )
+    {
     }
 
     public function fetch(string $id)

@@ -10,7 +10,7 @@ class StdOutLogger
     private const string LOG_CHANNEL_ERROR = 'stderr';
 
     /**
-     * @param string|\Stringable  $message
+     * @param string|\Stringable $message
      * @param array $context
      * @return void
      */
@@ -20,7 +20,7 @@ class StdOutLogger
     }
 
     /**
-     * @param string|\Stringable  $message
+     * @param string|\Stringable $message
      * @param array $context
      * @return void
      */
@@ -30,7 +30,7 @@ class StdOutLogger
     }
 
     /**
-     * @param string|\Stringable  $message
+     * @param string|\Stringable $message
      * @param array $context
      * @return void
      */
@@ -40,7 +40,7 @@ class StdOutLogger
     }
 
     /**
-     * @param string|\Stringable  $message
+     * @param string|\Stringable $message
      * @param array $context
      * @return void
      */

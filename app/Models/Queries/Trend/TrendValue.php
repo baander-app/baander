@@ -6,7 +6,8 @@ class TrendValue
 {
     public function __construct(
         public string $date,
-        public mixed $aggregate,
-    ) {
+        public mixed  $aggregate,
+    )
+    {
     }
 }

@@ -81,9 +81,9 @@ class AdvancedOutputMapping
     public function hasOut(string $out): bool
     {
         return Collection::make($this->outs)
-                         ->map(function ($out) {
-                             return HLSVideoFilters::beforeGlue($out);
-                         })
-                         ->contains(HLSVideoFilters::beforeGlue($out));
+            ->map(function ($out) {
+                return HLSVideoFilters::beforeGlue($out);
+            })
+            ->contains(HLSVideoFilters::beforeGlue($out));
     }
 }

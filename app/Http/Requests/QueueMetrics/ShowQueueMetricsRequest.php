@@ -28,12 +28,12 @@ class ShowQueueMetricsRequest extends FormRequest
              * @query
              * Current page
              */
-            'page'       => 'int',
+            'page'        => 'int',
             /**
              * @query
              * Items per page
              */
-            'limit'      => 'int',
+            'limit'       => 'int',
             /**
              * @query
              * MonitorStatus
@@ -43,17 +43,17 @@ class ShowQueueMetricsRequest extends FormRequest
              * - 3=STALE
              * - 4=QUEUED
              */
-            'status' => [Rule::in(MonitorStatus::values())],
+            'status'      => [Rule::in(MonitorStatus::values())],
             /**
              * @query
              * Name of the queue
              */
-            'queue'  => 'string',
+            'queue'       => 'string',
             /**
              * @query
              * Name of the job
              */
-            'name'   => 'string',
+            'name'        => 'string',
             /**
              * @query
              * Order queued jobs first

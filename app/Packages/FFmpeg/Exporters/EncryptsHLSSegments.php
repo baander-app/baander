@@ -221,17 +221,17 @@ trait EncryptsHLSSegments
         $this->listener = new StdListener(HLSExporter::ENCRYPTION_LISTENER);
 
         $this->addListener($this->listener)
-             ->onEvent(HLSExporter::ENCRYPTION_LISTENER, function ($line) {
-                 if (!strpos($line, ".keyinfo' for reading")) {
-                     return;
-                 }
+            ->onEvent(HLSExporter::ENCRYPTION_LISTENER, function ($line) {
+                if (!strpos($line, ".keyinfo' for reading")) {
+                    return;
+                }
 
-                 $this->segmentsOpened++;
+                $this->segmentsOpened++;
 
-                 if ($this->segmentsOpened % $this->segmentsPerKey === 0) {
-                     $this->rotateEncryptionKey();
-                 }
-             });
+                if ($this->segmentsOpened % $this->segmentsPerKey === 0) {
+                    $this->rotateEncryptionKey();
+                }
+            });
     }
 
     /**

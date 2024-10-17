@@ -81,26 +81,26 @@ class VTTPreviewThumbnailsGenerator
         );
 
         return Collection::range(1, $totalFiles * $thumbsPerTile)
-                         ->map(function ($thumb) use ($thumbsPerTile) {
-                             $start = $this->getTimestamp($thumb - 1, $this->tileFilter->interval);
-                             $end = $this->getTimestamp($thumb, $this->tileFilter->interval);
+            ->map(function ($thumb) use ($thumbsPerTile) {
+                $start = $this->getTimestamp($thumb - 1, $this->tileFilter->interval);
+                $end = $this->getTimestamp($thumb, $this->tileFilter->interval);
 
-                             $fileKey = ceil($thumb / $thumbsPerTile);
+                $fileKey = ceil($thumb / $thumbsPerTile);
 
-                             $filename = sprintf(
-                                 call_user_func($this->sequenceFilenameResolver, $fileKey),
-                                 $fileKey,
-                             );
+                $filename = sprintf(
+                    call_user_func($this->sequenceFilenameResolver, $fileKey),
+                    $fileKey,
+                );
 
-                             $positionOnTile = ($thumb - 1) % $thumbsPerTile;
-                             $position = $this->getPositionOnTile($positionOnTile);
+                $positionOnTile = ($thumb - 1) % $thumbsPerTile;
+                $position = $this->getPositionOnTile($positionOnTile);
 
-                             return implode(PHP_EOL, [
-                                 "{$start} --> {$end}",
-                                 "{$filename}#xywh={$position}",
-                             ]);
-                         })
-                         ->prepend("WEBVTT")
-                         ->implode(PHP_EOL . PHP_EOL);
+                return implode(PHP_EOL, [
+                    "{$start} --> {$end}",
+                    "{$filename}#xywh={$position}",
+                ]);
+            })
+            ->prepend("WEBVTT")
+            ->implode(PHP_EOL . PHP_EOL);
     }
 }

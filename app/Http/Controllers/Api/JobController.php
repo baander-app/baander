@@ -5,8 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Exceptions\Jobs\Manager\CouldNotFindJobException;
 use App\Http\Controllers\Controller;
 use App\Jobs\Library\ScanMusicLibraryJob;
-use App\Models\Library;
-use App\Models\TokenAbility;
+use App\Models\{Library, TokenAbility};
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Bus\DispatchesJobs;
 use Illuminate\Http\Request;
@@ -35,7 +34,7 @@ class JobController extends Controller
         try {
             $library = Library::whereSlug($slug)->firstOrFail();
         } catch (ModelNotFoundException $e) {
-          throw CouldNotFindJobException::throwFromController($e);
+            throw CouldNotFindJobException::throwFromController($e);
         }
 
         $job = new ScanMusicLibraryJob($library);

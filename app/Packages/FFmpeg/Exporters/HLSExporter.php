@@ -105,14 +105,15 @@ class HLSExporter extends MediaExporter
      */
     private function getSegmentFilenameGenerator(): callable
     {
-        return $this->segmentFilenameGenerator ?: function ($name, $format, $key, $segments, $playlist) {
-            $bitrate = $this->driver->getVideoStream()
-                ? $format->getKiloBitrate()
-                : $format->getAudioKiloBitrate();
+        return $this->segmentFilenameGenerator
+            ?: function ($name, $format, $key, $segments, $playlist) {
+                $bitrate = $this->driver->getVideoStream()
+                    ? $format->getKiloBitrate()
+                    : $format->getAudioKiloBitrate();
 
-            $segments("{$name}_{$key}_{$bitrate}_%05d.ts");
-            $playlist("{$name}_{$key}_{$bitrate}.m3u8");
-        };
+                $segments("{$name}_{$key}_{$bitrate}_%05d.ts");
+                $playlist("{$name}_{$key}_{$bitrate}.m3u8");
+            };
     }
 
     /**
@@ -315,9 +316,9 @@ class HLSExporter extends MediaExporter
             $this->getDisk()->put($mainPlaylistPath, $playlist);
 
             $this->replaceAbsolutePathsHLSEncryption($segmentPlaylists)
-                 ->cleanupSegmentPlaylistGuides($segmentPlaylists->first())
-                 ->cleanupHLSEncryption()
-                 ->removeHandlerThatRotatesEncryptionKey();
+                ->cleanupSegmentPlaylistGuides($segmentPlaylists->first())
+                ->cleanupHLSEncryption()
+                ->removeHandlerThatRotatesEncryptionKey();
 
             return $result;
         });

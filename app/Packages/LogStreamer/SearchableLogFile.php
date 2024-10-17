@@ -7,9 +7,10 @@ use Symfony\Component\Process\Process;
 class SearchableLogFile
 {
     public function __construct(
-        public string $path
+        public string $path,
     )
-    {}
+    {
+    }
 
     /**
      * Calculates the number of lines in a file.

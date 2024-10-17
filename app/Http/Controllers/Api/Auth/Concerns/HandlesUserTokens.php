@@ -3,9 +3,7 @@
 namespace App\Http\Controllers\Api\Auth\Concerns;
 
 use App\Http\Resources\Auth\NewAccessTokenResource;
-use App\Models\PersonalAccessToken;
-use App\Models\TokenAbility;
-use App\Models\User;
+use App\Models\{PersonalAccessToken, TokenAbility, User};
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 

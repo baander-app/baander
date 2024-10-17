@@ -18,7 +18,7 @@ class PublicKeyCredentialCreationOptionsData extends Data
         /** @var AuthenticatorSelectionCriteria */
         public ?string $authenticatorAttachment = null,
         /** @var array<string, mixed>|null */
-        public ?array $extensions = null,
+        public ?array  $extensions = null,
     )
     {
     }

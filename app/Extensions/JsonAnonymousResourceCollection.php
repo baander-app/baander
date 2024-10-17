@@ -10,7 +10,7 @@ class JsonAnonymousResourceCollection extends AnonymousResourceCollection
     {
         if ($this->preserveAllQueryParameters) {
             $this->resource->appends($request->query());
-        } elseif (! is_null($this->queryParameters)) {
+        } else if (!is_null($this->queryParameters)) {
             $this->resource->appends($this->queryParameters);
         }
 

@@ -83,7 +83,6 @@ class SchemaBuilder
         $schema += $options;
 
 
-
         return $schema;
     }
 

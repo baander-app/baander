@@ -213,8 +213,8 @@ class WatermarkFactory
         }
 
         $path = Disk::makeTemporaryDisk()
-                    ->makeMedia($this->media->getFilename())
-                    ->getLocalPath();
+            ->makeMedia($this->media->getFilename())
+            ->getLocalPath();
 
         $this->image->save($path);
 

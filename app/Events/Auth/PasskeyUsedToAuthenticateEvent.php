@@ -10,7 +10,7 @@ class PasskeyUsedToAuthenticateEvent
      * Create a new event instance.
      */
     public function __construct(
-        public Passkey $passkey
+        public Passkey $passkey,
     )
     {
         //

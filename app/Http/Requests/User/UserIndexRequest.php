@@ -26,12 +26,12 @@ class UserIndexRequest extends FormRequest
              * @query
              * Current page
              */
-            'page'       => 'int',
+            'page'         => 'int',
             /**
              * @query
              * Items per page
              */
-            'limit'      => 'int',
+            'limit'        => 'int',
             /**
              * @query
              */
@@ -41,19 +41,19 @@ class UserIndexRequest extends FormRequest
              *
              * JSON object
              */
-            'filters' => 'string',
+            'filters'      => 'string',
             /**
              * @query
              *
              * JSON object
              */
-            'filterModes' => 'string',
+            'filterModes'  => 'string',
             /**
              * @query
              *
              * JSON object
              */
-            'sorting' => 'string',
+            'sorting'      => 'string',
         ];
     }
 }

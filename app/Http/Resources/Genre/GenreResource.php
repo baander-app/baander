@@ -30,7 +30,7 @@ class GenreResource extends JsonResource
             /**
              * Songs relation
              */
-            'songs' => SongResource::collection($this->whenLoaded('songs')),
+            'songs'     => SongResource::collection($this->whenLoaded('songs')),
         ];
     }
 }

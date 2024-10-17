@@ -26,12 +26,12 @@ class LibraryIndexRequest extends FormRequest
              * @query
              * Current page
              */
-            'page'        => 'int',
+            'page'  => 'int',
             /**
              * @query
              * Items per page
              */
-            'limit'       => 'int',
+            'limit' => 'int',
         ];
     }
 }

@@ -11,6 +11,8 @@ class License extends Data
         public ?string $name,
         public ?string $spdx_id,
         public ?string $url,
-        public ?string $node_id
-    ) {}
+        public ?string $node_id,
+    )
+    {
+    }
 }

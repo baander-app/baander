@@ -25,8 +25,8 @@ class LaravelDataRequestExtension extends OperationExtension
         foreach ($method->getParameters() as $parameter) {
             /* Doing this check inline since PHPStan complains otherwise */
             if (
-                ! (($type = $parameter->getType()) instanceof ReflectionNamedType) ||
-                ! is_a($type->getName(), Data::class, true)
+                !(($type = $parameter->getType()) instanceof ReflectionNamedType) ||
+                !is_a($type->getName(), Data::class, true)
             ) {
                 continue;
             }
@@ -40,14 +40,14 @@ class LaravelDataRequestExtension extends OperationExtension
         $name = $type->getName();
         $supportsBody = in_array($operation->method, ['post', 'put', 'patch', 'delete'], true);
 
-        if (! $supportsBody) {
+        if (!$supportsBody) {
             $operation->addParameters($this->parametersFromDto($name));
 
             return;
         }
 
         $operation->addRequestBodyObject(
-            RequestBodyObject::make()->setContent('application/json', $this->schemaFromDto($name))
+            RequestBodyObject::make()->setContent('application/json', $this->schemaFromDto($name)),
         );
     }
 }

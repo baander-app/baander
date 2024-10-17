@@ -8,7 +8,7 @@ class Owner extends Data
 {
     public function __construct(
         public ?string $login,
-        public ?int $id,
+        public ?int    $id,
         public ?string $node_id,
         public ?string $avatar_url,
         public ?string $gravatar_id,
@@ -24,6 +24,8 @@ class Owner extends Data
         public ?string $events_url,
         public ?string $received_events_url,
         public ?string $type,
-        public ?bool $site_admin
-    ) {}
+        public ?bool   $site_admin,
+    )
+    {
+    }
 }

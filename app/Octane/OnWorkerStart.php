@@ -26,8 +26,8 @@ class OnWorkerStart extends OriginalOnWorkerStart
 
             $worker->boot([
                 'octane.cacheTable' => $this->workerState->cacheTable,
-                Server::class => $server,
-                WorkerState::class => $this->workerState,
+                Server::class       => $server,
+                WorkerState::class  => $this->workerState,
             ]);
 
             return $worker;

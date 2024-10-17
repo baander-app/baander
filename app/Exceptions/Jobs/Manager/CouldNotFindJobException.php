@@ -36,8 +36,8 @@ class CouldNotFindJobException extends Exception
         $message = sprintf("%s %s", static::$PUBLIC_MESSAGE, $this->jobClass !== null ? $this->jobClass : '');
 
         return \response([
-            'code' => self::$FROM_CONTROLLER,
-            'message' => $message
+            'code'    => self::$FROM_CONTROLLER,
+            'message' => $message,
         ], 500);
     }
 
