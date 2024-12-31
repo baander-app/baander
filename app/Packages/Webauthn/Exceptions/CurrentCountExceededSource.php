@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Auth\Webauthn\Exceptions;
+namespace App\Packages\Webauthn\Exceptions;
 
 class CurrentCountExceededSource extends \Exception
 {

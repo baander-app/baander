@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Auth\Webauthn\WebauthnService;
+use App\Packages\Webauthn\WebauthnService;
 use Database\Factories\PasskeyFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\{Factory, HasFactory};

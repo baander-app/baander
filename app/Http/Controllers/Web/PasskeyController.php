@@ -2,17 +2,15 @@
 
 namespace App\Http\Controllers\Web;
 
-use App\Auth\Webauthn\Actions\{
-    FindPasskeyToAuthenticateAction,
-    GeneratePasskeyAuthenticationOptionsAction,
-    GeneratePasskeyRegisterOptionsAction,
-    StorePasskeyAction
-};
 use App\Events\Auth\PasskeyUsedToAuthenticateEvent;
 use App\Http\Controllers\Api\Auth\Concerns\HandlesUserTokens;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\{AuthenticateUsingPasskeyRequest, StorePasskeyRequest};
 use App\Models\User;
+use App\Packages\Webauthn\Actions\{GeneratePasskeyAuthenticationOptionsAction};
+use App\Packages\Webauthn\Actions\FindPasskeyToAuthenticateAction;
+use App\Packages\Webauthn\Actions\GeneratePasskeyRegisterOptionsAction;
+use App\Packages\Webauthn\Actions\StorePasskeyAction;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{Log, Session};

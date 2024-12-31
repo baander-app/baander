@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Auth\Actions;
+namespace App\Actions\Tokens;
 
-use App\Auth\Services\AuthTokenService;
+use App\Services\AuthTokenService;
 use JetBrains\PhpStorm\ArrayShape;
 
 class PruneExpiredTokens

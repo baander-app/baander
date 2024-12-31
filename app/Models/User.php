@@ -3,9 +3,9 @@
 namespace App\Models;
 
 use App\Auth\Role;
-use App\Auth\Webauthn\Concerns\HasPasskeys;
 use App\Models\Player\PlayerQueue;
 use App\Models\Player\PlayerState;
+use App\Packages\Webauthn\Concerns\HasPasskeys;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;

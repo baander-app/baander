@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Auth\Webauthn\Concerns;
+namespace App\Packages\Webauthn\Concerns;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
 

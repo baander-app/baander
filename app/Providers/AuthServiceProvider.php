@@ -2,9 +2,9 @@
 
 namespace App\Providers;
 
-use App\Auth\Webauthn\CounterChecker;
-use App\Auth\Webauthn\WebauthnService;
 use App\Models\PersonalAccessToken;
+use App\Packages\Webauthn\CounterChecker;
+use App\Packages\Webauthn\WebauthnService;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Passport\Passport;

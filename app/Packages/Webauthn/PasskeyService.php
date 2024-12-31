@@ -1,13 +1,12 @@
 <?php
 
-namespace App\Auth\Webauthn;
+namespace App\Packages\Webauthn;
 
-use App\Auth\Webauthn\Exceptions\InvalidPasskey;
-use App\Auth\Webauthn\Exceptions\InvalidPasskeyOptions;
 use App\Models\Passkey;
+use App\Packages\Webauthn\Exceptions\InvalidPasskey;
+use App\Packages\Webauthn\Exceptions\InvalidPasskeyOptions;
 use Webauthn\PublicKeyCredential;
 use Webauthn\PublicKeyCredentialCreationOptions;
-use Webauthn\PublicKeyCredentialSource;
 use Webauthn\PublicKeyCredentialUserEntity;
 
 class PasskeyService

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Auth\Services;
+namespace App\Services;
 
 use App\Models\PersonalAccessToken;
 

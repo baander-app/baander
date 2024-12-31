@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Auth\Webauthn;
+namespace App\Packages\Webauthn;
 
-use App\Auth\Webauthn\Exceptions\CurrentCountExceededSource;
+use App\Packages\Webauthn\Exceptions\CurrentCountExceededSource;
 use Webauthn\PublicKeyCredentialSource;
 
 class CounterChecker implements \Webauthn\Counter\CounterChecker

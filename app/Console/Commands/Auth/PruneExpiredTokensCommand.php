@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands\Auth;
 
-use App\Auth\Actions\PruneExpiredTokens;
-use App\Auth\Services\AuthTokenService;
+use App\Actions\Tokens\PruneExpiredTokens;
+use App\Services\AuthTokenService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Arr;
 

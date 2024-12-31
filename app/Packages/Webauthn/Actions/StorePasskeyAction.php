@@ -1,17 +1,15 @@
 <?php
 
-namespace App\Auth\Webauthn\Actions;
+namespace App\Packages\Webauthn\Actions;
 
-use App\Auth\Webauthn\Concerns\HasPasskeys;
-use App\Auth\Webauthn\Exceptions\InvalidPasskey;
-use App\Auth\Webauthn\PasskeyService;
 use App\Models\Passkey;
+use App\Packages\Webauthn\Concerns\HasPasskeys;
+use App\Packages\Webauthn\Exceptions\InvalidPasskey;
+use App\Packages\Webauthn\PasskeyService;
 use Throwable;
 use Webauthn\AuthenticatorAttestationResponse;
 use Webauthn\AuthenticatorAttestationResponseValidator;
 use Webauthn\CeremonyStep\CeremonyStepManagerFactory;
-use Webauthn\PublicKeyCredential;
-use Webauthn\PublicKeyCredentialCreationOptions;
 use Webauthn\PublicKeyCredentialSource;
 
 class StorePasskeyAction

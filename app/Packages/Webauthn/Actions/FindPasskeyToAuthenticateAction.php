@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Auth\Webauthn\Actions;
+namespace App\Packages\Webauthn\Actions;
 
-use App\Auth\Webauthn\WebauthnService;
 use App\Models\Passkey;
+use App\Packages\Webauthn\WebauthnService;
 use Throwable;
 use Webauthn\AuthenticatorAssertionResponse;
 use Webauthn\AuthenticatorAssertionResponseValidator;

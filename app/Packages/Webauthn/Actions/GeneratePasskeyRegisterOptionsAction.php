@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Auth\Webauthn\Actions;
+namespace App\Packages\Webauthn\Actions;
 
-use App\Auth\Webauthn\Concerns\HasPasskeys;
-use App\Auth\Webauthn\Models\PublicKeyCredentialCreationOptionsData;
-use App\Auth\Webauthn\WebauthnService;
+use App\Packages\Webauthn\Concerns\HasPasskeys;
+use App\Packages\Webauthn\Models\PublicKeyCredentialCreationOptionsData;
+use App\Packages\Webauthn\WebauthnService;
 use Illuminate\Support\Str;
 use Webauthn\AuthenticatorSelectionCriteria;
 use Webauthn\PublicKeyCredentialCreationOptions;

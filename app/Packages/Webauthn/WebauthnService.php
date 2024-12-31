@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Auth\Webauthn;
+namespace App\Packages\Webauthn;
 
 use Symfony\Component\Serializer\SerializerInterface;
 use Webauthn\AttestationStatement\AttestationStatementSupportManager;

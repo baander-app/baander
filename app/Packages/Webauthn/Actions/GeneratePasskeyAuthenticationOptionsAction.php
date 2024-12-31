@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Auth\Webauthn\Actions;
+namespace App\Packages\Webauthn\Actions;
 
-use App\Auth\Webauthn\PasskeyService;
-use App\Auth\Webauthn\WebauthnService;
+use App\Packages\Webauthn\PasskeyService;
+use App\Packages\Webauthn\WebauthnService;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Webauthn\PublicKeyCredentialRequestOptions;

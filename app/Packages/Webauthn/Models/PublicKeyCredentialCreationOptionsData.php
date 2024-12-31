@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Auth\Webauthn\Models;
+namespace App\Packages\Webauthn\Models;
 
 use Spatie\LaravelData\Data;
 use Webauthn\AuthenticatorSelectionCriteria;
