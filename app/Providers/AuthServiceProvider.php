@@ -16,5 +16,13 @@ class AuthServiceProvider extends ServiceProvider
         Gate::define('viewApiDoc', function ($user) {
             return $user->isAdmin();
         });
+
+        Gate::define('viewDashboard', function ($user) {
+            return $user->isAdmin();
+        });
+
+        Gate::define('executeJob', function ($user) {
+            return $user->isAdmin();
+        });
     }
 }

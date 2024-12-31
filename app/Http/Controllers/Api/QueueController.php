@@ -35,6 +35,8 @@ class QueueController extends Controller
     #[Get('/', 'api.queue-metrics.show')]
     public function show(ShowQueueMetricsRequest $request)
     {
+        $this->gateCheckViewDashboard();
+
         $queuedFirst = $request->query('queuedFirst');
         $status = $request->query('status');
         $queue = $request->query('queue');
@@ -63,6 +65,8 @@ class QueueController extends Controller
     #[Get('/queues', 'api.queue-metrics.queues')]
     public function queues()
     {
+        $this->gateCheckViewDashboard();
+
         $queues = QueueMonitor::select('queue')
             ->groupBy('queue')
             ->get()
@@ -88,6 +92,8 @@ class QueueController extends Controller
     #[Get('/metrics', 'api.queue-metrics.metrics')]
     public function metrics(MetricsRequest $request)
     {
+        $this->gateCheckViewDashboard();
+
         $aggregateDays = $request->query('aggregateDays', 14);
 
         $metrics = $this->metricsService->collect(aggregateDays: (int)$aggregateDays);
@@ -105,6 +111,8 @@ class QueueController extends Controller
     #[Post('/retry/{id}', 'api.queue-metrics.retry-job')]
     public function retry(RetryJobRequest $request, string $id)
     {
+        $this->gateCheckViewDashboard();
+
         $monitor = QueueMonitor::whereId($id)
             ->whereStatus(MonitorStatus::Failed)
             ->whereRetried(false)
@@ -137,6 +145,8 @@ class QueueController extends Controller
     #[Delete('{id}', 'api.queue-metrics.delete')]
     public function delete(string $id)
     {
+        $this->gateCheckViewDashboard();
+
         QueueMonitor::whereId($id)->delete();
 
         return response(null, 204);
@@ -150,6 +160,8 @@ class QueueController extends Controller
     #[Delete('/purge', 'api.queue-metrics.purge')]
     public function purge()
     {
+        $this->gateCheckViewDashboard();
+
         QueueMonitor::truncate();
 
         return response(null, 204);
