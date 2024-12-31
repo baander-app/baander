@@ -1,0 +1,42 @@
+{
+  "created": "2017-07-09T11:49:48.479Z",
+  "count": 68,
+  "offset": 0,
+  "annotations": [
+    {
+      "type": "release",
+      "score": "100",
+      "entity": "6370e01e-4fd4-49c4-858b-6f1df7c7fe91",
+      "name": "Echo Ricochet",
+      "text": "Label: Awesome Arts - Cat#: AA001"
+    },
+    {
+      "type": "release",
+      "score": "66",
+      "entity": "29b65bb1-ea90-4159-864c-5dfb5a9d8a67",
+      "name": "I Got a Right",
+      "text": "An awesome, mind-blowing tune, impossible to find in record stores."
+    },
+    {
+      "type": "release",
+      "score": "58",
+      "entity": "f69b65b9-cbb4-4485-a48a-a3bcb7de6e8f",
+      "name": "South",
+      "text": "CDr,Limited edition,Jewel Box，350 copies\r\nExcellent music from the kick start. Tons of electro glitch with awesome synth."
+    },
+    {
+      "type": "release",
+      "score": "50",
+      "entity": "662c4da8-4754-4d39-89ba-ad71c8c6ddf6",
+      "name": "Wander this World",
+      "text": "Alternative music I first heard at Folklife in Seattle,WA with awesome fiddle and vocals in my humble opinion www dot guarneriunderground dot com"
+    },
+    {
+      "type": "release",
+      "score": "50",
+      "entity": "0c728583-9531-4e75-bd82-456c12c4d24e",
+      "name": "Remix Collection",
+      "text": "time for a special release.. awesome remix tracks by mellow sonic enjoy a epic new sound from all this classic tunes :)\n-- Noted from Bandcamp Entry"
+    }
+  ]
+}

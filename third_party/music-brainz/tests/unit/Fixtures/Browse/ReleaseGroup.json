@@ -1,0 +1,1064 @@
+{
+  "release-groups": [
+    {
+      "secondary-type-ids": [],
+      "disambiguation": "",
+      "user-rating": {
+        "value": null
+      },
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "user-tags": [],
+      "secondary-types": [],
+      "id": "02e8018b-9dfe-35f4-99a1-6759c8b5f41c",
+      "annotation": null,
+      "title": "The Heart of Saturday Night",
+      "first-release-date": "1974",
+      "tags": [
+        {
+          "name": "alt blues",
+          "count": 0
+        },
+        {
+          "name": "alternative and punk",
+          "count": 4
+        },
+        {
+          "name": "blues",
+          "count": 5
+        },
+        {
+          "name": "blues rock",
+          "count": 3
+        }
+      ],
+      "artist-credit": [
+        {
+          "name": "Tom Waits",
+          "artist": {
+            "name": "Tom Waits",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "sort-name": "Waits, Tom",
+            "disambiguation": ""
+          },
+          "joinphrase": ""
+        }
+      ],
+      "primary-type": "Album"
+    },
+    {
+      "id": "0b749ad8-2297-36b4-976b-fc8fc2d719cd",
+      "annotation": null,
+      "user-tags": [],
+      "secondary-types": [],
+      "secondary-type-ids": [],
+      "user-rating": {
+        "value": null
+      },
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "disambiguation": "",
+      "primary-type": "Album",
+      "tags": [
+        {
+          "name": "alternative rock",
+          "count": 6
+        },
+        {
+          "name": "blues rock",
+          "count": 3
+        },
+        {
+          "count": 0,
+          "name": "covered and sampled"
+        },
+        {
+          "name": "experimental",
+          "count": 3
+        },
+        {
+          "count": 2,
+          "name": "jazz"
+        },
+        {
+          "count": 2,
+          "name": "rock"
+        }
+      ],
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "artist": {
+            "sort-name": "Waits, Tom",
+            "disambiguation": "",
+            "name": "Tom Waits",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b"
+          },
+          "name": "Tom Waits"
+        }
+      ],
+      "title": "Franks Wild Years",
+      "first-release-date": "1987-08-17"
+    },
+    {
+      "secondary-types": [],
+      "user-tags": [],
+      "annotation": null,
+      "id": "25dadbf0-eea6-41a1-8008-e304a85f096f",
+      "disambiguation": "",
+      "user-rating": {
+        "value": null
+      },
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "secondary-type-ids": [],
+      "primary-type": "Album",
+      "first-release-date": "1992",
+      "title": "TV Dinner",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "name": "Tom Waits",
+          "artist": {
+            "sort-name": "Waits, Tom",
+            "disambiguation": "",
+            "name": "Tom Waits",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b"
+          }
+        }
+      ],
+      "tags": []
+    },
+    {
+      "user-tags": [],
+      "secondary-types": [],
+      "annotation": null,
+      "id": "272a7377-c944-3ec5-ae75-ccc00a384e3a",
+      "secondary-type-ids": [],
+      "user-rating": {
+        "value": null
+      },
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "disambiguation": "",
+      "primary-type": "Album",
+      "title": "Foreign Affairs",
+      "first-release-date": "1977-09",
+      "tags": [
+        {
+          "count": 1,
+          "name": "blues"
+        },
+        {
+          "name": "blues rock",
+          "count": 3
+        },
+        {
+          "name": "rock",
+          "count": 3
+        }
+      ],
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "name": "Tom Waits",
+          "artist": {
+            "disambiguation": "",
+            "sort-name": "Waits, Tom",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "name": "Tom Waits"
+          }
+        }
+      ]
+    },
+    {
+      "secondary-type-ids": [],
+      "user-rating": {
+        "value": null
+      },
+      "disambiguation": "",
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "id": "2eda5e56-197d-3842-9493-3f872b854875",
+      "annotation": null,
+      "user-tags": [],
+      "secondary-types": [],
+      "tags": [],
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "artist": {
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "name": "Tom Waits",
+            "disambiguation": "",
+            "sort-name": "Waits, Tom"
+          },
+          "name": "Tom Waits"
+        }
+      ],
+      "title": "A Nickel's Worth of Dreams",
+      "first-release-date": "",
+      "primary-type": "Album"
+    },
+    {
+      "title": "The Unrealized Tom Waits' Mohawks At The Diner",
+      "first-release-date": "",
+      "tags": [],
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "name": "Tom Waits",
+          "artist": {
+            "name": "Tom Waits",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "sort-name": "Waits, Tom",
+            "disambiguation": ""
+          }
+        }
+      ],
+      "primary-type": "Album",
+      "secondary-type-ids": [],
+      "user-rating": {
+        "value": null
+      },
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "disambiguation": "",
+      "user-tags": [],
+      "secondary-types": [],
+      "id": "2fb423bf-0c33-4d6b-9774-b7fe00144283",
+      "annotation": null
+    },
+    {
+      "primary-type": "Album",
+      "title": "Closing Time",
+      "first-release-date": "1973-05",
+      "tags": [
+        {
+          "count": 3,
+          "name": "acoustic"
+        },
+        {
+          "count": 4,
+          "name": "alternative and punk"
+        },
+        {
+          "name": "blues",
+          "count": 1
+        },
+        {
+          "count": 2,
+          "name": "rock"
+        },
+        {
+          "name": "smooth jazz",
+          "count": 1
+        }
+      ],
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "name": "Tom Waits",
+          "artist": {
+            "disambiguation": "",
+            "sort-name": "Waits, Tom",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "name": "Tom Waits"
+          }
+        }
+      ],
+      "user-tags": [],
+      "secondary-types": [],
+      "id": "35c9a4b0-d4dd-3e6f-87fd-2185519296e2",
+      "annotation": null,
+      "secondary-type-ids": [],
+      "user-rating": {
+        "value": null
+      },
+      "disambiguation": "",
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc"
+    },
+    {
+      "primary-type": "Album",
+      "first-release-date": "1993-10-25",
+      "title": "The Black Rider",
+      "artist-credit": [
+        {
+          "name": "Tom Waits",
+          "artist": {
+            "sort-name": "Waits, Tom",
+            "disambiguation": "",
+            "name": "Tom Waits",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b"
+          },
+          "joinphrase": ""
+        }
+      ],
+      "tags": [
+        {
+          "count": 1,
+          "name": "album rock"
+        },
+        {
+          "name": "alternative rock",
+          "count": 1
+        },
+        {
+          "name": "blues rock",
+          "count": 2
+        },
+        {
+          "count": 2,
+          "name": "rock"
+        }
+      ],
+      "secondary-types": [],
+      "user-tags": [],
+      "id": "3f43452a-9608-31de-874a-68abdb602a71",
+      "annotation": null,
+      "disambiguation": "",
+      "user-rating": {
+        "value": null
+      },
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "secondary-type-ids": []
+    },
+    {
+      "title": "The Black Rider: The Casting of the Magic Bullets: Demo Recordings 1990-1992",
+      "first-release-date": "1993",
+      "tags": [],
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "name": "Tom Waits",
+            "disambiguation": "",
+            "sort-name": "Waits, Tom"
+          },
+          "name": "Tom Waits",
+          "joinphrase": ""
+        }
+      ],
+      "primary-type": "Album",
+      "secondary-type-ids": [],
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "user-rating": {
+        "value": null
+      },
+      "disambiguation": "",
+      "user-tags": [],
+      "secondary-types": [],
+      "id": "4c3a828f-0c07-46a3-bc91-945140f90263",
+      "annotation": null
+    },
+    {
+      "secondary-type-ids": [],
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "user-rating": {
+        "value": null
+      },
+      "disambiguation": "",
+      "user-tags": [],
+      "secondary-types": [],
+      "annotation": null,
+      "id": "576c3356-80fc-3f59-b9b3-c4af2428056a",
+      "title": "Real Gone",
+      "first-release-date": "2004-10-04",
+      "tags": [
+        {
+          "name": "alternative rock",
+          "count": 1
+        },
+        {
+          "count": 3,
+          "name": "blues rock"
+        },
+        {
+          "count": 1,
+          "name": "classic pop and rock"
+        },
+        {
+          "count": 1,
+          "name": "rock"
+        }
+      ],
+      "artist-credit": [
+        {
+          "name": "Tom Waits",
+          "artist": {
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "name": "Tom Waits",
+            "disambiguation": "",
+            "sort-name": "Waits, Tom"
+          },
+          "joinphrase": ""
+        }
+      ],
+      "primary-type": "Album"
+    },
+    {
+      "primary-type": "Album",
+      "title": "Orphans: Brawlers, Bawlers & Bastards",
+      "first-release-date": "2006-11-17",
+      "tags": [
+        {
+          "name": "alternative",
+          "count": 1
+        },
+        {
+          "count": 2,
+          "name": "alternative folk"
+        },
+        {
+          "name": "alternative rock",
+          "count": 1
+        },
+        {
+          "name": "blues",
+          "count": 3
+        },
+        {
+          "count": 1,
+          "name": "classic pop and rock"
+        },
+        {
+          "name": "folk rock",
+          "count": 1
+        },
+        {
+          "count": 2,
+          "name": "rock"
+        },
+        {
+          "name": "soundtrack",
+          "count": 1
+        }
+      ],
+      "artist-credit": [
+        {
+          "artist": {
+            "name": "Tom Waits",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "sort-name": "Waits, Tom",
+            "disambiguation": ""
+          },
+          "name": "Tom Waits",
+          "joinphrase": ""
+        }
+      ],
+      "user-tags": [],
+      "secondary-types": [],
+      "id": "6163d607-3443-3062-b6a1-0a2e0790dff5",
+      "annotation": null,
+      "secondary-type-ids": [],
+      "user-rating": {
+        "value": null
+      },
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "disambiguation": ""
+    },
+    {
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "user-rating": {
+        "value": null
+      },
+      "disambiguation": "",
+      "secondary-type-ids": [],
+      "annotation": null,
+      "id": "63377d20-38df-30ae-b1bc-6808b9e05482",
+      "secondary-types": [],
+      "user-tags": [],
+      "artist-credit": [
+        {
+          "name": "Tom Waits",
+          "artist": {
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "name": "Tom Waits",
+            "disambiguation": "",
+            "sort-name": "Waits, Tom"
+          },
+          "joinphrase": ""
+        }
+      ],
+      "tags": [
+        {
+          "count": 1,
+          "name": "1970s/80s singer/songwriter pop-rock"
+        },
+        {
+          "name": "abstract",
+          "count": 1
+        },
+        {
+          "count": 2,
+          "name": "experimental"
+        },
+        {
+          "name": "folk",
+          "count": 1
+        },
+        {
+          "name": "rock",
+          "count": 5
+        }
+      ],
+      "first-release-date": "2002-05-06",
+      "title": "Blood Money",
+      "primary-type": "Album"
+    },
+    {
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "artist": {
+            "name": "Tom Waits",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "sort-name": "Waits, Tom",
+            "disambiguation": ""
+          },
+          "name": "Tom Waits"
+        }
+      ],
+      "tags": [
+        {
+          "count": 6,
+          "name": "alternative rock"
+        },
+        {
+          "name": "blues",
+          "count": 1
+        },
+        {
+          "name": "blues rock",
+          "count": 4
+        },
+        {
+          "name": "rock",
+          "count": 3
+        }
+      ],
+      "first-release-date": "1980-09",
+      "title": "Heartattack and Vine",
+      "primary-type": "Album",
+      "disambiguation": "",
+      "user-rating": {
+        "value": null
+      },
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "secondary-type-ids": [],
+      "id": "6a9906e1-1ab2-37e1-980b-5e4889661089",
+      "annotation": null,
+      "secondary-types": [],
+      "user-tags": []
+    },
+    {
+      "user-tags": [],
+      "secondary-types": [],
+      "id": "74d9eef1-bbc6-3029-8289-a53ef41698f6",
+      "annotation": null,
+      "secondary-type-ids": [],
+      "disambiguation": "",
+      "user-rating": {
+        "value": null
+      },
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "primary-type": "Album",
+      "title": "Small Change",
+      "first-release-date": "1976-10",
+      "tags": [
+        {
+          "count": 2,
+          "name": "blues"
+        },
+        {
+          "count": 3,
+          "name": "blues rock"
+        },
+        {
+          "name": "indie",
+          "count": 4
+        },
+        {
+          "name": "rock",
+          "count": 5
+        }
+      ],
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "name": "Tom Waits",
+            "disambiguation": "",
+            "sort-name": "Waits, Tom"
+          },
+          "name": "Tom Waits",
+          "joinphrase": ""
+        }
+      ]
+    },
+    {
+      "primary-type": "Album",
+      "first-release-date": "1981",
+      "title": "Bounced Checks",
+      "artist-credit": [
+        {
+          "artist": {
+            "name": "Tom Waits",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "sort-name": "Waits, Tom",
+            "disambiguation": ""
+          },
+          "name": "Tom Waits",
+          "joinphrase": ""
+        }
+      ],
+      "tags": [],
+      "secondary-types": [
+        "Compilation"
+      ],
+      "user-tags": [],
+      "id": "90c8fc03-de25-3fc1-9eb4-c2645cce0a71",
+      "annotation": null,
+      "disambiguation": "",
+      "user-rating": {
+        "value": null
+      },
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "secondary-type-ids": [
+        "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+      ]
+    },
+    {
+      "id": "91bfb44b-abf7-43f7-bafe-585ca07f3d3f",
+      "annotation": null,
+      "secondary-types": [],
+      "user-tags": [],
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "user-rating": {
+        "value": null
+      },
+      "disambiguation": "",
+      "secondary-type-ids": [],
+      "primary-type": "Album",
+      "artist-credit": [
+        {
+          "name": "Tom Waits",
+          "artist": {
+            "name": "Tom Waits",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "sort-name": "Waits, Tom",
+            "disambiguation": ""
+          },
+          "joinphrase": ""
+        }
+      ],
+      "tags": [],
+      "first-release-date": "",
+      "title": "Nighthawks on the Radio"
+    },
+    {
+      "first-release-date": "2011-10-21",
+      "title": "Bad as Me",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "name": "Tom Waits",
+          "artist": {
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "name": "Tom Waits",
+            "disambiguation": "",
+            "sort-name": "Waits, Tom"
+          }
+        }
+      ],
+      "tags": [
+        {
+          "name": "blues",
+          "count": 2
+        }
+      ],
+      "primary-type": "Album",
+      "disambiguation": "",
+      "user-rating": {
+        "value": null
+      },
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "secondary-type-ids": [],
+      "secondary-types": [],
+      "user-tags": [],
+      "id": "956f10e8-0c74-4010-99d3-1b60fb7e88bc",
+      "annotation": null
+    },
+    {
+      "user-tags": [],
+      "secondary-types": [],
+      "id": "a138f035-a018-3d29-8b90-36b30956fccc",
+      "annotation": null,
+      "secondary-type-ids": [],
+      "user-rating": {
+        "value": null
+      },
+      "disambiguation": "",
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "primary-type": "Album",
+      "title": "Blue Valentine",
+      "first-release-date": "1978-10",
+      "tags": [
+        {
+          "name": "acoustic",
+          "count": 1
+        },
+        {
+          "count": 3,
+          "name": "blues rock"
+        },
+        {
+          "count": 1,
+          "name": "rock"
+        },
+        {
+          "count": 1,
+          "name": "waits"
+        }
+      ],
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "name": "Tom Waits",
+            "disambiguation": "",
+            "sort-name": "Waits, Tom"
+          },
+          "name": "Tom Waits",
+          "joinphrase": ""
+        }
+      ]
+    },
+    {
+      "primary-type": "Album",
+      "first-release-date": "1992-08",
+      "title": "Bone Machine",
+      "artist-credit": [
+        {
+          "artist": {
+            "name": "Tom Waits",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "sort-name": "Waits, Tom",
+            "disambiguation": ""
+          },
+          "name": "Tom Waits",
+          "joinphrase": ""
+        }
+      ],
+      "tags": [
+        {
+          "name": "avantgarde",
+          "count": 1
+        },
+        {
+          "count": 5,
+          "name": "blues rock"
+        },
+        {
+          "count": 2,
+          "name": "experimental"
+        },
+        {
+          "name": "experimental rock",
+          "count": 1
+        },
+        {
+          "name": "rock",
+          "count": 4
+        }
+      ],
+      "secondary-types": [],
+      "user-tags": [],
+      "annotation": null,
+      "id": "b65ca7b8-4069-3782-9c4c-b2353cc4bc04",
+      "user-rating": {
+        "value": null
+      },
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "disambiguation": "",
+      "secondary-type-ids": []
+    },
+    {
+      "secondary-type-ids": [],
+      "disambiguation": "",
+      "user-rating": {
+        "value": null
+      },
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "annotation": null,
+      "id": "b8c4d2e1-ff8d-426e-917e-9f0fdbce3232",
+      "user-tags": [],
+      "secondary-types": [],
+      "tags": [],
+      "artist-credit": [
+        {
+          "artist": {
+            "sort-name": "Waits, Tom",
+            "disambiguation": "",
+            "name": "Tom Waits",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b"
+          },
+          "name": "Tom Waits",
+          "joinphrase": ""
+        }
+      ],
+      "title": "The Blue Hour",
+      "first-release-date": "",
+      "primary-type": "Album"
+    },
+    {
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "name": "Tom Waits",
+            "disambiguation": "",
+            "sort-name": "Waits, Tom"
+          },
+          "name": "Tom Waits",
+          "joinphrase": ""
+        }
+      ],
+      "tags": [
+        {
+          "count": 5,
+          "name": "abstract"
+        },
+        {
+          "count": 1,
+          "name": "acoustic"
+        },
+        {
+          "count": 5,
+          "name": "alternative and punk"
+        },
+        {
+          "name": "art rock",
+          "count": 2
+        },
+        {
+          "name": "electronic",
+          "count": 1
+        },
+        {
+          "name": "rock",
+          "count": 1
+        },
+        {
+          "name": "rock; avantgarde",
+          "count": 2
+        }
+      ],
+      "first-release-date": "1999-04-14",
+      "title": "Mule Variations",
+      "primary-type": "Album",
+      "user-rating": {
+        "value": null
+      },
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "disambiguation": "",
+      "secondary-type-ids": [],
+      "id": "be821a7a-4a19-3062-9ca6-8d07a658bc10",
+      "annotation": null,
+      "secondary-types": [],
+      "user-tags": []
+    },
+    {
+      "user-rating": {
+        "value": null
+      },
+      "disambiguation": "",
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "secondary-type-ids": [],
+      "id": "c1187ee0-fdeb-414e-bc97-c75859fdb8ed",
+      "annotation": null,
+      "secondary-types": [],
+      "user-tags": [],
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "name": "Tom Waits",
+          "artist": {
+            "sort-name": "Waits, Tom",
+            "disambiguation": "",
+            "name": "Tom Waits",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b"
+          }
+        }
+      ],
+      "tags": [
+        {
+          "count": 1,
+          "name": "rock"
+        }
+      ],
+      "first-release-date": "2004",
+      "title": "My Set Purpose",
+      "primary-type": "Album"
+    },
+    {
+      "tags": [
+        {
+          "name": "album rock",
+          "count": 1
+        },
+        {
+          "count": 2,
+          "name": "alternative/indie rock"
+        },
+        {
+          "name": "blues",
+          "count": 4
+        },
+        {
+          "name": "experimental",
+          "count": 1
+        }
+      ],
+      "artist-credit": [
+        {
+          "name": "Tom Waits",
+          "artist": {
+            "disambiguation": "",
+            "sort-name": "Waits, Tom",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "name": "Tom Waits"
+          },
+          "joinphrase": ""
+        }
+      ],
+      "title": "Swordfishtrombones",
+      "first-release-date": "1983",
+      "primary-type": "Album",
+      "secondary-type-ids": [],
+      "user-rating": {
+        "value": null
+      },
+      "disambiguation": "",
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "id": "c791b365-0400-3926-be67-d1d9c71fc37e",
+      "annotation": null,
+      "user-tags": [],
+      "secondary-types": []
+    },
+    {
+      "tags": [
+        {
+          "count": 4,
+          "name": "blues rock"
+        },
+        {
+          "name": "classic pop and rock",
+          "count": 1
+        },
+        {
+          "count": 1,
+          "name": "experimental"
+        },
+        {
+          "name": "jazz",
+          "count": 1
+        },
+        {
+          "name": "rock",
+          "count": 2
+        },
+        {
+          "name": "underground",
+          "count": 2
+        }
+      ],
+      "artist-credit": [
+        {
+          "name": "Tom Waits",
+          "artist": {
+            "sort-name": "Waits, Tom",
+            "disambiguation": "",
+            "name": "Tom Waits",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b"
+          },
+          "joinphrase": ""
+        }
+      ],
+      "title": "Alice",
+      "first-release-date": "2002-05-07",
+      "primary-type": "Album",
+      "secondary-type-ids": [],
+      "user-rating": {
+        "value": null
+      },
+      "disambiguation": "",
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "annotation": null,
+      "id": "e95110a2-d81c-3291-910c-8b80c878f99c",
+      "user-tags": [],
+      "secondary-types": []
+    },
+    {
+      "tags": [
+        {
+          "name": "album rock",
+          "count": 1
+        },
+        {
+          "name": "alternative/indie rock",
+          "count": 1
+        },
+        {
+          "count": 3,
+          "name": "blues"
+        },
+        {
+          "count": 5,
+          "name": "blues rock"
+        },
+        {
+          "count": 4,
+          "name": "blues/rock"
+        },
+        {
+          "name": "experimental",
+          "count": 3
+        },
+        {
+          "name": "folk",
+          "count": 2
+        },
+        {
+          "name": "indie",
+          "count": 2
+        },
+        {
+          "count": 4,
+          "name": "rock"
+        }
+      ],
+      "artist-credit": [
+        {
+          "name": "Tom Waits",
+          "artist": {
+            "disambiguation": "",
+            "sort-name": "Waits, Tom",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "name": "Tom Waits"
+          },
+          "joinphrase": ""
+        }
+      ],
+      "title": "Rain Dogs",
+      "first-release-date": "1985",
+      "primary-type": "Album",
+      "secondary-type-ids": [],
+      "user-rating": {
+        "value": null
+      },
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "disambiguation": "",
+      "id": "fb25a883-2270-3ec4-8c62-85c7ed857e6f",
+      "annotation": null,
+      "user-tags": [],
+      "secondary-types": []
+    }
+  ],
+  "release-group-offset": 0,
+  "release-group-count": 136
+}

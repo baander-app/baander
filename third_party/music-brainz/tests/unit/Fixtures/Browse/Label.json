@@ -1,0 +1,633 @@
+{
+  "label-count": 1857,
+  "labels": [
+    {
+      "name": "(in)Finity",
+      "sort-name": "(in)Finity",
+      "area": {
+        "disambiguation": "city",
+        "name": "Ithaca",
+        "id": "68d8f243-fd55-4ca1-b511-48fa93575476",
+        "type-id": null,
+        "sort-name": "Ithaca",
+        "type": null
+      },
+      "life-span": {
+        "end": null,
+        "ended": false,
+        "begin": null
+      },
+      "type-id": null,
+      "id": "0961eb52-4808-423b-a9bc-94691d5c3f27",
+      "country": null,
+      "disambiguation": "Finity's sister netlabel",
+      "type": null,
+      "ipis": [],
+      "label-code": null,
+      "isnis": []
+    },
+    {
+      "country": null,
+      "disambiguation": "Early and mid-80s New York electro label, now defunct.",
+      "isnis": [],
+      "label-code": null,
+      "ipis": [],
+      "type": "Distributor",
+      "name": "25 West Records",
+      "life-span": {
+        "begin": null,
+        "end": null,
+        "ended": false
+      },
+      "type-id": "53ab8dcc-9946-3b62-966e-7634d78e5034",
+      "id": "14244aba-78ac-4652-8b77-e012e3b1435e",
+      "area": {
+        "disambiguation": "",
+        "name": "New York",
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type-id": null,
+        "sort-name": "New York",
+        "type": null
+      },
+      "sort-name": "25 West Records"
+    },
+    {
+      "disambiguation": "",
+      "country": null,
+      "ipis": [],
+      "label-code": null,
+      "isnis": [],
+      "type": null,
+      "name": "51 West Records & Tapes",
+      "id": "22c0ad3f-e74b-4769-a7b7-2d7199076067",
+      "type-id": null,
+      "life-span": {
+        "end": null,
+        "ended": false,
+        "begin": null
+      },
+      "area": {
+        "name": "New York",
+        "disambiguation": "",
+        "type": null,
+        "sort-name": "New York",
+        "type-id": null,
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f"
+      },
+      "sort-name": "51 West Records & Tapes"
+    },
+    {
+      "country": null,
+      "disambiguation": "",
+      "type": null,
+      "ipis": [],
+      "label-code": null,
+      "isnis": [],
+      "name": "10.Deep",
+      "sort-name": "10.Deep",
+      "area": {
+        "name": "New York",
+        "disambiguation": "",
+        "type-id": null,
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "sort-name": "New York",
+        "type": null
+      },
+      "type-id": null,
+      "life-span": {
+        "begin": null,
+        "ended": false,
+        "end": null
+      },
+      "id": "32a4d9b6-9589-4deb-b973-86b440568efd"
+    },
+    {
+      "country": null,
+      "disambiguation": "hardcore/gabber",
+      "type": "Production",
+      "isnis": [],
+      "label-code": null,
+      "ipis": [],
+      "name": "12 Gauge Records",
+      "sort-name": "12 Gauge Records",
+      "area": {
+        "disambiguation": "",
+        "name": "New York",
+        "sort-name": "New York",
+        "type": null,
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type-id": null
+      },
+      "type-id": "a2426aab-2dd4-339c-b47d-b4923a241678",
+      "life-span": {
+        "begin": null,
+        "end": null,
+        "ended": false
+      },
+      "id": "3e4a01d4-8873-4804-83fe-431175098b33"
+    },
+    {
+      "type": "Original Production",
+      "label-code": null,
+      "isnis": [],
+      "ipis": [],
+      "disambiguation": "",
+      "country": null,
+      "sort-name": "4self Records",
+      "area": {
+        "disambiguation": "",
+        "name": "Brooklyn",
+        "sort-name": "Brooklyn",
+        "type": null,
+        "id": "a71b0d32-7752-49e9-8594-2247ad6ac12c",
+        "type-id": null
+      },
+      "id": "3eb4ecd7-1b54-4c54-96f0-6174dbb06aa8",
+      "life-span": {
+        "end": null,
+        "ended": false,
+        "begin": null
+      },
+      "type-id": "7aaa37fe-2def-3476-b359-80245850062d",
+      "name": "4self Records"
+    },
+    {
+      "country": null,
+      "disambiguation": "",
+      "isnis": [],
+      "label-code": null,
+      "ipis": [],
+      "type": "Original Production",
+      "name": "1-800-Prime-CD",
+      "type-id": "7aaa37fe-2def-3476-b359-80245850062d",
+      "life-span": {
+        "begin": null,
+        "end": null,
+        "ended": false
+      },
+      "id": "5b22c1d6-afd3-42ea-8aea-9d03a06a64b5",
+      "sort-name": "1-800-Prime-CD",
+      "area": {
+        "type-id": null,
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "sort-name": "New York",
+        "type": null,
+        "name": "New York",
+        "disambiguation": ""
+      }
+    },
+    {
+      "isnis": [],
+      "label-code": null,
+      "ipis": [],
+      "type": "Original Production",
+      "country": null,
+      "disambiguation": "",
+      "type-id": "7aaa37fe-2def-3476-b359-80245850062d",
+      "life-span": {
+        "end": null,
+        "ended": false,
+        "begin": null
+      },
+      "id": "60a0cf50-a458-48a7-ad76-ca7e5abb7951",
+      "sort-name": "13th Hour Records",
+      "area": {
+        "disambiguation": "",
+        "name": "Harlem",
+        "id": "7e037c94-d999-4611-a8fd-56e8770f2e3c",
+        "type-id": null,
+        "sort-name": "Harlem",
+        "type": null
+      },
+      "name": "13th Hour Records"
+    },
+    {
+      "type": "Original Production",
+      "ipis": [],
+      "label-code": null,
+      "isnis": [],
+      "disambiguation": "",
+      "country": null,
+      "sort-name": "4AM",
+      "area": {
+        "name": "New York",
+        "disambiguation": "",
+        "type": null,
+        "sort-name": "New York",
+        "type-id": null,
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f"
+      },
+      "id": "6369e836-e079-4496-a5fe-fcbc5f967a07",
+      "life-span": {
+        "ended": false,
+        "end": null,
+        "begin": "2010-03"
+      },
+      "type-id": "7aaa37fe-2def-3476-b359-80245850062d",
+      "name": "4AM"
+    },
+    {
+      "life-span": {
+        "ended": false,
+        "end": null,
+        "begin": "2018-10-31"
+      },
+      "type-id": null,
+      "id": "7606eb7e-bfb2-4147-864f-c8c25ed81162",
+      "area": {
+        "disambiguation": "",
+        "name": "New York",
+        "type": null,
+        "sort-name": "New York",
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type-id": null
+      },
+      "sort-name": "6th Floor Orchestra",
+      "name": "6th Floor Orchestra",
+      "label-code": null,
+      "isnis": [],
+      "ipis": [],
+      "type": null,
+      "country": null,
+      "disambiguation": ""
+    },
+    {
+      "country": null,
+      "disambiguation": "",
+      "type": "Production",
+      "isnis": [],
+      "label-code": null,
+      "ipis": [],
+      "name": "86'd Records",
+      "sort-name": "86'd Records",
+      "area": {
+        "name": "New York",
+        "disambiguation": "",
+        "type-id": null,
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "sort-name": "New York",
+        "type": null
+      },
+      "life-span": {
+        "begin": null,
+        "ended": false,
+        "end": null
+      },
+      "type-id": "a2426aab-2dd4-339c-b47d-b4923a241678",
+      "id": "79f7b773-c444-462b-955a-35460a4ab09b"
+    },
+    {
+      "ipis": [],
+      "label-code": null,
+      "isnis": [],
+      "type": "Production",
+      "disambiguation": "",
+      "country": null,
+      "id": "7b9734fa-1bdd-4cb5-97fa-86583fc46295",
+      "life-span": {
+        "begin": null,
+        "end": null,
+        "ended": false
+      },
+      "type-id": "a2426aab-2dd4-339c-b47d-b4923a241678",
+      "sort-name": "4PM Records",
+      "area": {
+        "type-id": null,
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type": null,
+        "sort-name": "New York",
+        "name": "New York",
+        "disambiguation": ""
+      },
+      "name": "4PM Records"
+    },
+    {
+      "type": null,
+      "ipis": [],
+      "label-code": null,
+      "isnis": [],
+      "country": null,
+      "disambiguation": "",
+      "area": {
+        "disambiguation": "",
+        "name": "New York",
+        "type": null,
+        "sort-name": "New York",
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type-id": null
+      },
+      "sort-name": "23 West Entertainment, Inc.",
+      "life-span": {
+        "begin": "1985",
+        "end": null,
+        "ended": false
+      },
+      "type-id": null,
+      "id": "80ab0c5f-eaf0-4d95-81eb-6ab7c6017dd1",
+      "name": "23 West Entertainment, Inc."
+    },
+    {
+      "disambiguation": "",
+      "country": null,
+      "label-code": null,
+      "isnis": [],
+      "ipis": [],
+      "type": null,
+      "name": "5Towns Records",
+      "id": "8461e775-173f-4238-b520-d96250dd6a32",
+      "life-span": {
+        "end": null,
+        "ended": false,
+        "begin": null
+      },
+      "type-id": null,
+      "area": {
+        "disambiguation": "",
+        "name": "New York",
+        "type": null,
+        "sort-name": "New York",
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type-id": null
+      },
+      "sort-name": "5Towns Records"
+    },
+    {
+      "disambiguation": "NYC based record label & performance series",
+      "country": null,
+      "label-code": null,
+      "isnis": [],
+      "ipis": [],
+      "type": null,
+      "name": "29 Speedway",
+      "id": "ab954592-1be2-4d24-834e-5df4e0e8fc18",
+      "type-id": null,
+      "life-span": {
+        "ended": false,
+        "end": null,
+        "begin": null
+      },
+      "sort-name": "29 Speedway",
+      "area": {
+        "disambiguation": "",
+        "name": "Brooklyn",
+        "type": null,
+        "sort-name": "Brooklyn",
+        "id": "a71b0d32-7752-49e9-8594-2247ad6ac12c",
+        "type-id": null
+      }
+    },
+    {
+      "isnis": [],
+      "label-code": null,
+      "ipis": [],
+      "type": "Publisher",
+      "disambiguation": "",
+      "country": null,
+      "id": "af4d1c77-004b-49f0-93af-8a7707c914c5",
+      "type-id": "e9ad53b0-e3d0-3885-a10b-8193d501338c",
+      "life-span": {
+        "begin": "2016-09-01",
+        "end": null,
+        "ended": false
+      },
+      "sort-name": "3rd & 9th Records",
+      "area": {
+        "disambiguation": "",
+        "name": "New Rochelle",
+        "id": "bed193ed-f886-4041-877a-2c9e64f9ab88",
+        "type-id": null,
+        "sort-name": "New Rochelle",
+        "type": null
+      },
+      "name": "3rd & 9th Records"
+    },
+    {
+      "disambiguation": "",
+      "country": null,
+      "isnis": [],
+      "label-code": null,
+      "ipis": [
+        "00521856456"
+      ],
+      "type": "Publisher",
+      "name": "70s Gymnastics",
+      "id": "b5246d61-1854-45dc-ad5c-7e2157f19995",
+      "life-span": {
+        "ended": false,
+        "end": null,
+        "begin": null
+      },
+      "type-id": "e9ad53b0-e3d0-3885-a10b-8193d501338c",
+      "sort-name": "70s Gymnastics",
+      "area": {
+        "disambiguation": "",
+        "name": "New York",
+        "sort-name": "New York",
+        "type": null,
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type-id": null
+      }
+    },
+    {
+      "disambiguation": "",
+      "country": null,
+      "ipis": [],
+      "label-code": null,
+      "isnis": [],
+      "type": "Original Production",
+      "name": "9th Path Productions",
+      "id": "bc01d68b-6828-42d2-afd7-a3e10d4bbd7b",
+      "type-id": "7aaa37fe-2def-3476-b359-80245850062d",
+      "life-span": {
+        "ended": false,
+        "end": null,
+        "begin": "2017-01-06"
+      },
+      "sort-name": "9th Path Productions",
+      "area": {
+        "type-id": null,
+        "id": "ecc58238-4ef4-4eaa-8c55-2c50707dc591",
+        "sort-name": "Astoria",
+        "type": null,
+        "name": "Astoria",
+        "disambiguation": ""
+      }
+    },
+    {
+      "name": "+1 Records",
+      "sort-name": "+1 Records",
+      "area": {
+        "disambiguation": "",
+        "name": "New York",
+        "sort-name": "New York",
+        "type": null,
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type-id": null
+      },
+      "life-span": {
+        "begin": "2004-01",
+        "ended": false,
+        "end": null
+      },
+      "type-id": "a2426aab-2dd4-339c-b47d-b4923a241678",
+      "id": "becff808-7fa6-4f85-ab15-0444bca5d04c",
+      "country": null,
+      "disambiguation": "",
+      "type": "Production",
+      "label-code": null,
+      "isnis": [],
+      "ipis": []
+    },
+    {
+      "disambiguation": "",
+      "country": null,
+      "type": "Original Production",
+      "ipis": [],
+      "isnis": [],
+      "label-code": 8291,
+      "name": "21 Records",
+      "area": {
+        "name": "New York",
+        "disambiguation": "",
+        "sort-name": "New York",
+        "type": null,
+        "type-id": null,
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f"
+      },
+      "sort-name": "21 Records",
+      "id": "bf2dbd91-7d1f-4eee-9798-15ef44fdf596",
+      "life-span": {
+        "begin": null,
+        "ended": false,
+        "end": null
+      },
+      "type-id": "7aaa37fe-2def-3476-b359-80245850062d"
+    },
+    {
+      "life-span": {
+        "begin": "2018",
+        "ended": false,
+        "end": null
+      },
+      "type-id": "7aaa37fe-2def-3476-b359-80245850062d",
+      "id": "c27a5af5-63fa-419a-b907-6f6968060579",
+      "sort-name": "22Twenty",
+      "area": {
+        "disambiguation": "",
+        "name": "New York",
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type-id": null,
+        "type": null,
+        "sort-name": "New York"
+      },
+      "name": "22Twenty",
+      "label-code": null,
+      "isnis": [],
+      "ipis": [],
+      "type": "Original Production",
+      "country": null,
+      "disambiguation": ""
+    },
+    {
+      "id": "cbc09f2a-a4f5-40ff-83fa-13a6284768db",
+      "type-id": null,
+      "life-span": {
+        "ended": false,
+        "end": null,
+        "begin": "2017"
+      },
+      "sort-name": "48k",
+      "area": {
+        "name": "New York",
+        "disambiguation": "",
+        "sort-name": "New York",
+        "type": null,
+        "type-id": null,
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f"
+      },
+      "name": "48k",
+      "ipis": [],
+      "isnis": [],
+      "label-code": null,
+      "type": null,
+      "disambiguation": "NYC electronic label",
+      "country": null
+    },
+    {
+      "name": "21st Hapilos Digital",
+      "sort-name": "21st Hapilos Digital",
+      "area": {
+        "sort-name": "New York",
+        "type": null,
+        "type-id": null,
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "name": "New York",
+        "disambiguation": ""
+      },
+      "id": "ce627338-a5f0-4c3c-b67c-2d532909f74d",
+      "type-id": "53ab8dcc-9946-3b62-966e-7634d78e5034",
+      "life-span": {
+        "begin": "2009",
+        "ended": false,
+        "end": null
+      },
+      "disambiguation": "dancehall and reggae online distribution",
+      "country": null,
+      "type": "Distributor",
+      "isnis": [],
+      "label-code": null,
+      "ipis": []
+    },
+    {
+      "type": "Original Production",
+      "ipis": [],
+      "isnis": [],
+      "label-code": null,
+      "disambiguation": "",
+      "country": null,
+      "sort-name": "100% Electronica",
+      "area": {
+        "name": "New York",
+        "disambiguation": "",
+        "type": null,
+        "sort-name": "New York",
+        "type-id": null,
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f"
+      },
+      "id": "e7489d32-a9a8-4891-9851-b6b06f0fbd6b",
+      "type-id": "7aaa37fe-2def-3476-b359-80245850062d",
+      "life-span": {
+        "begin": null,
+        "end": null,
+        "ended": false
+      },
+      "name": "100% Electronica"
+    },
+    {
+      "id": "f365767b-e931-4ea5-9e29-197bf41e3440",
+      "life-span": {
+        "begin": "2014-01",
+        "ended": false,
+        "end": null
+      },
+      "type-id": "b6285b2a-3514-3d43-80df-fcf528824ded",
+      "area": {
+        "name": "New York",
+        "disambiguation": "",
+        "type-id": null,
+        "id": "74e50e58-5deb-4b99-93a2-decbb365c07f",
+        "type": null,
+        "sort-name": "New York"
+      },
+      "sort-name": "80N7",
+      "name": "80N7",
+      "ipis": [],
+      "isnis": [],
+      "label-code": null,
+      "type": "Imprint",
+      "disambiguation": "80N7 LLC",
+      "country": null
+    }
+  ],
+  "label-offset": 0
+}

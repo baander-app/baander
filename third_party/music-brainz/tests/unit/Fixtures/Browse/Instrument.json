@@ -1,0 +1,3218 @@
+{
+  "instrument-count": 3,
+  "instruments": [
+    {
+      "user-genres": [],
+      "aliases": [
+        {
+          "begin": null,
+          "name": "Gitaro",
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false,
+          "sort-name": "Gitaro",
+          "locale": "eo",
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type": "Search hint",
+          "name": "Gitaroj",
+          "begin": null,
+          "primary": null,
+          "ended": false,
+          "locale": null,
+          "end": null,
+          "sort-name": "Gitaroj",
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d"
+        },
+        {
+          "primary": true,
+          "ended": false,
+          "begin": null,
+          "name": "Gitarre",
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "Gitarre",
+          "end": null,
+          "locale": "de"
+        },
+        {
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d",
+          "locale": null,
+          "end": null,
+          "sort-name": "Gitarren",
+          "primary": null,
+          "ended": false,
+          "type": "Search hint",
+          "name": "Gitarren",
+          "begin": null
+        },
+        {
+          "type": "Instrument name",
+          "begin": null,
+          "name": "gitaar",
+          "primary": true,
+          "ended": false,
+          "locale": "nl",
+          "end": null,
+          "sort-name": "gitaar",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "name": "gitar",
+          "begin": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "tr",
+          "sort-name": "gitar"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "gitara",
+          "locale": "pl",
+          "end": null,
+          "ended": false,
+          "primary": true,
+          "name": "gitara",
+          "begin": null,
+          "type": "Instrument name"
+        },
+        {
+          "ended": false,
+          "primary": null,
+          "type": "Search hint",
+          "begin": null,
+          "name": "gitaren",
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d",
+          "locale": null,
+          "end": null,
+          "sort-name": "gitaren"
+        },
+        {
+          "sort-name": "gitarlar",
+          "end": null,
+          "locale": null,
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d",
+          "begin": null,
+          "name": "gitarlar",
+          "type": "Search hint",
+          "ended": false,
+          "primary": null
+        },
+        {
+          "sort-name": "gitary",
+          "locale": null,
+          "end": null,
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d",
+          "begin": null,
+          "name": "gitary",
+          "type": "Search hint",
+          "primary": null,
+          "ended": false
+        },
+        {
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d",
+          "locale": null,
+          "end": null,
+          "sort-name": "gt",
+          "ended": false,
+          "primary": null,
+          "type": "Search hint",
+          "name": "gt",
+          "begin": null
+        },
+        {
+          "primary": null,
+          "ended": false,
+          "name": "gtr",
+          "begin": null,
+          "type": "Search hint",
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d",
+          "sort-name": "gtr",
+          "locale": null,
+          "end": null
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "guitar",
+          "locale": "en",
+          "end": null,
+          "primary": true,
+          "ended": false,
+          "name": "guitar",
+          "begin": null,
+          "type": "Instrument name"
+        },
+        {
+          "sort-name": "guitare",
+          "locale": "fr",
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "begin": null,
+          "name": "guitare",
+          "type": "Instrument name",
+          "ended": false,
+          "primary": true
+        },
+        {
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d",
+          "end": null,
+          "locale": null,
+          "sort-name": "guitares",
+          "primary": null,
+          "ended": false,
+          "type": "Search hint",
+          "begin": null,
+          "name": "guitares"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "es",
+          "sort-name": "guitarra",
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "name": "guitarra",
+          "begin": null
+        },
+        {
+          "ended": false,
+          "primary": null,
+          "type": "Search hint",
+          "name": "guitarras",
+          "begin": null,
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d",
+          "locale": null,
+          "end": null,
+          "sort-name": "guitarras"
+        },
+        {
+          "ended": false,
+          "primary": null,
+          "type": "Search hint",
+          "name": "guitarras",
+          "begin": null,
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d",
+          "end": null,
+          "locale": null,
+          "sort-name": "guitarras"
+        },
+        {
+          "locale": null,
+          "end": null,
+          "sort-name": "guitars",
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d",
+          "type": "Search hint",
+          "name": "guitars",
+          "begin": null,
+          "primary": null,
+          "ended": false
+        },
+        {
+          "sort-name": "kitara",
+          "locale": "fi",
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "name": "kitara",
+          "begin": null,
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false
+        },
+        {
+          "name": "kitarat",
+          "begin": null,
+          "type": "Search hint",
+          "ended": false,
+          "primary": null,
+          "sort-name": "kitarat",
+          "end": null,
+          "locale": null,
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d"
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "name": "kitarr",
+          "begin": null,
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "kitarr",
+          "end": null,
+          "locale": "et"
+        },
+        {
+          "sort-name": "kitarrid",
+          "locale": null,
+          "end": null,
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d",
+          "begin": null,
+          "name": "kitarrid",
+          "type": "Search hint",
+          "ended": false,
+          "primary": null
+        },
+        {
+          "end": null,
+          "locale": "el",
+          "sort-name": "κιθάρα",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "name": "κιθάρα",
+          "begin": null,
+          "ended": false,
+          "primary": true
+        },
+        {
+          "type": "Search hint",
+          "name": "κιθάρες",
+          "begin": null,
+          "primary": null,
+          "ended": false,
+          "locale": null,
+          "end": null,
+          "sort-name": "κιθάρες",
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d"
+        },
+        {
+          "name": "ギター",
+          "begin": null,
+          "type": "Instrument name",
+          "ended": false,
+          "primary": true,
+          "sort-name": "ギター",
+          "end": null,
+          "locale": "ja",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d",
+          "sort-name": "🎸",
+          "end": null,
+          "locale": null,
+          "primary": null,
+          "ended": false,
+          "name": "🎸",
+          "begin": null,
+          "type": "Search hint"
+        }
+      ],
+      "tags": [
+        {
+          "name": "arena rock",
+          "count": 1
+        },
+        {
+          "name": "art rock",
+          "count": 1
+        },
+        {
+          "name": "blues",
+          "count": 1
+        },
+        {
+          "name": "contra",
+          "count": 1
+        },
+        {
+          "name": "country rock",
+          "count": 1
+        },
+        {
+          "count": 1,
+          "name": "electric blues"
+        },
+        {
+          "name": "emoji",
+          "count": 1
+        },
+        {
+          "count": 1,
+          "name": "folk rock"
+        },
+        {
+          "count": 1,
+          "name": "frets"
+        },
+        {
+          "name": "generic",
+          "count": 1
+        },
+        {
+          "name": "hard rock",
+          "count": 1
+        },
+        {
+          "name": "hardcore punk",
+          "count": 1
+        },
+        {
+          "name": "industrial metal",
+          "count": 1
+        },
+        {
+          "count": 1,
+          "name": "jazz"
+        },
+        {
+          "name": "mathcore",
+          "count": 1
+        },
+        {
+          "count": 1,
+          "name": "metal"
+        },
+        {
+          "count": 1,
+          "name": "metalcore"
+        },
+        {
+          "name": "nu metal",
+          "count": 1
+        },
+        {
+          "count": 2,
+          "name": "plucked"
+        },
+        {
+          "count": 1,
+          "name": "pop rock"
+        },
+        {
+          "name": "power pop",
+          "count": 1
+        },
+        {
+          "name": "punk",
+          "count": 1
+        },
+        {
+          "name": "quadrivium",
+          "count": 1
+        },
+        {
+          "name": "rock",
+          "count": 1
+        },
+        {
+          "count": 2,
+          "name": "strings"
+        },
+        {
+          "name": "wood",
+          "count": 1
+        }
+      ],
+      "id": "63021302-86cd-4aee-80df-2270d54f4978",
+      "name": "guitar",
+      "annotation": null,
+      "type": "String instrument",
+      "type-id": "cc00f97f-cf3d-3ae2-9163-041cb1a0d726",
+      "description": "",
+      "genres": [
+        {
+          "count": 1,
+          "disambiguation": "",
+          "name": "arena rock",
+          "id": "26af3760-750a-4b5e-a699-78c87697585a"
+        },
+        {
+          "count": 1,
+          "name": "art rock",
+          "disambiguation": "",
+          "id": "b7ef058e-6d83-4ca4-8123-9724bff4648b"
+        },
+        {
+          "id": "fe12b346-a10e-450f-bf81-fa20894b5ea2",
+          "count": 1,
+          "disambiguation": "",
+          "name": "blues"
+        },
+        {
+          "id": "2f7f569a-9348-4384-8508-2d0ac7d6a778",
+          "disambiguation": "",
+          "name": "contra",
+          "count": 1
+        },
+        {
+          "count": 1,
+          "name": "country rock",
+          "disambiguation": "",
+          "id": "fb07b1e3-411d-4146-a0d6-3479c0e7557b"
+        },
+        {
+          "count": 1,
+          "name": "electric blues",
+          "disambiguation": "",
+          "id": "8164d906-055d-4ca8-9ab2-14204b301cc3"
+        },
+        {
+          "name": "folk rock",
+          "disambiguation": "",
+          "count": 1,
+          "id": "445dc48f-5233-4b4f-987f-867ff9ade836"
+        },
+        {
+          "id": "51cb9f91-e6a2-41bf-891f-e78e3f1e52ab",
+          "disambiguation": "",
+          "name": "hard rock",
+          "count": 1
+        },
+        {
+          "name": "hardcore punk",
+          "disambiguation": "",
+          "count": 1,
+          "id": "055a6e4d-d929-42ac-ba7a-9d063b254ea5"
+        },
+        {
+          "id": "d4df54b5-67b4-4fb7-8f73-79e71717a501",
+          "name": "industrial metal",
+          "disambiguation": "",
+          "count": 1
+        },
+        {
+          "disambiguation": "",
+          "name": "jazz",
+          "count": 1,
+          "id": "a715278f-1580-409f-8078-4ffbc800e08b"
+        },
+        {
+          "id": "8df1241b-2ba1-40b8-bb8f-2dc15ce6dc1e",
+          "name": "mathcore",
+          "disambiguation": "",
+          "count": 1
+        },
+        {
+          "id": "cc28f5aa-5e19-487c-88e1-e56b022f1fdd",
+          "disambiguation": "",
+          "name": "metal",
+          "count": 1
+        },
+        {
+          "id": "62f88295-0605-4ce8-958b-2e0063ece47e",
+          "name": "metalcore",
+          "disambiguation": "",
+          "count": 1
+        },
+        {
+          "id": "bbad9cda-bde2-448e-821c-7ebf85a54020",
+          "name": "nu metal",
+          "disambiguation": "",
+          "count": 1
+        },
+        {
+          "id": "797e2e85-5ffd-495c-a757-8b4079052f0e",
+          "count": 1,
+          "disambiguation": "",
+          "name": "pop rock"
+        },
+        {
+          "id": "618704fc-daac-44a2-92c9-89e3b1a2fc8c",
+          "count": 1,
+          "disambiguation": "",
+          "name": "power pop"
+        },
+        {
+          "id": "8cc9b280-230b-4a3a-b1e2-8acab0744dd3",
+          "name": "punk",
+          "disambiguation": "",
+          "count": 1
+        },
+        {
+          "id": "0e3fc579-2d24-4f20-9dae-736e1ec78798",
+          "count": 1,
+          "disambiguation": "",
+          "name": "rock"
+        }
+      ],
+      "disambiguation": "",
+      "user-tags": []
+    },
+    {
+      "type": "Wind instrument",
+      "annotation": null,
+      "name": "saxophone",
+      "id": "a9ed16cd-b8cb-4256-9c41-93f5f0458c49",
+      "user-genres": [],
+      "aliases": [
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "de",
+          "end": null,
+          "sort-name": "Saxophon",
+          "primary": true,
+          "ended": false,
+          "type": "Instrument name",
+          "name": "Saxophon",
+          "begin": null
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "gv",
+          "sort-name": "sacsafone",
+          "primary": true,
+          "ended": false,
+          "type": "Instrument name",
+          "name": "sacsafone",
+          "begin": null
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "name": "sacsafòn",
+          "begin": null,
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "sacsafòn",
+          "locale": "gd",
+          "end": null
+        },
+        {
+          "end": null,
+          "locale": "ga",
+          "sort-name": "sacsafón",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "begin": null,
+          "name": "sacsafón",
+          "primary": true,
+          "ended": false
+        },
+        {
+          "name": "sacsoffon",
+          "begin": null,
+          "type": "Instrument name",
+          "ended": false,
+          "primary": true,
+          "sort-name": "sacsoffon",
+          "locale": "cy",
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type": "Instrument name",
+          "name": "saksofoan",
+          "begin": null,
+          "primary": true,
+          "ended": false,
+          "locale": "fy",
+          "end": null,
+          "sort-name": "saksofoan",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "primary": true,
+          "ended": false,
+          "begin": null,
+          "name": "saksofon",
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "saksofon",
+          "end": null,
+          "locale": "az"
+        },
+        {
+          "type": "Instrument name",
+          "begin": null,
+          "name": "saksofon",
+          "primary": true,
+          "ended": false,
+          "end": null,
+          "locale": "bs",
+          "sort-name": "saksofon",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "saksofon",
+          "locale": "et",
+          "end": null,
+          "primary": true,
+          "ended": false,
+          "name": "saksofon",
+          "begin": null,
+          "type": "Instrument name"
+        },
+        {
+          "begin": null,
+          "name": "saksofon",
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false,
+          "sort-name": "saksofon",
+          "locale": "hr",
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type": "Instrument name",
+          "begin": null,
+          "name": "saksofon",
+          "ended": false,
+          "primary": true,
+          "end": null,
+          "locale": "id",
+          "sort-name": "saksofon",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "begin": null,
+          "name": "saksofon",
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "saksofon",
+          "locale": "jv",
+          "end": null
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "saksofon",
+          "locale": "ms",
+          "end": null,
+          "ended": false,
+          "primary": true,
+          "begin": null,
+          "name": "saksofon",
+          "type": "Instrument name"
+        },
+        {
+          "begin": null,
+          "name": "saksofon",
+          "type": "Instrument name",
+          "ended": false,
+          "primary": true,
+          "sort-name": "saksofon",
+          "end": null,
+          "locale": "nb",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "nn",
+          "sort-name": "saksofon",
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "saksofon"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "pl",
+          "sort-name": "saksofon",
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "saksofon"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "sl",
+          "end": null,
+          "sort-name": "saksofon",
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "saksofon"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "tr",
+          "sort-name": "saksofon",
+          "primary": true,
+          "ended": false,
+          "type": "Instrument name",
+          "name": "saksofon",
+          "begin": null
+        },
+        {
+          "end": null,
+          "locale": "uz",
+          "sort-name": "saksofon",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "name": "saksofon",
+          "begin": null,
+          "primary": true,
+          "ended": false
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "saksofon (serbo-croatian)",
+          "end": null,
+          "locale": null,
+          "primary": null,
+          "ended": false,
+          "begin": null,
+          "name": "saksofon",
+          "type": "Instrument name"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "lt",
+          "end": null,
+          "sort-name": "saksofonas",
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "saksofonas"
+        },
+        {
+          "sort-name": "saksofoni",
+          "locale": "fi",
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "begin": null,
+          "name": "saksofoni",
+          "type": "Instrument name",
+          "ended": false,
+          "primary": true
+        },
+        {
+          "type": "Instrument name",
+          "name": "saksofono",
+          "begin": null,
+          "primary": true,
+          "ended": false,
+          "locale": "eo",
+          "end": null,
+          "sort-name": "saksofono",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "begin": null,
+          "name": "saksofons",
+          "type": "Instrument name",
+          "ended": false,
+          "primary": true,
+          "sort-name": "saksofons",
+          "end": null,
+          "locale": "lv",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "primary": true,
+          "ended": false,
+          "begin": null,
+          "name": "saksuphun",
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "saksuphun",
+          "locale": "qu",
+          "end": null
+        },
+        {
+          "type": "Instrument name",
+          "name": "sakɩsofonɩ",
+          "begin": null,
+          "ended": false,
+          "primary": null,
+          "locale": null,
+          "end": null,
+          "sort-name": "sakɩsofonɩ (kabiye)",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "name": "sassofono",
+          "begin": null,
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false,
+          "sort-name": "sassofono",
+          "locale": "it",
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type": "Instrument name",
+          "begin": null,
+          "name": "sassòfunu",
+          "primary": null,
+          "ended": false,
+          "locale": null,
+          "end": null,
+          "sort-name": "sassòfunu (scots)",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type": "Instrument name",
+          "begin": null,
+          "name": "sasòfono",
+          "ended": false,
+          "primary": true,
+          "locale": "vec",
+          "end": null,
+          "sort-name": "sasòfono",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "ended": false,
+          "primary": null,
+          "begin": null,
+          "name": "sax",
+          "type": "Search hint",
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d",
+          "sort-name": "sax",
+          "locale": null,
+          "end": null
+        },
+        {
+          "ended": false,
+          "primary": null,
+          "name": "saxaphone",
+          "begin": null,
+          "type": "Search hint",
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d",
+          "sort-name": "saxaphone",
+          "end": null,
+          "locale": null
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "saxofoi",
+          "locale": "eu",
+          "end": null,
+          "ended": false,
+          "primary": true,
+          "name": "saxofoi",
+          "begin": null,
+          "type": "Instrument name"
+        },
+        {
+          "primary": true,
+          "ended": false,
+          "type": "Instrument name",
+          "name": "saxofon",
+          "begin": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "cs",
+          "end": null,
+          "sort-name": "saxofon"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "da",
+          "end": null,
+          "sort-name": "saxofon",
+          "primary": true,
+          "ended": false,
+          "type": "Instrument name",
+          "name": "saxofon",
+          "begin": null
+        },
+        {
+          "type": "Instrument name",
+          "begin": null,
+          "name": "saxofon",
+          "primary": true,
+          "ended": false,
+          "end": null,
+          "locale": "ro",
+          "sort-name": "saxofon",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "saxofon",
+          "end": null,
+          "locale": "sv",
+          "primary": true,
+          "ended": false,
+          "begin": null,
+          "name": "saxofon",
+          "type": "Instrument name"
+        },
+        {
+          "sort-name": "saxofone",
+          "locale": "pt",
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "name": "saxofone",
+          "begin": null,
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false
+        },
+        {
+          "ended": false,
+          "primary": null,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "saxofone",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": null,
+          "end": null,
+          "sort-name": "saxofone (picard)"
+        },
+        {
+          "sort-name": "saxofong (west flemish)",
+          "locale": null,
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "name": "saxofong",
+          "begin": null,
+          "type": "Instrument name",
+          "ended": false,
+          "primary": null
+        },
+        {
+          "name": "saxofono",
+          "begin": null,
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false,
+          "sort-name": "saxofono",
+          "locale": "io",
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "locale": "af",
+          "end": null,
+          "sort-name": "saxofoon",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "begin": null,
+          "name": "saxofoon",
+          "ended": false,
+          "primary": true
+        },
+        {
+          "sort-name": "saxofoon (west low german)",
+          "end": null,
+          "locale": "nds",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "begin": null,
+          "name": "saxofoon",
+          "type": "Instrument name",
+          "primary": false,
+          "ended": false
+        },
+        {
+          "type": "Instrument name",
+          "name": "saxofoon",
+          "begin": null,
+          "ended": false,
+          "primary": true,
+          "end": null,
+          "locale": "nl",
+          "sort-name": "saxofoon",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "name": "saxofòn",
+          "begin": null,
+          "type": "Instrument name",
+          "ended": false,
+          "primary": true,
+          "sort-name": "saxofòn",
+          "locale": "oc",
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "sort-name": "saxofón",
+          "end": null,
+          "locale": "ast",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "name": "saxofón",
+          "begin": null,
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "saxofón",
+          "locale": "es",
+          "end": null,
+          "ended": false,
+          "primary": true,
+          "name": "saxofón",
+          "begin": null,
+          "type": "Instrument name"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "gl",
+          "sort-name": "saxofón",
+          "primary": true,
+          "ended": false,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "saxofón"
+        },
+        {
+          "type": "Instrument name",
+          "begin": null,
+          "name": "saxofón",
+          "ended": false,
+          "primary": true,
+          "locale": "sk",
+          "end": null,
+          "sort-name": "saxofón",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "end": null,
+          "locale": "lb",
+          "sort-name": "saxophon",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "begin": null,
+          "name": "saxophon",
+          "primary": true,
+          "ended": false
+        },
+        {
+          "type": "Instrument name",
+          "begin": null,
+          "name": "saxophon",
+          "ended": false,
+          "primary": null,
+          "locale": null,
+          "end": null,
+          "sort-name": "saxophon (alemannisch)",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "saxophone",
+          "end": null,
+          "locale": "en",
+          "primary": true,
+          "ended": false,
+          "name": "saxophone",
+          "begin": null,
+          "type": "Instrument name"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "fr",
+          "end": null,
+          "sort-name": "saxophone",
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "name": "saxophone",
+          "begin": null
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "vi",
+          "end": null,
+          "sort-name": "saxophone",
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "saxophone"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": null,
+          "sort-name": "saxophone (min nan)",
+          "ended": false,
+          "primary": null,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "saxophone"
+        },
+        {
+          "end": null,
+          "locale": null,
+          "sort-name": "saxophone (waray)",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "name": "saxophone",
+          "begin": null,
+          "primary": null,
+          "ended": false
+        },
+        {
+          "sort-name": "saxophono",
+          "end": null,
+          "locale": "ia",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "name": "saxophono",
+          "begin": null,
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false
+        },
+        {
+          "name": "saxophonum",
+          "begin": null,
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false,
+          "sort-name": "saxophonum",
+          "locale": "la",
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "sort-name": "saxòfon",
+          "end": null,
+          "locale": "ca",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "name": "saxòfon",
+          "begin": null,
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false
+        },
+        {
+          "begin": null,
+          "name": "saxófónn",
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false,
+          "sort-name": "saxófónn",
+          "end": null,
+          "locale": "is",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "name": "szaxofon",
+          "begin": null,
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "szaxofon",
+          "end": null,
+          "locale": "hu"
+        },
+        {
+          "type": "Instrument name",
+          "begin": null,
+          "name": "σαξόφωνο",
+          "ended": false,
+          "primary": true,
+          "locale": "el",
+          "end": null,
+          "sort-name": "saxófono",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "end": null,
+          "locale": "be",
+          "sort-name": "saksafón",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "begin": null,
+          "name": "саксафон",
+          "primary": true,
+          "ended": false
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "be_tarask",
+          "sort-name": "saksafon",
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "name": "саксафон",
+          "begin": null
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "saksafón",
+          "locale": "bg",
+          "end": null,
+          "ended": false,
+          "primary": true,
+          "begin": null,
+          "name": "саксофон",
+          "type": "Instrument name"
+        },
+        {
+          "locale": "cv",
+          "end": null,
+          "sort-name": "saksofon",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "begin": null,
+          "name": "саксофон",
+          "ended": false,
+          "primary": true
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "name": "саксофон",
+          "begin": null,
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "saksofon",
+          "locale": "kk",
+          "end": null
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "ky",
+          "sort-name": "saksofon",
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "саксофон"
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "саксофон",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "mk",
+          "end": null,
+          "sort-name": "saksofon"
+        },
+        {
+          "primary": true,
+          "ended": false,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "саксофон",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "ru",
+          "sort-name": "saksofón"
+        },
+        {
+          "sort-name": "saksofon",
+          "locale": "sr",
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "begin": null,
+          "name": "саксофон",
+          "type": "Instrument name",
+          "ended": false,
+          "primary": true
+        },
+        {
+          "type": "Instrument name",
+          "begin": null,
+          "name": "саксофон",
+          "primary": true,
+          "ended": false,
+          "end": null,
+          "locale": "uk",
+          "sort-name": "saksofón",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "sak’sofon",
+          "end": null,
+          "locale": "hy",
+          "primary": true,
+          "ended": false,
+          "name": "սաքսոֆոն",
+          "begin": null,
+          "type": "Instrument name"
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "name": "סקסופון",
+          "begin": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "he",
+          "sort-name": "sqswpwn"
+        },
+        {
+          "sort-name": "saksifun",
+          "end": null,
+          "locale": "ar",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "begin": null,
+          "name": "ساكسفون",
+          "type": "Instrument name",
+          "ended": false,
+          "primary": true
+        },
+        {
+          "primary": true,
+          "ended": false,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "ساكسفون",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "ar_EG",
+          "end": null,
+          "sort-name": "saksfon"
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "ساکسفۆن",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "ckb",
+          "end": null,
+          "sort-name": "saksfon"
+        },
+        {
+          "sort-name": "saksofon",
+          "end": null,
+          "locale": "fa",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "begin": null,
+          "name": "ساکسوفون",
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false
+        },
+        {
+          "ended": false,
+          "primary": null,
+          "name": "ساکسوفون",
+          "begin": null,
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "saksofon (south azerbaijani)",
+          "locale": null,
+          "end": null
+        },
+        {
+          "begin": null,
+          "name": "சாக்சபோன்",
+          "type": "Instrument name",
+          "ended": false,
+          "primary": true,
+          "sort-name": "cākcapōṉ",
+          "end": null,
+          "locale": "ta",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "name": "ಸ್ಯಾಕ್ಸೋಫೋನ್",
+          "begin": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "kn",
+          "sort-name": "syāksōphōn"
+        },
+        {
+          "end": null,
+          "locale": "ml",
+          "sort-name": "sāksaphēāṇ",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "begin": null,
+          "name": "സാക്സഫോൺ",
+          "primary": true,
+          "ended": false
+        },
+        {
+          "sort-name": "sæ k so fon",
+          "end": null,
+          "locale": "th",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "name": "แซกโซโฟน",
+          "begin": null,
+          "type": "Instrument name",
+          "ended": false,
+          "primary": true
+        },
+        {
+          "begin": null,
+          "name": "ဆက်ဆိုဟွန်း",
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false,
+          "sort-name": "saat so hwann",
+          "locale": "my",
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "name": "საქსოფონი",
+          "begin": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "ka",
+          "end": null,
+          "sort-name": "saksoponi"
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "begin": null,
+          "name": "ሳክሶፎን",
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "sakisofoni",
+          "end": null,
+          "locale": "am"
+        },
+        {
+          "end": null,
+          "locale": "chr",
+          "sort-name": "atseluhisdi",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "begin": null,
+          "name": "ᎠᏤᎷᎯᏍᏗ",
+          "primary": true,
+          "ended": false
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "ja",
+          "end": null,
+          "sort-name": "sakusofōn",
+          "primary": true,
+          "ended": false,
+          "type": "Instrument name",
+          "name": "サクソフォーン",
+          "begin": null
+        },
+        {
+          "end": null,
+          "locale": "yue",
+          "sort-name": "sīk sih fūng",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "begin": null,
+          "name": "色士風",
+          "primary": true,
+          "ended": false
+        },
+        {
+          "begin": null,
+          "name": "色士風",
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false,
+          "sort-name": "sè shì fēng",
+          "end": null,
+          "locale": "zh",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "primary": null,
+          "ended": false,
+          "begin": null,
+          "name": "萨克斯",
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "sàkèsī (wu chinese)",
+          "end": null,
+          "locale": null
+        },
+        {
+          "end": null,
+          "locale": "zh_Hant_HK",
+          "sort-name": "sà shì guǎn",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "name": "薩氏管",
+          "begin": null,
+          "ended": false,
+          "primary": true
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "saegsopon",
+          "locale": "ko",
+          "end": null,
+          "ended": false,
+          "primary": true,
+          "name": "색소폰",
+          "begin": null,
+          "type": "Instrument name"
+        },
+        {
+          "begin": null,
+          "name": "🎷",
+          "type": "Search hint",
+          "ended": false,
+          "primary": null,
+          "sort-name": "🎷",
+          "end": null,
+          "locale": null,
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d"
+        }
+      ],
+      "tags": [
+        {
+          "count": 1,
+          "name": "actually brass"
+        },
+        {
+          "name": "brass",
+          "count": 1
+        },
+        {
+          "count": 1,
+          "name": "emoji"
+        },
+        {
+          "name": "hs 422.212-71",
+          "count": 1
+        },
+        {
+          "count": 1,
+          "name": "invented"
+        },
+        {
+          "name": "jazz",
+          "count": 1
+        },
+        {
+          "name": "keyed",
+          "count": 1
+        },
+        {
+          "count": 1,
+          "name": "single-reed"
+        },
+        {
+          "count": 1,
+          "name": "ska"
+        },
+        {
+          "count": 1,
+          "name": "ska punk"
+        },
+        {
+          "count": 1,
+          "name": "skacore"
+        },
+        {
+          "name": "wind",
+          "count": 1
+        },
+        {
+          "name": "woodwind",
+          "count": 1
+        }
+      ],
+      "user-tags": [],
+      "disambiguation": "",
+      "genres": [
+        {
+          "id": "a715278f-1580-409f-8078-4ffbc800e08b",
+          "name": "jazz",
+          "disambiguation": "",
+          "count": 1
+        },
+        {
+          "id": "65877068-2116-4af6-89a2-838179a7e103",
+          "name": "ska",
+          "disambiguation": "",
+          "count": 1
+        },
+        {
+          "id": "89e34d8e-6562-412f-8da3-d040e159e6cd",
+          "name": "ska punk",
+          "disambiguation": "",
+          "count": 1
+        },
+        {
+          "disambiguation": "",
+          "name": "skacore",
+          "count": 1,
+          "id": "7aabc697-7c79-4f12-bb6f-ee5d70298a3f"
+        }
+      ],
+      "description": "",
+      "type-id": "876464a8-e74f-3f40-9bd3-637d2b1743ae"
+    },
+    {
+      "type-id": "cc00f97f-cf3d-3ae2-9163-041cb1a0d726",
+      "description": "",
+      "disambiguation": "",
+      "genres": [
+        {
+          "disambiguation": "",
+          "name": "classical",
+          "count": 2,
+          "id": "6ed4e4d1-9a97-4e2c-b8df-083754f154f4"
+        },
+        {
+          "id": "2f7f569a-9348-4384-8508-2d0ac7d6a778",
+          "count": 1,
+          "disambiguation": "",
+          "name": "contra"
+        },
+        {
+          "count": 1,
+          "disambiguation": "",
+          "name": "jazz",
+          "id": "a715278f-1580-409f-8078-4ffbc800e08b"
+        }
+      ],
+      "user-tags": [],
+      "user-genres": [],
+      "tags": [
+        {
+          "name": "boogie woogie",
+          "count": 1
+        },
+        {
+          "count": 2,
+          "name": "classical"
+        },
+        {
+          "count": 1,
+          "name": "contra"
+        },
+        {
+          "count": 2,
+          "name": "invented"
+        },
+        {
+          "count": 1,
+          "name": "jazz"
+        },
+        {
+          "name": "keyboard",
+          "count": 1
+        },
+        {
+          "count": 1,
+          "name": "quadrivium"
+        },
+        {
+          "count": 1,
+          "name": "string"
+        },
+        {
+          "name": "strings",
+          "count": 1
+        },
+        {
+          "count": 1,
+          "name": "struck"
+        },
+        {
+          "count": 1,
+          "name": "traditional"
+        }
+      ],
+      "aliases": [
+        {
+          "name": "Klavier",
+          "begin": null,
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false,
+          "sort-name": "Klavier",
+          "end": null,
+          "locale": "de",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "biyaano",
+          "end": null,
+          "locale": "so",
+          "primary": true,
+          "ended": false,
+          "name": "biyaano",
+          "begin": null,
+          "type": "Instrument name"
+        },
+        {
+          "locale": "scn",
+          "end": null,
+          "sort-name": "chianuforti",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "name": "chianuforti",
+          "begin": null,
+          "ended": false,
+          "primary": true
+        },
+        {
+          "name": "clavazin",
+          "begin": null,
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false,
+          "sort-name": "clavazin",
+          "locale": "rm",
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "sort-name": "clavile",
+          "end": null,
+          "locale": "la",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "name": "clavile",
+          "begin": null,
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "dương cầm",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "vi",
+          "sort-name": "dương cầm"
+        },
+        {
+          "type": "Instrument name",
+          "begin": null,
+          "name": "fortepian",
+          "ended": false,
+          "primary": true,
+          "end": null,
+          "locale": "pl",
+          "sort-name": "fortepian",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type": "Instrument name",
+          "name": "fortepiano",
+          "begin": null,
+          "ended": false,
+          "primary": false,
+          "locale": "tt",
+          "end": null,
+          "sort-name": "fortepiano (crimean tatar)",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "end": null,
+          "locale": "uz",
+          "sort-name": "fortepiano",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "name": "fortepiano",
+          "begin": null,
+          "primary": true,
+          "ended": false
+        },
+        {
+          "primary": true,
+          "ended": false,
+          "type": "Instrument name",
+          "name": "fortepijonas",
+          "begin": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "lt",
+          "sort-name": "fortepijonas"
+        },
+        {
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d",
+          "end": null,
+          "locale": null,
+          "sort-name": "fp",
+          "primary": null,
+          "ended": false,
+          "type": "Search hint",
+          "begin": null,
+          "name": "fp"
+        },
+        {
+          "type": "Instrument name",
+          "name": "glasovir",
+          "begin": null,
+          "ended": false,
+          "primary": true,
+          "locale": "hr",
+          "end": null,
+          "sort-name": "glasovir",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "primary": null,
+          "ended": false,
+          "begin": null,
+          "name": "gáung-kìng",
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "gáung-kìng (min dong chinese)",
+          "locale": null,
+          "end": null
+        },
+        {
+          "sort-name": "ipiyano",
+          "end": null,
+          "locale": "zu",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "begin": null,
+          "name": "ipiyano",
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false
+        },
+        {
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d",
+          "locale": null,
+          "end": null,
+          "sort-name": "keys",
+          "ended": false,
+          "primary": null,
+          "type": "Search hint",
+          "name": "keys",
+          "begin": null
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "klaver",
+          "end": null,
+          "locale": "da",
+          "ended": false,
+          "primary": true,
+          "name": "klaver",
+          "begin": null,
+          "type": "Instrument name"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "et",
+          "sort-name": "klaver",
+          "primary": true,
+          "ended": false,
+          "type": "Instrument name",
+          "name": "klaver",
+          "begin": null
+        },
+        {
+          "ended": false,
+          "primary": false,
+          "begin": null,
+          "name": "klaver",
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "klaver",
+          "end": null,
+          "locale": "nb"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "klavier",
+          "end": null,
+          "locale": "af",
+          "primary": true,
+          "ended": false,
+          "begin": null,
+          "name": "klavier",
+          "type": "Instrument name"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": null,
+          "sort-name": "klavier (alemannisch)",
+          "primary": null,
+          "ended": false,
+          "type": "Instrument name",
+          "name": "klavier",
+          "begin": null
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": null,
+          "sort-name": "klavier (saterland frisian)",
+          "primary": null,
+          "ended": false,
+          "type": "Instrument name",
+          "name": "klavier",
+          "begin": null
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "klavieres",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "lv",
+          "end": null,
+          "sort-name": "klavieres"
+        },
+        {
+          "type": "Instrument name",
+          "name": "klavir",
+          "begin": null,
+          "ended": false,
+          "primary": true,
+          "locale": "bs",
+          "end": null,
+          "sort-name": "klavir",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "sl",
+          "sort-name": "klavir",
+          "primary": true,
+          "ended": false,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "klavir"
+        },
+        {
+          "type": "Instrument name",
+          "name": "klavvõr",
+          "begin": null,
+          "ended": false,
+          "primary": null,
+          "end": null,
+          "locale": null,
+          "sort-name": "klavvõr (vōro)",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "sort-name": "klavír",
+          "locale": "cs",
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "begin": null,
+          "name": "klavír",
+          "type": "Instrument name",
+          "ended": false,
+          "primary": true
+        },
+        {
+          "primary": true,
+          "ended": false,
+          "begin": null,
+          "name": "klavír",
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "klavír",
+          "locale": "sk",
+          "end": null
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "name": "kuãytasã",
+          "begin": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "gn",
+          "sort-name": "kuãytasã"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": null,
+          "end": null,
+          "sort-name": "kông-khìm (hakka chinese)",
+          "ended": false,
+          "primary": null,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "kông-khìm"
+        },
+        {
+          "locale": null,
+          "end": null,
+          "sort-name": "kǹg-khîm (min-nan)",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "name": "kǹg-khîm",
+          "begin": null,
+          "primary": null,
+          "ended": false
+        },
+        {
+          "type": "Instrument name",
+          "begin": null,
+          "name": "likembé lya mpótó",
+          "primary": true,
+          "ended": false,
+          "end": null,
+          "locale": "ln",
+          "sort-name": "likembé lya mpótó",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "name": "paino",
+          "begin": null,
+          "type": "Search hint",
+          "primary": null,
+          "ended": false,
+          "sort-name": "paino",
+          "locale": null,
+          "end": null,
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d"
+        },
+        {
+          "name": "pano",
+          "begin": null,
+          "type": "Search hint",
+          "primary": null,
+          "ended": false,
+          "sort-name": "pano",
+          "locale": null,
+          "end": null,
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d"
+        },
+        {
+          "sort-name": "pf",
+          "end": null,
+          "locale": null,
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d",
+          "begin": null,
+          "name": "pf",
+          "type": "Search hint",
+          "ended": false,
+          "primary": null
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "phianu (aromanian)",
+          "end": null,
+          "locale": null,
+          "ended": false,
+          "primary": null,
+          "begin": null,
+          "name": "phianu",
+          "type": "Instrument name"
+        },
+        {
+          "sort-name": "pian",
+          "locale": "ro",
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "begin": null,
+          "name": "pian",
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "piano",
+          "locale": "an",
+          "end": null,
+          "ended": false,
+          "primary": true,
+          "begin": null,
+          "name": "piano",
+          "type": "Instrument name"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "az",
+          "end": null,
+          "sort-name": "piano",
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "name": "piano",
+          "begin": null
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "begin": null,
+          "name": "piano",
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "piano",
+          "locale": "br",
+          "end": null
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "piano",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "ca",
+          "end": null,
+          "sort-name": "piano"
+        },
+        {
+          "type": "Instrument name",
+          "name": "piano",
+          "begin": null,
+          "primary": true,
+          "ended": false,
+          "end": null,
+          "locale": "cy",
+          "sort-name": "piano",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type": "Instrument name",
+          "begin": null,
+          "name": "piano",
+          "primary": false,
+          "ended": false,
+          "end": null,
+          "locale": "da",
+          "sort-name": "piano",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "name": "piano",
+          "begin": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "en",
+          "end": null,
+          "sort-name": "piano"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "eo",
+          "sort-name": "piano",
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "piano"
+        },
+        {
+          "sort-name": "piano",
+          "end": null,
+          "locale": "es",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "begin": null,
+          "name": "piano",
+          "type": "Instrument name",
+          "ended": false,
+          "primary": true
+        },
+        {
+          "name": "piano",
+          "begin": null,
+          "type": "Instrument name",
+          "ended": false,
+          "primary": true,
+          "sort-name": "piẏānō",
+          "locale": "eu",
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "piano",
+          "locale": "fi",
+          "end": null,
+          "ended": false,
+          "primary": true,
+          "name": "piano",
+          "begin": null,
+          "type": "Instrument name"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "fr",
+          "end": null,
+          "sort-name": "piano",
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "piano"
+        },
+        {
+          "end": null,
+          "locale": "fy",
+          "sort-name": "piano",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "name": "piano",
+          "begin": null,
+          "ended": false,
+          "primary": true
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "piano",
+          "end": null,
+          "locale": "gl",
+          "ended": false,
+          "primary": true,
+          "begin": null,
+          "name": "piano",
+          "type": "Instrument name"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "piano",
+          "locale": "id",
+          "end": null,
+          "ended": false,
+          "primary": true,
+          "begin": null,
+          "name": "piano",
+          "type": "Instrument name"
+        },
+        {
+          "end": null,
+          "locale": "lb",
+          "sort-name": "piano",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "begin": null,
+          "name": "piano",
+          "ended": false,
+          "primary": true
+        },
+        {
+          "type": "Instrument name",
+          "name": "piano",
+          "begin": null,
+          "ended": false,
+          "primary": true,
+          "locale": "lmo",
+          "end": null,
+          "sort-name": "piano",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "sort-name": "piano",
+          "end": null,
+          "locale": "ms",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "begin": null,
+          "name": "piano",
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false
+        },
+        {
+          "type": "Instrument name",
+          "name": "piano",
+          "begin": null,
+          "ended": false,
+          "primary": true,
+          "locale": "nb",
+          "end": null,
+          "sort-name": "piano",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "piano (west low german)",
+          "end": null,
+          "locale": "nds",
+          "primary": false,
+          "ended": false,
+          "begin": null,
+          "name": "piano",
+          "type": "Instrument name"
+        },
+        {
+          "end": null,
+          "locale": "nl",
+          "sort-name": "piano",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "name": "piano",
+          "begin": null,
+          "ended": false,
+          "primary": true
+        },
+        {
+          "name": "piano",
+          "begin": null,
+          "type": "Instrument name",
+          "ended": false,
+          "primary": true,
+          "sort-name": "piano",
+          "end": null,
+          "locale": "nn",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "name": "piano",
+          "begin": null,
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false,
+          "sort-name": "piano",
+          "end": null,
+          "locale": "pt",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "piano",
+          "end": null,
+          "locale": "sv",
+          "ended": false,
+          "primary": true,
+          "begin": null,
+          "name": "piano",
+          "type": "Instrument name"
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "begin": null,
+          "name": "piano",
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "piano",
+          "locale": "sw",
+          "end": null
+        },
+        {
+          "name": "piano",
+          "begin": null,
+          "type": "Instrument name",
+          "ended": false,
+          "primary": true,
+          "sort-name": "piano",
+          "locale": "tpi",
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "locale": null,
+          "end": null,
+          "sort-name": "piano (limburgish)",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "begin": null,
+          "name": "piano",
+          "ended": false,
+          "primary": null
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "piano (lingua franca nova)",
+          "locale": null,
+          "end": null,
+          "primary": null,
+          "ended": false,
+          "begin": null,
+          "name": "piano",
+          "type": "Instrument name"
+        },
+        {
+          "sort-name": "piano (picard)",
+          "end": null,
+          "locale": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "begin": null,
+          "name": "piano",
+          "type": "Instrument name",
+          "ended": false,
+          "primary": null
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": null,
+          "end": null,
+          "sort-name": "piano (piedemontese)",
+          "ended": false,
+          "primary": null,
+          "type": "Instrument name",
+          "name": "piano",
+          "begin": null
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "piano (scots)",
+          "end": null,
+          "locale": null,
+          "ended": false,
+          "primary": null,
+          "name": "piano",
+          "begin": null,
+          "type": "Instrument name"
+        },
+        {
+          "type": "Instrument name",
+          "name": "piano",
+          "begin": null,
+          "primary": null,
+          "ended": false,
+          "locale": null,
+          "end": null,
+          "sort-name": "piano (waray)",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "piano (west flemish)",
+          "locale": null,
+          "end": null,
+          "primary": null,
+          "ended": false,
+          "name": "piano",
+          "begin": null,
+          "type": "Instrument name"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "pianoforte",
+          "locale": "it",
+          "end": null,
+          "primary": true,
+          "ended": false,
+          "name": "pianoforte",
+          "begin": null,
+          "type": "Instrument name"
+        },
+        {
+          "ended": false,
+          "primary": false,
+          "begin": null,
+          "name": "pianoforte",
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "pianoforte",
+          "locale": "nb",
+          "end": null
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "name": "pianoforte",
+          "begin": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "vec",
+          "sort-name": "pianoforte"
+        },
+        {
+          "sort-name": "pianoja",
+          "end": null,
+          "locale": "sq",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "name": "pianoja",
+          "begin": null,
+          "type": "Instrument name",
+          "ended": false,
+          "primary": true
+        },
+        {
+          "primary": null,
+          "ended": false,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "pianotli",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": null,
+          "sort-name": "pianotli (nāhuatl)"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "pianu",
+          "locale": "ast",
+          "end": null,
+          "ended": false,
+          "primary": true,
+          "name": "pianu",
+          "begin": null,
+          "type": "Instrument name"
+        },
+        {
+          "name": "pianó",
+          "begin": null,
+          "type": "Instrument name",
+          "ended": false,
+          "primary": true,
+          "sort-name": "pianó",
+          "locale": "ga",
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type": "Instrument name",
+          "begin": null,
+          "name": "pianėns",
+          "ended": false,
+          "primary": null,
+          "locale": null,
+          "end": null,
+          "sort-name": "pianėns (samogitian)",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d",
+          "sort-name": "pino",
+          "locale": null,
+          "end": null,
+          "primary": null,
+          "ended": false,
+          "begin": null,
+          "name": "pino",
+          "type": "Search hint"
+        },
+        {
+          "type": "Instrument name",
+          "begin": null,
+          "name": "piyaanoo",
+          "ended": false,
+          "primary": null,
+          "locale": null,
+          "end": null,
+          "sort-name": "piyaanoo (kabiye)",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "primary": true,
+          "ended": false,
+          "type": "Instrument name",
+          "name": "piyano",
+          "begin": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "ku",
+          "sort-name": "piyano"
+        },
+        {
+          "sort-name": "piyano",
+          "locale": "tr",
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "begin": null,
+          "name": "piyano",
+          "type": "Instrument name",
+          "ended": false,
+          "primary": true
+        },
+        {
+          "ended": false,
+          "primary": null,
+          "begin": null,
+          "name": "piyano",
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "piyano (tagalong)",
+          "end": null,
+          "locale": null
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "piyano (zazaki)",
+          "locale": null,
+          "end": null,
+          "primary": null,
+          "ended": false,
+          "name": "piyano",
+          "begin": null,
+          "type": "Instrument name"
+        },
+        {
+          "name": "pt",
+          "begin": null,
+          "type": "Search hint",
+          "primary": null,
+          "ended": false,
+          "sort-name": "pt",
+          "locale": null,
+          "end": null,
+          "type-id": "7d5ef40f-4856-3000-8667-aa13b9db547d"
+        },
+        {
+          "end": null,
+          "locale": "ceb",
+          "sort-name": "pyano",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "begin": null,
+          "name": "pyano",
+          "primary": true,
+          "ended": false
+        },
+        {
+          "primary": true,
+          "ended": false,
+          "type": "Instrument name",
+          "name": "píanó",
+          "begin": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "is",
+          "end": null,
+          "sort-name": "píanó"
+        },
+        {
+          "locale": "qu",
+          "end": null,
+          "sort-name": "yatana qallwa",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "name": "yatana qallwa",
+          "begin": null,
+          "primary": true,
+          "ended": false
+        },
+        {
+          "type": "Instrument name",
+          "name": "zongora",
+          "begin": null,
+          "ended": false,
+          "primary": true,
+          "end": null,
+          "locale": "hu",
+          "sort-name": "zongora",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type": "Instrument name",
+          "begin": null,
+          "name": "πιάνο",
+          "ended": false,
+          "primary": true,
+          "locale": "el",
+          "end": null,
+          "sort-name": "piáno",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type": "Instrument name",
+          "begin": null,
+          "name": "зонгорö",
+          "ended": false,
+          "primary": null,
+          "locale": null,
+          "end": null,
+          "sort-name": "zongorõ (komi)",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "primary": true,
+          "ended": false,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "клавир",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "sr",
+          "end": null,
+          "sort-name": "klavir"
+        },
+        {
+          "sort-name": "klavir (rusyn)",
+          "end": null,
+          "locale": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "name": "клавір",
+          "begin": null,
+          "type": "Instrument name",
+          "primary": null,
+          "ended": false
+        },
+        {
+          "end": null,
+          "locale": "bg",
+          "sort-name": "piano",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "begin": null,
+          "name": "пиано",
+          "ended": false,
+          "primary": true
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "pijano",
+          "locale": "mk",
+          "end": null,
+          "ended": false,
+          "primary": true,
+          "begin": null,
+          "name": "пијано",
+          "type": "Instrument name"
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "name": "төгөлдөр хуур",
+          "begin": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "mn_MN",
+          "sort-name": "tögöldör xuur"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "be",
+          "sort-name": "fartepijana",
+          "primary": true,
+          "ended": false,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "фартэпіяна"
+        },
+        {
+          "primary": false,
+          "ended": false,
+          "type": "Instrument name",
+          "name": "фартэпіяна",
+          "begin": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "be",
+          "end": null,
+          "sort-name": "fartepijana"
+        },
+        {
+          "type": "Instrument name",
+          "begin": null,
+          "name": "фортепиано",
+          "ended": false,
+          "primary": true,
+          "locale": "ba",
+          "end": null,
+          "sort-name": "fortepiano",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "begin": null,
+          "name": "фортепиано",
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "fortepïano",
+          "end": null,
+          "locale": "kk"
+        },
+        {
+          "name": "фортепиано",
+          "begin": null,
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false,
+          "sort-name": "fortepiano",
+          "locale": "ru",
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "ky",
+          "end": null,
+          "sort-name": "fortepyano",
+          "primary": true,
+          "ended": false,
+          "type": "Instrument name",
+          "name": "фортепьяно",
+          "begin": null
+        },
+        {
+          "name": "фортепіано",
+          "begin": null,
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false,
+          "sort-name": "fortepiano",
+          "locale": "uk",
+          "end": null,
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type": "Instrument name",
+          "name": "դաշնամուր",
+          "begin": null,
+          "ended": false,
+          "primary": true,
+          "locale": "hy",
+          "end": null,
+          "sort-name": "dashnamour",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "sort-name": "tashnamour (western armenian)",
+          "end": null,
+          "locale": "hy",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "name": "դաշնամուր",
+          "begin": null,
+          "type": "Instrument name",
+          "primary": false,
+          "ended": false
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "begin": null,
+          "name": "פיאנע",
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "fyane",
+          "locale": "yi",
+          "end": null
+        },
+        {
+          "type": "Instrument name",
+          "name": "פסנתר",
+          "begin": null,
+          "primary": true,
+          "ended": false,
+          "end": null,
+          "locale": "he",
+          "sort-name": "psntr",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "bianu",
+          "locale": "ar",
+          "end": null,
+          "primary": true,
+          "ended": false,
+          "name": "بيانو",
+          "begin": null,
+          "type": "Instrument name"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "byanu",
+          "end": null,
+          "locale": "ar_EG",
+          "primary": true,
+          "ended": false,
+          "name": "بيانو",
+          "begin": null,
+          "type": "Instrument name"
+        },
+        {
+          "begin": null,
+          "name": "پىئانىنو",
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false,
+          "sort-name": "piAanino",
+          "end": null,
+          "locale": "ug",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "end": null,
+          "locale": "fa",
+          "sort-name": "piano",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "begin": null,
+          "name": "پیانو",
+          "primary": true,
+          "ended": false
+        },
+        {
+          "type": "Instrument name",
+          "name": "پیانو",
+          "begin": null,
+          "primary": true,
+          "ended": false,
+          "locale": "pa_Arab",
+          "end": null,
+          "sort-name": "piano",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "piano",
+          "locale": "ur",
+          "end": null,
+          "primary": true,
+          "ended": false,
+          "begin": null,
+          "name": "پیانو",
+          "type": "Instrument name"
+        },
+        {
+          "ended": false,
+          "primary": null,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "پیانو",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": null,
+          "end": null,
+          "sort-name": "piano (western punjabi)"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "piano",
+          "end": null,
+          "locale": "ckb",
+          "primary": true,
+          "ended": false,
+          "begin": null,
+          "name": "پیانۆ",
+          "type": "Instrument name"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "hi",
+          "end": null,
+          "sort-name": "piyaano",
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "name": "पियानो",
+          "begin": null
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "name": "पियानो",
+          "begin": null,
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "piyānō",
+          "end": null,
+          "locale": "mr"
+        },
+        {
+          "type": "Instrument name",
+          "begin": null,
+          "name": "পিয়ানো",
+          "primary": true,
+          "ended": false,
+          "locale": "bn",
+          "end": null,
+          "sort-name": "piẏānō",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "pi'ānō",
+          "end": null,
+          "locale": "pa",
+          "primary": true,
+          "ended": false,
+          "name": "ਪਿਆਨੋ",
+          "begin": null,
+          "type": "Instrument name"
+        },
+        {
+          "type": "Instrument name",
+          "name": "પિયાનો",
+          "begin": null,
+          "primary": true,
+          "ended": false,
+          "end": null,
+          "locale": "gu",
+          "sort-name": "piyānō",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "ta",
+          "sort-name": "kiṉṉarappeṭṭi",
+          "primary": true,
+          "ended": false,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "கின்னரப்பெட்டி"
+        },
+        {
+          "type": "Instrument name",
+          "begin": null,
+          "name": "పియానో",
+          "ended": false,
+          "primary": true,
+          "locale": "te",
+          "end": null,
+          "sort-name": "piyānō",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        },
+        {
+          "primary": true,
+          "ended": false,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "ಪಿಯಾನೋ",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "kn",
+          "end": null,
+          "sort-name": "piyānō"
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "പിയാനോ",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "ml",
+          "end": null,
+          "sort-name": "piyānēā"
+        },
+        {
+          "locale": "th",
+          "end": null,
+          "sort-name": "peīy no",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "name": "เปียโน",
+          "begin": null,
+          "primary": true,
+          "ended": false
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "begin": null,
+          "name": "རྣོ་སྦྲེང༏",
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "rno'sbreng'!",
+          "locale": "bo",
+          "end": null
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "my",
+          "sort-name": "candaraah",
+          "primary": true,
+          "ended": false,
+          "type": "Instrument name",
+          "name": "စန္ဒရား",
+          "begin": null
+        },
+        {
+          "ended": false,
+          "primary": true,
+          "name": "ფორტეპიანო",
+          "begin": null,
+          "type": "Instrument name",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "port’ep’iano",
+          "locale": "ka",
+          "end": null
+        },
+        {
+          "primary": true,
+          "ended": false,
+          "type": "Instrument name",
+          "begin": null,
+          "name": "ፒያኖ",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "locale": "am",
+          "end": null,
+          "sort-name": "pīyano"
+        },
+        {
+          "locale": "chr",
+          "end": null,
+          "sort-name": "u⁠ta⁠nv⁠ ⁠di⁠ka⁠no⁠gi⁠s⁠di",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "begin": null,
+          "name": "ᎤᏔᏅ ᏗᎧᏃᎩᏍᏗ",
+          "ended": false,
+          "primary": true
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "piano",
+          "end": null,
+          "locale": "ja",
+          "primary": true,
+          "ended": false,
+          "begin": null,
+          "name": "ピアノ",
+          "type": "Instrument name"
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "end": null,
+          "locale": "yue",
+          "sort-name": "gong kàhm",
+          "ended": false,
+          "primary": true,
+          "type": "Instrument name",
+          "name": "鋼琴",
+          "begin": null
+        },
+        {
+          "locale": "zh_Hant",
+          "end": null,
+          "sort-name": "gāngqín",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "begin": null,
+          "name": "鋼琴",
+          "primary": false,
+          "ended": false
+        },
+        {
+          "locale": "zh",
+          "end": null,
+          "sort-name": "gāngqín",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "type": "Instrument name",
+          "begin": null,
+          "name": "钢琴",
+          "ended": false,
+          "primary": true
+        },
+        {
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd",
+          "sort-name": "gāngqín (wu chinese)",
+          "locale": null,
+          "end": null,
+          "primary": null,
+          "ended": false,
+          "name": "钢琴",
+          "begin": null,
+          "type": "Instrument name"
+        },
+        {
+          "begin": null,
+          "name": "피아노",
+          "type": "Instrument name",
+          "primary": true,
+          "ended": false,
+          "sort-name": "piano",
+          "end": null,
+          "locale": "ko",
+          "type-id": "2322fc94-fbf3-3c09-b23c-aa5ec8d14fcd"
+        }
+      ],
+      "id": "b3eac5f9-7859-4416-ac39-7154e2e8d348",
+      "name": "piano",
+      "type": "String instrument",
+      "annotation": null
+    }
+  ],
+  "instrument-offset": 0
+}

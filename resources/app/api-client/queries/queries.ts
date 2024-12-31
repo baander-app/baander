@@ -14,7 +14,7 @@ import * as Common from "./common";
 * - year
 * - directory
 * @param data.relations Comma seperated string of relations
-* - albumArist
+* - artists
 * - cover
 * - library
 * - songs

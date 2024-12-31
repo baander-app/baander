@@ -8,9 +8,9 @@ use App\Jobs\BaseJob;
 use App\Packages\StrExt;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\File;
 use App\Packages\MetaAudio\{MetaAudio, Mp3, Tagger};
-use App\Support\Logger\StdOutLogger;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\LazyCollection;
 use Illuminate\Support\Str;
@@ -20,7 +20,6 @@ class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
 {
     private Library $library;
     private Tagger $tagger;
-    private StdOutLogger $logger;
 
     /**
      * Create a new job instance.
@@ -28,6 +27,11 @@ class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
     public function __construct(Library $library)
     {
         $this->library = $library;
+    }
+
+    public function middleware(): array
+    {
+        return [(new WithoutOverlapping($this->library->id))->dontRelease()];
     }
 
     /**
@@ -102,9 +106,6 @@ class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
 
             $bandName = $meta->getBand();
             $this->logger()->info("Looking up artist: $bandName");
-            $albumArtist = Artist::whereName($bandName)->firstOrCreate([
-                'name' => $bandName,
-            ]);
 
             $albumName = $meta->getAlbum();
             $this->logger()->info('Album: ' . $albumName);
@@ -112,7 +113,7 @@ class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
             $directoryName = basename(\File::dirname($file));
             $album = Album::whereTitle($albumName)->whereDirectory($directoryName)->first();
             if (!$album) {
-                $album = $this->createAlbum($meta, $albumArtist, $directoryName);
+                $album = $this->createAlbum($meta, $directoryName);
             }
 
             if (!$album) {
@@ -145,7 +146,7 @@ class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
 
             $this->processGenres($meta, $song);
 
-            $artists = array_map(fn(string $artist) => $artist, \Safe\preg_split('#([;\\\/])#', $meta->getArtist()));
+            $artists = array_map(fn(string $artist) => $artist, \Safe\preg_split('#([;\\\/])#', $meta->getArtist() ?? ''));
 
             $this->processArtists($artists, $song);
 
@@ -159,7 +160,7 @@ class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
     /**
      * @throws \Throwable
      */
-    private function createAlbum(Mp3 $meta, Artist $albumArtist, string $directoryName): ?Album
+    private function createAlbum(Mp3 $meta, string $directoryName): ?Album
     {
         $albumYear = $meta->getYear();
 
@@ -169,7 +170,6 @@ class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
             'directory' => $directoryName,
         ]);
 
-        $album->albumArtist()->associate($albumArtist);
         $album->library()->associate($this->library);
 
         try {
@@ -210,6 +210,10 @@ class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
         $artistIds = [];
 
         foreach ($artists as $artist) {
+            if ($artist === '') {
+                continue;
+            }
+
             $artistModel = Artist::whereName($artist)->first();
 
             if (!$artistModel && Str::length($artist) > 0) {

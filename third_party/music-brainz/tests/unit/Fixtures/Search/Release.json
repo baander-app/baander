@@ -1,0 +1,1506 @@
+{
+  "created": "2019-02-27T17:59:27.981Z",
+  "count": 372,
+  "offset": 0,
+  "releases": [
+    {
+      "id": "f627eea8-6862-3eec-96fe-458543738a76",
+      "score": 100,
+      "count": 1,
+      "title": "Live Seeds",
+      "status": "Official",
+      "packaging": "Jewel Case",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "ed4bb6ce-ace6-3841-931b-7f8f0bcfe806",
+        "type-id": "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0",
+        "title": "Live Seeds",
+        "primary-type": "Album",
+        "secondary-types": [
+          "Live"
+        ]
+      },
+      "date": "1996-08-05",
+      "country": "GB",
+      "release-events": [
+        {
+          "date": "1996-08-05",
+          "area": {
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "name": "United Kingdom",
+            "sort-name": "United Kingdom",
+            "iso-3166-1-codes": [
+              "GB"
+            ]
+          }
+        }
+      ],
+      "barcode": "724348436528",
+      "asin": "B000003Z4N",
+      "label-info": [
+        {
+          "catalog-number": "MUTE INT 846.930",
+          "label": {
+            "id": "e0b106a5-4add-4839-9e40-c192457e1bf8",
+            "name": "Mute"
+          }
+        }
+      ],
+      "track-count": 13,
+      "media": [
+        {
+          "format": "CD",
+          "disc-count": 7,
+          "track-count": 13
+        }
+      ]
+    },
+    {
+      "id": "769dbf35-3745-4fe0-95c0-e06846c9ec57",
+      "score": 100,
+      "count": 1,
+      "title": "Nocturama",
+      "status": "Official",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "29c29d84-1642-3217-b7b0-161d45b01487",
+        "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "title": "Nocturama",
+        "primary-type": "Album"
+      },
+      "date": "2003",
+      "country": "JP",
+      "release-events": [
+        {
+          "date": "2003",
+          "area": {
+            "id": "2db42837-c832-3c27-b4a3-08198f75693c",
+            "name": "Japan",
+            "sort-name": "Japan",
+            "iso-3166-1-codes": [
+              "JP"
+            ]
+          }
+        }
+      ],
+      "track-count": 13,
+      "media": [
+        {
+          "disc-count": 0,
+          "track-count": 13
+        }
+      ]
+    },
+    {
+      "id": "c38a865d-8924-303d-84c6-0d089c8ff0bf",
+      "score": 100,
+      "count": 1,
+      "title": "Your Funeral… My Trial",
+      "status": "Official",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "9f28beec-fc42-3b54-8340-1801f026d8ee",
+        "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "title": "Your Funeral… My Trial",
+        "primary-type": "Album"
+      },
+      "date": "1990",
+      "country": "AU",
+      "release-events": [
+        {
+          "date": "1990",
+          "area": {
+            "id": "106e0bec-b638-3b37-b731-f53d507dc00e",
+            "name": "Australia",
+            "sort-name": "Australia",
+            "iso-3166-1-codes": [
+              "AU"
+            ]
+          }
+        }
+      ],
+      "barcode": "9399601963625",
+      "label-info": [
+        {
+          "catalog-number": "D19636",
+          "label": {
+            "id": "5f6c3120-54c5-4074-9b51-a0b1aa9d1adf",
+            "name": "Liberation Records"
+          }
+        }
+      ],
+      "track-count": 9,
+      "media": [
+        {
+          "format": "CD",
+          "disc-count": 1,
+          "track-count": 9
+        }
+      ]
+    },
+    {
+      "id": "d1192928-a20b-3298-9b01-465625bc2023",
+      "score": 100,
+      "count": 1,
+      "title": "Henry’s Dream",
+      "status": "Official",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "697785ad-05f6-3067-9618-796e811e4ec3",
+        "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "title": "Henry’s Dream",
+        "primary-type": "Album"
+      },
+      "date": "1992",
+      "country": "AU",
+      "release-events": [
+        {
+          "date": "1992",
+          "area": {
+            "id": "106e0bec-b638-3b37-b731-f53d507dc00e",
+            "name": "Australia",
+            "sort-name": "Australia",
+            "iso-3166-1-codes": [
+              "AU"
+            ]
+          }
+        }
+      ],
+      "barcode": "9399603077122",
+      "label-info": [
+        {
+          "catalog-number": "TVD91032",
+          "label": {
+            "id": "5f6c3120-54c5-4074-9b51-a0b1aa9d1adf",
+            "name": "Liberation Records"
+          }
+        }
+      ],
+      "track-count": 9,
+      "media": [
+        {
+          "format": "CD",
+          "disc-count": 11,
+          "track-count": 9
+        }
+      ]
+    },
+    {
+      "id": "1e1a7793-2667-30e9-945e-7677fe5984fc",
+      "score": 100,
+      "count": 1,
+      "title": "Henry’s Dream",
+      "status": "Official",
+      "packaging": "Jewel Case",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "697785ad-05f6-3067-9618-796e811e4ec3",
+        "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "title": "Henry’s Dream",
+        "primary-type": "Album"
+      },
+      "date": "1992-04-27",
+      "country": "GB",
+      "release-events": [
+        {
+          "date": "1992-04-27",
+          "area": {
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "name": "United Kingdom",
+            "sort-name": "United Kingdom",
+            "iso-3166-1-codes": [
+              "GB"
+            ]
+          }
+        }
+      ],
+      "barcode": "5016025610921",
+      "asin": "B000006XI7",
+      "label-info": [
+        {
+          "catalog-number": "CDSTUMM 92",
+          "label": {
+            "id": "e0b106a5-4add-4839-9e40-c192457e1bf8",
+            "name": "Mute"
+          }
+        }
+      ],
+      "track-count": 9,
+      "media": [
+        {
+          "format": "CD",
+          "disc-count": 11,
+          "track-count": 9
+        }
+      ]
+    },
+    {
+      "id": "24ca1bc4-1c1e-375d-b872-b873a31de92b",
+      "score": 100,
+      "count": 1,
+      "title": "Kicking Against the Pricks",
+      "status": "Official",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "37be9e09-e5d5-3337-bde0-13382a0461cf",
+        "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "title": "Kicking Against the Pricks",
+        "primary-type": "Album"
+      },
+      "date": "1986-08-18",
+      "country": "GB",
+      "release-events": [
+        {
+          "date": "1986-08-18",
+          "area": {
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "name": "United Kingdom",
+            "sort-name": "United Kingdom",
+            "iso-3166-1-codes": [
+              "GB"
+            ]
+          }
+        }
+      ],
+      "barcode": "5016025310289",
+      "asin": "B000003Z6F",
+      "label-info": [
+        {
+          "catalog-number": "STUMM 28",
+          "label": {
+            "id": "e0b106a5-4add-4839-9e40-c192457e1bf8",
+            "name": "Mute"
+          }
+        }
+      ],
+      "track-count": 14,
+      "media": [
+        {
+          "format": "12\" Vinyl",
+          "disc-count": 0,
+          "track-count": 14
+        }
+      ]
+    },
+    {
+      "id": "bb571292-a0da-3cd9-bacc-84b5fdf30e1a",
+      "score": 100,
+      "count": 1,
+      "title": "From Her to Eternity",
+      "status": "Official",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "3d86cdea-11df-3b99-ab00-bb6193bd2103",
+        "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "title": "From Her to Eternity",
+        "primary-type": "Album"
+      },
+      "date": "1990",
+      "country": "AU",
+      "release-events": [
+        {
+          "date": "1990",
+          "area": {
+            "id": "106e0bec-b638-3b37-b731-f53d507dc00e",
+            "name": "Australia",
+            "sort-name": "Australia",
+            "iso-3166-1-codes": [
+              "AU"
+            ]
+          }
+        }
+      ],
+      "barcode": "9399601963427",
+      "label-info": [
+        {
+          "catalog-number": "D19634",
+          "label": {
+            "id": "5f6c3120-54c5-4074-9b51-a0b1aa9d1adf",
+            "name": "Liberation Records"
+          }
+        }
+      ],
+      "track-count": 10,
+      "media": [
+        {
+          "format": "CD",
+          "disc-count": 8,
+          "track-count": 10
+        }
+      ]
+    },
+    {
+      "id": "3c809aa9-8e83-4858-8af9-2f264189d1da",
+      "score": 100,
+      "count": 1,
+      "title": "Tender Prey",
+      "status": "Official",
+      "packaging": "Jewel Case",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "52356383-49dd-378e-bcb4-ff44625f695c",
+        "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "title": "Tender Prey",
+        "primary-type": "Album"
+      },
+      "date": "1988-09-19",
+      "country": "GB",
+      "release-events": [
+        {
+          "date": "1988-09-19",
+          "area": {
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "name": "United Kingdom",
+            "sort-name": "United Kingdom",
+            "iso-3166-1-codes": [
+              "GB"
+            ]
+          }
+        }
+      ],
+      "barcode": "5016025610525",
+      "asin": "B000026ZF1",
+      "label-info": [
+        {
+          "catalog-number": "CD STUMM 52",
+          "label": {
+            "id": "e0b106a5-4add-4839-9e40-c192457e1bf8",
+            "name": "Mute"
+          }
+        }
+      ],
+      "track-count": 10,
+      "media": [
+        {
+          "format": "CD",
+          "disc-count": 1,
+          "track-count": 10
+        }
+      ],
+      "tags": [
+        {
+          "count": 0,
+          "name": "alternative"
+        }
+      ]
+    },
+    {
+      "id": "3f60a3f3-ff4c-401c-8e3b-ab710c14330c",
+      "score": 100,
+      "count": 1,
+      "title": "More News From Nowhere",
+      "status": "Official",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "a8fd449e-ef9f-3394-880c-79b9480229c2",
+        "type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+        "title": "More News From Nowhere",
+        "primary-type": "Single"
+      },
+      "date": "2008-05-12",
+      "country": "GB",
+      "release-events": [
+        {
+          "date": "2008-05-12",
+          "area": {
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "name": "United Kingdom",
+            "sort-name": "United Kingdom",
+            "iso-3166-1-codes": [
+              "GB"
+            ]
+          }
+        }
+      ],
+      "barcode": "5099920893521",
+      "asin": "B0015U7ZKC",
+      "label-info": [
+        {
+          "catalog-number": "CDMUTE390",
+          "label": {
+            "id": "e0b106a5-4add-4839-9e40-c192457e1bf8",
+            "name": "Mute"
+          }
+        }
+      ],
+      "track-count": 2,
+      "media": [
+        {
+          "format": "CD",
+          "disc-count": 1,
+          "track-count": 2
+        }
+      ]
+    },
+    {
+      "id": "d9e6ec65-c567-4944-bcf6-ffc75b98cfa5",
+      "score": 100,
+      "count": 1,
+      "title": "Get Ready for Love",
+      "status": "Official",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "f1208a4b-082c-3e32-aa53-11f2231f990c",
+        "type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+        "title": "Get Ready for Love",
+        "primary-type": "Single"
+      },
+      "date": "2005-03-14",
+      "country": "GB",
+      "release-events": [
+        {
+          "date": "2005-03-14",
+          "area": {
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "name": "United Kingdom",
+            "sort-name": "United Kingdom",
+            "iso-3166-1-codes": [
+              "GB"
+            ]
+          }
+        }
+      ],
+      "barcode": "0724386892676",
+      "label-info": [
+        {
+          "catalog-number": "Mute339",
+          "label": {
+            "id": "e0b106a5-4add-4839-9e40-c192457e1bf8",
+            "name": "Mute"
+          }
+        }
+      ],
+      "track-count": 2,
+      "media": [
+        {
+          "format": "Vinyl",
+          "disc-count": 0,
+          "track-count": 2
+        }
+      ]
+    },
+    {
+      "id": "5cf1c270-5879-4d99-a24f-24f830dacfa6",
+      "score": 100,
+      "count": 1,
+      "title": "The Best Of",
+      "status": "Bootleg",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "d9434a90-2b3c-3a8b-928c-4556f9d68d4f",
+        "type-id": "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+        "title": "The Best Of",
+        "primary-type": "Album",
+        "secondary-types": [
+          "Compilation"
+        ]
+      },
+      "date": "1996",
+      "country": "BG",
+      "release-events": [
+        {
+          "date": "1996",
+          "area": {
+            "id": "114c14ad-9776-34e9-81b0-6299507f3771",
+            "name": "Bulgaria",
+            "sort-name": "Bulgaria",
+            "iso-3166-1-codes": [
+              "BG"
+            ]
+          }
+        }
+      ],
+      "track-count": 16,
+      "media": [
+        {
+          "disc-count": 1,
+          "track-count": 16
+        }
+      ]
+    },
+    {
+      "id": "f18a847d-dee5-34fb-bb56-3e08936d1787",
+      "score": 100,
+      "count": 1,
+      "title": "Dig, Lazarus, Dig!!!",
+      "status": "Official",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "7eebb8f5-dcfe-37cc-b211-95d28a64fe33",
+        "type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+        "title": "Dig, Lazarus, Dig!!!",
+        "primary-type": "Single"
+      },
+      "date": "2008-02-18",
+      "country": "GB",
+      "release-events": [
+        {
+          "date": "2008-02-18",
+          "area": {
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "name": "United Kingdom",
+            "sort-name": "United Kingdom",
+            "iso-3166-1-codes": [
+              "GB"
+            ]
+          }
+        }
+      ],
+      "barcode": "5099951879471",
+      "asin": "B0012CJLPU",
+      "label-info": [
+        {
+          "catalog-number": "MUTE377",
+          "label": {
+            "id": "e0b106a5-4add-4839-9e40-c192457e1bf8",
+            "name": "Mute"
+          }
+        }
+      ],
+      "track-count": 2,
+      "media": [
+        {
+          "format": "Vinyl",
+          "disc-count": 0,
+          "track-count": 2
+        }
+      ]
+    },
+    {
+      "id": "012387f5-bacd-4530-9a29-4901fc9c4217",
+      "score": 100,
+      "count": 1,
+      "title": "Dig, Lazarus, Dig!!!",
+      "status": "Official",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "7eebb8f5-dcfe-37cc-b211-95d28a64fe33",
+        "type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+        "title": "Dig, Lazarus, Dig!!!",
+        "primary-type": "Single"
+      },
+      "date": "2008-02-18",
+      "country": "GB",
+      "release-events": [
+        {
+          "date": "2008-02-18",
+          "area": {
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "name": "United Kingdom",
+            "sort-name": "United Kingdom",
+            "iso-3166-1-codes": [
+              "GB"
+            ]
+          }
+        }
+      ],
+      "barcode": "5099951939724",
+      "asin": "B0012CJ9IO",
+      "label-info": [
+        {
+          "catalog-number": "CDMUTE377",
+          "label": {
+            "id": "e0b106a5-4add-4839-9e40-c192457e1bf8",
+            "name": "Mute"
+          }
+        }
+      ],
+      "track-count": 2,
+      "media": [
+        {
+          "format": "CD",
+          "disc-count": 1,
+          "track-count": 2
+        }
+      ]
+    },
+    {
+      "id": "3f66a0a0-ce50-3a75-8f6e-454fb7f0da3b",
+      "score": 100,
+      "count": 1,
+      "title": "Loverman",
+      "status": "Official",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "13f65d30-4c8b-351d-bbe1-8d7a29ef1b09",
+        "type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+        "title": "Loverman",
+        "primary-type": "Single"
+      },
+      "date": "1994-07-04",
+      "country": "GB",
+      "release-events": [
+        {
+          "date": "1994-07-04",
+          "area": {
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "name": "United Kingdom",
+            "sort-name": "United Kingdom",
+            "iso-3166-1-codes": [
+              "GB"
+            ]
+          }
+        }
+      ],
+      "asin": "B000006XIA",
+      "label-info": [
+        {
+          "catalog-number": "12 MUTE 169",
+          "label": {
+            "id": "e0b106a5-4add-4839-9e40-c192457e1bf8",
+            "name": "Mute"
+          }
+        }
+      ],
+      "track-count": 2,
+      "media": [
+        {
+          "format": "Vinyl",
+          "disc-count": 0,
+          "track-count": 2
+        }
+      ]
+    },
+    {
+      "id": "60fc4997-f358-4b96-a3d2-86f651915311",
+      "score": 100,
+      "count": 1,
+      "title": "Acoustic Versions of Songs from \"Tender Prey\"",
+      "status": "Promotion",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "6432e42e-c910-364d-b576-c45e2102722c",
+        "type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+        "title": "Acoustic Versions of Songs from \"Tender Prey\"",
+        "primary-type": "Single"
+      },
+      "date": "1990",
+      "country": "GB",
+      "release-events": [
+        {
+          "date": "1990",
+          "area": {
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "name": "United Kingdom",
+            "sort-name": "United Kingdom",
+            "iso-3166-1-codes": [
+              "GB"
+            ]
+          }
+        }
+      ],
+      "barcode": "5016025310760",
+      "label-info": [
+        {
+          "catalog-number": "P STUMM 76",
+          "label": {
+            "id": "e0b106a5-4add-4839-9e40-c192457e1bf8",
+            "name": "Mute"
+          }
+        }
+      ],
+      "track-count": 3,
+      "media": [
+        {
+          "format": "7\" Vinyl",
+          "disc-count": 0,
+          "track-count": 3
+        }
+      ]
+    },
+    {
+      "id": "9e1162bc-9a3c-4d69-b373-58d249193e6c",
+      "score": 100,
+      "count": 1,
+      "title": "I Had a Dream, Joe",
+      "status": "Official",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "ad81b1c3-cf22-3cf3-bca4-4c3edf311cbb",
+        "type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+        "title": "I Had a Dream, Joe",
+        "primary-type": "Single"
+      },
+      "date": "1992",
+      "country": "AU",
+      "release-events": [
+        {
+          "date": "1992",
+          "area": {
+            "id": "106e0bec-b638-3b37-b731-f53d507dc00e",
+            "name": "Australia",
+            "sort-name": "Australia",
+            "iso-3166-1-codes": [
+              "AU"
+            ]
+          }
+        }
+      ],
+      "barcode": "9399601126624",
+      "label-info": [
+        {
+          "catalog-number": "D11266",
+          "label": {
+            "id": "5f6c3120-54c5-4074-9b51-a0b1aa9d1adf",
+            "name": "Liberation Records"
+          }
+        }
+      ],
+      "track-count": 5,
+      "media": [
+        {
+          "format": "CD",
+          "disc-count": 1,
+          "track-count": 5
+        }
+      ],
+      "tags": [
+        {
+          "count": 1,
+          "name": "alternative"
+        }
+      ]
+    },
+    {
+      "id": "2c9b5e7f-58a1-43af-99b8-98b55ba70207",
+      "score": 100,
+      "count": 1,
+      "title": "Murderous Ends, Collaborative Odds",
+      "status": "Bootleg",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "b8ce1cfe-1bdf-3b80-898f-4c986d88e0dc",
+        "type-id": "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+        "title": "Murderous Ends, Collaborative Odds",
+        "primary-type": "Album",
+        "secondary-types": [
+          "Compilation"
+        ]
+      },
+      "date": "1997",
+      "country": "GB",
+      "release-events": [
+        {
+          "date": "1997",
+          "area": {
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "name": "United Kingdom",
+            "sort-name": "United Kingdom",
+            "iso-3166-1-codes": [
+              "GB"
+            ]
+          }
+        }
+      ],
+      "label-info": [
+        {
+          "catalog-number": "Howl 2",
+          "label": {
+            "id": "b9f0747f-ed2e-4076-acda-ba5550e199f7",
+            "name": "Silver Wolf"
+          }
+        }
+      ],
+      "track-count": 17,
+      "media": [
+        {
+          "format": "CD",
+          "disc-count": 0,
+          "track-count": 17
+        }
+      ]
+    },
+    {
+      "id": "52912dbd-a227-4e73-96bc-80207ca47e25",
+      "score": 100,
+      "count": 1,
+      "title": "Jack the Ripper",
+      "status": "Promotion",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "b4b6b7d5-be6d-3942-a4c3-46d3dcefd087",
+        "type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+        "title": "Jack the Ripper",
+        "primary-type": "Single"
+      },
+      "date": "1992",
+      "country": "FR",
+      "release-events": [
+        {
+          "date": "1992",
+          "area": {
+            "id": "08310658-51eb-3801-80de-5a0739207115",
+            "name": "France",
+            "sort-name": "France",
+            "iso-3166-1-codes": [
+              "FR"
+            ]
+          }
+        }
+      ],
+      "label-info": [
+        {
+          "catalog-number": "SA 3252",
+          "label": {
+            "id": "7aa3b3f7-04dc-49a5-8d6a-7c87b39ca216",
+            "name": "Virgin France S.A."
+          }
+        }
+      ],
+      "track-count": 3,
+      "media": [
+        {
+          "format": "CD",
+          "disc-count": 0,
+          "track-count": 3
+        }
+      ]
+    },
+    {
+      "id": "0d18f6c3-95ca-4398-a54b-9e19b56878ba",
+      "score": 100,
+      "count": 2,
+      "title": "The Abattoir Blues Tour 2004",
+      "status": "Official",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "abfaad23-75e2-36a8-8960-284195fbb0c6",
+        "type-id": "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0",
+        "title": "The Abattoir Blues Tour",
+        "primary-type": "Album",
+        "secondary-types": [
+          "Live"
+        ]
+      },
+      "date": "2007-01-29",
+      "country": "GB",
+      "release-events": [
+        {
+          "date": "2007-01-29",
+          "area": {
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "name": "United Kingdom",
+            "sort-name": "United Kingdom",
+            "iso-3166-1-codes": [
+              "GB"
+            ]
+          }
+        }
+      ],
+      "asin": "B000LZ6CTC",
+      "label-info": [
+        {
+          "catalog-number": "SEEDDVD4",
+          "label": {
+            "id": "e0b106a5-4add-4839-9e40-c192457e1bf8",
+            "name": "Mute"
+          }
+        }
+      ],
+      "track-count": 17,
+      "media": [
+        {
+          "format": "CD",
+          "disc-count": 1,
+          "track-count": 8
+        },
+        {
+          "format": "CD",
+          "disc-count": 1,
+          "track-count": 9
+        }
+      ],
+      "tags": [
+        {
+          "count": 1,
+          "name": "alternative"
+        }
+      ]
+    },
+    {
+      "id": "ff3a76e6-cb0c-4b8a-b2b7-53d22c9e6697",
+      "score": 100,
+      "count": 1,
+      "title": "From Her to Eternity",
+      "status": "Official",
+      "packaging": "Cardboard/Paper Sleeve",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "3d86cdea-11df-3b99-ab00-bb6193bd2103",
+        "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "title": "From Her to Eternity",
+        "primary-type": "Album"
+      },
+      "date": "1984-06-01",
+      "country": "GB",
+      "release-events": [
+        {
+          "date": "1984-06-01",
+          "area": {
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "name": "United Kingdom",
+            "sort-name": "United Kingdom",
+            "iso-3166-1-codes": [
+              "GB"
+            ]
+          }
+        }
+      ],
+      "barcode": "5016025310173",
+      "asin": "B00004ZUZC",
+      "label-info": [
+        {
+          "catalog-number": "STUMM 17",
+          "label": {
+            "id": "e0b106a5-4add-4839-9e40-c192457e1bf8",
+            "name": "Mute"
+          }
+        }
+      ],
+      "track-count": 7,
+      "media": [
+        {
+          "format": "12\" Vinyl",
+          "disc-count": 0,
+          "track-count": 7
+        }
+      ]
+    },
+    {
+      "id": "a4d3596e-8e1c-4533-9a4e-eaeed477ce22",
+      "score": 100,
+      "count": 1,
+      "title": "Kicking Against the Pricks",
+      "status": "Official",
+      "packaging": "Jewel Case",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "37be9e09-e5d5-3337-bde0-13382a0461cf",
+        "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "title": "Kicking Against the Pricks",
+        "primary-type": "Album"
+      },
+      "date": "1986-08-18",
+      "country": "GB",
+      "release-events": [
+        {
+          "date": "1986-08-18",
+          "area": {
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "name": "United Kingdom",
+            "sort-name": "United Kingdom",
+            "iso-3166-1-codes": [
+              "GB"
+            ]
+          }
+        }
+      ],
+      "barcode": "",
+      "label-info": [
+        {
+          "catalog-number": "CD STUMM 28",
+          "label": {
+            "id": "e0b106a5-4add-4839-9e40-c192457e1bf8",
+            "name": "Mute"
+          }
+        }
+      ],
+      "track-count": 14,
+      "media": [
+        {
+          "format": "CD",
+          "disc-count": 11,
+          "track-count": 14
+        }
+      ],
+      "tags": [
+        {
+          "count": 1,
+          "name": "alternative"
+        }
+      ]
+    },
+    {
+      "id": "8b2cd962-a168-44bb-afcf-594142ccea58",
+      "score": 100,
+      "count": 1,
+      "title": "Let Love In",
+      "status": "Official",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "f369d4bf-71f1-31f5-9e01-ffdbf15acdbe",
+        "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "title": "Let Love In",
+        "primary-type": "Album"
+      },
+      "date": "1994-04-18",
+      "country": "AU",
+      "release-events": [
+        {
+          "date": "1994-04-18",
+          "area": {
+            "id": "106e0bec-b638-3b37-b731-f53d507dc00e",
+            "name": "Australia",
+            "sort-name": "Australia",
+            "iso-3166-1-codes": [
+              "AU"
+            ]
+          }
+        }
+      ],
+      "barcode": "9399603115824",
+      "label-info": [
+        {
+          "catalog-number": "D31158",
+          "label": {
+            "id": "5f6c3120-54c5-4074-9b51-a0b1aa9d1adf",
+            "name": "Liberation Records"
+          }
+        }
+      ],
+      "track-count": 10,
+      "media": [
+        {
+          "format": "CD",
+          "disc-count": 12,
+          "track-count": 10
+        }
+      ]
+    },
+    {
+      "id": "717f2617-f6ad-47cd-b80c-bea0a7d98ffe",
+      "score": 100,
+      "count": 1,
+      "title": "Nature Boy",
+      "status": "Official",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "7a382eef-60f3-38dd-9ce2-382fcf630a14",
+        "type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+        "title": "Nature Boy",
+        "primary-type": "Single"
+      },
+      "date": "2004-09-06",
+      "country": "AU",
+      "release-events": [
+        {
+          "date": "2004-09-06",
+          "area": {
+            "id": "106e0bec-b638-3b37-b731-f53d507dc00e",
+            "name": "Australia",
+            "sort-name": "Australia",
+            "iso-3166-1-codes": [
+              "AU"
+            ]
+          }
+        }
+      ],
+      "track-count": 2,
+      "media": [
+        {
+          "disc-count": 1,
+          "track-count": 2
+        }
+      ]
+    },
+    {
+      "id": "4d0790ec-1975-4702-869e-fdb9cbd0aaf2",
+      "score": 100,
+      "count": 1,
+      "title": "Viva Las Vegas",
+      "status": "Bootleg",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "b364c27b-d687-3538-b334-ef01cd16bef5",
+        "type-id": "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0",
+        "title": "Viva Las Vegas",
+        "primary-type": "Album",
+        "secondary-types": [
+          "Live"
+        ]
+      },
+      "date": "1994",
+      "country": "DE",
+      "release-events": [
+        {
+          "date": "1994",
+          "area": {
+            "id": "85752fda-13c4-31a3-bee5-0e5cb1f51dad",
+            "name": "Germany",
+            "sort-name": "Germany",
+            "iso-3166-1-codes": [
+              "DE"
+            ]
+          }
+        }
+      ],
+      "barcode": "",
+      "label-info": [
+        {
+          "catalog-number": "MO 10012",
+          "label": {
+            "id": "3b64d40d-fa59-4a26-a0d7-e592a1302e0b",
+            "name": "Montana"
+          }
+        }
+      ],
+      "track-count": 15,
+      "media": [
+        {
+          "format": "CD",
+          "disc-count": 0,
+          "track-count": 15
+        }
+      ]
+    },
+    {
+      "id": "3183b4a0-ea8c-47cf-bd22-c5b3c693a1a1",
+      "score": 100,
+      "count": 1,
+      "title": "Bring It On",
+      "status": "Official",
+      "packaging": "Digipak",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "172e1f1a-504d-4488-b053-6344ba63e6d0",
+            "name": "Nick Cave & The Bad Seeds",
+            "sort-name": "Cave, Nick, & The Bad Seeds"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "9b92d44e-64e6-3f21-b054-02ec2046d629",
+        "type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+        "title": "Bring It On",
+        "primary-type": "Single"
+      },
+      "date": "2003-02-24",
+      "country": "GB",
+      "release-events": [
+        {
+          "date": "2003-02-24",
+          "area": {
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "name": "United Kingdom",
+            "sort-name": "United Kingdom",
+            "iso-3166-1-codes": [
+              "GB"
+            ]
+          }
+        }
+      ],
+      "barcode": "0724354686405",
+      "asin": "B000084T5O",
+      "label-info": [
+        {
+          "catalog-number": "CDMUTE265",
+          "label": {
+            "id": "e0b106a5-4add-4839-9e40-c192457e1bf8",
+            "name": "Mute"
+          }
+        }
+      ],
+      "track-count": 3,
+      "media": [
+        {
+          "format": "CD",
+          "disc-count": 2,
+          "track-count": 3
+        }
+      ]
+    }
+  ]
+}

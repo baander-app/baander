@@ -1,0 +1,25 @@
+{
+  "resource": "http://www.bbc.co.uk/music/artists/4aae17a7-9f0c-487b-b60e-f8eafb410b1d",
+  "id": "40c1c047-fa88-4f4a-bcc6-4e29a5c42679",
+  "relations": [
+    {
+      "begin": null,
+      "target-credit": "",
+      "end": null,
+      "type": "BBC Music page",
+      "source-credit": "",
+      "direction": "backward",
+      "attribute-values": {},
+      "target-type": "artist",
+      "attributes": [],
+      "artist": {
+        "name": "Nick Cave",
+        "id": "4aae17a7-9f0c-487b-b60e-f8eafb410b1d",
+        "sort-name": "Cave, Nick",
+        "disambiguation": ""
+      },
+      "ended": false,
+      "type-id": "d028a975-000c-4525-9333-d3c8425e4b54"
+    }
+  ]
+}

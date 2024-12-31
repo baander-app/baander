@@ -1,10 +1,6 @@
 <?php
 
-use App\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Support\Facades\Route;
-
-
-\Laragear\WebAuthn\Http\Routes::register()->withoutMiddleware(VerifyCsrfToken::class);
 
 Route::get('/dbg', [\App\Http\Controllers\UIController::class, 'dbg'])->name('dbg');
 

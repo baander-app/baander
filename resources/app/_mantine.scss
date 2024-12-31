@@ -8,6 +8,8 @@ $mantine-breakpoint-md: '62em';
 $mantine-breakpoint-lg: '75em';
 $mantine-breakpoint-xl: '88em';
 
+@layer mantine, mantine-contextmenu;
+
 @function rem($value) {
   @return #{math.div(math.div($value, $value * 0 + 1), 16)}rem;
 }

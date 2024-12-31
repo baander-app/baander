@@ -27,9 +27,12 @@ export const $AlbumResource = {
             description: 'Cover relation',
             '$ref': '#/components/schemas/ImageResource'
         },
-        albumArtist: {
-            description: 'Album artist relation',
-            '$ref': '#/components/schemas/ArtistResource'
+        artists: {
+            type: 'array',
+            description: 'Album artists relation',
+            items: {
+                '$ref': '#/components/schemas/ArtistResource'
+            }
         },
         songs: {
             type: 'array',
@@ -73,9 +76,6 @@ export const $AlbumWithoutSongsResource = {
         directory: {
             type: 'string'
         },
-        coverUrl: {
-            type: 'string'
-        },
         createdAt: {
             type: ['string', 'null'],
             format: 'date-time'
@@ -84,7 +84,11 @@ export const $AlbumWithoutSongsResource = {
             type: ['string', 'null'],
             format: 'date-time'
         },
-        albumArtist: {
+        cover: {
+            description: 'Cover relation',
+            '$ref': '#/components/schemas/ImageResource'
+        },
+        artists: {
             description: 'Album artist relation',
             '$ref': '#/components/schemas/ArtistResource'
         }

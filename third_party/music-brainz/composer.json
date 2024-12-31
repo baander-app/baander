@@ -1,0 +1,40 @@
+{
+    "name": "xenos/musicbrainz",
+    "type": "library",
+    "description": "A PHP library for accessing the MusicBrainz API",
+    "keywords": ["musicbrainz", "library", "php", "api"],
+    "homepage": "https://github.com/XenosEleatikos/MusicBrainz",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Christoph Hochholzer",
+            "email": "christoph@hochholzer.info",
+            "homepage": "https://github.com/XenosEleatikos",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": ">=8.1.0",
+        "psr/log": "^3.0",
+        "xenos/asklucy": "^2"
+    },
+    "require-dev": {
+        "guzzlehttp/guzzle": "^7",
+        "phpunit/phpunit": "^10",
+        "squizlabs/php_codesniffer": "*",
+        "symfony/dom-crawler": "^7.0",
+        "friendsofphp/php-cs-fixer": "^3.48",
+        "phpstan/phpstan": "^1.10"
+    },
+    "suggest": {
+        "guzzle/guzzle": "Allows you to use the GuzzleHttpAdapter.",
+        "monolog/monolog": "Allows logging of the application flow."
+    },
+    "autoload": {
+        "psr-4": {
+            "MusicBrainz\\": "src",
+            "MusicBrainz\\Test\\": "tests/unit",
+            "MusicBrainz\\SpecificationTest\\": "tests/specification"
+        }
+    }
+}

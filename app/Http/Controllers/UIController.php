@@ -9,6 +9,10 @@ use App\Models\Album;
 use App\Packages\PhpInfoParser\Info;
 use App\Services\SystemMetricsCollectorService;
 use Illuminate\Http\Request;
+use MusicBrainz\Filter\PageFilter;
+use MusicBrainz\Filter\Search\ReleaseFilter;
+use MusicBrainz\MusicBrainz;
+use MusicBrainz\Value\Name;
 
 class UIController
 {
@@ -26,17 +30,28 @@ class UIController
 
     public function dbg()
     {
-        $service = app(SystemMetricsCollectorService::class);
+        $musicBrainz = app(MusicBrainz::class);
 
-        $metrics = [
-          'memoryUsage' => $service->memoryUsage(),
-          'systemLoad' => $service->systemLoad(),
-          'swooleVm' => $service->swooleVm(),
-        ];
+        $releaseFilter = new ReleaseFilter();
+        $name = new Name('Teenage Dream: The Complete Confection');
+        $releaseFilter->addReleaseName($name);
 
-        dd($metrics);
+        $pageFilter = new PageFilter(0, 1);
+        $artistList = $musicBrainz->api()->search()->release($releaseFilter, $pageFilter);
+        $release = $artistList[0]->release;
+
+        dd([
+            'aliases' => $release->getAliases(),
+            'annotationText' => $release->getAnnotationText(),
+            'artistCredit' => $release->getArtistCredits()[0]->getArtist(),
+            'country' => $release->getCountry(),
+            'date' => $release->getDate(),
+            'disambiguation' => $release->getDisambiguation(),
+            'labelInfos' => $release->getLabelInfos()->current(),
+        ]);
 
         return view('dbg', [
+            'release' => $release,
         ]);
     }
 }

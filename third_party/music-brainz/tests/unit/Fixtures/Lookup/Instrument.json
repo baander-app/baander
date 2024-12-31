@@ -1,0 +1,84 @@
+{
+  "type-id": "cc00f97f-cf3d-3ae2-9163-041cb1a0d726",
+  "description": "",
+  "relations": [
+    {
+      "begin": null,
+      "source-credit": "",
+      "attribute-values": {},
+      "target-credit": "",
+      "type-id": "deaf1d50-e624-3069-91bd-88e51cafd605",
+      "direction": "backward",
+      "type": "derivation",
+      "ended": false,
+      "attributes": [],
+      "instrument": {
+        "disambiguation": "",
+        "name": "guitar",
+        "description": "",
+        "id": "63021302-86cd-4aee-80df-2270d54f4978"
+      },
+      "end": null,
+      "target-type": "instrument"
+    },
+    {
+      "target-type": "instrument",
+      "end": null,
+      "attributes": [],
+      "instrument": {
+        "description": "unison course tuned 12 stringed electric guitar body with mandolin neck, it is tuned an octave higher than a conventional guitar, thus having the tonal range of the mandolin.",
+        "id": "1fb90aa8-2b49-4685-a1e5-03da74531136",
+        "disambiguation": "mandolin / electric guitar hybrid",
+        "name": "mandoguitar"
+      },
+      "attribute-values": {},
+      "target-credit": "",
+      "direction": "backward",
+      "type-id": "2f522cbc-46f9-409b-9957-d0308d0899ef",
+      "type": "hybrid of",
+      "ended": false,
+      "begin": null,
+      "source-credit": ""
+    },
+    {
+      "source-credit": "",
+      "begin": null,
+      "ended": false,
+      "type": "hybrid of",
+      "direction": "backward",
+      "type-id": "2f522cbc-46f9-409b-9957-d0308d0899ef",
+      "attribute-values": {},
+      "target-credit": "",
+      "instrument": {
+        "description": "Invented in 1966 by vox, and in 1969 by Bob Murrell, it is an electric guitar with electronic organ wiring and knobs added.",
+        "id": "8889a04e-467e-4319-9974-4bd77bb6463c",
+        "disambiguation": "el guitar / el organ hybrid",
+        "name": "guitorgan"
+      },
+      "attributes": [],
+      "end": null,
+      "target-type": "instrument"
+    },
+    {
+      "target-credit": "",
+      "attribute-values": {},
+      "direction": "forward",
+      "type-id": "1486fccd-cf59-35e4-9399-b50e2b255877",
+      "type": "wikidata",
+      "ended": false,
+      "begin": null,
+      "source-credit": "",
+      "end": null,
+      "url": {
+        "resource": "https://www.wikidata.org/wiki/Q78987",
+        "id": "61d3f769-6799-4117-b577-c088b09c7d5c"
+      },
+      "target-type": "url",
+      "attributes": []
+    }
+  ],
+  "type": "String instrument",
+  "id": "7ee8ebf5-3aed-4fc8-8004-49f4a8c45a87",
+  "disambiguation": "",
+  "name": "electric guitar"
+}

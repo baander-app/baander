@@ -1,0 +1,73 @@
+{
+  "relations": [
+    {
+      "target-type": "artist",
+      "end": null,
+      "type": "conductor",
+      "attributes": [],
+      "target-credit": "",
+      "attribute-values": {},
+      "ended": false,
+      "type-id": "234670ce-5f22-4fd0-921b-ef1662695c5d",
+      "direction": "backward",
+      "begin": null,
+      "source-credit": "",
+      "artist": {
+        "id": "7bf70168-f9e0-4adc-a04f-de84b1cf1c8a",
+        "sort-name": "Noseda, Gianandrea",
+        "name": "Gianandrea Noseda",
+        "disambiguation": ""
+      }
+    },
+    {
+      "direction": "forward",
+      "begin": null,
+      "ended": false,
+      "type-id": "a3005666-a872-32c3-ad06-98af558e99b0",
+      "work": {
+        "id": "c35b4956-d4f8-321a-865b-5b13d9ed192b",
+        "language": "deu",
+        "type-id": null,
+        "iswcs": [],
+        "title": "Symphony no. 9 in D minor, op. 125 “Choral”",
+        "languages": [
+          "deu"
+        ],
+        "type": null,
+        "disambiguation": "",
+        "attributes": []
+      },
+      "source-credit": "",
+      "attributes": [],
+      "target-type": "work",
+      "type": "performance",
+      "end": null,
+      "attribute-values": {},
+      "target-credit": ""
+    },
+    {
+      "attribute-values": {},
+      "target-credit": "",
+      "attributes": [],
+      "target-type": "artist",
+      "end": null,
+      "type": "performing orchestra",
+      "artist": {
+        "id": "92fc1517-7e49-44a0-9ca2-644e35b424c5",
+        "sort-name": "BBC Philharmonic",
+        "name": "BBC Philharmonic",
+        "disambiguation": ""
+      },
+      "source-credit": "",
+      "begin": null,
+      "direction": "backward",
+      "type-id": "3b6616c5-88ba-4341-b4ee-81ce1e6d7ebb",
+      "ended": false
+    }
+  ],
+  "title": "Symphony 9",
+  "length": 4044990,
+  "id": "61309059-1758-40d6-bf1b-52dedbd7b62b",
+  "disambiguation": "",
+  "video": false
+}

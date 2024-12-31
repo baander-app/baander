@@ -64,12 +64,6 @@ return [
             'replace_placeholders' => true,
         ],
 
-        'jobs_stack' => [
-            'driver'            => 'stack',
-            'channels'          => ['jobs_file', 'stdout'],
-            'ignore_exceptions' => false,
-        ],
-
         'jobs_file' => [
             'driver'               => 'single',
             'path'                 => storage_path('logs/jobs.log'),
@@ -126,17 +120,18 @@ return [
         ],
 
         'emergency' => [
+            'driver'  => 'monolog',
             'path' => storage_path('logs/laravel.log'),
         ],
 
-        'php_deprecations' => [
-            'path' => storage_path('logs/php_deprecations.log'),
-        ],
-
-        'deprecations' => [
-            'channel' => env('LOG_DEPRECATIONS_CHANNEL', 'php_deprecations'),
-            'trace'   => env('LOG_DEPRECATIONS_TRACE', false),
-        ],
+//        'php_deprecations' => [
+//            'path' => storage_path('logs/php_deprecations.log'),
+//        ],
+//
+//        'deprecations' => [
+//            'channel' => env('LOG_DEPRECATIONS_CHANNEL', 'php_deprecations'),
+//            'trace'   => env('LOG_DEPRECATIONS_TRACE', false),
+//        ],
 
         'buggregator' => [
             'driver' => 'monolog',

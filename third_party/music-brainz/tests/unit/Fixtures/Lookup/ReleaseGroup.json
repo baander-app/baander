@@ -1,0 +1,3988 @@
+{
+  "id": "e8f70201-8899-3f0c-9e07-5d6495bc8046",
+  "aliases": [
+    {
+      "sort-name": "Black Album",
+      "locale": null,
+      "end": null,
+      "begin": null,
+      "name": "Black Album",
+      "primary": null,
+      "type-id": null,
+      "type": null,
+      "ended": false
+    },
+    {
+      "type-id": "abc2db8a-7386-354d-82f4-252c0213cbe4",
+      "type": "Search hint",
+      "ended": false,
+      "begin": null,
+      "name": "The Black Album",
+      "primary": null,
+      "end": null,
+      "sort-name": "The Black Album",
+      "locale": null
+    }
+  ],
+  "user-tags": [],
+  "rating": {
+    "votes-count": 37,
+    "value": 4.2
+  },
+  "secondary-type-ids": [],
+  "artist-credit": [
+    {
+      "joinphrase": "",
+      "artist": {
+        "disambiguation": "",
+        "name": "Metallica",
+        "sort-name": "Metallica",
+        "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab"
+      },
+      "name": "Metallica"
+    }
+  ],
+  "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+  "tags": [
+    {
+      "count": 0,
+      "name": "1991"
+    },
+    {
+      "name": "classic pop and rock",
+      "count": 0
+    },
+    {
+      "name": "hard rock",
+      "count": 6
+    },
+    {
+      "count": 4,
+      "name": "hardrock"
+    },
+    {
+      "count": 15,
+      "name": "heavy metal"
+    },
+    {
+      "count": 0,
+      "name": "i own this"
+    },
+    {
+      "name": "metal",
+      "count": 7
+    },
+    {
+      "count": 1,
+      "name": "pop"
+    },
+    {
+      "count": 2,
+      "name": "pop/rock"
+    },
+    {
+      "name": "rock",
+      "count": 4
+    },
+    {
+      "name": "rock pop",
+      "count": 1
+    },
+    {
+      "count": 4,
+      "name": "speed metal"
+    },
+    {
+      "name": "thrash",
+      "count": 1
+    },
+    {
+      "name": "thrash metal",
+      "count": 4
+    },
+    {
+      "name": "trash metal",
+      "count": 2
+    }
+  ],
+  "releases": [
+    {
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "name": "Metallica",
+          "artist": {
+            "aliases": [
+              {
+                "name": "Metallica",
+                "primary": true,
+                "begin": null,
+                "ended": false,
+                "type": "Artist name",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "locale": "en",
+                "sort-name": "Metallica",
+                "end": null
+              },
+              {
+                "name": "メタリカ",
+                "primary": false,
+                "begin": null,
+                "type": "Artist name",
+                "ended": false,
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "sort-name": "メタリカ",
+                "locale": "ja",
+                "end": null
+              },
+              {
+                "locale": "ko_KR",
+                "sort-name": "메탈리카",
+                "end": null,
+                "primary": true,
+                "name": "메탈리카",
+                "begin": null,
+                "ended": false,
+                "type": null,
+                "type-id": null
+              }
+            ],
+            "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab",
+            "disambiguation": "",
+            "sort-name": "Metallica",
+            "name": "Metallica"
+          }
+        }
+      ],
+      "packaging-id": "ec27701a-4a22-37f4-bfac-6616e0f9750a",
+      "country": "ZA",
+      "disambiguation": "",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "title": "Metallica",
+      "id": "05678d96-23f6-4dae-b994-53c3ff4dede0",
+      "status": "Official",
+      "aliases": [],
+      "release-events": [
+        {
+          "date": "1991-09-02",
+          "area": {
+            "iso-3166-1-codes": [
+              "ZA"
+            ],
+            "disambiguation": "",
+            "name": "South Africa",
+            "sort-name": "South Africa",
+            "id": "50cc7852-862e-30ae-aa82-385fe7135b7f"
+          }
+        }
+      ],
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "packaging": "Jewel Case",
+      "quality": "normal",
+      "date": "1991-09-02",
+      "barcode": "6001210554837",
+      "media": [
+        {
+          "position": 1,
+          "discs": [
+            {
+              "offset-count": 12,
+              "offsets": [
+                182,
+                25045,
+                49402,
+                66475,
+                95507,
+                125822,
+                143847,
+                162175,
+                191332,
+                210572,
+                233712,
+                264437
+              ],
+              "id": "_qF9K7DD3fCk3keSxQIR8Dd1ds4-",
+              "sectors": 281980
+            }
+          ],
+          "format-id": "9712d52a-4509-3d4b-a1a2-67c88c643e31",
+          "track-count": 12,
+          "title": "",
+          "format": "CD"
+        }
+      ]
+    },
+    {
+      "barcode": "731451002212",
+      "quality": "normal",
+      "date": "1991",
+      "media": [
+        {
+          "discs": [],
+          "position": 1,
+          "title": "",
+          "format": "12\" Vinyl",
+          "format-id": "3e9080b0-5e6c-34ab-bd15-f526b6306a64",
+          "track-count": 6
+        },
+        {
+          "format-id": "3e9080b0-5e6c-34ab-bd15-f526b6306a64",
+          "track-count": 6,
+          "title": "",
+          "format": "12\" Vinyl",
+          "position": 2,
+          "discs": []
+        }
+      ],
+      "aliases": [],
+      "release-events": [
+        {
+          "date": "1991",
+          "area": {
+            "disambiguation": "",
+            "iso-3166-1-codes": [
+              "US"
+            ],
+            "sort-name": "United States",
+            "name": "United States",
+            "id": "489ce91b-6658-3307-9877-795b68554c98"
+          }
+        }
+      ],
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "packaging": null,
+      "status": "Official",
+      "id": "1398514b-dd55-30bf-817f-b637fc612350",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "disambiguation": "",
+      "title": "Metallica",
+      "packaging-id": null,
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "name": "Metallica",
+          "artist": {
+            "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab",
+            "aliases": [
+              {
+                "locale": "en",
+                "sort-name": "Metallica",
+                "end": null,
+                "primary": true,
+                "name": "Metallica",
+                "begin": null,
+                "ended": false,
+                "type": "Artist name",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc"
+              },
+              {
+                "ended": false,
+                "type": "Artist name",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "primary": false,
+                "name": "メタリカ",
+                "begin": null,
+                "end": null,
+                "locale": "ja",
+                "sort-name": "メタリカ"
+              },
+              {
+                "end": null,
+                "locale": "ko_KR",
+                "sort-name": "메탈리카",
+                "type-id": null,
+                "ended": false,
+                "type": null,
+                "begin": null,
+                "name": "메탈리카",
+                "primary": true
+              }
+            ],
+            "name": "Metallica",
+            "sort-name": "Metallica",
+            "disambiguation": ""
+          }
+        }
+      ],
+      "country": "US"
+    },
+    {
+      "title": "Metallica",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "disambiguation": "",
+      "country": "CA",
+      "packaging-id": null,
+      "artist-credit": [
+        {
+          "name": "Metallica",
+          "artist": {
+            "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab",
+            "aliases": [
+              {
+                "locale": "en",
+                "sort-name": "Metallica",
+                "end": null,
+                "name": "Metallica",
+                "primary": true,
+                "begin": null,
+                "ended": false,
+                "type": "Artist name",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc"
+              },
+              {
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "ended": false,
+                "type": "Artist name",
+                "begin": null,
+                "name": "メタリカ",
+                "primary": false,
+                "end": null,
+                "locale": "ja",
+                "sort-name": "メタリカ"
+              },
+              {
+                "end": null,
+                "sort-name": "메탈리카",
+                "locale": "ko_KR",
+                "type-id": null,
+                "type": null,
+                "ended": false,
+                "begin": null,
+                "primary": true,
+                "name": "메탈리카"
+              }
+            ],
+            "sort-name": "Metallica",
+            "name": "Metallica",
+            "disambiguation": ""
+          },
+          "joinphrase": ""
+        }
+      ],
+      "media": [
+        {
+          "title": "",
+          "format": "CD",
+          "format-id": "9712d52a-4509-3d4b-a1a2-67c88c643e31",
+          "track-count": 12,
+          "discs": [
+            {
+              "sectors": 281982,
+              "id": "0XAgYaWP9UMi6yH6d69QalMIAbY-",
+              "offset-count": 12,
+              "offsets": [
+                182,
+                25050,
+                49392,
+                66475,
+                95507,
+                125825,
+                143850,
+                162177,
+                191332,
+                210580,
+                233720,
+                264440
+              ]
+            },
+            {
+              "id": "187jLdhWBMqSj9dJv1Y71W0xXaA-",
+              "sectors": 281945,
+              "offsets": [
+                150,
+                25015,
+                49351,
+                66416,
+                95456,
+                125774,
+                143792,
+                162128,
+                191291,
+                210533,
+                233671,
+                264393
+              ],
+              "offset-count": 12
+            },
+            {
+              "id": "3N1IOTlI1Mo2T7SJB94sEtesqm8-",
+              "sectors": 281948,
+              "offsets": [
+                150,
+                25013,
+                49370,
+                66443,
+                95475,
+                125790,
+                143815,
+                162143,
+                191300,
+                210540,
+                233680,
+                264405
+              ],
+              "offset-count": 12
+            },
+            {
+              "sectors": 282134,
+              "id": "5ZwAwmmxEfcAwyQZPBePPHrkduY-",
+              "offset-count": 12,
+              "offsets": [
+                150,
+                25110,
+                49440,
+                66570,
+                95565,
+                125910,
+                143955,
+                162180,
+                191415,
+                210705,
+                233850,
+                264435
+              ]
+            },
+            {
+              "offset-count": 12,
+              "offsets": [
+                150,
+                24899,
+                49167,
+                66240,
+                95116,
+                125273,
+                143298,
+                161452,
+                190501,
+                209716,
+                232801,
+                263318
+              ],
+              "id": "EF575VQLcfM_aXV8qMB.KMjXhsg-",
+              "sectors": 280859
+            },
+            {
+              "id": "Ex07mIuCGmy0wSSlJS_nVqRlWaI-",
+              "sectors": 281979,
+              "offsets": [
+                182,
+                25045,
+                49402,
+                66475,
+                95507,
+                125822,
+                143847,
+                162175,
+                191332,
+                210572,
+                233712,
+                264437
+              ],
+              "offset-count": 12
+            },
+            {
+              "offsets": [
+                183,
+                25050,
+                49393,
+                66473,
+                95508,
+                125825,
+                143848,
+                162178,
+                191333,
+                210578,
+                233718,
+                264440
+              ],
+              "offset-count": 12,
+              "sectors": 281983,
+              "id": "LIkJpSHHaMLUZsdByM.SKfzkQsM-"
+            },
+            {
+              "offset-count": 12,
+              "offsets": [
+                182,
+                25045,
+                49402,
+                66475,
+                95507,
+                125822,
+                143847,
+                162175,
+                191332,
+                210572,
+                233712,
+                264437
+              ],
+              "sectors": 282130,
+              "id": "OTlRbNMyNaOX43PdRXXmBw0clDM-"
+            },
+            {
+              "offsets": [
+                150,
+                25042,
+                49385,
+                66457,
+                95500,
+                125817,
+                143832,
+                162170,
+                191325,
+                210570,
+                233710,
+                264432
+              ],
+              "offset-count": 12,
+              "id": "Tit3F0Do_sZ_7NbfM_1vlEbF0wo-",
+              "sectors": 281975
+            },
+            {
+              "id": "XZt2PKb_Sq1t9dl.NQfwxchigyY-",
+              "sectors": 281988,
+              "offsets": [
+                150,
+                25017,
+                49379,
+                66456,
+                95490,
+                125810,
+                143840,
+                162171,
+                191330,
+                210572,
+                233716,
+                264442
+              ],
+              "offset-count": 12
+            },
+            {
+              "sectors": 282001,
+              "id": "_gO4gbRoAIrGkQkMWO5j6lnCvNA-",
+              "offsets": [
+                150,
+                25083,
+                49431,
+                66473,
+                95528,
+                125850,
+                143862,
+                162200,
+                191348,
+                210591,
+                233730,
+                264446
+              ],
+              "offset-count": 12
+            },
+            {
+              "offsets": [
+                182,
+                25045,
+                49402,
+                66475,
+                95507,
+                125822,
+                143847,
+                162175,
+                191332,
+                210572,
+                233712,
+                264437
+              ],
+              "offset-count": 12,
+              "sectors": 281980,
+              "id": "_qF9K7DD3fCk3keSxQIR8Dd1ds4-"
+            },
+            {
+              "offsets": [
+                182,
+                25050,
+                49392,
+                66472,
+                95507,
+                125825,
+                143847,
+                162177,
+                191332,
+                210577,
+                233717,
+                264440
+              ],
+              "offset-count": 12,
+              "id": "abYPQeevuSBu3A8.nqS5kOPop0E-",
+              "sectors": 281982
+            },
+            {
+              "id": "fGVQJfPUwhTmICGSe8CA_SmV9VY-",
+              "sectors": 281950,
+              "offsets": [
+                150,
+                25018,
+                49360,
+                66440,
+                95475,
+                125793,
+                143815,
+                162145,
+                191300,
+                210545,
+                233685,
+                264408
+              ],
+              "offset-count": 12
+            },
+            {
+              "offset-count": 12,
+              "offsets": [
+                150,
+                25017,
+                49360,
+                66440,
+                95475,
+                125792,
+                143815,
+                162145,
+                191300,
+                210545,
+                233685,
+                264407
+              ],
+              "sectors": 281982,
+              "id": "goiyF_.BCukRYkQZoxu6iF7UvuI-"
+            },
+            {
+              "offset-count": 12,
+              "offsets": [
+                150,
+                25020,
+                49365,
+                66430,
+                95475,
+                125795,
+                143807,
+                162145,
+                191302,
+                210550,
+                233685,
+                264407
+              ],
+              "sectors": 281950,
+              "id": "jYRg_F0xcihZfRt3lsBR1qwdmHM-"
+            },
+            {
+              "offsets": [
+                150,
+                25065,
+                49412,
+                66492,
+                95532,
+                125840,
+                143865,
+                162205,
+                191352,
+                210602,
+                233740,
+                264455
+              ],
+              "offset-count": 12,
+              "sectors": 282025,
+              "id": "oCW9f2wGQUMDF2et.J_uApR_4ME-"
+            },
+            {
+              "offset-count": 12,
+              "offsets": [
+                183,
+                25095,
+                49445,
+                66530,
+                95555,
+                125873,
+                143903,
+                162225,
+                191380,
+                210635,
+                233773,
+                264483
+              ],
+              "sectors": 282045,
+              "id": "rfzqw_R9KHB5WE1p3MbJcl9F95c-"
+            },
+            {
+              "offsets": [
+                183,
+                25095,
+                49445,
+                66530,
+                95555,
+                125873,
+                143903,
+                162225,
+                191380,
+                210635,
+                233773,
+                264483
+              ],
+              "offset-count": 12,
+              "sectors": 282195,
+              "id": "xJZpfFDEOJKd5S8JLgBT34udxUc-"
+            },
+            {
+              "offset-count": 12,
+              "offsets": [
+                150,
+                24941,
+                49229,
+                66363,
+                95219,
+                125228,
+                143269,
+                161523,
+                190550,
+                209880,
+                232932,
+                263393
+              ],
+              "sectors": 280845,
+              "id": "zDd1xNZno4ippwK2H7dD2Jm3.Z8-"
+            },
+            {
+              "offset-count": 12,
+              "offsets": [
+                150,
+                25067,
+                49410,
+                66482,
+                95525,
+                125842,
+                143857,
+                162195,
+                191350,
+                210595,
+                233735,
+                264457
+              ],
+              "id": "zuJY_tMecFKoaXeuYWTKlIJedr0-",
+              "sectors": 282087
+            }
+          ],
+          "position": 1
+        }
+      ],
+      "barcode": "075596111324",
+      "quality": "normal",
+      "date": "1991-08-12",
+      "release-events": [
+        {
+          "area": {
+            "id": "71bbafaa-e825-3e15-8ca9-017dcad1748b",
+            "sort-name": "Canada",
+            "name": "Canada",
+            "disambiguation": "",
+            "iso-3166-1-codes": [
+              "CA"
+            ]
+          },
+          "date": "1991-08-12"
+        }
+      ],
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "packaging": null,
+      "aliases": [],
+      "status": "Official",
+      "id": "2529f558-970b-33d2-a42c-41ab15a970c6"
+    },
+    {
+      "packaging-id": "ec27701a-4a22-37f4-bfac-6616e0f9750a",
+      "artist-credit": [
+        {
+          "name": "Metallica",
+          "artist": {
+            "name": "Metallica",
+            "sort-name": "Metallica",
+            "disambiguation": "",
+            "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab",
+            "aliases": [
+              {
+                "primary": true,
+                "name": "Metallica",
+                "begin": null,
+                "type": "Artist name",
+                "ended": false,
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "sort-name": "Metallica",
+                "locale": "en",
+                "end": null
+              },
+              {
+                "end": null,
+                "sort-name": "メタリカ",
+                "locale": "ja",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "type": "Artist name",
+                "ended": false,
+                "begin": null,
+                "primary": false,
+                "name": "メタリカ"
+              },
+              {
+                "end": null,
+                "sort-name": "메탈리카",
+                "locale": "ko_KR",
+                "type": null,
+                "ended": false,
+                "type-id": null,
+                "name": "메탈리카",
+                "primary": true,
+                "begin": null
+              }
+            ]
+          },
+          "joinphrase": ""
+        }
+      ],
+      "country": "JP",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "disambiguation": "",
+      "title": "Metallica",
+      "status": "Official",
+      "id": "3750d9e2-59f5-471d-8916-463433069bd1",
+      "barcode": "4988009557724",
+      "quality": "normal",
+      "date": "1991-08-29",
+      "media": [
+        {
+          "title": "",
+          "format": "CD",
+          "format-id": "9712d52a-4509-3d4b-a1a2-67c88c643e31",
+          "track-count": 13,
+          "discs": [
+            {
+              "offset-count": 13,
+              "offsets": [
+                150,
+                25040,
+                49400,
+                66525,
+                95580,
+                125915,
+                143965,
+                162305,
+                191475,
+                210742,
+                233877,
+                264630,
+                282162
+              ],
+              "sectors": 296275,
+              "id": "EAqWgzppKFIOMFfcKLXXJerWIQU-"
+            },
+            {
+              "offsets": [
+                150,
+                25055,
+                49400,
+                66470,
+                95510,
+                125829,
+                143842,
+                162180,
+                191337,
+                210580,
+                233720,
+                264445,
+                281992
+              ],
+              "offset-count": 13,
+              "id": "P4lrBkPFueYMWsg95fApX_nqfEc-",
+              "sectors": 296117
+            },
+            {
+              "offset-count": 13,
+              "offsets": [
+                150,
+                25117,
+                49561,
+                66784,
+                95851,
+                126191,
+                144356,
+                162701,
+                191930,
+                211326,
+                234589,
+                265284,
+                282920
+              ],
+              "id": "aSJ16jbjQgNQMBdEcPOWYeYShLg-",
+              "sectors": 297045
+            },
+            {
+              "id": "gTG2rAkzrRSRL0UdcFjOfvVFf7c-",
+              "sectors": 296117,
+              "offset-count": 13,
+              "offsets": [
+                150,
+                25055,
+                49400,
+                66470,
+                95510,
+                125830,
+                143842,
+                162180,
+                191337,
+                210580,
+                233720,
+                264445,
+                281992
+              ]
+            },
+            {
+              "sectors": 296067,
+              "id": "sjBTreW16CT3m.qxvtoD1cEYu04-",
+              "offset-count": 13,
+              "offsets": [
+                150,
+                25013,
+                49370,
+                66443,
+                95475,
+                125790,
+                143815,
+                162143,
+                191300,
+                210540,
+                233680,
+                264405,
+                281956
+              ]
+            }
+          ],
+          "position": 1
+        }
+      ],
+      "aliases": [],
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "release-events": [
+        {
+          "date": "1991-08-29",
+          "area": {
+            "sort-name": "Japan",
+            "name": "Japan",
+            "disambiguation": "",
+            "iso-3166-1-codes": [
+              "JP"
+            ],
+            "id": "2db42837-c832-3c27-b4a3-08198f75693c"
+          }
+        }
+      ],
+      "packaging": "Jewel Case"
+    },
+    {
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "disambiguation": "HDtracks (24-Bit / 96kHz)",
+      "title": "Metallica",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "name": "Metallica",
+          "artist": {
+            "disambiguation": "",
+            "sort-name": "Metallica",
+            "name": "Metallica",
+            "aliases": [
+              {
+                "sort-name": "Metallica",
+                "locale": "en",
+                "end": null,
+                "begin": null,
+                "name": "Metallica",
+                "primary": true,
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "type": "Artist name",
+                "ended": false
+              },
+              {
+                "end": null,
+                "sort-name": "メタリカ",
+                "locale": "ja",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "type": "Artist name",
+                "ended": false,
+                "begin": null,
+                "primary": false,
+                "name": "メタリカ"
+              },
+              {
+                "end": null,
+                "locale": "ko_KR",
+                "sort-name": "메탈리카",
+                "ended": false,
+                "type": null,
+                "type-id": null,
+                "name": "메탈리카",
+                "primary": true,
+                "begin": null
+              }
+            ],
+            "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab"
+          }
+        }
+      ],
+      "packaging-id": "119eba76-b343-3e02-a292-f0f00644bb9b",
+      "country": "US",
+      "quality": "normal",
+      "date": "2008",
+      "barcode": "",
+      "media": [
+        {
+          "format-id": "907a28d9-b3b2-3ef6-89a8-7b18d91d4794",
+          "track-count": 12,
+          "title": "",
+          "format": "Digital Media",
+          "position": 1,
+          "discs": []
+        }
+      ],
+      "aliases": [],
+      "release-events": [
+        {
+          "date": "2008",
+          "area": {
+            "id": "489ce91b-6658-3307-9877-795b68554c98",
+            "sort-name": "United States",
+            "name": "United States",
+            "disambiguation": "",
+            "iso-3166-1-codes": [
+              "US"
+            ]
+          }
+        }
+      ],
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "packaging": "None",
+      "id": "3fa8057f-9637-49c4-9088-c8d4f6c2388c",
+      "status": "Official"
+    },
+    {
+      "country": "CA",
+      "packaging-id": null,
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "name": "Metallica",
+          "artist": {
+            "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab",
+            "aliases": [
+              {
+                "type": "Artist name",
+                "ended": false,
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "primary": true,
+                "name": "Metallica",
+                "begin": null,
+                "end": null,
+                "sort-name": "Metallica",
+                "locale": "en"
+              },
+              {
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "ended": false,
+                "type": "Artist name",
+                "begin": null,
+                "primary": false,
+                "name": "メタリカ",
+                "end": null,
+                "locale": "ja",
+                "sort-name": "メタリカ"
+              },
+              {
+                "type": null,
+                "ended": false,
+                "type-id": null,
+                "name": "메탈리카",
+                "primary": true,
+                "begin": null,
+                "end": null,
+                "sort-name": "메탈리카",
+                "locale": "ko_KR"
+              }
+            ],
+            "sort-name": "Metallica",
+            "name": "Metallica",
+            "disambiguation": ""
+          }
+        }
+      ],
+      "title": "Metallica",
+      "disambiguation": "",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "status": "Official",
+      "id": "4005d28d-7c24-4eec-aa7f-695fef776262",
+      "release-events": [
+        {
+          "date": "1991",
+          "area": {
+            "id": "71bbafaa-e825-3e15-8ca9-017dcad1748b",
+            "name": "Canada",
+            "sort-name": "Canada",
+            "iso-3166-1-codes": [
+              "CA"
+            ],
+            "disambiguation": ""
+          }
+        }
+      ],
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "packaging": null,
+      "aliases": [],
+      "media": [
+        {
+          "position": 1,
+          "discs": [],
+          "track-count": 12,
+          "format-id": "9712d52a-4509-3d4b-a1a2-67c88c643e31",
+          "format": "CD",
+          "title": ""
+        }
+      ],
+      "barcode": "075596111324",
+      "quality": "normal",
+      "date": "1991"
+    },
+    {
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "disambiguation": "",
+      "title": "Metallica",
+      "packaging-id": null,
+      "artist-credit": [
+        {
+          "name": "Metallica",
+          "artist": {
+            "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab",
+            "aliases": [
+              {
+                "begin": null,
+                "name": "Metallica",
+                "primary": true,
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "type": "Artist name",
+                "ended": false,
+                "sort-name": "Metallica",
+                "locale": "en",
+                "end": null
+              },
+              {
+                "primary": false,
+                "name": "メタリカ",
+                "begin": null,
+                "type": "Artist name",
+                "ended": false,
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "sort-name": "メタリカ",
+                "locale": "ja",
+                "end": null
+              },
+              {
+                "type-id": null,
+                "type": null,
+                "ended": false,
+                "begin": null,
+                "name": "메탈리카",
+                "primary": true,
+                "end": null,
+                "sort-name": "메탈리카",
+                "locale": "ko_KR"
+              }
+            ],
+            "sort-name": "Metallica",
+            "name": "Metallica",
+            "disambiguation": ""
+          },
+          "joinphrase": ""
+        }
+      ],
+      "country": "US",
+      "aliases": [],
+      "release-events": [
+        {
+          "area": {
+            "id": "489ce91b-6658-3307-9877-795b68554c98",
+            "disambiguation": "",
+            "iso-3166-1-codes": [
+              "US"
+            ],
+            "sort-name": "United States",
+            "name": "United States"
+          },
+          "date": "1991"
+        }
+      ],
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "packaging": null,
+      "barcode": null,
+      "quality": "normal",
+      "date": "1991",
+      "media": [
+        {
+          "title": "",
+          "format": "Cassette",
+          "format-id": "f5e6e254-8f39-331c-936b-9c69d686dc47",
+          "track-count": 12,
+          "discs": [],
+          "position": 1
+        }
+      ],
+      "status": "Official",
+      "id": "4bc28473-5211-387c-8898-74631bc9e040"
+    },
+    {
+      "quality": "normal",
+      "date": "2003-11-06",
+      "barcode": null,
+      "media": [
+        {
+          "format": "CD",
+          "title": "",
+          "track-count": 13,
+          "format-id": "9712d52a-4509-3d4b-a1a2-67c88c643e31",
+          "discs": [
+            {
+              "sectors": 296275,
+              "id": "EAqWgzppKFIOMFfcKLXXJerWIQU-",
+              "offsets": [
+                150,
+                25040,
+                49400,
+                66525,
+                95580,
+                125915,
+                143965,
+                162305,
+                191475,
+                210742,
+                233877,
+                264630,
+                282162
+              ],
+              "offset-count": 13
+            },
+            {
+              "id": "aSJ16jbjQgNQMBdEcPOWYeYShLg-",
+              "sectors": 297045,
+              "offsets": [
+                150,
+                25117,
+                49561,
+                66784,
+                95851,
+                126191,
+                144356,
+                162701,
+                191930,
+                211326,
+                234589,
+                265284,
+                282920
+              ],
+              "offset-count": 13
+            },
+            {
+              "id": "gTG2rAkzrRSRL0UdcFjOfvVFf7c-",
+              "sectors": 296117,
+              "offset-count": 13,
+              "offsets": [
+                150,
+                25055,
+                49400,
+                66470,
+                95510,
+                125830,
+                143842,
+                162180,
+                191337,
+                210580,
+                233720,
+                264445,
+                281992
+              ]
+            },
+            {
+              "sectors": 296067,
+              "id": "sjBTreW16CT3m.qxvtoD1cEYu04-",
+              "offset-count": 13,
+              "offsets": [
+                150,
+                25013,
+                49370,
+                66443,
+                95475,
+                125790,
+                143815,
+                162143,
+                191300,
+                210540,
+                233680,
+                264405,
+                281956
+              ]
+            }
+          ],
+          "position": 1
+        }
+      ],
+      "aliases": [],
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "packaging": null,
+      "release-events": [
+        {
+          "date": "2003-11-06",
+          "area": {
+            "disambiguation": "",
+            "iso-3166-1-codes": [
+              "JP"
+            ],
+            "sort-name": "Japan",
+            "name": "Japan",
+            "id": "2db42837-c832-3c27-b4a3-08198f75693c"
+          }
+        }
+      ],
+      "id": "4c0d2e3a-0049-3d6a-ad84-db77165412db",
+      "status": "Official",
+      "disambiguation": "",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "title": "Metallica",
+      "artist-credit": [
+        {
+          "artist": {
+            "aliases": [
+              {
+                "name": "Metallica",
+                "primary": true,
+                "begin": null,
+                "type": "Artist name",
+                "ended": false,
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "sort-name": "Metallica",
+                "locale": "en",
+                "end": null
+              },
+              {
+                "sort-name": "メタリカ",
+                "locale": "ja",
+                "end": null,
+                "primary": false,
+                "name": "メタリカ",
+                "begin": null,
+                "type": "Artist name",
+                "ended": false,
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc"
+              },
+              {
+                "begin": null,
+                "primary": true,
+                "name": "메탈리카",
+                "type-id": null,
+                "type": null,
+                "ended": false,
+                "sort-name": "메탈리카",
+                "locale": "ko_KR",
+                "end": null
+              }
+            ],
+            "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab",
+            "disambiguation": "",
+            "sort-name": "Metallica",
+            "name": "Metallica"
+          },
+          "name": "Metallica",
+          "joinphrase": ""
+        }
+      ],
+      "packaging-id": null,
+      "country": "JP"
+    },
+    {
+      "disambiguation": "",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "title": "Metallica",
+      "artist-credit": [
+        {
+          "artist": {
+            "disambiguation": "",
+            "sort-name": "Metallica",
+            "name": "Metallica",
+            "aliases": [
+              {
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "ended": false,
+                "type": "Artist name",
+                "begin": null,
+                "name": "Metallica",
+                "primary": true,
+                "end": null,
+                "locale": "en",
+                "sort-name": "Metallica"
+              },
+              {
+                "ended": false,
+                "type": "Artist name",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "primary": false,
+                "name": "メタリカ",
+                "begin": null,
+                "end": null,
+                "locale": "ja",
+                "sort-name": "メタリカ"
+              },
+              {
+                "end": null,
+                "sort-name": "메탈리카",
+                "locale": "ko_KR",
+                "type": null,
+                "ended": false,
+                "type-id": null,
+                "primary": true,
+                "name": "메탈리카",
+                "begin": null
+              }
+            ],
+            "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab"
+          },
+          "name": "Metallica",
+          "joinphrase": ""
+        }
+      ],
+      "packaging-id": "e724a489-a7e8-30a1-a17c-30dfd6831202",
+      "country": "JP",
+      "quality": "normal",
+      "date": "2006",
+      "barcode": "4988005440051",
+      "media": [
+        {
+          "track-count": 13,
+          "format-id": "9712d52a-4509-3d4b-a1a2-67c88c643e31",
+          "format": "CD",
+          "title": "",
+          "position": 1,
+          "discs": []
+        }
+      ],
+      "aliases": [],
+      "packaging": "Gatefold Cover",
+      "text-representation": {
+        "script": "Jpan",
+        "language": "jpn"
+      },
+      "release-events": [
+        {
+          "area": {
+            "id": "2db42837-c832-3c27-b4a3-08198f75693c",
+            "disambiguation": "",
+            "iso-3166-1-codes": [
+              "JP"
+            ],
+            "sort-name": "Japan",
+            "name": "Japan"
+          },
+          "date": "2006"
+        }
+      ],
+      "id": "4ffe8f1b-3fc4-4b6c-a750-00f1b50429e1",
+      "status": "Official"
+    },
+    {
+      "media": [
+        {
+          "format-id": "9712d52a-4509-3d4b-a1a2-67c88c643e31",
+          "track-count": 12,
+          "title": "",
+          "format": "CD",
+          "position": 1,
+          "discs": []
+        }
+      ],
+      "barcode": "731451002229",
+      "quality": "normal",
+      "date": "1991",
+      "packaging": "Jewel Case",
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "release-events": [
+        {
+          "area": {
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "iso-3166-1-codes": [
+              "GB"
+            ],
+            "disambiguation": "",
+            "name": "United Kingdom",
+            "sort-name": "United Kingdom"
+          },
+          "date": "1991"
+        }
+      ],
+      "aliases": [],
+      "status": "Official",
+      "id": "56bb94dc-9e63-4e79-a41c-db0d40f12475",
+      "title": "Metallica",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "disambiguation": "",
+      "country": "GB",
+      "packaging-id": "ec27701a-4a22-37f4-bfac-6616e0f9750a",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "name": "Metallica",
+          "artist": {
+            "disambiguation": "",
+            "sort-name": "Metallica",
+            "name": "Metallica",
+            "aliases": [
+              {
+                "begin": null,
+                "primary": true,
+                "name": "Metallica",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "type": "Artist name",
+                "ended": false,
+                "sort-name": "Metallica",
+                "locale": "en",
+                "end": null
+              },
+              {
+                "end": null,
+                "locale": "ja",
+                "sort-name": "メタリカ",
+                "ended": false,
+                "type": "Artist name",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "name": "メタリカ",
+                "primary": false,
+                "begin": null
+              },
+              {
+                "ended": false,
+                "type": null,
+                "type-id": null,
+                "primary": true,
+                "name": "메탈리카",
+                "begin": null,
+                "end": null,
+                "locale": "ko_KR",
+                "sort-name": "메탈리카"
+              }
+            ],
+            "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab"
+          }
+        }
+      ]
+    },
+    {
+      "aliases": [],
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "packaging": "None",
+      "release-events": [
+        {
+          "date": "2016",
+          "area": {
+            "id": "489ce91b-6658-3307-9877-795b68554c98",
+            "disambiguation": "",
+            "iso-3166-1-codes": [
+              "US"
+            ],
+            "sort-name": "United States",
+            "name": "United States"
+          }
+        }
+      ],
+      "barcode": "093624986553",
+      "date": "2016",
+      "quality": "normal",
+      "media": [
+        {
+          "track-count": 12,
+          "format-id": "907a28d9-b3b2-3ef6-89a8-7b18d91d4794",
+          "format": "Digital Media",
+          "title": "",
+          "position": 1,
+          "discs": []
+        }
+      ],
+      "status": "Official",
+      "id": "62b44e09-ce0c-4c42-af3b-d91c8550abb7",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "disambiguation": "Mastered for iTunes",
+      "title": "Metallica",
+      "packaging-id": "119eba76-b343-3e02-a292-f0f00644bb9b",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "artist": {
+            "aliases": [
+              {
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "ended": false,
+                "type": "Artist name",
+                "begin": null,
+                "name": "Metallica",
+                "primary": true,
+                "end": null,
+                "locale": "en",
+                "sort-name": "Metallica"
+              },
+              {
+                "primary": false,
+                "name": "メタリカ",
+                "begin": null,
+                "ended": false,
+                "type": "Artist name",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "locale": "ja",
+                "sort-name": "メタリカ",
+                "end": null
+              },
+              {
+                "locale": "ko_KR",
+                "sort-name": "메탈리카",
+                "end": null,
+                "name": "메탈리카",
+                "primary": true,
+                "begin": null,
+                "ended": false,
+                "type": null,
+                "type-id": null
+              }
+            ],
+            "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab",
+            "disambiguation": "",
+            "sort-name": "Metallica",
+            "name": "Metallica"
+          },
+          "name": "Metallica"
+        }
+      ],
+      "country": "US"
+    },
+    {
+      "barcode": "075596111393",
+      "quality": "normal",
+      "date": "2001",
+      "media": [
+        {
+          "format": "DVD-Audio",
+          "title": "",
+          "track-count": 12,
+          "format-id": "9d7fa8ab-3bb4-36f6-a8c6-b7eed946fc4b",
+          "discs": [],
+          "position": 1
+        }
+      ],
+      "aliases": [],
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "release-events": [
+        {
+          "date": "2001",
+          "area": {
+            "iso-3166-1-codes": [
+              "US"
+            ],
+            "disambiguation": "",
+            "name": "United States",
+            "sort-name": "United States",
+            "id": "489ce91b-6658-3307-9877-795b68554c98"
+          }
+        }
+      ],
+      "packaging": null,
+      "status": "Official",
+      "id": "64b1eb34-0981-49d8-93fd-f93a6c77ea29",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "disambiguation": "",
+      "title": "Metallica",
+      "packaging-id": null,
+      "artist-credit": [
+        {
+          "name": "Metallica",
+          "artist": {
+            "name": "Metallica",
+            "sort-name": "Metallica",
+            "disambiguation": "",
+            "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab",
+            "aliases": [
+              {
+                "locale": "en",
+                "sort-name": "Metallica",
+                "end": null,
+                "name": "Metallica",
+                "primary": true,
+                "begin": null,
+                "ended": false,
+                "type": "Artist name",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc"
+              },
+              {
+                "primary": false,
+                "name": "メタリカ",
+                "begin": null,
+                "type": "Artist name",
+                "ended": false,
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "sort-name": "メタリカ",
+                "locale": "ja",
+                "end": null
+              },
+              {
+                "primary": true,
+                "name": "메탈리카",
+                "begin": null,
+                "type": null,
+                "ended": false,
+                "type-id": null,
+                "sort-name": "메탈리카",
+                "locale": "ko_KR",
+                "end": null
+              }
+            ]
+          },
+          "joinphrase": ""
+        }
+      ],
+      "country": "US"
+    },
+    {
+      "title": "Metallica",
+      "disambiguation": "",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "country": "FR",
+      "artist-credit": [
+        {
+          "name": "Metallica",
+          "artist": {
+            "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab",
+            "aliases": [
+              {
+                "sort-name": "Metallica",
+                "locale": "en",
+                "end": null,
+                "begin": null,
+                "primary": true,
+                "name": "Metallica",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "type": "Artist name",
+                "ended": false
+              },
+              {
+                "end": null,
+                "sort-name": "メタリカ",
+                "locale": "ja",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "type": "Artist name",
+                "ended": false,
+                "begin": null,
+                "primary": false,
+                "name": "メタリカ"
+              },
+              {
+                "end": null,
+                "sort-name": "메탈리카",
+                "locale": "ko_KR",
+                "type": null,
+                "ended": false,
+                "type-id": null,
+                "primary": true,
+                "name": "메탈리카",
+                "begin": null
+              }
+            ],
+            "sort-name": "Metallica",
+            "name": "Metallica",
+            "disambiguation": ""
+          },
+          "joinphrase": ""
+        }
+      ],
+      "packaging-id": null,
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "release-events": [
+        {
+          "area": {
+            "id": "08310658-51eb-3801-80de-5a0739207115",
+            "name": "France",
+            "sort-name": "France",
+            "iso-3166-1-codes": [
+              "FR"
+            ],
+            "disambiguation": ""
+          },
+          "date": "2009-02-16"
+        }
+      ],
+      "packaging": null,
+      "aliases": [],
+      "media": [
+        {
+          "discs": [],
+          "position": 1,
+          "title": "",
+          "format": "Vinyl",
+          "format-id": "10e17707-9751-3aaf-95b2-2432acd5374c",
+          "track-count": 3
+        },
+        {
+          "track-count": 2,
+          "format-id": "10e17707-9751-3aaf-95b2-2432acd5374c",
+          "format": "Vinyl",
+          "title": "",
+          "position": 2,
+          "discs": []
+        },
+        {
+          "track-count": 3,
+          "format-id": "10e17707-9751-3aaf-95b2-2432acd5374c",
+          "format": "Vinyl",
+          "title": "",
+          "position": 3,
+          "discs": []
+        },
+        {
+          "track-count": 4,
+          "format-id": "10e17707-9751-3aaf-95b2-2432acd5374c",
+          "format": "Vinyl",
+          "title": "",
+          "position": 4,
+          "discs": []
+        }
+      ],
+      "quality": "normal",
+      "date": "2009-02-16",
+      "barcode": "600753156063",
+      "id": "67fc2b8e-9a31-3905-b424-45f97c7a795c",
+      "status": "Official"
+    },
+    {
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "disambiguation": "",
+      "title": "Metallica",
+      "packaging-id": "ec27701a-4a22-37f4-bfac-6616e0f9750a",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "artist": {
+            "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab",
+            "aliases": [
+              {
+                "end": null,
+                "locale": "en",
+                "sort-name": "Metallica",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "ended": false,
+                "type": "Artist name",
+                "begin": null,
+                "name": "Metallica",
+                "primary": true
+              },
+              {
+                "begin": null,
+                "primary": false,
+                "name": "メタリカ",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "type": "Artist name",
+                "ended": false,
+                "sort-name": "メタリカ",
+                "locale": "ja",
+                "end": null
+              },
+              {
+                "end": null,
+                "locale": "ko_KR",
+                "sort-name": "메탈리카",
+                "ended": false,
+                "type": null,
+                "type-id": null,
+                "name": "메탈리카",
+                "primary": true,
+                "begin": null
+              }
+            ],
+            "sort-name": "Metallica",
+            "name": "Metallica",
+            "disambiguation": ""
+          },
+          "name": "Metallica"
+        }
+      ],
+      "country": "JP",
+      "barcode": "4988005690685",
+      "quality": "normal",
+      "date": "2011-11-02",
+      "media": [
+        {
+          "track-count": 13,
+          "format-id": "4856b1c6-674d-3f68-a1dd-8ae517e8b566",
+          "format": "SHM-CD",
+          "title": "",
+          "position": 1,
+          "discs": []
+        }
+      ],
+      "aliases": [],
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "release-events": [
+        {
+          "date": "2011-11-02",
+          "area": {
+            "iso-3166-1-codes": [
+              "JP"
+            ],
+            "disambiguation": "",
+            "name": "Japan",
+            "sort-name": "Japan",
+            "id": "2db42837-c832-3c27-b4a3-08198f75693c"
+          }
+        }
+      ],
+      "packaging": "Jewel Case",
+      "status": "Official",
+      "id": "68d2419f-e55d-42ff-8a7a-a8ed079df0c9"
+    },
+    {
+      "status": "Official",
+      "id": "69a8ca83-a182-3375-a702-a30e216748c9",
+      "aliases": [
+        {
+          "sort-name": "Black Album",
+          "locale": null,
+          "end": null,
+          "primary": null,
+          "name": "Black Album",
+          "begin": null,
+          "type": null,
+          "ended": false,
+          "type-id": null
+        }
+      ],
+      "release-events": [
+        {
+          "date": "1991-08-12",
+          "area": {
+            "id": "489ce91b-6658-3307-9877-795b68554c98",
+            "name": "United States",
+            "sort-name": "United States",
+            "iso-3166-1-codes": [
+              "US"
+            ],
+            "disambiguation": ""
+          }
+        },
+        {
+          "area": null,
+          "date": "1991-08-13"
+        }
+      ],
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "packaging": "Jewel Case",
+      "barcode": "075596111324",
+      "quality": "normal",
+      "date": "1991-08-12",
+      "media": [
+        {
+          "position": 1,
+          "discs": [
+            {
+              "offsets": [
+                182,
+                25050,
+                49392,
+                66475,
+                95507,
+                125825,
+                143850,
+                162177,
+                191332,
+                210580,
+                233720,
+                264440
+              ],
+              "offset-count": 12,
+              "sectors": 281982,
+              "id": "0XAgYaWP9UMi6yH6d69QalMIAbY-"
+            },
+            {
+              "sectors": 281945,
+              "id": "187jLdhWBMqSj9dJv1Y71W0xXaA-",
+              "offset-count": 12,
+              "offsets": [
+                150,
+                25015,
+                49351,
+                66416,
+                95456,
+                125774,
+                143792,
+                162128,
+                191291,
+                210533,
+                233671,
+                264393
+              ]
+            },
+            {
+              "sectors": 281948,
+              "id": "3N1IOTlI1Mo2T7SJB94sEtesqm8-",
+              "offsets": [
+                150,
+                25013,
+                49370,
+                66443,
+                95475,
+                125790,
+                143815,
+                162143,
+                191300,
+                210540,
+                233680,
+                264405
+              ],
+              "offset-count": 12
+            },
+            {
+              "offset-count": 12,
+              "offsets": [
+                150,
+                25110,
+                49440,
+                66570,
+                95565,
+                125910,
+                143955,
+                162180,
+                191415,
+                210705,
+                233850,
+                264435
+              ],
+              "sectors": 282134,
+              "id": "5ZwAwmmxEfcAwyQZPBePPHrkduY-"
+            },
+            {
+              "id": "9G.vPL1kn2PQzejpApeIKzesjcQ-",
+              "sectors": 281950,
+              "offset-count": 12,
+              "offsets": [
+                150,
+                25018,
+                49360,
+                66443,
+                95475,
+                125793,
+                143818,
+                162145,
+                191300,
+                210548,
+                233688,
+                264408
+              ]
+            },
+            {
+              "id": "EF575VQLcfM_aXV8qMB.KMjXhsg-",
+              "sectors": 280859,
+              "offset-count": 12,
+              "offsets": [
+                150,
+                24899,
+                49167,
+                66240,
+                95116,
+                125273,
+                143298,
+                161452,
+                190501,
+                209716,
+                232801,
+                263318
+              ]
+            },
+            {
+              "offsets": [
+                182,
+                25045,
+                49402,
+                66475,
+                95507,
+                125822,
+                143847,
+                162175,
+                191332,
+                210572,
+                233712,
+                264437
+              ],
+              "offset-count": 12,
+              "id": "Ex07mIuCGmy0wSSlJS_nVqRlWaI-",
+              "sectors": 281979
+            },
+            {
+              "sectors": 281983,
+              "id": "LIkJpSHHaMLUZsdByM.SKfzkQsM-",
+              "offset-count": 12,
+              "offsets": [
+                183,
+                25050,
+                49393,
+                66473,
+                95508,
+                125825,
+                143848,
+                162178,
+                191333,
+                210578,
+                233718,
+                264440
+              ]
+            },
+            {
+              "id": "LQTZ7CEWKpVmSiJ43eLKcrYcO6I-",
+              "sectors": 282561,
+              "offset-count": 12,
+              "offsets": [
+                150,
+                25056,
+                49475,
+                66707,
+                95742,
+                126056,
+                144230,
+                162540,
+                191743,
+                211115,
+                234351,
+                265019
+              ]
+            },
+            {
+              "offsets": [
+                182,
+                25045,
+                49402,
+                66475,
+                95507,
+                125822,
+                143847,
+                162175,
+                191332,
+                210572,
+                233712,
+                264437
+              ],
+              "offset-count": 12,
+              "sectors": 282130,
+              "id": "OTlRbNMyNaOX43PdRXXmBw0clDM-"
+            },
+            {
+              "id": "Tit3F0Do_sZ_7NbfM_1vlEbF0wo-",
+              "sectors": 281975,
+              "offset-count": 12,
+              "offsets": [
+                150,
+                25042,
+                49385,
+                66457,
+                95500,
+                125817,
+                143832,
+                162170,
+                191325,
+                210570,
+                233710,
+                264432
+              ]
+            },
+            {
+              "offsets": [
+                150,
+                25017,
+                49379,
+                66456,
+                95490,
+                125810,
+                143840,
+                162171,
+                191330,
+                210572,
+                233716,
+                264442
+              ],
+              "offset-count": 12,
+              "id": "XZt2PKb_Sq1t9dl.NQfwxchigyY-",
+              "sectors": 281988
+            },
+            {
+              "offsets": [
+                150,
+                25083,
+                49431,
+                66473,
+                95528,
+                125850,
+                143862,
+                162200,
+                191348,
+                210591,
+                233730,
+                264446
+              ],
+              "offset-count": 12,
+              "sectors": 282001,
+              "id": "_gO4gbRoAIrGkQkMWO5j6lnCvNA-"
+            },
+            {
+              "id": "_qF9K7DD3fCk3keSxQIR8Dd1ds4-",
+              "sectors": 281980,
+              "offsets": [
+                182,
+                25045,
+                49402,
+                66475,
+                95507,
+                125822,
+                143847,
+                162175,
+                191332,
+                210572,
+                233712,
+                264437
+              ],
+              "offset-count": 12
+            },
+            {
+              "sectors": 281982,
+              "id": "abYPQeevuSBu3A8.nqS5kOPop0E-",
+              "offsets": [
+                182,
+                25050,
+                49392,
+                66472,
+                95507,
+                125825,
+                143847,
+                162177,
+                191332,
+                210577,
+                233717,
+                264440
+              ],
+              "offset-count": 12
+            },
+            {
+              "offset-count": 12,
+              "offsets": [
+                150,
+                25017,
+                49360,
+                66440,
+                95475,
+                125792,
+                143815,
+                162145,
+                191300,
+                210545,
+                233685,
+                264407
+              ],
+              "id": "goiyF_.BCukRYkQZoxu6iF7UvuI-",
+              "sectors": 281982
+            },
+            {
+              "sectors": 281950,
+              "id": "jYRg_F0xcihZfRt3lsBR1qwdmHM-",
+              "offset-count": 12,
+              "offsets": [
+                150,
+                25020,
+                49365,
+                66430,
+                95475,
+                125795,
+                143807,
+                162145,
+                191302,
+                210550,
+                233685,
+                264407
+              ]
+            },
+            {
+              "offsets": [
+                150,
+                25065,
+                49412,
+                66492,
+                95532,
+                125840,
+                143865,
+                162205,
+                191352,
+                210602,
+                233740,
+                264455
+              ],
+              "offset-count": 12,
+              "id": "oCW9f2wGQUMDF2et.J_uApR_4ME-",
+              "sectors": 282025
+            },
+            {
+              "sectors": 282045,
+              "id": "rfzqw_R9KHB5WE1p3MbJcl9F95c-",
+              "offsets": [
+                183,
+                25095,
+                49445,
+                66530,
+                95555,
+                125873,
+                143903,
+                162225,
+                191380,
+                210635,
+                233773,
+                264483
+              ],
+              "offset-count": 12
+            },
+            {
+              "offset-count": 12,
+              "offsets": [
+                183,
+                25095,
+                49445,
+                66530,
+                95555,
+                125873,
+                143903,
+                162225,
+                191380,
+                210635,
+                233773,
+                264483
+              ],
+              "sectors": 282195,
+              "id": "xJZpfFDEOJKd5S8JLgBT34udxUc-"
+            },
+            {
+              "sectors": 280845,
+              "id": "zDd1xNZno4ippwK2H7dD2Jm3.Z8-",
+              "offsets": [
+                150,
+                24941,
+                49229,
+                66363,
+                95219,
+                125228,
+                143269,
+                161523,
+                190550,
+                209880,
+                232932,
+                263393
+              ],
+              "offset-count": 12
+            },
+            {
+              "offset-count": 12,
+              "offsets": [
+                150,
+                25011,
+                49366,
+                66437,
+                95467,
+                125780,
+                143803,
+                162129,
+                191284,
+                210522,
+                233660,
+                264383
+              ],
+              "sectors": 281924,
+              "id": "zZ8O.UKwlUOmmeC.9xloz8_PbN8-"
+            },
+            {
+              "sectors": 282087,
+              "id": "zuJY_tMecFKoaXeuYWTKlIJedr0-",
+              "offset-count": 12,
+              "offsets": [
+                150,
+                25067,
+                49410,
+                66482,
+                95525,
+                125842,
+                143857,
+                162195,
+                191350,
+                210595,
+                233735,
+                264457
+              ]
+            }
+          ],
+          "format-id": "9712d52a-4509-3d4b-a1a2-67c88c643e31",
+          "track-count": 12,
+          "title": "",
+          "format": "CD"
+        }
+      ],
+      "packaging-id": "ec27701a-4a22-37f4-bfac-6616e0f9750a",
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab",
+            "aliases": [
+              {
+                "ended": false,
+                "type": "Artist name",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "name": "Metallica",
+                "primary": true,
+                "begin": null,
+                "end": null,
+                "locale": "en",
+                "sort-name": "Metallica"
+              },
+              {
+                "name": "メタリカ",
+                "primary": false,
+                "begin": null,
+                "ended": false,
+                "type": "Artist name",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "locale": "ja",
+                "sort-name": "メタリカ",
+                "end": null
+              },
+              {
+                "type": null,
+                "ended": false,
+                "type-id": null,
+                "name": "메탈리카",
+                "primary": true,
+                "begin": null,
+                "end": null,
+                "sort-name": "메탈리카",
+                "locale": "ko_KR"
+              }
+            ],
+            "sort-name": "Metallica",
+            "name": "Metallica",
+            "disambiguation": ""
+          },
+          "name": "Metallica",
+          "joinphrase": ""
+        }
+      ],
+      "country": "US",
+      "disambiguation": "",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "title": "Metallica"
+    },
+    {
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "disambiguation": "",
+      "title": "Metallica",
+      "packaging-id": "f7101ce3-0384-39ce-9fde-fbbd0044d35f",
+      "artist-credit": [
+        {
+          "name": "Metallica",
+          "artist": {
+            "disambiguation": "",
+            "sort-name": "Metallica",
+            "name": "Metallica",
+            "aliases": [
+              {
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "ended": false,
+                "type": "Artist name",
+                "begin": null,
+                "primary": true,
+                "name": "Metallica",
+                "end": null,
+                "locale": "en",
+                "sort-name": "Metallica"
+              },
+              {
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "type": "Artist name",
+                "ended": false,
+                "begin": null,
+                "name": "メタリカ",
+                "primary": false,
+                "end": null,
+                "sort-name": "メタリカ",
+                "locale": "ja"
+              },
+              {
+                "type-id": null,
+                "type": null,
+                "ended": false,
+                "begin": null,
+                "name": "메탈리카",
+                "primary": true,
+                "end": null,
+                "sort-name": "메탈리카",
+                "locale": "ko_KR"
+              }
+            ],
+            "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab"
+          },
+          "joinphrase": ""
+        }
+      ],
+      "country": "JP",
+      "barcode": "4988005628664",
+      "date": "2010-09-22",
+      "quality": "normal",
+      "media": [
+        {
+          "position": 1,
+          "discs": [
+            {
+              "sectors": 296275,
+              "id": "EAqWgzppKFIOMFfcKLXXJerWIQU-",
+              "offset-count": 13,
+              "offsets": [
+                150,
+                25040,
+                49400,
+                66525,
+                95580,
+                125915,
+                143965,
+                162305,
+                191475,
+                210742,
+                233877,
+                264630,
+                282162
+              ]
+            },
+            {
+              "id": "aSJ16jbjQgNQMBdEcPOWYeYShLg-",
+              "sectors": 297045,
+              "offsets": [
+                150,
+                25117,
+                49561,
+                66784,
+                95851,
+                126191,
+                144356,
+                162701,
+                191930,
+                211326,
+                234589,
+                265284,
+                282920
+              ],
+              "offset-count": 13
+            },
+            {
+              "offsets": [
+                150,
+                25055,
+                49400,
+                66470,
+                95510,
+                125830,
+                143842,
+                162180,
+                191337,
+                210580,
+                233720,
+                264445,
+                281992
+              ],
+              "offset-count": 13,
+              "sectors": 296117,
+              "id": "gTG2rAkzrRSRL0UdcFjOfvVFf7c-"
+            },
+            {
+              "offset-count": 13,
+              "offsets": [
+                150,
+                25013,
+                49370,
+                66443,
+                95475,
+                125790,
+                143815,
+                162143,
+                191300,
+                210540,
+                233680,
+                264405,
+                281956
+              ],
+              "sectors": 296067,
+              "id": "sjBTreW16CT3m.qxvtoD1cEYu04-"
+            }
+          ],
+          "track-count": 13,
+          "format-id": "4856b1c6-674d-3f68-a1dd-8ae517e8b566",
+          "format": "SHM-CD",
+          "title": ""
+        }
+      ],
+      "aliases": [],
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "release-events": [
+        {
+          "date": "2010-09-22",
+          "area": {
+            "id": "2db42837-c832-3c27-b4a3-08198f75693c",
+            "sort-name": "Japan",
+            "name": "Japan",
+            "disambiguation": "",
+            "iso-3166-1-codes": [
+              "JP"
+            ]
+          }
+        }
+      ],
+      "packaging": "Cardboard/Paper Sleeve",
+      "status": "Official",
+      "id": "6e729716-c0eb-3f50-a740-96ac173be50d"
+    },
+    {
+      "status": "Official",
+      "id": "7d0acc30-4130-4283-8e5b-c4d77af843b6",
+      "aliases": [],
+      "packaging": null,
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "release-events": [
+        {
+          "area": {
+            "id": "89a675c2-3e37-3518-b83c-418bad59a85a",
+            "sort-name": "Europe",
+            "name": "Europe",
+            "disambiguation": "",
+            "iso-3166-1-codes": [
+              "XE"
+            ]
+          },
+          "date": "2008"
+        },
+        {
+          "area": {
+            "id": "85752fda-13c4-31a3-bee5-0e5cb1f51dad",
+            "disambiguation": "",
+            "iso-3166-1-codes": [
+              "DE"
+            ],
+            "sort-name": "Germany",
+            "name": "Germany"
+          },
+          "date": "2009-02-20"
+        }
+      ],
+      "barcode": "600753156063",
+      "quality": "normal",
+      "date": "2008",
+      "media": [
+        {
+          "title": "",
+          "format": "12\" Vinyl",
+          "format-id": "3e9080b0-5e6c-34ab-bd15-f526b6306a64",
+          "track-count": 3,
+          "discs": [],
+          "position": 1
+        },
+        {
+          "position": 2,
+          "discs": [],
+          "format-id": "3e9080b0-5e6c-34ab-bd15-f526b6306a64",
+          "track-count": 2,
+          "title": "",
+          "format": "12\" Vinyl"
+        },
+        {
+          "title": "",
+          "format": "12\" Vinyl",
+          "format-id": "3e9080b0-5e6c-34ab-bd15-f526b6306a64",
+          "track-count": 3,
+          "discs": [],
+          "position": 3
+        },
+        {
+          "track-count": 4,
+          "format-id": "3e9080b0-5e6c-34ab-bd15-f526b6306a64",
+          "format": "12\" Vinyl",
+          "title": "",
+          "position": 4,
+          "discs": []
+        }
+      ],
+      "packaging-id": null,
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "name": "Metallica",
+          "artist": {
+            "name": "Metallica",
+            "sort-name": "Metallica",
+            "disambiguation": "",
+            "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab",
+            "aliases": [
+              {
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "type": "Artist name",
+                "ended": false,
+                "begin": null,
+                "primary": true,
+                "name": "Metallica",
+                "end": null,
+                "sort-name": "Metallica",
+                "locale": "en"
+              },
+              {
+                "locale": "ja",
+                "sort-name": "メタリカ",
+                "end": null,
+                "begin": null,
+                "name": "メタリカ",
+                "primary": false,
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "ended": false,
+                "type": "Artist name"
+              },
+              {
+                "locale": "ko_KR",
+                "sort-name": "메탈리카",
+                "end": null,
+                "name": "메탈리카",
+                "primary": true,
+                "begin": null,
+                "ended": false,
+                "type": null,
+                "type-id": null
+              }
+            ]
+          }
+        }
+      ],
+      "country": "XE",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "disambiguation": "",
+      "title": "Metallica"
+    },
+    {
+      "media": [
+        {
+          "discs": [],
+          "position": 1,
+          "title": "",
+          "format": "12\" Vinyl",
+          "format-id": "3e9080b0-5e6c-34ab-bd15-f526b6306a64",
+          "track-count": 3
+        },
+        {
+          "track-count": 2,
+          "format-id": "3e9080b0-5e6c-34ab-bd15-f526b6306a64",
+          "format": "12\" Vinyl",
+          "title": "",
+          "position": 2,
+          "discs": []
+        },
+        {
+          "format": "12\" Vinyl",
+          "title": "",
+          "track-count": 3,
+          "format-id": "3e9080b0-5e6c-34ab-bd15-f526b6306a64",
+          "discs": [],
+          "position": 3
+        },
+        {
+          "track-count": 4,
+          "format-id": "3e9080b0-5e6c-34ab-bd15-f526b6306a64",
+          "format": "12\" Vinyl",
+          "title": "",
+          "position": 4,
+          "discs": []
+        }
+      ],
+      "barcode": "0093624984962",
+      "quality": "normal",
+      "date": "2008-11-28",
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "release-events": [
+        {
+          "area": {
+            "id": "489ce91b-6658-3307-9877-795b68554c98",
+            "sort-name": "United States",
+            "name": "United States",
+            "disambiguation": "",
+            "iso-3166-1-codes": [
+              "US"
+            ]
+          },
+          "date": "2008-11-28"
+        }
+      ],
+      "packaging": null,
+      "aliases": [],
+      "status": "Official",
+      "id": "af4f69e8-1643-3b5a-94ba-a0269f8e3c77",
+      "title": "Metallica",
+      "disambiguation": "",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "country": "US",
+      "packaging-id": null,
+      "artist-credit": [
+        {
+          "artist": {
+            "name": "Metallica",
+            "sort-name": "Metallica",
+            "disambiguation": "",
+            "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab",
+            "aliases": [
+              {
+                "name": "Metallica",
+                "primary": true,
+                "begin": null,
+                "type": "Artist name",
+                "ended": false,
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "sort-name": "Metallica",
+                "locale": "en",
+                "end": null
+              },
+              {
+                "end": null,
+                "locale": "ja",
+                "sort-name": "メタリカ",
+                "ended": false,
+                "type": "Artist name",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "name": "メタリカ",
+                "primary": false,
+                "begin": null
+              },
+              {
+                "type-id": null,
+                "type": null,
+                "ended": false,
+                "begin": null,
+                "name": "메탈리카",
+                "primary": true,
+                "end": null,
+                "sort-name": "메탈리카",
+                "locale": "ko_KR"
+              }
+            ]
+          },
+          "name": "Metallica",
+          "joinphrase": ""
+        }
+      ]
+    },
+    {
+      "id": "e33609a4-fcda-4ebe-b845-b6503a6c0405",
+      "status": "Official",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "packaging": "Jewel Case",
+      "release-events": [
+        {
+          "date": "1991-08",
+          "area": {
+            "name": "Europe",
+            "sort-name": "Europe",
+            "iso-3166-1-codes": [
+              "XE"
+            ],
+            "disambiguation": "",
+            "id": "89a675c2-3e37-3518-b83c-418bad59a85a"
+          }
+        }
+      ],
+      "aliases": [
+        {
+          "end": null,
+          "sort-name": "The Black Album",
+          "locale": null,
+          "type": "Search hint",
+          "ended": false,
+          "type-id": "02939c89-0e48-3357-bf41-bf8e4162c874",
+          "primary": null,
+          "name": "The Black Album",
+          "begin": null
+        }
+      ],
+      "media": [
+        {
+          "format-id": "9712d52a-4509-3d4b-a1a2-67c88c643e31",
+          "track-count": 12,
+          "title": "",
+          "format": "CD",
+          "position": 1,
+          "discs": [
+            {
+              "sectors": 281982,
+              "id": "0XAgYaWP9UMi6yH6d69QalMIAbY-",
+              "offsets": [
+                182,
+                25050,
+                49392,
+                66475,
+                95507,
+                125825,
+                143850,
+                162177,
+                191332,
+                210580,
+                233720,
+                264440
+              ],
+              "offset-count": 12
+            },
+            {
+              "sectors": 281945,
+              "id": "187jLdhWBMqSj9dJv1Y71W0xXaA-",
+              "offset-count": 12,
+              "offsets": [
+                150,
+                25015,
+                49351,
+                66416,
+                95456,
+                125774,
+                143792,
+                162128,
+                191291,
+                210533,
+                233671,
+                264393
+              ]
+            },
+            {
+              "id": "3N1IOTlI1Mo2T7SJB94sEtesqm8-",
+              "sectors": 281948,
+              "offsets": [
+                150,
+                25013,
+                49370,
+                66443,
+                95475,
+                125790,
+                143815,
+                162143,
+                191300,
+                210540,
+                233680,
+                264405
+              ],
+              "offset-count": 12
+            },
+            {
+              "offset-count": 12,
+              "offsets": [
+                150,
+                25110,
+                49440,
+                66570,
+                95565,
+                125910,
+                143955,
+                162180,
+                191415,
+                210705,
+                233850,
+                264435
+              ],
+              "sectors": 282134,
+              "id": "5ZwAwmmxEfcAwyQZPBePPHrkduY-"
+            },
+            {
+              "sectors": 281950,
+              "id": "9G.vPL1kn2PQzejpApeIKzesjcQ-",
+              "offset-count": 12,
+              "offsets": [
+                150,
+                25018,
+                49360,
+                66443,
+                95475,
+                125793,
+                143818,
+                162145,
+                191300,
+                210548,
+                233688,
+                264408
+              ]
+            },
+            {
+              "offset-count": 12,
+              "offsets": [
+                150,
+                24899,
+                49167,
+                66240,
+                95116,
+                125273,
+                143298,
+                161452,
+                190501,
+                209716,
+                232801,
+                263318
+              ],
+              "sectors": 280859,
+              "id": "EF575VQLcfM_aXV8qMB.KMjXhsg-"
+            },
+            {
+              "sectors": 281979,
+              "id": "Ex07mIuCGmy0wSSlJS_nVqRlWaI-",
+              "offsets": [
+                182,
+                25045,
+                49402,
+                66475,
+                95507,
+                125822,
+                143847,
+                162175,
+                191332,
+                210572,
+                233712,
+                264437
+              ],
+              "offset-count": 12
+            },
+            {
+              "id": "LIkJpSHHaMLUZsdByM.SKfzkQsM-",
+              "sectors": 281983,
+              "offset-count": 12,
+              "offsets": [
+                183,
+                25050,
+                49393,
+                66473,
+                95508,
+                125825,
+                143848,
+                162178,
+                191333,
+                210578,
+                233718,
+                264440
+              ]
+            },
+            {
+              "id": "OTlRbNMyNaOX43PdRXXmBw0clDM-",
+              "sectors": 282130,
+              "offset-count": 12,
+              "offsets": [
+                182,
+                25045,
+                49402,
+                66475,
+                95507,
+                125822,
+                143847,
+                162175,
+                191332,
+                210572,
+                233712,
+                264437
+              ]
+            },
+            {
+              "id": "Tit3F0Do_sZ_7NbfM_1vlEbF0wo-",
+              "sectors": 281975,
+              "offsets": [
+                150,
+                25042,
+                49385,
+                66457,
+                95500,
+                125817,
+                143832,
+                162170,
+                191325,
+                210570,
+                233710,
+                264432
+              ],
+              "offset-count": 12
+            },
+            {
+              "sectors": 281988,
+              "id": "XZt2PKb_Sq1t9dl.NQfwxchigyY-",
+              "offset-count": 12,
+              "offsets": [
+                150,
+                25017,
+                49379,
+                66456,
+                95490,
+                125810,
+                143840,
+                162171,
+                191330,
+                210572,
+                233716,
+                264442
+              ]
+            },
+            {
+              "id": "_gO4gbRoAIrGkQkMWO5j6lnCvNA-",
+              "sectors": 282001,
+              "offsets": [
+                150,
+                25083,
+                49431,
+                66473,
+                95528,
+                125850,
+                143862,
+                162200,
+                191348,
+                210591,
+                233730,
+                264446
+              ],
+              "offset-count": 12
+            },
+            {
+              "offsets": [
+                182,
+                25045,
+                49402,
+                66475,
+                95507,
+                125822,
+                143847,
+                162175,
+                191332,
+                210572,
+                233712,
+                264437
+              ],
+              "offset-count": 12,
+              "sectors": 281980,
+              "id": "_qF9K7DD3fCk3keSxQIR8Dd1ds4-"
+            },
+            {
+              "offsets": [
+                182,
+                25050,
+                49392,
+                66472,
+                95507,
+                125825,
+                143847,
+                162177,
+                191332,
+                210577,
+                233717,
+                264440
+              ],
+              "offset-count": 12,
+              "sectors": 281982,
+              "id": "abYPQeevuSBu3A8.nqS5kOPop0E-"
+            },
+            {
+              "sectors": 281925,
+              "id": "gmDq_KOtFFUvdQWYNTOnN9Twj9Y-",
+              "offset-count": 12,
+              "offsets": [
+                182,
+                25050,
+                49395,
+                66472,
+                95505,
+                125827,
+                143852,
+                162177,
+                191337,
+                210575,
+                233720,
+                264432
+              ]
+            },
+            {
+              "offset-count": 12,
+              "offsets": [
+                150,
+                25017,
+                49360,
+                66440,
+                95475,
+                125792,
+                143815,
+                162145,
+                191300,
+                210545,
+                233685,
+                264407
+              ],
+              "sectors": 281982,
+              "id": "goiyF_.BCukRYkQZoxu6iF7UvuI-"
+            },
+            {
+              "offset-count": 12,
+              "offsets": [
+                150,
+                25020,
+                49365,
+                66430,
+                95475,
+                125795,
+                143807,
+                162145,
+                191302,
+                210550,
+                233685,
+                264407
+              ],
+              "id": "jYRg_F0xcihZfRt3lsBR1qwdmHM-",
+              "sectors": 281950
+            },
+            {
+              "sectors": 282025,
+              "id": "oCW9f2wGQUMDF2et.J_uApR_4ME-",
+              "offset-count": 12,
+              "offsets": [
+                150,
+                25065,
+                49412,
+                66492,
+                95532,
+                125840,
+                143865,
+                162205,
+                191352,
+                210602,
+                233740,
+                264455
+              ]
+            },
+            {
+              "offsets": [
+                183,
+                25095,
+                49445,
+                66530,
+                95555,
+                125873,
+                143903,
+                162225,
+                191380,
+                210635,
+                233773,
+                264483
+              ],
+              "offset-count": 12,
+              "id": "rfzqw_R9KHB5WE1p3MbJcl9F95c-",
+              "sectors": 282045
+            },
+            {
+              "offset-count": 12,
+              "offsets": [
+                183,
+                25095,
+                49445,
+                66530,
+                95555,
+                125873,
+                143903,
+                162225,
+                191380,
+                210635,
+                233773,
+                264483
+              ],
+              "id": "xJZpfFDEOJKd5S8JLgBT34udxUc-",
+              "sectors": 282195
+            },
+            {
+              "sectors": 280845,
+              "id": "zDd1xNZno4ippwK2H7dD2Jm3.Z8-",
+              "offset-count": 12,
+              "offsets": [
+                150,
+                24941,
+                49229,
+                66363,
+                95219,
+                125228,
+                143269,
+                161523,
+                190550,
+                209880,
+                232932,
+                263393
+              ]
+            },
+            {
+              "id": "zuJY_tMecFKoaXeuYWTKlIJedr0-",
+              "sectors": 282087,
+              "offset-count": 12,
+              "offsets": [
+                150,
+                25067,
+                49410,
+                66482,
+                95525,
+                125842,
+                143857,
+                162195,
+                191350,
+                210595,
+                233735,
+                264457
+              ]
+            }
+          ]
+        }
+      ],
+      "quality": "normal",
+      "date": "1991-08",
+      "barcode": "731451002229",
+      "country": "XE",
+      "artist-credit": [
+        {
+          "name": "Metallica",
+          "artist": {
+            "disambiguation": "",
+            "name": "Metallica",
+            "sort-name": "Metallica",
+            "aliases": [
+              {
+                "begin": null,
+                "primary": true,
+                "name": "Metallica",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "type": "Artist name",
+                "ended": false,
+                "sort-name": "Metallica",
+                "locale": "en",
+                "end": null
+              },
+              {
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "type": "Artist name",
+                "ended": false,
+                "begin": null,
+                "name": "メタリカ",
+                "primary": false,
+                "end": null,
+                "sort-name": "メタリカ",
+                "locale": "ja"
+              },
+              {
+                "begin": null,
+                "primary": true,
+                "name": "메탈리카",
+                "type-id": null,
+                "type": null,
+                "ended": false,
+                "sort-name": "메탈리카",
+                "locale": "ko_KR",
+                "end": null
+              }
+            ],
+            "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab"
+          },
+          "joinphrase": ""
+        }
+      ],
+      "packaging-id": "ec27701a-4a22-37f4-bfac-6616e0f9750a",
+      "title": "Metallica",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "disambiguation": ""
+    },
+    {
+      "id": "ee1fdc9b-a3a2-4140-aa12-a07073f1621f",
+      "status": "Official",
+      "aliases": [],
+      "release-events": [
+        {
+          "date": "2013-09-24",
+          "area": {
+            "iso-3166-1-codes": [
+              "US"
+            ],
+            "disambiguation": "",
+            "name": "United States",
+            "sort-name": "United States",
+            "id": "489ce91b-6658-3307-9877-795b68554c98"
+          }
+        }
+      ],
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "packaging": "Jewel Case",
+      "quality": "normal",
+      "date": "2013-09-24",
+      "barcode": "856115004514",
+      "media": [
+        {
+          "format": "CD",
+          "title": "",
+          "track-count": 12,
+          "format-id": "9712d52a-4509-3d4b-a1a2-67c88c643e31",
+          "discs": [
+            {
+              "sectors": 281982,
+              "id": "0XAgYaWP9UMi6yH6d69QalMIAbY-",
+              "offsets": [
+                182,
+                25050,
+                49392,
+                66475,
+                95507,
+                125825,
+                143850,
+                162177,
+                191332,
+                210580,
+                233720,
+                264440
+              ],
+              "offset-count": 12
+            }
+          ],
+          "position": 1
+        }
+      ],
+      "artist-credit": [
+        {
+          "name": "Metallica",
+          "artist": {
+            "aliases": [
+              {
+                "locale": "en",
+                "sort-name": "Metallica",
+                "end": null,
+                "begin": null,
+                "name": "Metallica",
+                "primary": true,
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "ended": false,
+                "type": "Artist name"
+              },
+              {
+                "sort-name": "メタリカ",
+                "locale": "ja",
+                "end": null,
+                "primary": false,
+                "name": "メタリカ",
+                "begin": null,
+                "type": "Artist name",
+                "ended": false,
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc"
+              },
+              {
+                "locale": "ko_KR",
+                "sort-name": "메탈리카",
+                "end": null,
+                "begin": null,
+                "name": "메탈리카",
+                "primary": true,
+                "type-id": null,
+                "ended": false,
+                "type": null
+              }
+            ],
+            "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab",
+            "disambiguation": "",
+            "name": "Metallica",
+            "sort-name": "Metallica"
+          },
+          "joinphrase": ""
+        }
+      ],
+      "packaging-id": "ec27701a-4a22-37f4-bfac-6616e0f9750a",
+      "country": "US",
+      "disambiguation": "",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "title": "Metallica"
+    },
+    {
+      "id": "fd93fc3f-128c-40d6-979b-60bcca8db05c",
+      "status": "Official",
+      "aliases": [],
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "packaging": null,
+      "release-events": [
+        {
+          "date": "1991-08",
+          "area": {
+            "iso-3166-1-codes": [
+              "US"
+            ],
+            "disambiguation": "",
+            "name": "United States",
+            "sort-name": "United States",
+            "id": "489ce91b-6658-3307-9877-795b68554c98"
+          }
+        }
+      ],
+      "quality": "normal",
+      "date": "1991-08",
+      "barcode": "075596111317",
+      "media": [
+        {
+          "position": 1,
+          "discs": [],
+          "format-id": "3e9080b0-5e6c-34ab-bd15-f526b6306a64",
+          "track-count": 6,
+          "title": "",
+          "format": "12\" Vinyl"
+        },
+        {
+          "position": 2,
+          "discs": [],
+          "format-id": "3e9080b0-5e6c-34ab-bd15-f526b6306a64",
+          "track-count": 6,
+          "title": "",
+          "format": "12\" Vinyl"
+        }
+      ],
+      "artist-credit": [
+        {
+          "name": "Metallica",
+          "artist": {
+            "disambiguation": "",
+            "sort-name": "Metallica",
+            "name": "Metallica",
+            "aliases": [
+              {
+                "end": null,
+                "sort-name": "Metallica",
+                "locale": "en",
+                "type": "Artist name",
+                "ended": false,
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "primary": true,
+                "name": "Metallica",
+                "begin": null
+              },
+              {
+                "end": null,
+                "locale": "ja",
+                "sort-name": "メタリカ",
+                "ended": false,
+                "type": "Artist name",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "primary": false,
+                "name": "メタリカ",
+                "begin": null
+              },
+              {
+                "locale": "ko_KR",
+                "sort-name": "메탈리카",
+                "end": null,
+                "begin": null,
+                "name": "메탈리카",
+                "primary": true,
+                "type-id": null,
+                "ended": false,
+                "type": null
+              }
+            ],
+            "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab"
+          },
+          "joinphrase": ""
+        }
+      ],
+      "packaging-id": null,
+      "country": "US",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "disambiguation": "",
+      "title": "Metallica"
+    }
+  ],
+  "first-release-date": "1991-08-12",
+  "primary-type": "Album",
+  "disambiguation": "“The Black Album”",
+  "user-rating": {
+    "value": null
+  },
+  "title": "Metallica",
+  "relations": [
+    {
+      "ended": false,
+      "type": "allmusic",
+      "direction": "forward",
+      "type-id": "a50a1d20-2b20-4d2c-9a29-eb771dd78386",
+      "attribute-values": {},
+      "target-credit": "",
+      "source-credit": "",
+      "begin": null,
+      "url": {
+        "resource": "http://www.allmusic.com/album/mw0000311315",
+        "id": "c8448bd3-8fb0-4ba9-bab8-a787747f88c3"
+      },
+      "target-type": "url",
+      "end": null,
+      "attributes": []
+    },
+    {
+      "source-credit": "",
+      "release_group": {
+        "id": "6056d622-2cef-4011-8870-6b734db5242f",
+        "first-release-date": "2011-08-24",
+        "releases": [],
+        "primary-type-id": null,
+        "artist-credit": [
+          {
+            "joinphrase": "",
+            "name": "Various Artists",
+            "artist": {
+              "id": "89ad4ac3-39f7-470e-963a-56509c546377",
+              "disambiguation": "add compilations to this artist",
+              "sort-name": "Various Artists",
+              "name": "Various Artists"
+            }
+          }
+        ],
+        "secondary-types": [],
+        "secondary-type-ids": [],
+        "aliases": [],
+        "title": "Metallica: A Tribute to the Black Album",
+        "disambiguation": "",
+        "primary-type": null
+      },
+      "begin": null,
+      "ended": false,
+      "type": "cover",
+      "direction": "backward",
+      "type-id": "cf02e524-9d5b-46b7-a88e-329737395818",
+      "attribute-values": {},
+      "target-credit": "",
+      "attributes": [],
+      "end": null,
+      "target-type": "release_group"
+    },
+    {
+      "attributes": [],
+      "target-type": "url",
+      "url": {
+        "resource": "https://www.discogs.com/master/6651",
+        "id": "0bc50032-b1dc-40fc-b80f-9fa1b6e0d6e4"
+      },
+      "end": null,
+      "begin": null,
+      "source-credit": "",
+      "type-id": "99e550f3-5ab4-3110-b5b9-fe01d970b126",
+      "direction": "forward",
+      "attribute-values": {},
+      "target-credit": "",
+      "ended": false,
+      "type": "discogs"
+    },
+    {
+      "end": null,
+      "target-type": "release_group",
+      "attributes": [],
+      "ended": false,
+      "type": "live performance",
+      "direction": "backward",
+      "type-id": "62beff0a-679c-43f3-8fe6-f6c8ed8581e4",
+      "attribute-values": {},
+      "target-credit": "",
+      "source-credit": "",
+      "release_group": {
+        "id": "331cc228-34f8-4898-be6c-29b55cbf06c0",
+        "first-release-date": "2012",
+        "artist-credit": [
+          {
+            "joinphrase": "",
+            "name": "Metallica",
+            "artist": {
+              "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab",
+              "name": "Metallica",
+              "sort-name": "Metallica",
+              "disambiguation": ""
+            }
+          }
+        ],
+        "releases": [],
+        "primary-type-id": null,
+        "secondary-types": [],
+        "secondary-type-ids": [],
+        "aliases": [],
+        "title": "2012-05-12: Stade de France, La Plaine Saint-Denis, France",
+        "disambiguation": "",
+        "primary-type": null
+      },
+      "begin": null
+    },
+    {
+      "end": null,
+      "target-type": "release_group",
+      "attributes": [],
+      "type-id": "62beff0a-679c-43f3-8fe6-f6c8ed8581e4",
+      "direction": "backward",
+      "attribute-values": {},
+      "target-credit": "",
+      "ended": false,
+      "type": "live performance",
+      "release_group": {
+        "id": "7a4fbcf8-5786-4771-92f5-ccdfc28d6163",
+        "first-release-date": "2012-05-28",
+        "artist-credit": [
+          {
+            "name": "Metallica",
+            "artist": {
+              "disambiguation": "",
+              "name": "Metallica",
+              "sort-name": "Metallica",
+              "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab"
+            },
+            "joinphrase": ""
+          }
+        ],
+        "primary-type-id": null,
+        "releases": [],
+        "secondary-types": [],
+        "secondary-type-ids": [],
+        "aliases": [],
+        "title": "2012-05-28: Festivalpark, Werchter, Belgium",
+        "primary-type": null,
+        "disambiguation": ""
+      },
+      "begin": null,
+      "source-credit": ""
+    },
+    {
+      "attributes": [],
+      "target-type": "release_group",
+      "end": null,
+      "release_group": {
+        "first-release-date": "2012-06-04",
+        "id": "c3330df2-8e48-4c6b-8f19-34e099d85710",
+        "artist-credit": [
+          {
+            "artist": {
+              "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab",
+              "sort-name": "Metallica",
+              "name": "Metallica",
+              "disambiguation": ""
+            },
+            "name": "Metallica",
+            "joinphrase": ""
+          }
+        ],
+        "primary-type-id": null,
+        "releases": [],
+        "aliases": [],
+        "secondary-types": [],
+        "secondary-type-ids": [],
+        "disambiguation": "",
+        "primary-type": null,
+        "title": "2012-06-04: Sonisphere: Kalasatama, Helsinki, Finland"
+      },
+      "begin": null,
+      "source-credit": "",
+      "type-id": "62beff0a-679c-43f3-8fe6-f6c8ed8581e4",
+      "direction": "backward",
+      "attribute-values": {},
+      "target-credit": "",
+      "ended": false,
+      "type": "live performance"
+    },
+    {
+      "attributes": [],
+      "end": null,
+      "target-type": "release_group",
+      "release_group": {
+        "aliases": [],
+        "secondary-type-ids": [],
+        "secondary-types": [],
+        "primary-type": null,
+        "disambiguation": "",
+        "title": "2012-06-09: Download Festival, Castle Donington, UK",
+        "first-release-date": "2012-06-12",
+        "id": "e82f03cf-47fb-4e33-a22c-dfdda6cc0f2c",
+        "artist-credit": [
+          {
+            "joinphrase": "",
+            "artist": {
+              "id": "65f4f0c5-ef9e-490c-aee3-909e7ae6b2ab",
+              "disambiguation": "",
+              "name": "Metallica",
+              "sort-name": "Metallica"
+            },
+            "name": "Metallica"
+          }
+        ],
+        "releases": [],
+        "primary-type-id": null
+      },
+      "begin": null,
+      "source-credit": "",
+      "type-id": "62beff0a-679c-43f3-8fe6-f6c8ed8581e4",
+      "direction": "backward",
+      "target-credit": "",
+      "attribute-values": {},
+      "ended": false,
+      "type": "live performance"
+    },
+    {
+      "source-credit": "",
+      "begin": null,
+      "type": "lyrics",
+      "ended": false,
+      "attribute-values": {},
+      "target-credit": "",
+      "type-id": "156344d3-da8b-40c6-8b10-7b1c22727124",
+      "direction": "forward",
+      "attributes": [],
+      "target-type": "url",
+      "url": {
+        "id": "0acb4304-7b95-4ed0-94ce-c9b578e2620c",
+        "resource": "http://lyrics.wikia.com/Metallica:Metallica_(1991)"
+      },
+      "end": null
+    },
+    {
+      "ended": false,
+      "type": "other databases",
+      "type-id": "38320e40-9f4a-3ae7-8cb2-3f3c9c5d856d",
+      "direction": "forward",
+      "attribute-values": {},
+      "target-credit": "",
+      "source-credit": "",
+      "begin": null,
+      "url": {
+        "resource": "http://rateyourmusic.com/release/album/metallica/metallica/",
+        "id": "9011c1c0-03d6-4eb2-af7b-feb7e47d93aa"
+      },
+      "end": null,
+      "target-type": "url",
+      "attributes": []
+    },
+    {
+      "series": {
+        "disambiguation": "",
+        "name": "Rolling Stone: 500 Greatest Albums of All Time: 2012 edition",
+        "aliases": [],
+        "id": "8668518f-4a1e-4802-8b0d-81703ced6418"
+      },
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "direction": "forward",
+      "target-credit": "",
+      "attribute-values": {
+        "number": "255"
+      },
+      "ended": false,
+      "type": "part of",
+      "begin": null,
+      "ordering-key": 255,
+      "source-credit": "",
+      "target-type": "series",
+      "end": null,
+      "attributes": [
+        "number"
+      ]
+    },
+    {
+      "begin": null,
+      "source-credit": "",
+      "direction": "forward",
+      "type-id": "c3ac9c3b-f546-4d15-873f-b294d2c1b708",
+      "attribute-values": {},
+      "target-credit": "",
+      "ended": false,
+      "type": "review",
+      "attributes": [],
+      "target-type": "url",
+      "url": {
+        "id": "3decbdb9-c861-46a6-a785-554c11375ef8",
+        "resource": "http://www.bbc.co.uk/music/reviews/8b8c"
+      },
+      "end": null
+    },
+    {
+      "attribute-values": {},
+      "target-credit": "",
+      "direction": "forward",
+      "type-id": "b988d08c-5d86-4a57-9557-c83b399e3580",
+      "type": "wikidata",
+      "ended": false,
+      "begin": null,
+      "source-credit": "",
+      "url": {
+        "id": "cfa87b8c-a16f-4b8f-a060-0b663cb1fa0a",
+        "resource": "https://www.wikidata.org/wiki/Q213516"
+      },
+      "end": null,
+      "target-type": "url",
+      "attributes": []
+    }
+  ],
+  "secondary-types": []
+}

@@ -1,0 +1,749 @@
+{
+  "place-count": 73,
+  "place-offset": 0,
+  "places": [
+    {
+      "type": "Venue",
+      "id": "00f290f0-fcfd-4ac6-b8e1-7e3d19b9b706",
+      "aliases": [],
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "disambiguation": "",
+        "name": "Leipzig",
+        "sort-name": "Leipzig"
+      },
+      "name": "Altes Landratsamt",
+      "user-tags": [],
+      "life-span": {
+        "ended": false,
+        "end": null,
+        "begin": null
+      },
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "disambiguation": "",
+      "address": "Tröndlinring 3, 04105 Leipzig",
+      "coordinates": {
+        "latitude": 51.344667,
+        "longitude": 12.375283
+      },
+      "annotation": null,
+      "tags": []
+    },
+    {
+      "coordinates": null,
+      "address": "",
+      "tags": [],
+      "annotation": null,
+      "life-span": {
+        "ended": true,
+        "begin": "1884",
+        "end": "1944"
+      },
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "disambiguation": "1884-1944",
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "disambiguation": "",
+        "sort-name": "Leipzig",
+        "name": "Leipzig"
+      },
+      "aliases": [],
+      "name": "Gewandhaus",
+      "user-tags": [],
+      "type": "Venue",
+      "id": "01a1d751-0b3c-4536-b958-d861a4fdc891"
+    },
+    {
+      "address": "Werkstättenstraße 4, 04319 Leipzig, Germany",
+      "coordinates": {
+        "latitude": 51.339643,
+        "longitude": 12.460427
+      },
+      "annotation": null,
+      "tags": [],
+      "life-span": {
+        "end": null,
+        "begin": "1992",
+        "ended": false
+      },
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "disambiguation": "",
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "disambiguation": "",
+        "name": "Leipzig",
+        "sort-name": "Leipzig"
+      },
+      "aliases": [],
+      "name": "Hellraiser Leipzig",
+      "user-tags": [],
+      "type": "Venue",
+      "id": "0427cec6-aeba-4800-87e4-4323372fde1a"
+    },
+    {
+      "disambiguation": "",
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "life-span": {
+        "begin": null,
+        "end": null,
+        "ended": false
+      },
+      "tags": [],
+      "annotation": null,
+      "coordinates": {
+        "latitude": 51.323299,
+        "longitude": 12.372037
+      },
+      "address": "Arndtstraße 33, 04275 Leipzig",
+      "id": "050bc25a-4eaf-4881-bea5-497b18462520",
+      "type": "Venue",
+      "user-tags": [],
+      "name": "Horns Erben",
+      "aliases": [],
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "disambiguation": "",
+        "name": "Leipzig",
+        "sort-name": "Leipzig"
+      }
+    },
+    {
+      "type": null,
+      "id": "0e5c9c52-e374-460b-8a44-500ec7875ec4",
+      "name": "CineStar Leipzig",
+      "user-tags": [],
+      "aliases": [],
+      "area": {
+        "sort-name": "Leipzig",
+        "name": "Leipzig",
+        "disambiguation": "",
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41"
+      },
+      "disambiguation": "",
+      "life-span": {
+        "ended": false,
+        "end": null,
+        "begin": null
+      },
+      "type-id": null,
+      "coordinates": null,
+      "address": "Petersstraße 44, 04109 Leipzig, Germany",
+      "annotation": null,
+      "tags": []
+    },
+    {
+      "id": "1f82a1ce-6b53-46e1-8bb4-9ba06a7b98f7",
+      "type": "Venue",
+      "user-tags": [],
+      "name": "Geyserhaus",
+      "area": {
+        "sort-name": "Leipzig",
+        "name": "Leipzig",
+        "disambiguation": "",
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41"
+      },
+      "aliases": [],
+      "disambiguation": "",
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "life-span": {
+        "begin": null,
+        "end": null,
+        "ended": false
+      },
+      "tags": [],
+      "annotation": null,
+      "coordinates": null,
+      "address": ""
+    },
+    {
+      "annotation": null,
+      "tags": [],
+      "coordinates": {
+        "latitude": 51.333333,
+        "longitude": 12.368056
+      },
+      "address": "Grassistraße 8, 04107 Leipzig, Germany",
+      "type-id": "882d46c9-625c-4061-891c-22dd412744db",
+      "life-span": {
+        "begin": "1843",
+        "end": null,
+        "ended": false
+      },
+      "disambiguation": "",
+      "aliases": [
+        {
+          "ended": false,
+          "begin": null,
+          "locale": "de",
+          "type-id": "fb68f9a2-622c-319b-83b0-bbff4127cdc5",
+          "name": "Hochschule für Musik und Theater Leipzig",
+          "primary": false,
+          "sort-name": "Hochschule für Musik und Theater Leipzig",
+          "type": "Place name",
+          "end": null
+        },
+        {
+          "type": "Place name",
+          "end": null,
+          "sort-name": "Leipzig Conservatory",
+          "primary": null,
+          "name": "Leipzig Conservatory",
+          "begin": null,
+          "locale": null,
+          "type-id": "fb68f9a2-622c-319b-83b0-bbff4127cdc5",
+          "ended": false
+        },
+        {
+          "locale": "en",
+          "begin": null,
+          "type-id": "fb68f9a2-622c-319b-83b0-bbff4127cdc5",
+          "ended": false,
+          "type": "Place name",
+          "end": null,
+          "name": "University of Music and Theatre Leipzig",
+          "sort-name": "University of Music and Theatre Leipzig",
+          "primary": false
+        }
+      ],
+      "area": {
+        "disambiguation": "",
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "name": "Leipzig",
+        "sort-name": "Leipzig"
+      },
+      "user-tags": [],
+      "name": "Hochschule für Musik und Theater »Felix Mendelssohn Bartholdy« Leipzig",
+      "id": "2158d48c-865d-4478-b648-0f4267313373",
+      "type": "Educational institution"
+    },
+    {
+      "disambiguation": "Leipzig",
+      "type-id": "a120ca4a-69e9-3c0e-bc09-21cae26eb621",
+      "life-span": {
+        "ended": false,
+        "begin": null,
+        "end": null
+      },
+      "annotation": null,
+      "tags": [],
+      "coordinates": {
+        "latitude": 51.3308,
+        "longitude": 12.34
+      },
+      "address": "Weißenfelser Str. 18, 04229 Leipzig",
+      "id": "2e3f7958-e85a-440d-83e8-6996f1ce3304",
+      "type": "Religious building",
+      "user-tags": [],
+      "name": "Heilandskirche",
+      "area": {
+        "sort-name": "Leipzig",
+        "name": "Leipzig",
+        "disambiguation": "",
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41"
+      },
+      "aliases": []
+    },
+    {
+      "type": "Venue",
+      "id": "36c3f5fe-e83a-4c2a-b3bb-bd8e5350003d",
+      "name": "Felsenkeller Leipzig",
+      "user-tags": [],
+      "area": {
+        "disambiguation": "",
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "name": "Leipzig",
+        "sort-name": "Leipzig"
+      },
+      "aliases": [],
+      "disambiguation": "",
+      "life-span": {
+        "begin": null,
+        "end": null,
+        "ended": false
+      },
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "address": "Karl-Heine-Straße 32, 04229 Leipzig",
+      "coordinates": {
+        "latitude": 51.332767,
+        "longitude": 12.338521
+      },
+      "annotation": null,
+      "tags": []
+    },
+    {
+      "user-tags": [],
+      "name": "Bruno-Plache-Stadion",
+      "area": {
+        "sort-name": "Leipzig",
+        "name": "Leipzig",
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "disambiguation": ""
+      },
+      "aliases": [],
+      "id": "557bbc0b-caba-412c-80c1-5c42caab9a6b",
+      "type": "Stadium",
+      "tags": [],
+      "annotation": null,
+      "coordinates": {
+        "latitude": 51.302778,
+        "longitude": 12.419167
+      },
+      "address": "Connewitzer Str. 21, 04289 Leipzig",
+      "disambiguation": "",
+      "type-id": "62664fbd-cd55-3b5f-a5ea-fb5d1bc0113c",
+      "life-span": {
+        "ended": false,
+        "end": null,
+        "begin": "1922"
+      }
+    },
+    {
+      "address": "",
+      "coordinates": {
+        "longitude": 12.372222,
+        "latitude": 51.343889
+      },
+      "annotation": null,
+      "tags": [],
+      "life-span": {
+        "ended": false,
+        "end": null,
+        "begin": null
+      },
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "disambiguation": "1766-1943",
+      "area": {
+        "sort-name": "Leipzig",
+        "name": "Leipzig",
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "disambiguation": ""
+      },
+      "aliases": [],
+      "name": "Altes Theater",
+      "user-tags": [],
+      "type": "Venue",
+      "id": "5c1f8e77-b447-4b09-be58-971118a2ce22"
+    },
+    {
+      "life-span": {
+        "ended": false,
+        "begin": null,
+        "end": null
+      },
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "disambiguation": "",
+      "address": "Conne Island, Koburger Str. 3, 04277 Leipzig",
+      "coordinates": {
+        "longitude": 12.374167,
+        "latitude": 51.303056
+      },
+      "annotation": null,
+      "tags": [],
+      "type": "Venue",
+      "id": "5de0ae21-6391-4014-926d-ffac24139562",
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "disambiguation": "",
+        "sort-name": "Leipzig",
+        "name": "Leipzig"
+      },
+      "aliases": [
+        {
+          "type": "Place name",
+          "end": null,
+          "primary": null,
+          "sort-name": "Eiskeller",
+          "name": "Eiskeller",
+          "locale": null,
+          "begin": null,
+          "type-id": "fb68f9a2-622c-319b-83b0-bbff4127cdc5",
+          "ended": true
+        }
+      ],
+      "name": "Conne Island",
+      "user-tags": []
+    },
+    {
+      "aliases": [],
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "disambiguation": "",
+        "sort-name": "Leipzig",
+        "name": "Leipzig"
+      },
+      "name": "Heartware Studios",
+      "user-tags": [],
+      "type": "Studio",
+      "id": "608d8a3f-a605-40d0-bf18-7b77680f2dfd",
+      "address": "",
+      "coordinates": null,
+      "annotation": null,
+      "tags": [],
+      "life-span": {
+        "ended": false,
+        "end": null,
+        "begin": null
+      },
+      "type-id": "05fa6a09-ff92-3d34-bdbb-5141d3c24f38",
+      "disambiguation": ""
+    },
+    {
+      "id": "69a35a89-9995-4df7-baba-86d622a9f2f6",
+      "type": "Studio",
+      "aliases": [],
+      "area": {
+        "disambiguation": "",
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "name": "Leipzig",
+        "sort-name": "Leipzig"
+      },
+      "user-tags": [],
+      "name": "FWL Studios Leipzig",
+      "type-id": "05fa6a09-ff92-3d34-bdbb-5141d3c24f38",
+      "life-span": {
+        "ended": false,
+        "begin": null,
+        "end": null
+      },
+      "disambiguation": "",
+      "tags": [],
+      "annotation": null,
+      "coordinates": null,
+      "address": ""
+    },
+    {
+      "id": "90c0848e-4c9b-425a-bf5c-2b6a62c10f1c",
+      "type": "Venue",
+      "user-tags": [],
+      "name": "agra Veranstaltungsgelände Leipzig",
+      "aliases": [],
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "disambiguation": "",
+        "sort-name": "Leipzig",
+        "name": "Leipzig"
+      },
+      "disambiguation": "",
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "life-span": {
+        "ended": false,
+        "begin": null,
+        "end": null
+      },
+      "tags": [],
+      "annotation": null,
+      "coordinates": {
+        "latitude": 51.280547,
+        "longitude": 12.389102
+      },
+      "address": "Bornaische Straße 210, 04279 Leipzig"
+    },
+    {
+      "area": {
+        "sort-name": "Leipzig",
+        "name": "Leipzig",
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "disambiguation": ""
+      },
+      "aliases": [],
+      "name": "Distillery",
+      "user-tags": [],
+      "type": "Venue",
+      "id": "977332ca-132c-4d25-b07a-6d4824453b5b",
+      "coordinates": {
+        "latitude": 51.320449,
+        "longitude": 12.37991
+      },
+      "address": "Kurt-Eisner-Straße 91, 04275 Leipzig, Germany",
+      "annotation": null,
+      "tags": [],
+      "life-span": {
+        "ended": false,
+        "end": null,
+        "begin": "1992-09"
+      },
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "disambiguation": ""
+    },
+    {
+      "user-tags": [],
+      "name": "Arena Leipzig",
+      "aliases": [],
+      "area": {
+        "disambiguation": "",
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "sort-name": "Leipzig",
+        "name": "Leipzig"
+      },
+      "id": "9be7e699-8d48-4680-a09a-e22e78172de3",
+      "type": "Indoor arena",
+      "tags": [],
+      "annotation": null,
+      "address": "Am Sportforum 2, 04105 Leipzig, Germany",
+      "coordinates": {
+        "latitude": 51.342778,
+        "longitude": 12.355278
+      },
+      "disambiguation": "",
+      "type-id": "a77c11f6-82fa-3cc0-9041-ac60e5f6e024",
+      "life-span": {
+        "end": null,
+        "begin": "2002-05-11",
+        "ended": false
+      }
+    },
+    {
+      "disambiguation": "",
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "life-span": {
+        "ended": false,
+        "end": null,
+        "begin": null
+      },
+      "tags": [],
+      "annotation": null,
+      "address": "Brandenburger Straße 2, 04103 Leipzig",
+      "coordinates": {
+        "latitude": 51.344419,
+        "longitude": 12.385744
+      },
+      "id": "a95c632f-3fdf-4d5e-ae78-70f843bfa19d",
+      "type": "Venue",
+      "user-tags": [],
+      "name": "K3 Lounge",
+      "aliases": [],
+      "area": {
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "disambiguation": ""
+      }
+    },
+    {
+      "type-id": "a0df5ead-0bd6-33d8-8444-855a9f3e9970",
+      "life-span": {
+        "end": null,
+        "begin": null,
+        "ended": false
+      },
+      "disambiguation": "",
+      "annotation": null,
+      "tags": [
+        {
+          "count": 1,
+          "name": "type=church"
+        }
+      ],
+      "address": "Stieglitzstraße 42, 04229 Leipzig-Schleußig",
+      "coordinates": {
+        "latitude": 51.321064,
+        "longitude": 12.346951
+      },
+      "id": "c6e961a7-936f-47e0-8293-c327241f395c",
+      "type": "Other",
+      "aliases": [
+        {
+          "type-id": "fb68f9a2-622c-319b-83b0-bbff4127cdc5",
+          "begin": null,
+          "locale": "en",
+          "ended": false,
+          "end": null,
+          "type": "Place name",
+          "name": "Bethanien Church",
+          "sort-name": "Bethanien Church",
+          "primary": false
+        },
+        {
+          "ended": false,
+          "type-id": "fb68f9a2-622c-319b-83b0-bbff4127cdc5",
+          "locale": "de",
+          "begin": null,
+          "primary": true,
+          "sort-name": "Bethanienkirche",
+          "name": "Bethanienkirche",
+          "end": null,
+          "type": "Place name"
+        }
+      ],
+      "area": {
+        "sort-name": "Leipzig",
+        "name": "Leipzig",
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "disambiguation": ""
+      },
+      "user-tags": [],
+      "name": "Bethanienkirche"
+    },
+    {
+      "tags": [],
+      "annotation": null,
+      "address": "",
+      "coordinates": null,
+      "disambiguation": "1781-1886",
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "life-span": {
+        "ended": true,
+        "end": "1886",
+        "begin": "1781"
+      },
+      "user-tags": [],
+      "name": "Gewandhaus",
+      "aliases": [],
+      "area": {
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "disambiguation": "",
+        "name": "Leipzig",
+        "sort-name": "Leipzig"
+      },
+      "id": "c78d1684-4771-4f40-9b94-ec06d54043e8",
+      "type": "Venue"
+    },
+    {
+      "disambiguation": "",
+      "life-span": {
+        "ended": false,
+        "end": null,
+        "begin": null
+      },
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "coordinates": {
+        "longitude": 12.362471,
+        "latitude": 51.34063
+      },
+      "address": "Elsterstraße 22-24, 04109 Leipzig, Germany",
+      "annotation": null,
+      "tags": [],
+      "type": "Venue",
+      "id": "e0d31bb4-daef-43e4-9a1e-e86a182868b1",
+      "name": "Haus Leipzig",
+      "user-tags": [],
+      "area": {
+        "name": "Leipzig",
+        "sort-name": "Leipzig",
+        "disambiguation": "",
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41"
+      },
+      "aliases": []
+    },
+    {
+      "disambiguation": "1981-",
+      "life-span": {
+        "ended": false,
+        "begin": "1981-10-08",
+        "end": null
+      },
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "coordinates": {
+        "longitude": 12.380556,
+        "latitude": 51.337778
+      },
+      "address": "Augustusplatz 8, 04109 Leipzig, Germany",
+      "annotation": null,
+      "tags": [],
+      "type": "Venue",
+      "id": "fb923d76-a489-4330-9df9-3746c1577b34",
+      "name": "Gewandhaus",
+      "user-tags": [],
+      "area": {
+        "sort-name": "Leipzig",
+        "name": "Leipzig",
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "disambiguation": ""
+      },
+      "aliases": [
+        {
+          "name": "Grosser Saal des Gewandhauses",
+          "primary": null,
+          "sort-name": "Grosser Saal des Gewandhauses",
+          "end": null,
+          "type": null,
+          "ended": false,
+          "type-id": null,
+          "begin": null,
+          "locale": null
+        }
+      ]
+    },
+    {
+      "aliases": [],
+      "area": {
+        "sort-name": "Leipzig",
+        "name": "Leipzig",
+        "disambiguation": "",
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41"
+      },
+      "user-tags": [],
+      "name": "Absintherie Sixtina",
+      "id": "fd731924-c2a3-4533-b338-0ac6666c1c20",
+      "type": "Venue",
+      "tags": [],
+      "annotation": null,
+      "address": "Sternwartenstraße 4, 04103 Leipzig",
+      "coordinates": {
+        "longitude": 12.379832,
+        "latitude": 51.335037
+      },
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "life-span": {
+        "ended": false,
+        "end": null,
+        "begin": null
+      },
+      "disambiguation": "2013 -"
+    },
+    {
+      "type": "Venue",
+      "id": "fda6fb03-6fb0-4c8e-9f7d-00b2e14d8832",
+      "aliases": [],
+      "area": {
+        "sort-name": "Leipzig",
+        "name": "Leipzig",
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "disambiguation": ""
+      },
+      "name": "Haus Auensee",
+      "user-tags": [],
+      "life-span": {
+        "ended": false,
+        "end": null,
+        "begin": null
+      },
+      "type-id": "cd92781a-a73f-30e8-a430-55d7521338db",
+      "disambiguation": "",
+      "address": "Gustav‐Esche‐Straße 4, 04159 Leipzig",
+      "coordinates": {
+        "longitude": 12.315689,
+        "latitude": 51.369853
+      },
+      "tags": [],
+      "annotation": null
+    },
+    {
+      "type-id": "a120ca4a-69e9-3c0e-bc09-21cae26eb621",
+      "life-span": {
+        "ended": false,
+        "end": null,
+        "begin": "1894"
+      },
+      "disambiguation": "Leipzig",
+      "tags": [],
+      "annotation": null,
+      "address": "Neustädter Markt 8",
+      "coordinates": {
+        "latitude": 51.3479,
+        "longitude": 12.4035
+      },
+      "id": "ffc0984e-7a86-40ca-9090-09706034bed2",
+      "type": "Religious building",
+      "area": {
+        "disambiguation": "",
+        "id": "20619e36-fca8-4499-bcc8-be01a3ea3e41",
+        "name": "Leipzig",
+        "sort-name": "Leipzig"
+      },
+      "aliases": [],
+      "user-tags": [],
+      "name": "Heilig-Kreuz-Kirche"
+    }
+  ]
+}

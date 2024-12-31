@@ -1,0 +1,793 @@
+{
+  "recordings": [
+    {
+      "user-rating": {
+        "value": null
+      },
+      "annotation": null,
+      "isrcs": [],
+      "artist-credit": [
+        {
+          "artist": {
+            "sort-name": "Waits, Tom",
+            "name": "Tom Waits",
+            "disambiguation": "",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b"
+          },
+          "name": "Tom Waits",
+          "joinphrase": ""
+        }
+      ],
+      "id": "00e7dad4-f5e0-46d1-a950-ea78b79d7c5f",
+      "disambiguation": "",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "length": 260826,
+      "user-tags": [],
+      "tags": [],
+      "video": false,
+      "title": "(Meet Me in) Paradise Alley"
+    },
+    {
+      "isrcs": [],
+      "annotation": null,
+      "user-rating": {
+        "value": null
+      },
+      "length": null,
+      "user-tags": [],
+      "title": "(Meet Me In) Paradise A",
+      "tags": [],
+      "video": false,
+      "id": "07be8075-f3e3-4e3c-8d95-788b17f2879d",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "artist": {
+            "name": "Tom Waits",
+            "sort-name": "Waits, Tom",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "disambiguation": ""
+          },
+          "name": "Tom Waits"
+        }
+      ],
+      "disambiguation": "",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      }
+    },
+    {
+      "user-rating": {
+        "value": null
+      },
+      "annotation": null,
+      "isrcs": [],
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "disambiguation": "",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "artist": {
+            "sort-name": "Waits, Tom",
+            "name": "Tom Waits",
+            "disambiguation": "",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b"
+          },
+          "name": "Tom Waits"
+        }
+      ],
+      "id": "0b881245-c2a2-4981-8fea-d8ca18130021",
+      "tags": [],
+      "video": false,
+      "title": "(Looking for) The Heart of Saturday Night",
+      "length": 222000,
+      "user-tags": []
+    },
+    {
+      "isrcs": [],
+      "user-rating": {
+        "value": null
+      },
+      "annotation": null,
+      "user-tags": [],
+      "length": 39000,
+      "tags": [],
+      "video": false,
+      "title": "[band entrance]",
+      "artist-credit": [
+        {
+          "artist": {
+            "disambiguation": "",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "sort-name": "Waits, Tom",
+            "name": "Tom Waits"
+          },
+          "name": "Tom Waits",
+          "joinphrase": ""
+        }
+      ],
+      "id": "0dd4fccc-6061-475e-80a7-8b7dc0b95903",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "disambiguation": "live, 2006-08-05: Ryman Auditorium, Nashville, TN, USA"
+    },
+    {
+      "disambiguation": "",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "id": "0e27f910-9993-4d61-8963-dda8b2291596",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "artist": {
+            "disambiguation": "",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "sort-name": "Waits, Tom",
+            "name": "Tom Waits"
+          },
+          "name": "Tom Waits"
+        }
+      ],
+      "title": "(Looking for) the Heart of Saturday Night",
+      "video": false,
+      "tags": [],
+      "length": 337346,
+      "user-tags": [],
+      "annotation": null,
+      "user-rating": {
+        "value": null
+      },
+      "isrcs": []
+    },
+    {
+      "user-rating": {
+        "value": null
+      },
+      "annotation": null,
+      "isrcs": [],
+      "artist-credit": [
+        {
+          "artist": {
+            "disambiguation": "",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "sort-name": "Waits, Tom",
+            "name": "Tom Waits"
+          },
+          "name": "Tom Waits",
+          "joinphrase": ""
+        }
+      ],
+      "id": "22174ba6-a47c-4631-af26-616cc924e9b3",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "disambiguation": "",
+      "user-tags": [],
+      "length": 275000,
+      "video": false,
+      "tags": [],
+      "title": "(Looking for) The Heart of Saturday Night"
+    },
+    {
+      "disambiguation": "",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "id": "2722713a-1129-4884-8e2d-e58661355fb6",
+      "artist-credit": [
+        {
+          "artist": {
+            "name": "Tom Waits",
+            "sort-name": "Waits, Tom",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "disambiguation": ""
+          },
+          "name": "Tom Waits",
+          "joinphrase": ""
+        }
+      ],
+      "title": "(Looking for) The Heart of Saturday Night",
+      "video": false,
+      "tags": [],
+      "user-tags": [],
+      "length": 231000,
+      "annotation": null,
+      "user-rating": {
+        "value": null
+      },
+      "isrcs": []
+    },
+    {
+      "user-tags": [],
+      "length": 264000,
+      "tags": [],
+      "video": false,
+      "title": "'til the Money Runs Out",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "artist": {
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "disambiguation": "",
+            "name": "Tom Waits",
+            "sort-name": "Waits, Tom"
+          },
+          "name": "Tom Waits"
+        }
+      ],
+      "id": "52d00187-cdcd-444b-abb1-8de20c1fbcbc",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "disambiguation": "",
+      "isrcs": [],
+      "user-rating": {
+        "value": null
+      },
+      "annotation": null
+    },
+    {
+      "tags": [
+        {
+          "name": "rock",
+          "count": 1
+        }
+      ],
+      "video": false,
+      "title": "'T 'Ain't No Sin",
+      "length": 147733,
+      "user-tags": [],
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "disambiguation": "",
+      "artist-credit": [
+        {
+          "artist": {
+            "name": "Tom Waits",
+            "sort-name": "Waits, Tom",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "disambiguation": ""
+          },
+          "name": "Tom Waits",
+          "joinphrase": ""
+        }
+      ],
+      "id": "5ba3b5da-b985-4499-b9d8-640734d25997",
+      "isrcs": [
+        "USIR19390106"
+      ],
+      "user-rating": {
+        "value": null
+      },
+      "annotation": null
+    },
+    {
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "disambiguation": "",
+            "name": "Tom Waits",
+            "sort-name": "Waits, Tom"
+          },
+          "name": "Tom Waits",
+          "joinphrase": ""
+        }
+      ],
+      "id": "5e0f862a-272e-4a41-9cae-70a38e39d553",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "disambiguation": "",
+      "length": 230000,
+      "user-tags": [],
+      "video": false,
+      "tags": [],
+      "title": "(Looking For) The Heart Of Saturday Night",
+      "user-rating": {
+        "value": null
+      },
+      "annotation": null,
+      "isrcs": []
+    },
+    {
+      "isrcs": [
+        "USEE10170337"
+      ],
+      "user-rating": {
+        "value": null
+      },
+      "annotation": null,
+      "length": 265880,
+      "user-tags": [],
+      "tags": [
+        {
+          "name": "alternative rock",
+          "count": 2
+        },
+        {
+          "count": 1,
+          "name": "blues rock"
+        },
+        {
+          "name": "rock",
+          "count": 1
+        }
+      ],
+      "video": false,
+      "title": "’Til the Money Runs Out",
+      "artist-credit": [
+        {
+          "artist": {
+            "disambiguation": "",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "sort-name": "Waits, Tom",
+            "name": "Tom Waits"
+          },
+          "name": "Tom Waits",
+          "joinphrase": ""
+        }
+      ],
+      "id": "720146d5-a117-4edf-b127-9f0a012ad793",
+      "disambiguation": "",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      }
+    },
+    {
+      "user-tags": [],
+      "length": 267000,
+      "tags": [],
+      "video": false,
+      "title": "(Meet Me in) Paradise Alley",
+      "artist-credit": [
+        {
+          "artist": {
+            "name": "Tom Waits",
+            "sort-name": "Waits, Tom",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "disambiguation": ""
+          },
+          "name": "Tom Waits",
+          "joinphrase": ""
+        }
+      ],
+      "id": "75b22206-da8d-425d-ad46-758db9533c6d",
+      "disambiguation": "",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "isrcs": [],
+      "user-rating": {
+        "value": null
+      },
+      "annotation": null
+    },
+    {
+      "user-rating": {
+        "value": null
+      },
+      "annotation": null,
+      "isrcs": [],
+      "artist-credit": [
+        {
+          "name": "Tom Waits",
+          "artist": {
+            "sort-name": "Waits, Tom",
+            "name": "Tom Waits",
+            "disambiguation": "",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b"
+          },
+          "joinphrase": ""
+        }
+      ],
+      "id": "975c5c1a-a8e9-413a-8943-7c55c035e955",
+      "disambiguation": "",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "user-tags": [],
+      "length": 224386,
+      "video": false,
+      "tags": [],
+      "title": "...but There's Never a Rose"
+    },
+    {
+      "user-rating": {
+        "value": null
+      },
+      "annotation": null,
+      "isrcs": [],
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "artist": {
+            "sort-name": "Waits, Tom",
+            "name": "Tom Waits",
+            "disambiguation": "",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b"
+          },
+          "name": "Tom Waits"
+        }
+      ],
+      "id": "9b71bf0d-0f76-4b5d-ad8d-73f6b908733f",
+      "disambiguation": "",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "user-tags": [],
+      "length": 675000,
+      "tags": [],
+      "video": false,
+      "title": "(Looking for) The Heart of Saturday Night"
+    },
+    {
+      "annotation": null,
+      "user-rating": {
+        "value": null
+      },
+      "isrcs": [
+        "USEE10170281"
+      ],
+      "id": "9ba54ad0-8f4e-47e9-a8cd-9a50e056db47",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "artist": {
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "disambiguation": "",
+            "name": "Tom Waits",
+            "sort-name": "Waits, Tom"
+          },
+          "name": "Tom Waits"
+        }
+      ],
+      "disambiguation": "",
+      "rating": {
+        "value": 3,
+        "votes-count": 1
+      },
+      "user-tags": [],
+      "length": 233160,
+      "title": "(Looking for) The Heart of Saturday Night",
+      "tags": [
+        {
+          "name": "blues",
+          "count": 3
+        },
+        {
+          "name": "covered by 4",
+          "count": 1
+        },
+        {
+          "name": "rock",
+          "count": 3
+        }
+      ],
+      "video": false
+    },
+    {
+      "length": 270000,
+      "user-tags": [],
+      "title": "(Meet Me in) Paradise Alley",
+      "tags": [],
+      "video": false,
+      "id": "ab516cdc-b35b-47c4-9fa1-373e357f9f52",
+      "artist-credit": [
+        {
+          "name": "Tom Waits",
+          "artist": {
+            "sort-name": "Waits, Tom",
+            "name": "Tom Waits",
+            "disambiguation": "",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b"
+          },
+          "joinphrase": ""
+        }
+      ],
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "disambiguation": "",
+      "isrcs": [],
+      "annotation": null,
+      "user-rating": {
+        "value": null
+      }
+    },
+    {
+      "disambiguation": "",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "id": "acb18d0a-b573-47f4-a3bb-e825f362d503",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "artist": {
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "disambiguation": "",
+            "name": "Tom Waits",
+            "sort-name": "Waits, Tom"
+          },
+          "name": "Tom Waits"
+        }
+      ],
+      "title": "(Looking for) The Heart of Saturday Night",
+      "video": false,
+      "tags": [],
+      "length": 221000,
+      "user-tags": [],
+      "annotation": null,
+      "user-rating": {
+        "value": null
+      },
+      "isrcs": []
+    },
+    {
+      "tags": [],
+      "video": false,
+      "title": "'til the Wheels Come Off",
+      "length": 366093,
+      "user-tags": [],
+      "disambiguation": "",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "artist-credit": [
+        {
+          "name": "Tom Waits",
+          "artist": {
+            "name": "Tom Waits",
+            "sort-name": "Waits, Tom",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "disambiguation": ""
+          },
+          "joinphrase": ""
+        }
+      ],
+      "id": "aec2dd4f-2b92-4a28-bd23-08b42d2ed860",
+      "isrcs": [],
+      "user-rating": {
+        "value": null
+      },
+      "annotation": null
+    },
+    {
+      "id": "b54479b5-4aa8-46fd-a910-dfc1385bfe3b",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "name": "Tom Waits",
+          "artist": {
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "disambiguation": "",
+            "name": "Tom Waits",
+            "sort-name": "Waits, Tom"
+          }
+        }
+      ],
+      "disambiguation": "",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "length": 366000,
+      "user-tags": [],
+      "title": "(Looking for) the Heart of Saturday Night",
+      "tags": [],
+      "video": false,
+      "annotation": null,
+      "user-rating": {
+        "value": null
+      },
+      "isrcs": []
+    },
+    {
+      "isrcs": [],
+      "annotation": null,
+      "user-rating": {
+        "value": null
+      },
+      "user-tags": [],
+      "length": 296560,
+      "title": "(Looking for) The Heart of Saturday Night",
+      "video": false,
+      "tags": [],
+      "id": "b7061532-e3d2-4b6f-a38c-a9353ae52c1e",
+      "artist-credit": [
+        {
+          "artist": {
+            "disambiguation": "",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "sort-name": "Waits, Tom",
+            "name": "Tom Waits"
+          },
+          "name": "Tom Waits",
+          "joinphrase": ""
+        }
+      ],
+      "disambiguation": "",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      }
+    },
+    {
+      "isrcs": [],
+      "annotation": null,
+      "user-rating": {
+        "value": null
+      },
+      "length": 393120,
+      "user-tags": [],
+      "title": "(My Baby Left Me on A) Trash Day",
+      "tags": [],
+      "video": false,
+      "id": "bd6eca62-5678-475d-b5eb-cb661cea5437",
+      "artist-credit": [
+        {
+          "artist": {
+            "name": "Tom Waits",
+            "sort-name": "Waits, Tom",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "disambiguation": ""
+          },
+          "name": "Tom Waits",
+          "joinphrase": ""
+        }
+      ],
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "disambiguation": ""
+    },
+    {
+      "disambiguation": "live, 1999-03-20: Paramount Theatre, Austin, TX, USA",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "id": "d5a73140-eaab-4084-a31b-0d2a549e5c17",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "artist": {
+            "disambiguation": "",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "sort-name": "Waits, Tom",
+            "name": "Tom Waits"
+          },
+          "name": "Tom Waits"
+        }
+      ],
+      "title": "(Looking for) the Heart of Saturday Night",
+      "video": false,
+      "tags": [],
+      "user-tags": [],
+      "length": 202200,
+      "annotation": null,
+      "user-rating": {
+        "value": null
+      },
+      "isrcs": []
+    },
+    {
+      "title": "(Looking for) the Heart of Saturday Night",
+      "video": false,
+      "tags": [],
+      "length": 320666,
+      "user-tags": [],
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "disambiguation": "",
+      "id": "d81fa335-8d65-44de-8eb1-ed305c5b7e40",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "name": "Tom Waits",
+          "artist": {
+            "name": "Tom Waits",
+            "sort-name": "Waits, Tom",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "disambiguation": ""
+          }
+        }
+      ],
+      "isrcs": [],
+      "annotation": null,
+      "user-rating": {
+        "value": null
+      }
+    },
+    {
+      "isrcs": [],
+      "user-rating": {
+        "value": null
+      },
+      "annotation": null,
+      "length": 167093,
+      "user-tags": [],
+      "tags": [],
+      "video": false,
+      "title": "(Looking for) The Heart of Saturday Night",
+      "artist-credit": [
+        {
+          "artist": {
+            "sort-name": "Waits, Tom",
+            "name": "Tom Waits",
+            "disambiguation": "",
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b"
+          },
+          "name": "Tom Waits",
+          "joinphrase": ""
+        }
+      ],
+      "id": "e2b2b933-bd4d-4716-a76c-3ccd593201ca",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "disambiguation": ""
+    },
+    {
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "disambiguation": "",
+      "id": "e88877c4-8684-478d-bce9-eb3d8877e9d8",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "artist": {
+            "id": "c3aeb863-7b26-4388-94e8-5a240f2be21b",
+            "disambiguation": "",
+            "name": "Tom Waits",
+            "sort-name": "Waits, Tom"
+          },
+          "name": "Tom Waits"
+        }
+      ],
+      "title": "(Meet Me In) Paradise Alley",
+      "video": false,
+      "tags": [],
+      "length": null,
+      "user-tags": [],
+      "annotation": null,
+      "user-rating": {
+        "value": null
+      },
+      "isrcs": []
+    }
+  ],
+  "recording-count": 2592,
+  "recording-offset": 0
+}

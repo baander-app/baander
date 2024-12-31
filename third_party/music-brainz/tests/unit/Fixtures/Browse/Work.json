@@ -1,0 +1,665 @@
+{
+  "works": [
+    {
+      "user-tags": [],
+      "languages": [
+        "eng"
+      ],
+      "attributes": [],
+      "user-rating": {
+        "value": null
+      },
+      "tags": [],
+      "id": "02eb1f4a-cfde-4850-944e-036fc125cce9",
+      "annotation": null,
+      "language": "eng",
+      "type": "Song",
+      "iswcs": [],
+      "aliases": [],
+      "title": "A-Chick-a-Boom",
+      "disambiguation": "",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "type-id": "f061270a-2fd6-32f1-a641-f0f8676d14e6"
+    },
+    {
+      "languages": [],
+      "user-tags": [],
+      "attributes": [],
+      "tags": [],
+      "user-rating": {
+        "value": null
+      },
+      "language": null,
+      "annotation": null,
+      "id": "1d0e2cba-2eba-3652-914f-e7afbe2bba1b",
+      "iswcs": [],
+      "type": null,
+      "title": "2:19",
+      "aliases": [],
+      "type-id": null,
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "disambiguation": ""
+    },
+    {
+      "aliases": [],
+      "title": "9th & Hennepin",
+      "disambiguation": "",
+      "type-id": null,
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "type": null,
+      "iswcs": [],
+      "user-rating": {
+        "value": null
+      },
+      "tags": [],
+      "id": "20b23b48-9332-375f-9267-89fe6fc691e0",
+      "language": null,
+      "annotation": null,
+      "languages": [],
+      "user-tags": [],
+      "attributes": []
+    },
+    {
+      "id": "22087ea3-e646-3444-a595-a925be0a814c",
+      "annotation": null,
+      "language": "eng",
+      "tags": [],
+      "user-rating": {
+        "value": null
+      },
+      "attributes": [],
+      "user-tags": [],
+      "languages": [
+        "eng"
+      ],
+      "disambiguation": "",
+      "type-id": "f061270a-2fd6-32f1-a641-f0f8676d14e6",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "aliases": [
+        {
+          "begin": null,
+          "end": null,
+          "name": "(Looking for) the Heart of Saturday Night",
+          "type-id": null,
+          "ended": false,
+          "sort-name": "(Looking for) the Heart of Saturday Night",
+          "primary": null,
+          "type": null,
+          "locale": null
+        },
+        {
+          "begin": null,
+          "end": null,
+          "name": "The Heart of Saturday Night",
+          "type-id": null,
+          "ended": false,
+          "sort-name": "The Heart of Saturday Night",
+          "primary": null,
+          "locale": null,
+          "type": null
+        }
+      ],
+      "title": "(Looking for) The Heart of Saturday Night",
+      "type": "Song",
+      "iswcs": []
+    },
+    {
+      "tags": [],
+      "user-rating": {
+        "value": null
+      },
+      "language": "eng",
+      "annotation": null,
+      "id": "280b17fe-87fb-4195-9c99-d20875d7bd5f",
+      "user-tags": [],
+      "languages": [
+        "eng"
+      ],
+      "attributes": [],
+      "title": "After You Die",
+      "aliases": [],
+      "type-id": "f061270a-2fd6-32f1-a641-f0f8676d14e6",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "disambiguation": "",
+      "iswcs": [],
+      "type": "Song"
+    },
+    {
+      "type": "Song",
+      "iswcs": [],
+      "disambiguation": "",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "type-id": "f061270a-2fd6-32f1-a641-f0f8676d14e6",
+      "aliases": [],
+      "title": "All the Time",
+      "attributes": [],
+      "languages": [
+        "eng"
+      ],
+      "user-tags": [],
+      "id": "325caa6a-b457-4ad0-815c-8dfa1131cd0a",
+      "language": "eng",
+      "annotation": null,
+      "user-rating": {
+        "value": null
+      },
+      "tags": []
+    },
+    {
+      "annotation": null,
+      "language": null,
+      "id": "3babc3b1-daca-337f-afe2-0cd45331956c",
+      "user-rating": {
+        "value": null
+      },
+      "tags": [],
+      "attributes": [],
+      "languages": [],
+      "user-tags": [],
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "type-id": null,
+      "disambiguation": "",
+      "title": "Back in the Good Old World (Gypsy)",
+      "aliases": [],
+      "iswcs": [],
+      "type": null
+    },
+    {
+      "aliases": [],
+      "title": "Baby I’m Not a Baby Anymore (Beatrice Theme)",
+      "disambiguation": "",
+      "type-id": null,
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "type": null,
+      "iswcs": [],
+      "user-rating": {
+        "value": null
+      },
+      "tags": [],
+      "id": "4a91b6cb-9b6f-4ea2-96f7-8a6f0ff62531",
+      "language": null,
+      "annotation": null,
+      "languages": [],
+      "user-tags": [],
+      "attributes": []
+    },
+    {
+      "attributes": [],
+      "languages": [],
+      "user-tags": [],
+      "id": "4f74d7e0-aa1d-30bf-a429-bb869ef2309f",
+      "annotation": null,
+      "language": null,
+      "user-rating": {
+        "value": null
+      },
+      "tags": [],
+      "type": null,
+      "iswcs": [],
+      "disambiguation": "",
+      "type-id": null,
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "aliases": [],
+      "title": "Anywhere I Lay My Head"
+    },
+    {
+      "user-tags": [],
+      "languages": [
+        "eng"
+      ],
+      "attributes": [],
+      "tags": [],
+      "user-rating": {
+        "value": null
+      },
+      "annotation": null,
+      "language": "eng",
+      "id": "567e4b25-44f5-32c5-828c-8058505d4ece",
+      "iswcs": [
+        "T-070.004.177-5"
+      ],
+      "type": "Song",
+      "title": "'T 'Ain't No Sin",
+      "aliases": [],
+      "type-id": "f061270a-2fd6-32f1-a641-f0f8676d14e6",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "disambiguation": ""
+    },
+    {
+      "iswcs": [
+        "T-070.222.179-1"
+      ],
+      "type": "Song",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "type-id": "f061270a-2fd6-32f1-a641-f0f8676d14e6",
+      "disambiguation": "",
+      "title": "Ain’t Going Down to the Well No More",
+      "aliases": [
+        {
+          "sort-name": "Ain't Goin' Down to the Well No Mo'",
+          "primary": null,
+          "locale": null,
+          "type": null,
+          "type-id": null,
+          "ended": false,
+          "name": "Ain't Goin' Down to the Well No Mo'",
+          "end": null,
+          "begin": null
+        }
+      ],
+      "attributes": [],
+      "languages": [],
+      "user-tags": [],
+      "language": null,
+      "annotation": null,
+      "id": "5983da01-aa5a-4731-9366-6c025c1aea45",
+      "user-rating": {
+        "value": null
+      },
+      "tags": []
+    },
+    {
+      "id": "5a1af997-8cc2-322d-b717-5b8adb324c88",
+      "annotation": null,
+      "language": "eng",
+      "tags": [],
+      "user-rating": {
+        "value": null
+      },
+      "attributes": [
+        {
+          "type-id": "01eeee67-f514-3801-bdce-279e04872f91",
+          "type": "GEMA ID",
+          "value": "1647863-001"
+        },
+        {
+          "type-id": "d833318c-6c6a-370e-8b16-9cb15873ba76",
+          "value": "490547594",
+          "type": "ASCAP ID"
+        }
+      ],
+      "languages": [
+        "eng"
+      ],
+      "user-tags": [],
+      "disambiguation": "",
+      "type-id": "f061270a-2fd6-32f1-a641-f0f8676d14e6",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "aliases": [
+        {
+          "end": null,
+          "name": "16 Shells From a 30-6",
+          "begin": null,
+          "locale": null,
+          "type": null,
+          "sort-name": "16 Shells From a 30-6",
+          "primary": null,
+          "ended": false,
+          "type-id": null
+        }
+      ],
+      "title": "16 Shells From a Thirty‐Ought‐Six",
+      "type": "Song",
+      "iswcs": [
+        "T-070.145.904-2"
+      ]
+    },
+    {
+      "title": "16 Memme en d’r Vringmaschin",
+      "aliases": [],
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "type-id": "f061270a-2fd6-32f1-a641-f0f8676d14e6",
+      "disambiguation": "",
+      "iswcs": [],
+      "type": "Song",
+      "tags": [],
+      "user-rating": {
+        "value": null
+      },
+      "language": "ksh",
+      "annotation": null,
+      "id": "5b7fcda5-732b-4ad7-b99c-81b74aadec82",
+      "user-tags": [],
+      "languages": [
+        "ksh"
+      ],
+      "attributes": []
+    },
+    {
+      "iswcs": [],
+      "type": "Song",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "type-id": "f061270a-2fd6-32f1-a641-f0f8676d14e6",
+      "disambiguation": "",
+      "title": "Back in the Crowd",
+      "aliases": [],
+      "attributes": [],
+      "user-tags": [],
+      "languages": [
+        "eng"
+      ],
+      "language": "eng",
+      "annotation": null,
+      "id": "5df5467c-900d-469b-9e1c-2f6bd471173b",
+      "tags": [],
+      "user-rating": {
+        "value": null
+      }
+    },
+    {
+      "languages": [],
+      "user-tags": [],
+      "attributes": [],
+      "user-rating": {
+        "value": null
+      },
+      "tags": [],
+      "language": null,
+      "annotation": null,
+      "id": "64072812-94f9-35c3-9a93-37a075ccd667",
+      "iswcs": [
+        "T-071.851.242-5"
+      ],
+      "type": null,
+      "title": "A Good Man Is Hard to Find",
+      "aliases": [],
+      "type-id": null,
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "disambiguation": ""
+    },
+    {
+      "iswcs": [],
+      "type": null,
+      "title": "’Til the Money Runs Out",
+      "aliases": [],
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "type-id": null,
+      "disambiguation": "",
+      "languages": [],
+      "user-tags": [],
+      "attributes": [],
+      "user-rating": {
+        "value": null
+      },
+      "tags": [],
+      "language": null,
+      "annotation": null,
+      "id": "726cecc0-6c5c-347a-9acb-e0779ee5c65f"
+    },
+    {
+      "type": "Song",
+      "iswcs": [],
+      "aliases": [],
+      "title": "$29.00",
+      "disambiguation": "",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "type-id": "f061270a-2fd6-32f1-a641-f0f8676d14e6",
+      "user-tags": [],
+      "languages": [
+        "eng"
+      ],
+      "attributes": [],
+      "user-rating": {
+        "value": null
+      },
+      "tags": [],
+      "id": "79b7759c-f27a-48fd-a3dd-c485fb2fd9a4",
+      "language": "eng",
+      "annotation": null
+    },
+    {
+      "tags": [],
+      "user-rating": {
+        "value": null
+      },
+      "id": "9c2a4b1a-36bc-40f3-aae5-77afc857f312",
+      "language": "eng",
+      "annotation": null,
+      "languages": [
+        "eng"
+      ],
+      "user-tags": [],
+      "attributes": [],
+      "aliases": [],
+      "title": "Baby Gonna Leave Me",
+      "disambiguation": "",
+      "type-id": "f061270a-2fd6-32f1-a641-f0f8676d14e6",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "type": "Song",
+      "iswcs": []
+    },
+    {
+      "attributes": [],
+      "user-tags": [],
+      "languages": [
+        "eng"
+      ],
+      "id": "a648ce2d-8b62-4865-aa14-f0486e9eddf9",
+      "annotation": null,
+      "language": "eng",
+      "tags": [],
+      "user-rating": {
+        "value": null
+      },
+      "type": "Song",
+      "iswcs": [],
+      "disambiguation": "",
+      "type-id": "f061270a-2fd6-32f1-a641-f0f8676d14e6",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "aliases": [],
+      "title": "A Sweet Little Bullet From a Pretty Blue Gun"
+    },
+    {
+      "type-id": "f061270a-2fd6-32f1-a641-f0f8676d14e6",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "disambiguation": "",
+      "title": "A Little Rain",
+      "aliases": [],
+      "iswcs": [],
+      "type": "Song",
+      "annotation": null,
+      "language": "eng",
+      "id": "a8b397ce-bd5b-4fa2-add0-30d96c2aaa95",
+      "user-rating": {
+        "value": null
+      },
+      "tags": [],
+      "attributes": [],
+      "languages": [
+        "eng"
+      ],
+      "user-tags": []
+    },
+    {
+      "languages": [
+        "eng"
+      ],
+      "user-tags": [],
+      "attributes": [],
+      "tags": [],
+      "user-rating": {
+        "value": null
+      },
+      "id": "accc42ea-0680-357e-bc14-787c8b0a91a8",
+      "language": "eng",
+      "annotation": null,
+      "type": "Song",
+      "iswcs": [],
+      "aliases": [],
+      "title": "Alice",
+      "disambiguation": "Tom Waits song",
+      "type-id": "f061270a-2fd6-32f1-a641-f0f8676d14e6",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      }
+    },
+    {
+      "languages": [
+        "eng"
+      ],
+      "user-tags": [],
+      "attributes": [],
+      "tags": [],
+      "user-rating": {
+        "value": null
+      },
+      "language": "eng",
+      "annotation": null,
+      "id": "b72b4829-3d0d-473f-92fb-392ff80e9e36",
+      "iswcs": [],
+      "type": "Song",
+      "title": "All Stripped Down",
+      "aliases": [],
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "type-id": "f061270a-2fd6-32f1-a641-f0f8676d14e6",
+      "disambiguation": ""
+    },
+    {
+      "iswcs": [],
+      "type": "Song",
+      "title": "All the World Is Green",
+      "aliases": [],
+      "type-id": "f061270a-2fd6-32f1-a641-f0f8676d14e6",
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "disambiguation": "",
+      "user-tags": [],
+      "languages": [],
+      "attributes": [],
+      "tags": [],
+      "user-rating": {
+        "value": null
+      },
+      "annotation": null,
+      "language": null,
+      "id": "b8c90e33-d8ca-403c-938a-9306080b8232"
+    },
+    {
+      "disambiguation": "",
+      "rating": {
+        "value": null,
+        "votes-count": 0
+      },
+      "type-id": "f061270a-2fd6-32f1-a641-f0f8676d14e6",
+      "aliases": [],
+      "title": "A Sight for Sore Eyes",
+      "type": "Song",
+      "iswcs": [
+        "T-902.818.206-1"
+      ],
+      "id": "d731bf47-1545-4e9f-9074-9da533a253ce",
+      "language": "eng",
+      "annotation": null,
+      "user-rating": {
+        "value": null
+      },
+      "tags": [],
+      "attributes": [
+        {
+          "type-id": "01eeee67-f514-3801-bdce-279e04872f91",
+          "type": "GEMA ID",
+          "value": "1684796-001"
+        },
+        {
+          "type": "ASCAP ID",
+          "value": "490421433",
+          "type-id": "d833318c-6c6a-370e-8b16-9cb15873ba76"
+        }
+      ],
+      "user-tags": [],
+      "languages": [
+        "eng"
+      ]
+    },
+    {
+      "title": "Another Man's Vine",
+      "aliases": [],
+      "rating": {
+        "votes-count": 0,
+        "value": null
+      },
+      "type-id": "f061270a-2fd6-32f1-a641-f0f8676d14e6",
+      "disambiguation": "",
+      "iswcs": [],
+      "type": "Song",
+      "tags": [],
+      "user-rating": {
+        "value": null
+      },
+      "annotation": null,
+      "language": null,
+      "id": "f20205ac-84e5-4d49-838e-8f139b0300fa",
+      "languages": [],
+      "user-tags": [],
+      "attributes": []
+    }
+  ],
+  "work-count": 368,
+  "work-offset": 0
+}

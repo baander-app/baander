@@ -38,6 +38,12 @@ class Artist extends BaseModel
         return 'slug';
     }
 
+    public function albums()
+    {
+        return $this->belongsToMany(Album::class)
+            ->using(AlbumArtist::class);
+    }
+
     public function songs()
     {
         return $this->belongsToMany(Song::class)

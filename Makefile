@@ -57,7 +57,14 @@ env-dev: ## Creates config for dev environment
 
 ssh: ## Get bash inside laravel docker container
 ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@HOST_UID=$(HOST_UID) HOST_GID=$(HOST_GID) WEB_PORT_HTTP=$(WEB_PORT_HTTP) WEB_PORT_SSL=$(WEB_PORT_SSL) XDEBUG_CONFIG=$(XDEBUG_CONFIG) XDEBUG_VERSION=$(XDEBUG_VERSION) docker-compose  exec $(OPTION_T) $(PHP_USER) app bash
+	@HOST_UID=$(HOST_UID) HOST_GID=$(HOST_GID) WEB_PORT_HTTP=$(WEB_PORT_HTTP) WEB_PORT_SSL=$(WEB_PORT_SSL) XDEBUG_CONFIG=$(XDEBUG_CONFIG) XDEBUG_VERSION=$(XDEBUG_VERSION) docker-compose exec $(OPTION_T) $(PHP_USER) app bash
+else
+	$(ERROR_ONLY_FOR_HOST)
+endif
+
+restart-app: ## Get bash inside laravel docker container
+ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
+	@HOST_UID=$(HOST_UID) HOST_GID=$(HOST_GID) WEB_PORT_HTTP=$(WEB_PORT_HTTP) WEB_PORT_SSL=$(WEB_PORT_SSL) XDEBUG_CONFIG=$(XDEBUG_CONFIG) XDEBUG_VERSION=$(XDEBUG_VERSION) docker-compose restart app
 else
 	$(ERROR_ONLY_FOR_HOST)
 endif

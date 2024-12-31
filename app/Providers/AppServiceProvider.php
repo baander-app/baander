@@ -5,11 +5,14 @@ namespace App\Providers;
 use App\Repositories\Cache\CacheRepositoryInterface;
 use App\Repositories\Cache\LaravelCacheRepository;
 use Ergebnis\Clock\SystemClock;
+use GuzzleHttp\Client;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\{Cache, DB, URL, View};
 use Illuminate\Support\ServiceProvider;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\ImageManager;
+use MusicBrainz\HttpAdapter\GuzzleHttpAdapter;
+use MusicBrainz\MusicBrainz;
 use Saloon\CachePlugin\Drivers\LaravelCacheDriver;
 use Saloon\Http\Senders\GuzzleSender;
 
@@ -37,7 +40,17 @@ class AppServiceProvider extends ServiceProvider
             return new ImageManager(new Driver());
         });
 
-        $this->app->scoped(GuzzleSender::class, fn () => new GuzzleSender);
+        $this->app->scoped(GuzzleSender::class, fn() => new GuzzleSender);
+
+        $this->app->scoped(MusicBrainz::class, function () {
+            $guzzle = new GuzzleHttpAdapter(new Client());
+            $musicBrainz = new MusicBrainz($guzzle);
+
+            $musicBrainz->config()
+                ->setUserAgent('Baander server v' . config('app.version'));
+
+            return $musicBrainz;
+        });
     }
 
     /**

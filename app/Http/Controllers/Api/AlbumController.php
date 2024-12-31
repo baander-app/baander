@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Filters\AlbumFilter;
 use App\Extensions\{JsonPaginator};
 use App\Extensions\BaseBuilder;
 use App\Http\Controllers\Controller;
@@ -66,7 +65,7 @@ class AlbumController extends Controller
     public function show(Library $library, Album $album)
     {
         $album->setRelation('library', $library);
-        $album->loadMissing(['albumArtist', 'cover', 'songs']);
+        $album->loadMissing(['artists', 'cover', 'songs']);
 
         return new AlbumResource($album);
     }

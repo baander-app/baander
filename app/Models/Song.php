@@ -20,7 +20,7 @@ class Song extends BaseModel implements DirectStreamableFile
         'album',
         'album.cover',
         'artists',
-        'album.albumArtist',
+        'album',
         'genres',
     ];
 
@@ -75,11 +75,6 @@ class Song extends BaseModel implements DirectStreamableFile
     {
         return $this->belongsToMany(Artist::class)
             ->using(ArtistSong::class);
-    }
-
-    public function albumArtist()
-    {
-        return $this->belongsTo(Artist::class, '');
     }
 
     public function userMediaActivies()

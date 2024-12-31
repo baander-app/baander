@@ -19,7 +19,7 @@ class Album extends BaseModel
     ];
 
     public static array $filterRelations = [
-      'albumArtist',
+      'artists',
       'cover',
       'library',
       'songs',
@@ -54,9 +54,10 @@ class Album extends BaseModel
         return 'slug';
     }
 
-    public function albumArtist()
+    public function artists()
     {
-        return $this->belongsTo(Artist::class, 'artist_id', 'id', '');
+        return $this->belongsToMany(Artist::class)
+            ->using(AlbumArtist::class);
     }
 
     public function cover()

@@ -1,0 +1,452 @@
+{
+  "created": "2018-12-08T19:13:37.072Z",
+  "count": 21,
+  "offset": 0,
+  "artists": [
+    {
+      "id": "f0a4c8af-2b25-45cf-9b41-19171cf4d80f",
+      "type": "Person",
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "score": 100,
+      "name": "John Waite",
+      "sort-name": "Waite, John",
+      "gender": "male",
+      "country": "GB",
+      "area": {
+        "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+        "type": "Country",
+        "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+        "name": "United Kingdom",
+        "sort-name": "United Kingdom",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "begin-area": {
+        "id": "0d2238db-557e-4ac4-b48d-550d8b6c1ede",
+        "type": "City",
+        "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+        "name": "City of Lancaster",
+        "sort-name": "City of Lancaster",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "begin": "1952-07-04",
+        "ended": null
+      },
+      "aliases": [
+        {
+          "sort-name": "John Weight",
+          "name": "John Weight",
+          "locale": null,
+          "type": null,
+          "primary": null,
+          "begin-date": null,
+          "end-date": null
+        },
+        {
+          "sort-name": "John Wait",
+          "name": "John Wait",
+          "locale": null,
+          "type": null,
+          "primary": null,
+          "begin-date": null,
+          "end-date": null
+        },
+        {
+          "sort-name": "Waite, John Charles",
+          "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+          "name": "John Charles Waite",
+          "locale": null,
+          "type": "Legal name",
+          "primary": null,
+          "begin-date": null,
+          "end-date": null
+        },
+        {
+          "sort-name": "John Walte",
+          "name": "John Walte",
+          "locale": null,
+          "type": null,
+          "primary": null,
+          "begin-date": null,
+          "end-date": null
+        }
+      ],
+      "tags": [
+        {
+          "count": 1,
+          "name": "pop"
+        },
+        {
+          "count": 1,
+          "name": "pop rock"
+        },
+        {
+          "count": 1,
+          "name": "classic pop and rock"
+        }
+      ]
+    },
+    {
+      "id": "0e940ca2-82f1-438f-9fc0-21639e960065",
+      "type": "Person",
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "score": 86,
+      "name": "Geneviève Waïte",
+      "sort-name": "Waïte, Geneviève",
+      "gender": "female",
+      "country": "ZA",
+      "area": {
+        "id": "50cc7852-862e-30ae-aa82-385fe7135b7f",
+        "type": "Country",
+        "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+        "name": "South Africa",
+        "sort-name": "South Africa",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "begin": "1948-02-19",
+        "ended": null
+      },
+      "aliases": [
+        {
+          "sort-name": "Geneviève Waile",
+          "name": "Geneviève Waile",
+          "locale": null,
+          "type": null,
+          "primary": null,
+          "begin-date": null,
+          "end-date": null
+        }
+      ]
+    },
+    {
+      "id": "d0d1eb28-8ed4-470d-9497-63bb94568d4a",
+      "type": "Person",
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "score": 85,
+      "name": "Michael Waite",
+      "sort-name": "Waite, Michael",
+      "gender": "male",
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "f0793314-adbe-4411-adc4-bc15f638296f",
+      "type": "Person",
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "score": 84,
+      "name": "Diana Waite",
+      "sort-name": "Waite, Diana",
+      "gender": "female",
+      "country": "US",
+      "area": {
+        "id": "489ce91b-6658-3307-9877-795b68554c98",
+        "type": "Country",
+        "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+        "name": "United States",
+        "sort-name": "United States",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "b856b4ae-5c73-4476-a61c-f1fddc573a4e",
+      "type": "Person",
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "score": 84,
+      "name": "Xanthe Waite",
+      "sort-name": "Waite, Xanthe",
+      "gender": "female",
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "778ae060-4fe0-4b65-9f38-553521206a56",
+      "type": "Person",
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "score": 84,
+      "name": "Adam Waite",
+      "sort-name": "Waite, Adam",
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "32ff5d41-f9af-4cd6-bd56-ffec0f80de1a",
+      "type": "Person",
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "score": 84,
+      "name": "Chris Waite",
+      "sort-name": "Waite, Chris",
+      "gender": "male",
+      "country": "US",
+      "area": {
+        "id": "489ce91b-6658-3307-9877-795b68554c98",
+        "type": "Country",
+        "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+        "name": "United States",
+        "sort-name": "United States",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "1638ccc0-64f1-4cdb-bbcf-afaf90d92430",
+      "type": "Person",
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "score": 84,
+      "name": "Tony Waite",
+      "sort-name": "Waite, Tony",
+      "gender": "male",
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "cbf0f4a9-7ac5-45b5-9b87-a107d9322b6b",
+      "type": "Person",
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "score": 84,
+      "name": "Marcus Waite",
+      "sort-name": "Waite, Marcus",
+      "gender": "male",
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "2fa7e0ca-84db-4fff-93a6-b55772f6b031",
+      "type": "Person",
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "score": 84,
+      "name": "Celeste Waite",
+      "sort-name": "Waite, Celeste",
+      "gender": "female",
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "c699a4e9-1a2c-4d99-8a81-07d8a6966b00",
+      "type": "Person",
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "score": 84,
+      "name": "Mark Waite",
+      "sort-name": "Waite, Mark",
+      "gender": "male",
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "891cfda8-b206-49ad-b7dd-576bcfc84790",
+      "type": "Person",
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "score": 84,
+      "name": "Freddie Waite",
+      "sort-name": "Waite, Freddie",
+      "gender": "male",
+      "country": "GB",
+      "area": {
+        "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+        "type": "Country",
+        "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+        "name": "United Kingdom",
+        "sort-name": "United Kingdom",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "4ef1a137-96f6-4d71-82ed-5441fa3e296f",
+      "type": "Person",
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "score": 84,
+      "name": "Andrew Waite",
+      "sort-name": "Waite, Andrew",
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "84fad89f-6fb4-4691-8b47-97d2ed1e77a2",
+      "type": "Person",
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "score": 84,
+      "name": "Craig Waite",
+      "sort-name": "Waite, Craig",
+      "gender": "male",
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "72183346-a1f7-41f7-a360-9ad50d7c01a6",
+      "type": "Person",
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "score": 84,
+      "name": "Jennifer Waite",
+      "sort-name": "Waite, Jennifer",
+      "gender": "female",
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "69cbc0d2-f4c5-44c0-b61c-64bf015420a3",
+      "type": "Person",
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "score": 84,
+      "name": "Gabriel Waite",
+      "sort-name": "Waite, Gabriel",
+      "gender": "male",
+      "country": "GB",
+      "area": {
+        "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+        "type": "Country",
+        "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+        "name": "United Kingdom",
+        "sort-name": "United Kingdom",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "aaba538e-fa2c-4165-96eb-760f412a7266",
+      "type": "Person",
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "score": 84,
+      "name": "Patrick Waite",
+      "sort-name": "Waite, Patrick",
+      "gender": "male",
+      "country": "GB",
+      "area": {
+        "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+        "type": "Country",
+        "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+        "name": "United Kingdom",
+        "sort-name": "United Kingdom",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "begin": "1963-06-16",
+        "end": "1993-02-18",
+        "ended": true
+      }
+    },
+    {
+      "id": "b1399bc1-b849-481c-b2d8-9ee20feed031",
+      "type": "Person",
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "score": 84,
+      "name": "Hal Waite",
+      "sort-name": "Waite, Hal",
+      "gender": "male",
+      "country": "US",
+      "area": {
+        "id": "489ce91b-6658-3307-9877-795b68554c98",
+        "type": "Country",
+        "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+        "name": "United States",
+        "sort-name": "United States",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      },
+      "aliases": [
+        {
+          "sort-name": "Waite, Hal, Jr.",
+          "name": "Hal Waite Jr.",
+          "locale": null,
+          "type": null,
+          "primary": null,
+          "begin-date": null,
+          "end-date": null
+        }
+      ]
+    },
+    {
+      "id": "5dc711e4-6fa6-4610-9487-a3fbb5114e83",
+      "score": 76,
+      "name": "Barry Waite Unlimited",
+      "sort-name": "Barry Waite Unlimited",
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "494cc4f1-1e5d-4e05-b864-b33d9db65b66",
+      "type": "Person",
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+      "score": 76,
+      "name": "Freddie Waite Sr.",
+      "sort-name": "Waite, Freddie Sr.",
+      "gender": "male",
+      "country": "GB",
+      "area": {
+        "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+        "type": "Country",
+        "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+        "name": "United Kingdom",
+        "sort-name": "United Kingdom",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      }
+    },
+    {
+      "id": "e30e935d-4364-4041-b24e-e2dbf0e26a0b",
+      "type": "Group",
+      "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+      "score": 71,
+      "name": "Barry Waite & Ltd",
+      "sort-name": "Waite, Barry & Ltd",
+      "country": "US",
+      "area": {
+        "id": "489ce91b-6658-3307-9877-795b68554c98",
+        "type": "Country",
+        "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+        "name": "United States",
+        "sort-name": "United States",
+        "life-span": {
+          "ended": null
+        }
+      },
+      "life-span": {
+        "ended": null
+      }
+    }
+  ]
+}

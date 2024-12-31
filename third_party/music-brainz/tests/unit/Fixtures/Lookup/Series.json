@@ -1,0 +1,1632 @@
+{
+  "disambiguation": "",
+  "id": "1df4b695-967a-4294-8bb2-856a22f0c726",
+  "type-id": "4c1c4949-7b6c-3a2d-9d54-a50a27e4fa77",
+  "name": "MTV Unplugged",
+  "type": "Release group series",
+  "relations": [
+    {
+      "attributes": [],
+      "end": null,
+      "target-credit": "",
+      "begin": null,
+      "target-type": "url",
+      "direction": "forward",
+      "type": "discogs",
+      "attribute-values": {},
+      "type-id": "338811ef-b1a9-449d-954e-115846f33a44",
+      "source-credit": "",
+      "url": {
+        "resource": "https://www.discogs.com/label/453080",
+        "id": "852b4f9d-68e9-479b-ae3b-02e452cb756a"
+      },
+      "ended": false
+    },
+    {
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "ended": false,
+      "target-type": "release_group",
+      "direction": "backward",
+      "attribute-values": {},
+      "type": "part of",
+      "ordering-key": 1,
+      "release_group": {
+        "primary-type-id": null,
+        "disambiguation": "",
+        "title": "VH1 Storytellers & MTV Unplugged",
+        "secondary-type-ids": [],
+        "first-release-date": "",
+        "secondary-types": [],
+        "id": "d4d6842b-1ba3-3b8e-a64c-d8033ab9f3e8",
+        "primary-type": null
+      },
+      "target-credit": "",
+      "begin": null,
+      "end": null,
+      "attributes": []
+    },
+    {
+      "ordering-key": 1,
+      "attribute-values": {
+        "number": "1991"
+      },
+      "type": "part of",
+      "target-type": "release_group",
+      "direction": "backward",
+      "ended": false,
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "begin": null,
+      "release_group": {
+        "primary-type": null,
+        "id": "ff69b2d2-92ab-3319-8c1e-3904ce2cb58c",
+        "disambiguation": "",
+        "primary-type-id": null,
+        "title": "Unplugged: The Official Bootleg",
+        "first-release-date": "1991",
+        "secondary-type-ids": [],
+        "secondary-types": []
+      },
+      "target-credit": ""
+    },
+    {
+      "target-credit": "",
+      "release_group": {
+        "id": "cdb6ccf3-d940-3605-b6a6-e864f621c14c",
+        "primary-type": null,
+        "secondary-types": [],
+        "secondary-type-ids": [],
+        "first-release-date": "1992-06-02",
+        "title": "MTV Unplugged",
+        "primary-type-id": null,
+        "disambiguation": ""
+      },
+      "begin": null,
+      "attributes": [
+        "number"
+      ],
+      "end": null,
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "ended": false,
+      "direction": "backward",
+      "target-type": "release_group",
+      "type": "part of",
+      "attribute-values": {
+        "number": "1992"
+      },
+      "ordering-key": 2
+    },
+    {
+      "target-credit": "",
+      "release_group": {
+        "title": "Unplugged",
+        "primary-type-id": null,
+        "disambiguation": "",
+        "secondary-types": [],
+        "secondary-type-ids": [],
+        "first-release-date": "1992-08-21",
+        "id": "61c4a210-6e90-3d41-b6c1-fd2c7e4fb6ac",
+        "primary-type": null
+      },
+      "begin": null,
+      "attributes": [
+        "number"
+      ],
+      "end": null,
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "ended": false,
+      "direction": "backward",
+      "target-type": "release_group",
+      "attribute-values": {
+        "number": "1992"
+      },
+      "ordering-key": 3,
+      "type": "part of"
+    },
+    {
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "begin": null,
+      "release_group": {
+        "id": "2054102a-eab9-326a-a2aa-58fb8b47e219",
+        "primary-type": null,
+        "disambiguation": "",
+        "primary-type-id": null,
+        "title": "1992-09-22: Warner Hollywood Studios, Los Angeles, CA, USA",
+        "secondary-type-ids": [],
+        "first-release-date": "1992",
+        "secondary-types": []
+      },
+      "target-credit": "",
+      "type": "part of",
+      "attribute-values": {
+        "number": "1993"
+      },
+      "ordering-key": 4,
+      "target-type": "release_group",
+      "direction": "backward",
+      "ended": false,
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": ""
+    },
+    {
+      "begin": null,
+      "release_group": {
+        "id": "663e44c4-a897-3b98-a11b-833bf4404863",
+        "primary-type": null,
+        "first-release-date": "1993-05-25",
+        "secondary-type-ids": [],
+        "secondary-types": [],
+        "disambiguation": "",
+        "primary-type-id": null,
+        "title": "Unplugged… and Seated"
+      },
+      "target-credit": "",
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "ended": false,
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "attribute-values": {
+        "number": "1993"
+      },
+      "ordering-key": 5,
+      "type": "part of",
+      "target-type": "release_group",
+      "direction": "backward"
+    },
+    {
+      "attribute-values": {
+        "number": "1993"
+      },
+      "type": "part of",
+      "ordering-key": 6,
+      "direction": "backward",
+      "target-type": "release_group",
+      "ended": false,
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "begin": null,
+      "target-credit": "",
+      "release_group": {
+        "id": "7de89e5d-f573-3626-8eff-5e57925380b6",
+        "primary-type": null,
+        "first-release-date": "1993-06-11",
+        "secondary-type-ids": [],
+        "secondary-types": [],
+        "primary-type-id": null,
+        "disambiguation": "",
+        "title": "Unplugged"
+      }
+    },
+    {
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "ended": false,
+      "target-type": "release_group",
+      "direction": "backward",
+      "type": "part of",
+      "attribute-values": {
+        "number": "1993"
+      },
+      "ordering-key": 7,
+      "release_group": {
+        "first-release-date": "1993-10-22",
+        "secondary-type-ids": [],
+        "secondary-types": [],
+        "disambiguation": "",
+        "primary-type-id": null,
+        "title": "MTV Unplugged",
+        "id": "cd1f2752-5ad9-3e8b-95a0-efc7cac6d3a9",
+        "primary-type": null
+      },
+      "target-credit": "",
+      "begin": null,
+      "attributes": [
+        "number"
+      ],
+      "end": null
+    },
+    {
+      "direction": "backward",
+      "target-type": "release_group",
+      "attribute-values": {
+        "number": "1994"
+      },
+      "ordering-key": 8,
+      "type": "part of",
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "ended": false,
+      "attributes": [
+        "number"
+      ],
+      "end": null,
+      "target-credit": "",
+      "release_group": {
+        "id": "58e075a7-d43e-34d7-a944-8b9fb0b46e68",
+        "primary-type": null,
+        "disambiguation": "",
+        "primary-type-id": null,
+        "title": "MTV Unplugged",
+        "secondary-type-ids": [],
+        "first-release-date": "1994-08-03",
+        "secondary-types": []
+      },
+      "begin": null
+    },
+    {
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "release_group": {
+        "first-release-date": "1994-11-01",
+        "secondary-type-ids": [],
+        "secondary-types": [],
+        "disambiguation": "",
+        "primary-type-id": null,
+        "title": "MTV Unplugged in New York",
+        "id": "fb3770f6-83fb-32b7-85c4-1f522a92287e",
+        "primary-type": null
+      },
+      "target-credit": "",
+      "begin": null,
+      "target-type": "release_group",
+      "direction": "backward",
+      "attribute-values": {
+        "number": "1994"
+      },
+      "type": "part of",
+      "ordering-key": 9,
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "ended": false
+    },
+    {
+      "attribute-values": {
+        "number": "1994"
+      },
+      "type": "part of",
+      "ordering-key": 10,
+      "target-type": "release_group",
+      "direction": "backward",
+      "ended": false,
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "begin": null,
+      "release_group": {
+        "primary-type-id": null,
+        "disambiguation": "live album",
+        "title": "No Quarter",
+        "secondary-type-ids": [],
+        "first-release-date": "1994-11-07",
+        "secondary-types": [],
+        "id": "96223279-d70a-3e8b-be19-3cddd9a772a8",
+        "primary-type": null
+      },
+      "target-credit": ""
+    },
+    {
+      "ended": false,
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "attribute-values": {
+        "number": "1995"
+      },
+      "ordering-key": 11,
+      "type": "part of",
+      "direction": "backward",
+      "target-type": "release_group",
+      "begin": null,
+      "target-credit": "",
+      "release_group": {
+        "id": "3ee15c41-77b1-32bd-9513-d6035444a34e",
+        "primary-type": null,
+        "secondary-types": [],
+        "secondary-type-ids": [],
+        "first-release-date": "1995-04",
+        "title": "MTV Unplugged",
+        "disambiguation": "",
+        "primary-type-id": null
+      },
+      "attributes": [
+        "number"
+      ],
+      "end": null
+    },
+    {
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "ended": false,
+      "direction": "backward",
+      "target-type": "release_group",
+      "attribute-values": {
+        "number": "1996"
+      },
+      "type": "part of",
+      "ordering-key": 12,
+      "target-credit": "",
+      "release_group": {
+        "secondary-types": [],
+        "secondary-type-ids": [],
+        "first-release-date": "1996",
+        "title": "MTV Unplugged: Comfort y música para volar",
+        "disambiguation": "",
+        "primary-type-id": null,
+        "id": "687b0a9c-35c6-3206-8462-3a02c7298089",
+        "primary-type": null
+      },
+      "begin": null,
+      "attributes": [
+        "number"
+      ],
+      "end": null
+    },
+    {
+      "target-credit": "",
+      "release_group": {
+        "id": "828e931c-a160-3143-a02f-5578d2fd5219",
+        "primary-type": null,
+        "secondary-types": [],
+        "secondary-type-ids": [],
+        "first-release-date": "1996-03-02",
+        "title": "MTV Unplugged",
+        "primary-type-id": null,
+        "disambiguation": ""
+      },
+      "begin": null,
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "ended": false,
+      "direction": "backward",
+      "target-type": "release_group",
+      "attribute-values": {
+        "number": "1996"
+      },
+      "ordering-key": 13,
+      "type": "part of"
+    },
+    {
+      "target-type": "release_group",
+      "direction": "backward",
+      "attribute-values": {
+        "number": "1996"
+      },
+      "type": "part of",
+      "ordering-key": 14,
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "ended": false,
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "release_group": {
+        "first-release-date": "1996-04-10",
+        "secondary-type-ids": [],
+        "secondary-types": [],
+        "primary-type-id": null,
+        "disambiguation": "",
+        "title": "MTV Unplugged",
+        "id": "fd9e039a-0a75-3b48-b7b5-66e66bd355fe",
+        "primary-type": null
+      },
+      "target-credit": "",
+      "begin": null
+    },
+    {
+      "target-credit": "",
+      "release_group": {
+        "id": "83f9cf2f-c42f-3bc5-b16f-25087817a73f",
+        "primary-type": null,
+        "disambiguation": "",
+        "primary-type-id": null,
+        "title": "Unplugged",
+        "secondary-type-ids": [],
+        "first-release-date": "1996-08-13",
+        "secondary-types": []
+      },
+      "begin": null,
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "ended": false,
+      "direction": "backward",
+      "target-type": "release_group",
+      "attribute-values": {
+        "number": "1996"
+      },
+      "type": "part of",
+      "ordering-key": 15
+    },
+    {
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "ended": false,
+      "target-type": "release_group",
+      "direction": "backward",
+      "attribute-values": {
+        "number": "1996"
+      },
+      "ordering-key": 16,
+      "type": "part of",
+      "release_group": {
+        "id": "63ca86c2-585f-328c-ad49-28c785738296",
+        "primary-type": null,
+        "title": "MTV Unplugged",
+        "disambiguation": "",
+        "primary-type-id": null,
+        "secondary-types": [],
+        "first-release-date": "2004",
+        "secondary-type-ids": []
+      },
+      "target-credit": "",
+      "begin": null,
+      "end": null,
+      "attributes": [
+        "number"
+      ]
+    },
+    {
+      "ended": false,
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "attribute-values": {
+        "number": "1997"
+      },
+      "type": "part of",
+      "ordering-key": 17,
+      "target-type": "release_group",
+      "direction": "backward",
+      "begin": null,
+      "release_group": {
+        "primary-type": null,
+        "id": "c6e0ba95-02f1-3eed-b942-deffc869b954",
+        "title": "MTV Unplugged",
+        "primary-type-id": null,
+        "disambiguation": "",
+        "secondary-types": [],
+        "secondary-type-ids": [],
+        "first-release-date": "1997-07-15"
+      },
+      "target-credit": "",
+      "attributes": [
+        "number"
+      ],
+      "end": null
+    },
+    {
+      "begin": null,
+      "target-credit": "",
+      "release_group": {
+        "secondary-types": [],
+        "secondary-type-ids": [],
+        "first-release-date": "1997-11-25",
+        "title": "MTV Unplugged NYC 1997",
+        "disambiguation": "",
+        "primary-type-id": null,
+        "primary-type": null,
+        "id": "26cefc84-67ec-3d55-bfa9-ca2159fc7a87"
+      },
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "ended": false,
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "attribute-values": {
+        "number": "1997"
+      },
+      "ordering-key": 18,
+      "type": "part of",
+      "direction": "backward",
+      "target-type": "release_group"
+    },
+    {
+      "release_group": {
+        "secondary-types": [],
+        "first-release-date": "1997-12-08",
+        "secondary-type-ids": [],
+        "title": "Unplugged",
+        "disambiguation": "",
+        "primary-type-id": null,
+        "id": "81c11f97-089a-3c87-8b46-8d5e70f929bf",
+        "primary-type": null
+      },
+      "target-credit": "",
+      "begin": null,
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "ended": false,
+      "target-type": "release_group",
+      "direction": "backward",
+      "attribute-values": {
+        "number": "1997"
+      },
+      "ordering-key": 19,
+      "type": "part of"
+    },
+    {
+      "attributes": [
+        "number"
+      ],
+      "end": null,
+      "begin": null,
+      "target-credit": "",
+      "release_group": {
+        "primary-type-id": null,
+        "disambiguation": "",
+        "title": "MTV Unplugged",
+        "first-release-date": "1999-06-22",
+        "secondary-type-ids": [],
+        "secondary-types": [],
+        "id": "a43e195f-fb2e-38cf-a609-b75f39e0fba0",
+        "primary-type": null
+      },
+      "ordering-key": 20,
+      "attribute-values": {
+        "number": "1999"
+      },
+      "type": "part of",
+      "direction": "backward",
+      "target-type": "release_group",
+      "ended": false,
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd"
+    },
+    {
+      "type": "part of",
+      "attribute-values": {
+        "number": "1999"
+      },
+      "ordering-key": 21,
+      "target-type": "release_group",
+      "direction": "backward",
+      "ended": false,
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "begin": null,
+      "release_group": {
+        "title": "Unplugged",
+        "primary-type-id": null,
+        "disambiguation": "",
+        "secondary-types": [],
+        "first-release-date": "1999-11-12",
+        "secondary-type-ids": [],
+        "primary-type": null,
+        "id": "25af6d34-1f55-338d-8ad8-52bf30a3bbd8"
+      },
+      "target-credit": ""
+    },
+    {
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "ended": false,
+      "target-type": "release_group",
+      "direction": "backward",
+      "attribute-values": {
+        "number": "1999"
+      },
+      "type": "part of",
+      "ordering-key": 22,
+      "release_group": {
+        "secondary-type-ids": [],
+        "first-release-date": "1999-11-22",
+        "secondary-types": [],
+        "primary-type-id": null,
+        "disambiguation": "",
+        "title": "MTV Unplugged",
+        "id": "1f57afa7-4a14-37b4-a196-572738fa5ebb",
+        "primary-type": null
+      },
+      "target-credit": "",
+      "begin": null,
+      "attributes": [
+        "number"
+      ],
+      "end": null
+    },
+    {
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "target-credit": "",
+      "release_group": {
+        "secondary-type-ids": [],
+        "first-release-date": "2000-02-28",
+        "secondary-types": [],
+        "primary-type-id": null,
+        "disambiguation": "",
+        "title": "MTV Unplugged",
+        "id": "57c8f164-0bef-3b1e-b5eb-f9f0fa27efc5",
+        "primary-type": null
+      },
+      "begin": null,
+      "direction": "backward",
+      "target-type": "release_group",
+      "type": "part of",
+      "attribute-values": {
+        "number": "2000"
+      },
+      "ordering-key": 23,
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "ended": false
+    },
+    {
+      "ordering-key": 24,
+      "attribute-values": {
+        "number": "2000"
+      },
+      "type": "part of",
+      "target-type": "release_group",
+      "direction": "backward",
+      "ended": false,
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "attributes": [
+        "number"
+      ],
+      "end": null,
+      "begin": null,
+      "release_group": {
+        "id": "9f56cfb3-56d2-36a3-9d68-67a8865b7cc8",
+        "primary-type": null,
+        "title": "Unplugged",
+        "primary-type-id": null,
+        "disambiguation": "",
+        "secondary-types": [],
+        "secondary-type-ids": [],
+        "first-release-date": "2000-10-30"
+      },
+      "target-credit": ""
+    },
+    {
+      "target-type": "release_group",
+      "direction": "backward",
+      "type": "part of",
+      "attribute-values": {
+        "number": "2001"
+      },
+      "ordering-key": 25,
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "ended": false,
+      "attributes": [
+        "number"
+      ],
+      "end": null,
+      "release_group": {
+        "id": "fe139c57-01b6-3830-b1b2-5666e31f7dfc",
+        "primary-type": null,
+        "primary-type-id": null,
+        "disambiguation": "",
+        "title": "MTV Unplugged",
+        "secondary-type-ids": [],
+        "first-release-date": "2001",
+        "secondary-types": []
+      },
+      "target-credit": "",
+      "begin": null
+    },
+    {
+      "target-type": "release_group",
+      "direction": "backward",
+      "type": "part of",
+      "attribute-values": {
+        "number": "2001"
+      },
+      "ordering-key": 26,
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "ended": false,
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "release_group": {
+        "id": "76e5fdb9-6107-3d9d-b92b-4e913c7d93ea",
+        "primary-type": null,
+        "title": "MTV Unplugged",
+        "primary-type-id": null,
+        "disambiguation": "",
+        "secondary-types": [],
+        "first-release-date": "2001-09-04",
+        "secondary-type-ids": []
+      },
+      "target-credit": "",
+      "begin": null
+    },
+    {
+      "attributes": [
+        "number"
+      ],
+      "end": null,
+      "begin": null,
+      "release_group": {
+        "id": "34316efd-0c39-392c-aae1-a1151eccdfa4",
+        "primary-type": null,
+        "title": "Unplugged",
+        "primary-type-id": null,
+        "disambiguation": "",
+        "secondary-types": [],
+        "secondary-type-ids": [],
+        "first-release-date": "2001-12-18"
+      },
+      "target-credit": "",
+      "attribute-values": {
+        "number": "2001"
+      },
+      "type": "part of",
+      "ordering-key": 27,
+      "target-type": "release_group",
+      "direction": "backward",
+      "ended": false,
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": ""
+    },
+    {
+      "direction": "backward",
+      "target-type": "release_group",
+      "attribute-values": {
+        "number": "2002"
+      },
+      "ordering-key": 28,
+      "type": "part of",
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "ended": false,
+      "attributes": [
+        "number"
+      ],
+      "end": null,
+      "target-credit": "",
+      "release_group": {
+        "primary-type-id": null,
+        "disambiguation": "",
+        "title": "MTV Unplugged & Live",
+        "secondary-type-ids": [],
+        "first-release-date": "2001-11",
+        "secondary-types": [],
+        "id": "adb4a492-6f8d-3e43-8de1-22f86f277ba0",
+        "primary-type": null
+      },
+      "begin": null
+    },
+    {
+      "ended": false,
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "type": "part of",
+      "attribute-values": {
+        "number": "2002"
+      },
+      "ordering-key": 29,
+      "direction": "backward",
+      "target-type": "release_group",
+      "begin": null,
+      "target-credit": "",
+      "release_group": {
+        "title": "MTV Unplugged № 2.0",
+        "primary-type-id": null,
+        "disambiguation": "",
+        "secondary-types": [],
+        "first-release-date": "2002-05-07",
+        "secondary-type-ids": [],
+        "id": "da14599c-be7f-3f93-a219-47b2e8028c04",
+        "primary-type": null
+      },
+      "attributes": [
+        "number"
+      ],
+      "end": null
+    },
+    {
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "release_group": {
+        "secondary-types": [],
+        "secondary-type-ids": [],
+        "first-release-date": "2002-06-10",
+        "title": "The Very Best of MTV Unplugged",
+        "disambiguation": "",
+        "primary-type-id": null,
+        "id": "25f44677-2ecd-33fb-8454-9a9776496e3c",
+        "primary-type": null
+      },
+      "target-credit": "",
+      "begin": null,
+      "target-type": "release_group",
+      "direction": "backward",
+      "attribute-values": {
+        "number": "2002"
+      },
+      "ordering-key": 30,
+      "type": "part of",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "ended": false
+    },
+    {
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "ended": false,
+      "target-type": "release_group",
+      "direction": "backward",
+      "ordering-key": 31,
+      "attribute-values": {
+        "number": "2002"
+      },
+      "type": "part of",
+      "release_group": {
+        "secondary-types": [],
+        "secondary-type-ids": [],
+        "first-release-date": "2002-12-03",
+        "title": "MTV Unplugged v2.0",
+        "disambiguation": "",
+        "primary-type-id": null,
+        "id": "d4805d10-dc7c-3784-a0db-c6f820b4057a",
+        "primary-type": null
+      },
+      "target-credit": "",
+      "begin": null,
+      "attributes": [
+        "number"
+      ],
+      "end": null
+    },
+    {
+      "target-credit": "",
+      "release_group": {
+        "primary-type": null,
+        "id": "fc3dc2b2-e0bd-3608-974e-c2151566dc0e",
+        "title": "The Very Best of MTV Unplugged 2",
+        "disambiguation": "",
+        "primary-type-id": null,
+        "secondary-types": [],
+        "first-release-date": "2003-02-24",
+        "secondary-type-ids": []
+      },
+      "begin": null,
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "ended": false,
+      "direction": "backward",
+      "target-type": "release_group",
+      "ordering-key": 32,
+      "attribute-values": {
+        "number": "2003"
+      },
+      "type": "part of"
+    },
+    {
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "ended": false,
+      "direction": "backward",
+      "target-type": "release_group",
+      "attribute-values": {
+        "number": "2004"
+      },
+      "type": "part of",
+      "ordering-key": 33,
+      "target-credit": "",
+      "release_group": {
+        "id": "e7223f60-719c-3b77-af5b-53e4007d2359",
+        "primary-type": null,
+        "title": "MTV Unplugged",
+        "disambiguation": "",
+        "primary-type-id": null,
+        "secondary-types": [],
+        "secondary-type-ids": [],
+        "first-release-date": "2004"
+      },
+      "begin": null,
+      "attributes": [
+        "number"
+      ],
+      "end": null
+    },
+    {
+      "target-credit": "",
+      "release_group": {
+        "first-release-date": "2004-09-27",
+        "secondary-type-ids": [],
+        "secondary-types": [],
+        "primary-type-id": null,
+        "disambiguation": "",
+        "title": "The Very Best of MTV Unplugged 3",
+        "id": "7de01029-d1f3-3dc9-933b-708b320ca148",
+        "primary-type": null
+      },
+      "begin": null,
+      "attributes": [
+        "number"
+      ],
+      "end": null,
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "ended": false,
+      "direction": "backward",
+      "target-type": "release_group",
+      "attribute-values": {
+        "number": "2004"
+      },
+      "ordering-key": 34,
+      "type": "part of"
+    },
+    {
+      "target-credit": "",
+      "release_group": {
+        "id": "f7e2dd00-4c3e-3a2c-b567-636a1b1fc75a",
+        "primary-type": null,
+        "disambiguation": "",
+        "primary-type-id": null,
+        "title": "MTV Unplugged",
+        "first-release-date": "2005-05-18",
+        "secondary-type-ids": [],
+        "secondary-types": []
+      },
+      "begin": null,
+      "attributes": [
+        "number"
+      ],
+      "end": null,
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "ended": false,
+      "direction": "backward",
+      "target-type": "release_group",
+      "attribute-values": {
+        "number": "2005"
+      },
+      "ordering-key": 35,
+      "type": "part of"
+    },
+    {
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "begin": null,
+      "target-credit": "",
+      "release_group": {
+        "id": "59be226b-5160-3997-88a2-d35c90ed5216",
+        "primary-type": null,
+        "title": "Unplugged",
+        "disambiguation": "",
+        "primary-type-id": null,
+        "secondary-types": [],
+        "secondary-type-ids": [],
+        "first-release-date": "2005-10-11"
+      },
+      "attribute-values": {
+        "number": "2005"
+      },
+      "type": "part of",
+      "ordering-key": 36,
+      "direction": "backward",
+      "target-type": "release_group",
+      "ended": false,
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd"
+    },
+    {
+      "begin": null,
+      "target-credit": "",
+      "release_group": {
+        "id": "5d1e1b4d-af8d-3a77-ac2c-6dfaa6a03253",
+        "primary-type": null,
+        "secondary-types": [],
+        "first-release-date": "2005-12-07",
+        "secondary-type-ids": [],
+        "title": "Sound drop～MTV Unplugged＋Acoustic live 2005～",
+        "primary-type-id": null,
+        "disambiguation": ""
+      },
+      "attributes": [
+        "number"
+      ],
+      "end": null,
+      "ended": false,
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "attribute-values": {
+        "number": "2005"
+      },
+      "ordering-key": 37,
+      "type": "part of",
+      "direction": "backward",
+      "target-type": "release_group"
+    },
+    {
+      "ended": false,
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "attribute-values": {
+        "number": "2006"
+      },
+      "type": "part of",
+      "ordering-key": 38,
+      "target-type": "release_group",
+      "direction": "backward",
+      "begin": null,
+      "release_group": {
+        "id": "1378b6ef-efe0-3b17-b17e-ae932d866b92",
+        "primary-type": null,
+        "primary-type-id": null,
+        "disambiguation": "",
+        "title": "MTV Unplugged",
+        "first-release-date": "2006-11-07",
+        "secondary-type-ids": [],
+        "secondary-types": []
+      },
+      "target-credit": "",
+      "end": null,
+      "attributes": [
+        "number"
+      ]
+    },
+    {
+      "type": "part of",
+      "attribute-values": {
+        "number": "2007"
+      },
+      "ordering-key": 39,
+      "target-type": "release_group",
+      "direction": "backward",
+      "ended": false,
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "begin": null,
+      "release_group": {
+        "first-release-date": "2007-03-06",
+        "secondary-type-ids": [],
+        "secondary-types": [],
+        "disambiguation": "",
+        "primary-type-id": null,
+        "title": "MTV Unplugged",
+        "id": "27ca441b-d904-4d13-bea9-f7ecec4ec0da",
+        "primary-type": null
+      },
+      "target-credit": ""
+    },
+    {
+      "target-type": "release_group",
+      "direction": "backward",
+      "type": "part of",
+      "attribute-values": {
+        "number": "2008"
+      },
+      "ordering-key": 40,
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "ended": false,
+      "attributes": [
+        "number"
+      ],
+      "end": null,
+      "release_group": {
+        "primary-type": null,
+        "id": "a4358c4b-2e11-391d-8d0f-2c6a3a3f99ed",
+        "disambiguation": "",
+        "primary-type-id": null,
+        "title": "MTV Unplugged",
+        "first-release-date": "2008-06-10",
+        "secondary-type-ids": [],
+        "secondary-types": []
+      },
+      "target-credit": "",
+      "begin": null
+    },
+    {
+      "begin": null,
+      "release_group": {
+        "title": "MTV Unplugged",
+        "disambiguation": "",
+        "primary-type-id": null,
+        "secondary-types": [],
+        "secondary-type-ids": [],
+        "first-release-date": "2009-09-28",
+        "id": "fe590402-6d1c-4b29-8f53-390dfba1aa9a",
+        "primary-type": null
+      },
+      "target-credit": "",
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "ended": false,
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "attribute-values": {
+        "number": "2009"
+      },
+      "ordering-key": 41,
+      "type": "part of",
+      "target-type": "release_group",
+      "direction": "backward"
+    },
+    {
+      "attribute-values": {
+        "number": "2009"
+      },
+      "ordering-key": 42,
+      "type": "part of",
+      "target-type": "release_group",
+      "direction": "backward",
+      "ended": false,
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "attributes": [
+        "number"
+      ],
+      "end": null,
+      "begin": null,
+      "release_group": {
+        "first-release-date": "2009-11-13",
+        "secondary-type-ids": [],
+        "secondary-types": [],
+        "primary-type-id": null,
+        "disambiguation": "",
+        "title": "MTV Unplugged",
+        "id": "ecf963ed-0a46-4536-9fcc-d25b9adc8de4",
+        "primary-type": null
+      },
+      "target-credit": ""
+    },
+    {
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "release_group": {
+        "id": "ae3a718b-44db-4bce-aed7-f0a5d2495295",
+        "primary-type": null,
+        "secondary-types": [],
+        "first-release-date": "2010-02-01",
+        "secondary-type-ids": [],
+        "title": "MTV Unplugged",
+        "disambiguation": "",
+        "primary-type-id": null
+      },
+      "target-credit": "",
+      "begin": null,
+      "target-type": "release_group",
+      "direction": "backward",
+      "attribute-values": {
+        "number": "2010"
+      },
+      "ordering-key": 43,
+      "type": "part of",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "ended": false
+    },
+    {
+      "attributes": [
+        "number"
+      ],
+      "end": null,
+      "target-credit": "",
+      "release_group": {
+        "id": "16932f6b-b54a-4296-a3b4-edee857cc1bd",
+        "primary-type": null,
+        "title": "MTV Unplugged: Above and Beyond",
+        "disambiguation": "",
+        "primary-type-id": null,
+        "secondary-types": [],
+        "secondary-type-ids": [],
+        "first-release-date": "2010-11-12"
+      },
+      "begin": null,
+      "direction": "backward",
+      "target-type": "release_group",
+      "ordering-key": 44,
+      "attribute-values": {
+        "number": "2010"
+      },
+      "type": "part of",
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "ended": false
+    },
+    {
+      "direction": "backward",
+      "target-type": "release_group",
+      "attribute-values": {
+        "number": "2011"
+      },
+      "type": "part of",
+      "ordering-key": 45,
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "ended": false,
+      "attributes": [
+        "number"
+      ],
+      "end": null,
+      "target-credit": "",
+      "release_group": {
+        "secondary-type-ids": [],
+        "first-release-date": "2011-02-11",
+        "secondary-types": [],
+        "disambiguation": "",
+        "primary-type-id": null,
+        "title": "MTV Unplugged: Música de fondo",
+        "id": "3f3e7dd3-13e9-41c2-864a-b1a8457d53ef",
+        "primary-type": null
+      },
+      "begin": null
+    },
+    {
+      "ended": false,
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "attribute-values": {
+        "number": "2011"
+      },
+      "ordering-key": 46,
+      "type": "part of",
+      "direction": "backward",
+      "target-type": "release_group",
+      "begin": null,
+      "target-credit": "",
+      "release_group": {
+        "disambiguation": "",
+        "primary-type-id": null,
+        "title": "MTV Unplugged: Los Tigres del Norte & Friends",
+        "secondary-type-ids": [],
+        "first-release-date": "2011-05-22",
+        "secondary-types": [],
+        "id": "cdfdc0a0-b810-4100-af12-e3ad80cdab62",
+        "primary-type": null
+      },
+      "end": null,
+      "attributes": [
+        "number"
+      ]
+    },
+    {
+      "begin": null,
+      "release_group": {
+        "secondary-types": [],
+        "secondary-type-ids": [],
+        "first-release-date": "2011-08-23",
+        "title": "MTV Unplugged",
+        "primary-type-id": null,
+        "disambiguation": "",
+        "id": "b19e010e-2182-47d2-a236-7e2f75c2c746",
+        "primary-type": null
+      },
+      "target-credit": "",
+      "attributes": [
+        "number"
+      ],
+      "end": null,
+      "ended": false,
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "source-credit": "",
+      "attribute-values": {
+        "number": "2011"
+      },
+      "type": "part of",
+      "ordering-key": 47,
+      "target-type": "release_group",
+      "direction": "backward"
+    },
+    {
+      "begin": null,
+      "target-credit": "",
+      "release_group": {
+        "id": "ab1c6946-f9c0-4c7c-bd7a-2bff19b338b4",
+        "primary-type": null,
+        "disambiguation": "",
+        "primary-type-id": null,
+        "title": "MTV Unplugged",
+        "first-release-date": "2012-04-05",
+        "secondary-type-ids": [],
+        "secondary-types": []
+      },
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "ended": false,
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "type": "part of",
+      "attribute-values": {
+        "number": "2012"
+      },
+      "ordering-key": 48,
+      "direction": "backward",
+      "target-type": "release_group"
+    },
+    {
+      "attributes": [
+        "number"
+      ],
+      "end": null,
+      "target-credit": "",
+      "release_group": {
+        "id": "b7a39601-c4b7-45e6-8274-d716b20d51d0",
+        "primary-type": null,
+        "title": "MTV Unplugged",
+        "disambiguation": "",
+        "primary-type-id": null,
+        "secondary-types": [],
+        "first-release-date": "2012-05-05",
+        "secondary-type-ids": []
+      },
+      "begin": null,
+      "direction": "backward",
+      "target-type": "release_group",
+      "type": "part of",
+      "attribute-values": {
+        "number": "2012"
+      },
+      "ordering-key": 49,
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "ended": false
+    },
+    {
+      "direction": "backward",
+      "target-type": "release_group",
+      "type": "part of",
+      "attribute-values": {
+        "number": "2013"
+      },
+      "ordering-key": 50,
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "ended": false,
+      "attributes": [
+        "number"
+      ],
+      "end": null,
+      "target-credit": "",
+      "release_group": {
+        "secondary-types": [],
+        "first-release-date": "2013-12-18",
+        "secondary-type-ids": [],
+        "title": "MTV UNPLUGGED Kana Nishino",
+        "primary-type-id": null,
+        "disambiguation": "",
+        "primary-type": null,
+        "id": "e9db57d9-1cb7-4169-9306-a512cd99ed64"
+      },
+      "begin": null
+    },
+    {
+      "target-credit": "",
+      "release_group": {
+        "id": "d62284cb-a364-4ec8-b898-65c4a1abcd0b",
+        "primary-type": null,
+        "title": "Unplugged: The Complete 1991 and 2001 Sessions",
+        "disambiguation": "",
+        "primary-type-id": null,
+        "secondary-types": [],
+        "secondary-type-ids": [],
+        "first-release-date": "2014-04-19"
+      },
+      "begin": null,
+      "attributes": [
+        "number"
+      ],
+      "end": null,
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "ended": false,
+      "direction": "backward",
+      "target-type": "release_group",
+      "attribute-values": {
+        "number": "2014"
+      },
+      "type": "part of",
+      "ordering-key": 51
+    },
+    {
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "target-credit": "",
+      "release_group": {
+        "id": "38674d44-d863-4d80-a1f7-31dc18a4fd12",
+        "primary-type": null,
+        "disambiguation": "",
+        "primary-type-id": null,
+        "title": "MTV Unplugged",
+        "first-release-date": "2015-11-27",
+        "secondary-type-ids": [],
+        "secondary-types": []
+      },
+      "begin": null,
+      "direction": "backward",
+      "target-type": "release_group",
+      "type": "part of",
+      "attribute-values": {
+        "number": "2015"
+      },
+      "ordering-key": 52,
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "ended": false
+    },
+    {
+      "begin": null,
+      "target-credit": "",
+      "release_group": {
+        "primary-type": null,
+        "id": "38674d44-d863-4d80-a1f7-31dc18a4fd12",
+        "disambiguation": "",
+        "primary-type-id": null,
+        "title": "MTV Unplugged",
+        "first-release-date": "2015-11-27",
+        "secondary-type-ids": [],
+        "secondary-types": []
+      },
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "ended": false,
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "attribute-values": {
+        "number": "2015-08-19"
+      },
+      "ordering-key": 53,
+      "type": "part of",
+      "direction": "backward",
+      "target-type": "release_group"
+    },
+    {
+      "begin": null,
+      "target-credit": "",
+      "release_group": {
+        "id": "4e3e82ec-016b-4291-823f-0f3e1c48c7ed",
+        "primary-type": null,
+        "first-release-date": "2017-10-06",
+        "secondary-type-ids": [],
+        "secondary-types": [],
+        "primary-type-id": null,
+        "disambiguation": "",
+        "title": "MTV Unplugged: Summer Solstice"
+      },
+      "attributes": [
+        "number"
+      ],
+      "end": null,
+      "ended": false,
+      "source-credit": "",
+      "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+      "attribute-values": {
+        "number": "2017"
+      },
+      "type": "part of",
+      "ordering-key": 54,
+      "direction": "backward",
+      "target-type": "release_group"
+    },
+    {
+      "direction": "forward",
+      "target-type": "series",
+      "type": "subseries",
+      "attribute-values": {},
+      "source-credit": "",
+      "type-id": "a3af4c16-de83-4d63-b9b8-77e074c9babe",
+      "ended": false,
+      "series": {
+        "id": "4dbc6beb-a439-4a7e-8a57-ff4c263dc5d9",
+        "disambiguation": "",
+        "name": "Acústico MTV"
+      },
+      "attributes": [],
+      "end": null,
+      "target-credit": "",
+      "begin": null
+    },
+    {
+      "ended": false,
+      "type-id": "a3af4c16-de83-4d63-b9b8-77e074c9babe",
+      "source-credit": "",
+      "attribute-values": {},
+      "type": "subseries",
+      "target-type": "series",
+      "direction": "forward",
+      "begin": null,
+      "target-credit": "",
+      "end": null,
+      "series": {
+        "id": "dde5fd18-33e6-4cf6-b8ca-025a75076dff",
+        "disambiguation": "",
+        "name": "The Very Best of MTV Unplugged"
+      },
+      "attributes": []
+    },
+    {
+      "source-credit": "",
+      "type-id": "a1eecd98-f2f2-420b-ba8e-e5bc61697869",
+      "ended": false,
+      "url": {
+        "id": "0c38c316-4d13-4543-a734-2abdb7448e07",
+        "resource": "https://www.wikidata.org/wiki/Q10913761"
+      },
+      "direction": "forward",
+      "target-type": "url",
+      "attribute-values": {},
+      "type": "wikidata",
+      "target-credit": "",
+      "begin": null,
+      "end": null,
+      "attributes": []
+    },
+    {
+      "end": null,
+      "attributes": [],
+      "target-credit": "",
+      "begin": null,
+      "target-type": "url",
+      "direction": "forward",
+      "attribute-values": {},
+      "type": "wikipedia",
+      "type-id": "b2b9407a-dd32-30f4-aa48-b2fd2077d1d2",
+      "source-credit": "",
+      "url": {
+        "resource": "https://en.wikipedia.org/wiki/List_of_MTV_series_albums",
+        "id": "8b62eebe-019d-4df4-8c0d-517cfc0427f5"
+      },
+      "ended": false
+    }
+  ]
+}
