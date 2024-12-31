@@ -2,7 +2,6 @@ import { PersonalAccessTokenViewResource } from '@/api-client/requests';
 import { Group, Paper, Text, Chip, Fieldset, TextInput, Code } from '@mantine/core';
 import { useDateFormatter } from '@/providers/dayjs-provider.tsx';
 
-
 export interface TokenDetailProps {
   item: PersonalAccessTokenViewResource;
 }

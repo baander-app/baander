@@ -4,8 +4,7 @@ import { useUserTokenServiceUserTokenGetUserTokens } from '@/api-client/queries'
 import { useDateFormatter } from '@/providers/dayjs-provider.tsx';
 import { useDisclosure } from '@mantine/hooks';
 import { PersonalAccessTokenViewResource } from '@/api-client/requests';
-import { TokenDetail } from '@/modules/account/tokens/token-detail.tsx';
-
+import { TokenDetail } from '@/modules/user-settings/features/tokens/token-detail.tsx';
 
 export function Sessions() {
   const { data, isLoading } = useUserTokenServiceUserTokenGetUserTokens({ user: '1', perPage: 100 });

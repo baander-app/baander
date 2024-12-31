@@ -22,6 +22,7 @@ export function CreatePasskey() {
 
   const onSubmit = async (values: FormValues) => {
     const options = await AuthService.authPasskeyRegisterOptions();
+    // @ts-ignore
     const registration = await startRegistration(options);
 
     AuthService.authPasskeyRegister({
