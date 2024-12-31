@@ -12,7 +12,6 @@ enum TokenName: string
     case Refresh = 'refresh_token';
     case Stream  = 'stream_token';
 
-
     public function camelCaseValue(): string
     {
         return self::toCamelCase($this->value);

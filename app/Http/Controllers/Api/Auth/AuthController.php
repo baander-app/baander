@@ -9,7 +9,6 @@ use App\Http\Requests\Auth\{ForgotPasswordRequest, LoginRequest, LogoutRequest, 
 use App\Http\Resources\Auth\NewAccessTokenResource;
 use App\Http\Resources\User\UserResource;
 use Illuminate\Http\Response;
-use Illuminate\Support\Str;
 use App\Models\{PersonalAccessToken, TokenAbility, User};
 use App\Notifications\ForgotPasswordNotification;
 use Illuminate\Auth\Events\Verified;
@@ -18,7 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\{Hash, Password};
-use Spatie\RouteAttributes\Attributes\{Group, Post, Prefix};
+use Spatie\RouteAttributes\Attributes\{Post, Prefix};
 use Queue;
 
 /**
