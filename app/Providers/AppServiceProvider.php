@@ -7,15 +7,12 @@ use App\Repositories\Cache\LaravelCacheRepository;
 use Ergebnis\Clock\SystemClock;
 use GuzzleHttp\Client;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\{Cache, DB, URL, View};
+use Illuminate\Support\Facades\{DB, URL};
 use Illuminate\Support\ServiceProvider;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\ImageManager;
 use MusicBrainz\HttpAdapter\GuzzleHttpAdapter;
 use MusicBrainz\MusicBrainz;
-use Saloon\CachePlugin\Drivers\LaravelCacheDriver;
-use Saloon\Http\Senders\GuzzleSender;
-
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -32,15 +29,9 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->scoped(CacheRepositoryInterface::class, LaravelCacheRepository::class);
 
-        $this->app->scoped(LaravelCacheDriver::class, function () {
-            return new LaravelCacheDriver(Cache::store(config('saloon.cache.store')));
-        });
-
         $this->app->scoped(ImageManager::class, function () {
             return new ImageManager(new Driver());
         });
-
-        $this->app->scoped(GuzzleSender::class, fn() => new GuzzleSender);
 
         $this->app->scoped(MusicBrainz::class, function () {
             $guzzle = new GuzzleHttpAdapter(new Client());
