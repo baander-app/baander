@@ -26,9 +26,9 @@ class SecurityHeadersMiddleware
             'X-Content-Type-Options' => 'nosniff',
             'Referrer-Policy'        => 'strict-origin-when-cross-origin',
         ];
-//        foreach ($headers as $name => $value) {
-//            $response->headers->set($name, $value);
-//        }
+        foreach ($headers as $name => $value) {
+            $response->headers->set($name, $value);
+        }
 
 
         return $response;
