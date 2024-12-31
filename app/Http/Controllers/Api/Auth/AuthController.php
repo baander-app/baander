@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api\Auth;
 
-use Auth2Fa;
 use App\Http\Requests\Auth\{ForgotPasswordRequest, LoginRequest, RegisterRequest, ResetPasswordRequest};
 use App\Http\Resources\Auth\NewAccessTokenResource;
 use App\Http\Resources\User\UserResource;
@@ -36,8 +35,7 @@ class AuthController
         if (!$user) {
             abort(401, 'Invalid credentials.');
         }
-
-        $attempt = Auth2FA::attempt($request->only('email', 'password'), $request->filled('remember'));
+        $attempt = auth()->attempt($request->only('email', 'password'), $request->filled('remember'));
 
         if (!$attempt) {
             abort(401, 'Invalid credentials.');
