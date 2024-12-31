@@ -15,15 +15,17 @@ use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
 class SystemInfoController
 {
     /**
+     * Get php info
+     *
      * @response array{
      *   section: string,
      *   values: array{
-     *     name: string,
+     *     key: string,
      *     value: string|int|bool|float|null,
      *   }[]
      * }[]
      */
-    #[Get('/', 'api.system-info.show')]
+    #[Get('/', 'api.system-info.php')]
     public function php()
     {
         return response()->json(Info::getModules());

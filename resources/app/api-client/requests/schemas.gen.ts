@@ -54,7 +54,7 @@ export const $AlbumResource = {
             }
         }
     },
-    required: ['title', 'slug', 'year', 'directory', 'createdAt', 'updatedAt', 'genres'],
+    required: ['title', 'slug', 'year', 'directory', 'createdAt', 'updatedAt'],
     title: 'AlbumResource'
 } as const;
 
