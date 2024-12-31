@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Extensions\BaseBuilder;
-use App\Filters\FilterBuilder;
 use App\Models\Concerns\HasLibraryAccess;
 use App\Models\Player\PlayerState;
 use App\Packages\Http\Concerns\DirectStreamableFile;
@@ -21,13 +20,31 @@ class Song extends BaseModel implements DirectStreamableFile
         'album',
         'album.cover',
         'artists',
-        'albumArtist',
+        'album.albumArtist',
         'genres',
     ];
 
     protected $perPage = 30;
 
     protected $with = ['album'];
+
+    protected $fillable = [
+      'public_id',
+      'album_id',
+      'title',
+      'path',
+      'size',
+      'mime_type',
+      'length',
+      'lyrics',
+      'track',
+      'disc',
+      'modified_time',
+      'year',
+      'comment',
+      'hash',
+      'librarySlug',
+    ];
 
     public function getRouteKeyName(): string
     {

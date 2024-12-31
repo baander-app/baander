@@ -1,4 +1,4 @@
-FROM php:8.3-fpm
+FROM php:8.3-cli
 
 # set main params
 ARG BUILD_ARGUMENT_ENV=dev
@@ -51,13 +51,15 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
       libxpm-dev \
       libpq-dev \
       liblz4-dev \
-      iputils-ping
+      iputils-ping \
+      libcurl4-openssl-dev \
+      libsqlite3-dev \
+      libc-ares-dev
 
 RUN set -xe \
     && docker-php-ext-configure gd --with-webp --with-jpeg --with-xpm --with-freetype \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
     && docker-php-ext-configure intl
-
 
 RUN docker-php-ext-install -j "$(nproc)" \
       gd \
@@ -98,6 +100,10 @@ RUN mkdir -p /usr/local/src/pecl \
     && pecl bundle -d /usr/local/src/pecl excimer \
     && docker-php-ext-configure /usr/local/src/pecl/excimer \
     && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/excimer \
+    # swoole
+    && pecl bundle -d /usr/local/src/pecl swoole \
+    && docker-php-ext-configure /usr/local/src/pecl/swoole --enable-sockets --enable-swoole-curl --enable-cares --enable-swoole-pgsql \
+    && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/swoole \
     && rm -rf /usr/local/src/pecl \
     && rm -rf /tmp/* \
     && rm -rf /var/list/apt/* \
@@ -112,7 +118,6 @@ RUN mkdir -p $APP_HOME/public && \
     && chown -R ${USERNAME}:${USERNAME} $APP_HOME
 
 # put php config for Laravel
-COPY ./docker/$BUILD_ARGUMENT_ENV/www.conf /usr/local/etc/php-fpm.d/www.conf
 COPY ./docker/$BUILD_ARGUMENT_ENV/php.ini /usr/local/etc/php/php.ini
 
 # install Xdebug in case dev/test environment
@@ -128,6 +133,7 @@ ENV COMPOSER_ALLOW_SUPERUSER 1
 # add supervisor
 RUN mkdir -p /var/log/supervisor
 COPY --chown=root:root ./docker/general/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+# add crontab
 COPY --chown=root:crontab ./docker/general/cron /var/spool/cron/crontabs/root
 RUN chmod 0600 /var/spool/cron/crontabs/root
 
@@ -143,13 +149,19 @@ WORKDIR $APP_HOME
 
 USER ${USERNAME}
 
+RUN echo 'alias artisan="php /var/www/html/artisan"' >> /home/${USERNAME}/.bashrc
+
 # copy source files and config file
 COPY --chown=${USERNAME}:${USERNAME} . $APP_HOME/
 COPY --chown=${USERNAME}:${USERNAME} .env $APP_HOME/.env
+COPY --chown=${USERNAME}:${USERNAME} start-swoole-server $APP_HOME/start-swoole-server
+
+RUN set -xe \
+    && chmod +x ./start-swoole-server
 
 # install all PHP dependencies
 RUN if [ "$BUILD_ARGUMENT_ENV" = "dev" ] || [ "$BUILD_ARGUMENT_ENV" = "test" ]; then COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interaction --no-progress; \
     else COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interaction --no-progress --no-dev; \
     fi
 
-USER root
+CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

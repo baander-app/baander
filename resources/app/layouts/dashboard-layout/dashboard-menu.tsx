@@ -21,7 +21,7 @@ const menu: LinksGroupProps[] = [
     label: 'Users',
     iconName: 'heroicons:user-circle-solid',
     links: [
-      {label: 'View list', to: ''},
+      {label: 'View list', to: 'users/list'},
       {label: 'Prune tokens', to: ''},
     ],
   },

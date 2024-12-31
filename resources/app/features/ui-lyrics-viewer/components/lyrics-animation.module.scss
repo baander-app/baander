@@ -1,0 +1,17 @@
+.lyricLine {
+  width: 100%;
+  text-align: center;
+  position: absolute;
+  padding-left: 3px;
+  padding-right: 3px;
+}
+
+.currentLyric {
+  top: 50%; /* Center the current lyric */
+  transform: translateY(-50%);
+}
+
+.nextLyric {
+  top: 60%; /* Place next lyric below current lyric */
+  transform: translateY(-50%);
+}

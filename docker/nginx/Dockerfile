@@ -17,7 +17,7 @@ RUN mkdir -p /etc/nginx/certificates
 
 # generate certificates
 # TODO: change it and make additional logic for production environment
-RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/nginx/certificates/key.pem -out /etc/nginx/certificates/cert.pem -subj "/C=DK/ST=Odense/L=Odense/O=Baander/OU=Development/CN=localhost"
+RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/nginx/certificates/key.pem -out /etc/nginx/certificates/cert.pem -subj "/C=DK/ST=Odense/L=Odense/O=Baander/OU=Development/CN=baander.test"
 
 # put nginx config
 COPY ./$BUILD_ARGUMENT_ENV/nginx.conf /etc/nginx/conf.d/default.conf

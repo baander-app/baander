@@ -32,6 +32,21 @@
 - [Phpstorm configuration](/docs/phpstorm.md)
 - [Using XDebug](/docs/xdebug.md)
 
+# Screenshots
+
+![#login page](/docs/images/readme/page_login.png)
+![#login page](/docs/images/readme/page_albums.png)
+![#login page](/docs/images/readme/page_songs.png)
+
+## Api documentation
+
+We use [Scramble](https://scramble.dedoc.co/) to generate the documentation.
+
+Visit `yourapp.tld/api/docs` for the documentation page.
+![#login page](/docs/images/readme/page_api_docs.png)
+
+The openapi collection is available at `yourapp.tld/api/docs.json`
+
 ## License
 
 Apache 2.0 See [LICENSE](/LICENSE)

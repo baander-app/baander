@@ -17,7 +17,7 @@ export function Waveform({ onClose }: WaveformProps) {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   // Window state
   const [size, updateSize] = useState({ width: 800, height: 180 });
-  const [position, updatePosition] = useState({ x: 400, y: -200 });
+  const [position, updatePosition] = useState({ x: -500, y: -200 });
 
 
   useEffect(() => {

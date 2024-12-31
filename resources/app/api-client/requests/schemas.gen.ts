@@ -353,6 +353,71 @@ export const $PersonalAccessTokenViewResource = {
     title: 'PersonalAccessTokenViewResource'
 } as const;
 
+export const $QueueMonitorResource = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'integer'
+        },
+        job_id: {
+            type: 'string'
+        },
+        name: {
+            type: ['string', 'null']
+        },
+        queue: {
+            type: ['string', 'null']
+        },
+        started_at: {
+            type: ['string', 'null'],
+            format: 'date-time'
+        },
+        started_at_exact: {
+            type: ['string', 'null']
+        },
+        finished_at: {
+            type: ['string', 'null'],
+            format: 'date-time'
+        },
+        finished_at_exact: {
+            type: ['string', 'null']
+        },
+        attempt: {
+            type: 'integer'
+        },
+        progress: {
+            type: ['integer', 'null']
+        },
+        exception: {
+            type: ['string', 'null']
+        },
+        exception_message: {
+            type: 'string'
+        },
+        exception_class: {
+            type: ['string', 'null']
+        },
+        data: {
+            type: ['string', 'null']
+        },
+        status: {
+            type: 'string'
+        },
+        job_uuid: {
+            type: ['string', 'null']
+        },
+        retried: {
+            type: 'boolean'
+        },
+        queued_at: {
+            type: ['string', 'null'],
+            format: 'date-time'
+        }
+    },
+    required: ['id', 'job_id', 'name', 'queue', 'started_at', 'started_at_exact', 'finished_at', 'finished_at_exact', 'attempt', 'progress', 'exception', 'exception_message', 'exception_class', 'data', 'status', 'job_uuid', 'retried', 'queued_at'],
+    title: 'QueueMonitorResource'
+} as const;
+
 export const $RegisterRequest = {
     type: 'object',
     properties: {
@@ -365,9 +430,6 @@ export const $RegisterRequest = {
             type: 'string'
         },
         password_confirmation: {
-            type: 'string'
-        },
-        name: {
             type: 'string'
         }
     },
@@ -394,6 +456,16 @@ export const $ResetPasswordRequest = {
     },
     required: ['email', 'token', 'password', 'password_confirmation'],
     title: 'ResetPasswordRequest'
+} as const;
+
+export const $RetryJobRequest = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'integer'
+        }
+    },
+    title: 'RetryJobRequest'
 } as const;
 
 export const $SongResource = {
@@ -423,6 +495,9 @@ export const $SongResource = {
         lyrics: {
             type: ['string', 'null']
         },
+        lyricsExist: {
+            type: 'boolean'
+        },
         modifiedTime: {
             type: ['integer', 'null']
         },
@@ -447,6 +522,9 @@ export const $SongResource = {
         stream: {
             type: ['string', 'null']
         },
+        librarySlug: {
+            type: 'string'
+        },
         createdAt: {
             type: ['string', 'null'],
             format: 'date-time'
@@ -457,9 +535,15 @@ export const $SongResource = {
         },
         album: {
             '$ref': '#/components/schemas/AlbumWithoutSongsResource'
+        },
+        artists: {
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ArtistResource'
+            }
         }
     },
-    required: ['public_id', 'title', 'year', 'comment', 'disc', 'length', 'durationHuman', 'lyrics', 'modifiedTime', 'path', 'track', 'size', 'sizeHuman', 'mimeType', 'hash', 'createdAt', 'updatedAt'],
+    required: ['public_id', 'title', 'year', 'comment', 'disc', 'length', 'durationHuman', 'lyrics', 'lyricsExist', 'modifiedTime', 'path', 'track', 'size', 'sizeHuman', 'mimeType', 'hash', 'createdAt', 'updatedAt'],
     title: 'SongResource'
 } as const;
 
@@ -536,23 +620,4 @@ export const $UserResource = {
     },
     required: ['name', 'email', 'isAdmin', 'createdAt', 'updatedAt'],
     title: 'UserResource'
-} as const;
-
-export const $WidgetListItemResource = {
-    type: 'object',
-    properties: {
-        id: {
-            type: 'string',
-            description: `Id of the widget.
-Use this to query the schema.`,
-            examples: ['https://baander.test/api/schemas/widgets/MainNavBar']
-        },
-        name: {
-            type: 'string',
-            description: 'Name of the schema.',
-            examples: ['MainNavBar']
-        }
-    },
-    required: ['id', 'name'],
-    title: 'WidgetListItemResource'
 } as const;

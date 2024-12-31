@@ -91,10 +91,10 @@ return [
         'client' => env('REDIS_CLIENT', 'phpredis'),
 
         'options' => [
-            'cluster' => env('REDIS_CLUSTER', 'redis'),
-            'prefix'  => env('REDIS_PREFIX', 'baander_database_'),
-            'serializer' => Redis::SERIALIZER_IGBINARY,
-           'compression' => Redis::COMPRESSION_ZSTD,
+            'cluster'     => env('REDIS_CLUSTER', 'redis'),
+            'prefix'      => env('REDIS_PREFIX', 'baander_database_'),
+            'serializer'  => Redis::SERIALIZER_IGBINARY,
+            'compression' => Redis::COMPRESSION_ZSTD,
         ],
 
         'default' => [

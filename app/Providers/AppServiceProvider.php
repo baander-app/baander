@@ -2,19 +2,17 @@
 
 namespace App\Providers;
 
-use App\Extensions\JsonAnonymousResourceCollection;
-use App\Extensions\JsonPaginatedResourceResponse;
-use App\Packages\JsonSchema\Validation\DefaultValidationRuleProvider;
-use App\Packages\JsonSchema\Validation\ValidationRuleProviderInterface;
 use App\Repositories\Cache\CacheRepositoryInterface;
 use App\Repositories\Cache\LaravelCacheRepository;
-use App\View\Composers\BaanderViewComposer;
 use Ergebnis\Clock\SystemClock;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\{DB, URL, View};
-use Illuminate\Http\Resources\Json\PaginatedResourceResponse;
+use Illuminate\Support\Facades\{Cache, DB, URL, View};
 use Illuminate\Support\ServiceProvider;
+use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\ImageManager;
+use Saloon\CachePlugin\Drivers\LaravelCacheDriver;
+use Saloon\Http\Senders\GuzzleSender;
+
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -23,14 +21,23 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->singleton(SystemClock::class, function () {
+        $this->app->scoped(SystemClock::class, function () {
             $timeZone = new \DateTimeZone(config('app.timezone'));
 
             return new SystemClock($timeZone);
         });
 
-        $this->app->singleton(CacheRepositoryInterface::class, LaravelCacheRepository::class);
-        $this->app->singleton(ValidationRuleProviderInterface::class, DefaultValidationRuleProvider::class);
+        $this->app->scoped(CacheRepositoryInterface::class, LaravelCacheRepository::class);
+
+        $this->app->scoped(LaravelCacheDriver::class, function () {
+            return new LaravelCacheDriver(Cache::store(config('saloon.cache.store')));
+        });
+
+        $this->app->scoped(ImageManager::class, function () {
+            return new ImageManager(new Driver());
+        });
+
+        $this->app->scoped(GuzzleSender::class, fn () => new GuzzleSender);
     }
 
     /**
@@ -51,7 +58,5 @@ class AppServiceProvider extends ServiceProvider
         });
 
         URL::forceScheme('https');
-
-        View::composer(['auth.layout', 'app'], BaanderViewComposer::class);
     }
 }

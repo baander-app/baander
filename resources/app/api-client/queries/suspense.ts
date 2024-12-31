@@ -1,7 +1,7 @@
-// generated with @7nohe/openapi-react-query-codegen@1.6.0 
+// generated with @7nohe/openapi-react-query-codegen@1.6.1 
 
 import { UseQueryOptions, useSuspenseQuery } from "@tanstack/react-query";
-import { AlbumService, ArtistService, GenreService, ImageService, LibraryService, ModelSchemaService, OpCacheService, SongService, UserService, UserTokenService, WidgetSchemaService, WidgetService } from "../requests/services.gen";
+import { AlbumService, ArtistService, GenreService, ImageService, LibraryService, OpCacheService, QueueService, SongService, SystemInfoService, UserService, UserTokenService } from "../requests/services.gen";
 import * as Common from "./common";
 /**
 * Get a collection of albums
@@ -133,11 +133,6 @@ export const useLibraryServiceLibrariesIndexSuspense = <TData = Common.LibrarySe
   page?: number;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseLibraryServiceLibrariesIndexKeyFn({ limit, page }, queryKey), queryFn: () => LibraryService.librariesIndex({ limit, page }) as TData, ...options });
 /**
-* @returns string
-* @throws ApiError
-*/
-export const useModelSchemaServiceSchemasModelSuspense = <TData = Common.ModelSchemaServiceSchemasModelDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseModelSchemaServiceSchemasModelKeyFn(queryKey), queryFn: () => ModelSchemaService.schemasModel() as TData, ...options });
-/**
 * Get status
 * @returns unknown
 * @throws ApiError
@@ -150,6 +145,29 @@ export const useOpCacheServiceOpCacheGetStatusSuspense = <TData = Common.OpCache
 */
 export const useOpCacheServiceOpcacheGetConfigSuspense = <TData = Common.OpCacheServiceOpcacheGetConfigDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseOpCacheServiceOpcacheGetConfigKeyFn(queryKey), queryFn: () => OpCacheService.opcacheGetConfig() as TData, ...options });
 /**
+* Get a collection of monitor entries
+* ⚠️Cannot generate request documentation: Class "romanzipp\QueueMonitor\Enums\MonitorStatus" not found
+* @returns unknown Json paginated set of `QueueMonitorResource`
+* @throws ApiError
+*/
+export const useQueueServiceQueueMetricsShowSuspense = <TData = Common.QueueServiceQueueMetricsShowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseQueueServiceQueueMetricsShowKeyFn(queryKey), queryFn: () => QueueService.queueMetricsShow() as TData, ...options });
+/**
+* Get a list of queue names
+* @returns unknown
+* @throws ApiError
+*/
+export const useQueueServiceQueueMetricsQueuesSuspense = <TData = Common.QueueServiceQueueMetricsQueuesDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseQueueServiceQueueMetricsQueuesKeyFn(queryKey), queryFn: () => QueueService.queueMetricsQueues() as TData, ...options });
+/**
+* Get a metrics collection
+* @param data The data for the request.
+* @param data.aggregateDays Days to aggregate
+* @returns unknown
+* @throws ApiError
+*/
+export const useQueueServiceQueueMetricsMetricsSuspense = <TData = Common.QueueServiceQueueMetricsMetricsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ aggregateDays }: {
+  aggregateDays?: number;
+} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseQueueServiceQueueMetricsMetricsKeyFn({ aggregateDays }, queryKey), queryFn: () => QueueService.queueMetricsMetrics({ aggregateDays }) as TData, ...options });
+/**
 * Get a collection of songs
 * @param data The data for the request.
 * @param data.library The library slug
@@ -160,7 +178,7 @@ export const useOpCacheServiceOpcacheGetConfigSuspense = <TData = Common.OpCache
 * @param data.relations Comma seperated string of relations
 * - album
 * - artists
-* - albumArtist
+* - album.albumArtist
 * - genres
 * @returns unknown Json paginated set of `SongResource`
 * @throws ApiError
@@ -174,17 +192,23 @@ export const useSongServiceSongsIndexSuspense = <TData = Common.SongServiceSongs
   relations?: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseSongServiceSongsIndexKeyFn({ genreNames, genreSlugs, library, limit, page, relations }, queryKey), queryFn: () => SongService.songsIndex({ genreNames, genreSlugs, library, limit, page, relations }) as TData, ...options });
 /**
-* Get a song
+* Get a song by public id
 * @param data The data for the request.
 * @param data.library The library slug
-* @param data.song The song public id
+* @param data.publicId
+* @param data.relations Comma seperated string of relations
+* - album
+* - artists
+* - albumArtist
+* - genres
 * @returns SongResource `SongResource`
 * @throws ApiError
 */
-export const useSongServiceSongsShowSuspense = <TData = Common.SongServiceSongsShowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ library, song }: {
+export const useSongServiceSongsShowSuspense = <TData = Common.SongServiceSongsShowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ library, publicId, relations }: {
   library: string;
-  song: string;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseSongServiceSongsShowKeyFn({ library, song }, queryKey), queryFn: () => SongService.songsShow({ library, song }) as TData, ...options });
+  publicId: string;
+  relations?: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseSongServiceSongsShowKeyFn({ library, publicId, relations }, queryKey), queryFn: () => SongService.songsShow({ library, publicId, relations }) as TData, ...options });
 /**
 * Direct stream the song
 * Requires token with "access-stream"
@@ -199,11 +223,30 @@ export const useSongServiceSongsStreamSuspense = <TData = Common.SongServiceSong
   song: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseSongServiceSongsStreamKeyFn({ library, song }, queryKey), queryFn: () => SongService.songsStream({ library, song }) as TData, ...options });
 /**
+* @returns unknown
+* @throws ApiError
+*/
+export const useSystemInfoServiceSystemInfoShowSuspense = <TData = Common.SystemInfoServiceSystemInfoShowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseSystemInfoServiceSystemInfoShowKeyFn(queryKey), queryFn: () => SystemInfoService.systemInfoShow() as TData, ...options });
+/**
 * Get a collection of users
+* @param data The data for the request.
+* @param data.page Current page
+* @param data.limit Items per page
+* @param data.globalFilter
+* @param data.filters JSON object
+* @param data.filterModes JSON object
+* @param data.sorting JSON object
 * @returns unknown Json paginated set of `UserResource`
 * @throws ApiError
 */
-export const useUserServiceUsersIndexSuspense = <TData = Common.UserServiceUsersIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseUserServiceUsersIndexKeyFn(queryKey), queryFn: () => UserService.usersIndex() as TData, ...options });
+export const useUserServiceUsersIndexSuspense = <TData = Common.UserServiceUsersIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ filterModes, filters, globalFilter, limit, page, sorting }: {
+  filterModes?: string;
+  filters?: string;
+  globalFilter?: string;
+  limit?: number;
+  page?: number;
+  sorting?: string;
+} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseUserServiceUsersIndexKeyFn({ filterModes, filters, globalFilter, limit, page, sorting }, queryKey), queryFn: () => UserService.usersIndex({ filterModes, filters, globalFilter, limit, page, sorting }) as TData, ...options });
 /**
 * Get small user detail info
 * @param data The data for the request.
@@ -234,31 +277,3 @@ export const useUserTokenServiceUserTokenGetUserTokensSuspense = <TData = Common
   perPage?: number;
   user: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseUserTokenServiceUserTokenGetUserTokensKeyFn({ page, perPage, user }, queryKey), queryFn: () => UserTokenService.userTokenGetUserTokens({ page, perPage, user }) as TData, ...options });
-/**
-* Get a widget for the user
-* @param data The data for the request.
-* @param data.name
-* @returns null
-* @throws ApiError
-*/
-export const useWidgetServiceWidgetsGetWidgetSuspense = <TData = Common.WidgetServiceWidgetsGetWidgetDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ name }: {
-  name: string;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseWidgetServiceWidgetsGetWidgetKeyFn({ name }, queryKey), queryFn: () => WidgetService.widgetsGetWidget({ name }) as TData, ...options });
-/**
-* Get a list of widgets
-* @returns WidgetListItemResource Array of `WidgetListItemResource`
-* @throws ApiError
-*/
-export const useWidgetSchemaServiceWidgetSchemaGetWidgetsSuspense = <TData = Common.WidgetSchemaServiceWidgetSchemaGetWidgetsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseWidgetSchemaServiceWidgetSchemaGetWidgetsKeyFn(queryKey), queryFn: () => WidgetSchemaService.widgetSchemaGetWidgets() as TData, ...options });
-/**
-* Get widget schema
-* @param data The data for the request.
-* @param data.name Name of the schema
-* @param data.id
-* @returns string
-* @throws ApiError
-*/
-export const useWidgetSchemaServiceWidgetSchemaGetWidgetSuspense = <TData = Common.WidgetSchemaServiceWidgetSchemaGetWidgetDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ id, name }: {
-  id: string;
-  name: string;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseWidgetSchemaServiceWidgetSchemaGetWidgetKeyFn({ id, name }, queryKey), queryFn: () => WidgetSchemaService.widgetSchemaGetWidget({ id, name }) as TData, ...options });

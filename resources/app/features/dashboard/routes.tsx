@@ -2,8 +2,9 @@ import { Route, Routes } from 'react-router-dom';
 import { LibrariesList } from '@/features/dashboard/libraries/libraries-list.tsx';
 import { LibrariesNew } from '@/features/dashboard/libraries/libraries-new.tsx';
 import { LogViewer } from '@/features/dashboard/routes/log-viewer.tsx';
-import { QueueMonitor } from '@/features/dashboard/routes/queue-monitor.tsx';
+import { QueueMonitor } from '@/features/dashboard/queue-monitor/queue-monitor.tsx';
 import { ApiDocs } from '@/features/dashboard/routes/api-docs.tsx';
+import { UsersList } from '@/features/dashboard/users/users-list.tsx';
 
 export const DashboardRoutes = () => {
   return (
@@ -13,6 +14,8 @@ export const DashboardRoutes = () => {
       <Route path="libraries/new" element={<LibrariesNew/>}></Route>
       <Route path="log-viewer" element={<LogViewer/>}/>
       <Route path="queue-monitor" element={<QueueMonitor />}/>
+
+      <Route path="users/list" element={<UsersList />} />
     </Routes>
   );
 };

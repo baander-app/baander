@@ -5,6 +5,10 @@ declare(strict_types=1);
 use Saloon\Http\Senders\GuzzleSender;
 
 return [
+    'cache' => [
+        'driver' => 'redis',
+        'store'  => 'redis',
+    ],
 
     /*
     |--------------------------------------------------------------------------

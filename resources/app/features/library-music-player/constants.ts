@@ -1,0 +1,1 @@
+export const MUSIC_CONTROL_ICON_SIZE = 26;

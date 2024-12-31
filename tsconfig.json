@@ -1,48 +1,46 @@
 {
-    "compilerOptions": {
-        "target": "esnext",
-        "useDefineForClassFields": true,
-        "lib": [
-            "es2022",
-            "dom",
-            "DOM.Iterable"
-        ],
-        "module": "ESNext",
-        "skipLibCheck": true,
-        "esModuleInterop": true,
-        /* Bundler mode */
-        "moduleResolution": "node",
-        "allowImportingTsExtensions": true,
-        "resolveJsonModule": true,
-        "isolatedModules": true,
-        "noEmit": true,
-        "jsx": "react-jsx",
-        /* Linting */
-        "strict": true,
-        "noUnusedLocals": true,
-        "noUnusedParameters": true,
-        "noFallthroughCasesInSwitch": true,
-        "baseUrl": "./resources/app",
-        "paths": {
-            "@/*": [
-                "*"
-            ]
-        },
-        "typeRoots": [
-            "./resources/app/types",
-            "./node_modules/@types"
-        ]
-    },
-    "include": [
-        "resources/app"
-    ],
-    "references": [
-        {
-            "path": "./tsconfig.node.json"
-        }
-    ],
+  "compilerOptions": {
+    "target": "esnext",
+    "useDefineForClassFields": true,
     "lib": [
-        "WebWorker"
+      "es2022",
+      "dom",
+      "DOM.Iterable",
+      "WebWorker"
     ],
-    "extends": "./tsconfig.paths.json"
+    "module": "esnext",
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    /* Bundler mode */
+    "moduleResolution": "node",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "baseUrl": "./resources/app",
+    "paths": {
+      "@/*": [
+        "*"
+      ]
+    },
+    "typeRoots": [
+      "./resources/app/types",
+      "./node_modules/@types"
+    ]
+  },
+  "include": [
+    "resources/app"
+  ],
+  "references": [
+    {
+      "path": "./tsconfig.node.json"
+    }
+  ],
+  "extends": "./tsconfig.paths.json"
 }

@@ -1,35 +1,34 @@
 <?php
 
+use App\Packages\QueueMonitor\MonitorStatus;
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
+use Tpetry\PostgresqlEnhanced\Schema\Blueprint;
+use Tpetry\PostgresqlEnhanced\Support\Facades\Schema;
 
-class CreateQueueMonitorTable extends Migration
-{
+return new class extends Migration {
     public function up()
     {
-        Schema::create(config('queue-monitor.table'), function (Blueprint $table) {
-            $table->increments('id');
+        Schema::create('queue_monitor', function (Blueprint $table) {
+            $table->id('id');
+            $table->uuid('job_uuid')->nullable();
 
             $table->text('job_id')->index();
-            $table->text('name')->nullable();
+            $table->caseInsensitiveText('name')->nullable();
             $table->text('queue')->nullable();
+            $table->enum('status', MonitorStatus::values())->default(MonitorStatus::Running)->after('queue');
+            $table->dateTimeTz('queued_at')->nullable();
 
-            $table->timestamp('started_at')->nullable()->index();
+            $table->timestampTz('started_at')->nullable()->index();
             $table->text('started_at_exact')->nullable();
 
-            $table->timestamp('finished_at')->nullable();
+            $table->timestampTz('finished_at')->nullable();
             $table->text('finished_at_exact')->nullable();
 
-            $table->float('time_elapsed', 12, 6)->nullable()->index();
-
-            $table->boolean('failed')->default(false)->index();
-
             $table->integer('attempt')->default(0);
+            $table->boolean('retried')->default(false);
             $table->integer('progress')->nullable();
 
-            $table->text('exception')->nullable();
-            $table->text('exception_message')->nullable();
+            $table->jsonb('exception')->nullable();
             $table->text('exception_class')->nullable();
 
             $table->text('data')->nullable();
@@ -40,4 +39,4 @@ class CreateQueueMonitorTable extends Migration
     {
         Schema::drop(config('queue-monitor.table'));
     }
-}
+};

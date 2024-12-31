@@ -19,7 +19,7 @@ services:
     depends_on:
       - app
 
-  app: &app-template
+  app:
     image: martinjuul/baander-app:latest
     container_name: baander-app
     build:
@@ -31,18 +31,16 @@ services:
         XDEBUG_CONFIG: ${XDEBUG_CONFIG}
         XDEBUG_VERSION: ${XDEBUG_VERSION}
       dockerfile: ./Dockerfile
+    ulimits:
+      nofile:
+        soft: 10000
+        hard: 10000
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     volumes:
       - ./:/var/www/html:cached
     networks:
       - baander-backtier
-
-  supervisord:
-    <<: *app-template
-    container_name: baander-scheduler
-    expose: []
-    command: ["/usr/bin/supervisord"]
 
   mail:
     image: axllent/mailpit:latest
@@ -61,7 +59,7 @@ services:
     networks:
       - baander-backtier
     ports:
-      - 127.0.0.1:5432:5432
+      - "127.0.0.1:5432:5432"
     shm_size: 128mb
     environment:
       POSTGRES_USER: ${DB_USERNAME}
@@ -74,7 +72,7 @@ services:
     networks:
       - baander-backtier
     ports:
-      - 127.0.0.1:6379:6379
+      - "127.0.0.1:6379:6379"
 
 networks:
   baander-backtier:

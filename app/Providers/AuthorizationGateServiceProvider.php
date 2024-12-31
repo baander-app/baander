@@ -10,17 +10,6 @@ use Opcodes\LogViewer\LogFolder;
 
 class AuthorizationGateServiceProvider extends ServiceProvider
 {
-    /**
-     * Register services.
-     */
-    public function register(): void
-    {
-        //
-    }
-
-    /**
-     * Bootstrap services.
-     */
     public function boot(): void
     {
         Gate::define('downloadLogFile', function (?User $user, LogFile $file) {
