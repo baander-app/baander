@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Auth\Concerns;
 
+use App\Auth\TokenName;
 use App\Http\Resources\Auth\NewAccessTokenResource;
 use App\Models\{PersonalAccessToken, TokenAbility, User};
 use Illuminate\Http\Request;
@@ -14,21 +15,21 @@ trait HandlesUserTokens
         $device = PersonalAccessToken::prepareDeviceFromRequest($request);
 
         $accessToken = $user->createToken(
-            name: 'access_token',
+            name: TokenName::Access->value,
             abilities: [TokenAbility::ACCESS_API->value, TokenAbility::ACCESS_BROADCASTING->value],
             expiresAt: Carbon::now()->addMinutes(config('sanctum.access_token_expiration')),
             device: $device,
         );
         $refreshToken = $user->createToken(
-            name: 'refresh_token',
+            name: TokenName::Refresh->value,
             abilities: [TokenAbility::ISSUE_ACCESS_TOKEN->value],
             expiresAt: Carbon::now()->addMinutes(config('sanctum.refresh_token_expiration')),
             device: $device,
         );
 
         return response()->json([
-            'accessToken'  => new NewAccessTokenResource($accessToken),
-            'refreshToken' => new NewAccessTokenResource($refreshToken),
+            TokenName::Access->camelCaseValue()  => new NewAccessTokenResource($accessToken),
+            TokenName::Refresh->camelCaseValue() => new NewAccessTokenResource($refreshToken),
         ]);
     }
 }

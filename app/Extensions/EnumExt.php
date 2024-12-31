@@ -18,4 +18,9 @@ trait EnumExt
     {
         return array_combine(self::values(), self::names());
     }
+
+    public static function toCamelCase(string $value): string
+    {
+        return lcfirst(str_replace(' ', '', ucwords(str_replace('_', ' ', $value))));
+    }
 }

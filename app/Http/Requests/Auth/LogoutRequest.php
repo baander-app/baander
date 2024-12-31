@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Auth\TokenName;
 use Illuminate\Foundation\Http\FormRequest;
 
 class LogoutRequest extends FormRequest
@@ -22,7 +23,7 @@ class LogoutRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'refreshToken' => 'string',
+            TokenName::Refresh->camelCaseValue() => 'string',
         ];
     }
 }

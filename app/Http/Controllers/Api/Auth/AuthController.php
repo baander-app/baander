@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Api\Auth;
 
+use App\Auth\TokenName;
 use App\Http\Controllers\Api\Auth\Concerns\HandlesUserTokens;
 use App\Jobs\Auth\RevokeTokenJob;
 use App\Http\Requests\Auth\{ForgotPasswordRequest, LoginRequest, LogoutRequest, RegisterRequest, ResetPasswordRequest};
 use App\Http\Resources\Auth\NewAccessTokenResource;
 use App\Http\Resources\User\UserResource;
 use Illuminate\Http\Response;
+use Illuminate\Support\Str;
 use App\Models\{PersonalAccessToken, TokenAbility, User};
 use App\Notifications\ForgotPasswordNotification;
 use Illuminate\Auth\Events\Verified;
@@ -39,6 +41,7 @@ class AuthController
         if (!$user) {
             abort(401, 'Invalid credentials.');
         }
+
         $attempt = auth()->attempt($request->only('email', 'password'), $request->filled('remember'));
 
         if (!$attempt) {
@@ -57,16 +60,17 @@ class AuthController
     public function refreshToken(Request $request)
     {
         $device = PersonalAccessToken::prepareDeviceFromRequest($request);
+        $tokenName = TokenName::Access->value;
 
         $accessToken = $request->user()->createToken(
-            name: 'access_token',
+            name: TokenName::Access->value,
             abilities: [TokenAbility::ACCESS_API->value, TokenAbility::ACCESS_BROADCASTING->value],
             expiresAt: Carbon::now()->addMinutes(config('sanctum.access_token_expiration')),
             device: $device,
         );
 
         return response([
-            'accessToken' => new NewAccessTokenResource($accessToken),
+            TokenName::Access->camelCaseValue() => new NewAccessTokenResource($accessToken),
         ]);
     }
 
@@ -84,14 +88,14 @@ class AuthController
         $device = PersonalAccessToken::prepareDeviceFromRequest($request);
 
         $streamToken = $request->user()->createToken(
-            name: 'stream_token',
+            name: TokenName::Stream->value,
             abilities: [TokenAbility::ACCESS_STREAM->value],
             expiresAt: Carbon::now()->addMinutes(config('sanctum.stream_token_expiration')),
             device: $device,
         );
 
         return response()->json([
-            'streamToken' => new NewAccessTokenResource($streamToken),
+            TokenName::Stream->camelCaseValue() => new NewAccessTokenResource($streamToken),
         ]);
     }
 
@@ -149,7 +153,7 @@ class AuthController
         }
 
         $user->password = Hash::make($request->input('password'));
-        $user->save();
+        $user->saveOrFail();
 
         Password::deleteToken($user);
 
@@ -184,9 +188,12 @@ class AuthController
     #[Post('logout', 'auth.logout', ['auth:sanctum'])]
     public function logout(LogoutRequest $request)
     {
-        Queue::push(new RevokeTokenJob($request->user()->currentAccessToken()->token));
+        $accessToken = $request->user()->currentAccessToken()->token;
+        if ($accessToken) {
+            Queue::push(new RevokeTokenJob($accessToken));
+        }
 
-        $refreshToken = $request->get('refreshToken');
+        $refreshToken = $request->get(TokenName::Refresh->camelCaseValue());
         if ($refreshToken) {
             Queue::push(new RevokeTokenJob($refreshToken));
         }
