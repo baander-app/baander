@@ -124,14 +124,17 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
-//        'php_deprecations' => [
-//            'path' => storage_path('logs/php_deprecations.log'),
-//        ],
-//
-//        'deprecations' => [
-//            'channel' => env('LOG_DEPRECATIONS_CHANNEL', 'php_deprecations'),
-//            'trace'   => env('LOG_DEPRECATIONS_TRACE', false),
-//        ],
+        'php_deprecations' => [
+            'driver'               => 'single',
+            'path'                 => storage_path('logs/deprecations.log'),
+            'level'                => env('LOG_LEVEL', 'debug'),
+            'replace_placeholders' => true,
+        ],
+
+        'deprecations' => [
+            'channel' => env('LOG_DEPRECATIONS_CHANNEL', 'php_deprecations'),
+            'trace'   => env('LOG_DEPRECATIONS_TRACE', false),
+        ],
 
         'buggregator' => [
             'driver' => 'monolog',

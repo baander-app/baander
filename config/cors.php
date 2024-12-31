@@ -1,6 +1,6 @@
 <?php
 
-return [
+$config = [
 
     /*
     |--------------------------------------------------------------------------
@@ -15,11 +15,11 @@ return [
     |
     */
 
-    'paths' => ['api/*', 'graphql', 'sanctum/csrf-cookie'],
+    'paths' => ['api/*', 'sanctum/csrf-cookie'],
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'],
+    'allowed_origins' => [],
 
     'allowed_origins_patterns' => [],
 
@@ -32,3 +32,9 @@ return [
     'supports_credentials' => false,
 
 ];
+
+if (env('APP_ENV') === 'local' || env('APP_ENV') === 'testing') {
+    $config['allowed_origins'][] = '*';
+} else {
+    $config['allowed_origins'][] = env('APP_URL');
+}
