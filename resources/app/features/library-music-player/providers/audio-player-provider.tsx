@@ -52,7 +52,10 @@ export const AudioPlayerContext = React.createContext<AudioPlayerContextType>({
 AudioPlayerContext.displayName = 'AudioPlayerContext';
 
 export function AudioPlayerContextProvider({ children }: { children: React.ReactNode }) {
-  const musicSource = useMusicSource();
+  const {
+    setAudioRef,
+    authenticatedSource,
+  } = useMusicSource();
 
   const audioRef = useRef<HTMLAudioElement>(new Audio());
 
@@ -146,9 +149,9 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
 
   useEffect(() => {
     if (audioRef.current) {
-      musicSource.setAudioRef(audioRef);
+      setAudioRef(audioRef);
     }
-  }, [audioRef.current, musicSource.setAudioRef]);
+  }, [audioRef, setAudioRef]);
 
   useEffect(() => {
     if (currentVolume) {
@@ -184,15 +187,15 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
   }, [isPlaying, isReady]);
 
   useEffect(() => {
-    if (!musicSource.authenticatedSource) {
+    if (!authenticatedSource) {
       return;
     }
 
     if (!audioRef.current) {
-      audioRef.current = new Audio(musicSource.authenticatedSource);
-    } else {
+      audioRef.current = new Audio(authenticatedSource);
+    } else if (authenticatedSource) {
       audioRef.current.pause();
-      audioRef.current.src = musicSource.authenticatedSource;
+      audioRef.current.src = authenticatedSource;
     }
 
     audioRef.current.volume = volume / 100;
@@ -204,7 +207,10 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
     audioRef.current.ontimeupdate = (e) => handleTimeUpdate(e);
     // @ts-ignore
     audioRef.current.onprogress = (e) => handleBufferProgress(e);
-  }, [musicSource.authenticatedSource]);
+    audioRef.current.play().then(() => {
+      setIsPlaying(true);
+    })
+  }, [authenticatedSource]);
 
   return (
     <AudioPlayerContext.Provider
