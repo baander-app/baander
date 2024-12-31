@@ -123,7 +123,7 @@ export default defineConfig(config => {
         },
       }),
       // @ts-ignore - wrongly typed
-      laravelTranslations.default({ namespace: 'translation' }),
+      laravelTranslations({ namespace: 'translation' }),
       visualizer({ open: false, template: 'flamegraph', filename: 'bundle-visualization.html' }),
       optimizeCssModules(),
       Info(),
