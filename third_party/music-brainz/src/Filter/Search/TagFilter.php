@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MusicBrainz\Filter\Search;
 
+use MusicBrainz\Filter\Property\TagNameTrait;
+
 /**
  * A filter for searching tags
  *
@@ -11,5 +13,5 @@ namespace MusicBrainz\Filter\Search;
  */
 class TagFilter extends AbstractFilter
 {
-    use \MusicBrainz\Filter\Property\TagNameTrait;
+    use TagNameTrait;
 }

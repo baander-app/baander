@@ -11,16 +11,6 @@ trait EndedTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the "ended" flag.
-     *
-     * @return string
-     */
-    public static function ended(): string
-    {
-        return 'ended';
-    }
-
-    /**
      * Adds a flag indicating whether or not the searched entity has ended.
      *
      * @param bool $ended A flag indicating whether or not the searched entity has ended
@@ -29,6 +19,16 @@ trait EndedTrait
      */
     public function addEnded(bool $ended): Term
     {
-        return $this->addTerm((string) $ended, self::ended());
+        return $this->addTerm((string)$ended, self::ended());
+    }
+
+    /**
+     * Returns the field name for the "ended" flag.
+     *
+     * @return string
+     */
+    public static function ended(): string
+    {
+        return 'ended';
     }
 }

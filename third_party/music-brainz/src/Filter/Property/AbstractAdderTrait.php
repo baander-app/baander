@@ -13,7 +13,7 @@ trait AbstractAdderTrait
      * Creates a new term by given search word and field name, adds it to the filter query and returns it.
      *
      * @param string $searchWord A search word
-     * @param string $field      The name of the field to search in
+     * @param string $field The name of the field to search in
      *
      * @return Term
      */
@@ -23,7 +23,7 @@ trait AbstractAdderTrait
      * Creates a new phrase by given search words and field name, adds it to the filter query and returns it.
      *
      * @param string $searchWords Search words
-     * @param string $field       The name of the field to search in
+     * @param string $field The name of the field to search in
      *
      * @return Phrase
      */

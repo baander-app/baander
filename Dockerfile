@@ -1,5 +1,9 @@
 FROM php:zts-bookworm
 
+COPY --from=martinjuul/ffmpeg-baander-static /usr/src/ffmpeg-build-script/workspace/bin/ffmpeg /bin/ffmpeg
+COPY --from=martinjuul/ffmpeg-baander-static /usr/src/ffmpeg-build-script/workspace/bin/ffprobe /bin/ffprobe
+COPY --from=martinjuul/ffmpeg-baander-static /usr/src/ffmpeg-build-script/workspace/bin/ffplay /bin/ffplay
+
 # set main params
 ARG BUILD_ARGUMENT_ENV=dev
 ENV ENV=$BUILD_ARGUMENT_ENV
@@ -11,7 +15,7 @@ ARG INSIDE_DOCKER_CONTAINER=1
 ENV INSIDE_DOCKER_CONTAINER=$INSIDE_DOCKER_CONTAINER
 ARG XDEBUG_CONFIG=main
 ENV XDEBUG_CONFIG=$XDEBUG_CONFIG
-ARG XDEBUG_VERSION=3.3.2
+ARG XDEBUG_VERSION=3.4.1
 ENV XDEBUG_VERSION=$XDEBUG_VERSION
 
 # Check environment
@@ -29,7 +33,6 @@ RUN set -xe \
     && DEBIAN_FRONTEND=noninteractive apt-get install -yqq -o=Dpkg::Use-Pty=0 \
       cron \
       curl \
-      ffmpeg \
       git \
       nano \
       nodejs \
@@ -47,7 +50,6 @@ RUN set -xe \
       libjpeg-dev \
       libjpeg62-turbo-dev \
       liblz4-dev \
-      liblzf-dev \
       libmagickwand-dev \
       libpng-dev \
       libpq-dev \
@@ -60,6 +62,7 @@ RUN set -xe \
       libzip-dev \
       libzstd-dev \
       libyaml-dev \
+      libuv1-dev \
       zlib1g-dev
 
 RUN set -xe \
@@ -86,6 +89,10 @@ RUN set -xe && \
 RUN set -xe \
     && pecl channel-update pecl.php.net \
     && mkdir -p /usr/local/src/pecl \
+    # var_representation
+    && pecl bundle -d /usr/local/src/pecl var_representation \
+    && docker-php-ext-configure /usr/local/src/pecl/var_representation \
+    && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/var_representation \
     # jsonpath
     && pecl bundle -d /usr/local/src/pecl jsonpath \
     && docker-php-ext-configure /usr/local/src/pecl/jsonpath \
@@ -122,6 +129,14 @@ RUN set -xe \
     && pecl bundle -d /usr/local/src/pecl yaml \
     && docker-php-ext-configure /usr/local/src/pecl/yaml \
     && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/yaml \
+    # parallel
+    && pecl bundle -d /usr/local/src/pecl parallel \
+    && docker-php-ext-configure /usr/local/src/pecl/parallel \
+    && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/parallel \
+    # uv
+    && pecl bundle -d /usr/local/src/pecl uv \
+    && docker-php-ext-configure /usr/local/src/pecl/uv \
+    && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/uv \
     # swoole
     && pecl bundle -d /usr/local/src/pecl swoole \
     && docker-php-ext-configure /usr/local/src/pecl/swoole --enable-sockets --enable-swoole-curl --enable-cares --enable-swoole-pgsql \
@@ -141,12 +156,18 @@ RUN set -xe \
     && chown -R ${USERNAME}:${USERNAME} ${APP_HOME}
 
 # put php config for Laravel
-COPY ./docker/$BUILD_ARGUMENT_ENV/php.ini /usr/local/etc/php/php.ini
+#COPY ./docker/$BUILD_ARGUMENT_ENV/php.ini /usr/local/etc/php/php.ini
 
 # install Xdebug in case dev/test environment
-COPY ./docker/general/do_we_need_xdebug.sh /tmp/
-COPY ./docker/dev/xdebug-${XDEBUG_CONFIG}.ini /tmp/xdebug.ini
-RUN chmod u+x /tmp/do_we_need_xdebug.sh && /tmp/do_we_need_xdebug.sh
+#COPY ./docker/general/do_we_need_xdebug.sh /tmp/
+#COPY ./docker/dev/xdebug-${XDEBUG_CONFIG}.ini /tmp/xdebug.ini
+#RUN chmod u+x /tmp/do_we_need_xdebug.sh && /tmp/do_we_need_xdebug.sh
+
+COPY /docker/dev/xdebug-main.ini /docker/dev/xdebug.ini
+
+RUN set -xe \
+    && pecl install xdebug-3.4.0 \
+    && mv /docker/dev/xdebug.ini /usr/local/etc/php/conf.d/
 
 # install composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer

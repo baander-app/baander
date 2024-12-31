@@ -79,7 +79,7 @@ class PasskeyController extends Controller
     /**
      * Get passkey registration options
      */
-    #[Get('/register', 'auth.passkey.register-options', ['auth:sanctum'])]
+    #[Get('/register', 'auth.passkey.register-option', ['auth:sanctum'])]
     public function getRegisterOptions(Request $request)
     {
         if (!$user = $request->user()) {
@@ -132,6 +132,7 @@ class PasskeyController extends Controller
 
         return $this;
     }
+
 
     public function validPasskeyResponse(Request $request, User $user)
     {

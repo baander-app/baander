@@ -12,16 +12,6 @@ trait DataQualityTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the data quality.
-     *
-     * @return string
-     */
-    public static function dataQuality(): string
-    {
-        return 'quality';
-    }
-
-    /**
      * Adds the data quality.
      *
      * @param DataQuality $dataQuality The data quality
@@ -30,6 +20,16 @@ trait DataQualityTrait
      */
     public function addDataQuality(DataQuality $dataQuality): Term
     {
-        return $this->addTerm((string) $dataQuality, self::dataQuality());
+        return $this->addTerm((string)$dataQuality, self::dataQuality());
+    }
+
+    /**
+     * Returns the field name for the data quality.
+     *
+     * @return string
+     */
+    public static function dataQuality(): string
+    {
+        return 'quality';
     }
 }

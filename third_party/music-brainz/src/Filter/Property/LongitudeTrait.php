@@ -12,16 +12,6 @@ trait LongitudeTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the longitude.
-     *
-     * @return string
-     */
-    public static function longitude(): string
-    {
-        return 'longitude';
-    }
-
-    /**
      * Adds the longitude.
      *
      * @param Longitude $longitude The longitude
@@ -30,6 +20,16 @@ trait LongitudeTrait
      */
     public function addLongitude(Longitude $longitude): Term
     {
-        return $this->addTerm((string) $longitude, self::longitude());
+        return $this->addTerm((string)$longitude, self::longitude());
+    }
+
+    /**
+     * Returns the field name for the longitude.
+     *
+     * @return string
+     */
+    public static function longitude(): string
+    {
+        return 'longitude';
     }
 }

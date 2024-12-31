@@ -12,16 +12,6 @@ trait BeginAreaNameTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the name of the beginning area.
-     *
-     * @return string
-     */
-    public static function beginAreaName(): string
-    {
-        return 'beginarea';
-    }
-
-    /**
      * Adds the name of the beginning area.
      *
      * @param Name $beginAreaName The name of the beginning area
@@ -30,6 +20,16 @@ trait BeginAreaNameTrait
      */
     public function addBeginAreaName(Name $beginAreaName): Phrase
     {
-        return $this->addPhrase((string) $beginAreaName, self::beginAreaName());
+        return $this->addPhrase((string)$beginAreaName, self::beginAreaName());
+    }
+
+    /**
+     * Returns the field name for the name of the beginning area.
+     *
+     * @return string
+     */
+    public static function beginAreaName(): string
+    {
+        return 'beginarea';
     }
 }

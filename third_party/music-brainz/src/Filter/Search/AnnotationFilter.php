@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace MusicBrainz\Filter\Search;
 
+use MusicBrainz\Filter\Property\AnnotationTextTrait;
+use MusicBrainz\Filter\Property\EntityIdTrait;
+use MusicBrainz\Filter\Property\EntityNameTrait;
+use MusicBrainz\Filter\Property\EntityTypeTrait;
+
 /**
  * A filter for searching annotations
  *
@@ -11,8 +16,8 @@ namespace MusicBrainz\Filter\Search;
  */
 class AnnotationFilter extends AbstractFilter
 {
-    use \MusicBrainz\Filter\Property\AnnotationTextTrait;
-    use \MusicBrainz\Filter\Property\EntityIdTrait;
-    use \MusicBrainz\Filter\Property\EntityNameTrait;
-    use \MusicBrainz\Filter\Property\EntityTypeTrait;
+    use AnnotationTextTrait;
+    use EntityIdTrait;
+    use EntityNameTrait;
+    use EntityTypeTrait;
 }

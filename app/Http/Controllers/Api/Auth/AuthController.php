@@ -31,6 +31,11 @@ class AuthController
     /**
      * Login
      * @unauthenticated
+     *
+     * @response array{
+     *   accessToken: string,
+     *   refreshToken: string
+     * }
      */
     #[Post('login', 'auth.login')]
     public function login(LoginRequest $request)
@@ -59,17 +64,17 @@ class AuthController
     public function refreshToken(Request $request)
     {
         $device = PersonalAccessToken::prepareDeviceFromRequest($request);
-        $tokenName = TokenName::Access->value;
+        $tokenName = 'access_token';
 
         $accessToken = $request->user()->createToken(
-            name: TokenName::Access->value,
+            name: 'access_token',
             abilities: [TokenAbility::ACCESS_API->value, TokenAbility::ACCESS_BROADCASTING->value],
             expiresAt: Carbon::now()->addMinutes(config('sanctum.access_token_expiration')),
             device: $device,
         );
 
         return response([
-            TokenName::Access->camelCaseValue() => new NewAccessTokenResource($accessToken),
+           'accessToken' => new NewAccessTokenResource($accessToken),
         ]);
     }
 
@@ -87,20 +92,25 @@ class AuthController
         $device = PersonalAccessToken::prepareDeviceFromRequest($request);
 
         $streamToken = $request->user()->createToken(
-            name: TokenName::Stream->value,
+            name: 'stream_token',
             abilities: [TokenAbility::ACCESS_STREAM->value],
             expiresAt: Carbon::now()->addMinutes(config('sanctum.stream_token_expiration')),
             device: $device,
         );
 
         return response()->json([
-            TokenName::Stream->camelCaseValue() => new NewAccessTokenResource($streamToken),
+           'streamToken' => new NewAccessTokenResource($streamToken),
         ]);
     }
 
     /**
      * Register
      * @unauthenticated
+     *
+     * @response array{
+     *   accessToken: string,
+     *   refreshToken: string
+     * }
      */
     #[Post('register', 'auth.register')]
     public function register(RegisterRequest $request)
@@ -192,7 +202,7 @@ class AuthController
             Queue::push(new RevokeTokenJob($accessToken));
         }
 
-        $refreshToken = $request->get(TokenName::Refresh->camelCaseValue());
+        $refreshToken = $request->get('refreshToken');
         if ($refreshToken) {
             Queue::push(new RevokeTokenJob($refreshToken));
         }

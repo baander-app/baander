@@ -7,13 +7,15 @@ use App\Repositories\Cache\CacheRepositoryInterface;
 use App\Repositories\Cache\LaravelCacheRepository;
 use Ergebnis\Clock\SystemClock;
 use GuzzleHttp\Client;
+use Illuminate\Foundation\Application;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\{DB, URL};
+use Illuminate\Support\Facades\{DB, Log, URL};
 use Illuminate\Support\ServiceProvider;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\ImageManager;
 use MusicBrainz\HttpAdapter\GuzzleHttpAdapter;
 use MusicBrainz\MusicBrainz;
+use Psr\Log\LoggerInterface;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -34,9 +36,9 @@ class AppServiceProvider extends ServiceProvider
             return new ImageManager(new Driver());
         });
 
-        $this->app->scoped(MusicBrainz::class, function () {
+        $this->app->scoped(MusicBrainz::class, function (Application $app) {
             $guzzle = new GuzzleHttpAdapter(new Client());
-            $musicBrainz = new MusicBrainz($guzzle);
+            $musicBrainz = new MusicBrainz($guzzle, $app->get(LoggerInterface::class)->channel('buggregator'));
 
             $musicBrainz->config()
                 ->setUserAgent('Baander server/' . Baander::VERSION);
@@ -50,11 +52,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        DB::listen(function ($query) {
-            $previous = \Stopwatch::getDuration('Database') ?? 0;
-            \Stopwatch::setDuration('Database', $previous + $query->time);
-        });
-
         JsonResource::withoutWrapping();
         JsonResource::macro('paginationInformation', function ($request, $paginated, $default) {
             unset($default['links']);

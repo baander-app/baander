@@ -21,18 +21,6 @@ class RelationToArtist extends Relation
     private $artist;
 
     /**
-     * Sets the related artist.
-     *
-     * @param array $artist Information about the related artist
-     *
-     * @return void
-     */
-    protected function setRelatedEntity(array $artist): void
-    {
-        $this->artist = new Artist($artist);
-    }
-
-    /**
      * Returns the entity type of the related entity.
      *
      * @return EntityType
@@ -50,5 +38,17 @@ class RelationToArtist extends Relation
     public function getArtist(): Artist
     {
         return $this->artist;
+    }
+
+    /**
+     * Sets the related artist.
+     *
+     * @param array $artist Information about the related artist
+     *
+     * @return void
+     */
+    protected function setRelatedEntity(array $artist): void
+    {
+        $this->artist = new Artist($artist);
     }
 }

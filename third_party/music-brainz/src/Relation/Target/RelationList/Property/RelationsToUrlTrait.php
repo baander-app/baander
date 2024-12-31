@@ -8,7 +8,6 @@ use MusicBrainz\Helper\ArrayAccess;
 use MusicBrainz\Relation\Target\RelationList\RelationToUrlList;
 use MusicBrainz\Relation\Target\RelationToUrl;
 use MusicBrainz\Value\EntityType;
-
 use function is_null;
 
 /**

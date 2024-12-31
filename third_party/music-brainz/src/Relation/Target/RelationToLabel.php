@@ -21,18 +21,6 @@ class RelationToLabel extends Relation
     private $label;
 
     /**
-     * Sets the related label.
-     *
-     * @param array $label Information about the related label
-     *
-     * @return void
-     */
-    protected function setRelatedEntity(array $label): void
-    {
-        $this->label = new Label($label);
-    }
-
-    /**
      * Returns the entity type of the related entity.
      *
      * @return EntityType
@@ -50,5 +38,17 @@ class RelationToLabel extends Relation
     public function getLabel(): Label
     {
         return $this->label;
+    }
+
+    /**
+     * Sets the related label.
+     *
+     * @param array $label Information about the related label
+     *
+     * @return void
+     */
+    protected function setRelatedEntity(array $label): void
+    {
+        $this->label = new Label($label);
     }
 }

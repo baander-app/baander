@@ -12,16 +12,6 @@ trait AsinTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the ASIN.
-     *
-     * @return string
-     */
-    public static function asin(): string
-    {
-        return 'asin';
-    }
-
-    /**
      * Adds the Amazon Standard Identification Number (ASIN).
      *
      * @param ASIN $asin The Amazon Standard Identification Number (ASIN)
@@ -30,6 +20,16 @@ trait AsinTrait
      */
     public function addASIN(ASIN $asin): Term
     {
-        return $this->addTerm((string) $asin, self::asin());
+        return $this->addTerm((string)$asin, self::asin());
+    }
+
+    /**
+     * Returns the field name for the ASIN.
+     *
+     * @return string
+     */
+    public static function asin(): string
+    {
+        return 'asin';
     }
 }

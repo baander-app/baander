@@ -5,19 +5,26 @@ declare(strict_types=1);
 namespace MusicBrainz\Relation\RelationList;
 
 use MusicBrainz\Helper\RelationFactory;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToLabelTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToRecordingTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToReleaseGroupTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToReleaseTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToSeriesTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToUrlTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToWorkTrait;
 
 /**
  * A sorted list of relations a label stands in
  */
 class LabelRelationList
 {
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToLabelTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToRecordingTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToReleaseGroupTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToReleaseTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToSeriesTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToUrlTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToWorkTrait;
+    use RelationsToLabelTrait;
+    use RelationsToRecordingTrait;
+    use RelationsToReleaseGroupTrait;
+    use RelationsToReleaseTrait;
+    use RelationsToSeriesTrait;
+    use RelationsToUrlTrait;
+    use RelationsToWorkTrait;
 
     /**
      * Constructs a sorted list of relations an label stands in.

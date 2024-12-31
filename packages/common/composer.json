@@ -1,0 +1,19 @@
+{
+  "name": "baander/common",
+  "type": "library",
+  "description": "Shared library",
+  "license": "Apache-2.0",
+  "require": {
+    "php": "^8.4"
+  },
+  "autoload": {
+    "psr-4": {
+      "Baander\\Common\\": "src/"
+    }
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "preferred-install": "dist",
+    "sort-packages": true
+  }
+}

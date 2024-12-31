@@ -12,16 +12,6 @@ trait QuantizedLengthTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the quantized length (length / 2000).
-     *
-     * @return string
-     */
-    public static function quantizedLength(): string
-    {
-        return 'qdur';
-    }
-
-    /**
      * Adds the quantized length (length / 2000).
      *
      * @param Length $quantizedLength The Quantized length (length / 2000)
@@ -30,6 +20,16 @@ trait QuantizedLengthTrait
      */
     public function addQuantizedLength(Length $quantizedLength): Term
     {
-        return $this->addTerm((string) $quantizedLength, self::quantizedLength());
+        return $this->addTerm((string)$quantizedLength, self::quantizedLength());
+    }
+
+    /**
+     * Returns the field name for the quantized length (length / 2000).
+     *
+     * @return string
+     */
+    public static function quantizedLength(): string
+    {
+        return 'qdur';
     }
 }

@@ -12,16 +12,6 @@ trait EndDateTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the ending date.
-     *
-     * @return string
-     */
-    public static function endDate(): string
-    {
-        return 'end';
-    }
-
-    /**
      * Adds the ending date.
      *
      * @param Date $endDate The ending date
@@ -30,6 +20,16 @@ trait EndDateTrait
      */
     public function addEndDate(Date $endDate): Term
     {
-        return $this->addTerm((string) $endDate, self::endDate());
+        return $this->addTerm((string)$endDate, self::endDate());
+    }
+
+    /**
+     * Returns the field name for the ending date.
+     *
+     * @return string
+     */
+    public static function endDate(): string
+    {
+        return 'end';
     }
 }

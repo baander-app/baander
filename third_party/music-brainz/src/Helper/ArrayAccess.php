@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace MusicBrainz\Helper;
 
-use MusicBrainz\MusicBrainz;
-
+use MusicBrainz\LoggerManager;
 use function gettype;
 use function is_array;
 use function is_bool;
@@ -22,8 +21,8 @@ class ArrayAccess
      * Extracts an array from a certain key of a given input array, and returns it. Returns null, if the array key
      * doesn't exist or doesn't contain a value of type array. Logs an error in the latter case.
      *
-     * @param array      $array The input array
-     * @param int|string $key   An array key
+     * @param array $array The input array
+     * @param int|string $key An array key
      *
      * @return null|array
      */
@@ -37,7 +36,8 @@ class ArrayAccess
             return $array[$key];
         }
 
-        MusicBrainz::log()
+        LoggerManager::getInstance()
+            ->getLogger()
             ->error('Unexpected API behavior: Expected "' . $key . '" to be of type array, but got ' . gettype($array[$key]));
 
         return null;
@@ -47,8 +47,8 @@ class ArrayAccess
      * Extracts a boolean value from a certain key of a given input array, and returns it. Returns null, if the array
      * key doesn't exist or doesn't contain a value of type string. Logs an error in the latter case.
      *
-     * @param array  $array The input array
-     * @param string $key   An array key
+     * @param array $array The input array
+     * @param string $key An array key
      *
      * @return null|bool
      */
@@ -62,7 +62,8 @@ class ArrayAccess
             return $array[$key];
         }
 
-        MusicBrainz::log()
+        LoggerManager::getInstance()
+            ->getLogger()
             ->error('Unexpected API behavior: Expected "' . $key . '" to be of type boolean, but got ' . gettype($array[$key]));
 
         return null;
@@ -72,8 +73,8 @@ class ArrayAccess
      * Extracts a float from a certain key of a given input array, and returns it. Returns null, if the array key
      * doesn't exist or doesn't contain a value of type float. Logs an error in the latter case.
      *
-     * @param array  $array The input array
-     * @param string $key   An array key
+     * @param array $array The input array
+     * @param string $key An array key
      *
      * @return null|float
      */
@@ -87,7 +88,8 @@ class ArrayAccess
             return $array[$key];
         }
 
-        MusicBrainz::log()
+        LoggerManager::getInstance()
+            ->getLogger()
             ->error('Unexpected API behavior: Expected "' . $key . '" to be of type float, but got ' . gettype($array[$key]));
 
         return null;
@@ -97,8 +99,8 @@ class ArrayAccess
      * Extracts an integer from a certain key of a given input array, and returns it. Returns null, if the array key
      * doesn't exist or doesn't contain a value of type integer. Logs an error in the latter case.
      *
-     * @param array  $array The input array
-     * @param string $key   An array key
+     * @param array $array The input array
+     * @param string $key An array key
      *
      * @return null|int
      */
@@ -112,7 +114,8 @@ class ArrayAccess
             return $array[$key];
         }
 
-        MusicBrainz::log()
+        LoggerManager::getInstance()
+            ->getLogger()
             ->error('Unexpected API behavior: Expected "' . $key . '" to be of type integer, but got ' . gettype($array[$key]));
 
         return null;
@@ -122,8 +125,8 @@ class ArrayAccess
      * Extracts a string from a certain key of a given input array, and returns it. Returns null, if the array key
      * doesn't exist or doesn't contain a value of type string. Logs an error in the latter case.
      *
-     * @param array  $array The input array
-     * @param string $key   An array key
+     * @param array $array The input array
+     * @param string $key An array key
      *
      * @return null|string
      */
@@ -137,7 +140,8 @@ class ArrayAccess
             return $array[$key];
         }
 
-        MusicBrainz::log()
+        LoggerManager::getInstance()
+            ->getLogger()
             ->error('Unexpected API behavior: Expected "' . $key . '" to be of type string, but got ' . gettype($array[$key]));
 
         return null;

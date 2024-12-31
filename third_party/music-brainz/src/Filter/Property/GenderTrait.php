@@ -12,16 +12,6 @@ trait GenderTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the gender.
-     *
-     * @return string
-     */
-    public static function gender(): string
-    {
-        return 'gender';
-    }
-
-    /**
      * Adds a gender.
      *
      * @param Gender $gender A gender
@@ -30,6 +20,16 @@ trait GenderTrait
      */
     public function addGender(Gender $gender): Term
     {
-        return $this->addTerm((string) $gender, self::gender());
+        return $this->addTerm((string)$gender, self::gender());
+    }
+
+    /**
+     * Returns the field name for the gender.
+     *
+     * @return string
+     */
+    public static function gender(): string
+    {
+        return 'gender';
     }
 }

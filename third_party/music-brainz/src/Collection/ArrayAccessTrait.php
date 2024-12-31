@@ -20,9 +20,9 @@ trait ArrayAccessTrait
      *
      * @param string $key A key
      *
-     * @return null|mixed
+     * @return mixed|null The value of the given key or null if key does not exist
      */
-    public function offsetGet($key): mixed
+    public function offsetGet(mixed $key): mixed
     {
         return $this->elements[$key] ?? null;
     }
@@ -30,12 +30,12 @@ trait ArrayAccessTrait
     /**
      * Sets a given value to a given key.
      *
-     * @param string $key   A key
-     * @param mixed  $value A value
+     * @param string $key A key
+     * @param mixed $value A value
      *
      * @return void
      */
-    public function offsetSet($key, mixed $value): void
+    public function offsetSet(mixed $key, mixed $value): void
     {
         $this->elements[$key] = $value;
     }
@@ -47,7 +47,7 @@ trait ArrayAccessTrait
      *
      * @return void
      */
-    public function offsetUnset($key): void
+    public function offsetUnset(mixed $key): void
     {
         unset($this->elements[$key]);
     }
@@ -57,9 +57,9 @@ trait ArrayAccessTrait
      *
      * @param string $key A key
      *
-     * @return bool
+     * @return bool True if key exists, otherwise false
      */
-    public function offsetExists($key): bool
+    public function offsetExists(mixed $key): bool
     {
         return array_key_exists($key, $this->elements);
     }

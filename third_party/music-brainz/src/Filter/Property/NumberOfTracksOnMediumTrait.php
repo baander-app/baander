@@ -12,16 +12,6 @@ trait NumberOfTracksOnMediumTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the number of tracks in the medium.
-     *
-     * @return string
-     */
-    public static function numberOfTracksOnMedium(): string
-    {
-        return 'tracksmedium';
-    }
-
-    /**
      * Adds the number of tracks in the medium on release.
      *
      * @param TrackNumber $numberOfTracksOnMedium The number of tracks in the medium on release
@@ -30,6 +20,16 @@ trait NumberOfTracksOnMediumTrait
      */
     public function addNumberOfTracksOnMedium(TrackNumber $numberOfTracksOnMedium): Term
     {
-        return $this->addTerm((string) $numberOfTracksOnMedium, self::numberOfTracksOnMedium());
+        return $this->addTerm((string)$numberOfTracksOnMedium, self::numberOfTracksOnMedium());
+    }
+
+    /**
+     * Returns the field name for the number of tracks in the medium.
+     *
+     * @return string
+     */
+    public static function numberOfTracksOnMedium(): string
+    {
+        return 'tracksmedium';
     }
 }

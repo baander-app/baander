@@ -12,16 +12,6 @@ trait ArtistIdTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the artist ID.
-     *
-     * @return string
-     */
-    public static function artistId(): string
-    {
-        return 'arid';
-    }
-
-    /**
      * Adds the MusicBrainz Identifier (MBID) of an artist.
      *
      * @param MBID $artistId The MusicBrainz Identifier (MBID) of an artist
@@ -30,6 +20,16 @@ trait ArtistIdTrait
      */
     public function addArtistId(MBID $artistId): Term
     {
-        return $this->addTerm((string) $artistId, self::artistId());
+        return $this->addTerm((string)$artistId, self::artistId());
+    }
+
+    /**
+     * Returns the field name for the artist ID.
+     *
+     * @return string
+     */
+    public static function artistId(): string
+    {
+        return 'arid';
     }
 }

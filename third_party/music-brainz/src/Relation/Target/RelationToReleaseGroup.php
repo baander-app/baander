@@ -21,18 +21,6 @@ class RelationToReleaseGroup extends Relation
     private $releaseGroup;
 
     /**
-     * Sets the related release group.
-     *
-     * @param array $releaseGroup Information about the related release group
-     *
-     * @return void
-     */
-    protected function setRelatedEntity(array $releaseGroup): void
-    {
-        $this->releaseGroup = new ReleaseGroup($releaseGroup);
-    }
-
-    /**
      * Returns the entity type of the related entity.
      *
      * @return EntityType
@@ -50,5 +38,17 @@ class RelationToReleaseGroup extends Relation
     public function getReleaseGroup(): ReleaseGroup
     {
         return $this->releaseGroup;
+    }
+
+    /**
+     * Sets the related release group.
+     *
+     * @param array $releaseGroup Information about the related release group
+     *
+     * @return void
+     */
+    protected function setRelatedEntity(array $releaseGroup): void
+    {
+        $this->releaseGroup = new ReleaseGroup($releaseGroup);
     }
 }

@@ -6,14 +6,13 @@ namespace MusicBrainz\Helper;
 
 use MusicBrainz\Definition\RelationTarget;
 use MusicBrainz\Definition\RelationTypeId;
-use MusicBrainz\MusicBrainz;
+use MusicBrainz\LoggerManager;
 use MusicBrainz\Relation;
 use MusicBrainz\Relation\NullType;
 use MusicBrainz\Relation\Type;
 use MusicBrainz\Value\Direction;
 use MusicBrainz\Value\MBID;
 use MusicBrainz\Value\Property\AreaTrait;
-
 use function array_key_exists;
 use function is_null;
 
@@ -35,7 +34,7 @@ class RelationFactory
             if (is_null($relation)) {
                 continue;
             }
-            $relationList[(string) $relation::getRelatedEntityType()][] = $relation;
+            $relationList[(string)$relation::getRelatedEntityType()][] = $relation;
         }
 
         return $relationList ?? [];
@@ -55,7 +54,8 @@ class RelationFactory
         $relationType = self::getRelationType(new MBID($relationTypeId));
 
         if ($relationType instanceof NullType) {
-            MusicBrainz::log()->alert('Unknown relation type given. See: https://musicbrainz.org/relationship/' . $relationTypeId);
+            LoggerManager::getInstance()
+                ->getLogger()->alert('Unknown relation type given. See: https://musicbrainz.org/relationship/' . $relationTypeId);
 
             return null;
         }
@@ -66,18 +66,19 @@ class RelationFactory
             ? $relationType::getRelatedEntityType()
             : $relationType::getBaseEntityType();
 
-        $class = RelationTarget::getClassMap()[(string) $relatedEntityType];
+        $class = RelationTarget::getClassMap()[(string)$relatedEntityType];
 
-        if (empty($relation[(string) $relatedEntityType])) {
-            MusicBrainz::log()->alert('Cannot resolve relation. See: https://musicbrainz.org/relationship/' . $relationTypeId);
+        if (empty($relation[(string)$relatedEntityType])) {
+            LoggerManager::getInstance()
+                ->getLogger()->alert('Cannot resolve relation. See: https://musicbrainz.org/relationship/' . $relationTypeId);
 
             return null;
         }
 
         return new $class(
-            $relation[(string) $relatedEntityType],
+            $relation[(string)$relatedEntityType],
             $relationType,
-            $direction
+            $direction,
         );
     }
 
@@ -92,8 +93,8 @@ class RelationFactory
     {
         $classMap = RelationTypeId::getClassMap();
 
-        if (array_key_exists((string) $relationTypeId, $classMap)) {
-            $relationType = RelationTypeId::getClassMap()[(string) $relationTypeId];
+        if (array_key_exists((string)$relationTypeId, $classMap)) {
+            $relationType = RelationTypeId::getClassMap()[(string)$relationTypeId];
 
             return new $relationType();
         }

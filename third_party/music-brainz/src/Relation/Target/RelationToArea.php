@@ -21,18 +21,6 @@ class RelationToArea extends Relation
     private $area;
 
     /**
-     * Sets the related area.
-     *
-     * @param array $area Information about the related area
-     *
-     * @return void
-     */
-    protected function setRelatedEntity(array $area): void
-    {
-        $this->area = new Area($area);
-    }
-
-    /**
      * Returns the entity type of the related entity.
      *
      * @return EntityType
@@ -50,5 +38,17 @@ class RelationToArea extends Relation
     public function getArea(): Area
     {
         return $this->area;
+    }
+
+    /**
+     * Sets the related area.
+     *
+     * @param array $area Information about the related area
+     *
+     * @return void
+     */
+    protected function setRelatedEntity(array $area): void
+    {
+        $this->area = new Area($area);
     }
 }

@@ -7,14 +7,16 @@ namespace MusicBrainz;
 use MusicBrainz\Relation\Type;
 use MusicBrainz\Value\Direction;
 use MusicBrainz\Value\EntityType;
+use MusicBrainz\Value\Property\DirectionTrait;
+use MusicBrainz\Value\Property\RelationTypeTrait;
 
 /**
  * A relation
  */
 abstract class Relation
 {
-    use \MusicBrainz\Value\Property\DirectionTrait;
-    use \MusicBrainz\Value\Property\RelationTypeTrait;
+    use DirectionTrait;
+    use RelationTypeTrait;
 
     /**
      * Constructs the relation.
@@ -31,11 +33,11 @@ abstract class Relation
     /**
      * Sets the related entity.
      *
-     * @param array $entity Information about the related entity
+     * @param mixed $entity Information about the related entity
      *
      * @return void
      */
-    abstract protected function setRelatedEntity(array $entity): void;
+    abstract protected function setRelatedEntity(mixed $entity): void;
 
     /**
      * Returns the entity type of the related entity.

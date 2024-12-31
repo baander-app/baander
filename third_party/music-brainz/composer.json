@@ -14,8 +14,9 @@
         }
     ],
     "require": {
-        "php": ">=8.1.0",
+        "php": ">=8.3.0",
         "psr/log": "^3.0",
+        "spatie/laravel-data": "^4",
         "xenos/asklucy": "^2"
     },
     "require-dev": {

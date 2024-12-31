@@ -12,16 +12,6 @@ trait LanguageTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the language.
-     *
-     * @return string
-     */
-    public static function language(): string
-    {
-        return 'lang';
-    }
-
-    /**
      * Adds the language.
      *
      * @param Language $language The language
@@ -30,6 +20,16 @@ trait LanguageTrait
      */
     public function addLanguage(Language $language): Term
     {
-        return $this->addTerm((string) $language, self::language());
+        return $this->addTerm((string)$language, self::language());
+    }
+
+    /**
+     * Returns the field name for the language.
+     *
+     * @return string
+     */
+    public static function language(): string
+    {
+        return 'lang';
     }
 }

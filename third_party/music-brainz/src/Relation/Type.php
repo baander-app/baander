@@ -43,11 +43,11 @@ abstract class Type
     final public static function getRelationTypeId(): MBID
     {
         return new MBID(
-            // @phpstan-ignore-next-line Each relation type is defined in class map
+        // @phpstan-ignore-next-line Each relation type is defined in class map
             array_search(
                 self::class,
-                RelationTypeId::getClassMap()
-            )
+                RelationTypeId::getClassMap(),
+            ),
         );
     }
 }

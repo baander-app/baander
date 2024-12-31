@@ -7,4 +7,6 @@ namespace MusicBrainz;
 /**
  * An expression
  */
-interface Value extends Expression {}
+interface Value extends Expression
+{
+}

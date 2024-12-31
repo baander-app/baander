@@ -12,16 +12,6 @@ trait LabelNameWithAccentsTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the label's name (with accented characters).
-     *
-     * @return string
-     */
-    public static function labelNameWithAccents(): string
-    {
-        return 'label';
-    }
-
-    /**
      * Adds the label's name (with accented characters).
      *
      * @param Name $labelNameWithAccents The label's name (with accented characters)
@@ -30,6 +20,16 @@ trait LabelNameWithAccentsTrait
      */
     public function addLabelNameWithAccents(Name $labelNameWithAccents): Phrase
     {
-        return $this->addPhrase((string) $labelNameWithAccents, self::labelNameWithAccents());
+        return $this->addPhrase((string)$labelNameWithAccents, self::labelNameWithAccents());
+    }
+
+    /**
+     * Returns the field name for the label's name (with accented characters).
+     *
+     * @return string
+     */
+    public static function labelNameWithAccents(): string
+    {
+        return 'label';
     }
 }

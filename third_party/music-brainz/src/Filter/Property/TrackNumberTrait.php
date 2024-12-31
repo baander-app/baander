@@ -12,16 +12,6 @@ trait TrackNumberTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the track number.
-     *
-     * @return string
-     */
-    public static function trackNumber(): string
-    {
-        return 'tnum';
-    }
-
-    /**
      * Adds the track number.
      *
      * @param TrackNumber $trackNumber The track number
@@ -30,6 +20,16 @@ trait TrackNumberTrait
      */
     public function addTrackNumber(TrackNumber $trackNumber): Term
     {
-        return $this->addTerm((string) $trackNumber, self::trackNumber());
+        return $this->addTerm((string)$trackNumber, self::trackNumber());
+    }
+
+    /**
+     * Returns the field name for the track number.
+     *
+     * @return string
+     */
+    public static function trackNumber(): string
+    {
+        return 'tnum';
     }
 }

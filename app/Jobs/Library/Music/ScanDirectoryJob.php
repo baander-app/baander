@@ -99,7 +99,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
                 return;
             }
 
-            $hash = \Safe\sha1_file($filePath);
+            $hash = sha1_file($filePath);
             $metaAudio = new MetaAudio($file);
 
             if (!$metaAudio->isAudioFile() || Song::whereHash($hash)->exists()) {

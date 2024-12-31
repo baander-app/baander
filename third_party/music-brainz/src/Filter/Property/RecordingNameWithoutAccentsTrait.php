@@ -12,16 +12,6 @@ trait RecordingNameWithoutAccentsTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the name of the recording (without accented characters).
-     *
-     * @return string
-     */
-    public static function recordingNameWithoutAccent(): string
-    {
-        return 'recording';
-    }
-
-    /**
      * Adds the name of the recording (without accented characters).
      *
      * @param Name $recordingNameWithoutAccents The name of the name of the recording (without accented characters)
@@ -30,6 +20,16 @@ trait RecordingNameWithoutAccentsTrait
      */
     public function addRecordingNameWithoutAccents(Name $recordingNameWithoutAccents): Phrase
     {
-        return $this->addPhrase((string) $recordingNameWithoutAccents, self::recordingNameWithoutAccent());
+        return $this->addPhrase((string)$recordingNameWithoutAccents, self::recordingNameWithoutAccent());
+    }
+
+    /**
+     * Returns the field name for the name of the recording (without accented characters).
+     *
+     * @return string
+     */
+    public static function recordingNameWithoutAccent(): string
+    {
+        return 'recording';
     }
 }

@@ -21,18 +21,6 @@ class RelationToEvent extends Relation
     private $event;
 
     /**
-     * Sets the related event.
-     *
-     * @param array $event Information about the related event
-     *
-     * @return void
-     */
-    protected function setRelatedEntity(array $event): void
-    {
-        $this->event = new Event($event);
-    }
-
-    /**
      * Returns the entity type of the related entity.
      *
      * @return EntityType
@@ -50,5 +38,17 @@ class RelationToEvent extends Relation
     public function getEvent(): Event
     {
         return $this->event;
+    }
+
+    /**
+     * Sets the related event.
+     *
+     * @param array $event Information about the related event
+     *
+     * @return void
+     */
+    protected function setRelatedEntity(array $event): void
+    {
+        $this->event = new Event($event);
     }
 }

@@ -21,18 +21,6 @@ class RelationToPlace extends Relation
     private $place;
 
     /**
-     * Sets the related place.
-     *
-     * @param array $place Information about the related place
-     *
-     * @return void
-     */
-    protected function setRelatedEntity(array $place): void
-    {
-        $this->place = new Place($place);
-    }
-
-    /**
      * Returns the entity type of the related entity.
      *
      * @return EntityType
@@ -50,5 +38,17 @@ class RelationToPlace extends Relation
     public function getPlace(): Place
     {
         return $this->place;
+    }
+
+    /**
+     * Sets the related place.
+     *
+     * @param array $place Information about the related place
+     *
+     * @return void
+     */
+    protected function setRelatedEntity(array $place): void
+    {
+        $this->place = new Place($place);
     }
 }

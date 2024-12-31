@@ -30,7 +30,7 @@ class Config
      *
      * @var string
      */
-    private string $userAgent = 'https://github.com/XenosEleatikos/MusicBrainz';
+    private string $userAgent = 'MusicBrainz PHP Client';
 
     /**
      * URL of the MusicBrainz API

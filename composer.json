@@ -4,7 +4,7 @@
   "description": "a media server project",
   "license": "Apache-2.0",
   "require": {
-    "php": "^8.3",
+    "php": "^8.4",
     "ext-curl": "*",
     "ext-dom": "*",
     "ext-fileinfo": "*",
@@ -18,17 +18,20 @@
     "ext-jsonpath": "*",
     "ext-libxml": "*",
     "ext-mbstring": "*",
+    "ext-openssl": "*",
     "ext-pcntl": "*",
     "ext-redis": "*",
+    "ext-simplexml": "*",
     "ext-swoole": "*",
     "ext-zend-opcache": "*",
+    "amphp/rpc": "^2.0",
     "bacon/bacon-qr-code": "^3.0",
     "bepsvpt/blurhash": "^3.0",
     "beyondcode/laravel-server-timing": "^1.5",
     "dedoc/scramble": "^0.11.9",
     "ergebnis/clock": "^2.8",
     "genealabs/laravel-pivot-events": "^11.0",
-    "guzzlehttp/guzzle": "^7.2",
+    "guzzlehttp/guzzle": "^7.9",
     "hidehalo/nanoid-php": "^1.1",
     "indexzer0/eloquent-filtering": "^2.1",
     "intervention/image": "^3.5",
@@ -50,7 +53,7 @@
     "opcodesio/log-viewer": "^3.10",
     "overtrue/laravel-versionable": "^5.2",
     "php-ffmpeg/php-ffmpeg": "^1.2",
-    "spatie/laravel-data": "^4.9",
+    "spatie/laravel-data": "^4.11",
     "spatie/laravel-permission": "^6.9",
     "spatie/laravel-route-attributes": "^1.22",
     "spatie/laravel-sluggable": "^3.6",
@@ -58,7 +61,6 @@
     "stevebauman/unfinalize": "^2.1",
     "symfony/lock": "^7.1",
     "symfony/string": "^7.1",
-    "thecodingmachine/safe": "^2.5",
     "tightenco/ziggy": "^2.2",
     "timokoerber/laravel-one-time-operations": "^1.4",
     "tpetry/laravel-postgresql-enhanced": "^2.0",
@@ -73,16 +75,26 @@
     "laracraft-tech/laravel-schema-rules": "^1.4",
     "larastan/larastan": "^2.0",
     "mockery/mockery": "^1.4.4",
+    "nikic/php-parser": "^5.3",
     "nunomaduro/collision": "^8.1",
+    "phpmd/phpmd": "^2.15",
     "phpstan/phpstan": "^1.12",
     "phpunit/phpunit": "^10.1",
     "spatie/laravel-ignition": "^2.0",
+    "squizlabs/php_codesniffer": "^3.11",
     "swoole/ide-helper": "~5.0.0",
     "xammie/mailbook": "^1.8"
+  },
+  "replace": {
+    "symfony/polyfill-php80": "*",
+    "symfony/polyfill-ctype": "*",
+    "symfony/polyfill-mbstring": "*",
+    "symfony/polyfill-intl-idn": "*"
   },
   "autoload": {
     "psr-4": {
       "App\\": "app/",
+      "Baander\\Common\\": "packages/common/src/",
       "Database\\Factories\\": "database/factories/",
       "Database\\Seeders\\": "database/seeders/"
     },
@@ -111,6 +123,12 @@
     ],
     "phpstan": [
       "vendor/bin/phpstan analyse -c phpstan.neon"
+    ],
+    "phpcs": [
+      "vendor/bin/phpcs"
+    ],
+    "phpcbf": [
+      "vendor/bin/phpcbf"
     ]
   },
   "extra": {

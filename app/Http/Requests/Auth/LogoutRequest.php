@@ -23,7 +23,7 @@ class LogoutRequest extends FormRequest
     public function rules(): array
     {
         return [
-            TokenName::Refresh->camelCaseValue() => 'string',
+            'refresh_token' => 'string',
         ];
     }
 }

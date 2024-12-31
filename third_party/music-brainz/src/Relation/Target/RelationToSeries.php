@@ -21,18 +21,6 @@ class RelationToSeries extends Relation
     private $series;
 
     /**
-     * Sets the related series.
-     *
-     * @param array $series Information about the related series
-     *
-     * @return void
-     */
-    protected function setRelatedEntity(array $series): void
-    {
-        $this->series = new Series($series);
-    }
-
-    /**
      * Returns the entity type of the related entity.
      *
      * @return EntityType
@@ -50,5 +38,17 @@ class RelationToSeries extends Relation
     public function getSeries(): Series
     {
         return $this->series;
+    }
+
+    /**
+     * Sets the related series.
+     *
+     * @param array $series Information about the related series
+     *
+     * @return void
+     */
+    protected function setRelatedEntity(array $series): void
+    {
+        $this->series = new Series($series);
     }
 }

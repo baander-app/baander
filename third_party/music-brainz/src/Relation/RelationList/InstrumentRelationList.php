@@ -5,17 +5,22 @@ declare(strict_types=1);
 namespace MusicBrainz\Relation\RelationList;
 
 use MusicBrainz\Helper\RelationFactory;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToAreaTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToArtistTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToInstrumentTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToLabelTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToUrlTrait;
 
 /**
  * A sorted list of relations an instrument stands in
  */
 class InstrumentRelationList
 {
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToAreaTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToArtistTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToInstrumentTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToLabelTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToUrlTrait;
+    use RelationsToAreaTrait;
+    use RelationsToArtistTrait;
+    use RelationsToInstrumentTrait;
+    use RelationsToLabelTrait;
+    use RelationsToUrlTrait;
 
     /**
      * Constructs a sorted list of relations an instrument stands in.

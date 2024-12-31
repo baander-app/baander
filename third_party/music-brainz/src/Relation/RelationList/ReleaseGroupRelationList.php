@@ -5,18 +5,24 @@ declare(strict_types=1);
 namespace MusicBrainz\Relation\RelationList;
 
 use MusicBrainz\Helper\RelationFactory;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToArtistTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToEventTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToLabelTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToReleaseGroupTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToSeriesTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToUrlTrait;
 
 /**
  * A sorted list of relations a release group stands in
  */
 class ReleaseGroupRelationList
 {
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToArtistTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToEventTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToLabelTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToReleaseGroupTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToSeriesTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToUrlTrait;
+    use RelationsToArtistTrait;
+    use RelationsToEventTrait;
+    use RelationsToLabelTrait;
+    use RelationsToReleaseGroupTrait;
+    use RelationsToSeriesTrait;
+    use RelationsToUrlTrait;
 
     /**
      * Constructs a sorted list of relations a release stands in.

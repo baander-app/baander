@@ -34,12 +34,12 @@ class Api
      * Constructs the search API.
      *
      * @param AbstractHttpAdapter $httpAdapter An HTTP adapter
-     * @param Config              $config      The API client configuration
+     * @param Config $config The API client configuration
      */
     public function __construct(AbstractHttpAdapter $httpAdapter, Config $config)
     {
         $this->httpAdapter = $httpAdapter;
-        $this->config      = $config;
+        $this->config = $config;
     }
 
     /**

@@ -12,16 +12,6 @@ trait TagNameTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the tag name.
-     *
-     * @return string
-     */
-    public static function tagName(): string
-    {
-        return 'tag';
-    }
-
-    /**
      * Adds a tag name.
      *
      * @param Name $tagName The tag name
@@ -30,6 +20,16 @@ trait TagNameTrait
      */
     public function addTagName(Name $tagName): Phrase
     {
-        return $this->addPhrase((string) $tagName, self::tagName());
+        return $this->addPhrase((string)$tagName, self::tagName());
+    }
+
+    /**
+     * Returns the field name for the tag name.
+     *
+     * @return string
+     */
+    public static function tagName(): string
+    {
+        return 'tag';
     }
 }

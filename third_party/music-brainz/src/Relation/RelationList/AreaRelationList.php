@@ -5,20 +5,28 @@ declare(strict_types=1);
 namespace MusicBrainz\Relation\RelationList;
 
 use MusicBrainz\Helper\RelationFactory;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToAreaTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToEventTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToInstrumentTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToRecordingTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToReleaseTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToSeriesTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToUrlTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToWorkTrait;
 
 /**
  * A sorted list of relations an area stands in
  */
 class AreaRelationList
 {
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToAreaTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToEventTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToInstrumentTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToRecordingTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToReleaseTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToSeriesTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToUrlTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToWorkTrait;
+    use RelationsToAreaTrait;
+    use RelationsToEventTrait;
+    use RelationsToInstrumentTrait;
+    use RelationsToRecordingTrait;
+    use RelationsToReleaseTrait;
+    use RelationsToSeriesTrait;
+    use RelationsToUrlTrait;
+    use RelationsToWorkTrait;
 
     /**
      * Constructs a sorted list of relations an area stands in.

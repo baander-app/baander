@@ -12,16 +12,6 @@ trait LabelCodeTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the Label Code (LC).
-     *
-     * @return string
-     */
-    public static function labelCode(): string
-    {
-        return 'code';
-    }
-
-    /**
      * Adds the Label Code (LC) of the label.
      *
      * @param LabelCode $labelCode The Label Code (LC) of the label
@@ -31,5 +21,15 @@ trait LabelCodeTrait
     public function addLabelCode(LabelCode $labelCode): Term
     {
         return $this->addTerm($labelCode->getLabelCodeWithoutLcPrefix(), self::labelCode());
+    }
+
+    /**
+     * Returns the field name for the Label Code (LC).
+     *
+     * @return string
+     */
+    public static function labelCode(): string
+    {
+        return 'code';
     }
 }

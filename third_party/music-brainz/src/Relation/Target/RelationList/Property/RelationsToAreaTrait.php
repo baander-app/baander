@@ -7,7 +7,6 @@ namespace MusicBrainz\Relation\Target\RelationList\Property;
 use MusicBrainz\Helper\ArrayAccess;
 use MusicBrainz\Relation\Target\RelationList\RelationToAreaList;
 use MusicBrainz\Value\EntityType;
-
 use function is_null;
 
 /**

@@ -12,16 +12,6 @@ trait PlaceIdTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the place ID.
-     *
-     * @return string
-     */
-    public static function placeId(): string
-    {
-        return 'pid';
-    }
-
-    /**
      * Adds the MusicBrainz Identifier (MBID) of a place.
      *
      * @param MBID $placeId The MusicBrainz Identifier (MBID) of a place
@@ -30,6 +20,16 @@ trait PlaceIdTrait
      */
     public function addPlaceId(MBID $placeId): Term
     {
-        return $this->addTerm((string) $placeId, self::placeId());
+        return $this->addTerm((string)$placeId, self::placeId());
+    }
+
+    /**
+     * Returns the field name for the place ID.
+     *
+     * @return string
+     */
+    public static function placeId(): string
+    {
+        return 'pid';
     }
 }

@@ -12,16 +12,6 @@ trait WorkTypeTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the type of work.
-     *
-     * @return string
-     */
-    public static function workType(): string
-    {
-        return 'type';
-    }
-
-    /**
      * Adds the type of work.
      *
      * @param WorkType $workType The type of work
@@ -30,6 +20,16 @@ trait WorkTypeTrait
      */
     public function addWorkType(WorkType $workType): Term
     {
-        return $this->addTerm((string) $workType, self::workType());
+        return $this->addTerm((string)$workType, self::workType());
+    }
+
+    /**
+     * Returns the field name for the type of work.
+     *
+     * @return string
+     */
+    public static function workType(): string
+    {
+        return 'type';
     }
 }

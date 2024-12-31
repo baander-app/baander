@@ -12,16 +12,6 @@ trait ReleaseFormatTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the release format.
-     *
-     * @return string
-     */
-    public static function format(): string
-    {
-        return 'format';
-    }
-
-    /**
      * Adds the recording release format.
      *
      * @param Format $format The recording release format
@@ -30,6 +20,16 @@ trait ReleaseFormatTrait
      */
     public function addFormat(Format $format): Term
     {
-        return $this->addTerm((string) $format, self::format());
+        return $this->addTerm((string)$format, self::format());
+    }
+
+    /**
+     * Returns the field name for the release format.
+     *
+     * @return string
+     */
+    public static function format(): string
+    {
+        return 'format';
     }
 }

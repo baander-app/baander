@@ -21,18 +21,6 @@ class RelationToWork extends Relation
     private $work;
 
     /**
-     * Sets the related work.
-     *
-     * @param array $work Information about the related work
-     *
-     * @return void
-     */
-    protected function setRelatedEntity(array $work): void
-    {
-        $this->work = new Work($work);
-    }
-
-    /**
      * Returns the entity type of the related entity.
      *
      * @return EntityType
@@ -50,5 +38,17 @@ class RelationToWork extends Relation
     public function getWork(): Work
     {
         return $this->work;
+    }
+
+    /**
+     * Sets the related work.
+     *
+     * @param array $work Information about the related work
+     *
+     * @return void
+     */
+    protected function setRelatedEntity(array $work): void
+    {
+        $this->work = new Work($work);
     }
 }

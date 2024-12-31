@@ -8,7 +8,6 @@ use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\GuzzleException;
 use MusicBrainz\Config;
 use MusicBrainz\Exception;
-
 use function is_array;
 
 /**
@@ -38,19 +37,20 @@ class GuzzleHttpAdapter extends AbstractHttpAdapter
      *
      * @param string $path
      * @param Config $config
-     * @param array  $params
-     * @param bool   $isAuthRequired
-     *
-     * @throws Exception
+     * @param array $params
+     * @param bool $isAuthRequired
      *
      * @return array
+     * @throws Exception
+     *
      */
     public function call(
         string $path,
         Config $config,
-        array $params = [],
-        bool $isAuthRequired = false
-    ): array {
+        array  $params = [],
+        bool   $isAuthRequired = false,
+    ): array
+    {
         if (empty($config->getUserAgent())) {
             throw new Exception('You must set a valid User Agent before accessing the MusicBrainz API');
         }
@@ -60,7 +60,7 @@ class GuzzleHttpAdapter extends AbstractHttpAdapter
                 'Accept'     => 'application/json',
                 'User-Agent' => $config->getUserAgent(),
             ],
-            'query' => urldecode(http_build_query($params)),
+            'query'   => urldecode(http_build_query($params)),
         ];
 
         if ($isAuthRequired) {

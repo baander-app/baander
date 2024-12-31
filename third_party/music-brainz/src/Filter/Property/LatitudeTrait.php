@@ -12,16 +12,6 @@ trait LatitudeTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the latitude.
-     *
-     * @return string
-     */
-    public static function latitude(): string
-    {
-        return 'latitude';
-    }
-
-    /**
      * Adds the latitude.
      *
      * @param Latitude $latitude The latitude
@@ -30,6 +20,16 @@ trait LatitudeTrait
      */
     public function addLatitude(Latitude $latitude): Term
     {
-        return $this->addTerm((string) $latitude, self::latitude());
+        return $this->addTerm((string)$latitude, self::latitude());
+    }
+
+    /**
+     * Returns the field name for the latitude.
+     *
+     * @return string
+     */
+    public static function latitude(): string
+    {
+        return 'latitude';
     }
 }

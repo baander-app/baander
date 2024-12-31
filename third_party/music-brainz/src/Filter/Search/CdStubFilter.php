@@ -4,6 +4,13 @@ declare(strict_types=1);
 
 namespace MusicBrainz\Filter\Search;
 
+use MusicBrainz\Filter\Property\ArtistNameWithoutAccentsTrait;
+use MusicBrainz\Filter\Property\BarcodeTrait;
+use MusicBrainz\Filter\Property\DisambiguationTrait;
+use MusicBrainz\Filter\Property\DiscIdTrait;
+use MusicBrainz\Filter\Property\NumberOfTracksOnMediumTrait;
+use MusicBrainz\Filter\Property\TitleTrait;
+
 /**
  * A filter for searching CD stubs
  *
@@ -11,10 +18,10 @@ namespace MusicBrainz\Filter\Search;
  */
 class CdStubFilter extends AbstractFilter
 {
-    use \MusicBrainz\Filter\Property\ArtistNameWithoutAccentsTrait;
-    use \MusicBrainz\Filter\Property\BarcodeTrait;
-    use \MusicBrainz\Filter\Property\DisambiguationTrait;
-    use \MusicBrainz\Filter\Property\DiscIdTrait;
-    use \MusicBrainz\Filter\Property\TitleTrait;
-    use \MusicBrainz\Filter\Property\NumberOfTracksOnMediumTrait;
+    use ArtistNameWithoutAccentsTrait;
+    use BarcodeTrait;
+    use DisambiguationTrait;
+    use DiscIdTrait;
+    use TitleTrait;
+    use NumberOfTracksOnMediumTrait;
 }

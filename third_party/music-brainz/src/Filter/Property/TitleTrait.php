@@ -12,16 +12,6 @@ trait TitleTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the title.
-     *
-     * @return string
-     */
-    public static function title(): string
-    {
-        return 'title';
-    }
-
-    /**
      * Adds the title.
      *
      * @param Title $title The title comment
@@ -30,6 +20,16 @@ trait TitleTrait
      */
     public function addTitleComment(Title $title): Phrase
     {
-        return $this->addPhrase((string) $title, self::title());
+        return $this->addPhrase((string)$title, self::title());
+    }
+
+    /**
+     * Returns the field name for the title.
+     *
+     * @return string
+     */
+    public static function title(): string
+    {
+        return 'title';
     }
 }

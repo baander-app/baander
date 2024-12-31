@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MusicBrainz\Api;
 
 use MusicBrainz\Config;
+use MusicBrainz\HasLogger;
 use MusicBrainz\HttpAdapter\AbstractHttpAdapter;
 use MusicBrainz\Supplement\Fields;
 use MusicBrainz\Supplement\Lookup\AreaFields;
@@ -43,6 +44,8 @@ use src\Supplement\Lookup\CollectionFields;
  */
 class Lookup
 {
+    use HasLogger;
+
     /**
      * An HTTP adapter
      *
@@ -61,18 +64,18 @@ class Lookup
      * Constructs the search API.
      *
      * @param AbstractHttpAdapter $httpAdapter An HTTP adapter
-     * @param Config              $config      The API client configuration
+     * @param Config $config The API client configuration
      */
     public function __construct(AbstractHttpAdapter $httpAdapter, Config $config)
     {
         $this->httpAdapter = $httpAdapter;
-        $this->config      = $config;
+        $this->config = $config;
     }
 
     /**
      * Looks up for an area and returns the result.
      *
-     * @param MBID       $mbid       A Music Brainz Identifier (MBID) of an area
+     * @param MBID $mbid A Music Brainz Identifier (MBID) of an area
      * @param AreaFields $areaFields List of fields to be included in the response
      *
      * @return Area
@@ -85,9 +88,54 @@ class Lookup
     }
 
     /**
+     * Looks up for an entity by performing a request to MusicBrainz webservice.
+     *
+     * @link http://musicbrainz.org/doc/XML_Web_Service
+     *
+     * @param EntityType $entityType An entity type
+     * @param MBID $mbid A MusicBrainz Identifier (MBID)
+     * @param Fields $includes A list of include parameters
+     * @param bool $authRequired True, if user authentication is required
+     *
+     * @return array
+     */
+    private function lookup(EntityType $entityType, MBID $mbid, Fields $includes, bool $authRequired = false)
+    {
+        $includes = (string)$includes;
+
+        $params = [
+            'inc' => (string)$includes,
+            'fmt' => 'json',
+        ];
+
+        if (!empty($includes)) {
+            $params['inc'] = $includes;
+        }
+
+        $authRequired = $authRequired || stripos($includes, 'user');
+
+        $this->getLogger()->debug("[Lookup] entityType={$entityType} mbid={$mbid} includes=$includes", [
+            'params'       => $params,
+            'includes'     => $includes,
+            'authRequired' => $authRequired,
+        ]);
+
+        $response = $this->httpAdapter->call(
+            str_replace('_', '-', (string)$entityType) .
+            '/' .
+            $mbid,
+            $this->config,
+            $params,
+            $authRequired,
+        );
+
+        return $response;
+    }
+
+    /**
      * Looks up for an artist and returns the result.
      *
-     * @param MBID         $mbid         A Music Brainz Identifier (MBID) of an artist
+     * @param MBID $mbid A Music Brainz Identifier (MBID) of an artist
      * @param ArtistFields $artistFields List of fields to be included in the response
      * @return Artist
      */
@@ -115,7 +163,7 @@ class Lookup
     /**
      * Looks up for an event and returns the result.
      *
-     * @param MBID        $mbid        A Music Brainz Identifier (MBID) of an event
+     * @param MBID $mbid A Music Brainz Identifier (MBID) of an event
      * @param EventFields $eventFields List of fields to be included in the response
      *
      * @return Event
@@ -130,7 +178,7 @@ class Lookup
     /**
      * Looks up for an instrument and returns the result.
      *
-     * @param MBID             $mbid             A Music Brainz Identifier (MBID) of an instrument
+     * @param MBID $mbid A Music Brainz Identifier (MBID) of an instrument
      * @param InstrumentFields $instrumentFields List of fields to be included in the response
      *
      * @return Instrument
@@ -159,7 +207,7 @@ class Lookup
     /**
      * Looks up for a place and returns the result.
      *
-     * @param MBID        $mbid        A Music Brainz Identifier (MBID) of a label
+     * @param MBID $mbid A Music Brainz Identifier (MBID) of a label
      * @param PlaceFields $placeFields List of fields to be included in the response
      *
      * @return Place
@@ -174,7 +222,7 @@ class Lookup
     /**
      * Looks up for a recording and returns the result.
      *
-     * @param MBID            $mbid            A Music Brainz Identifier (MBID) of a recording
+     * @param MBID $mbid A Music Brainz Identifier (MBID) of a recording
      * @param RecordingFields $recordingFields List of fields to be included in the response
      *
      * @return Recording
@@ -189,7 +237,7 @@ class Lookup
     /**
      * Looks up for a release and returns the result.
      *
-     * @param MBID          $mbid          A Music Brainz Identifier (MBID) of a release
+     * @param MBID $mbid A Music Brainz Identifier (MBID) of a release
      * @param ReleaseFields $releaseFields List of fields to be included in the response
      *
      * @return Release
@@ -204,7 +252,7 @@ class Lookup
     /**
      * Looks up for a release group and returns the result.
      *
-     * @param MBID               $mbid               A Music Brainz Identifier (MBID) of a release
+     * @param MBID $mbid A Music Brainz Identifier (MBID) of a release
      * @param ReleaseGroupFields $releaseGroupFields List of fields to be included in the response
      *
      * @return ReleaseGroup
@@ -219,7 +267,7 @@ class Lookup
     /**
      * Looks up for an URL and returns the result.
      *
-     * @param MBID         $mbid         A Music Brainz Identifier (MBID) of a release
+     * @param MBID $mbid A Music Brainz Identifier (MBID) of a release
      * @param SeriesFields $seriesFields List of fields to be included in the response
      *
      * @return Series
@@ -234,7 +282,7 @@ class Lookup
     /**
      * Looks up for an URL and returns the result.
      *
-     * @param MBID         $mbid          A Music Brainz Identifier (MBID) of a release
+     * @param MBID $mbid A Music Brainz Identifier (MBID) of a release
      * @param UrlFields $urlFields List of fields to be included in the response
      *
      * @return URL
@@ -258,44 +306,5 @@ class Lookup
         $result = $this->lookup(new EntityType(EntityType::WORK), $mbid, $workFields);
 
         return new Work($result);
-    }
-
-    /**
-     * Looks up for an entity by performing a request to MusicBrainz webservice.
-     *
-     * @link http://musicbrainz.org/doc/XML_Web_Service
-     *
-     * @param EntityType $entityType   An entity type
-     * @param MBID       $mbid         A MusicBrainz Identifier (MBID)
-     * @param Fields     $includes     A list of include parameters
-     * @param bool       $authRequired True, if user authentication is required
-     *
-     * @return array
-     */
-    private function lookup(EntityType $entityType, MBID $mbid, Fields $includes, bool $authRequired = false)
-    {
-        $includes = (string) $includes;
-
-        $params = [
-            'inc' => (string) $includes,
-            'fmt' => 'json',
-        ];
-
-        if (!empty($includes)) {
-            $params['inc'] = $includes;
-        }
-
-        $authRequired = $authRequired || stripos($includes, 'user');
-
-        $response = $this->httpAdapter->call(
-            str_replace('_', '-', (string) $entityType) .
-            '/' .
-            $mbid,
-            $this->config,
-            $params,
-            $authRequired
-        );
-
-        return $response;
     }
 }

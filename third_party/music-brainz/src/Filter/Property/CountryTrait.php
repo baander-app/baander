@@ -12,16 +12,6 @@ trait CountryTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the country.
-     *
-     * @return string
-     */
-    public static function country(): string
-    {
-        return 'country';
-    }
-
-    /**
      * Adds a country.
      *
      * @param Country $country A country
@@ -30,6 +20,16 @@ trait CountryTrait
      */
     public function addCountry(Country $country): Term
     {
-        return $this->addTerm((string) $country, self::country());
+        return $this->addTerm((string)$country, self::country());
+    }
+
+    /**
+     * Returns the field name for the country.
+     *
+     * @return string
+     */
+    public static function country(): string
+    {
+        return 'country';
     }
 }

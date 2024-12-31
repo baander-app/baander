@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MusicBrainz\Relation\Target;
 
 use MusicBrainz\Relation;
+use MusicBrainz\Value\Data\RecordingData;
 use MusicBrainz\Value\EntityType;
 use MusicBrainz\Value\Recording;
 
@@ -18,19 +19,7 @@ class RelationToRecording extends Relation
      *
      * @var Recording
      */
-    private $recording;
 
-    /**
-     * Sets the related recording.
-     *
-     * @param array $recording Information about the related recording
-     *
-     * @return void
-     */
-    protected function setRelatedEntity(array $recording): void
-    {
-        $this->recording = new Recording($recording);
-    }
 
     /**
      * Returns the entity type of the related entity.
@@ -51,4 +40,20 @@ class RelationToRecording extends Relation
     {
         return $this->recording;
     }
+
+    /**
+     * Sets the related recording.
+     *
+     * @param mixed $recording Information about the related recording
+     *
+     * @return void
+     */
+    protected function setRelatedEntity(mixed $recording): void
+    {
+        $this->recording = new Recording($recording);
+    }
+
+    public function __construct(
+        private Recording $recording
+    ) {}
 }

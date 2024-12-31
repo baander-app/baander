@@ -81,7 +81,7 @@ class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
         $destination = config('image.storage.covers') . DIRECTORY_SEPARATOR . $fileName . '.' . $extension;
 
         \File::put($destination, $artwork->getImageData());
-        $imageInfo = \Safe\getimagesize($destination);
+        $imageInfo = getimagesize($destination);
 
         return [
             'extension' => $extension,

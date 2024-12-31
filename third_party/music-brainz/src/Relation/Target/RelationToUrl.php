@@ -21,18 +21,6 @@ class RelationToUrl extends Relation
     private $url;
 
     /**
-     * Sets the related URL.
-     *
-     * @param array $url Information about the related URL
-     *
-     * @return void
-     */
-    protected function setRelatedEntity(array $url): void
-    {
-        $this->url = new URL($url);
-    }
-
-    /**
      * Returns the entity type of the related entity.
      *
      * @return EntityType
@@ -50,5 +38,17 @@ class RelationToUrl extends Relation
     public function getUrl(): URL
     {
         return $this->url;
+    }
+
+    /**
+     * Sets the related URL.
+     *
+     * @param array $url Information about the related URL
+     *
+     * @return void
+     */
+    protected function setRelatedEntity(array $url): void
+    {
+        $this->url = new URL($url);
     }
 }

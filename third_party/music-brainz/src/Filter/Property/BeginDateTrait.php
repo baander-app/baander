@@ -12,16 +12,6 @@ trait BeginDateTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the beginning date.
-     *
-     * @return string
-     */
-    public static function beginDate(): string
-    {
-        return 'begin';
-    }
-
-    /**
      * Adds the beginning date.
      *
      * @param Date $beginDate The beginning date
@@ -30,6 +20,16 @@ trait BeginDateTrait
      */
     public function addBeginDate(Date $beginDate): Term
     {
-        return $this->addTerm((string) $beginDate, self::beginDate());
+        return $this->addTerm((string)$beginDate, self::beginDate());
+    }
+
+    /**
+     * Returns the field name for the beginning date.
+     *
+     * @return string
+     */
+    public static function beginDate(): string
+    {
+        return 'begin';
     }
 }

@@ -21,18 +21,6 @@ class RelationToRelease extends Relation
     private $release;
 
     /**
-     * Sets the related release.
-     *
-     * @param array $release Information about the related release
-     *
-     * @return void
-     */
-    protected function setRelatedEntity(array $release): void
-    {
-        $this->release = new Release($release);
-    }
-
-    /**
      * Returns the entity type of the related entity.
      *
      * @return EntityType
@@ -50,5 +38,17 @@ class RelationToRelease extends Relation
     public function getRelease(): Release
     {
         return $this->release;
+    }
+
+    /**
+     * Sets the related release.
+     *
+     * @param array $release Information about the related release
+     *
+     * @return void
+     */
+    protected function setRelatedEntity(array $release): void
+    {
+        $this->release = new Release($release);
     }
 }

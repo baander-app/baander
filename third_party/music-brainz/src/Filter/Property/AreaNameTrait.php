@@ -12,16 +12,6 @@ trait AreaNameTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the area name.
-     *
-     * @return string
-     */
-    public static function areaName(): string
-    {
-        return 'area';
-    }
-
-    /**
      * Adds an area name.
      *
      * @param Name $areaName An area name
@@ -30,6 +20,16 @@ trait AreaNameTrait
      */
     public function addAreaName(Name $areaName): Phrase
     {
-        return $this->addPhrase((string) $areaName, self::areaName());
+        return $this->addPhrase((string)$areaName, self::areaName());
+    }
+
+    /**
+     * Returns the field name for the area name.
+     *
+     * @return string
+     */
+    public static function areaName(): string
+    {
+        return 'area';
     }
 }

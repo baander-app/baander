@@ -5,22 +5,32 @@ declare(strict_types=1);
 namespace MusicBrainz\Relation\RelationList;
 
 use MusicBrainz\Helper\RelationFactory;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToAreaTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToArtistTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToEventTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToPlaceTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToRecordingTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToReleaseGroupTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToReleaseTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToSeriesTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToUrlTrait;
+use MusicBrainz\Relation\Target\RelationList\Property\RelationsToWorkTrait;
 
 /**
  * A sorted list of relations an event stands in
  */
 class EventRelationList
 {
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToAreaTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToArtistTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToEventTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToPlaceTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToRecordingTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToReleaseGroupTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToReleaseTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToSeriesTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToUrlTrait;
-    use \MusicBrainz\Relation\Target\RelationList\Property\RelationsToWorkTrait;
+    use RelationsToAreaTrait;
+    use RelationsToArtistTrait;
+    use RelationsToEventTrait;
+    use RelationsToPlaceTrait;
+    use RelationsToRecordingTrait;
+    use RelationsToReleaseGroupTrait;
+    use RelationsToReleaseTrait;
+    use RelationsToSeriesTrait;
+    use RelationsToUrlTrait;
+    use RelationsToWorkTrait;
 
     /**
      * Constructs a sorted list of relations an artist stands in.

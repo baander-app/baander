@@ -12,16 +12,6 @@ trait ReleaseGroupNameWithAccentsTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the name of the release group (with accents).
-     *
-     * @return string
-     */
-    public static function releaseGroupNameWithAccent(): string
-    {
-        return 'releasegroupaccent';
-    }
-
-    /**
      * Adds the name of the release group (with accents).
      *
      * @param Name $releaseGroupNameWithAccents The name of the release group (with accents)
@@ -30,6 +20,16 @@ trait ReleaseGroupNameWithAccentsTrait
      */
     public function addReleaseGroupNameWithAccents(Name $releaseGroupNameWithAccents): Phrase
     {
-        return $this->addPhrase((string) $releaseGroupNameWithAccents, self::releaseGroupNameWithAccent());
+        return $this->addPhrase((string)$releaseGroupNameWithAccents, self::releaseGroupNameWithAccent());
+    }
+
+    /**
+     * Returns the field name for the name of the release group (with accents).
+     *
+     * @return string
+     */
+    public static function releaseGroupNameWithAccent(): string
+    {
+        return 'releasegroupaccent';
     }
 }

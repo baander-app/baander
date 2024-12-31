@@ -12,16 +12,6 @@ trait NumberOfTracksOnReleaseTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the number of tracks on release as a whole.
-     *
-     * @return string
-     */
-    public static function numberOfTracksOnRelease(): string
-    {
-        return 'tracks';
-    }
-
-    /**
      * Adds the number of tracks on release as a whole.
      *
      * @param TrackNumber $numberOfTracksOnRelease The number of tracks on release as a whole
@@ -30,6 +20,16 @@ trait NumberOfTracksOnReleaseTrait
      */
     public function addNumberOfTracksOnRelease(TrackNumber $numberOfTracksOnRelease): Term
     {
-        return $this->addTerm((string) $numberOfTracksOnRelease, self::numberOfTracksOnRelease());
+        return $this->addTerm((string)$numberOfTracksOnRelease, self::numberOfTracksOnRelease());
+    }
+
+    /**
+     * Returns the field name for the number of tracks on release as a whole.
+     *
+     * @return string
+     */
+    public static function numberOfTracksOnRelease(): string
+    {
+        return 'tracks';
     }
 }

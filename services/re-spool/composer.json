@@ -1,0 +1,57 @@
+{
+  "name": "baander/re-spool",
+  "type": "project",
+  "description": "Transcoding component",
+  "license": "Apache-2.0",
+  "require": {
+    "php": "^8.4",
+    "amphp/amp": "^3.0",
+    "amphp/byte-stream": "^2.1",
+    "amphp/cache": "^2.0",
+    "amphp/cluster": "^2.0",
+    "amphp/file": "^3.1",
+    "amphp/log": "^2.0",
+    "amphp/parallel": "^2.3",
+    "amphp/process": "^2.0",
+    "amphp/redis": "^2.0",
+    "amphp/rpc": "^2.0",
+    "amphp/serialization": "^1.0",
+    "amphp/socket": "^2.3",
+    "amphp/sync": "^2.3",
+    "martinjuul/baander-extensions": "@dev",
+    "php-di/php-di": "^7.0",
+    "revolt/event-loop": "^1.0",
+    "vlucas/phpdotenv": "^5.6"
+  },
+  "replace": {
+    "symfony/polyfill-php80": "*",
+    "symfony/polyfill-ctype": "*",
+    "symfony/polyfill-mbstring": "*",
+    "symfony/polyfill-intl-idn": "*"
+  },
+  "autoload": {
+    "files": [
+      "src/helpers.php"
+    ],
+    "psr-4": {
+      "Baander\\ReSpool\\": "src/",
+      "Baander\\Common\\": "../../packages/common/src/"
+    }
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "preferred-install": "dist",
+    "sort-packages": true
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true,
+  "repositories": [
+    {
+      "type": "path",
+      "url": "../../packages/baander-extensions",
+      "options": {
+        "symlink": true
+      }
+    }
+  ]
+}

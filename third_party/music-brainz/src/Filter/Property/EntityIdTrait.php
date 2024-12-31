@@ -12,16 +12,6 @@ trait EntityIdTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the entity ID.
-     *
-     * @return string
-     */
-    public static function entityId(): string
-    {
-        return 'entity';
-    }
-
-    /**
      * Adds the MusicBrainz Identifier (MBID) of an entity.
      *
      * @param MBID $entityId The MusicBrainz Identifier (MBID) of an entity
@@ -30,6 +20,16 @@ trait EntityIdTrait
      */
     public function addEntityId(MBID $entityId): Term
     {
-        return $this->addTerm((string) $entityId, self::entityId());
+        return $this->addTerm((string)$entityId, self::entityId());
+    }
+
+    /**
+     * Returns the field name for the entity ID.
+     *
+     * @return string
+     */
+    public static function entityId(): string
+    {
+        return 'entity';
     }
 }

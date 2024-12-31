@@ -8,7 +8,6 @@ use MusicBrainz\Helper\ArrayAccess;
 use MusicBrainz\Relation\Target\RelationList\RelationToEventList;
 use MusicBrainz\Relation\Target\RelationToEvent;
 use MusicBrainz\Value\EntityType;
-
 use function is_null;
 
 /**

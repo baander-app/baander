@@ -30,6 +30,6 @@ trait TrackDisplayNumberTrait
      */
     public function addTrackDisplayNumber(TrackDisplayNumber $trackDisplayNumber): Phrase
     {
-        return $this->addPhrase((string) $trackDisplayNumber, self::trackId());
+        return $this->addPhrase((string)$trackDisplayNumber, self::trackId());
     }
 }

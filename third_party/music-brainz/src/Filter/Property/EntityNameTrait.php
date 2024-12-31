@@ -12,16 +12,6 @@ trait EntityNameTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the entity name.
-     *
-     * @return string
-     */
-    public static function entityName(): string
-    {
-        return 'name';
-    }
-
-    /**
      * Adds an entity name.
      *
      * @param Name $entityName An entity name
@@ -30,6 +20,16 @@ trait EntityNameTrait
      */
     public function addEntityName(Name $entityName): Phrase
     {
-        return $this->addPhrase((string) $entityName, self::entityName());
+        return $this->addPhrase((string)$entityName, self::entityName());
+    }
+
+    /**
+     * Returns the field name for the entity name.
+     *
+     * @return string
+     */
+    public static function entityName(): string
+    {
+        return 'name';
     }
 }

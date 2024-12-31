@@ -4,6 +4,17 @@ declare(strict_types=1);
 
 namespace MusicBrainz\Filter\Search;
 
+use MusicBrainz\Filter\Property\AliasNameTrait;
+use MusicBrainz\Filter\Property\ArtistIdTrait;
+use MusicBrainz\Filter\Property\ArtistNameWithoutAccentsTrait;
+use MusicBrainz\Filter\Property\DisambiguationTrait;
+use MusicBrainz\Filter\Property\IsrcTrait;
+use MusicBrainz\Filter\Property\LanguageTrait;
+use MusicBrainz\Filter\Property\TagNameTrait;
+use MusicBrainz\Filter\Property\WorkNameWithAccentsTrait;
+use MusicBrainz\Filter\Property\WorkNameWithoutAccentsTrait;
+use MusicBrainz\Filter\Property\WorkTypeTrait;
+
 /**
  * A filter for searching works
  *
@@ -11,14 +22,14 @@ namespace MusicBrainz\Filter\Search;
  */
 class WorkFilter extends AbstractFilter
 {
-    use \MusicBrainz\Filter\Property\AliasNameTrait;
-    use \MusicBrainz\Filter\Property\ArtistIdTrait;
-    use \MusicBrainz\Filter\Property\ArtistNameWithoutAccentsTrait;
-    use \MusicBrainz\Filter\Property\DisambiguationTrait;
-    use \MusicBrainz\Filter\Property\IsrcTrait;
-    use \MusicBrainz\Filter\Property\LanguageTrait;
-    use \MusicBrainz\Filter\Property\TagNameTrait;
-    use \MusicBrainz\Filter\Property\WorkNameWithAccentsTrait;
-    use \MusicBrainz\Filter\Property\WorkNameWithoutAccentsTrait;
-    use \MusicBrainz\Filter\Property\WorkTypeTrait;
+    use AliasNameTrait;
+    use ArtistIdTrait;
+    use ArtistNameWithoutAccentsTrait;
+    use DisambiguationTrait;
+    use IsrcTrait;
+    use LanguageTrait;
+    use TagNameTrait;
+    use WorkNameWithAccentsTrait;
+    use WorkNameWithoutAccentsTrait;
+    use WorkTypeTrait;
 }

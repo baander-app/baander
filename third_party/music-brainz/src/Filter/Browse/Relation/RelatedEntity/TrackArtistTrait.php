@@ -13,11 +13,11 @@ use MusicBrainz\Value\MBID;
 trait TrackArtistTrait
 {
     /**
-     * @see EntityType::TRACK_ARTIST
-     *
      * @param MBID $mbid The MusicBrainz Identifier (MBID) of the related artist
      *
      * @return void
+     * @see EntityType::TRACK_ARTIST
+     *
      */
     public function trackArtist(MBID $mbid): void
     {

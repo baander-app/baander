@@ -12,16 +12,6 @@ trait CreditNameTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the credit name.
-     *
-     * @return string
-     */
-    public static function creditName(): string
-    {
-        return 'creditname';
-    }
-
-    /**
      * Adds a name credit.
      *
      * @param Name $creditName A name credit
@@ -30,6 +20,16 @@ trait CreditNameTrait
      */
     public function addCreditName(Name $creditName): Phrase
     {
-        return $this->addPhrase((string) $creditName, self::creditName());
+        return $this->addPhrase((string)$creditName, self::creditName());
+    }
+
+    /**
+     * Returns the field name for the credit name.
+     *
+     * @return string
+     */
+    public static function creditName(): string
+    {
+        return 'creditname';
     }
 }

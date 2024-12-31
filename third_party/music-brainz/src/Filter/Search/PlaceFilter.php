@@ -4,6 +4,18 @@ declare(strict_types=1);
 
 namespace MusicBrainz\Filter\Search;
 
+use MusicBrainz\Filter\Property\AddressTrait;
+use MusicBrainz\Filter\Property\AliasNameTrait;
+use MusicBrainz\Filter\Property\AreaNameTrait;
+use MusicBrainz\Filter\Property\BeginDateTrait;
+use MusicBrainz\Filter\Property\DisambiguationTrait;
+use MusicBrainz\Filter\Property\EndDateTrait;
+use MusicBrainz\Filter\Property\EndedTrait;
+use MusicBrainz\Filter\Property\LatitudeTrait;
+use MusicBrainz\Filter\Property\LongitudeTrait;
+use MusicBrainz\Filter\Property\PlaceIdTrait;
+use MusicBrainz\Filter\Property\PlaceTypeTrait;
+
 /**
  * A filter for searching places
  *
@@ -11,15 +23,15 @@ namespace MusicBrainz\Filter\Search;
  */
 class PlaceFilter extends AbstractFilter
 {
-    use \MusicBrainz\Filter\Property\AddressTrait;
-    use \MusicBrainz\Filter\Property\AliasNameTrait;
-    use \MusicBrainz\Filter\Property\AreaNameTrait;
-    use \MusicBrainz\Filter\Property\BeginDateTrait;
-    use \MusicBrainz\Filter\Property\DisambiguationTrait;
-    use \MusicBrainz\Filter\Property\EndDateTrait;
-    use \MusicBrainz\Filter\Property\EndedTrait;
-    use \MusicBrainz\Filter\Property\LatitudeTrait;
-    use \MusicBrainz\Filter\Property\LongitudeTrait;
-    use \MusicBrainz\Filter\Property\PlaceIdTrait;
-    use \MusicBrainz\Filter\Property\PlaceTypeTrait;
+    use AddressTrait;
+    use AliasNameTrait;
+    use AreaNameTrait;
+    use BeginDateTrait;
+    use DisambiguationTrait;
+    use EndDateTrait;
+    use EndedTrait;
+    use LatitudeTrait;
+    use LongitudeTrait;
+    use PlaceIdTrait;
+    use PlaceTypeTrait;
 }

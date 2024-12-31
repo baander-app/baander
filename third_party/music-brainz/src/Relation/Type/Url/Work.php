@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MusicBrainz\Relation\Type\Url;
 
+use MusicBrainz\Relation\Type\Url;
 use MusicBrainz\Value\EntityType;
 
 /**
@@ -11,7 +12,7 @@ use MusicBrainz\Value\EntityType;
  *
  * @link https://musicbrainz.org/relationships/url-work
  */
-abstract class Work extends \MusicBrainz\Relation\Type\Url
+abstract class Work extends Url
 {
     /**
      * Returns the entity type of the related entity.

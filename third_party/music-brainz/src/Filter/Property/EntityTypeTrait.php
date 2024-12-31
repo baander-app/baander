@@ -12,16 +12,6 @@ trait EntityTypeTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the type of entity.
-     *
-     * @return string
-     */
-    public static function entityType(): string
-    {
-        return 'type';
-    }
-
-    /**
      * Adds the type of entity.
      *
      * @param EntityType $entityType The type of entity
@@ -30,6 +20,16 @@ trait EntityTypeTrait
      */
     public function addEntityType(EntityType $entityType): Term
     {
-        return $this->addTerm((string) $entityType, self::entityType());
+        return $this->addTerm((string)$entityType, self::entityType());
+    }
+
+    /**
+     * Returns the field name for the type of entity.
+     *
+     * @return string
+     */
+    public static function entityType(): string
+    {
+        return 'type';
     }
 }

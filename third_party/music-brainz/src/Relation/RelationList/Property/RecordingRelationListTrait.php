@@ -6,7 +6,6 @@ namespace MusicBrainz\Relation\RelationList\Property;
 
 use MusicBrainz\Helper\ArrayAccess;
 use MusicBrainz\Relation\RelationList\RecordingRelationList;
-
 use function is_null;
 
 /**

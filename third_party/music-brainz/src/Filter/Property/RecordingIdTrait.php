@@ -12,16 +12,6 @@ trait RecordingIdTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the MusicBrainz ID (MBID) of a recording.
-     *
-     * @return string
-     */
-    public static function recordingId(): string
-    {
-        return 'rid';
-    }
-
-    /**
      * Adds the MusicBrainz ID (MBID) of a recording.
      *
      * @param MBID $recordingId The MusicBrainz ID (MBID) of a recording
@@ -30,6 +20,16 @@ trait RecordingIdTrait
      */
     public function addRecordingId(MBID $recordingId): Term
     {
-        return $this->addTerm((string) $recordingId, self::recordingId());
+        return $this->addTerm((string)$recordingId, self::recordingId());
+    }
+
+    /**
+     * Returns the field name for the MusicBrainz ID (MBID) of a recording.
+     *
+     * @return string
+     */
+    public static function recordingId(): string
+    {
+        return 'rid';
     }
 }

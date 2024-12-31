@@ -21,18 +21,6 @@ class RelationToInstrument extends Relation
     private $instrument;
 
     /**
-     * Sets the related instrument.
-     *
-     * @param array $instrument Information about the related instrument
-     *
-     * @return void
-     */
-    protected function setRelatedEntity(array $instrument): void
-    {
-        $this->instrument = new Instrument($instrument);
-    }
-
-    /**
      * Returns the entity type of the related entity.
      *
      * @return EntityType
@@ -50,5 +38,17 @@ class RelationToInstrument extends Relation
     public function getInstrument(): Instrument
     {
         return $this->instrument;
+    }
+
+    /**
+     * Sets the related instrument.
+     *
+     * @param array $instrument Information about the related instrument
+     *
+     * @return void
+     */
+    protected function setRelatedEntity(array $instrument): void
+    {
+        $this->instrument = new Instrument($instrument);
     }
 }

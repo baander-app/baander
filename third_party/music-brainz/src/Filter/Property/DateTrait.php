@@ -12,16 +12,6 @@ trait DateTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the date.
-     *
-     * @return string
-     */
-    public static function date(): string
-    {
-        return 'date';
-    }
-
-    /**
      * Adds the recording release date.
      *
      * @param Date $date The recording release date
@@ -30,6 +20,16 @@ trait DateTrait
      */
     public function addDate(Date $date): Term
     {
-        return $this->addTerm((string) $date, self::date());
+        return $this->addTerm((string)$date, self::date());
+    }
+
+    /**
+     * Returns the field name for the date.
+     *
+     * @return string
+     */
+    public static function date(): string
+    {
+        return 'date';
     }
 }

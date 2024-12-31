@@ -12,16 +12,6 @@ trait WorkNameWithoutAccentsTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the name of the work.
-     *
-     * @return string
-     */
-    public static function workNameWithoutAccents(): string
-    {
-        return 'name';
-    }
-
-    /**
      * Adds the name of the work.
      *
      * @param Name $workNameWithoutAccents The name of the work
@@ -30,6 +20,16 @@ trait WorkNameWithoutAccentsTrait
      */
     public function addWorkNameWithoutAccents(Name $workNameWithoutAccents): Phrase
     {
-        return $this->addPhrase((string) $workNameWithoutAccents, self::workNameWithoutAccents());
+        return $this->addPhrase((string)$workNameWithoutAccents, self::workNameWithoutAccents());
+    }
+
+    /**
+     * Returns the field name for the name of the work.
+     *
+     * @return string
+     */
+    public static function workNameWithoutAccents(): string
+    {
+        return 'name';
     }
 }

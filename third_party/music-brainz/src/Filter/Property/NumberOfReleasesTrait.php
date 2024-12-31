@@ -12,16 +12,6 @@ trait NumberOfReleasesTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the number of releases.
-     *
-     * @return string
-     */
-    public static function numberOfReleases(): string
-    {
-        return 'releases';
-    }
-
-    /**
      * Adds the number of releases in this release group.
      *
      * @param Count $numberOfReleases The number of releases in the release group
@@ -30,6 +20,16 @@ trait NumberOfReleasesTrait
      */
     public function addNumberOfReleases(Count $numberOfReleases): Term
     {
-        return $this->addTerm((string) $numberOfReleases, self::numberOfReleases());
+        return $this->addTerm((string)$numberOfReleases, self::numberOfReleases());
+    }
+
+    /**
+     * Returns the field name for the number of releases.
+     *
+     * @return string
+     */
+    public static function numberOfReleases(): string
+    {
+        return 'releases';
     }
 }

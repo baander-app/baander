@@ -12,16 +12,6 @@ trait LabelTypeTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the type of label.
-     *
-     * @return string
-     */
-    public static function labelType(): string
-    {
-        return 'type';
-    }
-
-    /**
      * Adds the type of label.
      *
      * @param LabelType $labelType The type of label
@@ -30,6 +20,16 @@ trait LabelTypeTrait
      */
     public function addLabelType(LabelType $labelType): Term
     {
-        return $this->addTerm((string) $labelType, self::labelType());
+        return $this->addTerm((string)$labelType, self::labelType());
+    }
+
+    /**
+     * Returns the field name for the type of label.
+     *
+     * @return string
+     */
+    public static function labelType(): string
+    {
+        return 'type';
     }
 }

@@ -12,16 +12,6 @@ trait PlaceTypeTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the type of place.
-     *
-     * @return string
-     */
-    public static function placeType(): string
-    {
-        return 'type';
-    }
-
-    /**
      * Adds the type of place.
      *
      * @param PlaceType $placeType The type of place
@@ -30,6 +20,16 @@ trait PlaceTypeTrait
      */
     public function addPlaceType(PlaceType $placeType): Term
     {
-        return $this->addTerm((string) $placeType, self::placeType());
+        return $this->addTerm((string)$placeType, self::placeType());
+    }
+
+    /**
+     * Returns the field name for the type of place.
+     *
+     * @return string
+     */
+    public static function placeType(): string
+    {
+        return 'type';
     }
 }

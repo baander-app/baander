@@ -4,8 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Baander;
 use MusicBrainz\Filter\PageFilter;
+use MusicBrainz\Filter\Search\RecordingFilter;
 use MusicBrainz\Filter\Search\ReleaseFilter;
 use MusicBrainz\MusicBrainz;
+use MusicBrainz\Supplement\Lookup\RecordingFields;
+use MusicBrainz\Value\MBID;
 use MusicBrainz\Value\Name;
 
 class UIController
@@ -21,23 +24,24 @@ class UIController
     {
         $musicBrainz = app(MusicBrainz::class);
 
-        $releaseFilter = new ReleaseFilter();
-        $name = new Name('Teenage Dream: The Complete Confection');
-        $releaseFilter->addReleaseName($name);
+        $filter = new RecordingFilter();
+        $filter->addRecordingNameWithoutAccents(new Name('Teenage dream'));
+        $filter->addArtistNameWithoutAccents(new Name('Katy Perry'));
 
         $pageFilter = new PageFilter(0, 1);
-        $artistList = $musicBrainz->api()->search()->release($releaseFilter, $pageFilter);
-        $release = $artistList[0]->release;
 
-        dd([
-            'aliases'        => $release->getAliases(),
-            'annotationText' => $release->getAnnotationText(),
-            'artistCredit'   => $release->getArtistCredits()[0]->getArtist(),
-            'country'        => $release->getCountry(),
-            'date'           => $release->getDate(),
-            'disambiguation' => $release->getDisambiguation(),
-            'labelInfos'     => $release->getLabelInfos()->current(),
-        ]);
+        $recording = $musicBrainz->api()->search()->recording($filter, $pageFilter);
+
+        $mbid = $recording[0]->recording->getMBID();
+
+        $fields = (new RecordingFields)
+            ->includeReleaseRelations()
+            ->includeRecordingRelations()
+            ->includeArtistRelations();
+
+        $res = $musicBrainz->api()->lookup()->recording(new MBID($mbid), $fields);
+
+        dd($res);
 
         return view('dbg', [
             'release' => $release,

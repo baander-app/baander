@@ -12,16 +12,6 @@ trait ReleaseNameWithAccentsTrait
     use AbstractAdderTrait;
 
     /**
-     * Returns the field name for the release name (with accents).
-     *
-     * @return string
-     */
-    public static function releaseNameWithAccent(): string
-    {
-        return 'releaseaccent';
-    }
-
-    /**
      * Adds the name of a release (with accents).
      *
      * @param Name $releaseNameWithAccent The name of a release (with accents)
@@ -30,6 +20,16 @@ trait ReleaseNameWithAccentsTrait
      */
     public function addReleaseNameWithAccent(Name $releaseNameWithAccent): Phrase
     {
-        return $this->addPhrase((string) $releaseNameWithAccent, self::releaseNameWithAccent());
+        return $this->addPhrase((string)$releaseNameWithAccent, self::releaseNameWithAccent());
+    }
+
+    /**
+     * Returns the field name for the release name (with accents).
+     *
+     * @return string
+     */
+    public static function releaseNameWithAccent(): string
+    {
+        return 'releaseaccent';
     }
 }
