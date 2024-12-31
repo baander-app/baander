@@ -38,3 +38,5 @@ if (env('APP_ENV') === 'local' || env('APP_ENV') === 'testing') {
 } else {
     $config['allowed_origins'][] = env('APP_URL');
 }
+
+return $config;
