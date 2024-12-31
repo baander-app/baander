@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Extensions\JsonPaginator;
+use App\Extensions\Pagination\JsonPaginator;
 use App\Http\Requests\Artist\ArtistIndexRequest;
 use App\Http\Resources\Artist\ArtistResource;
 use App\Models\{Artist, TokenAbility};

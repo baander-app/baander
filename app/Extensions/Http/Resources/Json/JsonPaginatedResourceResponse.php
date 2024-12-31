@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Extensions;
+namespace App\Extensions\Http\Resources\Json;
 
 use Illuminate\Http\Resources\Json\PaginatedResourceResponse;
 

@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Extensions\JsonPaginator;
+use App\Extensions\Pagination\JsonPaginator;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Library\{CreateLibraryRequest, LibraryIndexRequest, UpdateLibraryRequest};
 use App\Http\Resources\Library\LibraryResource;

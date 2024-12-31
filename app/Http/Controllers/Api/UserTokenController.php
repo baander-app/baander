@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Extensions\JsonPaginator;
+use App\Extensions\Pagination\JsonPaginator;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UserToken\UserTokenIndexRequest;
 use App\Http\Resources\UserToken\PersonalAccessTokenViewResource;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use App\Models\{PersonalAccessToken, TokenAbility};
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Prefix};
 
 #[Prefix('users/tokens')]

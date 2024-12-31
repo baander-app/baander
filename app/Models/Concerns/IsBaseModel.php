@@ -2,7 +2,7 @@
 
 namespace App\Models\Concerns;
 
-use App\Extensions\BaseBuilder;
+use App\Extensions\Eloquent\BaseBuilder;
 
 /**
  * @method BaseBuilder query()

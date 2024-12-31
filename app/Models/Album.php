@@ -2,11 +2,11 @@
 
 namespace App\Models;
 
-use App\Extensions\BaseBuilder;
+use App\Extensions\Eloquent\BaseBuilder;
 use App\Models\Concerns\HasLibraryAccess;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Spatie\Sluggable\{HasSlug, SlugOptions};
 use Overtrue\LaravelVersionable\Versionable;
+use Spatie\Sluggable\{HasSlug, SlugOptions};
 
 class Album extends BaseModel
 {

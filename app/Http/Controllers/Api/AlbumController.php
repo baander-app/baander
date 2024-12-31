@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Extensions\{JsonPaginator};
-use App\Extensions\BaseBuilder;
+use App\Extensions\{Pagination\JsonPaginator};
+use App\Extensions\Eloquent\BaseBuilder;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Album\AlbumIndexRequest;
 use App\Http\Resources\Album\AlbumResource;

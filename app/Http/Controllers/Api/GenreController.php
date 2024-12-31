@@ -2,13 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Extensions\BaseBuilder;
-use App\Extensions\JsonPaginator;
+use App\Extensions\Pagination\JsonPaginator;
 use App\Http\Requests\Genre\{GenreIndexRequest, UpdateGenreRequest};
 use App\Http\Resources\Genre\GenreResource;
 use App\Models\{Genre, TokenAbility};
-use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Patch, Prefix};
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Patch, Prefix};
 
 #[Prefix('/genres')]
 #[Middleware([

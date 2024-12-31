@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Extensions\BaseBuilder;
+use App\Extensions\Eloquent\BaseBuilder;
 use App\Models\Concerns\HasLibraryAccess;
 use App\Models\Player\PlayerState;
 use App\Packages\Http\Concerns\DirectStreamableFile;

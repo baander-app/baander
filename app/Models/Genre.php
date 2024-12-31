@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Extensions\BaseBuilder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Spatie\Sluggable\{HasSlug, SlugOptions};
 
