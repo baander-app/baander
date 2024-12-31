@@ -26,24 +26,26 @@ export const LyricsAnimation: React.FC<LyricsAnimationProps> = ({ currentTime })
   }, [currentTime, synchronizer]);
 
   return (
-    <Box w="inherit">
+    <Box w="inherit" className={styles.lyricContainer}>
       <AnimatePresence mode="sync">
-        <Text
-          component={motion.p}
-          fz={32}
-          fw={700}
-          c={theme.white}
-          className={`${styles.lyricLine} ${styles.currentLyric}`}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          transition={{ duration: 0.5 }}
-          key={currentLyric}
-        >
-          {currentLyric}
-        </Text>
+        {currentLyric && ( // Only render if there is text
+          <Text
+            component={motion.p}
+            fz={32}
+            fw={700}
+            c={theme.white}
+            className={`${styles.lyricLine} ${styles.currentLyric}`}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.5 }}
+            key={currentLyric}
+          >
+            {currentLyric}
+          </Text>
+        )}
       </AnimatePresence>
-      {nextLyric && (
+      {nextLyric && ( // Only render if there is text
         <Text
           component={motion.p}
           fz={24}
