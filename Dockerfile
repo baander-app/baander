@@ -2,7 +2,7 @@ FROM php:8.3-cli
 
 # set main params
 ARG BUILD_ARGUMENT_ENV=dev
-ENV ENV=$BUILD_ARGUMENT_ENV
+ENV ENV=${$BUILD_ARGUMENT_ENV}
 ENV APP_HOME /var/www/html
 ARG HOST_UID=1000
 ARG HOST_GID=1000
@@ -16,8 +16,8 @@ ENV XDEBUG_VERSION=$XDEBUG_VERSION
 
 # check environment
 RUN set -xe && \
-    if [ "$BUILD_ARGUMENT_ENV" = "default" ]; then echo "Set BUILD_ARGUMENT_ENV in docker build-args like --build-arg BUILD_ARGUMENT_ENV=dev" && exit 2; \
-    elif [ "$BUILD_ARGUMENT_ENV" = "dev" ]; then echo "Building development environment."; \
+    if [ "${$BUILD_ARGUMENT_ENV}" = "default" ]; then echo "Set BUILD_ARGUMENT_ENV in docker build-args like --build-arg BUILD_ARGUMENT_ENV=dev" && exit 2; \
+    elif [ "${$BUILD_ARGUMENT_ENV}" = "dev" ]; then echo "Building development environment."; \
     else echo "Set correct BUILD_ARGUMENT_ENV in docker build-args like --build-arg BUILD_ARGUMENT_ENV=dev. Available choices are dev" && exit 2; \
     fi
 
@@ -112,14 +112,15 @@ RUN set -xe \
     && apt-get clean
 
 # create document root, fix permissions for www-data user and change owner to www-data
-RUN mkdir -p $APP_HOME/public && \
-    mkdir -p /home/$USERNAME && chown $USERNAME:$USERNAME /home/$USERNAME \
-    && usermod -o -u $HOST_UID $USERNAME -d /home/$USERNAME \
-    && groupmod -o -g $HOST_GID $USERNAME \
-    && chown -R ${USERNAME}:${USERNAME} $APP_HOME
+RUN set -xe \
+    && mkdir -p ${APP_HOME}/public \
+    && mkdir -p /home/${USERNAME} && chown ${USERNAME}:${USERNAME} /home/${USERNAME} \
+    && usermod -o -u ${HOST_UID} ${USERNAME} -d /home/${USERNAME} \
+    && groupmod -o -g ${HOST_GID} ${USERNAME} \
+    && chown -R ${USERNAME}:${USERNAME} ${APP_HOME}
 
 # put php config for Laravel
-COPY ./docker/$BUILD_ARGUMENT_ENV/php.ini /usr/local/etc/php/php.ini
+COPY ./docker/${BUILD_ARGUMENT_ENV}/php.ini /usr/local/etc/php/php.ini
 
 # install Xdebug in case dev/test environment
 COPY ./docker/general/do_we_need_xdebug.sh /tmp/
@@ -146,22 +147,22 @@ RUN set -xe \
     && npm i -g yarn
 
 # set working directory
-WORKDIR $APP_HOME
+WORKDIR ${APP_HOME}
 
 USER ${USERNAME}
 
 RUN echo 'alias artisan="php /var/www/html/artisan"' >> /home/${USERNAME}/.bashrc
 
 # copy source files and config file
-COPY --chown=${USERNAME}:${USERNAME} . $APP_HOME/
-COPY --chown=${USERNAME}:${USERNAME} .env $APP_HOME/.env
-COPY --chown=${USERNAME}:${USERNAME} start-swoole-server $APP_HOME/start-swoole-server
+COPY --chown=${USERNAME}:${USERNAME} . ${APP_HOME}/
+COPY --chown=${USERNAME}:${USERNAME} .env ${APP_HOME}/.env
+COPY --chown=${USERNAME}:${USERNAME} start-swoole-server ${APP_HOME}/start-swoole-server
 
 RUN set -xe \
     && chmod +x ./start-swoole-server
 
 # install all PHP dependencies
-RUN if [ "$BUILD_ARGUMENT_ENV" = "dev" ] || [ "$BUILD_ARGUMENT_ENV" = "test" ]; then COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interaction --no-progress; \
+RUN if [ "${$BUILD_ARGUMENT_ENV}" = "dev" ] || [ "${$BUILD_ARGUMENT_ENV}" = "test" ]; then COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interaction --no-progress; \
     else COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interaction --no-progress --no-dev; \
     fi
 
