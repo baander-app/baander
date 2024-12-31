@@ -27,6 +27,7 @@
 
 - [Configure host](/docs/dev_setup_host.md)
 - [Platform development](/docs/dev_workflow.md)
+- [Test users](/docs/dev_users.md)
 - [Docker services](/docs/dev_docker_services.md)
 - [Phpstorm configuration](/docs/phpstorm.md)
 - [Using XDebug](/docs/xdebug.md)
