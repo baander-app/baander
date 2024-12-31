@@ -2,15 +2,14 @@
 
 namespace App\Models;
 
-use App\Modules\JsonSchema\Eloquent\HasJsonSchema;
-use App\Modules\JsonSchema\Eloquent\JsonSchemaRepresentable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Spatie\Sluggable\{HasSlug, SlugOptions};
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 
-class Library extends BaseModel implements JsonSchemaRepresentable
+class Library extends BaseModel
 {
-    use HasFactory, HasJsonSchema, HasSlug;
+    use HasFactory, HasSlug;
 
     protected $fillable = [
         'name',
@@ -36,33 +35,11 @@ class Library extends BaseModel implements JsonSchemaRepresentable
         return 'slug';
     }
 
-    public function getJsonSchemaFieldOptions(): array
+    public function updateLastScan(Carbon $date = null): void
     {
-        return [
-            'name'       => [
-                'required' => true,
-            ],
-            'slug'       => [
-                'required' => true,
-                'readOnly' => true,
-            ],
-            'path'       => [
-                'required' => true,
-            ],
-            'type'       => [
-                'required' => true,
-                'enum'     => LibraryType::values(),
-            ],
-            'last_scan'  => [
-                'readOnly' => true,
-            ],
-            'created_at' => [
-                'readOnly' => true,
-            ],
-            'updated_at' => [
-                'readOnly' => true,
-            ],
-        ];
+        $this->update([
+            'last_scan' => $date ?? now(),
+        ]);
     }
 
     public function getDisk()

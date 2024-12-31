@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\HasLibraryAccess;
 use App\Modules\Eloquent\BaseBuilder;
+use App\Modules\Translation\LocaleString;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Overtrue\LaravelVersionable\Versionable;
 use Spatie\Sluggable\{HasSlug, SlugOptions};
@@ -35,7 +36,6 @@ class Album extends BaseModel
         'title',
         'slug',
         'year',
-        'directory',
     ];
 
     protected $versionable = [
@@ -58,6 +58,17 @@ class Album extends BaseModel
     public function getRouteKeyName(): string
     {
         return 'slug';
+    }
+
+    public function getTitleAttribute()
+    {
+        $title = $this->attributes['title'];
+
+        if (LocaleString::isLocaleString($title)) {
+            return __(LocaleString::removeDelimiters($title));
+        }
+
+        return $title;
     }
 
     public function artists()

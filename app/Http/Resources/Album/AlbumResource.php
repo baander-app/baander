@@ -27,7 +27,6 @@ class AlbumResource extends AlbumWithoutSongsResource
             'title'     => $this->title,
             'slug'      => $this->slug,
             'year'      => $this->year,
-            'directory' => $this->directory,
             'createdAt' => $this->created_at,
             'updatedAt' => $this->updated_at,
             /**

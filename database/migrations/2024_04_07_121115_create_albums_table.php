@@ -21,7 +21,6 @@ return new class extends Migration {
 
             $table->caseInsensitiveText('title');
             $table->text('slug')->unique();
-            $table->text('directory');
 
             $table->integer('year')->nullable()->comment('The year the album was released');
 

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Jobs\Library;
+namespace App\Jobs\Library\Music;
 
 use App\Jobs\BaseJob;
 use App\Models\Album;

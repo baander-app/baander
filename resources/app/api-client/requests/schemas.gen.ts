@@ -12,9 +12,6 @@ export const $AlbumResource = {
         year: {
             type: ['integer', 'null']
         },
-        directory: {
-            type: 'string'
-        },
         createdAt: {
             type: ['string', 'null'],
             format: 'date-time'
@@ -57,7 +54,7 @@ export const $AlbumResource = {
             }
         }
     },
-    required: ['title', 'slug', 'year', 'directory', 'createdAt', 'updatedAt'],
+    required: ['title', 'slug', 'year', 'createdAt', 'updatedAt'],
     title: 'AlbumResource'
 } as const;
 
@@ -72,9 +69,6 @@ export const $AlbumWithoutSongsResource = {
         },
         year: {
             type: ['integer', 'null']
-        },
-        directory: {
-            type: 'string'
         },
         createdAt: {
             type: ['string', 'null'],
@@ -93,7 +87,7 @@ export const $AlbumWithoutSongsResource = {
             '$ref': '#/components/schemas/ArtistResource'
         }
     },
-    required: ['title', 'slug', 'year', 'directory', 'createdAt', 'updatedAt'],
+    required: ['title', 'slug', 'year', 'createdAt', 'updatedAt'],
     title: 'AlbumWithoutSongsResource'
 } as const;
 

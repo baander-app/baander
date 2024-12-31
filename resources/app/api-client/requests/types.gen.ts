@@ -4,7 +4,6 @@ export type AlbumResource = {
     title: string;
     slug: string;
     year: number | null;
-    directory: string;
     createdAt: string | null;
     updatedAt: string | null;
     /**
@@ -29,7 +28,6 @@ export type AlbumWithoutSongsResource = {
     title: string;
     slug: string;
     year: number | null;
-    directory: string;
     createdAt: string | null;
     updatedAt: string | null;
     /**
@@ -468,18 +466,18 @@ export type AuthLoginData = {
     requestBody: LoginRequest;
 };
 
-export type AuthLoginResponse = {
-    accessToken: NewAccessTokenResource;
-    refreshToken: NewAccessTokenResource;
-};
+export type AuthLoginResponse = [
+    NewAccessTokenResource,
+    NewAccessTokenResource
+];
 
-export type AuthRefreshTokenResponse = {
-    accessToken: NewAccessTokenResource;
-};
+export type AuthRefreshTokenResponse = [
+    NewAccessTokenResource
+];
 
-export type AuthStreamTokenResponse = {
-    streamToken: NewAccessTokenResource;
-};
+export type AuthStreamTokenResponse = [
+    NewAccessTokenResource
+];
 
 export type AuthRegisterData = {
     requestBody?: RegisterRequest & {
@@ -487,10 +485,10 @@ export type AuthRegisterData = {
 };
 };
 
-export type AuthRegisterResponse = {
-    accessToken: NewAccessTokenResource;
-    refreshToken: NewAccessTokenResource;
-};
+export type AuthRegisterResponse = [
+    NewAccessTokenResource,
+    NewAccessTokenResource
+];
 
 export type AuthForgotPasswordData = {
     requestBody: ForgotPasswordRequest;
@@ -526,14 +524,14 @@ export type AuthPasskeyLoginData = {
     requestBody: AuthenticateUsingPasskeyRequest;
 };
 
-export type AuthPasskeyLoginResponse = {
-    accessToken: {
+export type AuthPasskeyLoginResponse = [
+    {
         [key: string]: unknown;
-    };
-    refreshToken: {
+    },
+    {
         [key: string]: unknown;
-    };
-} | string;
+    }
+] | string;
 
 export type AuthPasskeyRegisterOptionsResponse = string | {
     [key: string]: unknown;
@@ -1659,10 +1657,10 @@ export type $OpenApiTs = {
         post: {
             req: AuthLoginData;
             res: {
-                200: {
-                    accessToken: NewAccessTokenResource;
-                    refreshToken: NewAccessTokenResource;
-                };
+                200: [
+                    NewAccessTokenResource,
+                    NewAccessTokenResource
+                ];
                 /**
                  * An error
                  */
@@ -1702,9 +1700,9 @@ export type $OpenApiTs = {
     '/api/auth/refreshToken': {
         post: {
             res: {
-                200: {
-                    accessToken: NewAccessTokenResource;
-                };
+                200: [
+                    NewAccessTokenResource
+                ];
                 /**
                  * Unauthenticated
                  */
@@ -1720,9 +1718,9 @@ export type $OpenApiTs = {
     '/api/auth/streamToken': {
         post: {
             res: {
-                200: {
-                    streamToken: NewAccessTokenResource;
-                };
+                200: [
+                    NewAccessTokenResource
+                ];
                 /**
                  * Unauthenticated
                  */
@@ -1739,10 +1737,10 @@ export type $OpenApiTs = {
         post: {
             req: AuthRegisterData;
             res: {
-                200: {
-                    accessToken: NewAccessTokenResource;
-                    refreshToken: NewAccessTokenResource;
-                };
+                200: [
+                    NewAccessTokenResource,
+                    NewAccessTokenResource
+                ];
                 /**
                  * Authorization error
                  */
@@ -1914,14 +1912,14 @@ export type $OpenApiTs = {
         post: {
             req: AuthPasskeyLoginData;
             res: {
-                200: {
-    accessToken: {
+                200: [
+    {
         [key: string]: unknown;
-    };
-    refreshToken: {
+    },
+    {
         [key: string]: unknown;
-    };
-} | string;
+    }
+] | string;
                 401: {
                     message: string;
                 };
