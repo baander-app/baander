@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Baander;
 use App\Repositories\Cache\CacheRepositoryInterface;
 use App\Repositories\Cache\LaravelCacheRepository;
 use Ergebnis\Clock\SystemClock;
@@ -38,7 +39,7 @@ class AppServiceProvider extends ServiceProvider
             $musicBrainz = new MusicBrainz($guzzle);
 
             $musicBrainz->config()
-                ->setUserAgent('Baander server v' . config('app.version'));
+                ->setUserAgent('Baander server/' . Baander::VERSION);
 
             return $musicBrainz;
         });
