@@ -43,14 +43,14 @@ class QueueController extends Controller
         $name = $request->query('name');
 
         $models = QueueMonitor::when($status, function (BaseBuilder $query, $status) {
-                return $query->where('status', $status);
-            })->when($queue, function (BaseBuilder $query, $queue) {
-                return $query->where('queue', $queue);
-            })->when($name, function (BaseBuilder $query, $name) {
-                return $query->where('name', 'like', '%' . $name . '%');
-            })->when($queuedFirst, function (BaseBuilder $query) {
-                return $query->orderByRaw('started_at DESC NULLS LAST');
-            })->paginate();
+            return $query->where('status', $status);
+        })->when($queue, function (BaseBuilder $query, $queue) {
+            return $query->where('queue', $queue);
+        })->when($name, function (BaseBuilder $query, $name) {
+            return $query->where('name', 'like', '%' . $name . '%');
+        })->when($queuedFirst, function (BaseBuilder $query) {
+            return $query->orderByRaw('started_at DESC NULLS LAST');
+        })->paginate();
 
         return QueueMonitorResource::collection($models);
     }

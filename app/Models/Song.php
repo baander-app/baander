@@ -29,21 +29,21 @@ class Song extends BaseModel implements DirectStreamableFile
     protected $with = ['album'];
 
     protected $fillable = [
-      'public_id',
-      'album_id',
-      'title',
-      'path',
-      'size',
-      'mime_type',
-      'length',
-      'lyrics',
-      'track',
-      'disc',
-      'modified_time',
-      'year',
-      'comment',
-      'hash',
-      'librarySlug',
+        'public_id',
+        'album_id',
+        'title',
+        'path',
+        'size',
+        'mime_type',
+        'length',
+        'lyrics',
+        'track',
+        'disc',
+        'modified_time',
+        'year',
+        'comment',
+        'hash',
+        'librarySlug',
     ];
 
     public function getRouteKeyName(): string

@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 class DeviceDetector
 {
     public function __construct(
-        protected CacheRepository $cacheRepository
+        protected CacheRepository $cacheRepository,
     )
     {
     }
@@ -20,7 +20,7 @@ class DeviceDetector
 
         $dd = new MatomoDeviceDetector(
             userAgent: $userAgent,
-            clientHints: $clientHints
+            clientHints: $clientHints,
         );
 
         $dd->setCache(cache: $this->cacheRepository);

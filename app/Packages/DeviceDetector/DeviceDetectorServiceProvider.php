@@ -17,8 +17,9 @@ class DeviceDetectorServiceProvider extends ServiceProvider
     {
         $this->app->when(CacheRepository::class)
             ->needs(Repository::class)
-            ->give(fn($app) => $app->cache->store(
-                $app->config->get('device-detector.cache_store')
+            ->give(fn($app)
+                => $app->cache->store(
+                $app->config->get('device-detector.cache_store'),
             ));
     }
 

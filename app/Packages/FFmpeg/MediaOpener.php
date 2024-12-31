@@ -200,8 +200,8 @@ class MediaOpener
     public function exportTile(callable $withTileFactory): MediaExporter
     {
         return $this->export()
-                    ->addTileFilter($withTileFactory)
-                    ->inFormat(new ImageFormat());
+            ->addTileFilter($withTileFactory)
+            ->inFormat(new ImageFormat());
     }
 
     public function exportFramesByAmount(int $amount, int $width = null, int $height = null, int $quality = null): MediaExporter
@@ -214,7 +214,8 @@ class MediaOpener
     public function exportFramesByInterval(float $interval, int $width = null, int $height = null, int $quality = null): MediaExporter
     {
         return $this->exportTile(
-            fn(TileFactory $tileFactory) => $tileFactory
+            fn(TileFactory $tileFactory)
+                => $tileFactory
                 ->interval($interval)
                 ->grid(1, 1)
                 ->scale($width, $height)

@@ -7,7 +7,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 class JsonPaginator extends LengthAwarePaginator
 {
     protected array $queryParams = [
-        'page'  => 'page',
+        'page' => 'page',
     ];
 
     public function toArray(): array

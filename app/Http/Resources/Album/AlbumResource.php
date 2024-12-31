@@ -24,31 +24,31 @@ class AlbumResource extends AlbumWithoutSongsResource
     public function toArray(Request $request): array
     {
         return [
-            'title'       => $this->title,
-            'slug'        => $this->slug,
-            'year'        => $this->year,
-            'directory'   => $this->directory,
-            'createdAt'   => $this->created_at,
-            'updatedAt'   => $this->updated_at,
+            'title'     => $this->title,
+            'slug'      => $this->slug,
+            'year'      => $this->year,
+            'directory' => $this->directory,
+            'createdAt' => $this->created_at,
+            'updatedAt' => $this->updated_at,
             /**
              * Cover relation
              */
-            'cover'    => ImageResource::make($this->whenLoaded('cover')),
+            'cover'     => ImageResource::make($this->whenLoaded('cover')),
             /**
              * Album artists relation
              */
-            'artists' => ArtistResource::collection($this->whenLoaded('artists')),
+            'artists'   => ArtistResource::collection($this->whenLoaded('artists')),
             /**
              * Songs relation
              */
-            'songs'       => SongResource::collection($this->whenLoaded('songs')),
+            'songs'     => SongResource::collection($this->whenLoaded('songs')),
             /**
              * @var array{
              *   slug: string,
              *   name: string
              * }[]
              */
-            'genres'      => $this->whenLoaded('songs', function () {
+            'genres'    => $this->whenLoaded('songs', function () {
                 return $this->songs->flatMap(fn($song) => $song->genres)->unique('id')->values()->map(fn($genre)
                     => [
                     'slug' => $genre->slug,

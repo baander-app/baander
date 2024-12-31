@@ -26,7 +26,7 @@ class PasskeyService
         }
 
         /** @var PublicKeyCredential $publicKeyCredential */
-        $publicKeyCredential =app(WebauthnService::class)->deserialize(
+        $publicKeyCredential = app(WebauthnService::class)->deserialize(
             $json,
             PublicKeyCredential::class,
         );

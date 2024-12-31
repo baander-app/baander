@@ -50,8 +50,8 @@ class LegacyFilterMapping
     public function apply(PHPFFMpeg $driver, Collection $maps): void
     {
         $freshDriver = $driver->fresh()
-                              ->open($this->singleMediaCollection($driver->getMediaCollection()))
-                              ->addFilter(...$this->arguments);
+            ->open($this->singleMediaCollection($driver->getMediaCollection()))
+            ->addFilter(...$this->arguments);
 
         $format = $maps->filter->hasOut($this->out)->first()->getFormat();
 

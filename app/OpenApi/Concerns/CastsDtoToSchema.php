@@ -18,7 +18,7 @@ trait CastsDtoToSchema
 {
     public function schemaFromDto(string $className): Schema
     {
-        if (! class_exists($className) || ! is_a($className, Data::class, true)) {
+        if (!class_exists($className) || !is_a($className, Data::class, true)) {
             throw new \Exception("$className is not a valid Data object");
         }
 
@@ -52,7 +52,7 @@ trait CastsDtoToSchema
      */
     public function rulesFromDtoNoRecursion(string $className): array
     {
-        if (! class_exists($className) || ! is_a($className, Data::class, true)) {
+        if (!class_exists($className) || !is_a($className, Data::class, true)) {
             throw new \Exception("$className is not a valid Data object");
         }
 
@@ -62,7 +62,7 @@ trait CastsDtoToSchema
     }
 
     /**
-     * @param  array<string, mixed>  $rules
+     * @param array<string, mixed> $rules
      * @return array<string, mixed>
      *
      * @throws ReflectionException
@@ -70,7 +70,7 @@ trait CastsDtoToSchema
     protected function unwrapRules(array $rules): array
     {
         foreach ($rules as $key => $rule) {
-            if (! $rule instanceof NestedRules) {
+            if (!$rule instanceof NestedRules) {
                 continue;
             }
 
@@ -94,18 +94,18 @@ trait CastsDtoToSchema
     {
         $closure = (new ReflectionObject($rule))->getProperty('callback')->getValue($rule);
 
-        if (! $closure instanceof Closure) {
+        if (!$closure instanceof Closure) {
             return [];
         }
 
         $useVariables = (new ReflectionClosure($closure))->getUseVariables();
 
-        if (! (($prop = ($useVariables['dataProperty'] ?? null)) instanceof DataProperty)) {
+        if (!(($prop = ($useVariables['dataProperty'] ?? null)) instanceof DataProperty)) {
             return [];
         }
 
         $attribute = $prop->attributes
-            ->filter(fn ($attribute) => is_a($attribute->class, DataCollectionOf::class, true))
+            ->filter(fn($attribute) => is_a($attribute->class, DataCollectionOf::class, true))
             ->first();
 
         $rules = $this->rulesFromDtoNoRecursion($attribute->class);

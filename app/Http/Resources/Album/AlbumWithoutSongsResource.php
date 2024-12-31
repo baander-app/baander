@@ -24,20 +24,20 @@ class AlbumWithoutSongsResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'title'       => $this->title,
-            'slug'        => $this->slug,
-            'year'        => $this->year,
-            'directory'   => $this->directory,
-            'createdAt'   => $this->created_at,
-            'updatedAt'   => $this->updated_at,
+            'title'     => $this->title,
+            'slug'      => $this->slug,
+            'year'      => $this->year,
+            'directory' => $this->directory,
+            'createdAt' => $this->created_at,
+            'updatedAt' => $this->updated_at,
             /**
              * Cover relation
              */
-            'cover'    => ImageResource::make($this->whenLoaded('cover')),
+            'cover'     => ImageResource::make($this->whenLoaded('cover')),
             /**
              * Album artist relation
              */
-            'artists' => ArtistResource::make($this->whenLoaded('artists')),
+            'artists'   => ArtistResource::make($this->whenLoaded('artists')),
         ];
     }
 }

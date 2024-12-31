@@ -2,23 +2,21 @@
 
 namespace App\Http\Controllers\Web;
 
-use App\Auth\Webauthn\Actions\FindPasskeyToAuthenticateAction;
-use App\Auth\Webauthn\Actions\GeneratePasskeyAuthenticationOptionsAction;
-use App\Auth\Webauthn\Actions\GeneratePasskeyRegisterOptionsAction;
-use App\Auth\Webauthn\Actions\StorePasskeyAction;
+use App\Auth\Webauthn\Actions\{
+    FindPasskeyToAuthenticateAction,
+    GeneratePasskeyAuthenticationOptionsAction,
+    GeneratePasskeyRegisterOptionsAction,
+    StorePasskeyAction
+};
 use App\Events\Auth\PasskeyUsedToAuthenticateEvent;
 use App\Http\Controllers\Api\Auth\Concerns\HandlesUserTokens;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Auth\AuthenticateUsingPasskeyRequest;
-use App\Http\Requests\Auth\StorePasskeyRequest;
+use App\Http\Requests\Auth\{AuthenticateUsingPasskeyRequest, StorePasskeyRequest};
 use App\Models\User;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Session;
-use Spatie\RouteAttributes\Attributes\Get;
-use Spatie\RouteAttributes\Attributes\Post;
-use Spatie\RouteAttributes\Attributes\Prefix;
+use Illuminate\Support\Facades\{Log, Session};
+use Spatie\RouteAttributes\Attributes\{Get, Post, Prefix};
 
 /**
  * @tags Auth

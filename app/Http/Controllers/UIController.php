@@ -2,13 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Extensions\BaseBuilder;
-use App\Http\Integrations\Github\BaanderGhApi;
-use App\Http\Resources\Album\AlbumResource;
-use App\Models\Album;
-use App\Packages\PhpInfoParser\Info;
-use App\Services\SystemMetricsCollectorService;
-use Illuminate\Http\Request;
 use MusicBrainz\Filter\PageFilter;
 use MusicBrainz\Filter\Search\ReleaseFilter;
 use MusicBrainz\MusicBrainz;
@@ -41,13 +34,13 @@ class UIController
         $release = $artistList[0]->release;
 
         dd([
-            'aliases' => $release->getAliases(),
+            'aliases'        => $release->getAliases(),
             'annotationText' => $release->getAnnotationText(),
-            'artistCredit' => $release->getArtistCredits()[0]->getArtist(),
-            'country' => $release->getCountry(),
-            'date' => $release->getDate(),
+            'artistCredit'   => $release->getArtistCredits()[0]->getArtist(),
+            'country'        => $release->getCountry(),
+            'date'           => $release->getDate(),
             'disambiguation' => $release->getDisambiguation(),
-            'labelInfos' => $release->getLabelInfos()->current(),
+            'labelInfos'     => $release->getLabelInfos()->current(),
         ]);
 
         return view('dbg', [

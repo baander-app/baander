@@ -20,10 +20,10 @@ class Id3v1 extends AbstractModule
         }
 
         $tags = [
-            "title"     =>  $this->file->read(30),
-            "artist"    =>  $this->file->read(30),
-            "album"     =>  $this->file->read(30),
-            "year"      =>  $this->file->read(4),
+            "title"  => $this->file->read(30),
+            "artist" => $this->file->read(30),
+            "album"  => $this->file->read(30),
+            "year"   => $this->file->read(4),
         ];
 
         foreach ($tags as &$value) {
@@ -96,7 +96,7 @@ class Id3v1 extends AbstractModule
         $content .= $this->formatValue("", 29);
 
         # Write the track number (technically in the end of the comments field)
-        $content .= chr((int) $tags["track"]);
+        $content .= chr((int)$tags["track"]);
 
         # We don't support the genre field yet
         $content .= $this->formatValue("", 1);
@@ -134,7 +134,7 @@ class Id3v1 extends AbstractModule
      */
     public function getTitle()
     {
-        return (string) $this->getTag("title");
+        return (string)$this->getTag("title");
     }
 
 
@@ -145,7 +145,7 @@ class Id3v1 extends AbstractModule
      */
     public function getTrackNumber()
     {
-        return (int) $this->getTag("track");
+        return (int)$this->getTag("track");
     }
 
 
@@ -156,7 +156,7 @@ class Id3v1 extends AbstractModule
      */
     public function getArtist()
     {
-        return (string) $this->getTag("artist");
+        return (string)$this->getTag("artist");
     }
 
 
@@ -167,7 +167,7 @@ class Id3v1 extends AbstractModule
      */
     public function getAlbum()
     {
-        return (string) $this->getTag("album");
+        return (string)$this->getTag("album");
     }
 
 
@@ -178,7 +178,7 @@ class Id3v1 extends AbstractModule
      */
     public function getYear()
     {
-        return (int) $this->getTag("year");
+        return (int)$this->getTag("year");
     }
 
 

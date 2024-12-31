@@ -13,22 +13,22 @@ class Album extends BaseModel
     use HasFactory, HasLibraryAccess, HasSlug, Versionable;
 
     public static array $filterFields = [
-      'title',
-      'slug',
-      'year',
-      'directory',
+        'title',
+        'slug',
+        'year',
+        'directory',
     ];
 
     public static array $filterRelations = [
-      'artists',
-      'cover',
-      'library',
-      'songs',
-      'songs.genres',
+        'artists',
+        'cover',
+        'library',
+        'songs',
+        'songs.genres',
     ];
 
     public static array $advancedFilters = [
-      'genres',
+        'genres',
     ];
 
     protected $fillable = [
@@ -39,8 +39,8 @@ class Album extends BaseModel
     ];
 
     protected $versionable = [
-      'title',
-      'year',
+        'title',
+        'year',
     ];
 
     protected $perPage = 60;

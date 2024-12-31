@@ -57,8 +57,8 @@ class HLSPlaylistGenerator implements PlaylistGenerator
 
             return [$streamInfoLine, $segmentPlaylist->getFilename()];
         })->collapse()
-                         ->prepend(static::PLAYLIST_START)
-                         ->push(static::PLAYLIST_END)
-                         ->implode(PHP_EOL);
+            ->prepend(static::PLAYLIST_START)
+            ->push(static::PLAYLIST_END)
+            ->implode(PHP_EOL);
     }
 }

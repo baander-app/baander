@@ -52,7 +52,7 @@ class SongIndexRequest extends FormRequest
              * - album.albumArtist
              * - genres
              */
-            'relations' => 'string',
+            'relations'  => 'string',
         ];
     }
 }

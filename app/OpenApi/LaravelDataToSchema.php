@@ -41,7 +41,7 @@ class LaravelDataToSchema extends TypeToSchemaExtension
         return Response::make(200)
             ->setContent(
                 'application/json',
-                $this->schemaFromDto($type->name)
+                $this->schemaFromDto($type->name),
             );
     }
 }

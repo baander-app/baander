@@ -21,19 +21,17 @@ class Info
         $info = self::capture();
 
         $modules = [];
-        foreach ($info->modules() as $k => $module)
-        {
+        foreach ($info->modules() as $k => $module) {
             $name = $module->name();
             $section = [
                 'section' => $name,
-                'values' => [],
+                'values'  => [],
             ];
 
 
-            foreach ($module->configs() as $config)
-            {
+            foreach ($module->configs() as $config) {
                 $section['values'][] = [
-                    'key' => $config->name(),
+                    'key'   => $config->name(),
                     'value' => $config->value(),
                 ];
             }

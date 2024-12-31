@@ -20,7 +20,7 @@ class LibraryScanCompleted implements ShouldQueue
      * Create a new event instance.
      */
     public function __construct(
-        public Library $library
+        public Library $library,
     )
     {
         //
@@ -45,8 +45,8 @@ class LibraryScanCompleted implements ShouldQueue
         return [
             'notification' => [
                 'title' => 'Library scan completed',
-                'body' => "$name was successfully scanned"
-            ]
+                'body'  => "$name was successfully scanned",
+            ],
         ];
     }
 }

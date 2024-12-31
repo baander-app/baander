@@ -18,10 +18,11 @@ class EmergencyWorker implements Worker
     protected Run $whoops;
 
     public function __construct(
-        protected Client $client,
+        protected Client    $client,
         protected Throwable $exception,
-        protected array $serverState,
-    ) {
+        protected array     $serverState,
+    )
+    {
         $this->whoops = new Run();
         $this->whoops->allowQuit(false);
         $this->whoops->writeToOutput(false);

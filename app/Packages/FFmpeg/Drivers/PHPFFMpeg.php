@@ -149,7 +149,7 @@ class PHPFFMpeg
         $localPaths = $this->mediaCollection->getLocalPaths();
 
         $this->media = $this->ffmpeg->open(Arr::first($localPaths))
-                                    ->concat($localPaths);
+            ->concat($localPaths);
 
         return $this;
     }
