@@ -521,6 +521,16 @@ export const $LoginRequest = {
     title: 'LoginRequest'
 } as const;
 
+export const $LogoutRequest = {
+    type: 'object',
+    properties: {
+        refreshToken: {
+            type: 'string'
+        }
+    },
+    title: 'LogoutRequest'
+} as const;
+
 export const $NewAccessTokenResource = {
     type: 'object',
     properties: {

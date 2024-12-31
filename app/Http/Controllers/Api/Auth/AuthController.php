@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Api\Auth\Concerns\HandlesUserTokens;
-use App\Http\Requests\Auth\{ForgotPasswordRequest, LoginRequest, RegisterRequest, ResetPasswordRequest};
+use App\Jobs\Auth\RevokeTokenJob;
+use App\Http\Requests\Auth\{ForgotPasswordRequest, LoginRequest, LogoutRequest, RegisterRequest, ResetPasswordRequest};
 use App\Http\Resources\Auth\NewAccessTokenResource;
 use App\Http\Resources\User\UserResource;
+use Illuminate\Http\Response;
 use App\Models\{PersonalAccessToken, TokenAbility, User};
 use App\Notifications\ForgotPasswordNotification;
 use Illuminate\Auth\Events\Verified;
@@ -15,6 +17,7 @@ use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\{Hash, Password};
 use Spatie\RouteAttributes\Attributes\{Group, Post, Prefix};
+use Queue;
 
 /**
  * @tags Auth
@@ -171,5 +174,23 @@ class AuthController
         }
 
         return new UserResource($user);
+    }
+
+    /**
+     * Logout
+     *
+     * Invalidates the current session
+     */
+    #[Post('logout', 'auth.logout', ['auth:sanctum'])]
+    public function logout(LogoutRequest $request)
+    {
+        Queue::push(new RevokeTokenJob($request->user()->currentAccessToken()->token));
+
+        $refreshToken = $request->get('refreshToken');
+        if ($refreshToken) {
+            Queue::push(new RevokeTokenJob($refreshToken));
+        }
+
+        return response(null, Response::HTTP_NO_CONTENT);
     }
 }

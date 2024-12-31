@@ -189,6 +189,10 @@ export type LoginRequest = {
     remember?: boolean;
 };
 
+export type LogoutRequest = {
+    refreshToken?: string;
+};
+
 export type NewAccessTokenResource = {
     token: string;
     abilities: string;
@@ -505,6 +509,12 @@ export type AuthResetPasswordResponse = {
 };
 
 export type AuthVerifyResponse = UserResource;
+
+export type AuthLogoutData = {
+    requestBody?: LogoutRequest;
+};
+
+export type AuthLogoutResponse = null;
 
 export type AuthPasskeyOptionsResponse = {
     challenge: string;
@@ -1844,6 +1854,50 @@ export type $OpenApiTs = {
                  * `UserResource`
                  */
                 200: UserResource;
+            };
+        };
+    };
+    '/api/auth/logout': {
+        post: {
+            req: AuthLogoutData;
+            res: {
+                /**
+                 * No content
+                 */
+                204: null;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
             };
         };
     };

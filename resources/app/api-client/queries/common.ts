@@ -326,6 +326,7 @@ export type AuthServiceAuthRegisterMutationResult = Awaited<ReturnType<typeof Au
 export type AuthServiceAuthForgotPasswordMutationResult = Awaited<ReturnType<typeof AuthService.authForgotPassword>>;
 export type AuthServiceAuthResetPasswordMutationResult = Awaited<ReturnType<typeof AuthService.authResetPassword>>;
 export type AuthServiceAuthVerifyMutationResult = Awaited<ReturnType<typeof AuthService.authVerify>>;
+export type AuthServiceAuthLogoutMutationResult = Awaited<ReturnType<typeof AuthService.authLogout>>;
 export type AuthServiceAuthPasskeyLoginMutationResult = Awaited<ReturnType<typeof AuthService.authPasskeyLogin>>;
 export type AuthServiceAuthPasskeyRegisterMutationResult = Awaited<ReturnType<typeof AuthService.authPasskeyRegister>>;
 export type PasskeyServiceAuthPasskeyLoginMutationResult = Awaited<ReturnType<typeof PasskeyService.authPasskeyLogin>>;

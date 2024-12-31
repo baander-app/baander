@@ -1,7 +1,17 @@
 // import { createAppSlice } from '@/store/create-app-slice.ts';
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Token } from '@/services/auth/token.ts';
-import { NewAccessTokenResource } from '@/api-client/requests';
+import { AuthService, NewAccessTokenResource } from '@/api-client/requests';
+
+export const logoutUser = createAsyncThunk('auth/logout', async () => {
+  const token = Token.get();
+
+  if (!token) {
+    return;
+  }
+
+  return AuthService.authLogout({ requestBody: { refreshToken: token.refreshToken.token } });
+})
 
 export interface UserModel {
   name: string;
@@ -15,6 +25,7 @@ export interface UserSliceState {
   refreshToken: NewAccessTokenResource | null;
   streamToken: NewAccessTokenResource | null;
   user: UserModel | null;
+  loading: boolean;
 }
 
 const initialState: UserSliceState = {
@@ -23,6 +34,7 @@ const initialState: UserSliceState = {
   refreshToken: null,
   streamToken: null,
   user: null,
+  loading: false,
 };
 
 export const authSlice = createSlice({
@@ -47,14 +59,20 @@ export const authSlice = createSlice({
     removeUser(state) {
       state.user = null;
     },
-    logoutUser(state) {
+  },
+  extraReducers: builder => {
+    builder.addCase(logoutUser.pending, (state) => {
+      state.loading = true;
+    })
+    builder.addCase(logoutUser.fulfilled, (state) => {
       state.authenticated = false;
       state.accessToken = null;
       state.refreshToken = null;
       state.streamToken = null;
       state.user = null;
+      state.loading = false;
       Token.clear();
-    },
+    })
   },
   selectors: {
     selectIsAuthenticated: auth => auth.authenticated,
@@ -72,7 +90,6 @@ export const {
   setStreamToken,
   setUser,
   removeUser,
-  logoutUser,
 } = authSlice.actions;
 
 export const {

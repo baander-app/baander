@@ -2,7 +2,7 @@
 
 import { useMutation, UseMutationOptions, useQuery, UseQueryOptions } from "@tanstack/react-query";
 import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, OpCacheService, PasskeyService, PendingJobsService, QueueMetricsService, QueueService, RetryService, SilencedJobsService, SongService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
-import { AuthenticateUsingPasskeyRequest, CreateLibraryRequest, CreateUserRequest, ForgotPasswordRequest, LoginRequest, RegisterRequest, ResetPasswordRequest, RetryJobRequest, StorePasskeyRequest, UpdateGenreRequest, UpdateLibraryRequest, UpdateUserRequest } from "../requests/types.gen";
+import { AuthenticateUsingPasskeyRequest, CreateLibraryRequest, CreateUserRequest, ForgotPasswordRequest, LoginRequest, LogoutRequest, RegisterRequest, ResetPasswordRequest, RetryJobRequest, StorePasskeyRequest, UpdateGenreRequest, UpdateLibraryRequest, UpdateUserRequest } from "../requests/types.gen";
 import * as Common from "./common";
 /**
 * Get a collection of albums
@@ -623,6 +623,19 @@ export const useAuthServiceAuthResetPassword = <TData = Common.AuthServiceAuthRe
 * @throws ApiError
 */
 export const useAuthServiceAuthVerify = <TData = Common.AuthServiceAuthVerifyMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, void, TContext>, "mutationFn">) => useMutation<TData, TError, void, TContext>({ mutationFn: () => AuthService.authVerify() as unknown as Promise<TData>, ...options });
+/**
+* Logout
+* Invalidates the current session
+* @param data The data for the request.
+* @param data.requestBody
+* @returns null No content
+* @throws ApiError
+*/
+export const useAuthServiceAuthLogout = <TData = Common.AuthServiceAuthLogoutMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody?: LogoutRequest;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody?: LogoutRequest;
+}, TContext>({ mutationFn: ({ requestBody }) => AuthService.authLogout({ requestBody }) as unknown as Promise<TData>, ...options });
 /**
 * Login with a passkey
 * @param data The data for the request.

@@ -15,4 +15,13 @@ class AuthTokenService
     {
         return PersonalAccessToken::whereExpired()->count();
     }
+
+    public function revokeToken(string $token): bool
+    {
+        $model = PersonalAccessToken::whereToken($token)->firstOrFail();
+
+        return $model->update([
+            'expires_at' => now(),
+        ]);
+    }
 }
