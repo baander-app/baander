@@ -1,7 +1,7 @@
 #!/usr/bin/env php
 <?php
 
-use App\Modules\Octane\OnWorkerStart;
+use App\Octane\OnWorkerStart;
 use Laravel\Octane\RequestContext;
 use Laravel\Octane\Swoole\{ServerStateFile, SwooleExtension, WorkerState};
 use Laravel\Octane\Swoole\Handlers\{OnManagerStart, OnServerStart};

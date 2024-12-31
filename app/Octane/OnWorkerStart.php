@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Octane;
+namespace App\Octane;
 
 use Laravel\Octane\ApplicationFactory;
 use Laravel\Octane\Contracts\Worker as WorkerContract;

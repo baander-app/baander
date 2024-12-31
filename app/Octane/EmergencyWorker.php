@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Octane;
+namespace App\Octane;
 
 use Closure;
 use Illuminate\Http\Request;
