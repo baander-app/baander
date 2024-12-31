@@ -2,11 +2,11 @@
 
 namespace App\Models;
 
-use App\Support\EnumExtensions;
+use App\Extensions\EnumExt;
 
 enum LibraryType: string
 {
-    use EnumExtensions;
+    use EnumExt;
 
     case Music = 'music';
     case Podcast = 'podcast';

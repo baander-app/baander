@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Support;
+namespace App\Extensions;
 
-trait EnumExtensions
+trait EnumExt
 {
     public static function names(): array
     {

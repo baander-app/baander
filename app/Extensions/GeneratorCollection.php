@@ -1,11 +1,10 @@
 <?php
 
-namespace App\Support;
+namespace App\Extensions;
 
 use Exception;
 use Generator;
 use IteratorAggregate;
-use Traversable;
 
 /**
  * @template T

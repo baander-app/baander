@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Support\Logger;
+namespace App\Extensions\Logger;
 
 use Illuminate\Support\Facades\Log;
 

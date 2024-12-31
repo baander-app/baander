@@ -2,7 +2,7 @@
 
 namespace App\Modules\OpenApi;
 
-use App\Extensions\Pagination\JsonPaginator;
+use App\Modules\Pagination\JsonPaginator;
 use Dedoc\Scramble\Extensions\TypeToSchemaExtension;
 use Dedoc\Scramble\Support\Generator\{Response, Schema};
 use Dedoc\Scramble\Support\Generator\Types\{ArrayType, IntegerType, ObjectType as OpenApiObjectType};

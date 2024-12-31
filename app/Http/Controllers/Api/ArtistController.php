@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Extensions\Pagination\JsonPaginator;
 use App\Http\Requests\Artist\ArtistIndexRequest;
 use App\Http\Resources\Artist\ArtistResource;
 use App\Models\{Artist, TokenAbility};
+use App\Modules\Pagination\JsonPaginator;
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
 
 #[Prefix('/libraries/{library}/artists')]

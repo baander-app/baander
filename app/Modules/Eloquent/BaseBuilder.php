@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Extensions\Eloquent;
+namespace App\Modules\Eloquent;
 
-use App\Extensions\Pagination\JsonPaginator;
+use App\Modules\Pagination\JsonPaginator;
 use Illuminate\Container\Container;
 use Illuminate\Database\Eloquent\Builder;
 

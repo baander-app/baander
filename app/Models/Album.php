@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use App\Extensions\Eloquent\BaseBuilder;
 use App\Models\Concerns\HasLibraryAccess;
+use App\Modules\Eloquent\BaseBuilder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Overtrue\LaravelVersionable\Versionable;
 use Spatie\Sluggable\{HasSlug, SlugOptions};

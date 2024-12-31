@@ -2,7 +2,7 @@
 
 namespace App\Http\Concerns;
 
-use App\Extensions\Eloquent\BaseBuilder;
+use App\Modules\Eloquent\BaseBuilder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 

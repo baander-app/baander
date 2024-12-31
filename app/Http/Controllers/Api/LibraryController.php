@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Extensions\Pagination\JsonPaginator;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Library\{CreateLibraryRequest, LibraryIndexRequest, UpdateLibraryRequest};
 use App\Http\Resources\Library\LibraryResource;
 use App\Models\{Library, TokenAbility};
+use App\Modules\Pagination\JsonPaginator;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Patch, Post, Prefix};

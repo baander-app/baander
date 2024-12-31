@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Extensions\{Http\Resources\Json\JsonAnonymousResourceCollection, Pagination\JsonPaginator};
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Song\{SongIndexRequest, SongShowRequest};
 use App\Http\Resources\Song\SongResource;
 use App\Models\{Album, Library, Song, TokenAbility};
+use App\Modules\{Pagination\JsonPaginator};
+use App\Modules\Http\Resources\Json\JsonAnonymousResourceCollection;
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 

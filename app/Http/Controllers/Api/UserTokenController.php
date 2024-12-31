@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Extensions\Pagination\JsonPaginator;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UserToken\UserTokenIndexRequest;
 use App\Http\Resources\UserToken\PersonalAccessTokenViewResource;
 use App\Models\{PersonalAccessToken, TokenAbility};
+use App\Modules\Pagination\JsonPaginator;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Prefix};

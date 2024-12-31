@@ -2,7 +2,7 @@
 
 namespace App\Http\Resources;
 
-use App\Extensions\Http\Resources\Json\JsonAnonymousResourceCollection;
+use App\Modules\Http\Resources\Json\JsonAnonymousResourceCollection;
 
 trait HasJsonCollection
 {

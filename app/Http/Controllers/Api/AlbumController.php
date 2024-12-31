@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Extensions\{Pagination\JsonPaginator};
-use App\Extensions\Eloquent\BaseBuilder;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Album\AlbumIndexRequest;
 use App\Http\Resources\Album\AlbumResource;
 use App\Models\{Album, Library, TokenAbility};
+use App\Modules\{Pagination\JsonPaginator};
+use App\Modules\Eloquent\BaseBuilder;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
 
