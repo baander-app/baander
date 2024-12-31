@@ -23,9 +23,9 @@ export const $AlbumResource = {
             type: ['string', 'null'],
             format: 'date-time'
         },
-        coverUrl: {
-            type: 'string',
-            description: 'Cover relation'
+        cover: {
+            description: 'Cover relation',
+            '$ref': '#/components/schemas/ImageResource'
         },
         albumArtist: {
             description: 'Album artist relation',
@@ -231,11 +231,14 @@ export const $ImageResource = {
         height: {
             type: 'integer'
         },
+        blurhash: {
+            type: 'string'
+        },
         url: {
             type: 'string'
         }
     },
-    required: ['public_id', 'path', 'extension', 'size', 'mime_type', 'width', 'height', 'url'],
+    required: ['public_id', 'path', 'extension', 'size', 'mime_type', 'width', 'height', 'blurhash', 'url'],
     title: 'ImageResource'
 } as const;
 

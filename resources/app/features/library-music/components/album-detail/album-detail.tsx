@@ -36,7 +36,7 @@ export function AlbumDetail({ albumSlug, ...rest }: AlbumDetailProps) {
           <Card.Section withBorder>
             <Flex>
               <Box p="sm">
-                <Cover imgSrc={data?.coverUrl} size={180}/>
+                <Cover imgSrc={data?.cover?.url} size={180}/>
               </Box>
 
               <Box p="sm">
@@ -51,7 +51,7 @@ export function AlbumDetail({ albumSlug, ...rest }: AlbumDetailProps) {
           </Card.Section>
 
           <Group>
-            {data?.songs && <AlbumSongs title={data.title} coverUrl={data.coverUrl} songs={data.songs}/>}
+            {data?.songs && <AlbumSongs title={data.title} coverUrl={data.cover?.url} songs={data.songs}/>}
           </Group>
         </Card>
       )}
