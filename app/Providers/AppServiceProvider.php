@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Packages\JsonSchema\Validation\DefaultValidationRuleProvider;
+use App\Packages\JsonSchema\Validation\ValidationRuleProviderInterface;
+use App\Repositories\Cache\CacheRepositoryInterface;
+use App\Repositories\Cache\LaravelCacheRepository;
 use App\View\Composers\BaanderViewComposer;
 use Ergebnis\Clock\SystemClock;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -20,6 +24,9 @@ class AppServiceProvider extends ServiceProvider
 
             return new SystemClock($timeZone);
         });
+
+        $this->app->singleton(CacheRepositoryInterface::class, LaravelCacheRepository::class);
+        $this->app->singleton(ValidationRuleProviderInterface::class, DefaultValidationRuleProvider::class);
     }
 
     /**
