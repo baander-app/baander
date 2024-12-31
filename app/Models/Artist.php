@@ -9,6 +9,15 @@ class Artist extends BaseModel
 {
     use HasFactory, HasSlug;
 
+    public static array $filterFields = [
+        'name',
+        'slug',
+    ];
+
+    public static array $filterRelations = [
+        'songs',
+    ];
+
     protected $fillable = [
         'name',
         'slug',

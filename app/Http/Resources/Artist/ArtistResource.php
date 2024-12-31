@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Artist;
 
+use App\Http\Resources\Image\ImageResource;
 use App\Models\Artist;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -23,6 +24,10 @@ class ArtistResource extends JsonResource
             'slug'      => $this->slug,
             'createdAt' => $this->created_at,
             'updatedAt' => $this->updated_at,
+            /**
+             * Portrait relation
+             */
+            'portrait'  => ImageResource::make($this->whenLoaded('portrait')),
         ];
     }
 }

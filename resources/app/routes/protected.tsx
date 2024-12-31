@@ -4,18 +4,21 @@ import { EchoContextProvider } from '@/providers/echo-provider.tsx';
 import { Suspense } from 'react';
 import { LibraryMusicRoutes } from '@/features/library-music/routes/routes.tsx';
 import { DashboardLayout } from '@/layouts/dashboard-layout/dasbhard-layout.tsx';
-import { AccountRoutes } from '@/features/account/routes/routes.tsx';
+import { AccountRoutes } from '@/features/account/pages/routes.tsx';
 import { DashboardRoutes } from '@/features/dashboard/routes.tsx';
+import { AudioPlayerContextProvider } from '@/features/library-music-player/providers/audio-player-provider.tsx';
 
 const App = () => {
   return (
-    <RootLayout>
-      <EchoContextProvider>
-        <Suspense>
-          <Outlet/>
-        </Suspense>
-      </EchoContextProvider>
-    </RootLayout>
+    <EchoContextProvider>
+      <AudioPlayerContextProvider>
+      <RootLayout>
+          <Suspense>
+            <Outlet/>
+          </Suspense>
+      </RootLayout>
+      </AudioPlayerContextProvider>
+    </EchoContextProvider>
   );
 };
 
@@ -40,7 +43,7 @@ export const protectedRoutes: RouteObject[] = [
       },
       {
         path: '/account/*',
-        element: <AccountRoutes />
+        element: <AccountRoutes/>,
       },
       {
         path: '*',

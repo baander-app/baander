@@ -22,6 +22,8 @@ class OpCacheController extends Controller
     }
 
     /**
+     * Get status
+     *
      * @response array{
      *  opcache_enabled: bool,
      *  file_cache: string,
@@ -76,6 +78,8 @@ class OpCacheController extends Controller
     }
 
     /**
+     * Get config
+     *
      * @response array{
      *   directives: array{property: int|float|bool|string},
      *   version: array{version: string, opcache_product_name: string},
@@ -91,6 +95,8 @@ class OpCacheController extends Controller
     }
 
     /**
+     * Clear
+     *
      * @response array{
      *  success: bool
      * }
@@ -106,6 +112,8 @@ class OpCacheController extends Controller
     }
 
     /**
+     * Compile cache
+     *
      * @response array{
      *   totalFiles: int,
      *   compiled: int

@@ -11,14 +11,21 @@ import '@mantine/nprogress/styles.css';
 import '@mantine/tiptap/styles.css';
 import 'overlayscrollbars/overlayscrollbars.css';
 
+import dayjs from 'dayjs';
+import localizedFormat from 'dayjs/plugin/localizedFormat';
+dayjs.extend(localizedFormat);
+
 import 'dayjs/locale/da';
 import 'dayjs/locale/de';
 import 'dayjs/locale/en';
+import 'dayjs/locale/en-gb';
+import 'dayjs/locale/es';
+import 'dayjs/locale/th';
+import 'dayjs/locale/zh-cn';
 
 import { applyInterceptors } from '@/api-client-ext/interceptors';
 import { OpenAPI as OpenAPIConfig } from '@/api-client/requests';
 import { Token } from '@/services/auth/token.ts';
-
 
 OpenAPIConfig.BASE = `${import.meta.env.VITE_APP_URL}/api`;
 OpenAPIConfig.CREDENTIALS = 'same-origin';

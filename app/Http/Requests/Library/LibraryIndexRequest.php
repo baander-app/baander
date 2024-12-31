@@ -23,9 +23,9 @@ class LibraryIndexRequest extends FormRequest
     {
         return [
             /** @query */
-            'page' => 'optional|int',
+            'page' => 'int',
             /** @query */
-            'perPage' => 'optional|int',
+            'perPage' => 'int',
         ];
     }
 }

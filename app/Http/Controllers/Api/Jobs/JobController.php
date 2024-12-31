@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Jobs;
 
+use App\Exceptions\Jobs\Manager\CouldNotFindJobException;
 use App\Http\Controllers\Controller;
 use App\Jobs\Library\ScanMusicLibraryJob;
 use App\Models\Library;
@@ -21,19 +22,18 @@ class JobController extends Controller
 {
     use DispatchesJobs;
 
-    #[Post('/scanLibrary/{slug}', 'api.job.library-scan')]
     /**
      * Scan a library
      */
+    #[Post('/scanLibrary/{slug}', 'api.job.library-scan')]
     public function startLibraryScan(Request $request)
     {
         $slug = $request->route('slug');
 
         try {
             $library = Library::whereSlug($slug)->firstOrFail();
-        } catch (ModelNotFoundException) {
-            abort(404);
-            return;
+        } catch (ModelNotFoundException $e) {
+          throw CouldNotFindJobException::throwFromController($e);
         }
 
         $job = new ScanMusicLibraryJob($library);

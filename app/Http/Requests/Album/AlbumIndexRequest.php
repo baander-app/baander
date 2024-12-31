@@ -22,15 +22,38 @@ class AlbumIndexRequest extends FormRequest
     public function rules(): array
     {
         return [
-            /** @query */
-            'page'      => 'int',
-            /** @query */
-            'perPage'   => 'int',
-            /** @query */
+            /**
+             * @query
+             * Comma seperated string of fields you want to select. If nothing is defined `select *` is default.
+             * - title
+             * - slug
+             * - year
+             * - directory
+             */
             'fields'    => 'string',
-            /** @query */
+            /**
+             * @query
+             * Comma seperated string of relations
+             * - albumArist
+             * - cover
+             * - library
+             * - songs
+             */
             'relations' => 'string',
-            /** @query */
+            /**
+             * @query
+             * Current page
+             */
+            'page'      => 'int',
+            /**
+             * @query
+             * Items per page
+             */
+            'perPage'   => 'int',
+            /**
+             * @query
+             * _Extension_ Comma seperated list of genres
+             */
             'genres'    => 'string',
         ];
     }

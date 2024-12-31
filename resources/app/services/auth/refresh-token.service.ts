@@ -1,14 +1,13 @@
 import { Token } from '@/services/auth/token.ts';
 import { AuthService, OpenAPI } from '@/api-client/requests';
-import { useAppDispatch, useAppSelector } from '@/store/hooks.ts';
-import { selectRefreshToken, setAccessToken, setRefreshToken, setStreamToken } from '@/store/users/auth-slice.ts';
+import { setAccessToken, setStreamToken } from '@/store/users/auth-slice.ts';
+import { store } from '@/store';
 
 export async function refreshToken(type: 'access' | 'stream') {
-  const dispatch = useAppDispatch();
-  const refreshToken = useAppSelector(state => state.auth)
+  const refreshToken = store.getState().auth?.refreshToken;
 
   if (refreshToken) {
-    OpenAPI.TOKEN = refreshToken.refreshToken.token;
+    OpenAPI.TOKEN = refreshToken.token;
   } else {
     throw new Error('Refresh token not found');
   }
@@ -18,10 +17,9 @@ export async function refreshToken(type: 'access' | 'stream') {
 
     Token.set({
       accessToken: accessToken.accessToken,
-      refreshToken: token.refreshToken,
+      refreshToken: refreshToken,
     });
-    dispatch(setAccessToken(accessToken.accessToken));
-    dispatch(setRefreshToken(token.refreshToken));
+    store.dispatch(setAccessToken(accessToken.accessToken));
 
     OpenAPI.TOKEN = accessToken.accessToken.token;
 
@@ -32,7 +30,7 @@ export async function refreshToken(type: 'access' | 'stream') {
     const streamToken = await AuthService.authStreamToken();
 
     Token.setStreamToken(streamToken.streamToken);
-    dispatch(setStreamToken(streamToken.streamToken));
+    store.dispatch(setStreamToken(streamToken.streamToken));
 
     return;
   }

@@ -8,6 +8,9 @@ use App\Packages\Http\Concerns\DirectStreamableFile;
 use App\Packages\Nanoid\Concerns\HasNanoPublicId;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
+/**
+ * @property string $librarySlug Available in SongController
+ */
 class Song extends BaseModel implements DirectStreamableFile
 {
     use HasFactory, HasNanoPublicId;
@@ -26,6 +29,8 @@ class Song extends BaseModel implements DirectStreamableFile
         'size',
         'mime_type',
     ];
+
+    protected $with = ['album'];
 
     public function getRouteKeyName(): string
     {

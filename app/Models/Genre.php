@@ -9,6 +9,15 @@ class Genre extends BaseModel
 {
     use HasFactory, HasSlug;
 
+    public static array $filterFields = [
+        'name',
+        'slug',
+    ];
+
+    public static array $filterRelations = [
+        'songs',
+    ];
+
     protected $fillable = [
         'name',
         'slug',
@@ -17,11 +26,11 @@ class Genre extends BaseModel
     /**
      * Get the options for generating the slug.
      */
-    public function getSlugOptions() : SlugOptions
+    public function getSlugOptions(): SlugOptions
     {
         return SlugOptions::create()
-                          ->generateSlugsFrom('name')
-                          ->saveSlugsTo('slug');
+            ->generateSlugsFrom('name')
+            ->saveSlugsTo('slug');
     }
 
     public function getRouteKeyName(): string
@@ -29,8 +38,8 @@ class Genre extends BaseModel
         return 'slug';
     }
 
-   public function songs()
-   {
-       return $this->morphedByMany(Song::class, 'genreable');
-   }
+    public function songs()
+    {
+        return $this->morphedByMany(Song::class, 'genreable');
+    }
 }

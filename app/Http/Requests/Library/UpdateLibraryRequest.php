@@ -24,10 +24,10 @@ class UpdateLibraryRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name'  => 'optional|string:min:1|max:100',
-            'path'  => 'optional|string:min:1|max:1000',
+            'name'  => 'string:min:1|max:100',
+            'path'  => 'string:min:1|max:1000',
             'type'  => ['optional', Rule::enum(LibraryType::class)],
-            'order' => 'optional|integer',
+            'order' => 'integer',
         ];
     }
 }

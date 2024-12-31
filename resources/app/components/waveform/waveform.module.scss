@@ -5,5 +5,7 @@
 
 .titleBar {
   background-color: var(--mantine-color-dark-0);
-  padding: var(--mantine-spacing-xs);
+  padding: 0.2rem;
+  display: flex;
+  justify-content: space-between;
 }

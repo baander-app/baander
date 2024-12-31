@@ -10,6 +10,24 @@ class Album extends BaseModel
 {
     use HasFactory, HasSlug;
 
+    public static array $filterFields = [
+      'title',
+      'slug',
+      'year',
+      'directory',
+    ];
+
+    public static array $filterRelations = [
+      'albumArist',
+      'cover',
+      'library',
+      'songs'
+    ];
+
+    public static array $advancedFilters = [
+      'genres',
+    ];
+
     protected $fillable = [
         'title',
         'slug',
@@ -32,11 +50,6 @@ class Album extends BaseModel
         return 'slug';
     }
 
-    public function library()
-    {
-        return $this->belongsTo(Library::class);
-    }
-
     public function albumArtist()
     {
         return $this->belongsTo(Artist::class, 'artist_id', 'id', '');
@@ -45,6 +58,11 @@ class Album extends BaseModel
     public function cover()
     {
         return $this->morphOne(Image::class, 'imageable');
+    }
+
+    public function library()
+    {
+        return $this->belongsTo(Library::class);
     }
 
     public function songs()

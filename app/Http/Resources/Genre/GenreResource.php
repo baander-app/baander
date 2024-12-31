@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Genre;
 
+use App\Http\Resources\Song\SongResource;
 use App\Models\Genre;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -23,6 +24,10 @@ class GenreResource extends JsonResource
             'slug'      => $this->slug,
             'createdAt' => $this->created_at,
             'updatedAt' => $this->updated_at,
+            /**
+             * Songs relation
+             */
+            'songs' => SongResource::collection($this->whenLoaded('songs')),
         ];
     }
 }
