@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "86afca60418dfa6f568397cbaef7f3e2",
+    "content-hash": "a10a05f57dc461e3caddbf3cf5e12a9e",
     "packages": [
         {
             "name": "amphp/amp",
@@ -14003,16 +14003,16 @@
         },
         {
             "name": "tpetry/laravel-postgresql-enhanced",
-            "version": "2.0.0",
+            "version": "2.0.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/tpetry/laravel-postgresql-enhanced.git",
-                "reference": "a14719f193340a52ff60353b054f31b9975f947b"
+                "reference": "2e47e65fc68044c1c3c15b079329c45c3f9ee627"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/tpetry/laravel-postgresql-enhanced/zipball/a14719f193340a52ff60353b054f31b9975f947b",
-                "reference": "a14719f193340a52ff60353b054f31b9975f947b",
+                "url": "https://api.github.com/repos/tpetry/laravel-postgresql-enhanced/zipball/2e47e65fc68044c1c3c15b079329c45c3f9ee627",
+                "reference": "2e47e65fc68044c1c3c15b079329c45c3f9ee627",
                 "shasum": ""
             },
             "require": {
@@ -14071,9 +14071,9 @@
             ],
             "support": {
                 "issues": "https://github.com/tpetry/laravel-postgresql-enhanced/issues",
-                "source": "https://github.com/tpetry/laravel-postgresql-enhanced/tree/2.0.0"
+                "source": "https://github.com/tpetry/laravel-postgresql-enhanced/tree/2.0.1"
             },
-            "time": "2024-09-27T06:30:41+00:00"
+            "time": "2024-10-30T09:12:29+00:00"
         },
         {
             "name": "vlucas/phpdotenv",
@@ -17470,6 +17470,6 @@
         "ext-swoole": "*",
         "ext-zend-opcache": "*"
     },
-    "platform-dev": {},
+    "platform-dev": [],
     "plugin-api-version": "2.6.0"
 }
