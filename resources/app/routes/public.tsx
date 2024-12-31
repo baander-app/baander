@@ -20,6 +20,7 @@ export const publicRoutes = [
     children: [
       {path: '', element: <AuthRoutes/>},
       {path: 'authorize/*', element: <AuthorizeRoutes/>},
+      {path: '*', element: <AuthRoutes/>},
     ],
   },
 ];

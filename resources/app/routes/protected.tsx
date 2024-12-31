@@ -82,4 +82,8 @@ export const protectedRoutes: RouteObject[] = [
       },
     ],
   },
+  {
+    path: '/*',
+    element: <Navigate to="/"/>,
+  },
 ];

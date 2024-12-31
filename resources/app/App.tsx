@@ -27,7 +27,7 @@ function App() {
 
             <ModalsProvider>
               <MusicSourceProvider>
-                <BrowserRouter future={{ v7_startTransition: true }}>
+                <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                   <AppRoutes/>
                 </BrowserRouter>
 

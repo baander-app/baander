@@ -27,7 +27,6 @@ const LyricsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
 
   useEffect(() => {
     const handler: ReactEventHandler<HTMLAudioElement> = () => {
-      console.log('timeupdate');
       audioLyricsSynchronizer.timeUpdate(audioRef.current.currentTime);
     }
 
