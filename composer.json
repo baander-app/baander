@@ -15,7 +15,6 @@
         "beyondcode/laravel-server-timing": "^1.5",
         "dedoc/scramble": "^0.11.9",
         "ergebnis/clock": "^2.8",
-        "fedeisas/laravel-mail-css-inliner": "^5.3",
         "genealabs/laravel-pivot-events": "^11.0",
         "guzzlehttp/guzzle": "^7.2",
         "hidehalo/nanoid-php": "^1.1",

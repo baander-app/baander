@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Support\BaseBuilder;
+use App\Extensions\BaseBuilder;
 use Illuminate\Database\Eloquent\Model;
 
 abstract class BaseModel extends Model

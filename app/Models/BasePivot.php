@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Support\BaseBuilder;
+use App\Extensions\BaseBuilder;
 use GeneaLabs\LaravelPivotEvents\Traits\PivotEventTrait;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 

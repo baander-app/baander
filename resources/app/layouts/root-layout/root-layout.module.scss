@@ -2,6 +2,11 @@
     flex: 1;
 }
 
+.container {
+    margin-left: var(--mantine-spacing-xs);
+    margin-right: var(--mantine-spacing-xs);
+}
+
 .main {
     margin-bottom: rem(150px);
 }

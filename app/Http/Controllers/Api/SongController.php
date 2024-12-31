@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Extensions\JsonPaginator;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Song\SongIndexRequest;
 use App\Http\Resources\Song\SongResource;
 use App\Models\{Album, Library, Song, TokenAbility};
-use App\Support\JsonPaginator;
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
 
 #[Middleware(['force.json'])]

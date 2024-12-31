@@ -7,7 +7,6 @@ import richSvg from 'vite-plugin-react-rich-svg';
 import manifestSRI from 'vite-plugin-manifest-sri';
 import filterReplace from 'vite-plugin-filter-replace';
 import inspect from 'vite-plugin-inspect';
-import { sentryVitePlugin } from "@sentry/vite-plugin";
 
 const lottieScopeVariables = [
   'value',
@@ -136,12 +135,6 @@ export default defineConfig(config => {
         },
       ]),
       inspect(),
-      sentryVitePlugin({
-        org: process.env.SENTRY_ORG,
-        project: process.env.SENTRY_PROJECT,
-        authToken: process.env.SENTRY_AUTH_TOKEN,
-        telemetry: false,
-      }),
     ],
     resolve: {
       alias: {

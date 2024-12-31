@@ -1,7 +1,11 @@
 import { Token } from '@/services/auth/token.ts';
 import { AuthService, OpenAPI } from '@/api-client/requests';
+import { useAppDispatch } from '@/store/hooks.ts';
+import { setAccessToken, setRefreshToken, setStreamToken } from '@/store/users/auth-slice.ts';
 
 export async function refreshToken(type: 'access' | 'stream') {
+  const dispatch = useAppDispatch();
+
   const token = Token.get();
 
   if (token?.refreshToken.token) {
@@ -17,6 +21,8 @@ export async function refreshToken(type: 'access' | 'stream') {
       accessToken: accessToken.accessToken,
       refreshToken: token.refreshToken,
     });
+    dispatch(setAccessToken(accessToken.accessToken));
+    dispatch(setRefreshToken(token.refreshToken));
 
     OpenAPI.TOKEN = accessToken.accessToken.token;
 
@@ -27,6 +33,7 @@ export async function refreshToken(type: 'access' | 'stream') {
     const streamToken = await AuthService.authStreamToken();
 
     Token.setStreamToken(streamToken.streamToken);
+    dispatch(setStreamToken(streamToken.streamToken));
 
     return;
   }

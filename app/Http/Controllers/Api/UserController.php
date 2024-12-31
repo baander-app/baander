@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Models\TokenAbility;
-use App\Support\JsonPaginator;
+use App\Extensions\JsonPaginator;
 use App\Http\Requests\Users\{CreateUserRequest, UpdateUserRequest};
 use App\Http\Resources\User\UserResource;
+use App\Models\TokenAbility;
 use App\Models\User;
-use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Patch, Post, Prefix};
 use Illuminate\Http\Request;
+use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Patch, Post, Prefix};
 
 #[Prefix('users')]
 #[Middleware([

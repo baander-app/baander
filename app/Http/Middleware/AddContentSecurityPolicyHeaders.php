@@ -19,7 +19,7 @@ class AddContentSecurityPolicyHeaders
     {
         return $next($request);
 
-        if (Str::contains($request->path(), config('csp.avoidPaths'))) {
+        if (Str::contains($request->path(), config('app.csp.disable_paths'))) {
             return $next($request);
         }
 

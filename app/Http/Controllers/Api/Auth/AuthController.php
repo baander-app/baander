@@ -122,7 +122,7 @@ class AuthController
         $url = str_replace(
             ['{token}', '{email}'],
             [$token, $user->email],
-            $request->input('url') ?? config('app.url') . '/password/reset?token={token}&email={email}'
+            $request->input('url') ?? config('app.url') . '/password/reset?token={token}&email={email}',
         );
 
 
@@ -178,7 +178,7 @@ class AuthController
 
         $accessToken = $user->createToken(
             name: 'access_token',
-            abilities: [TokenAbility::ACCESS_API->value],
+            abilities: [TokenAbility::ACCESS_API->value, TokenAbility::ACCESS_BROADCASTING->value],
             expiresAt: Carbon::now()->addMinutes(config('sanctum.access_token_expiration')),
             device: $device,
         );

@@ -1,25 +1,27 @@
-// generated with @7nohe/openapi-react-query-codegen@1.5.1 
+// generated with @7nohe/openapi-react-query-codegen@1.6.0 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AlbumService, ArtistService, GenreService, ImageService, LibraryService, LogsService, SongService, UserService, WidgetSchemaService, WidgetService } from "../requests/services.gen";
+import { AlbumService, ArtistService, GenreService, ImageService, LibraryService, ModelSchemaService, OpCacheService, SongService, UserService, WidgetSchemaService, WidgetService } from "../requests/services.gen";
 import * as Common from "./common";
 /**
 * @param data The data for the request.
-* @param data.library
+* @param data.library The library slug
 * @param data.page
 * @param data.perPage
 * @param data.fields
 * @param data.relations
+* @param data.genres
 * @returns unknown Json paginated set of `AlbumResource`
 * @throws ApiError
 */
-export const prefetchUseAlbumServiceAlbumsIndex = (queryClient: QueryClient, { fields, library, page, perPage, relations }: {
+export const prefetchUseAlbumServiceAlbumsIndex = (queryClient: QueryClient, { fields, genres, library, page, perPage, relations }: {
   fields?: string;
+  genres?: string;
   library: string;
   page?: number;
   perPage?: number;
   relations?: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseAlbumServiceAlbumsIndexKeyFn({ fields, library, page, perPage, relations }), queryFn: () => AlbumService.albumsIndex({ fields, library, page, perPage, relations }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseAlbumServiceAlbumsIndexKeyFn({ fields, genres, library, page, perPage, relations }), queryFn: () => AlbumService.albumsIndex({ fields, genres, library, page, perPage, relations }) });
 /**
 * @param data The data for the request.
 * @param data.library The library slug
@@ -86,11 +88,20 @@ export const prefetchUseLibraryServiceLibrariesIndex = (queryClient: QueryClient
   perPage?: number;
 } = {}) => queryClient.prefetchQuery({ queryKey: Common.UseLibraryServiceLibrariesIndexKeyFn({ page, perPage }), queryFn: () => LibraryService.librariesIndex({ page, perPage }) });
 /**
-* Get a list of log files
+* @returns string
+* @throws ApiError
+*/
+export const prefetchUseModelSchemaServiceSchemasModel = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseModelSchemaServiceSchemasModelKeyFn(), queryFn: () => ModelSchemaService.schemasModel() });
+/**
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseLogsServiceLogsFiles = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseLogsServiceLogsFilesKeyFn(), queryFn: () => LogsService.logsFiles() });
+export const prefetchUseOpCacheServiceOpCacheGetStatus = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseOpCacheServiceOpCacheGetStatusKeyFn(), queryFn: () => OpCacheService.opCacheGetStatus() });
+/**
+* @returns unknown
+* @throws ApiError
+*/
+export const prefetchUseOpCacheServiceOpcacheGetConfig = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseOpCacheServiceOpcacheGetConfigKeyFn(), queryFn: () => OpCacheService.opcacheGetConfig() });
 /**
 * @param data The data for the request.
 * @param data.library The library slug
@@ -127,7 +138,7 @@ export const prefetchUseSongServiceSongsShow = (queryClient: QueryClient, { libr
 * Direct stream the song
 * Requires token with "access-stream"
 * @param data The data for the request.
-* @param data.library
+* @param data.library The library slug
 * @param data.song The song public id
 * @returns unknown
 * @throws ApiError
@@ -162,7 +173,7 @@ export const prefetchUseUserServiceUsersMe = (queryClient: QueryClient) => query
 * Get a widget for the user
 * @param data The data for the request.
 * @param data.name
-* @returns string
+* @returns null
 * @throws ApiError
 */
 export const prefetchUseWidgetServiceWidgetsGetWidget = (queryClient: QueryClient, { name }: {

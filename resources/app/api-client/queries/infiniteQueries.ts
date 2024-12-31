@@ -1,24 +1,26 @@
-// generated with @7nohe/openapi-react-query-codegen@1.5.1 
+// generated with @7nohe/openapi-react-query-codegen@1.6.0 
 
 import { InfiniteData, useInfiniteQuery, UseInfiniteQueryOptions } from "@tanstack/react-query";
 import { AlbumService, GenreService, LibraryService, SongService } from "../requests/services.gen";
 import * as Common from "./common";
 /**
 * @param data The data for the request.
-* @param data.library
+* @param data.library The library slug
 * @param data.page
 * @param data.perPage
 * @param data.fields
 * @param data.relations
+* @param data.genres
 * @returns unknown Json paginated set of `AlbumResource`
 * @throws ApiError
 */
-export const useAlbumServiceAlbumsIndexInfinite = <TData = InfiniteData<Common.AlbumServiceAlbumsIndexDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fields, library, perPage, relations }: {
+export const useAlbumServiceAlbumsIndexInfinite = <TData = InfiniteData<Common.AlbumServiceAlbumsIndexDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fields, genres, library, perPage, relations }: {
   fields?: string;
+  genres?: string;
   library: string;
   perPage?: number;
   relations?: string;
-}, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({ queryKey: Common.UseAlbumServiceAlbumsIndexKeyFn({ fields, library, perPage, relations }, queryKey), queryFn: ({ pageParam }) => AlbumService.albumsIndex({ fields, library, page: pageParam as number, perPage, relations }) as TData, initialPageParam: 1, getNextPageParam: response => (response as { nextPage: number }).nextPage, ...options });
+}, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({ queryKey: Common.UseAlbumServiceAlbumsIndexKeyFn({ fields, genres, library, perPage, relations }, queryKey), queryFn: ({ pageParam }) => AlbumService.albumsIndex({ fields, genres, library, page: pageParam as number, perPage, relations }) as TData, initialPageParam: 1, getNextPageParam: response => (response as { nextPage: number }).nextPage, ...options });
 /**
 * @param data The data for the request.
 * @param data.library

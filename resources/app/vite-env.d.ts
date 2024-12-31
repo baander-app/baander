@@ -2,6 +2,7 @@
 /// <reference types="vite/client" />
 import Pusher from 'pusher-js';
 
+
 global {
   interface Window {
     Pusher: typeof Pusher;
@@ -14,3 +15,4 @@ global {
     }
   }
 }
+

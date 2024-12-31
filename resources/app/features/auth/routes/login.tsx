@@ -1,6 +1,6 @@
 import { Token } from '@/services/auth/token.ts';
 import { useAppDispatch } from '@/store/hooks.ts';
-import { setIsAuthenticated } from '@/store/users/auth-slice.ts';
+import { setAccessToken, setIsAuthenticated, setRefreshToken } from '@/store/users/auth-slice.ts';
 import { AuthService, OpenAPI } from '@/api-client/requests';
 import {
   Box,
@@ -13,7 +13,7 @@ import {
   Title,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import styles from './login.module.scss'
+import styles from './login.module.scss';
 import { VinylSpinAnimation } from '@/components/animations/vinyl-spin-animation/vinyl-spin-animation.tsx';
 
 type LoginInput = {
@@ -34,7 +34,7 @@ export default function Login() {
       password: (val) => (val.length <= 6 ? 'Password should include at least 6 characters' : null),
     },
 
-  })
+  });
 
   const onSubmit = async (formData: LoginInput) => {
     const res = await AuthService.authLogin({
@@ -47,6 +47,8 @@ export default function Login() {
     Token.set(res);
     OpenAPI.TOKEN = res.accessToken.token;
     dispatch(setIsAuthenticated(true));
+    dispatch(setAccessToken(res.accessToken));
+    dispatch(setRefreshToken(res.refreshToken));
   };
 
   return (

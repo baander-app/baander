@@ -12,11 +12,12 @@ import styles from './songs.module.scss';
 import { nprogress } from '@mantine/nprogress';
 
 export default function Songs() {
-  const {library} = useParams();
+  const { library } = useParams();
   if (!library) return <>Error no library</>;
 
-  const {data: genreData, isFetching: isGenresFetching} = useGenreServiceGenresIndex({library});
+  const { data: genreData, isFetching: isGenresFetching } = useGenreServiceGenresIndex({ library });
   const [genres, setGenres] = useState<ScrollListItem[]>([]);
+  const [selectedGenres, setSelectedGenres] = useState<ScrollListItem | undefined>();
 
   useEffect(() => {
     if (genreData) {
@@ -29,7 +30,11 @@ export default function Songs() {
     }
   }, [genreData]);
 
-  const {data: albumData, isFetching: isAlbumsFetching} = useAlbumServiceAlbumsIndex({library, fields: 'title,slug'});
+  const { data: albumData, isFetching: isAlbumsFetching } = useAlbumServiceAlbumsIndex({
+    library,
+    fields: 'title,slug',
+    genres: selectedGenres?.key ?? undefined,
+  });
   const [albums, setAlbums] = useState<ScrollListItem[]>([]);
   useEffect(() => {
     if (albumData) {
@@ -42,7 +47,7 @@ export default function Songs() {
     }
   }, [albumData]);
 
-  const {data: artistData, isFetching: isArtistsFetching} = useArtistServiceArtistsIndex({library});
+  const { data: artistData, isFetching: isArtistsFetching } = useArtistServiceArtistsIndex({ library });
   const [artists, setArtists] = useState<ScrollListItem[]>([]);
 
   useEffect(() => {
@@ -72,21 +77,22 @@ export default function Songs() {
           header="Genres"
           listItems={genres}
           totalCount={genres.length}
-          style={{height: 150, flexGrow: 1}}
+          style={{ height: 150, flexGrow: 1 }}
+          onItemPress={item => setSelectedGenres(item)}
         />
 
         <ScrollList
           header="Artists"
           listItems={artists}
           totalCount={artists.length}
-          style={{height: 150}}
+          style={{ height: 150 }}
         />
 
         <ScrollList
           header="Albums"
           listItems={albums}
           totalCount={albums.length}
-          style={{height: 150}}
+          style={{ height: 150 }}
         />
       </Flex>
 

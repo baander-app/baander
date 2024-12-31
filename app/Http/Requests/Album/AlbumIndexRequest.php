@@ -23,13 +23,15 @@ class AlbumIndexRequest extends FormRequest
     {
         return [
             /** @query */
-            'page'    => 'int',
+            'page'      => 'int',
             /** @query */
-            'perPage' => 'int',
+            'perPage'   => 'int',
             /** @query */
-            'fields'  => 'string',
+            'fields'    => 'string',
             /** @query */
             'relations' => 'string',
+            /** @query */
+            'genres'    => 'string',
         ];
     }
 }

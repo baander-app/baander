@@ -5,12 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\TokenAbility;
 use App\Services\OpCacheService;
-use Appstract\Opcache\OpcacheFacade;
 use Illuminate\Http\Request;
-use Spatie\RouteAttributes\Attributes\Get;
-use Spatie\RouteAttributes\Attributes\Middleware;
-use Spatie\RouteAttributes\Attributes\Post;
-use Spatie\RouteAttributes\Attributes\Prefix;
+use Spatie\RouteAttributes\Attributes\{Get, Middleware, Post, Prefix};
 
 #[Prefix('opcache')]
 #[Middleware([

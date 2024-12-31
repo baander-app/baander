@@ -1,17 +1,18 @@
-// generated with @7nohe/openapi-react-query-codegen@1.5.1 
+// generated with @7nohe/openapi-react-query-codegen@1.6.0 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, GenreService, ImageService, JobService, LibraryService, LogsService, SongService, UserService, WidgetSchemaService, WidgetService } from "../requests/services.gen";
+import { AlbumService, ArtistService, AuthService, GenreService, ImageService, JobService, LibraryService, ModelSchemaService, OpCacheService, SongService, UserService, WidgetSchemaService, WidgetService } from "../requests/services.gen";
 export type AlbumServiceAlbumsIndexDefaultResponse = Awaited<ReturnType<typeof AlbumService.albumsIndex>>;
 export type AlbumServiceAlbumsIndexQueryResult<TData = AlbumServiceAlbumsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAlbumServiceAlbumsIndexKey = "AlbumServiceAlbumsIndex";
-export const UseAlbumServiceAlbumsIndexKeyFn = ({ fields, library, page, perPage, relations }: {
+export const UseAlbumServiceAlbumsIndexKeyFn = ({ fields, genres, library, page, perPage, relations }: {
   fields?: string;
+  genres?: string;
   library: string;
   page?: number;
   perPage?: number;
   relations?: string;
-}, queryKey?: Array<unknown>) => [useAlbumServiceAlbumsIndexKey, ...(queryKey ?? [{ fields, library, page, perPage, relations }])];
+}, queryKey?: Array<unknown>) => [useAlbumServiceAlbumsIndexKey, ...(queryKey ?? [{ fields, genres, library, page, perPage, relations }])];
 export type AlbumServiceAlbumsShowDefaultResponse = Awaited<ReturnType<typeof AlbumService.albumsShow>>;
 export type AlbumServiceAlbumsShowQueryResult<TData = AlbumServiceAlbumsShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAlbumServiceAlbumsShowKey = "AlbumServiceAlbumsShow";
@@ -53,10 +54,18 @@ export const UseLibraryServiceLibrariesIndexKeyFn = ({ page, perPage }: {
   page?: number;
   perPage?: number;
 } = {}, queryKey?: Array<unknown>) => [useLibraryServiceLibrariesIndexKey, ...(queryKey ?? [{ page, perPage }])];
-export type LogsServiceLogsFilesDefaultResponse = Awaited<ReturnType<typeof LogsService.logsFiles>>;
-export type LogsServiceLogsFilesQueryResult<TData = LogsServiceLogsFilesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useLogsServiceLogsFilesKey = "LogsServiceLogsFiles";
-export const UseLogsServiceLogsFilesKeyFn = (queryKey?: Array<unknown>) => [useLogsServiceLogsFilesKey, ...(queryKey ?? [])];
+export type ModelSchemaServiceSchemasModelDefaultResponse = Awaited<ReturnType<typeof ModelSchemaService.schemasModel>>;
+export type ModelSchemaServiceSchemasModelQueryResult<TData = ModelSchemaServiceSchemasModelDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useModelSchemaServiceSchemasModelKey = "ModelSchemaServiceSchemasModel";
+export const UseModelSchemaServiceSchemasModelKeyFn = (queryKey?: Array<unknown>) => [useModelSchemaServiceSchemasModelKey, ...(queryKey ?? [])];
+export type OpCacheServiceOpCacheGetStatusDefaultResponse = Awaited<ReturnType<typeof OpCacheService.opCacheGetStatus>>;
+export type OpCacheServiceOpCacheGetStatusQueryResult<TData = OpCacheServiceOpCacheGetStatusDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useOpCacheServiceOpCacheGetStatusKey = "OpCacheServiceOpCacheGetStatus";
+export const UseOpCacheServiceOpCacheGetStatusKeyFn = (queryKey?: Array<unknown>) => [useOpCacheServiceOpCacheGetStatusKey, ...(queryKey ?? [])];
+export type OpCacheServiceOpcacheGetConfigDefaultResponse = Awaited<ReturnType<typeof OpCacheService.opcacheGetConfig>>;
+export type OpCacheServiceOpcacheGetConfigQueryResult<TData = OpCacheServiceOpcacheGetConfigDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useOpCacheServiceOpcacheGetConfigKey = "OpCacheServiceOpcacheGetConfig";
+export const UseOpCacheServiceOpcacheGetConfigKeyFn = (queryKey?: Array<unknown>) => [useOpCacheServiceOpcacheGetConfigKey, ...(queryKey ?? [])];
 export type SongServiceSongsIndexDefaultResponse = Awaited<ReturnType<typeof SongService.songsIndex>>;
 export type SongServiceSongsIndexQueryResult<TData = SongServiceSongsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSongServiceSongsIndexKey = "SongServiceSongsIndex";
@@ -123,6 +132,8 @@ export type AuthServiceAuthResetPasswordMutationResult = Awaited<ReturnType<type
 export type AuthServiceAuthVerifyMutationResult = Awaited<ReturnType<typeof AuthService.authVerify>>;
 export type JobServiceJobLibraryScanMutationResult = Awaited<ReturnType<typeof JobService.jobLibraryScan>>;
 export type LibraryServiceLibraryCreateMutationResult = Awaited<ReturnType<typeof LibraryService.libraryCreate>>;
+export type OpCacheServiceOpcacheClearMutationResult = Awaited<ReturnType<typeof OpCacheService.opcacheClear>>;
+export type OpCacheServiceOpcacheCompileMutationResult = Awaited<ReturnType<typeof OpCacheService.opcacheCompile>>;
 export type UserServiceUsersStoreMutationResult = Awaited<ReturnType<typeof UserService.usersStore>>;
 export type LibraryServiceLibraryUpdateMutationResult = Awaited<ReturnType<typeof LibraryService.libraryUpdate>>;
 export type UserServiceUsersUpdateMutationResult = Awaited<ReturnType<typeof UserService.usersUpdate>>;

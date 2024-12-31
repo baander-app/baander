@@ -51,10 +51,7 @@ export const $ArtistResource = {
         },
         createdAt: {
             type: ['string', 'null'],
-            format: 'date-time',
-            description: `$this->mergeWhen($this->whenLoaded('portrait') && $this->portrait, [
-'portrait' => route('api.image.serve', ['image' => $this->portrait]),
-]),`
+            format: 'date-time'
         },
         updatedAt: {
             type: ['string', 'null'],
@@ -195,6 +192,9 @@ export const $LoginRequest = {
         },
         password: {
             type: 'string'
+        },
+        remember: {
+            type: 'boolean'
         }
     },
     required: ['email', 'password'],

@@ -150,6 +150,13 @@ return [
         // 'store' => 'redis',
     ],
 
+    'csp' => [
+      'disable_paths' => [
+          'docs',
+          'system/log-viewer',
+      ]
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Autoloaded Service Providers
@@ -168,7 +175,6 @@ return [
         App\Packages\DeviceDetector\DeviceDetectorServiceProvider::class,
         App\Packages\Nanoid\NanoIdServiceProvider::class,
         App\Providers\FortifyServiceProvider::class,
-
 
         /*
          * Application Service Providers...
@@ -195,6 +201,7 @@ return [
     */
 
     'aliases' => Facade::defaultAliases()->merge([
+
     ])->toArray(),
 
 ];

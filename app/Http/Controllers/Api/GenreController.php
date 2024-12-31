@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Extensions\JsonPaginator;
 use App\Http\Requests\Genres\GenreIndexRequest;
 use App\Http\Resources\Genre\GenreResource;
-use App\Support\JsonPaginator;
 use App\Models\{Genre, TokenAbility};
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
 

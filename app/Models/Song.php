@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Filters\FilterBuilder;
+use App\Models\Player\PlayerState;
 use App\Packages\Http\Concerns\DirectStreamableFile;
 use App\Packages\Nanoid\Concerns\HasNanoPublicId;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -70,6 +71,11 @@ class Song extends BaseModel implements DirectStreamableFile
     public function userMediaActivies()
     {
         return $this->morphToMany(UserMediaActivity::class, 'userMediaActivityable');
+    }
+
+    public function playerStates()
+    {
+        return $this->morphToMany(PlayerState::class, 'playable');
     }
 
     /**
