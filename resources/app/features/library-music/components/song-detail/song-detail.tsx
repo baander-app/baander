@@ -1,13 +1,13 @@
 import { useSongServiceSongsShow } from '@/api-client/queries';
-import { Box, NumberInput, SimpleGrid, Text, Textarea, TextInput, Loader, Alert } from '@mantine/core';
+import { Box, NumberInput, SimpleGrid, Text, Textarea, TextInput, Loader, Alert, SimpleGridProps } from '@mantine/core';
 import { DateTime } from '@/components/dates/date-time.tsx';
 import { useEffect, useState } from 'react';
 
-export interface SongDetailProps {
+export interface SongDetailProps extends SimpleGridProps {
   publicId: string;
 }
 
-export function SongDetail({ publicId }: SongDetailProps) {
+export function SongDetail({ publicId, ...rest }: SongDetailProps) {
   const { data, error, isLoading } = useSongServiceSongsShow({ library: 'music', publicId });
 
   const [title, setTitle] = useState('');
@@ -36,7 +36,7 @@ export function SongDetail({ publicId }: SongDetailProps) {
   const { public_id, path, durationHuman, sizeHuman, createdAt, updatedAt } = data;
 
   return (
-    <SimpleGrid cols={2}>
+    <SimpleGrid cols={2} {...rest}>
       <Box>
         <TextInput
           label="Title"

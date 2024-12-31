@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { lazyImport } from '@/utils/lazy-import.ts';
 import { AppShell, Flex, Title } from '@mantine/core';
-import { Env } from '@/services/env.ts';
+import { Env } from '@/common/env.ts';
 
 const { BaanderLogo } = lazyImport(() => import('@/components/branding/baander-logo/baander-logo.tsx'), 'BaanderLogo');
 

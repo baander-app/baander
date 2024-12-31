@@ -13,6 +13,7 @@ import { DatesProvider } from '@mantine/dates';
 import { ContextMenuProvider } from 'mantine-contextmenu';
 import { HelmetProvider } from 'react-helmet-async';
 import { theme } from '@/theme.ts';
+import { DebugComponent } from '@/debug-component.tsx';
 
 function App() {
   return (

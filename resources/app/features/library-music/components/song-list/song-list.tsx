@@ -10,7 +10,7 @@ import { LibraryParams } from '@/features/library-music/routes/_routes';
 import { useSongServiceSongsIndexInfinite } from '@/api-client/queries/infiniteQueries';
 import { Iconify } from '@/components/icons/iconify';
 import { useAppDispatch } from '@/store/hooks';
-import { setQueue, setCurrentSongIndex } from '@/store/music/music-player-slice';
+import { setQueueAndSong } from '@/store/music/music-player-slice';
 import styles from './song-list.module.scss';
 import { TableProps } from '@mantine/core/lib/components/Table/Table';
 
@@ -61,8 +61,10 @@ export function SongList() {
     setActiveIndex(index);
     if (songData) {
       const newQueue = songData.pages.flatMap((page) => page.data).slice(index);
-      dispatch(setQueue(newQueue));
-      dispatch(setCurrentSongIndex(0));
+      dispatch(setQueueAndSong({
+        queue: newQueue,
+        playPublicId: newQueue[0].public_id,
+      }));
     }
   }, [dispatch, songData]);
 
@@ -85,7 +87,7 @@ export function SongList() {
         onClick={() => onSongClick(index)}
         onContextMenu={showContextMenu(getContextMenuTemplate(data))}
       >
-        {data.lyricsExist ? <Iconify icon="arcticons:quicklyric" /> : ''}
+        {data.lyricsExist ? <Iconify icon="arcticons:quicklyric"/> : ''}
         <Text size="sm">{data.lyricsExist}</Text>
       </Table.Td>
 
