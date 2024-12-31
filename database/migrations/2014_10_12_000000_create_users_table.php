@@ -15,7 +15,6 @@ return new class extends Migration
             $table->id();
             $table->caseInsensitiveText('name');
             $table->text('email')->unique();
-            $table->boolean('is_admin')->default(false);
             $table->timestampTz('email_verified_at')->nullable();
             $table->text('password');
             $table->text('remember_token')->nullable();

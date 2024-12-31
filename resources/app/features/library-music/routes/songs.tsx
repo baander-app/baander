@@ -9,19 +9,20 @@ import { useEffect, useState } from 'react';
 import { SongList } from '@/features/library-music/components/song-list/song-list.tsx';
 import { useParams } from 'react-router-dom';
 import styles from './songs.module.scss';
-import { nprogress } from '@mantine/nprogress';
+import { GenreResource } from '@/api-client/requests';
 
 export default function Songs() {
   const { library } = useParams();
   if (!library) return <>Error no library</>;
 
-  const { data: genreData, isFetching: isGenresFetching } = useGenreServiceGenresIndex({ library });
+  // @ts-ignore
+  const { data: genreData, isFetching: isGenresFetching } = useGenreServiceGenresIndex<any>({ library });
   const [genres, setGenres] = useState<ScrollListItem[]>([]);
   const [selectedGenres, setSelectedGenres] = useState<ScrollListItem | undefined>();
 
   useEffect(() => {
     if (genreData) {
-      const data = genreData.data.map(x => ({
+      const data = genreData.data.map((x: GenreResource) => ({
         label: x.name,
         key: x.slug,
       }));
@@ -30,7 +31,7 @@ export default function Songs() {
     }
   }, [genreData]);
 
-  const { data: albumData, isFetching: isAlbumsFetching } = useAlbumServiceAlbumsIndex({
+  const { data: albumData } = useAlbumServiceAlbumsIndex({
     library,
     fields: 'title,slug',
     genres: selectedGenres?.key ?? undefined,
@@ -47,7 +48,7 @@ export default function Songs() {
     }
   }, [albumData]);
 
-  const { data: artistData, isFetching: isArtistsFetching } = useArtistServiceArtistsIndex({ library });
+  const { data: artistData } = useArtistServiceArtistsIndex({ library });
   const [artists, setArtists] = useState<ScrollListItem[]>([]);
 
   useEffect(() => {
@@ -59,16 +60,6 @@ export default function Songs() {
       setArtists(items);
     }
   }, [artistData]);
-
-  useEffect(() => {
-    const isDone = isAlbumsFetching && isArtistsFetching && isGenresFetching;
-
-    if (!isDone) {
-      nprogress.increment();
-    } else {
-      nprogress.complete();
-    }
-  }, [isAlbumsFetching, isArtistsFetching, isGenresFetching]);
 
   return (
     <Box>

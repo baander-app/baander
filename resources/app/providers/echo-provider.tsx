@@ -22,7 +22,7 @@ EchoContext.displayName = 'EchoContext';
 export function EchoContextProvider({ children }: { children: React.ReactNode }) {
   const [echo, setEcho] = useState<Echo>();
   const [connectionState, setConnectionState] = useState<PusherConnectionState>('initialized');
-  const [playerStateChannel, setPlayerStateChannel] = useState<Channel | undefined>(undefined);
+  const [playerStateChannel, setPlayerStateChannel] = useState<PusherPrivateChannel | undefined>(undefined);
 
   useEffect(() => {
     window.Pusher = Pusher;
@@ -62,7 +62,7 @@ export function EchoContextProvider({ children }: { children: React.ReactNode })
       const token = Token.get()?.accessToken.token;
 
       const psc = echo.private(`playerState.${token}`);
-      setPlayerStateChannel(psc);
+      setPlayerStateChannel(psc as unknown as PusherPrivateChannel);
 
       echo.connector.pusher.connection.bind('connected', () => {
         const state = echo.connector.pusher.connection.state;

@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('genres', function (Blueprint $table) {
             $table->id();
 
-            $table->caseInsensitiveText('name');
+            $table->caseInsensitiveText('name')->index();
             $table->text('slug')->unique();
 
             $table->timestampsTz();

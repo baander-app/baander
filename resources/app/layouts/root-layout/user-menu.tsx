@@ -9,10 +9,11 @@ const menu: LinksGroupProps[] = [
     label: 'Authentication',
     iconName: 'ion:key',
     links: [
-      {label: 'Two factor', to: 'account/two-factor'},
-      {label: 'Passkey', to: ''},
-      {label: 'Password', to: ''},
-      {label: 'Sessions', to: 'account/sessions'},
+      { label: 'Dev', to: 'account/dev-panel' },
+      { label: 'Two factor', to: 'account/two-factor' },
+      { label: 'Passkey', to: '' },
+      { label: 'Password', to: '' },
+      { label: 'Sessions', to: 'account/sessions' },
     ],
   },
 ];

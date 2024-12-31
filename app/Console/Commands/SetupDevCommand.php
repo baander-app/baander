@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\UsersSeed;
 use File;
 use Illuminate\Console\Command;
@@ -50,6 +51,10 @@ class SetupDevCommand extends Command
     private function database()
     {
         $this->call('migrate');
+
+        $this->call('db:seed', [
+            '--class' => DatabaseSeeder::class,
+        ]);
 
         $this->call('db:seed', [
             '--class' => UsersSeed::class,

@@ -86,23 +86,21 @@ export const useLibraryServiceLibrariesIndexInfinite = <TData = InfiniteData<Com
 * Get a collection of songs
 * @param data The data for the request.
 * @param data.library The library slug
-* @param data.albumArtist
-* @param data.genreIds
-* @param data.title
-* @param data.albumId
-* @param data.page
-* @param data.perPage
-* @returns unknown Json paginated set of `SongWithAlbumResource`
+* @param data.page Current page
+* @param data.perPage Items per page
+* @param data.genreNames Comma seperated list of genre names You can only search for names or slugs. Not both.
+* @param data.genreSlugs Comma seperated list of genre slugs
+* @param data.relations
+* @returns unknown Json paginated set of `SongResource`
 * @throws ApiError
 */
-export const useSongServiceSongsIndexInfinite = <TData = InfiniteData<Common.SongServiceSongsIndexDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ albumArtist, albumId, genreIds, library, perPage, title }: {
-  albumArtist?: string;
-  albumId?: number;
-  genreIds?: string;
+export const useSongServiceSongsIndexInfinite = <TData = InfiniteData<Common.SongServiceSongsIndexDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ genreNames, genreSlugs, library, perPage, relations }: {
+  genreNames?: string;
+  genreSlugs?: string;
   library: string;
   perPage?: number;
-  title?: string;
-}, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({ queryKey: Common.UseSongServiceSongsIndexKeyFn({ albumArtist, albumId, genreIds, library, perPage, title }, queryKey), queryFn: ({ pageParam }) => SongService.songsIndex({ albumArtist, albumId, genreIds, library, page: pageParam as number, perPage, title }) as TData, initialPageParam: 1, getNextPageParam: response => (response as { nextPage: number }).nextPage, ...options });
+  relations?: string;
+}, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({ queryKey: Common.UseSongServiceSongsIndexKeyFn({ genreNames, genreSlugs, library, perPage, relations }, queryKey), queryFn: ({ pageParam }) => SongService.songsIndex({ genreNames, genreSlugs, library, page: pageParam as number, perPage, relations }) as TData, initialPageParam: 1, getNextPageParam: response => (response as { nextPage: number }).nextPage, ...options });
 /**
 * Get a collection of tokens
 * @param data The data for the request.

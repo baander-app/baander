@@ -1,5 +1,5 @@
 import { Alert, Button } from '@mantine/core';
-import { isPromise } from '@/support/is-promise.ts';
+import { isPromise } from '@/utils/is-promise.ts';
 import { useCallback } from 'react';
 
 export interface AlertLoadingErrorProps {

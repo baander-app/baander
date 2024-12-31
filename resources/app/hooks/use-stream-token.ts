@@ -2,11 +2,8 @@ import { useEffect, useState } from 'react';
 import { NewAccessTokenResource } from '@/api-client/requests';
 import { isTokenExpired, Token } from '@/services/auth/token';
 import { refreshStreamToken } from '@/services/auth/stream-token.ts';
-import { useAppSelector } from '@/store/hooks.ts';
-import { selectIsAuthenticated } from '@/store/users/auth-slice.ts';
 
 export function useStreamToken() {
-  const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const [token, setToken] = useState<NewAccessTokenResource | undefined>(Token.getStreamToken());
 
   useEffect(() => {

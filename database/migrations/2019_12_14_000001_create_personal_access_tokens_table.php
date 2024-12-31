@@ -22,9 +22,6 @@ return new class extends Migration
             $table->text('user_agent')->nullable();
             $table->text('device_operating_system')->nullable();
             $table->text('device_name')->nullable();
-            $table->text('device_brand_name')->nullable();
-            $table->text('device_model')->nullable();
-            $table->text('device_type')->nullable();
             $table->text('client_name')->nullable();
             $table->text('client_version')->nullable();
             $table->text('client_type')->nullable();

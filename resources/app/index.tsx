@@ -10,6 +10,7 @@ import { Ziggy } from './ziggy.js';
 // @ts-ignore
 globalThis.Ziggy = Ziggy;
 import './bootstrap.ts';
+import './i18n.ts';
 import { DateFormatterProvider } from '@/providers/dayjs-provider.tsx';
 
 const queryClient = new QueryClient();

@@ -4,10 +4,9 @@ import '@fontsource/open-sans';
 
 import { AppRoutes } from '@/routes';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { MusicSourceProvider } from '@/providers';
-import { ColorSchemeScript, MantineProvider } from '@mantine/core';
+import { MusicSourceProvider } from '@/providers/music-source-provider';
+import { MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
-import { NavigationProgress } from '@mantine/nprogress';
 import { ModalsProvider } from '@mantine/modals';
 import { DatesProvider } from '@mantine/dates';
 import { ContextMenuProvider } from 'mantine-contextmenu';
@@ -20,7 +19,6 @@ function App() {
         <ContextMenuProvider>
           <DatesProvider settings={{ locale: 'en' }}>
             <Notifications/>
-            <NavigationProgress/>
 
             <ModalsProvider>
               <MusicSourceProvider>
@@ -28,7 +26,7 @@ function App() {
                   <AppRoutes/>
                 </BrowserRouter>
 
-                {/*<ReactQueryDevtools/>*/}
+                <ReactQueryDevtools/>
               </MusicSourceProvider>
             </ModalsProvider>
           </DatesProvider>

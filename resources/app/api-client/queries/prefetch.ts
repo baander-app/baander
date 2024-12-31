@@ -151,30 +151,28 @@ export const prefetchUseOpCacheServiceOpcacheGetConfig = (queryClient: QueryClie
 * Get a collection of songs
 * @param data The data for the request.
 * @param data.library The library slug
-* @param data.albumArtist
-* @param data.genreIds
-* @param data.title
-* @param data.albumId
-* @param data.page
-* @param data.perPage
-* @returns unknown Json paginated set of `SongWithAlbumResource`
+* @param data.page Current page
+* @param data.perPage Items per page
+* @param data.genreNames Comma seperated list of genre names You can only search for names or slugs. Not both.
+* @param data.genreSlugs Comma seperated list of genre slugs
+* @param data.relations
+* @returns unknown Json paginated set of `SongResource`
 * @throws ApiError
 */
-export const prefetchUseSongServiceSongsIndex = (queryClient: QueryClient, { albumArtist, albumId, genreIds, library, page, perPage, title }: {
-  albumArtist?: string;
-  albumId?: number;
-  genreIds?: string;
+export const prefetchUseSongServiceSongsIndex = (queryClient: QueryClient, { genreNames, genreSlugs, library, page, perPage, relations }: {
+  genreNames?: string;
+  genreSlugs?: string;
   library: string;
   page?: number;
   perPage?: number;
-  title?: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseSongServiceSongsIndexKeyFn({ albumArtist, albumId, genreIds, library, page, perPage, title }), queryFn: () => SongService.songsIndex({ albumArtist, albumId, genreIds, library, page, perPage, title }) });
+  relations?: string;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseSongServiceSongsIndexKeyFn({ genreNames, genreSlugs, library, page, perPage, relations }), queryFn: () => SongService.songsIndex({ genreNames, genreSlugs, library, page, perPage, relations }) });
 /**
 * Get a song
 * @param data The data for the request.
 * @param data.library The library slug
 * @param data.song The song public id
-* @returns SongWithAlbumResource `SongWithAlbumResource`
+* @returns SongResource `SongResource`
 * @throws ApiError
 */
 export const prefetchUseSongServiceSongsShow = (queryClient: QueryClient, { library, song }: {

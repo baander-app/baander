@@ -13,9 +13,18 @@ return new class extends Migration {
         Schema::create('player_queues', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('user_id')->index();
+            $table->foreignId('user_id')
+                ->references('id')
+                ->on('users')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
+            $table->index('user_id', 'player_queues_user_id_index');
 
-            $table->foreignId('song_id')->constrained('songs');
+            $table->foreignId('song_id')
+                ->references('id')
+                ->on('songs')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
 
             $table->integer('order');
 
@@ -28,6 +37,9 @@ return new class extends Migration {
      */
     public function down(): void
     {
+        Schema::table('player_queues', function (Blueprint $table) {
+            $table->dropIndex('player_queues_user_id_index');
+        });
         Schema::dropIfExists('player_queues');
     }
 };

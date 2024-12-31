@@ -2,8 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Requests\Genre\UpdateGenreRequest;
-use App\Http\Requests\Genres\GenreIndexRequest;
+use App\Http\Requests\Genre\{GenreIndexRequest, UpdateGenreRequest};
 use App\Http\Resources\Genre\GenreResource;
 use App\Models\{Genre, TokenAbility};
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Patch, Prefix};
@@ -27,7 +26,7 @@ class GenreController
         $genres = Genre::query()
             ->selectFields(Genre::$filterFields, $fields)
             ->withRelations(Genre::$filterFields, $fields)
-            ->paginate($request->query('perPage'));
+            ->paginate();
 
         return GenreResource::collection($genres);
     }

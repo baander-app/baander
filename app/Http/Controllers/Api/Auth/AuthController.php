@@ -56,7 +56,7 @@ class AuthController
 
         $accessToken = $request->user()->createToken(
             name: 'access_token',
-            abilities: [TokenAbility::ACCESS_API->value],
+            abilities: [TokenAbility::ACCESS_API->value, TokenAbility::ACCESS_BROADCASTING->value],
             expiresAt: Carbon::now()->addMinutes(config('sanctum.access_token_expiration')),
             device: $device,
         );

@@ -12,8 +12,18 @@ return new class extends Migration {
     {
         Schema::create('albums', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('library_id')->index()->constrained()->cascadeOnDelete();
-            $table->foreignId('artist_id')->index()->constrained()->cascadeOnDelete();
+
+            $table->foreignId('library_id')
+                ->references('id')
+                ->on('libraries')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
+
+            $table->foreignId('artist_id')
+                ->references('id')
+                ->on('artists')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
 
             $table->caseInsensitiveText('title');
             $table->text('slug')->unique();
@@ -22,6 +32,9 @@ return new class extends Migration {
             $table->integer('year')->nullable()->comment('The year the album was released');
 
             $table->timestampsTz();
+
+            $table->index('library_id');
+            $table->index('artist_id');
         });
     }
 

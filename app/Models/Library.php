@@ -36,19 +36,6 @@ class Library extends BaseModel implements JsonSchemaRepresentable
         return 'slug';
     }
 
-    public function getDisk()
-    {
-        return Storage::build([
-            'driver' => 'local',
-            'root'   => $this->path,
-        ]);
-    }
-
-    public function albums()
-    {
-        return $this->hasMany(Album::class);
-    }
-
     public function getJsonSchemaFieldOptions(): array
     {
         return [
@@ -76,5 +63,24 @@ class Library extends BaseModel implements JsonSchemaRepresentable
                 'readOnly' => true,
             ],
         ];
+    }
+
+    public function getDisk()
+    {
+        return Storage::build([
+            'driver' => 'local',
+            'root'   => $this->path,
+        ]);
+    }
+
+    public function albums()
+    {
+        return $this->hasMany(Album::class);
+    }
+
+    public function users()
+    {
+        return $this->belongsToMany(User::class)
+            ->using(UserLibrary::class);
     }
 }

@@ -2,10 +2,10 @@ import styles from './album-detail.module.scss';
 import { Cover } from '@/features/library-music/components/artwork/cover';
 import { useAlbumServiceAlbumsShow } from '@/api-client/queries';
 import { SongResource } from '@/api-client/requests';
-import { useMusicSource } from '@/providers';
+import { useMusicSource } from '@/providers/music-source-provider';
 import { Table, Title, Text, Card, Group, Flex, Box, ScrollArea, Skeleton } from '@mantine/core';
 import { AlertLoadingError } from '@/components/alerts/alert-loading-error.tsx';
-import { formatDuration } from '@/support/time';
+import { formatDuration } from '@/utils/time/format-duration.ts';
 
 interface AlbumDetailProps {
   albumSlug: string;

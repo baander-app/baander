@@ -88,8 +88,6 @@ export default function Login() {
       <Flex justify="center" w="100%">
         <Box p={30}>
           <VinylSpinAnimation
-            loop
-            play
             className={styles.animation}
           />
 

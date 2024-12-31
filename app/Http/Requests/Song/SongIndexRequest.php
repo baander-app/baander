@@ -22,18 +22,36 @@ class SongIndexRequest extends FormRequest
     public function rules(): array
     {
         return [
-            /** @query */
-            'albumArtist' => 'string',
-            /** @query */
-            'genreIds'    => 'string',
-            /** @query */
-            'title'       => 'string',
-            /** @query */
-            'albumId'     => 'integer',
-            /** @query */
-            'page'        => 'int',
-            /** @query */
-            'perPage'     => 'int',
+            /**
+             * @query
+             * Comma seperated string of relations
+             * - album
+             * - artists
+             * - albumArtist
+             * - genres
+             */
+            /**
+             * @query
+             * Current page
+             */
+            'page'      => 'int',
+            /**
+             * @query
+             * Items per page
+             */
+            'perPage'   => 'int',
+            /**
+             * @query
+             * Comma seperated list of genre names
+             *
+             * You can only search for names or slugs. Not both.
+             */
+            'genreNames' => 'string',
+            /**
+             * @query
+             * Comma seperated list of genre slugs
+             */
+            'genreSlugs' => 'string',
         ];
     }
 }

@@ -1,4 +1,4 @@
-import { lazyImport } from '@/hooks/lazy-import';
+import { lazyImport } from '@/utils/lazy-import.ts';
 import { BareLayout } from '@/layouts/bare-layout';
 import { Outlet } from 'react-router-dom';
 import { AuthorizeRoutes } from '@/features/authorize/routes.tsx';

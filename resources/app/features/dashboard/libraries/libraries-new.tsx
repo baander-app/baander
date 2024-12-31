@@ -1,4 +1,4 @@
-import { Box, Button, Container, Table, Title } from '@mantine/core';
+import { Container, Title } from '@mantine/core';
 import { CreateLibrary } from '@/features/dashboard/libraries/components/create-library.tsx';
 
 export function LibrariesNew() {
@@ -8,8 +8,8 @@ export function LibrariesNew() {
 
       <Container>
 
-        <CreateLibrary />
+        <CreateLibrary/>
       </Container>
     </>
-  )
+  );
 }

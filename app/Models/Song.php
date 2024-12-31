@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Extensions\BaseBuilder;
 use App\Filters\FilterBuilder;
+use App\Models\Concerns\HasLibraryAccess;
 use App\Models\Player\PlayerState;
 use App\Packages\Http\Concerns\DirectStreamableFile;
 use App\Packages\Nanoid\Concerns\HasNanoPublicId;
@@ -13,22 +15,16 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  */
 class Song extends BaseModel implements DirectStreamableFile
 {
-    use HasFactory, HasNanoPublicId;
+    use HasFactory, HasLibraryAccess, HasNanoPublicId;
 
-    protected $fillable = [
-        'title',
-        'year',
-        'comment',
-        'disc',
-        'length',
-        'lyrics',
-        'modified_time',
-        'path',
-        'track',
-        'hash',
-        'size',
-        'mime_type',
+    public static array $filterRelations = [
+        'album',
+        'artists',
+        'albumArtist',
+        'genres',
     ];
+
+    protected $perPage = 30;
 
     protected $with = ['album'];
 
@@ -83,16 +79,17 @@ class Song extends BaseModel implements DirectStreamableFile
         return $this->morphToMany(PlayerState::class, 'playable');
     }
 
-    /**
-     * @param $query
-     * @param array $filters
-     * @return \Tpetry\PostgresqlEnhanced\Query\Builder
-     */
-    public function scopeFilterBy($query, array $filters)
+    protected function scopeWhereGenreNames(BaseBuilder $q, array $names)
     {
-        $namespace = 'App\Filters\SongFilters';
-        $filter = new FilterBuilder($query, $filters, $namespace);
+        return $q->whereHas('genres', function ($q) use ($names) {
+            $q->whereIn('name', $names);
+        });
+    }
 
-        return $filter->apply();
+    protected function scopeWhereGenreSlugs(BaseBuilder $q, array $slugs)
+    {
+        return $q->whereHas('genres', function ($q) use ($slugs) {
+            $q->whereIn('name', $slugs);
+        });
     }
 }
