@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Baander;
 use MusicBrainz\Filter\PageFilter;
 use MusicBrainz\Filter\Search\ReleaseFilter;
 use MusicBrainz\MusicBrainz;
@@ -12,12 +13,7 @@ class UIController
     public function getUI()
     {
         return view('app', [
-            'appInfo' => [
-                'name'        => config('app.name'),
-                'environment' => config('app.env'),
-                'debug'       => config('app.debug'),
-                'locale'      => config('app.locale'),
-            ],
+            'appInfo' => Baander::getAppInfo(),
         ]);
     }
 

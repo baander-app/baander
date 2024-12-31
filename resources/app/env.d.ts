@@ -9,3 +9,14 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+declare interface Window {
+  BaanderAppInfo: {
+    name: string;
+    url: string;
+    environment: 'local' | 'production' | 'testing';
+    debug: boolean;
+    locale: string;
+    version: string;
+  };
+}

@@ -1,14 +1,20 @@
+const fallback = 'UNKNOWN';
+
 export class Env {
   static appName() {
-    return import.meta.env.VITE_APP_NAME;
+    return window.BaanderAppInfo?.name ?? import.meta.env.VITE_APP_NAME;
   }
 
   static env() {
-    return import.meta.env.VITE_APP_ENV;
+    return window.BaanderAppInfo?.environment ?? import.meta.env.VITE_APP_ENV ?? fallback;
   }
 
   static url() {
-    return import.meta.env.VITE_APP_URL;
+    return window.BaanderAppInfo?.url ?? import.meta.env.VITE_APP_URL ?? fallback;
+  }
+
+  static version() {
+    return window.BaanderAppInfo?.version ?? fallback;
   }
 
   static isProduction() {

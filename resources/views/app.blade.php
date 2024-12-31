@@ -22,7 +22,7 @@
       Ziggy.url = '{{ config('app.url') }}'
     </script>
     <script nonce="{{ Vite::cspNonce() }}">
-      BaanderAppInfo = @js($appInfo)
+      window.BaanderAppInfo = @js($appInfo)
     </script>
     <style>
         .clockwork-toolbar {
