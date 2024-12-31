@@ -29,6 +29,13 @@ const menu: LinksGroupProps[] = [
       {label: 'Queue monitor', to: 'queue-monitor'},
     ],
   },
+  {
+    label: 'Documentation',
+    iconName: 'heroicons:book-open-20-solid',
+    links: [
+      {label: 'Api', to: 'docs/api'},
+    ],
+  },
 ];
 
 export function DashboardMenu() {
