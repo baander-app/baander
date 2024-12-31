@@ -38,7 +38,7 @@ const menu: LinksGroupProps[] = [
     label: 'Documentation',
     iconName: 'heroicons:book-open-20-solid',
     links: [
-      {label: 'Api', to: 'docs/api'},
+      {label: 'Api', href: route('scramble.docs.ui')},
     ],
   },
 ];

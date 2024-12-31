@@ -12,7 +12,7 @@ use Illuminate\Http\Request;
 /**
  * @mixin Album
  */
-class AlbumResourceResource extends AlbumWithoutSongsResource
+class AlbumResource extends AlbumWithoutSongsResource
 {
     use HasJsonCollection;
 
@@ -42,6 +42,19 @@ class AlbumResourceResource extends AlbumWithoutSongsResource
              * Songs relation
              */
             'songs'       => SongResource::collection($this->whenLoaded('songs')),
+            /**
+             * @var array{
+             *   slug: string,
+             *   name: string
+             * }[]
+             */
+            'genres'      => $this->whenLoaded('songs', function () {
+                return $this->songs->flatMap(fn($song) => $song->genres)->unique('id')->values()->map(fn($genre)
+                    => [
+                    'slug' => $genre->slug,
+                    'name' => $genre->name,
+                ]);
+            }),
         ];
     }
 }

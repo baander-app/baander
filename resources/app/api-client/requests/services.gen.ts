@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { AlbumsIndexData, AlbumsIndexResponse, AlbumsShowData, AlbumsShowResponse, ArtistsIndexData, ArtistsIndexResponse, ArtistsShowData, ArtistsShowResponse, AuthLoginData, AuthLoginResponse, AuthRefreshTokenResponse, AuthStreamTokenResponse, AuthRegisterData, AuthRegisterResponse, AuthForgotPasswordData, AuthForgotPasswordResponse, AuthResetPasswordData, AuthResetPasswordResponse, AuthVerifyResponse, GenresIndexData, GenresIndexResponse, GenresShowData, GenresShowResponse, GenresUpdateData, GenresUpdateResponse, GenresDestroyData, GenresDestroyResponse, ImageServeData, ImageServeResponse, JobLibraryScanData, JobLibraryScanResponse, LibrariesIndexData, LibrariesIndexResponse, LibraryCreateData, LibraryCreateResponse, LibraryUpdateData, LibraryUpdateResponse, LibraryDeleteResponse, OpCacheGetStatusResponse, OpcacheGetConfigResponse, OpcacheClearResponse, OpcacheCompileData, OpcacheCompileResponse, QueueMetricsShowResponse, QueueMetricsQueuesResponse, QueueMetricsMetricsData, QueueMetricsMetricsResponse, QueueMetricsRetryJobData, QueueMetricsRetryJobResponse, QueueMetricsDeleteData, QueueMetricsDeleteResponse, QueueMetricsPurgeResponse, SongsIndexData, SongsIndexResponse, SongsShowData, SongsShowResponse, SongsStreamData, SongsStreamResponse, SystemInfoShowResponse, UsersIndexData, UsersIndexResponse, UsersStoreData, UsersStoreResponse, UsersUpdateData, UsersUpdateResponse, UsersShowData, UsersShowResponse, UsersDestroyData, UsersDestroyResponse, UsersMeResponse, UserTokenGetUserTokensData, UserTokenGetUserTokensResponse, UserTokenRevokeTokenData, UserTokenRevokeTokenResponse } from './types.gen';
+import type { AlbumsIndexData, AlbumsIndexResponse, AlbumsShowData, AlbumsShowResponse, ArtistsIndexData, ArtistsIndexResponse, ArtistsShowData, ArtistsShowResponse, AuthLoginData, AuthLoginResponse, AuthRefreshTokenResponse, AuthStreamTokenResponse, AuthRegisterData, AuthRegisterResponse, AuthForgotPasswordData, AuthForgotPasswordResponse, AuthResetPasswordData, AuthResetPasswordResponse, AuthVerifyResponse, GenresIndexData, GenresIndexResponse, GenresShowData, GenresShowResponse, GenresUpdateData, GenresUpdateResponse, GenresDestroyData, GenresDestroyResponse, ImageServeData, ImageServeResponse, JobLibraryScanData, JobLibraryScanResponse, LibrariesIndexData, LibrariesIndexResponse, LibraryCreateData, LibraryCreateResponse, LibraryUpdateData, LibraryUpdateResponse, LibraryDeleteResponse, OpCacheGetStatusResponse, OpcacheGetConfigResponse, OpcacheClearResponse, OpcacheCompileData, OpcacheCompileResponse, QueueMetricsShowData, QueueMetricsShowResponse, QueueMetricsQueuesResponse, QueueMetricsMetricsData, QueueMetricsMetricsResponse, QueueMetricsRetryJobData, QueueMetricsRetryJobResponse, QueueMetricsDeleteData, QueueMetricsDeleteResponse, QueueMetricsPurgeResponse, SongsIndexData, SongsIndexResponse, SongsShowData, SongsShowResponse, SongsStreamData, SongsStreamResponse, SystemInfoShowResponse, UsersIndexData, UsersIndexResponse, UsersStoreData, UsersStoreResponse, UsersUpdateData, UsersUpdateResponse, UsersShowData, UsersShowResponse, UsersDestroyData, UsersDestroyResponse, UsersMeResponse, UserTokenGetUserTokensData, UserTokenGetUserTokensResponse, UserTokenRevokeTokenData, UserTokenRevokeTokenResponse } from './types.gen';
 
 export class AlbumService {
     /**
@@ -23,7 +23,7 @@ export class AlbumService {
      * @param data.page Current page
      * @param data.limit Items per page
      * @param data.genres _Extension_ Comma seperated list of genres
-     * @returns unknown Json paginated set of `AlbumResourceResource`
+     * @returns unknown Json paginated set of `AlbumResource`
      * @throws ApiError
      */
     public static albumsIndex(data: AlbumsIndexData): CancelablePromise<AlbumsIndexResponse> {
@@ -54,7 +54,7 @@ export class AlbumService {
      * @param data The data for the request.
      * @param data.library The library slug
      * @param data.album The album slug
-     * @returns AlbumResourceResource `AlbumResourceResource`
+     * @returns AlbumResource `AlbumResource`
      * @throws ApiError
      */
     public static albumsShow(data: AlbumsShowData): CancelablePromise<AlbumsShowResponse> {
@@ -578,14 +578,33 @@ export class OpCacheService {
 export class QueueService {
     /**
      * Get a collection of monitor entries
-     * ⚠️Cannot generate request documentation: Class "romanzipp\QueueMonitor\Enums\MonitorStatus" not found
+     * @param data The data for the request.
+     * @param data.page Current page
+     * @param data.limit Items per page
+     * @param data.status MonitorStatus
+     * - 0=RUNNING
+     * - 1=SUCCEEDED
+     * - 2=FAILED
+     * - 3=STALE
+     * - 4=QUEUED
+     * @param data.queue Name of the queue
+     * @param data.name Name of the job
+     * @param data.queuedFirst Order queued jobs first
      * @returns unknown Json paginated set of `QueueMonitorResource`
      * @throws ApiError
      */
-    public static queueMetricsShow(): CancelablePromise<QueueMetricsShowResponse> {
+    public static queueMetricsShow(data: QueueMetricsShowData = {}): CancelablePromise<QueueMetricsShowResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/queue-metrics',
+            query: {
+                page: data.page,
+                limit: data.limit,
+                status: data.status,
+                queue: data.queue,
+                name: data.name,
+                queuedFirst: data.queuedFirst
+            },
             errors: {
                 401: 'Unauthenticated',
                 403: 'Authorization error',

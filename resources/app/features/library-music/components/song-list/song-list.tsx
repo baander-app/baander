@@ -40,7 +40,7 @@ export function SongList() {
   const dispatch = useAppDispatch();
   const { data: songData, fetchNextPage, hasNextPage } = useSongServiceSongsIndexInfinite({
     library: libraryParam,
-    relations: 'album,album.cover',
+    relations: 'album,album.cover,songs.genres',
   });
   const [activeIndex, setActiveIndex] = useState(0);
   const { showContextMenu } = useContextMenu();

@@ -78,7 +78,14 @@ export const UseOpCacheServiceOpcacheGetConfigKeyFn = (queryKey?: Array<unknown>
 export type QueueServiceQueueMetricsShowDefaultResponse = Awaited<ReturnType<typeof QueueService.queueMetricsShow>>;
 export type QueueServiceQueueMetricsShowQueryResult<TData = QueueServiceQueueMetricsShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useQueueServiceQueueMetricsShowKey = "QueueServiceQueueMetricsShow";
-export const UseQueueServiceQueueMetricsShowKeyFn = (queryKey?: Array<unknown>) => [useQueueServiceQueueMetricsShowKey, ...(queryKey ?? [])];
+export const UseQueueServiceQueueMetricsShowKeyFn = ({ limit, name, page, queue, queuedFirst, status }: {
+  limit?: number;
+  name?: string;
+  page?: number;
+  queue?: string;
+  queuedFirst?: boolean;
+  status?: "running" | "succeeded" | "failed" | "stale" | "queued";
+} = {}, queryKey?: Array<unknown>) => [useQueueServiceQueueMetricsShowKey, ...(queryKey ?? [{ limit, name, page, queue, queuedFirst, status }])];
 export type QueueServiceQueueMetricsQueuesDefaultResponse = Awaited<ReturnType<typeof QueueService.queueMetricsQueues>>;
 export type QueueServiceQueueMetricsQueuesQueryResult<TData = QueueServiceQueueMetricsQueuesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useQueueServiceQueueMetricsQueuesKey = "QueueServiceQueueMetricsQueues";

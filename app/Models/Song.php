@@ -82,11 +82,6 @@ class Song extends BaseModel implements DirectStreamableFile
         return $this->belongsTo(Artist::class, '');
     }
 
-    public function genres()
-    {
-        return $this->morphToMany(Genre::class, 'genreables');
-    }
-
     public function userMediaActivies()
     {
         return $this->morphToMany(UserMediaActivity::class, 'userMediaActivityable');
@@ -95,6 +90,12 @@ class Song extends BaseModel implements DirectStreamableFile
     public function playerStates()
     {
         return $this->morphToMany(PlayerState::class, 'playable');
+    }
+
+    public function genres()
+    {
+        return $this->belongsToMany(Genre::class)
+            ->using(GenreSong::class);
     }
 
     protected function scopeWhereGenreNames(BaseBuilder $q, array $names)

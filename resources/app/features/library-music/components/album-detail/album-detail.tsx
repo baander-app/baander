@@ -22,6 +22,8 @@ export function AlbumDetail({ albumSlug, ...rest }: AlbumDetailProps) {
     library: library,
   });
 
+  const genres = data?.genres?.map((genre) => genre.name).join(', ');
+
   return (
     <Box {...rest}>
       {isFetching && <AlbumDetailSkeleton/>}
@@ -43,7 +45,7 @@ export function AlbumDetail({ albumSlug, ...rest }: AlbumDetailProps) {
                   <Text>{data.albumArtist.name}</Text>
                 )}
 
-                <Text>album.genre - {data?.year}</Text>
+                <Text>{genres} - {data?.year}</Text>
               </Box>
             </Flex>
           </Card.Section>

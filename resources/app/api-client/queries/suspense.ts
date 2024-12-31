@@ -20,7 +20,7 @@ import * as Common from "./common";
 * @param data.page Current page
 * @param data.limit Items per page
 * @param data.genres _Extension_ Comma seperated list of genres
-* @returns unknown Json paginated set of `AlbumResourceResource`
+* @returns unknown Json paginated set of `AlbumResource`
 * @throws ApiError
 */
 export const useAlbumServiceAlbumsIndexSuspense = <TData = Common.AlbumServiceAlbumsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fields, genres, library, limit, page, relations }: {
@@ -36,7 +36,7 @@ export const useAlbumServiceAlbumsIndexSuspense = <TData = Common.AlbumServiceAl
 * @param data The data for the request.
 * @param data.library The library slug
 * @param data.album The album slug
-* @returns AlbumResourceResource `AlbumResourceResource`
+* @returns AlbumResource `AlbumResource`
 * @throws ApiError
 */
 export const useAlbumServiceAlbumsShowSuspense = <TData = Common.AlbumServiceAlbumsShowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ album, library }: {
@@ -146,11 +146,29 @@ export const useOpCacheServiceOpCacheGetStatusSuspense = <TData = Common.OpCache
 export const useOpCacheServiceOpcacheGetConfigSuspense = <TData = Common.OpCacheServiceOpcacheGetConfigDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseOpCacheServiceOpcacheGetConfigKeyFn(queryKey), queryFn: () => OpCacheService.opcacheGetConfig() as TData, ...options });
 /**
 * Get a collection of monitor entries
-* ⚠️Cannot generate request documentation: Class "romanzipp\QueueMonitor\Enums\MonitorStatus" not found
+* @param data The data for the request.
+* @param data.page Current page
+* @param data.limit Items per page
+* @param data.status MonitorStatus
+* - 0=RUNNING
+* - 1=SUCCEEDED
+* - 2=FAILED
+* - 3=STALE
+* - 4=QUEUED
+* @param data.queue Name of the queue
+* @param data.name Name of the job
+* @param data.queuedFirst Order queued jobs first
 * @returns unknown Json paginated set of `QueueMonitorResource`
 * @throws ApiError
 */
-export const useQueueServiceQueueMetricsShowSuspense = <TData = Common.QueueServiceQueueMetricsShowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseQueueServiceQueueMetricsShowKeyFn(queryKey), queryFn: () => QueueService.queueMetricsShow() as TData, ...options });
+export const useQueueServiceQueueMetricsShowSuspense = <TData = Common.QueueServiceQueueMetricsShowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, name, page, queue, queuedFirst, status }: {
+  limit?: number;
+  name?: string;
+  page?: number;
+  queue?: string;
+  queuedFirst?: boolean;
+  status?: "running" | "succeeded" | "failed" | "stale" | "queued";
+} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseQueueServiceQueueMetricsShowKeyFn({ limit, name, page, queue, queuedFirst, status }, queryKey), queryFn: () => QueueService.queueMetricsShow({ limit, name, page, queue, queuedFirst, status }) as TData, ...options });
 /**
 * Get a list of queue names
 * @returns unknown
