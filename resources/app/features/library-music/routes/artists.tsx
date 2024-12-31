@@ -1,16 +1,21 @@
 import styles from './artists.module.scss';
 import { CoverGrid } from '@/features/library-music/components/cover-grid';
-import { artistMocks } from '@/features/library-music/mock.ts';
 import { ArtistBigCircle } from '@/features/library-music/components/artwork/artist-big-circle/artist-big-circle.tsx';
 import { Container } from '@mantine/core';
+import { usePathParam } from '@/hooks/use-path-param.ts';
+import { LibraryParams } from '@/features/library-music/routes/_routes.tsx';
+import { useArtistServiceArtistsIndex } from '@/api-client/queries';
 
 export default function Artists() {
-  const list = artistMocks;
+  const { library: libraryParam } = usePathParam<LibraryParams>();
+  const {data: artistsData} = useArtistServiceArtistsIndex({
+    library: libraryParam,
+  })
 
   return (
     <Container className={styles.artistsLayout}>
       <CoverGrid style={{ gap: '32px' }}>
-        {list.map((artist, index) => (
+        {artistsData?.data.map((artist, index) => (
           <div className={styles.artist} key={index}>
             <ArtistBigCircle artist={artist} />
           </div>
