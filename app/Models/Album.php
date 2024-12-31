@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Extensions\BaseBuilder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Spatie\Sluggable\{HasSlug, SlugOptions};
 
@@ -19,11 +20,11 @@ class Album extends BaseModel
     /**
      * Get the options for generating the slug.
      */
-    public function getSlugOptions() : SlugOptions
+    public function getSlugOptions(): SlugOptions
     {
         return SlugOptions::create()
-                          ->generateSlugsFrom('title')
-                          ->saveSlugsTo('slug');
+            ->generateSlugsFrom('title')
+            ->saveSlugsTo('slug');
     }
 
     public function getRouteKeyName(): string
@@ -50,5 +51,14 @@ class Album extends BaseModel
     public function songs()
     {
         return $this->hasMany(Song::class);
+    }
+
+    protected function scopeWhereGenreNames(BaseBuilder $q, array $names)
+    {
+        return $q->whereHas('songs', function ($q) use ($names) {
+            $q->whereHas('genres', function ($q) use ($names) {
+                $q->whereIn('name', $names);
+            });
+        });
     }
 }
