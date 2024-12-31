@@ -42,7 +42,6 @@ class Album extends BaseModel
         return $this->belongsTo(Artist::class, 'artist_id', 'id', '');
     }
 
-
     public function cover()
     {
         return $this->morphOne(Image::class, 'imageable');

@@ -1,35 +1,45 @@
-import { combineReducers, configureStore } from '@reduxjs/toolkit';
+import { Action, combineSlices, configureStore, ThunkAction } from '@reduxjs/toolkit';
 import { persistReducer, persistStore } from 'redux-persist';
 import storage from 'redux-persist/lib/storage';
+import { authSlice } from '@/store/users/auth-slice.ts';
+import { musicPlayerSlice } from '@/store/music-player/music-player-slice.ts';
 
-import authSlice from '@/store/users/auth-slice.ts';
-import musicPlayerSlice from '@/store/music-player/music-player-slice.ts';
-import shellReducer from '@/store/app/shell-slice.ts';
-
-const reducers = combineReducers({
+const rootReducer = combineSlices(
   authSlice,
   musicPlayerSlice,
-  shellReducer
-});
+);
+export type RootState = ReturnType<typeof rootReducer>
 
 const persistConfig = {
   key: 'root',
   storage,
 };
-const persistedReducer = persistReducer(persistConfig, reducers) as unknown as typeof reducers;
+const persistedReducer = persistReducer(persistConfig, rootReducer);// as unknown as typeof rootReducer;
 
-export const store = configureStore({
-  devTools: true,
-  reducer: persistedReducer,
-  middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware({
-      serializableCheck: false,
-    }),
-});
+export const makeStore = () => {
+  const store = configureStore({
+    devTools: true,
+    reducer: persistedReducer,
+    middleware: (getDefaultMiddleware) =>
+      getDefaultMiddleware({
+        serializableCheck: false,
+      }),
+  });
+
+  return store;
+};
+
+export const store = makeStore();
 
 export const persistor = persistStore(store);
 
-// Infer the `RootState` and `AppDispatch` types from the store itself
-export type RootState = ReturnType<typeof store.getState>
-// Inferred type: {posts: PostsState, comments: CommentsState, users: UsersState}
-export type AppDispatch = typeof store.dispatch
+// Infer the type of `store`
+export type AppStore = typeof store
+// Infer the `AppDispatch` type from the store itself
+export type AppDispatch = AppStore["dispatch"]
+export type AppThunk<ThunkReturnType = void> = ThunkAction<
+  ThunkReturnType,
+  RootState,
+  unknown,
+  Action
+>
