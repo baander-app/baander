@@ -172,8 +172,8 @@ return [
         /*
          * Package Service Providers...
          */
-        App\Packages\DeviceDetector\DeviceDetectorServiceProvider::class,
-        App\Packages\Nanoid\NanoIdServiceProvider::class,
+        App\Modules\DeviceDetector\DeviceDetectorServiceProvider::class,
+        App\Modules\Nanoid\NanoIdServiceProvider::class,
         App\Providers\FortifyServiceProvider::class,
 
         /*

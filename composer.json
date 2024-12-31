@@ -90,7 +90,7 @@
       "Database\\Seeders\\": "database/seeders/"
     },
     "files": [
-      "app/Packages/Humanize/bytes.php"
+      "app/Modules/Humanize/bytes.php"
     ]
   },
   "autoload-dev": {

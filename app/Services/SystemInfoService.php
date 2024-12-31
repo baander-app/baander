@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Packages\PhpInfoParser\Info;
+use App\Modules\PhpInfoParser\Info;
 
 class SystemInfoService
 {

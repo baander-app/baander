@@ -2,7 +2,7 @@
 
 namespace App\Providers;
 
-use App\Packages\Humanize\HumanDuration;
+use App\Modules\Humanize\HumanDuration;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecurityScheme;

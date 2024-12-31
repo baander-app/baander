@@ -11,7 +11,7 @@ use App\Http\Requests\QueueMonitor\RetryJobRequest;
 use App\Http\Resources\QueueMonitor\QueueMonitorResource;
 use App\Models\QueueMonitor;
 use App\Models\TokenAbility;
-use App\Packages\QueueMonitor\MonitorStatus;
+use App\Modules\QueueMonitor\MonitorStatus;
 use App\Services\QueueMetrics\QueueMetricsService;
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Post, Prefix};
 

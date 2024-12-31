@@ -2,16 +2,16 @@
 
 namespace App\Jobs\Library;
 
-use App\Models\{Album, Artist, Genre, Library, Song};
 use App\Events\LibraryScanCompleted;
+use App\Extensions\StrExt;
 use App\Jobs\BaseJob;
-use App\Packages\StrExt;
+use App\Models\{Album, Artist, Genre, Library, Song};
+use App\Modules\MetaAudio\{MetaAudio, Mp3, Tagger};
 use Illuminate\Contracts\Queue\ShouldBeUnique;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\File;
-use App\Packages\MetaAudio\{MetaAudio, Mp3, Tagger};
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\LazyCollection;
 use Illuminate\Support\Str;
 use Safe\Exceptions\{MbstringException, StringsException};

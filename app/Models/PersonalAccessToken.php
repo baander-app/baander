@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Packages\DeviceDetector\Device;
+use App\Modules\DeviceDetector\Device;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;

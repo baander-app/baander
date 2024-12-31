@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use App\Models\BaseModel;
-use App\Packages\Nanoid\Concerns\HasNanoPublicId;
+use App\Modules\Nanoid\Concerns\HasNanoPublicId;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class UserMediaActivity extends BaseModel

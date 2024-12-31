@@ -4,7 +4,7 @@ namespace App\Console\Commands\QueueMonitor;
 
 use App\Console\Commands\QueueMonitor\Concerns\HandlesDateInputs;
 use App\Models\QueueMonitor;
-use App\Packages\QueueMonitor\MonitorStatus;
+use App\Modules\QueueMonitor\MonitorStatus;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;

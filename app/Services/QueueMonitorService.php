@@ -3,9 +3,9 @@
 namespace App\Services;
 
 use App\Models\QueueMonitor;
-use App\Packages\QueueMonitor\Concerns\IsMonitored;
-use App\Packages\QueueMonitor\Contracts\MonitoredJobContract;
-use App\Packages\QueueMonitor\MonitorStatus;
+use App\Modules\QueueMonitor\Concerns\IsMonitored;
+use App\Modules\QueueMonitor\Contracts\MonitoredJobContract;
+use App\Modules\QueueMonitor\MonitorStatus;
 use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Contracts\Queue\Job as JobContract;
 use Illuminate\Support\Carbon;

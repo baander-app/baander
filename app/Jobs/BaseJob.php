@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Jobs\Concerns\HasJobsLogger;
-use App\Packages\QueueMonitor\Concerns\IsMonitored;
+use App\Modules\QueueMonitor\Concerns\IsMonitored;
 use Illuminate\Bus\Queueable;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;

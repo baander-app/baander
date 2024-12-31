@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use App\Packages\JsonSchema\Eloquent\HasJsonSchema;
-use App\Packages\JsonSchema\Eloquent\JsonSchemaRepresentable;
+use App\Modules\JsonSchema\Eloquent\HasJsonSchema;
+use App\Modules\JsonSchema\Eloquent\JsonSchemaRepresentable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Spatie\Sluggable\{HasSlug, SlugOptions};
 use Illuminate\Support\Facades\Storage;

@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\TokenAbility;
-use App\Packages\PhpInfoParser\Info;
+use App\Modules\PhpInfoParser\Info;
 use App\Services\SystemMetricsCollectorService;
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
 

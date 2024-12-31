@@ -6,10 +6,10 @@ use App\Http\Resources\Album\AlbumWithoutSongsResource;
 use App\Http\Resources\Artist\ArtistResource;
 use App\Http\Resources\HasJsonCollection;
 use App\Models\Song;
-use App\Packages\Humanize\HumanDuration;
+use App\Modules\Humanize\HumanDuration;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use function App\Packages\Humanize\humanize_bytes;
+use function App\Modules\Humanize\humanize_bytes;
 
 /**
  * @mixin Song

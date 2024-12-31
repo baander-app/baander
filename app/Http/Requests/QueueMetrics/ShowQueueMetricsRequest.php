@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\QueueMetrics;
 
-use App\Packages\QueueMonitor\MonitorStatus;
+use App\Modules\QueueMonitor\MonitorStatus;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 

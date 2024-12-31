@@ -3,7 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\UserTwoFactorAuthentication;
-use App\Packages\TwoFactor\TwoFactorService;
+use App\Modules\TwoFactor\TwoFactorService;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Collection;
 

@@ -5,8 +5,8 @@ namespace App\Models;
 use App\Extensions\Eloquent\BaseBuilder;
 use App\Models\Concerns\HasLibraryAccess;
 use App\Models\Player\PlayerState;
-use App\Packages\Http\Concerns\DirectStreamableFile;
-use App\Packages\Nanoid\Concerns\HasNanoPublicId;
+use App\Modules\Http\Concerns\DirectStreamableFile;
+use App\Modules\Nanoid\Concerns\HasNanoPublicId;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 /**

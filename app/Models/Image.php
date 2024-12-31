@@ -3,8 +3,8 @@
 namespace App\Models;
 
 use App\Observers\ImageObserver;
-use App\Packages\Http\Concerns\DirectStreamableFile;
-use App\Packages\Nanoid\Concerns\HasNanoPublicId;
+use App\Modules\Http\Concerns\DirectStreamableFile;
+use App\Modules\Nanoid\Concerns\HasNanoPublicId;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 

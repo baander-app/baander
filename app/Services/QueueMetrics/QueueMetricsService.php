@@ -3,7 +3,7 @@
 namespace App\Services\QueueMetrics;
 
 use App\Models\QueueMonitor;
-use App\Packages\QueueMonitor\MonitorStatus;
+use App\Modules\QueueMonitor\MonitorStatus;
 use App\Services\QueueMetrics\Models\QueueMetric;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
