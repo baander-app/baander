@@ -1,0 +1,16 @@
+:root {
+    --layout-default-body-padding: 12px 12px 90px 12px;
+    --progress-width: 0;
+    --buffered-width: 0;
+}
+
+body {
+    height: 100%;
+    width: 100%;
+}
+
+
+#baanderapproot {
+    height: 100%;
+    margin: 0;
+}

@@ -1,0 +1,81 @@
+services:
+  nginx:
+    image: martinjuul/baander-nginx:latest
+    container_name: baander-nginx
+    build:
+      context: ./docker/
+      args:
+        BUILD_ARGUMENT_ENV: dev
+      dockerfile: ./nginx/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT_HTTP}:80"
+      - "${WEB_PORT_TLS}:443"
+    networks:
+      - baander-backtier
+    volumes:
+      - ./:/var/www/html:ro,cached
+      - ./docker/dev/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+
+  app: &app-template
+    image: martinjuul/baander-app:latest
+    container_name: baander-app
+    build:
+      context: .
+      args:
+        BUILD_ARGUMENT_ENV: dev
+        HOST_UID: ${HOST_UID}
+        HOST_GID: ${HOST_GID}
+        XDEBUG_CONFIG: ${XDEBUG_CONFIG}
+        XDEBUG_VERSION: ${XDEBUG_VERSION}
+      dockerfile: ./Dockerfile
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    volumes:
+      - ./:/var/www/html:cached
+    networks:
+      - baander-backtier
+
+  supervisord:
+    <<: *app-template
+    container_name: baander-scheduler
+    expose: []
+    command: ["/usr/bin/supervisord"]
+
+  mail:
+    image: axllent/mailpit:latest
+    container_name: baander-mail
+    restart: always
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    networks:
+      - baander-backtier
+
+  postgres:
+    image: postgres:16.3-bookworm
+    container_name: baander-postgres
+    restart: unless-stopped
+    networks:
+      - baander-backtier
+    ports:
+      - 127.0.0.1:5432:5432
+    shm_size: 128mb
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+
+  redis:
+    image: redis:7-alpine
+    container_name: baander-redis
+    restart: unless-stopped
+    networks:
+      - baander-backtier
+    ports:
+      - 127.0.0.1:6379:6379
+
+networks:
+  baander-backtier:
+    name: baander-backtier

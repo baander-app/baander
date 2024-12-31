@@ -1,0 +1,42 @@
+services:
+  nginx:
+    image: martinjuul/baander-nginx:latest
+    container_name: baander-nginx
+    build:
+      context: ./docker/
+      args:
+        BUILD_ARGUMENT_ENV: prod
+      dockerfile: ./nginx/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT_HTTP}:80"
+    networks:
+      - baander-backtier
+    volumes:
+      - ./:/var/www/html:ro,cached
+    depends_on:
+      - app
+
+  app: &app-template
+    image: martinjuul/baander-app:latest
+    container_name: baander-app
+    restart: unless-stopped
+    build:
+      context: .
+      args:
+        BUILD_ARGUMENT_ENV: prod
+        HOST_UID: ${HOST_UID}
+        HOST_GID: ${HOST_GID}
+      dockerfile: ./Dockerfile
+    networks:
+      - baander-backtier
+
+  supervisord:
+    <<: *app-template
+    container_name: baander-scheduler
+    expose: []
+    command: ["/usr/bin/supervisord"]
+
+networks:
+  baander-backtier:
+    name: baander-backtier

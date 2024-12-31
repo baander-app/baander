@@ -1,0 +1,40 @@
+.scrollList {
+    flex: 1;
+    border-right: 1px solid #e0dddd;
+    border-bottom: 1px solid #e0dddd;
+
+    .title {
+        margin-left: 3px;
+    }
+}
+
+.listItem {
+    cursor: pointer;
+}
+
+.scrollbar {
+    --sb-track-color: 'transparent';
+    --sb-thumb-color: #828282;
+    --sb-size: 6px;
+}
+
+.scrollbar::-webkit-scrollbar {
+    width: var(--sb-size)
+}
+
+.scrollbar::-webkit-scrollbar-track {
+    background: var(--sb-track-color);
+    border-radius: 3px;
+}
+
+.scrollbar::-webkit-scrollbar-thumb {
+    background: var(--sb-thumb-color);
+    border-radius: 3px;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+    .scrollbar {
+        scrollbar-color: var(--sb-thumb-color)
+        var(--sb-track-color);
+    }
+}

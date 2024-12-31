@@ -1,0 +1,16 @@
+.album {
+    display: flex;
+    flex-direction: column;
+    height: 220px;
+    width: 200px;
+
+    .title {
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+
+    &:hover {
+        cursor: pointer;
+    }
+}

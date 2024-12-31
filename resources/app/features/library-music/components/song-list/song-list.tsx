@@ -1,0 +1,146 @@
+import React, { useCallback, useState } from 'react';
+import { useSongServiceSongsIndex } from '@/api-client/queries';
+import { TableVirtuoso } from 'react-virtuoso';
+import { Modal, Table, Text } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
+import { ContextMenuContent, useContextMenu } from 'mantine-contextmenu';
+import { TableProps } from '@mantine/core/lib/components/Table/Table';
+import { SongResource } from '@/api-client/requests';
+import { SongDetail } from '@/features/library-music/components/song-detail/song-detail.tsx';
+import styles from './song-list.module.scss';
+import { useMusicSource } from '@/providers';
+
+export function SongList() {
+  const {data: songData} = useSongServiceSongsIndex({library: 'music'});
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [openedSong, setOpenedSong] = useState<SongResource>();
+  const [opened, {open, close}] = useDisclosure(false);
+  const {showContextMenu} = useContextMenu();
+  const {setSource, setDetails} = useMusicSource();
+
+  const getContextMenuTemplate = useCallback((data: SongResource) => {
+    const contextMenuTemplate: ContextMenuContent = [
+      {
+        key: 'info',
+        onClick: () => {
+          setOpenedSong(data);
+          open();
+        },
+      },
+      {
+        key: 'divider',
+      },
+      {
+        key: 'delete',
+        color: 'red',
+        onClick: () => {
+
+        },
+      },
+    ];
+
+    return contextMenuTemplate;
+  }, [setOpenedSong, open]);
+
+  const onSongClick = useCallback((index: number, song: SongResource) => {
+    setActiveIndex(index);
+
+    setSource(song.stream);
+    setDetails({
+      title: song.title,
+    });
+  }, [setActiveIndex, setSource, setDetails]);
+
+  return (
+    <>
+      <TableVirtuoso
+        className={styles.scrollList}
+        data={songData?.data}
+        totalCount={songData?.meta.count}
+        // @ts-ignore
+        components={TableComponents}
+        useWindowScroll={true}
+        fixedHeaderContent={() => (
+          <Table.Tr>
+            <Table.Td w="60%">Title</Table.Td>
+            <Table.Td w="5%">Year</Table.Td>
+            <Table.Td w="5%">Length</Table.Td>
+            <Table.Td w="5%">Track</Table.Td>
+          </Table.Tr>
+        )}
+        itemContent={(index, data) => {
+          return (
+            <React.Fragment
+              key={data.public_id}
+            >
+              <Table.Td
+                className={styles.listItem}
+                style={{backgroundColor: activeIndex === index ? '#ccc' : 'unset'}}
+                onClick={() => onSongClick(index, data)}
+                onContextMenu={showContextMenu(getContextMenuTemplate(data))}
+              >
+                <Text size="sm">{data.title}</Text>
+              </Table.Td>
+
+              <Table.Td
+                className={styles.listItem}
+                style={{backgroundColor: activeIndex === index ? '#ccc' : 'unset'}}
+                onClick={() => onSongClick(index, data)}
+                onContextMenu={showContextMenu(getContextMenuTemplate(data))}
+              >{data.year}</Table.Td>
+
+              <Table.Td
+                className={styles.listItem}
+                style={{backgroundColor: activeIndex === index ? '#ccc' : 'unset'}}
+                onClick={() => onSongClick(index, data)}
+                onContextMenu={showContextMenu(getContextMenuTemplate(data))}
+              >{data.durationHuman}</Table.Td>
+
+              <Table.Td
+                className={styles.listItem}
+                style={{backgroundColor: activeIndex === index ? '#ccc' : 'unset'}}
+                onClick={() => onSongClick(index, data)}
+                onContextMenu={showContextMenu(getContextMenuTemplate(data))}
+              >{data.track}</Table.Td>
+            </React.Fragment>
+          );
+        }}
+
+      />
+
+      <Modal
+        title="Song details"
+        size="auto"
+        opened={opened}
+        onClose={close}
+      >
+        {openedSong && (
+          <SongDetail publicId={openedSong.public_id}/>
+        )}
+      </Modal>
+    </>
+  )
+    ;
+}
+
+
+interface ScrollerProps {
+  style: React.CSSProperties;
+
+  [key: string]: any;
+}
+
+const Scroller = React.forwardRef<HTMLDivElement, ScrollerProps>(({style, ...props}, ref) => {
+  // an alternative option to assign the ref is
+  // <div ref={(r) => ref.current = r}>
+  return <div className={styles.scrollbar} style={{...style}} ref={ref} {...props} />;
+});
+const TableComponents = {
+  // Footer,
+  Scroller,
+  Table: (props: TableProps) => <Table {...props} style={{borderCollapse: 'separate'}}/>,
+  TableHead: Table.Thead,
+  TableRow: Table.Tr,
+  // @ts-ignore
+  TableBody: React.forwardRef((props, ref) => <Table.Tbody {...props} ref={ref}/>),
+};

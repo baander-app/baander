@@ -1,0 +1,683 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+  <html xmlns="http://www.w3.org/1999/xhtml">
+		<head>
+			<!-- template designed by Marco Von Ballmoos -->
+			<title>Docs For Class Zend_Media_Asf_Object_ContentEncryption</title>
+			<link rel="stylesheet" href="../../media/stylesheet.css" />
+			<meta http-equiv='Content-Type' content='text/html; charset=iso-8859-1'/>
+		</head>
+		<body>
+			<div class="page-body">			
+<h2 class="class-name"><img src="../../media/images/Class_logo.png"
+														alt=" Class"
+														title=" Class"
+														style="vertical-align: middle"> Zend_Media_Asf_Object_ContentEncryption</h2>
+
+<a name="sec-description"></a>
+<div class="info-box">
+	<div class="info-box-title">Description</div>
+	<div class="nav-bar">
+					<span class="disabled">Description</span> |
+													<a href="#sec-vars">Vars</a>
+						|											<a href="#sec-method-summary">Methods</a> (<a href="#sec-methods">details</a>)
+						
+											<a href="#sec-consts">Constants</a>
+						
+			</div>
+	<div class="info-box-body">
+        		<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">The <em>Content Encryption Object</em> lets authors protect content by using  Microsoft® Digital Rights Manager version 1.</p>
+	<ul class="tags">
+				<li><span class="field">author:</span> Sven Vollbehr &lt;<a href="mailto:sven@vollbehr.eu">sven@vollbehr.eu</a>&gt;</li>
+				<li><span class="field">version:</span> $Id: ContentEncryption.php 177 2010-03-09 13:13:34Z svollbehr $</li>
+				<li><span class="field">copyright:</span> Copyright (c) 2005-2010 Zend Technologies USA Inc. (http://www.zend.com)</li>
+				<li><span class="field">license:</span> <a href="http://framework.zend.com/license/new-bsd">New BSD License</a></li>
+			</ul>
+		<p class="notes">
+			Located in <a class="field" href="_Media---Asf---Object---ContentEncryption.php.html">/Media/Asf/Object/ContentEncryption.php</a> (line <span class="field">39</span>)
+		</p>
+		
+				
+		<pre><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html">Zend_Media_Asf_Object</a>
+   |
+   --Zend_Media_Asf_Object_ContentEncryption</pre>
+	
+			</div>
+</div>
+
+
+
+
+	<a name="sec-method-summary"></a>
+	<div class="info-box">
+		<div class="info-box-title">Method Summary</span></div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+															<a href="#sec-consts">Constants</a>
+							
+															<a href="#sec-vars">Vars</a>
+				 
+				|
+						<span class="disabled">Methods</span> (<a href="#sec-methods">details</a>)
+		</div>
+		<div class="info-box-body">			
+			<div class="method-summary">
+																																																																																																<div class="method-definition">
+					<img src="../../media/images/Constructor.png" alt=" "/>
+											<span class="method-result">Zend_Media_Asf_Object_ContentEncryption</span>
+										<a href="#__construct" title="details" class="method-name">__construct</a>
+											([<span class="var-type"><a href="../../Zend_Io/Zend_Io_Reader.html">Zend_Io_Reader</a></span>&nbsp;<span class="var-name">$reader</span> = <span class="var-default">null</span>], [<span class="var-type"></span>&nbsp;<span class="var-name">&$options</span> = <span class="var-default">array()</span>], <span class="var-type">Array</span>&nbsp;<span class="var-name">$options</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">string</span>
+										<a href="#getKeyId" title="details" class="method-name">getKeyId</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">string</span>
+										<a href="#getLicenseUrl" title="details" class="method-name">getLicenseUrl</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">string</span>
+										<a href="#getProtectionType" title="details" class="method-name">getProtectionType</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">string</span>
+										<a href="#getSecretData" title="details" class="method-name">getSecretData</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#setKeyId" title="details" class="method-name">setKeyId</a>
+											(<span class="var-type">string</span>&nbsp;<span class="var-name">$keyId</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#setLicenseUrl" title="details" class="method-name">setLicenseUrl</a>
+											(<span class="var-type">string</span>&nbsp;<span class="var-name">$licenseUrl</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#setProtectionType" title="details" class="method-name">setProtectionType</a>
+											(<span class="var-type">string</span>&nbsp;<span class="var-name">$protectionType</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#setSecretData" title="details" class="method-name">setSecretData</a>
+											(<span class="var-type">string</span>&nbsp;<span class="var-name">$secretData</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">void</span>
+										<a href="#write" title="details" class="method-name">write</a>
+											(<span class="var-type"><a href="../../Zend_Io/Zend_Io_Writer.html">Zend_Io_Writer</a></span>&nbsp;<span class="var-name">$writer</span>)
+									</div>
+											</div>
+		</div>
+	</div>		
+
+	<a name="sec-vars"></a>
+	<div class="info-box">
+		<div class="info-box-title">Variables</div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+										<a href="#sec-var-summary">Vars</a> (<span class="disabled">details</span>)
+						
+			
+												<a href="#sec-consts">Constants</a>
+							
+										| 
+									<a href="#sec-method-summary">Methods</a> (<a href="#sec-methods">details</a>)
+							
+					</div>
+		<div class="info-box-body">
+			
+							<h4>Inherited Variables</h4>
+				<A NAME='inherited_vars'><!-- --></A>
+									<p>Inherited from <span class="classname"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html">Zend_Media_Asf_Object</a></span></p>
+					<blockquote>
+													<img src="../../media/images/Variable.png" />
+							<span class="var-title">
+								<span class="var-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#var$_options">Zend_Media_Asf_Object::$_options</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="var-title">
+								<span class="var-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#var$_reader">Zend_Media_Asf_Object::$_reader</a></span><br>
+							</span>
+											</blockquote> 
+										
+		</div>
+	</div>
+	
+	<a name="sec-methods"></a>
+	<div class="info-box">
+		<div class="info-box-title">Methods</div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+															<a href="#sec-vars">Vars</a>
+														<a href="#sec-method-summary">Methods</a> (<span class="disabled">details</span>)
+						
+		</div>
+		<div class="info-box-body">
+			<A NAME='method_detail'></A>
+<a name="method__construct" id="__construct"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Constructor.png" />
+		<span class="method-title">Constructor __construct</span> (line <span class="line-number">61</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Constructs the class with given parameters and reads object related data  from the ASF file.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">Zend_Media_Asf_Object_ContentEncryption</span>
+		<span class="method-name">
+			__construct
+		</span>
+					([<span class="var-type"><a href="../../Zend_Io/Zend_Io_Reader.html">Zend_Io_Reader</a></span>&nbsp;<span class="var-name">$reader</span> = <span class="var-default">null</span>], [<span class="var-type"></span>&nbsp;<span class="var-name">&$options</span> = <span class="var-default">array()</span>], <span class="var-type">Array</span>&nbsp;<span class="var-name">$options</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type"><a href="../../Zend_Io/Zend_Io_Reader.html">Zend_Io_Reader</a></span>
+				<span class="var-name">$reader</span><span class="var-description">: The reader object.</span>			</li>
+					<li>
+				<span class="var-type">Array</span>
+				<span class="var-name">$options</span><span class="var-description">: The options array.</span>			</li>
+					<li>
+				<span class="var-type"></span>
+				<span class="var-name">&$options</span>			</li>
+				</ul>
+		
+			<hr class="separator" />
+		<div class="notes">Redefinition of:</div>
+		<dl>
+			<dt><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#method__construct">Zend_Media_Asf_Object::__construct()</a></dt>
+						<dd>Constructs the class with given parameters and options.</dd>
+					</dl>
+			
+	</div>
+<a name="methodgetKeyId" id="getKeyId"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getKeyId</span> (line <span class="line-number">127</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the key ID used.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">string</span>
+		<span class="method-name">
+			getKeyId
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetLicenseUrl" id="getLicenseUrl"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getLicenseUrl</span> (line <span class="line-number">148</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the URL from which a license to manipulate the content can be  acquired.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">string</span>
+		<span class="method-name">
+			getLicenseUrl
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetProtectionType" id="getProtectionType"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getProtectionType</span> (line <span class="line-number">106</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the type of protection mechanism used. The value of this field  is set to 'DRM'.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">string</span>
+		<span class="method-name">
+			getProtectionType
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetSecretData" id="getSecretData"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getSecretData</span> (line <span class="line-number">85</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the secret data.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">string</span>
+		<span class="method-name">
+			getSecretData
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodsetKeyId" id="setKeyId"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">setKeyId</span> (line <span class="line-number">137</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Sets the key ID used.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			setKeyId
+		</span>
+					(<span class="var-type">string</span>&nbsp;<span class="var-name">$keyId</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type">string</span>
+				<span class="var-name">$keyId</span><span class="var-description">: The key ID used.</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="methodsetLicenseUrl" id="setLicenseUrl"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">setLicenseUrl</span> (line <span class="line-number">159</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the URL from which a license to manipulate the content can be  acquired.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			setLicenseUrl
+		</span>
+					(<span class="var-type">string</span>&nbsp;<span class="var-name">$licenseUrl</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type">string</span>
+				<span class="var-name">$licenseUrl</span><span class="var-description">: The URL from which a license can be acquired.</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="methodsetProtectionType" id="setProtectionType"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">setProtectionType</span> (line <span class="line-number">117</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Sets the type of protection mechanism used. The value of this field  is to be set to 'DRM'.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			setProtectionType
+		</span>
+					(<span class="var-type">string</span>&nbsp;<span class="var-name">$protectionType</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type">string</span>
+				<span class="var-name">$protectionType</span><span class="var-description">: The protection mechanism used.</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="methodsetSecretData" id="setSecretData"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">setSecretData</span> (line <span class="line-number">95</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Sets the secret data.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			setSecretData
+		</span>
+					(<span class="var-type">string</span>&nbsp;<span class="var-name">$secretData</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type">string</span>
+				<span class="var-name">$secretData</span><span class="var-description">: The secret data.</span>			</li>
+				</ul>
+		
+			
+	</div>
+<a name="methodwrite" id="write"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">write</span> (line <span class="line-number">170</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Writes the object data.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">void</span>
+		<span class="method-name">
+			write
+		</span>
+					(<span class="var-type"><a href="../../Zend_Io/Zend_Io_Writer.html">Zend_Io_Writer</a></span>&nbsp;<span class="var-name">$writer</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type"><a href="../../Zend_Io/Zend_Io_Writer.html">Zend_Io_Writer</a></span>
+				<span class="var-name">$writer</span><span class="var-description">: The writer object.</span>			</li>
+				</ul>
+		
+			<hr class="separator" />
+		<div class="notes">Redefinition of:</div>
+		<dl>
+			<dt><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#methodwrite">Zend_Media_Asf_Object::write()</a></dt>
+						<dd>Writes the object data.</dd>
+					</dl>
+			
+	</div>
+							<h4>Inherited Methods</h4>
+				<a name='inherited_methods'><!-- --></a>	
+									<!-- =========== Summary =========== -->
+					<p>Inherited From <span class="classname"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html">Zend_Media_Asf_Object</a></span></p>
+					<blockquote>
+													<img src="../../media/images/Constructor.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#method__construct">Zend_Media_Asf_Object::__construct()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#methodclearOption">Zend_Media_Asf_Object::clearOption()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#methodgetIdentifier">Zend_Media_Asf_Object::getIdentifier()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#methodgetOffset">Zend_Media_Asf_Object::getOffset()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#methodgetOption">Zend_Media_Asf_Object::getOption()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#methodgetOptions">Zend_Media_Asf_Object::getOptions()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#methodgetParent">Zend_Media_Asf_Object::getParent()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#methodgetSize">Zend_Media_Asf_Object::getSize()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#methodsetIdentifier">Zend_Media_Asf_Object::setIdentifier()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#methodsetOffset">Zend_Media_Asf_Object::setOffset()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#methodsetOption">Zend_Media_Asf_Object::setOption()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#methodsetOptions">Zend_Media_Asf_Object::setOptions()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#methodsetParent">Zend_Media_Asf_Object::setParent()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#methodsetSize">Zend_Media_Asf_Object::setSize()</a></span><br>
+													<img src="../../media/images/AbstractMethod.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#methodwrite">Zend_Media_Asf_Object::write()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#method__get">Zend_Media_Asf_Object::__get()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#method__set">Zend_Media_Asf_Object::__set()</a></span><br>
+											</blockquote>
+										
+		</div>
+	</div>
+
+	<a name="sec-consts"></a>
+	<div class="info-box">
+		<div class="info-box-title">Class Constants</div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+										<a href="#sec-var-summary">Constants</a> (<span class="disabled">details</span>)
+						
+			
+												<a href="#sec-vars">Vars</a>
+														| 
+									<a href="#sec-method-summary">Methods</a> (<a href="#sec-methods">details</a>)
+							
+					</div>
+		<div class="info-box-body">
+										<h4>Inherited Constants</h4>
+				<A NAME='inherited_consts'><!-- --></A>
+									<p>Inherited from <span class="classname"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html">Zend_Media_Asf_Object</a></span></p>
+					<blockquote>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constADVANCED_CONTENT_ENCRYPTION">Zend_Media_Asf_Object::ADVANCED_CONTENT_ENCRYPTION</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constADVANCED_MUTUAL_EXCLUSION">Zend_Media_Asf_Object::ADVANCED_MUTUAL_EXCLUSION</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constBANDWIDTH_SHARING">Zend_Media_Asf_Object::BANDWIDTH_SHARING</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constBITRATE_MUTUAL_EXCLUSION">Zend_Media_Asf_Object::BITRATE_MUTUAL_EXCLUSION</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constCODEC_LIST">Zend_Media_Asf_Object::CODEC_LIST</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constCOMPATIBILITY">Zend_Media_Asf_Object::COMPATIBILITY</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constCONTENT_BRANDING">Zend_Media_Asf_Object::CONTENT_BRANDING</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constCONTENT_DESCRIPTION">Zend_Media_Asf_Object::CONTENT_DESCRIPTION</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constCONTENT_ENCRYPTION">Zend_Media_Asf_Object::CONTENT_ENCRYPTION</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constDATA">Zend_Media_Asf_Object::DATA</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constDIGITAL_SIGNATURE">Zend_Media_Asf_Object::DIGITAL_SIGNATURE</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constERROR_CORRECTION">Zend_Media_Asf_Object::ERROR_CORRECTION</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constEXTENDED_CONTENT_DESCRIPTION">Zend_Media_Asf_Object::EXTENDED_CONTENT_DESCRIPTION</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constEXTENDED_CONTENT_ENCRYPTION">Zend_Media_Asf_Object::EXTENDED_CONTENT_ENCRYPTION</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constEXTENDED_STREAM_PROPERTIES">Zend_Media_Asf_Object::EXTENDED_STREAM_PROPERTIES</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constFILE_PROPERTIES">Zend_Media_Asf_Object::FILE_PROPERTIES</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constGROUP_MUTUAL_EXCLUSION">Zend_Media_Asf_Object::GROUP_MUTUAL_EXCLUSION</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constHEADER">Zend_Media_Asf_Object::HEADER</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constHEADER_EXTENSION">Zend_Media_Asf_Object::HEADER_EXTENSION</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constINDEX">Zend_Media_Asf_Object::INDEX</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constINDEX_PARAMETERS">Zend_Media_Asf_Object::INDEX_PARAMETERS</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constLANGUAGE_LIST">Zend_Media_Asf_Object::LANGUAGE_LIST</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constMARKER">Zend_Media_Asf_Object::MARKER</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constMEDIA_OBJECT_INDEX">Zend_Media_Asf_Object::MEDIA_OBJECT_INDEX</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constMEDIA_OBJECT_INDEX_PARAMETERS">Zend_Media_Asf_Object::MEDIA_OBJECT_INDEX_PARAMETERS</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constMETADATA">Zend_Media_Asf_Object::METADATA</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constMETADATA_LIBRARY">Zend_Media_Asf_Object::METADATA_LIBRARY</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constPADDING">Zend_Media_Asf_Object::PADDING</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constSCRIPT_COMMAND">Zend_Media_Asf_Object::SCRIPT_COMMAND</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constSIMPLE_INDEX">Zend_Media_Asf_Object::SIMPLE_INDEX</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constSTREAM_BITRATE_PROPERTIES">Zend_Media_Asf_Object::STREAM_BITRATE_PROPERTIES</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constSTREAM_PRIORITIZATION">Zend_Media_Asf_Object::STREAM_PRIORITIZATION</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constSTREAM_PROPERTIES">Zend_Media_Asf_Object::STREAM_PROPERTIES</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constTIMECODE_INDEX">Zend_Media_Asf_Object::TIMECODE_INDEX</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/ASF/Zend_Media_Asf_Object.html#constTIMECODE_INDEX_PARAMETERS">Zend_Media_Asf_Object::TIMECODE_INDEX_PARAMETERS</a></span><br>
+							</span>
+											</blockquote> 
+										
+		</div>
+	</div>
+	
+	<p class="notes" id="credit">
+		Documentation generated on Wed, 04 May 2011 08:36:41 +0300 by <a href="http://www.phpdoc.org" target="_blank">phpDocumentor 1.4.3</a>
+	</p>
+	</div></body>
+</html>

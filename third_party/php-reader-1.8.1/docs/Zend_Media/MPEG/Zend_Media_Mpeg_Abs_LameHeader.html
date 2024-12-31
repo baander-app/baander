@@ -1,0 +1,1587 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+  <html xmlns="http://www.w3.org/1999/xhtml">
+		<head>
+			<!-- template designed by Marco Von Ballmoos -->
+			<title>Docs For Class Zend_Media_Mpeg_Abs_LameHeader</title>
+			<link rel="stylesheet" href="../../media/stylesheet.css" />
+			<meta http-equiv='Content-Type' content='text/html; charset=iso-8859-1'/>
+		</head>
+		<body>
+			<div class="page-body">			
+<h2 class="class-name"><img src="../../media/images/Class_logo.png"
+														alt=" Class"
+														title=" Class"
+														style="vertical-align: middle"> Zend_Media_Mpeg_Abs_LameHeader</h2>
+
+<a name="sec-description"></a>
+<div class="info-box">
+	<div class="info-box-title">Description</div>
+	<div class="nav-bar">
+					<span class="disabled">Description</span> |
+													<a href="#sec-vars">Vars</a>
+						|											<a href="#sec-method-summary">Methods</a> (<a href="#sec-methods">details</a>)
+						
+											<a href="#sec-const-summary">Constants</a> (<a href="#sec-consts">details</a>)
+						
+			</div>
+	<div class="info-box-body">
+        		<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">This class represents a LAME extension to the Xing VBR header. The purpose of</p>
+<p class="description"><p>this header is to provide extra information about the audio bistream, encoder  and parameters used. This header should, as much as possible, be meaningfull  for as many encoders as possible, even if it is unlikely that other encoders  than LAME will implement it.</p><p>This header should be backward compatible with the Xing VBR tag, providing  basic support for a lot of already written software. As much as possible the  current revision (revision 1) should provide information similar to the one  already provided by revision 0.</p></p>
+	<ul class="tags">
+				<li><span class="field">author:</span> Sven Vollbehr &lt;<a href="mailto:sven@vollbehr.eu">sven@vollbehr.eu</a>&gt;</li>
+				<li><span class="field">version:</span> $Id: LameHeader.php 177 2010-03-09 13:13:34Z svollbehr $</li>
+				<li><span class="field">copyright:</span> Copyright (c) 2005-2010 Zend Technologies USA Inc. (http://www.zend.com)</li>
+				<li><span class="field">license:</span> <a href="http://framework.zend.com/license/new-bsd">New BSD License</a></li>
+			</ul>
+		<p class="notes">
+			Located in <a class="field" href="_Media---Mpeg---Abs---LameHeader.php.html">/Media/Mpeg/Abs/LameHeader.php</a> (line <span class="field">49</span>)
+		</p>
+		
+				
+		<pre><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Object.html">Zend_Media_Mpeg_Object</a>
+   |
+   --<a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html">Zend_Media_Mpeg_Abs_Object</a>
+      |
+      --Zend_Media_Mpeg_Abs_LameHeader</pre>
+	
+			</div>
+</div>
+
+
+	<a name="sec-const-summary"></a>
+	<div class="info-box">
+		<div class="info-box-title">Class Constant Summary</span></div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+						<span class="disabled">Constants</span> (<a href="#sec-consts">details</a>)
+												<a href="#sec-vars">Vars</a>
+				 
+				|
+										| 
+									<a href="#sec-method-summary">Methods</a> (<a href="#sec-methods">details</a>)
+							
+					</div>
+		<div class="info-box-body">
+			<div class="const-summary">
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#ENCODING_FLAG_NOGAP_CONTINUATION" title="details" class="const-name">ENCODING_FLAG_NOGAP_CONTINUATION</a> = 					<span class="var-type"> 8</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#ENCODING_FLAG_NOGAP_CONTINUED" title="details" class="const-name">ENCODING_FLAG_NOGAP_CONTINUED</a> = 					<span class="var-type"> 4</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#ENCODING_FLAG_NSPSYTUNE" title="details" class="const-name">ENCODING_FLAG_NSPSYTUNE</a> = 					<span class="var-type"> 1</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#ENCODING_FLAG_NSSAFEJOINT" title="details" class="const-name">ENCODING_FLAG_NSSAFEJOINT</a> = 					<span class="var-type"> 2</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#MODE_AUTO" title="details" class="const-name">MODE_AUTO</a> = 					<span class="var-type"> 5</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#MODE_DUAL" title="details" class="const-name">MODE_DUAL</a> = 					<span class="var-type"> 2</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#MODE_FORCE" title="details" class="const-name">MODE_FORCE</a> = 					<span class="var-type"> 4</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#MODE_INTENSITY" title="details" class="const-name">MODE_INTENSITY</a> = 					<span class="var-type"> 6</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#MODE_JOINT" title="details" class="const-name">MODE_JOINT</a> = 					<span class="var-type"> 3</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#MODE_MONO" title="details" class="const-name">MODE_MONO</a> = 					<span class="var-type"> 0</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#MODE_STEREO" title="details" class="const-name">MODE_STEREO</a> = 					<span class="var-type"> 1</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#MODE_UNDEFINED" title="details" class="const-name">MODE_UNDEFINED</a> = 					<span class="var-type"> 7</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#SOURCE_FREQUENCY_32000_OR_LOWER" title="details" class="const-name">SOURCE_FREQUENCY_32000_OR_LOWER</a> = 					<span class="var-type"> 0</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#SOURCE_FREQUENCY_44100" title="details" class="const-name">SOURCE_FREQUENCY_44100</a> = 					<span class="var-type"> 1</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#SOURCE_FREQUENCY_48000" title="details" class="const-name">SOURCE_FREQUENCY_48000</a> = 					<span class="var-type"> 2</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#SOURCE_FREQUENCY_HIGHER" title="details" class="const-name">SOURCE_FREQUENCY_HIGHER</a> = 					<span class="var-type"> 3</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#SURROUND_AMBISONIC" title="details" class="const-name">SURROUND_AMBISONIC</a> = 					<span class="var-type"> 3</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#SURROUND_DPL" title="details" class="const-name">SURROUND_DPL</a> = 					<span class="var-type"> 1</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#SURROUND_DPL2" title="details" class="const-name">SURROUND_DPL2</a> = 					<span class="var-type"> 2</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#SURROUND_NONE" title="details" class="const-name">SURROUND_NONE</a> = 					<span class="var-type"> 0</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#VBR_METHOD_ABR" title="details" class="const-name">VBR_METHOD_ABR</a> = 					<span class="var-type"> 2</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#VBR_METHOD_CONSTANT" title="details" class="const-name">VBR_METHOD_CONSTANT</a> = 					<span class="var-type"> 1</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#VBR_METHOD_MT" title="details" class="const-name">VBR_METHOD_MT</a> = 					<span class="var-type"> 5</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#VBR_METHOD_MTRH" title="details" class="const-name">VBR_METHOD_MTRH</a> = 					<span class="var-type"> 4</span>
+
+				</div>
+								<div class="const-title">
+					<img src="../../media/images/Constant.png" alt=" " />
+					<a href="#VBR_METHOD_RH" title="details" class="const-name">VBR_METHOD_RH</a> = 					<span class="var-type"> 3</span>
+
+				</div>
+							</div>
+		</div>
+	</div>
+
+
+	<a name="sec-method-summary"></a>
+	<div class="info-box">
+		<div class="info-box-title">Method Summary</span></div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+															<a href="#sec-const-summary">Constants</a> (<a href="#sec-consts">details</a>)
+							
+															<a href="#sec-vars">Vars</a>
+				 
+				|
+						<span class="disabled">Methods</span> (<a href="#sec-methods">details</a>)
+		</div>
+		<div class="info-box-body">			
+			<div class="method-summary">
+																																																																																																																																																																																																																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">boolean</span>
+										<a href="#areUnwiseSettingsUsed" title="details" class="method-name">areUnwiseSettingsUsed</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Constructor.png" alt=" "/>
+											<span class="method-result">Zend_Media_Mpeg_Abs_LameHeader</span>
+										<a href="#__construct" title="details" class="method-name">__construct</a>
+											(<span class="var-type"><a href="../../Zend_Io/Zend_Io_Reader.html">Zend_Io_Reader</a></span>&nbsp;<span class="var-name">$reader</span>, [<span class="var-type"></span>&nbsp;<span class="var-name">&$options</span> = <span class="var-default">array()</span>], <span class="var-type">Array</span>&nbsp;<span class="var-name">$options</span>)
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getAthType" title="details" class="method-name">getAthType</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">Array</span>
+										<a href="#getAudiophileReplayGain" title="details" class="method-name">getAudiophileReplayGain</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getBitrate" title="details" class="method-name">getBitrate</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getCrc" title="details" class="method-name">getCrc</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getEncoderDelaySamples" title="details" class="method-name">getEncoderDelaySamples</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getEncodingFlags" title="details" class="method-name">getEncodingFlags</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getLowpass" title="details" class="method-name">getLowpass</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getMode" title="details" class="method-name">getMode</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getMp3Gain" title="details" class="method-name">getMp3Gain</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getMusicCrc" title="details" class="method-name">getMusicCrc</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getMusicLength" title="details" class="method-name">getMusicLength</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getNoiseShaping" title="details" class="method-name">getNoiseShaping</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getPaddedSamples" title="details" class="method-name">getPaddedSamples</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getPeakSignalAmplitude" title="details" class="method-name">getPeakSignalAmplitude</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getPresetUsed" title="details" class="method-name">getPresetUsed</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">Array</span>
+										<a href="#getRadioReplayGain" title="details" class="method-name">getRadioReplayGain</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getRevision" title="details" class="method-name">getRevision</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getSourceSampleFrequency" title="details" class="method-name">getSourceSampleFrequency</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getSurroundInfo" title="details" class="method-name">getSurroundInfo</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">boolean</span>
+										<a href="#getUnwiseSettingsUsed" title="details" class="method-name">getUnwiseSettingsUsed</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">integer</span>
+										<a href="#getVbrMethod" title="details" class="method-name">getVbrMethod</a>
+										()
+									</div>
+																<div class="method-definition">
+					<img src="../../media/images/Method.png" alt=" "/>
+											<span class="method-result">string</span>
+										<a href="#getVersion" title="details" class="method-name">getVersion</a>
+										()
+									</div>
+											</div>
+		</div>
+	</div>		
+
+	<a name="sec-vars"></a>
+	<div class="info-box">
+		<div class="info-box-title">Variables</div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+										<a href="#sec-var-summary">Vars</a> (<span class="disabled">details</span>)
+						
+			
+												<a href="#sec-const-summary">Constants</a> (<a href="#sec-consts">details</a>)
+							
+										| 
+									<a href="#sec-method-summary">Methods</a> (<a href="#sec-methods">details</a>)
+							
+					</div>
+		<div class="info-box-body">
+			
+							<h4>Inherited Variables</h4>
+				<A NAME='inherited_vars'><!-- --></A>
+									<p>Inherited from <span class="classname"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html">Zend_Media_Mpeg_Abs_Object</a></span></p>
+					<blockquote>
+													<img src="../../media/images/Variable.png" />
+							<span class="var-title">
+								<span class="var-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#var$sidesizes">Zend_Media_Mpeg_Abs_Object::$sidesizes</a></span><br>
+							</span>
+											</blockquote> 
+									<p>Inherited from <span class="classname"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Object.html">Zend_Media_Mpeg_Object</a></span></p>
+					<blockquote>
+													<img src="../../media/images/Variable.png" />
+							<span class="var-title">
+								<span class="var-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Object.html#var$_reader">Zend_Media_Mpeg_Object::$_reader</a></span><br>
+							</span>
+											</blockquote> 
+										
+		</div>
+	</div>
+	
+	<a name="sec-methods"></a>
+	<div class="info-box">
+		<div class="info-box-title">Methods</div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+															<a href="#sec-vars">Vars</a>
+														<a href="#sec-method-summary">Methods</a> (<span class="disabled">details</span>)
+						
+		</div>
+		<div class="info-box-body">
+			<A NAME='method_detail'></A>
+<a name="methodareUnwiseSettingsUsed" id="areUnwiseSettingsUsed"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">areUnwiseSettingsUsed</span> (line <span class="line-number">423</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">An alias to getUnwiseSettingsUsed().</p>
+	<ul class="tags">
+				<li><span class="field">see:</span> <a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_LameHeader.html#methodgetUnwiseSettingsUsed">Zend_Media_Mpeg_Abs_LameHeader::getUnwiseSettingsUsed()</a></li>
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">boolean</span>
+		<span class="method-name">
+			areUnwiseSettingsUsed
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="method__construct" id="__construct"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Constructor.png" />
+		<span class="method-title">Constructor __construct</span> (line <span class="line-number">199</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Constructs the class with given parameters and reads object related data  from the bitstream.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">Zend_Media_Mpeg_Abs_LameHeader</span>
+		<span class="method-name">
+			__construct
+		</span>
+					(<span class="var-type"><a href="../../Zend_Io/Zend_Io_Reader.html">Zend_Io_Reader</a></span>&nbsp;<span class="var-name">$reader</span>, [<span class="var-type"></span>&nbsp;<span class="var-name">&$options</span> = <span class="var-default">array()</span>], <span class="var-type">Array</span>&nbsp;<span class="var-name">$options</span>)
+			</div>
+	
+			<ul class="parameters">
+					<li>
+				<span class="var-type"><a href="../../Zend_Io/Zend_Io_Reader.html">Zend_Io_Reader</a></span>
+				<span class="var-name">$reader</span><span class="var-description">: The reader object.</span>			</li>
+					<li>
+				<span class="var-type">Array</span>
+				<span class="var-name">$options</span><span class="var-description">: Array of options.</span>			</li>
+					<li>
+				<span class="var-type"></span>
+				<span class="var-name">&$options</span>			</li>
+				</ul>
+		
+			<hr class="separator" />
+		<div class="notes">Redefinition of:</div>
+		<dl>
+			<dt><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#method__construct">Zend_Media_Mpeg_Abs_Object::__construct()</a></dt>
+						<dd>Constructs the class with given parameters.</dd>
+					</dl>
+			
+	</div>
+<a name="methodgetAthType" id="getAthType"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getAthType</span> (line <span class="line-number">369</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the ATH type.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getAthType
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetAudiophileReplayGain" id="getAudiophileReplayGain"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getAudiophileReplayGain</span> (line <span class="line-number">348</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the audiophile replay gain field of replay gain, required to give  ideal listening loudness, as an array that consists of the following  keys.</p>
+<p class="description"><p><ul><li>name -- Specifies the name of the gain adjustment. Can be one of the
+     following values: 0 = not set, 1 = radio, or 2 = audiophile.</li></ul> <ul></ul>     one of the following values: 0 = not set, 1 = set by artist, 2 = set      by user, 3 = set by my model, 4 = set by simple RMS average.</p><p><ul><li>absoluteGainAdjustment -- Speficies the absolute gain adjustment.</li></ul></p></p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">Array</span>
+		<span class="method-name">
+			getAudiophileReplayGain
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetBitrate" id="getBitrate"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getBitrate</span> (line <span class="line-number">381</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the bitrate for CBR encoded files and the minimal birate for  VBR encoded file. The maximum value of this field is 255 even with higher  actual bitrates.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getBitrate
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetCrc" id="getCrc"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getCrc</span> (line <span class="line-number">523</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the CRC-16 of the first 190 bytes of the header frame.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getCrc
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetEncoderDelaySamples" id="getEncoderDelaySamples"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getEncoderDelaySamples</span> (line <span class="line-number">391</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the encoder delay or number of samples added at start.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getEncoderDelaySamples
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetEncodingFlags" id="getEncodingFlags"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getEncodingFlags</span> (line <span class="line-number">359</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the encoding flags. See the corresponding flag constants for  possible values.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getEncodingFlags
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetLowpass" id="getLowpass"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getLowpass</span> (line <span class="line-number">295</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the lowpass filter value.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getLowpass
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetMode" id="getMode"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getMode</span> (line <span class="line-number">443</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the stereo mode. See corresponding constants for possible values.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getMode
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetMp3Gain" id="getMp3Gain"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getMp3Gain</span> (line <span class="line-number">465</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the MP3 gain change. Any MP3 can be amplified in a lossless  manner. If done so, this field can be used to log such transformation  happened so that any given time it can be undone.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getMp3Gain
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetMusicCrc" id="getMusicCrc"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getMusicCrc</span> (line <span class="line-number">513</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the CRC-16 of the complete MP3 music data as made originally by  LAME.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getMusicCrc
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetMusicLength" id="getMusicLength"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getMusicLength</span> (line <span class="line-number">502</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the exact length in bytes of the MP3 file originally made by LAME  excluded ID3 tag info at the end.</p>
+<p class="description"><p>The first byte it counts is the first byte of this LAME header and the  last byte it counts is the last byte of the last MP3 frame containing  music. The value should be equal to file length at the time of LAME  encoding, except when using ID3 tags.</p></p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getMusicLength
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetNoiseShaping" id="getNoiseShaping"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getNoiseShaping</span> (line <span class="line-number">453</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the noise shaping.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getNoiseShaping
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetPaddedSamples" id="getPaddedSamples"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getPaddedSamples</span> (line <span class="line-number">401</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the number of padded samples to complete the last frame.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getPaddedSamples
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetPeakSignalAmplitude" id="getPeakSignalAmplitude"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getPeakSignalAmplitude</span> (line <span class="line-number">307</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the peak signal amplitude field of replay gain. The value of 1.0  (ie 100%) represents maximal signal amplitude storeable in decoding  format.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getPeakSignalAmplitude
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetPresetUsed" id="getPresetUsed"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getPresetUsed</span> (line <span class="line-number">486</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the preset used in encoding.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getPresetUsed
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetRadioReplayGain" id="getRadioReplayGain"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getRadioReplayGain</span> (line <span class="line-number">327</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the radio replay gain field of replay gain, required to make all  tracks equal loudness, as an array that consists of the following keys.</p>
+<p class="description"><p><ul><li>name -- Specifies the name of the gain adjustment. Can be one of the
+     following values: 0 = not set, 1 = radio, or 2 = audiophile.</li></ul> <ul></ul>     one of the following values: 0 = not set, 1 = set by artist, 2 = set      by user, 3 = set by my model, 4 = set by simple RMS average.</p><p><ul><li>absoluteGainAdjustment -- Speficies the absolute gain adjustment.</li></ul></p></p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">Array</span>
+		<span class="method-name">
+			getRadioReplayGain
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetRevision" id="getRevision"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getRevision</span> (line <span class="line-number">274</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the info tag revision.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getRevision
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetSourceSampleFrequency" id="getSourceSampleFrequency"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getSourceSampleFrequency</span> (line <span class="line-number">412</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the source sample frequency. See corresponding constants for  possible values.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getSourceSampleFrequency
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetSurroundInfo" id="getSurroundInfo"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getSurroundInfo</span> (line <span class="line-number">476</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the surround info. See corresponding contants for possible  values.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getSurroundInfo
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetUnwiseSettingsUsed" id="getUnwiseSettingsUsed"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getUnwiseSettingsUsed</span> (line <span class="line-number">433</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns whether unwise settings were used to encode the file.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">boolean</span>
+		<span class="method-name">
+			getUnwiseSettingsUsed
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetVbrMethod" id="getVbrMethod"><!-- --></a>
+<div class="oddrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getVbrMethod</span> (line <span class="line-number">285</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the VBR method used for encoding. See the corresponding constants  for possible return values.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">integer</span>
+		<span class="method-name">
+			getVbrMethod
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+<a name="methodgetVersion" id="getVersion"><!-- --></a>
+<div class="evenrow">
+	
+	<div class="method-header">
+		<img src="../../media/images/Method.png" />
+		<span class="method-title">getVersion</span> (line <span class="line-number">264</span>)
+	</div> 
+	
+	<!-- ========== Info from phpDoc block ========= -->
+<p class="short-description">Returns the version string of the header.</p>
+	<ul class="tags">
+				<li><span class="field">access:</span> public</li>
+			</ul>
+	
+	<div class="method-signature">
+		<span class="method-result">string</span>
+		<span class="method-name">
+			getVersion
+		</span>
+				()
+			</div>
+	
+		
+			
+	</div>
+							<h4>Inherited Methods</h4>
+				<a name='inherited_methods'><!-- --></a>	
+									<!-- =========== Summary =========== -->
+					<p>Inherited From <span class="classname"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html">Zend_Media_Mpeg_Abs_Object</a></span></p>
+					<blockquote>
+													<img src="../../media/images/Constructor.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#method__construct">Zend_Media_Mpeg_Abs_Object::__construct()</a></span><br>
+											</blockquote>
+									<!-- =========== Summary =========== -->
+					<p>Inherited From <span class="classname"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Object.html">Zend_Media_Mpeg_Object</a></span></p>
+					<blockquote>
+													<img src="../../media/images/Constructor.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Object.html#method__construct">Zend_Media_Mpeg_Object::__construct()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Object.html#methodclearOption">Zend_Media_Mpeg_Object::clearOption()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Object.html#methodformatTime">Zend_Media_Mpeg_Object::formatTime()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Object.html#methodgetOption">Zend_Media_Mpeg_Object::getOption()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Object.html#methodgetOptions">Zend_Media_Mpeg_Object::getOptions()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Object.html#methodnextStartCode">Zend_Media_Mpeg_Object::nextStartCode()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Object.html#methodprevStartCode">Zend_Media_Mpeg_Object::prevStartCode()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Object.html#methodsetOption">Zend_Media_Mpeg_Object::setOption()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Object.html#methodsetOptions">Zend_Media_Mpeg_Object::setOptions()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Object.html#method__get">Zend_Media_Mpeg_Object::__get()</a></span><br>
+													<img src="../../media/images/Method.png" alt=" "/>
+							<span class="method-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Object.html#method__set">Zend_Media_Mpeg_Object::__set()</a></span><br>
+											</blockquote>
+										
+		</div>
+	</div>
+
+	<a name="sec-consts"></a>
+	<div class="info-box">
+		<div class="info-box-title">Class Constants</div>
+		<div class="nav-bar">
+			<a href="#sec-description">Description</a> |
+										<a href="#sec-var-summary">Constants</a> (<span class="disabled">details</span>)
+						
+			
+												<a href="#sec-vars">Vars</a>
+														| 
+									<a href="#sec-method-summary">Methods</a> (<a href="#sec-methods">details</a>)
+							
+					</div>
+		<div class="info-box-body">
+			<a name="constENCODING_FLAG_NOGAP_CONTINUATION" id="ENCODING_FLAG_NOGAP_CONTINUATION"><!-- --></A>
+<div class="oddrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">ENCODING_FLAG_NOGAP_CONTINUATION</span>
+			 = <span class="const-default"> 8</span>
+			(line <span class="line-number">76</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constENCODING_FLAG_NOGAP_CONTINUED" id="ENCODING_FLAG_NOGAP_CONTINUED"><!-- --></A>
+<div class="evenrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">ENCODING_FLAG_NOGAP_CONTINUED</span>
+			 = <span class="const-default"> 4</span>
+			(line <span class="line-number">73</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constENCODING_FLAG_NSPSYTUNE" id="ENCODING_FLAG_NSPSYTUNE"><!-- --></A>
+<div class="oddrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">ENCODING_FLAG_NSPSYTUNE</span>
+			 = <span class="const-default"> 1</span>
+			(line <span class="line-number">67</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constENCODING_FLAG_NSSAFEJOINT" id="ENCODING_FLAG_NSSAFEJOINT"><!-- --></A>
+<div class="evenrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">ENCODING_FLAG_NSSAFEJOINT</span>
+			 = <span class="const-default"> 2</span>
+			(line <span class="line-number">70</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constMODE_AUTO" id="MODE_AUTO"><!-- --></A>
+<div class="oddrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">MODE_AUTO</span>
+			 = <span class="const-default"> 5</span>
+			(line <span class="line-number">94</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constMODE_DUAL" id="MODE_DUAL"><!-- --></A>
+<div class="evenrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">MODE_DUAL</span>
+			 = <span class="const-default"> 2</span>
+			(line <span class="line-number">85</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constMODE_FORCE" id="MODE_FORCE"><!-- --></A>
+<div class="oddrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">MODE_FORCE</span>
+			 = <span class="const-default"> 4</span>
+			(line <span class="line-number">91</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constMODE_INTENSITY" id="MODE_INTENSITY"><!-- --></A>
+<div class="evenrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">MODE_INTENSITY</span>
+			 = <span class="const-default"> 6</span>
+			(line <span class="line-number">97</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constMODE_JOINT" id="MODE_JOINT"><!-- --></A>
+<div class="oddrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">MODE_JOINT</span>
+			 = <span class="const-default"> 3</span>
+			(line <span class="line-number">88</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constMODE_MONO" id="MODE_MONO"><!-- --></A>
+<div class="evenrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">MODE_MONO</span>
+			 = <span class="const-default"> 0</span>
+			(line <span class="line-number">79</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constMODE_STEREO" id="MODE_STEREO"><!-- --></A>
+<div class="oddrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">MODE_STEREO</span>
+			 = <span class="const-default"> 1</span>
+			(line <span class="line-number">82</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constMODE_UNDEFINED" id="MODE_UNDEFINED"><!-- --></A>
+<div class="evenrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">MODE_UNDEFINED</span>
+			 = <span class="const-default"> 7</span>
+			(line <span class="line-number">100</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constSOURCE_FREQUENCY_32000_OR_LOWER" id="SOURCE_FREQUENCY_32000_OR_LOWER"><!-- --></A>
+<div class="oddrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">SOURCE_FREQUENCY_32000_OR_LOWER</span>
+			 = <span class="const-default"> 0</span>
+			(line <span class="line-number">103</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constSOURCE_FREQUENCY_44100" id="SOURCE_FREQUENCY_44100"><!-- --></A>
+<div class="evenrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">SOURCE_FREQUENCY_44100</span>
+			 = <span class="const-default"> 1</span>
+			(line <span class="line-number">106</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constSOURCE_FREQUENCY_48000" id="SOURCE_FREQUENCY_48000"><!-- --></A>
+<div class="oddrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">SOURCE_FREQUENCY_48000</span>
+			 = <span class="const-default"> 2</span>
+			(line <span class="line-number">109</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constSOURCE_FREQUENCY_HIGHER" id="SOURCE_FREQUENCY_HIGHER"><!-- --></A>
+<div class="evenrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">SOURCE_FREQUENCY_HIGHER</span>
+			 = <span class="const-default"> 3</span>
+			(line <span class="line-number">112</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constSURROUND_AMBISONIC" id="SURROUND_AMBISONIC"><!-- --></A>
+<div class="oddrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">SURROUND_AMBISONIC</span>
+			 = <span class="const-default"> 3</span>
+			(line <span class="line-number">124</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constSURROUND_DPL" id="SURROUND_DPL"><!-- --></A>
+<div class="evenrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">SURROUND_DPL</span>
+			 = <span class="const-default"> 1</span>
+			(line <span class="line-number">118</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constSURROUND_DPL2" id="SURROUND_DPL2"><!-- --></A>
+<div class="oddrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">SURROUND_DPL2</span>
+			 = <span class="const-default"> 2</span>
+			(line <span class="line-number">121</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constSURROUND_NONE" id="SURROUND_NONE"><!-- --></A>
+<div class="evenrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">SURROUND_NONE</span>
+			 = <span class="const-default"> 0</span>
+			(line <span class="line-number">115</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constVBR_METHOD_ABR" id="VBR_METHOD_ABR"><!-- --></A>
+<div class="oddrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">VBR_METHOD_ABR</span>
+			 = <span class="const-default"> 2</span>
+			(line <span class="line-number">55</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constVBR_METHOD_CONSTANT" id="VBR_METHOD_CONSTANT"><!-- --></A>
+<div class="evenrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">VBR_METHOD_CONSTANT</span>
+			 = <span class="const-default"> 1</span>
+			(line <span class="line-number">52</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constVBR_METHOD_MT" id="VBR_METHOD_MT"><!-- --></A>
+<div class="oddrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">VBR_METHOD_MT</span>
+			 = <span class="const-default"> 5</span>
+			(line <span class="line-number">64</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constVBR_METHOD_MTRH" id="VBR_METHOD_MTRH"><!-- --></A>
+<div class="evenrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">VBR_METHOD_MTRH</span>
+			 = <span class="const-default"> 4</span>
+			(line <span class="line-number">61</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+<a name="constVBR_METHOD_RH" id="VBR_METHOD_RH"><!-- --></A>
+<div class="oddrow">
+
+	<div class="const-header">
+		<img src="../../media/images/Variable.png" />
+		<span class="const-title">
+			<span class="const-name">VBR_METHOD_RH</span>
+			 = <span class="const-default"> 3</span>
+			(line <span class="line-number">58</span>)
+		</span>
+	</div>
+
+	<!-- ========== Info from phpDoc block ========= -->
+	
+	
+</div>
+							<h4>Inherited Constants</h4>
+				<A NAME='inherited_consts'><!-- --></A>
+									<p>Inherited from <span class="classname"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html">Zend_Media_Mpeg_Abs_Object</a></span></p>
+					<blockquote>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constCHANNEL_DUAL_CHANNEL">Zend_Media_Mpeg_Abs_Object::CHANNEL_DUAL_CHANNEL</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constCHANNEL_JOINT_STEREO">Zend_Media_Mpeg_Abs_Object::CHANNEL_JOINT_STEREO</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constCHANNEL_SINGLE_CHANNEL">Zend_Media_Mpeg_Abs_Object::CHANNEL_SINGLE_CHANNEL</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constCHANNEL_STEREO">Zend_Media_Mpeg_Abs_Object::CHANNEL_STEREO</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constEMPHASIS_50_15">Zend_Media_Mpeg_Abs_Object::EMPHASIS_50_15</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constEMPHASIS_CCIT_J17">Zend_Media_Mpeg_Abs_Object::EMPHASIS_CCIT_J17</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constEMPHASIS_NONE">Zend_Media_Mpeg_Abs_Object::EMPHASIS_NONE</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constLAYER_ONE">Zend_Media_Mpeg_Abs_Object::LAYER_ONE</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constLAYER_THREE">Zend_Media_Mpeg_Abs_Object::LAYER_THREE</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constLAYER_TWO">Zend_Media_Mpeg_Abs_Object::LAYER_TWO</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constMODE_ISOFF_MSSOFF">Zend_Media_Mpeg_Abs_Object::MODE_ISOFF_MSSOFF</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constMODE_ISOFF_MSSON">Zend_Media_Mpeg_Abs_Object::MODE_ISOFF_MSSON</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constMODE_ISON_MSSOFF">Zend_Media_Mpeg_Abs_Object::MODE_ISON_MSSOFF</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constMODE_ISON_MSSON">Zend_Media_Mpeg_Abs_Object::MODE_ISON_MSSON</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constMODE_SUBBAND_4_TO_31">Zend_Media_Mpeg_Abs_Object::MODE_SUBBAND_4_TO_31</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constMODE_SUBBAND_8_TO_31">Zend_Media_Mpeg_Abs_Object::MODE_SUBBAND_8_TO_31</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constMODE_SUBBAND_12_TO_31">Zend_Media_Mpeg_Abs_Object::MODE_SUBBAND_12_TO_31</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constMODE_SUBBAND_16_TO_31">Zend_Media_Mpeg_Abs_Object::MODE_SUBBAND_16_TO_31</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constSAMPLING_FREQUENCY_HIGH">Zend_Media_Mpeg_Abs_Object::SAMPLING_FREQUENCY_HIGH</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constSAMPLING_FREQUENCY_LOW">Zend_Media_Mpeg_Abs_Object::SAMPLING_FREQUENCY_LOW</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constVERSION_ONE">Zend_Media_Mpeg_Abs_Object::VERSION_ONE</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constVERSION_TWO">Zend_Media_Mpeg_Abs_Object::VERSION_TWO</a></span><br>
+							</span>
+													<img src="../../media/images/Variable.png" />
+							<span class="const-title">
+								<span class="const-name"><a href="../../Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html#constVERSION_TWO_FIVE">Zend_Media_Mpeg_Abs_Object::VERSION_TWO_FIVE</a></span><br>
+							</span>
+											</blockquote> 
+										
+		</div>
+	</div>
+	
+	<p class="notes" id="credit">
+		Documentation generated on Wed, 04 May 2011 08:36:48 +0300 by <a href="http://www.phpdoc.org" target="_blank">phpDocumentor 1.4.3</a>
+	</p>
+	</div></body>
+</html>

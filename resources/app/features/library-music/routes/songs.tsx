@@ -1,0 +1,99 @@
+import { ScrollList, ScrollListItem } from '@/features/library-music/components/scroll-list';
+import { Box, Flex } from '@mantine/core';
+import {
+  useAlbumServiceAlbumsIndex,
+  useArtistServiceArtistsIndex,
+  useGenreServiceGenresIndex,
+} from '@/api-client/queries';
+import { useEffect, useState } from 'react';
+import { SongList } from '@/features/library-music/components/song-list/song-list.tsx';
+import { useParams } from 'react-router-dom';
+import styles from './songs.module.scss';
+import { nprogress } from '@mantine/nprogress';
+
+export default function Songs() {
+  const {library} = useParams();
+  if (!library) return <>Error no library</>;
+
+  const {data: genreData, isFetching: isGenresFetching} = useGenreServiceGenresIndex({library});
+  const [genres, setGenres] = useState<ScrollListItem[]>([]);
+
+  useEffect(() => {
+    if (genreData) {
+      const data = genreData.data.map(x => ({
+        label: x.name,
+        key: x.slug,
+      }));
+
+      setGenres(data);
+    }
+  }, [genreData]);
+
+  const {data: albumData, isFetching: isAlbumsFetching} = useAlbumServiceAlbumsIndex({library, fields: 'title,slug'});
+  const [albums, setAlbums] = useState<ScrollListItem[]>([]);
+  useEffect(() => {
+    if (albumData) {
+      const items = albumData.data.map(x => ({
+        label: x.title,
+        key: x.slug,
+      }));
+
+      setAlbums(items);
+    }
+  }, [albumData]);
+
+  const {data: artistData, isFetching: isArtistsFetching} = useArtistServiceArtistsIndex({library});
+  const [artists, setArtists] = useState<ScrollListItem[]>([]);
+
+  useEffect(() => {
+    if (artistData) {
+      const items = artistData.data.map(x => ({
+        label: x.name,
+        key: x.slug,
+      }));
+      setArtists(items);
+    }
+  }, [artistData]);
+
+  useEffect(() => {
+    const isDone = isAlbumsFetching && isArtistsFetching && isGenresFetching;
+
+    if (!isDone) {
+      nprogress.increment();
+    } else {
+      nprogress.complete();
+    }
+  }, [isAlbumsFetching, isArtistsFetching, isGenresFetching]);
+
+  return (
+    <Box>
+      <Flex justify="space-between" m="-12px">
+        <ScrollList
+          header="Genres"
+          listItems={genres}
+          totalCount={genres.length}
+          style={{height: 150, flexGrow: 1}}
+        />
+
+        <ScrollList
+          header="Artists"
+          listItems={artists}
+          totalCount={artists.length}
+          style={{height: 150}}
+        />
+
+        <ScrollList
+          header="Albums"
+          listItems={albums}
+          totalCount={albums.length}
+          style={{height: 150}}
+        />
+      </Flex>
+
+      <Box className={styles.songListContainer}>
+        <SongList/>
+      </Box>
+    </Box>
+  );
+
+}
