@@ -6,6 +6,7 @@ use App\Events\LibraryScanCompleted;
 use App\Extensions\StrExt;
 use App\Jobs\BaseJob;
 use App\Models\{Album, Artist, Genre, Library, Song};
+use Arr;
 use App\Modules\MetaAudio\{MetaAudio, Mp3, Tagger};
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -81,9 +82,6 @@ class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
         $coverJobs = [];
 
         $files->each(/**
-         * @throws \Throwable
-         * @throws MbstringException
-         * @throws StringsException
          */ function (\SplFileInfo $file) use (&$coverJobs, &$lyrics) {
             $this->logger()->info('Scanning file: ' . $file->getFilename());
 
@@ -150,9 +148,9 @@ class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
 
             $this->processArtists($artists, $song);
 
-            if (!$album->cover()->exists() && !isset($coverJobs[$album->id])) {
+            if (!$album->cover()->exists() && !Arr::has($coverJobs, $album->id)) {
                 dispatch(new SaveAlbumCoverJob($album));
-                $coverJobs[$album->id] = true;
+                $coverJobs[] = $album->id;
             }
         });
     }

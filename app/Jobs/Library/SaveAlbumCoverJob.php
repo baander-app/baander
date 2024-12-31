@@ -41,12 +41,6 @@ class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
     {
         $this->queueProgress(0);
 
-        if ($this->album->cover()->exists()) {
-            $this->queueData(['status' => 'Skipped. Cover already exists.']);
-            $this->queueProgress(100);
-            return;
-        }
-
         $song = $this->album->songs()->firstOrFail();
         $id3 = new Zend_Media_Id3v2($song->path);
         $frames = $id3->getFramesByIdentifier('APIC');
