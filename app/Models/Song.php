@@ -19,6 +19,7 @@ class Song extends BaseModel implements DirectStreamableFile
 
     public static array $filterRelations = [
         'album',
+        'album.cover',
         'artists',
         'albumArtist',
         'genres',

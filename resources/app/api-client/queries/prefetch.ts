@@ -18,19 +18,19 @@ import * as Common from "./common";
 * - library
 * - songs
 * @param data.page Current page
-* @param data.perPage Items per page
+* @param data.limit Items per page
 * @param data.genres _Extension_ Comma seperated list of genres
 * @returns unknown Json paginated set of `AlbumResourceResource`
 * @throws ApiError
 */
-export const prefetchUseAlbumServiceAlbumsIndex = (queryClient: QueryClient, { fields, genres, library, page, perPage, relations }: {
+export const prefetchUseAlbumServiceAlbumsIndex = (queryClient: QueryClient, { fields, genres, library, limit, page, relations }: {
   fields?: string;
   genres?: string;
   library: string;
+  limit?: number;
   page?: number;
-  perPage?: number;
   relations?: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseAlbumServiceAlbumsIndexKeyFn({ fields, genres, library, page, perPage, relations }), queryFn: () => AlbumService.albumsIndex({ fields, genres, library, page, perPage, relations }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseAlbumServiceAlbumsIndexKeyFn({ fields, genres, library, limit, page, relations }), queryFn: () => AlbumService.albumsIndex({ fields, genres, library, limit, page, relations }) });
 /**
 * Get an album
 * @param data The data for the request.
@@ -54,19 +54,19 @@ export const prefetchUseAlbumServiceAlbumsShow = (queryClient: QueryClient, { al
 * - portrait
 * - songs
 * @param data.page Current page
-* @param data.perPage Items per page
+* @param data.limit Items per page
 * @param data.genres _Extension_ Comma seperated list of genres
 * @returns unknown Json paginated set of `ArtistResource`
 * @throws ApiError
 */
-export const prefetchUseArtistServiceArtistsIndex = (queryClient: QueryClient, { fields, genres, library, page, perPage, relations }: {
+export const prefetchUseArtistServiceArtistsIndex = (queryClient: QueryClient, { fields, genres, library, limit, page, relations }: {
   fields?: string;
   genres?: string;
   library: string;
+  limit?: number;
   page?: number;
-  perPage?: number;
   relations?: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseArtistServiceArtistsIndexKeyFn({ fields, genres, library, page, perPage, relations }), queryFn: () => ArtistService.artistsIndex({ fields, genres, library, page, perPage, relations }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseArtistServiceArtistsIndexKeyFn({ fields, genres, library, limit, page, relations }), queryFn: () => ArtistService.artistsIndex({ fields, genres, library, limit, page, relations }) });
 /**
 * Get an artist
 * @param data The data for the request.
@@ -87,17 +87,19 @@ export const prefetchUseArtistServiceArtistsShow = (queryClient: QueryClient, { 
 * - slug
 * @param data.relations Comma seperated string of relations
 * - songs
-* @param data.page
-* @param data.perPage
-* @returns GenreResource Array of `GenreResource`
+* @param data.librarySlug Constrain the query to only fetch genres that are contained within the given library
+* @param data.page Current page
+* @param data.limit Items per page
+* @returns unknown Json paginated set of `GenreResource`
 * @throws ApiError
 */
-export const prefetchUseGenreServiceGenresIndex = (queryClient: QueryClient, { fields, page, perPage, relations }: {
+export const prefetchUseGenreServiceGenresIndex = (queryClient: QueryClient, { fields, librarySlug, limit, page, relations }: {
   fields?: string;
+  librarySlug?: string;
+  limit?: number;
   page?: number;
-  perPage?: number;
   relations?: string;
-} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseGenreServiceGenresIndexKeyFn({ fields, page, perPage, relations }), queryFn: () => GenreService.genresIndex({ fields, page, perPage, relations }) });
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseGenreServiceGenresIndexKeyFn({ fields, librarySlug, limit, page, relations }), queryFn: () => GenreService.genresIndex({ fields, librarySlug, limit, page, relations }) });
 /**
 * Get a genre
 * @param data The data for the request.
@@ -121,15 +123,15 @@ export const prefetchUseImageServiceImageServe = (queryClient: QueryClient, { im
 /**
 * Get a collection of media libraries
 * @param data The data for the request.
-* @param data.page
-* @param data.perPage
+* @param data.page Current page
+* @param data.limit Items per page
 * @returns unknown Json paginated set of `LibraryResource`
 * @throws ApiError
 */
-export const prefetchUseLibraryServiceLibrariesIndex = (queryClient: QueryClient, { page, perPage }: {
+export const prefetchUseLibraryServiceLibrariesIndex = (queryClient: QueryClient, { limit, page }: {
+  limit?: number;
   page?: number;
-  perPage?: number;
-} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseLibraryServiceLibrariesIndexKeyFn({ page, perPage }), queryFn: () => LibraryService.librariesIndex({ page, perPage }) });
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseLibraryServiceLibrariesIndexKeyFn({ limit, page }), queryFn: () => LibraryService.librariesIndex({ limit, page }) });
 /**
 * @returns string
 * @throws ApiError
@@ -152,21 +154,25 @@ export const prefetchUseOpCacheServiceOpcacheGetConfig = (queryClient: QueryClie
 * @param data The data for the request.
 * @param data.library The library slug
 * @param data.page Current page
-* @param data.perPage Items per page
+* @param data.limit Items per page
 * @param data.genreNames Comma seperated list of genre names You can only search for names or slugs. Not both.
 * @param data.genreSlugs Comma seperated list of genre slugs
-* @param data.relations
+* @param data.relations Comma seperated string of relations
+* - album
+* - artists
+* - albumArtist
+* - genres
 * @returns unknown Json paginated set of `SongResource`
 * @throws ApiError
 */
-export const prefetchUseSongServiceSongsIndex = (queryClient: QueryClient, { genreNames, genreSlugs, library, page, perPage, relations }: {
+export const prefetchUseSongServiceSongsIndex = (queryClient: QueryClient, { genreNames, genreSlugs, library, limit, page, relations }: {
   genreNames?: string;
   genreSlugs?: string;
   library: string;
+  limit?: number;
   page?: number;
-  perPage?: number;
   relations?: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseSongServiceSongsIndexKeyFn({ genreNames, genreSlugs, library, page, perPage, relations }), queryFn: () => SongService.songsIndex({ genreNames, genreSlugs, library, page, perPage, relations }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseSongServiceSongsIndexKeyFn({ genreNames, genreSlugs, library, limit, page, relations }), queryFn: () => SongService.songsIndex({ genreNames, genreSlugs, library, limit, page, relations }) });
 /**
 * Get a song
 * @param data The data for the request.

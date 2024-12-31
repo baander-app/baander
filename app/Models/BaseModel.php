@@ -23,4 +23,6 @@ abstract class BaseModel extends Model
     {
         return new BaseBuilder($query);
     }
+
+
 }

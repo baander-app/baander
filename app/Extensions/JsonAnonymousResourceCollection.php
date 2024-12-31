@@ -1,0 +1,19 @@
+<?php
+
+namespace App\Extensions;
+
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+
+class JsonAnonymousResourceCollection extends AnonymousResourceCollection
+{
+    protected function preparePaginatedResponse($request)
+    {
+        if ($this->preserveAllQueryParameters) {
+            $this->resource->appends($request->query());
+        } elseif (! is_null($this->queryParameters)) {
+            $this->resource->appends($this->queryParameters);
+        }
+
+        return (new JsonPaginatedResourceResponse($this))->toResponse($request);
+    }
+}

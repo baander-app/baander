@@ -1,5 +1,4 @@
 import React, { useCallback, useState } from 'react';
-import { useSongServiceSongsIndex } from '@/api-client/queries';
 import { TableVirtuoso } from 'react-virtuoso';
 import { Modal, Table, Text } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
@@ -9,17 +8,21 @@ import { SongResource } from '@/api-client/requests';
 import { SongDetail } from '@/features/library-music/components/song-detail/song-detail.tsx';
 import styles from './song-list.module.scss';
 import { useMusicSource } from '@/providers/music-source-provider';
-
-const perPage = 30;
+import { usePathParam } from '@/hooks/use-path-param.ts';
+import { LibraryParams } from '@/features/library-music/routes/_routes.tsx';
+import { useSongServiceSongsIndexInfinite } from '@/api-client/queries/infiniteQueries.ts';
 
 export function SongList() {
-  const [currentPage, setCurrentPage] = useState(0);
-  const {data: songData} = useSongServiceSongsIndex({library: 'music', page: currentPage, perPage});
+  const { library: libraryParam } = usePathParam<LibraryParams>()
+
+  const { data: songData, fetchNextPage, hasNextPage } = useSongServiceSongsIndexInfinite({ library: libraryParam, relations: 'album,album.cover' });
   const [activeIndex, setActiveIndex] = useState(0);
+
+  const { showContextMenu } = useContextMenu();
+  const { setSong } = useMusicSource();
+
   const [openedSong, setOpenedSong] = useState<SongResource>();
-  const [opened, {open, close}] = useDisclosure(false);
-  const {showContextMenu} = useContextMenu();
-  const {setSong} = useMusicSource();
+  const [opened, { open, close }] = useDisclosure(false);
 
   const getContextMenuTemplate = useCallback((data: SongResource) => {
     const contextMenuTemplate: ContextMenuContent = [
@@ -51,26 +54,18 @@ export function SongList() {
     setSong(song);
   }, [setActiveIndex, setSong]);
 
-  const loadMore = useCallback(() => {
-    const lastPage = songData?.meta?.lastPage;
-    if (lastPage && lastPage > currentPage) {
-      console.log(currentPage)
-      setCurrentPage(currentPage + 1);
-      console.log('currentPage', currentPage)
-    }
-  }, [songData])
-
-
   return (
     <>
       <TableVirtuoso
         className={styles.scrollList}
-        data={songData?.data}
-        totalCount={songData?.meta.count}
+        data={songData?.pages.flatMap(page => page.data)}
+        totalCount={songData?.pages[0].total}
         // @ts-ignore
         components={TableComponents}
         useWindowScroll={true}
-        endReached={loadMore}
+        endReached={() => {
+          hasNextPage && fetchNextPage();
+        }}
         fixedHeaderContent={() => (
           <Table.Tr>
             <Table.Td w="50%">Title</Table.Td>
@@ -88,7 +83,7 @@ export function SongList() {
             >
               <Table.Td
                 className={styles.listItem}
-                style={{backgroundColor: activeIndex === index ? '#ccc' : 'unset'}}
+                style={{ backgroundColor: activeIndex === index ? '#ccc' : 'unset' }}
                 onClick={() => onSongClick(index, data)}
                 onContextMenu={showContextMenu(getContextMenuTemplate(data))}
               >
@@ -97,32 +92,31 @@ export function SongList() {
 
               <Table.Td
                 className={styles.listItem}
-                style={{backgroundColor: activeIndex === index ? '#ccc' : 'unset'}}
+                style={{ backgroundColor: activeIndex === index ? '#ccc' : 'unset' }}
                 onClick={() => onSongClick(index, data)}
               >
                 <Text size="sm">{
-                  // @ts-ignore
                   data?.album?.title
                 }</Text>
               </Table.Td>
 
               <Table.Td
                 className={styles.listItem}
-                style={{backgroundColor: activeIndex === index ? '#ccc' : 'unset'}}
+                style={{ backgroundColor: activeIndex === index ? '#ccc' : 'unset' }}
                 onClick={() => onSongClick(index, data)}
                 onContextMenu={showContextMenu(getContextMenuTemplate(data))}
-              >{data.year}</Table.Td>
+              >{data.album?.year}</Table.Td>
 
               <Table.Td
                 className={styles.listItem}
-                style={{backgroundColor: activeIndex === index ? '#ccc' : 'unset'}}
+                style={{ backgroundColor: activeIndex === index ? '#ccc' : 'unset' }}
                 onClick={() => onSongClick(index, data)}
                 onContextMenu={showContextMenu(getContextMenuTemplate(data))}
               >{data.durationHuman}</Table.Td>
 
               <Table.Td
                 className={styles.listItem}
-                style={{backgroundColor: activeIndex === index ? '#ccc' : 'unset'}}
+                style={{ backgroundColor: activeIndex === index ? '#ccc' : 'unset' }}
                 onClick={() => onSongClick(index, data)}
                 onContextMenu={showContextMenu(getContextMenuTemplate(data))}
               >{data.track}</Table.Td>
@@ -153,15 +147,15 @@ interface ScrollerProps {
   [key: string]: any;
 }
 
-const Scroller = React.forwardRef<HTMLDivElement, ScrollerProps>(({style, ...props}, ref) => {
+const Scroller = React.forwardRef<HTMLDivElement, ScrollerProps>(({ style, ...props }, ref) => {
   // an alternative option to assign the ref is
   // <div ref={(r) => ref.current = r}>
-  return <div className={styles.scrollbar} style={{...style}} ref={ref} {...props} />;
+  return <div className={styles.scrollbar} style={{ ...style }} ref={ref} {...props} />;
 });
 const TableComponents = {
   // Footer,
   Scroller,
-  Table: (props: TableProps) => <Table {...props} style={{borderCollapse: 'separate'}}/>,
+  Table: (props: TableProps) => <Table {...props} style={{ borderCollapse: 'separate' }}/>,
   TableHead: Table.Thead,
   TableRow: Table.Tr,
   // @ts-ignore

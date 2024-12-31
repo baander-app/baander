@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Genre;
 
+use App\Http\Resources\HasJsonCollection;
 use App\Http\Resources\Song\SongResource;
 use App\Models\Genre;
 use Illuminate\Http\Request;
@@ -12,6 +13,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class GenreResource extends JsonResource
 {
+    use HasJsonCollection;
+
     /**
      * Transform the resource into an array.
      *

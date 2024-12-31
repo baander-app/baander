@@ -13,3 +13,7 @@ export const LibraryMusicRoutes = () => {
     </Routes>
   )
 }
+
+export interface LibraryParams {
+  library: string;
+}

@@ -22,10 +22,16 @@ class LibraryIndexRequest extends FormRequest
     public function rules(): array
     {
         return [
-            /** @query */
-            'page' => 'int',
-            /** @query */
-            'perPage' => 'int',
+            /**
+             * @query
+             * Current page
+             */
+            'page'        => 'int',
+            /**
+             * @query
+             * Items per page
+             */
+            'limit'       => 'int',
         ];
     }
 }

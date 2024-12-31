@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Song;
 
 use App\Http\Resources\Album\AlbumWithoutSongsResource;
+use App\Http\Resources\HasJsonCollection;
 use App\Models\Song;
 use App\Packages\Humanize\HumanDuration;
 use Illuminate\Http\Request;
@@ -14,6 +15,8 @@ use function App\Packages\Humanize\humanize_bytes;
  */
 class SongResource extends JsonResource
 {
+    use HasJsonCollection;
+
     /**
      * Transform the resource into an array.
      *

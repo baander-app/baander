@@ -28,17 +28,29 @@ class GenreIndexRequest extends FormRequest
              * - name
              * - slug
              */
-            'fields'    => 'string',
+            'fields'      => 'string',
             /**
              * @query
              * Comma seperated string of relations
              * - songs
              */
-            'relations' => 'string',
-            /** @query */
-            'page' => 'int',
-            /** @query */
-            'perPage' => 'int',
+            'relations'   => 'string',
+            /**
+             * @query
+             *
+             * Constrain the query to only fetch genres that are contained within the given library
+             */
+            'librarySlug' => 'string',
+            /**
+             * @query
+             * Current page
+             */
+            'page'        => 'int',
+            /**
+             * @query
+             * Items per page
+             */
+            'limit'       => 'int',
         ];
     }
 }

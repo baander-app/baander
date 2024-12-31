@@ -24,22 +24,14 @@ class SongIndexRequest extends FormRequest
         return [
             /**
              * @query
-             * Comma seperated string of relations
-             * - album
-             * - artists
-             * - albumArtist
-             * - genres
-             */
-            /**
-             * @query
              * Current page
              */
-            'page'      => 'int',
+            'page'       => 'int',
             /**
              * @query
              * Items per page
              */
-            'perPage'   => 'int',
+            'limit'      => 'int',
             /**
              * @query
              * Comma seperated list of genre names
@@ -52,6 +44,15 @@ class SongIndexRequest extends FormRequest
              * Comma seperated list of genre slugs
              */
             'genreSlugs' => 'string',
+            /**
+             * @query
+             * Comma seperated string of relations
+             * - album
+             * - artists
+             * - albumArtist
+             * - genres
+             */
+            'relations' => 'string',
         ];
     }
 }

@@ -5,14 +5,14 @@ import { AlbumService, ArtistService, AuthService, GenreService, ImageService, J
 export type AlbumServiceAlbumsIndexDefaultResponse = Awaited<ReturnType<typeof AlbumService.albumsIndex>>;
 export type AlbumServiceAlbumsIndexQueryResult<TData = AlbumServiceAlbumsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAlbumServiceAlbumsIndexKey = "AlbumServiceAlbumsIndex";
-export const UseAlbumServiceAlbumsIndexKeyFn = ({ fields, genres, library, page, perPage, relations }: {
+export const UseAlbumServiceAlbumsIndexKeyFn = ({ fields, genres, library, limit, page, relations }: {
   fields?: string;
   genres?: string;
   library: string;
+  limit?: number;
   page?: number;
-  perPage?: number;
   relations?: string;
-}, queryKey?: Array<unknown>) => [useAlbumServiceAlbumsIndexKey, ...(queryKey ?? [{ fields, genres, library, page, perPage, relations }])];
+}, queryKey?: Array<unknown>) => [useAlbumServiceAlbumsIndexKey, ...(queryKey ?? [{ fields, genres, library, limit, page, relations }])];
 export type AlbumServiceAlbumsShowDefaultResponse = Awaited<ReturnType<typeof AlbumService.albumsShow>>;
 export type AlbumServiceAlbumsShowQueryResult<TData = AlbumServiceAlbumsShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAlbumServiceAlbumsShowKey = "AlbumServiceAlbumsShow";
@@ -23,14 +23,14 @@ export const UseAlbumServiceAlbumsShowKeyFn = ({ album, library }: {
 export type ArtistServiceArtistsIndexDefaultResponse = Awaited<ReturnType<typeof ArtistService.artistsIndex>>;
 export type ArtistServiceArtistsIndexQueryResult<TData = ArtistServiceArtistsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useArtistServiceArtistsIndexKey = "ArtistServiceArtistsIndex";
-export const UseArtistServiceArtistsIndexKeyFn = ({ fields, genres, library, page, perPage, relations }: {
+export const UseArtistServiceArtistsIndexKeyFn = ({ fields, genres, library, limit, page, relations }: {
   fields?: string;
   genres?: string;
   library: string;
+  limit?: number;
   page?: number;
-  perPage?: number;
   relations?: string;
-}, queryKey?: Array<unknown>) => [useArtistServiceArtistsIndexKey, ...(queryKey ?? [{ fields, genres, library, page, perPage, relations }])];
+}, queryKey?: Array<unknown>) => [useArtistServiceArtistsIndexKey, ...(queryKey ?? [{ fields, genres, library, limit, page, relations }])];
 export type ArtistServiceArtistsShowDefaultResponse = Awaited<ReturnType<typeof ArtistService.artistsShow>>;
 export type ArtistServiceArtistsShowQueryResult<TData = ArtistServiceArtistsShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useArtistServiceArtistsShowKey = "ArtistServiceArtistsShow";
@@ -41,12 +41,13 @@ export const UseArtistServiceArtistsShowKeyFn = ({ artist, library }: {
 export type GenreServiceGenresIndexDefaultResponse = Awaited<ReturnType<typeof GenreService.genresIndex>>;
 export type GenreServiceGenresIndexQueryResult<TData = GenreServiceGenresIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useGenreServiceGenresIndexKey = "GenreServiceGenresIndex";
-export const UseGenreServiceGenresIndexKeyFn = ({ fields, page, perPage, relations }: {
+export const UseGenreServiceGenresIndexKeyFn = ({ fields, librarySlug, limit, page, relations }: {
   fields?: string;
+  librarySlug?: string;
+  limit?: number;
   page?: number;
-  perPage?: number;
   relations?: string;
-} = {}, queryKey?: Array<unknown>) => [useGenreServiceGenresIndexKey, ...(queryKey ?? [{ fields, page, perPage, relations }])];
+} = {}, queryKey?: Array<unknown>) => [useGenreServiceGenresIndexKey, ...(queryKey ?? [{ fields, librarySlug, limit, page, relations }])];
 export type GenreServiceGenresShowDefaultResponse = Awaited<ReturnType<typeof GenreService.genresShow>>;
 export type GenreServiceGenresShowQueryResult<TData = GenreServiceGenresShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useGenreServiceGenresShowKey = "GenreServiceGenresShow";
@@ -62,10 +63,10 @@ export const UseImageServiceImageServeKeyFn = ({ image }: {
 export type LibraryServiceLibrariesIndexDefaultResponse = Awaited<ReturnType<typeof LibraryService.librariesIndex>>;
 export type LibraryServiceLibrariesIndexQueryResult<TData = LibraryServiceLibrariesIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useLibraryServiceLibrariesIndexKey = "LibraryServiceLibrariesIndex";
-export const UseLibraryServiceLibrariesIndexKeyFn = ({ page, perPage }: {
+export const UseLibraryServiceLibrariesIndexKeyFn = ({ limit, page }: {
+  limit?: number;
   page?: number;
-  perPage?: number;
-} = {}, queryKey?: Array<unknown>) => [useLibraryServiceLibrariesIndexKey, ...(queryKey ?? [{ page, perPage }])];
+} = {}, queryKey?: Array<unknown>) => [useLibraryServiceLibrariesIndexKey, ...(queryKey ?? [{ limit, page }])];
 export type ModelSchemaServiceSchemasModelDefaultResponse = Awaited<ReturnType<typeof ModelSchemaService.schemasModel>>;
 export type ModelSchemaServiceSchemasModelQueryResult<TData = ModelSchemaServiceSchemasModelDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useModelSchemaServiceSchemasModelKey = "ModelSchemaServiceSchemasModel";
@@ -81,14 +82,14 @@ export const UseOpCacheServiceOpcacheGetConfigKeyFn = (queryKey?: Array<unknown>
 export type SongServiceSongsIndexDefaultResponse = Awaited<ReturnType<typeof SongService.songsIndex>>;
 export type SongServiceSongsIndexQueryResult<TData = SongServiceSongsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSongServiceSongsIndexKey = "SongServiceSongsIndex";
-export const UseSongServiceSongsIndexKeyFn = ({ genreNames, genreSlugs, library, page, perPage, relations }: {
+export const UseSongServiceSongsIndexKeyFn = ({ genreNames, genreSlugs, library, limit, page, relations }: {
   genreNames?: string;
   genreSlugs?: string;
   library: string;
+  limit?: number;
   page?: number;
-  perPage?: number;
   relations?: string;
-}, queryKey?: Array<unknown>) => [useSongServiceSongsIndexKey, ...(queryKey ?? [{ genreNames, genreSlugs, library, page, perPage, relations }])];
+}, queryKey?: Array<unknown>) => [useSongServiceSongsIndexKey, ...(queryKey ?? [{ genreNames, genreSlugs, library, limit, page, relations }])];
 export type SongServiceSongsShowDefaultResponse = Awaited<ReturnType<typeof SongService.songsShow>>;
 export type SongServiceSongsShowQueryResult<TData = SongServiceSongsShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSongServiceSongsShowKey = "SongServiceSongsShow";

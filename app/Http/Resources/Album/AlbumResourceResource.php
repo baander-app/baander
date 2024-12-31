@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Album;
 
 use App\Http\Resources\Artist\ArtistResource;
+use App\Http\Resources\HasJsonCollection;
 use App\Http\Resources\Image\ImageResource;
 use App\Http\Resources\Song\SongResource;
 use App\Models\Album;
@@ -13,6 +14,8 @@ use Illuminate\Http\Request;
  */
 class AlbumResourceResource extends AlbumWithoutSongsResource
 {
+    use HasJsonCollection;
+
     /**
      * Transform the resource into an array.
      *

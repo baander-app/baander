@@ -2,14 +2,18 @@
 
 namespace App\Providers;
 
+use App\Extensions\JsonAnonymousResourceCollection;
+use App\Extensions\JsonPaginatedResourceResponse;
 use App\Packages\JsonSchema\Validation\DefaultValidationRuleProvider;
 use App\Packages\JsonSchema\Validation\ValidationRuleProviderInterface;
 use App\Repositories\Cache\CacheRepositoryInterface;
 use App\Repositories\Cache\LaravelCacheRepository;
 use App\View\Composers\BaanderViewComposer;
 use Ergebnis\Clock\SystemClock;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\{DB, URL, View};
+use Illuminate\Http\Resources\Json\PaginatedResourceResponse;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider

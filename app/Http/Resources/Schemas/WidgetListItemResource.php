@@ -2,11 +2,14 @@
 
 namespace App\Http\Resources\Schemas;
 
+use App\Http\Resources\HasJsonCollection;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class WidgetListItemResource extends JsonResource
 {
+    use HasJsonCollection;
+
     /**
      * Transform the resource into an array.
      *
