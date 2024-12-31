@@ -1,5 +1,5 @@
-import { ThreeBandEq } from '@/lib/models/three-band-eq.ts';
-import { BarsMode } from '@/features/feature-equalizer/types.ts';
+import { ThreeBandEq } from '@/modules/equalizer/models/three-band-eq.ts';
+import { BarsMode } from '@/modules/equalizer/types.ts';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 export interface EqualizerState {

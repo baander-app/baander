@@ -3,7 +3,7 @@ import { lazyImport } from '@/utils/lazy-import.ts';
 import { AppShell, Flex, Title } from '@mantine/core';
 import { Env } from '@/common/env.ts';
 
-const { BaanderLogo } = lazyImport(() => import('@/components/branding/baander-logo/baander-logo.tsx'), 'BaanderLogo');
+const { BaanderLogo } = lazyImport(() => import('@/ui/branding/baander-logo/baander-logo.tsx'), 'BaanderLogo');
 
 export function BareLayout(props: { children?: ReactNode }) {
   return (

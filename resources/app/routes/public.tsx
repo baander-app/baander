@@ -1,9 +1,9 @@
 import { lazyImport } from '@/utils/lazy-import.ts';
-import { BareLayout } from '@/layouts/bare-layout';
+import { BareLayout } from '@/layouts/bare-layout/bare-layout.tsx';
 import { Outlet } from 'react-router-dom';
-import { AuthorizeRoutes } from '@/features/authorize/routes.tsx';
+import { AuthorizeRoutes } from '@/modules/authorize/routes.tsx';
 
-const {AuthRoutes} = lazyImport(() => import('@/features/auth/routes'), 'AuthRoutes');
+const {AuthRoutes} = lazyImport(() => import('@/modules/auth/routes'), 'AuthRoutes');
 
 const App = () => {
   return (

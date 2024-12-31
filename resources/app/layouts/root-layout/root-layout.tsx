@@ -1,16 +1,16 @@
 import { ReactNode, useMemo } from 'react';
 import styles from './root-layout.module.scss';
 import { AppShell, Burger, Group, Text } from '@mantine/core';
-import { NavLink } from '@/components/nav-link.tsx';
+import { NavLink } from '@/ui/nav-link.tsx';
 import { useDisclosure } from '@mantine/hooks';
-import { UserMenu } from '@/layouts/root-layout/user-menu.tsx';
-import { MusicLibraryNav } from '@/layouts/root-layout/music-library-nav/music-library-nav.tsx';
+import { UserMenu } from '@/layouts/root-layout/components/user-menu.tsx';
+import { MusicLibraryNav } from '@/layouts/root-layout/components/music-library-nav.tsx';
 import { lazyImport } from '@/utils/lazy-import.ts';
-import { LibraryNav } from '@/layouts/root-layout/library-nav/library-nav.tsx';
+import { LibraryNav } from '@/layouts/root-layout/components/library-nav.tsx';
 import { useLibraryServiceLibrariesIndex } from '@/api-client/queries';
 
-const { BaanderLogo } = lazyImport(() => import('@/components/branding/baander-logo/baander-logo.tsx'), 'BaanderLogo');
-const { InlinePlayer } = lazyImport(() => import('@/features/library-music-player/inline-player/inline-player.tsx'), 'InlinePlayer');
+const { BaanderLogo } = lazyImport(() => import('@/ui/branding/baander-logo/baander-logo.tsx'), 'BaanderLogo');
+const { InlinePlayer } = lazyImport(() => import('@/modules/library-music-player/inline-player/inline-player.tsx'), 'InlinePlayer');
 
 export function RootLayout(props: { children?: ReactNode }) {
   const [opened, { toggle }] = useDisclosure();

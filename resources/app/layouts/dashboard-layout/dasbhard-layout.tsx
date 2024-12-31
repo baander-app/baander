@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { AppShell } from '@mantine/core';
 import { lazyImport } from '@/utils/lazy-import.ts';
 
-const { DashboardMenu } = lazyImport(() => import('@/layouts/dashboard-layout/dashboard-menu.tsx'), 'DashboardMenu');
+const { DashboardMenu } = lazyImport(() => import('@/layouts/dashboard-layout/components/dashboard-menu.tsx'), 'DashboardMenu');
 
 export interface DashboardLayoutProps {
   children?: ReactNode;

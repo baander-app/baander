@@ -2,15 +2,15 @@ import { RootLayout } from '@/layouts/root-layout/root-layout.tsx';
 import { Navigate, Outlet, RouteObject } from 'react-router-dom';
 import { EchoContextProvider } from '@/providers/echo-provider.tsx';
 import { Suspense } from 'react';
-import { LibraryMusicRoutes } from '@/features/library-music/routes/_routes.tsx';
+import { LibraryMusicRoutes } from '@/modules/library-music/routes/_routes.tsx';
 import { DashboardLayout } from '@/layouts/dashboard-layout/dasbhard-layout.tsx';
-import { AccountRoutes } from '@/features/account/routes/routes.tsx';
-import { DashboardRoutes } from '@/features/dashboard/routes.tsx';
-import { AudioPlayerContextProvider } from '@/features/library-music-player/providers/audio-player-provider.tsx';
-import { UserSettingsRoutes } from '@/features/feature-user-settings/routes/routes.tsx';
+import { AccountRoutes } from '@/modules/account/routes/routes.tsx';
+import { DashboardRoutes } from '@/modules/dashboard/routes.tsx';
+import { AudioPlayerContextProvider } from '@/modules/library-music-player/providers/audio-player-provider.tsx';
+import { UserSettingsRoutes } from '@/modules/user-settings/routes/routes.tsx';
 import { useLibraryServiceLibraryShow } from '@/api-client/queries';
 import { usePathParam } from '@/hooks/use-path-param.ts';
-import { LibraryMoviesRoutes } from '@/features/library-movies/routes/_routes.tsx';
+import { LibraryMoviesRoutes } from '@/modules/library-movies/routes/_routes.tsx';
 
 const App = () => {
   return (
