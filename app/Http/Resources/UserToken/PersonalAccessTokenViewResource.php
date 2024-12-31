@@ -24,6 +24,9 @@ class PersonalAccessTokenViewResource extends JsonResource
         return [
             'id'                    => $this->id,
             'name'                  => $this->name,
+            /**
+             * @var array<string>|null
+             */
             'abilities'             => $this->abilities,
             'userAgent'             => $this->user_agent,
             'clientName'            => $this->client_name,

@@ -51,7 +51,7 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
         'device_operating_system' => "null|string",
         'device_name'             => "null|string",
     ])]
-    public static function prepareDeviceFromRequest(Request $request)
+    public static function prepareDeviceFromRequest(Request $request): array
     {
         $deviceDetector = Device::detectRequest($request);
 
@@ -63,6 +63,11 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
         if ($osVersion === 'UNK') {
             $osVersion = null;
         }
+
+        if ($osName === 'Windows' && $osVersion === '10') {
+            $osVersion = '>=10';
+        }
+
         $deviceName = $deviceDetector->getDeviceName();
 
         return [

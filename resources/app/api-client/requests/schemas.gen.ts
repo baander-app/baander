@@ -549,7 +549,9 @@ export const $PersonalAccessTokenViewResource = {
         },
         abilities: {
             type: ['array', 'null'],
-            items: {}
+            items: {
+                type: 'string'
+            }
         },
         userAgent: {
             type: ['string', 'null']

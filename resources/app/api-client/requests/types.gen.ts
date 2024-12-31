@@ -198,7 +198,7 @@ export type NewAccessTokenResource = {
 export type PersonalAccessTokenViewResource = {
     id: number;
     name: string;
-    abilities: Array<unknown> | null;
+    abilities: Array<(string)> | null;
     userAgent: string | null;
     clientName: string | null;
     clientVersion: string | null;
