@@ -35,8 +35,9 @@
 # Screenshots
 
 ![#login page](/docs/images/readme/page_login.png)
-![#login page](/docs/images/readme/page_albums.png)
-![#login page](/docs/images/readme/page_songs.png)
+![#albums page](/docs/images/readme/page_albums.png)
+![#songs page](/docs/images/readme/page_songs.png)
+![#songs lyrics page](/docs/images/readme/page_songs_lyrics.png)
 
 ## Api documentation
 
