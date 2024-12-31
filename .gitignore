@@ -27,3 +27,4 @@ bundle-visualization.html
 /storage/clockwork/*
 .env.sentry-build-plugin
 /api.json
+/*.pem

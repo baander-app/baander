@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.1 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AlbumService, ArtistService, GenreService, ImageService, LibraryService, OpCacheService, QueueService, SongService, SystemInfoService, UserService, UserTokenService } from "../requests/services.gen";
+import { AlbumService, ArtistService, AuthService, GenreService, ImageService, LibraryService, OpCacheService, PasskeyService, QueueService, SongService, SystemInfoService, UserService, UserTokenService } from "../requests/services.gen";
 import * as Common from "./common";
 /**
 * Get a collection of albums
@@ -79,6 +79,30 @@ export const prefetchUseArtistServiceArtistsShow = (queryClient: QueryClient, { 
   artist: string;
   library: string;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseArtistServiceArtistsShowKeyFn({ artist, library }), queryFn: () => ArtistService.artistsShow({ artist, library }) });
+/**
+* Get a passkey challenge
+* @returns unknown
+* @throws ApiError
+*/
+export const prefetchUseAuthServiceAuthPasskeyOptions = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAuthServiceAuthPasskeyOptionsKeyFn(), queryFn: () => AuthService.authPasskeyOptions() });
+/**
+* Get passkey registration options
+* @returns unknown
+* @throws ApiError
+*/
+export const prefetchUseAuthServiceAuthPasskeyRegisterOptions = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAuthServiceAuthPasskeyRegisterOptionsKeyFn(), queryFn: () => AuthService.authPasskeyRegisterOptions() });
+/**
+* Get a passkey challenge
+* @returns unknown
+* @throws ApiError
+*/
+export const prefetchUsePasskeyServiceAuthPasskeyOptions = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UsePasskeyServiceAuthPasskeyOptionsKeyFn(), queryFn: () => PasskeyService.authPasskeyOptions() });
+/**
+* Get passkey registration options
+* @returns unknown
+* @throws ApiError
+*/
+export const prefetchUsePasskeyServiceAuthPasskeyRegisterOptions = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UsePasskeyServiceAuthPasskeyRegisterOptionsKeyFn(), queryFn: () => PasskeyService.authPasskeyRegisterOptions() });
 /**
 * Get a collection of genres
 * @param data The data for the request.

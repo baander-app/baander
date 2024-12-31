@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.1 
 
 import { UseQueryOptions, useSuspenseQuery } from "@tanstack/react-query";
-import { AlbumService, ArtistService, GenreService, ImageService, LibraryService, OpCacheService, QueueService, SongService, SystemInfoService, UserService, UserTokenService } from "../requests/services.gen";
+import { AlbumService, ArtistService, AuthService, GenreService, ImageService, LibraryService, OpCacheService, PasskeyService, QueueService, SongService, SystemInfoService, UserService, UserTokenService } from "../requests/services.gen";
 import * as Common from "./common";
 /**
 * Get a collection of albums
@@ -79,6 +79,30 @@ export const useArtistServiceArtistsShowSuspense = <TData = Common.ArtistService
   artist: string;
   library: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseArtistServiceArtistsShowKeyFn({ artist, library }, queryKey), queryFn: () => ArtistService.artistsShow({ artist, library }) as TData, ...options });
+/**
+* Get a passkey challenge
+* @returns unknown
+* @throws ApiError
+*/
+export const useAuthServiceAuthPasskeyOptionsSuspense = <TData = Common.AuthServiceAuthPasskeyOptionsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAuthServiceAuthPasskeyOptionsKeyFn(queryKey), queryFn: () => AuthService.authPasskeyOptions() as TData, ...options });
+/**
+* Get passkey registration options
+* @returns unknown
+* @throws ApiError
+*/
+export const useAuthServiceAuthPasskeyRegisterOptionsSuspense = <TData = Common.AuthServiceAuthPasskeyRegisterOptionsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAuthServiceAuthPasskeyRegisterOptionsKeyFn(queryKey), queryFn: () => AuthService.authPasskeyRegisterOptions() as TData, ...options });
+/**
+* Get a passkey challenge
+* @returns unknown
+* @throws ApiError
+*/
+export const usePasskeyServiceAuthPasskeyOptionsSuspense = <TData = Common.PasskeyServiceAuthPasskeyOptionsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UsePasskeyServiceAuthPasskeyOptionsKeyFn(queryKey), queryFn: () => PasskeyService.authPasskeyOptions() as TData, ...options });
+/**
+* Get passkey registration options
+* @returns unknown
+* @throws ApiError
+*/
+export const usePasskeyServiceAuthPasskeyRegisterOptionsSuspense = <TData = Common.PasskeyServiceAuthPasskeyRegisterOptionsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UsePasskeyServiceAuthPasskeyRegisterOptionsKeyFn(queryKey), queryFn: () => PasskeyService.authPasskeyRegisterOptions() as TData, ...options });
 /**
 * Get a collection of genres
 * @param data The data for the request.

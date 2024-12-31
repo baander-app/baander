@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use App\Auth\Role;
+use App\Auth\Webauthn\Concerns\HasPasskeys;
 use App\Models\Player\PlayerQueue;
 use App\Models\Player\PlayerState;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
@@ -15,7 +17,7 @@ use Laravel\Sanctum\{HasApiTokens, NewAccessToken};
 use Ramsey\Uuid\Uuid;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable
+class User extends Authenticatable implements HasPasskeys
 {
     use HasFactory,
         HasApiTokens,
@@ -114,5 +116,25 @@ class User extends Authenticatable
     public function userMediaActivities()
     {
         return $this->hasMany(UserMediaActivity::class);
+    }
+
+    public function passkeys(): HasMany
+    {
+        return $this->hasMany(Passkey::class);
+    }
+
+    public function getPassKeyName(): string
+    {
+        return $this->email;
+    }
+
+    public function getPassKeyId(): string
+    {
+        return $this->id;
+    }
+
+    public function getPassKeyDisplayName(): string
+    {
+        return $this->name;
     }
 }

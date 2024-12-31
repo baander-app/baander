@@ -18,10 +18,10 @@ return [
             'middleware' => 'api',
             'patterns'   => ['*Controller.php'],
         ],
-        app_path('Http/Controllers/Web') => [
-            'middleware' => 'web',
-            'patterns'   => ['*Controller.php'],
-        ],
+//        app_path('Http/Controllers/Web') => [
+//            'middleware' => 'web',
+//            'patterns'   => ['*Controller.php'],
+//        ],
     ],
 
     /**

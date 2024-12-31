@@ -4,7 +4,7 @@ namespace App\Http\Requests\Auth;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class ConfirmTotpRequest extends FormRequest
+class StorePasskeyRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -22,7 +22,8 @@ class ConfirmTotpRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'code' => 'required|numeric',
+            'name'    => ['required', 'string', 'max:255'],
+            'passkey' => ['required', 'json'],
         ];
     }
 }

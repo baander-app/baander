@@ -123,6 +123,17 @@ export const $ArtistResource = {
     title: 'ArtistResource'
 } as const;
 
+export const $AuthenticateUsingPasskeyRequest = {
+    type: 'object',
+    properties: {
+        start_authentication_response: {
+            type: 'string'
+        }
+    },
+    required: ['start_authentication_response'],
+    title: 'AuthenticateUsingPasskeyRequest'
+} as const;
+
 export const $CreateLibraryRequest = {
     type: 'object',
     properties: {
@@ -567,6 +578,21 @@ export const $SongResource = {
     },
     required: ['public_id', 'title', 'year', 'comment', 'disc', 'length', 'durationHuman', 'lyrics', 'lyricsExist', 'modifiedTime', 'path', 'track', 'size', 'sizeHuman', 'mimeType', 'hash', 'createdAt', 'updatedAt'],
     title: 'SongResource'
+} as const;
+
+export const $StorePasskeyRequest = {
+    type: 'object',
+    properties: {
+        name: {
+            type: 'string',
+            maxLength: 255
+        },
+        passkey: {
+            type: 'string'
+        }
+    },
+    required: ['name', 'passkey'],
+    title: 'StorePasskeyRequest'
 } as const;
 
 export const $UpdateGenreRequest = {

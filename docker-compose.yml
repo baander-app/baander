@@ -16,6 +16,8 @@ services:
     volumes:
       - ./:/var/www/html:ro,cached
       - ./docker/dev/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./cert.pem:/etc/nginx/certificates/cert.pem:ro
+      - ./key.pem:/etc/nginx/certificates/key.pem:ro
     depends_on:
       - app
 

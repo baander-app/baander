@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Api\Auth;
 
+use App\Http\Controllers\Api\Auth\Concerns\HandlesUserTokens;
 use App\Http\Requests\Auth\{ForgotPasswordRequest, LoginRequest, RegisterRequest, ResetPasswordRequest};
 use App\Http\Resources\Auth\NewAccessTokenResource;
 use App\Http\Resources\User\UserResource;
 use App\Models\{PersonalAccessToken, TokenAbility, User};
 use App\Notifications\ForgotPasswordNotification;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\Request;
@@ -20,9 +20,10 @@ use Spatie\RouteAttributes\Attributes\{Group, Post, Prefix};
  * @tags Auth
  */
 #[Prefix('auth')]
-#[Group('auth')]
 class AuthController
 {
+    use HandlesUserTokens;
+
     /**
      * Login
      * @unauthenticated
@@ -162,7 +163,7 @@ class AuthController
         $user = User::query()->findOrFail($id);
 
         if (method_exists($user, 'createToken') && !hash_equals((string)$hash, sha1($user->getEmailForVerification()))) {
-            throw new AuthorizationException('Invalid hash');
+            throw new \Exception('Invalid hash');
         }
 
         if ($user instanceof MustVerifyEmail && $user->markEmailAsVerified()) {
@@ -170,28 +171,5 @@ class AuthController
         }
 
         return new UserResource($user);
-    }
-
-    private function createTokenSet(Request $request, User $user)
-    {
-        $device = PersonalAccessToken::prepareDeviceFromRequest($request);
-
-        $accessToken = $user->createToken(
-            name: 'access_token',
-            abilities: [TokenAbility::ACCESS_API->value, TokenAbility::ACCESS_BROADCASTING->value],
-            expiresAt: Carbon::now()->addMinutes(config('sanctum.access_token_expiration')),
-            device: $device,
-        );
-        $refreshToken = $user->createToken(
-            name: 'refresh_token',
-            abilities: [TokenAbility::ISSUE_ACCESS_TOKEN->value],
-            expiresAt: Carbon::now()->addMinutes(config('sanctum.refresh_token_expiration')),
-            device: $device,
-        );
-
-        return response()->json([
-            'accessToken'  => new NewAccessTokenResource($accessToken),
-            'refreshToken' => new NewAccessTokenResource($refreshToken),
-        ]);
     }
 }

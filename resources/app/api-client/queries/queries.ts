@@ -1,8 +1,8 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.1 
 
 import { useMutation, UseMutationOptions, useQuery, UseQueryOptions } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, GenreService, ImageService, JobService, LibraryService, OpCacheService, QueueService, SongService, SystemInfoService, UserService, UserTokenService } from "../requests/services.gen";
-import { CreateLibraryRequest, CreateUserRequest, ForgotPasswordRequest, LoginRequest, RegisterRequest, ResetPasswordRequest, RetryJobRequest, UpdateGenreRequest, UpdateLibraryRequest, UpdateUserRequest } from "../requests/types.gen";
+import { AlbumService, ArtistService, AuthService, GenreService, ImageService, JobService, LibraryService, OpCacheService, PasskeyService, QueueService, SongService, SystemInfoService, UserService, UserTokenService } from "../requests/services.gen";
+import { AuthenticateUsingPasskeyRequest, CreateLibraryRequest, CreateUserRequest, ForgotPasswordRequest, LoginRequest, RegisterRequest, ResetPasswordRequest, RetryJobRequest, StorePasskeyRequest, UpdateGenreRequest, UpdateLibraryRequest, UpdateUserRequest } from "../requests/types.gen";
 import * as Common from "./common";
 /**
 * Get a collection of albums
@@ -80,6 +80,30 @@ export const useArtistServiceArtistsShow = <TData = Common.ArtistServiceArtistsS
   artist: string;
   library: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseArtistServiceArtistsShowKeyFn({ artist, library }, queryKey), queryFn: () => ArtistService.artistsShow({ artist, library }) as TData, ...options });
+/**
+* Get a passkey challenge
+* @returns unknown
+* @throws ApiError
+*/
+export const useAuthServiceAuthPasskeyOptions = <TData = Common.AuthServiceAuthPasskeyOptionsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAuthServiceAuthPasskeyOptionsKeyFn(queryKey), queryFn: () => AuthService.authPasskeyOptions() as TData, ...options });
+/**
+* Get passkey registration options
+* @returns unknown
+* @throws ApiError
+*/
+export const useAuthServiceAuthPasskeyRegisterOptions = <TData = Common.AuthServiceAuthPasskeyRegisterOptionsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAuthServiceAuthPasskeyRegisterOptionsKeyFn(queryKey), queryFn: () => AuthService.authPasskeyRegisterOptions() as TData, ...options });
+/**
+* Get a passkey challenge
+* @returns unknown
+* @throws ApiError
+*/
+export const usePasskeyServiceAuthPasskeyOptions = <TData = Common.PasskeyServiceAuthPasskeyOptionsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePasskeyServiceAuthPasskeyOptionsKeyFn(queryKey), queryFn: () => PasskeyService.authPasskeyOptions() as TData, ...options });
+/**
+* Get passkey registration options
+* @returns unknown
+* @throws ApiError
+*/
+export const usePasskeyServiceAuthPasskeyRegisterOptions = <TData = Common.PasskeyServiceAuthPasskeyRegisterOptionsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePasskeyServiceAuthPasskeyRegisterOptionsKeyFn(queryKey), queryFn: () => PasskeyService.authPasskeyRegisterOptions() as TData, ...options });
 /**
 * Get a collection of genres
 * @param data The data for the request.
@@ -370,6 +394,54 @@ export const useAuthServiceAuthResetPassword = <TData = Common.AuthServiceAuthRe
 * @throws ApiError
 */
 export const useAuthServiceAuthVerify = <TData = Common.AuthServiceAuthVerifyMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, void, TContext>, "mutationFn">) => useMutation<TData, TError, void, TContext>({ mutationFn: () => AuthService.authVerify() as unknown as Promise<TData>, ...options });
+/**
+* Login with a passkey
+* @param data The data for the request.
+* @param data.requestBody
+* @returns unknown
+* @throws ApiError
+*/
+export const useAuthServiceAuthPasskeyLogin = <TData = Common.AuthServiceAuthPasskeyLoginMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody?: AuthenticateUsingPasskeyRequest;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody?: AuthenticateUsingPasskeyRequest;
+}, TContext>({ mutationFn: ({ requestBody }) => AuthService.authPasskeyLogin({ requestBody }) as unknown as Promise<TData>, ...options });
+/**
+* Register passkey
+* @param data The data for the request.
+* @param data.requestBody
+* @returns unknown
+* @throws ApiError
+*/
+export const useAuthServiceAuthPasskeyRegister = <TData = Common.AuthServiceAuthPasskeyRegisterMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody?: StorePasskeyRequest;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody?: StorePasskeyRequest;
+}, TContext>({ mutationFn: ({ requestBody }) => AuthService.authPasskeyRegister({ requestBody }) as unknown as Promise<TData>, ...options });
+/**
+* Login with a passkey
+* @param data The data for the request.
+* @param data.requestBody
+* @returns unknown
+* @throws ApiError
+*/
+export const usePasskeyServiceAuthPasskeyLogin = <TData = Common.PasskeyServiceAuthPasskeyLoginMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody?: AuthenticateUsingPasskeyRequest;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody?: AuthenticateUsingPasskeyRequest;
+}, TContext>({ mutationFn: ({ requestBody }) => PasskeyService.authPasskeyLogin({ requestBody }) as unknown as Promise<TData>, ...options });
+/**
+* Register passkey
+* @param data The data for the request.
+* @param data.requestBody
+* @returns unknown
+* @throws ApiError
+*/
+export const usePasskeyServiceAuthPasskeyRegister = <TData = Common.PasskeyServiceAuthPasskeyRegisterMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody?: StorePasskeyRequest;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody?: StorePasskeyRequest;
+}, TContext>({ mutationFn: ({ requestBody }) => PasskeyService.authPasskeyRegister({ requestBody }) as unknown as Promise<TData>, ...options });
 /**
 * Scan a library
 * @param data The data for the request.

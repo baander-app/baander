@@ -38,7 +38,6 @@
         "league/mime-type-detection": "^1.15",
         "matomo/device-detector": "^6.3",
         "maxakawizard/json-collection-parser": "^1.10",
-        "xenos/musicbrainz": "@dev",
         "opcodesio/log-viewer": "^3.10",
         "php-ffmpeg/php-ffmpeg": "^1.2",
         "saloonphp/cache-plugin": "^3.0",
@@ -55,6 +54,8 @@
         "tightenco/ziggy": "^2.2",
         "timokoerber/laravel-one-time-operations": "^1.4",
         "tpetry/laravel-postgresql-enhanced": "2.0.0",
+        "web-auth/webauthn-lib": "^5.0",
+        "xenos/musicbrainz": "@dev",
         "zend/php-reader": "@dev"
     },
     "require-dev": {
