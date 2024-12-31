@@ -15,67 +15,68 @@ ARG XDEBUG_VERSION=3.3.2
 ENV XDEBUG_VERSION=$XDEBUG_VERSION
 
 # check environment
-RUN if [ "$BUILD_ARGUMENT_ENV" = "default" ]; then echo "Set BUILD_ARGUMENT_ENV in docker build-args like --build-arg BUILD_ARGUMENT_ENV=dev" && exit 2; \
+RUN set -xe && \
+    if [ "$BUILD_ARGUMENT_ENV" = "default" ]; then echo "Set BUILD_ARGUMENT_ENV in docker build-args like --build-arg BUILD_ARGUMENT_ENV=dev" && exit 2; \
     elif [ "$BUILD_ARGUMENT_ENV" = "dev" ]; then echo "Building development environment."; \
     else echo "Set correct BUILD_ARGUMENT_ENV in docker build-args like --build-arg BUILD_ARGUMENT_ENV=dev. Available choices are dev" && exit 2; \
     fi
 
 # install all the dependencies and enable PHP modules
 RUN apt-get update && apt-get upgrade -y && apt-get install -y \
+      cron \
       curl \
       ffmpeg \
-      procps \
-      nano \
       git \
-      unzip \
-      libbz2-dev \
-      libicu-dev \
-      zlib1g-dev \
-      libxml2 \
-      libxml2-dev \
-      libreadline-dev \
-      supervisor \
-      cron \
+      nano \
+      procps \
       sudo \
-      libzip-dev \
-      liblzf-dev \
-      libzstd-dev \
-      libmagickwand-dev \
-      zlib1g-dev \
-      libpng-dev \
+      supervisor \
+      unzip \
+      iputils-ping \
+      libavif-dev \
+      libbz2-dev \
+      libc-ares-dev\
+      libcurl4-openssl-dev \
       libfreetype6-dev \
+      libicu-dev \
       libjpeg-dev \
       libjpeg62-turbo-dev \
-      libwebp-dev \
-      libavif-dev \
-      libxpm-dev \
-      libpq-dev \
       liblz4-dev \
-      iputils-ping \
-      libcurl4-openssl-dev \
+      liblzf-dev \
+      libmagickwand-dev \
+      libpng-dev \
+      libpq-dev \
+      libreadline-dev \
       libsqlite3-dev \
-      libc-ares-dev
+      libwebp-dev \
+      libxml2-dev \
+      libxpm-dev \
+      libzip-dev \
+      libzstd-dev \
+      zlib1g-dev
 
 RUN set -xe \
     && docker-php-ext-configure gd --with-webp --with-jpeg --with-xpm --with-freetype \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
     && docker-php-ext-configure intl
 
-RUN docker-php-ext-install -j "$(nproc)" \
-      gd \
-      intl \
-      ffi \
-      pgsql \
+RUN set -xe && \
+    docker-php-ext-install -j "$(nproc)" \
       exif \
+      ffi \
+      gd \
+      gettext \
+      intl \
+      opcache \
+      pcntl \
       pdo \
       pdo_pgsql \
-      gettext \
-      pcntl \
+      pgsql \
       sockets \
-      opcache \
       zip
 
-RUN mkdir -p /usr/local/src/pecl \
+RUN set -xe \
+    && mkdir -p /usr/local/src/pecl \
     # imagick
     && pecl bundle -d /usr/local/src/pecl imagick \
     && docker-php-ext-configure /usr/local/src/pecl/imagick \
