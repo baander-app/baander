@@ -24,6 +24,7 @@ return new class extends Migration
 
             $table->text('credential_id');
             $table->jsonb('data');
+            $table->unsignedBigInteger('counter')->default(0);
 
             $table->timestampTz('last_used_at')->nullable();
 

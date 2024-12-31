@@ -34,7 +34,7 @@ import { OpenAPI as OpenAPIConfig } from '@/api-client/requests';
 import { Token } from '@/services/auth/token.ts';
 
 // OpenAPI configuration
-OpenAPIConfig.BASE = `${import.meta.env.VITE_APP_URL}/api`;
+OpenAPIConfig.BASE = `${import.meta.env.VITE_APP_URL}`;
 OpenAPIConfig.CREDENTIALS = 'same-origin';
 OpenAPIConfig.HEADERS = {
   'accept': 'application/json',

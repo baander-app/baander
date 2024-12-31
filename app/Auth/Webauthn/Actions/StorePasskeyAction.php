@@ -43,7 +43,6 @@ class StorePasskeyAction
     ): PublicKeyCredentialSource
     {
         $passkeyOptions = $this->getService()->makePublicKeyCredentialCreationOptions($passkeyOptionsJson);
-
         $publicKeyCredential = $this->getService()->getPublicKeyCredentialByPasskey($passkeyJson);
 
         if (!$publicKeyCredential->response instanceof AuthenticatorAttestationResponse) {

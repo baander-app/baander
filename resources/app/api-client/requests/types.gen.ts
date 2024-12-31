@@ -98,6 +98,14 @@ export type ImageResource = {
     url: string;
 };
 
+export type LevelCountResource = {
+    level: string;
+    level_name: string;
+    level_class: string;
+    count: string;
+    selected: string;
+};
+
 export type LibraryResource = {
     name: string;
     slug: string;
@@ -110,6 +118,70 @@ export type LibraryResource = {
 };
 
 export type LibraryType = 'music' | 'podcast' | 'audiobook' | 'movie' | 'tv_show';
+
+export type LogFileResource = {
+    type: {
+        value: string;
+        name: string;
+    };
+    identifier: string;
+    sub_folder: string;
+    sub_folder_identifier: string;
+    path: string;
+    name: string;
+    size: string;
+    size_in_mb: string;
+    size_formatted: string;
+    download_url: string;
+    earliest_timestamp: string;
+    latest_timestamp: string;
+    can_download: string;
+    can_delete: string;
+    loading: boolean;
+    /**
+     * helper for frontend
+     */
+    selected_for_deletion: boolean;
+};
+
+export type LogFolderResource = {
+    identifier: string;
+    path: string;
+    clean_path: string;
+    is_root: string;
+    earliest_timestamp: string;
+    latest_timestamp: string;
+    download_url: string;
+    files: Array<LogFileResource>;
+    can_download: string;
+    can_delete: string;
+    loading: boolean;
+};
+
+export type LogResource = {
+    index: string;
+    file_identifier: string;
+    file_position: string;
+    level: string;
+    level_name: string;
+    level_class: string;
+    datetime: string;
+    time: string;
+    message: string;
+    context: string;
+    extra: string;
+    full_text: string;
+    url: string;
+};
+
+export type LogViewerHostResource = {
+    identifier: string;
+    name: string;
+    host: string;
+    headers: string;
+    auth: string;
+    is_remote: string;
+};
 
 export type LoginRequest = {
     email: string;
@@ -447,7 +519,146 @@ export type AuthPasskeyRegisterData = {
 
 export type AuthPasskeyRegisterResponse = {
     message: string;
+} | string;
+
+export type HorizonJobsBatchesIndexResponse = {
+    batches: Array<(string)>;
 };
+
+export type HorizonJobsBatchesShowData = {
+    id: string;
+};
+
+export type HorizonJobsBatchesShowResponse = {
+    batch: string;
+    failedJobs: string;
+};
+
+export type HorizonJobsBatchesRetryData = {
+    id: string;
+};
+
+export type HorizonJobsBatchesRetryResponse = {
+    [key: string]: unknown;
+};
+
+export type HorizonCompletedJobsIndexData = {
+    startingAt?: string;
+};
+
+export type HorizonCompletedJobsIndexResponse = {
+    jobs: string;
+    total: string;
+};
+
+export type HorizonStatsIndexResponse = {
+    failedJobs: string;
+    jobsPerMinute: string;
+    pausedMasters: string | 0;
+    periods: {
+        failedJobs: string;
+        recentJobs: string;
+    };
+    processes: string;
+    queueWithMaxRuntime: string;
+    queueWithMaxThroughput: string;
+    recentJobs: string;
+    status: 'paused' | 'running' | 'inactive';
+    wait: string;
+};
+
+export type HorizonFailedJobsIndexData = {
+    tag?: string;
+};
+
+export type HorizonFailedJobsIndexResponse = {
+    jobs: string;
+    total: string;
+};
+
+export type HorizonFailedJobsShowData = {
+    id: string;
+};
+
+export type HorizonFailedJobsShowResponse = string;
+
+export type LogViewerFilesResponse = Array<LogFileResource>;
+
+export type LogViewerFilesRequestDownloadData = {
+    fileIdentifier: string;
+};
+
+export type LogViewerFilesRequestDownloadResponse = {
+    url: string;
+};
+
+export type LogViewerFilesClearCacheData = {
+    fileIdentifier: string;
+};
+
+export type LogViewerFilesClearCacheResponse = {
+    success: boolean;
+};
+
+export type LogViewerFilesDeleteData = {
+    fileIdentifier: string;
+};
+
+export type LogViewerFilesDeleteResponse = {
+    success: boolean;
+};
+
+export type LogViewerFilesClearCacheAllResponse = {
+    success: boolean;
+};
+
+export type LogViewerFilesDeleteMultipleFilesData = {
+    requestBody?: {
+        files?: string;
+    };
+};
+
+export type LogViewerFilesDeleteMultipleFilesResponse = {
+    success: boolean;
+};
+
+export type LogViewerFilesDownloadData = {
+    fileIdentifier: string;
+};
+
+export type LogViewerFilesDownloadResponse = string;
+
+export type LogViewerFoldersResponse = Array<LogFolderResource>;
+
+export type LogViewerFoldersRequestDownloadData = {
+    folderIdentifier: string;
+};
+
+export type LogViewerFoldersRequestDownloadResponse = {
+    url: string;
+};
+
+export type LogViewerFoldersClearCacheData = {
+    folderIdentifier: string;
+};
+
+export type LogViewerFoldersClearCacheResponse = {
+    success: boolean;
+};
+
+export type LogViewerFoldersDeleteData = {
+    folderIdentifier: string;
+};
+
+export type LogViewerFoldersDeleteResponse = {
+    success: boolean;
+};
+
+export type LogViewerFoldersDownloadData = {
+    folderIdentifier: string;
+};
+
+export type LogViewerFoldersDownloadResponse = string;
 
 export type GenresIndexData = {
     /**
@@ -531,6 +742,8 @@ export type GenresDestroyData = {
 
 export type GenresDestroyResponse = null;
 
+export type LogViewerHostsResponse = Array<LogViewerHostResource>;
+
 export type ImageServeData = {
     /**
      * The image public id
@@ -547,6 +760,22 @@ export type JobLibraryScanData = {
 export type JobLibraryScanResponse = {
     message: string;
 };
+
+export type HorizonJobsMetricsIndexResponse = Array<(string)>;
+
+export type HorizonJobsMetricsShowData = {
+    id: string;
+};
+
+export type HorizonJobsMetricsShowResponse = {
+    [key: string]: unknown;
+};
+
+export type HorizonJobsShowData = {
+    id: string;
+};
+
+export type HorizonJobsShowResponse = Array<(string)>;
 
 export type LibrariesIndexData = {
     /**
@@ -600,6 +829,79 @@ export type LibraryUpdateData = {
 export type LibraryUpdateResponse = LibraryResource;
 
 export type LibraryDeleteResponse = null;
+
+export type LogViewerLogsData = {
+    direction?: string;
+    excludeFileTypes?: string;
+    excludeLevels?: string;
+    file?: string;
+    log?: string;
+    perPage?: string;
+    query?: string;
+    shorterStackTraces?: boolean;
+};
+
+export type LogViewerLogsResponse = {
+    file: LogFileResource | null;
+    levelCounts: Array<LevelCountResource>;
+    logs: Array<LogResource>;
+    columns: string | null;
+    pagination: {
+        current_page: string;
+        first_page_url: string;
+        from: string;
+        last_page: string;
+        last_page_url: string;
+        links: string;
+        links_short: string;
+        next_page_url: string;
+        path: string;
+        per_page: string;
+        prev_page_url: string;
+        to: string;
+        total: string;
+    } | null;
+    expandAutomatically: string;
+    cacheRecentlyCleared: string;
+    hasMoreResults: string;
+    percentScanned: string;
+    performance: {
+        memoryUsage: string;
+        requestTime: string;
+        version: string;
+    };
+};
+
+export type HorizonMastersIndexResponse = {
+    [key: string]: unknown;
+};
+
+export type HorizonMonitoringIndexResponse = {
+    [key: string]: unknown;
+};
+
+export type HorizonMonitoringStoreResponse = {
+    [key: string]: unknown;
+};
+
+export type HorizonMonitoringTagPaginateData = {
+    limit?: string;
+    tag: string;
+    tag?: string;
+};
+
+export type HorizonMonitoringTagPaginateResponse = {
+    jobs: string;
+    total: string;
+};
+
+export type HorizonMonitoringTagDestroyData = {
+    tag: string;
+};
+
+export type HorizonMonitoringTagDestroyResponse = {
+    [key: string]: unknown;
+};
 
 export type OpCacheGetStatusResponse = {
     opcache_enabled: boolean;
@@ -673,6 +975,15 @@ export type OpcacheCompileData = {
 export type OpcacheCompileResponse = {
     totalFiles: number;
     compiled: number;
+};
+
+export type HorizonPendingJobsIndexData = {
+    startingAt?: string;
+};
+
+export type HorizonPendingJobsIndexResponse = {
+    jobs: string;
+    total: string;
 };
 
 export type QueueMetricsShowData = {
@@ -772,6 +1083,33 @@ export type QueueMetricsDeleteData = {
 export type QueueMetricsDeleteResponse = null;
 
 export type QueueMetricsPurgeResponse = null;
+
+export type HorizonQueuesMetricsIndexResponse = Array<(string)>;
+
+export type HorizonQueuesMetricsShowData = {
+    id: string;
+};
+
+export type HorizonQueuesMetricsShowResponse = {
+    [key: string]: unknown;
+};
+
+export type HorizonRetryJobsShowData = {
+    id: string;
+};
+
+export type HorizonRetryJobsShowResponse = {
+    [key: string]: unknown;
+};
+
+export type HorizonSilencedJobsIndexData = {
+    startingAt?: string;
+};
+
+export type HorizonSilencedJobsIndexResponse = {
+    jobs: string;
+    total: string;
+};
 
 export type SongsIndexData = {
     /**
@@ -1010,8 +1348,10 @@ export type UserTokenRevokeTokenData = {
 
 export type UserTokenRevokeTokenResponse = null;
 
+export type HorizonWorkloadIndexResponse = Array<(string)>;
+
 export type $OpenApiTs = {
-    '/libraries/{library}/albums': {
+    '/api/libraries/{library}/albums': {
         get: {
             req: AlbumsIndexData;
             res: {
@@ -1090,7 +1430,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/libraries/{library}/albums/{album}': {
+    '/api/libraries/{library}/albums/{album}': {
         get: {
             req: AlbumsShowData;
             res: {
@@ -1119,7 +1459,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/libraries/{library}/artists': {
+    '/api/libraries/{library}/artists': {
         get: {
             req: ArtistsIndexData;
             res: {
@@ -1189,7 +1529,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/libraries/{library}/artists/{artist}': {
+    '/api/libraries/{library}/artists/{artist}': {
         get: {
             req: ArtistsShowData;
             res: {
@@ -1218,7 +1558,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/auth/login': {
+    '/api/auth/login': {
         post: {
             req: AuthLoginData;
             res: {
@@ -1262,7 +1602,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/auth/refreshToken': {
+    '/api/auth/refreshToken': {
         post: {
             res: {
                 200: {
@@ -1280,7 +1620,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/auth/streamToken': {
+    '/api/auth/streamToken': {
         post: {
             res: {
                 200: {
@@ -1298,7 +1638,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/auth/register': {
+    '/api/auth/register': {
         post: {
             req: AuthRegisterData;
             res: {
@@ -1333,7 +1673,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/auth/forgotPassword': {
+    '/api/auth/forgotPassword': {
         post: {
             req: AuthForgotPasswordData;
             res: {
@@ -1367,7 +1707,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/auth/resetPassword': {
+    '/api/auth/resetPassword': {
         post: {
             req: AuthResetPasswordData;
             res: {
@@ -1410,7 +1750,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/auth/verify/:id/:hash': {
+    '/api/auth/verify/:id/:hash': {
         post: {
             res: {
                 /**
@@ -1420,7 +1760,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/passkey': {
+    '/webauthn/passkey': {
         get: {
             res: {
                 200: {
@@ -1462,14 +1802,14 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/passkey/register': {
+    '/webauthn/passkey/register': {
         get: {
             res: {
                 200: string | {
     [key: string]: unknown;
 };
                 /**
-                 * An error
+                 * Unauthenticated
                  */
                 401: {
                     /**
@@ -1483,6 +1823,15 @@ export type $OpenApiTs = {
             req: AuthPasskeyRegisterData;
             res: {
                 200: {
+    message: string;
+} | string;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
                     message: string;
                 };
                 /**
@@ -1509,13 +1858,245 @@ export type $OpenApiTs = {
                         [key: string]: Array<(string)>;
                     };
                 };
-                500: {
-                    error: string;
+                500: string | {
+    error: string;
+};
+            };
+        };
+    };
+    '/-/horizon/api/batches': {
+        get: {
+            res: {
+                200: {
+                    batches: Array<(string)>;
                 };
             };
         };
     };
-    '/genres': {
+    '/-/horizon/api/batches/{id}': {
+        get: {
+            req: HorizonJobsBatchesShowData;
+            res: {
+                200: {
+                    batch: string;
+                    failedJobs: string;
+                };
+            };
+        };
+    };
+    '/-/horizon/api/batches/retry/{id}': {
+        post: {
+            req: HorizonJobsBatchesRetryData;
+            res: {
+                200: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+    };
+    '/-/horizon/api/jobs/completed': {
+        get: {
+            req: HorizonCompletedJobsIndexData;
+            res: {
+                200: {
+                    jobs: string;
+                    total: string;
+                };
+            };
+        };
+    };
+    '/-/horizon/api/stats': {
+        get: {
+            res: {
+                200: {
+                    failedJobs: string;
+                    jobsPerMinute: string;
+                    pausedMasters: string | 0;
+                    periods: {
+                        failedJobs: string;
+                        recentJobs: string;
+                    };
+                    processes: string;
+                    queueWithMaxRuntime: string;
+                    queueWithMaxThroughput: string;
+                    recentJobs: string;
+                    status: 'paused' | 'running' | 'inactive';
+                    wait: string;
+                };
+            };
+        };
+    };
+    '/-/horizon/api/jobs/failed': {
+        get: {
+            req: HorizonFailedJobsIndexData;
+            res: {
+                200: {
+                    jobs: string;
+                    total: string;
+                };
+            };
+        };
+    };
+    '/-/horizon/api/jobs/failed/{id}': {
+        get: {
+            req: HorizonFailedJobsShowData;
+            res: {
+                200: string;
+            };
+        };
+    };
+    '/system/log-viewer/api/files': {
+        get: {
+            res: {
+                /**
+                 * Array of `LogFileResource`
+                 */
+                200: Array<LogFileResource>;
+            };
+        };
+    };
+    '/system/log-viewer/api/files/{fileIdentifier}/download/request': {
+        get: {
+            req: LogViewerFilesRequestDownloadData;
+            res: {
+                200: {
+                    url: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/system/log-viewer/api/files/{fileIdentifier}/clear-cache': {
+        post: {
+            req: LogViewerFilesClearCacheData;
+            res: {
+                200: {
+                    success: boolean;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/system/log-viewer/api/files/{fileIdentifier}': {
+        delete: {
+            req: LogViewerFilesDeleteData;
+            res: {
+                200: {
+                    success: boolean;
+                };
+            };
+        };
+    };
+    '/system/log-viewer/api/clear-cache-all': {
+        post: {
+            res: {
+                200: {
+                    success: boolean;
+                };
+            };
+        };
+    };
+    '/system/log-viewer/api/delete-multiple-files': {
+        post: {
+            req: LogViewerFilesDeleteMultipleFilesData;
+            res: {
+                200: {
+                    success: boolean;
+                };
+            };
+        };
+    };
+    '/system/log-viewer/api/files/{fileIdentifier}/download': {
+        get: {
+            req: LogViewerFilesDownloadData;
+            res: {
+                200: string;
+            };
+        };
+    };
+    '/system/log-viewer/api/folders': {
+        get: {
+            res: {
+                /**
+                 * Array of `LogFolderResource`
+                 */
+                200: Array<LogFolderResource>;
+            };
+        };
+    };
+    '/system/log-viewer/api/folders/{folderIdentifier}/download/request': {
+        get: {
+            req: LogViewerFoldersRequestDownloadData;
+            res: {
+                200: {
+                    url: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/system/log-viewer/api/folders/{folderIdentifier}/clear-cache': {
+        post: {
+            req: LogViewerFoldersClearCacheData;
+            res: {
+                200: {
+                    success: boolean;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/system/log-viewer/api/folders/{folderIdentifier}': {
+        delete: {
+            req: LogViewerFoldersDeleteData;
+            res: {
+                200: {
+                    success: boolean;
+                };
+            };
+        };
+    };
+    '/system/log-viewer/api/folders/{folderIdentifier}/download': {
+        get: {
+            req: LogViewerFoldersDownloadData;
+            res: {
+                200: string;
+            };
+        };
+    };
+    '/api/genres': {
         get: {
             req: GenresIndexData;
             res: {
@@ -1585,7 +2166,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/genres/{genre}': {
+    '/api/genres/{genre}': {
         get: {
             req: GenresShowData;
             res: {
@@ -1692,7 +2273,17 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/images/{image}': {
+    '/system/log-viewer/api/hosts': {
+        get: {
+            res: {
+                /**
+                 * Array of `LogViewerHostResource`
+                 */
+                200: Array<LogViewerHostResource>;
+            };
+        };
+    };
+    '/api/images/{image}': {
         get: {
             req: ImageServeData;
             res: {
@@ -1709,7 +2300,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/jobs/scanLibrary/{slug}': {
+    '/api/jobs/scanLibrary/{slug}': {
         post: {
             req: JobLibraryScanData;
             res: {
@@ -1728,7 +2319,32 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/libraries': {
+    '/-/horizon/api/metrics/jobs': {
+        get: {
+            res: {
+                200: Array<(string)>;
+            };
+        };
+    };
+    '/-/horizon/api/metrics/jobs/{id}': {
+        get: {
+            req: HorizonJobsMetricsShowData;
+            res: {
+                200: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+    };
+    '/-/horizon/api/jobs/{id}': {
+        get: {
+            req: HorizonJobsShowData;
+            res: {
+                200: Array<(string)>;
+            };
+        };
+    };
+    '/api/libraries': {
         get: {
             req: LibrariesIndexData;
             res: {
@@ -1840,7 +2456,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/libraries/:slug': {
+    '/api/libraries/:slug': {
         patch: {
             req: LibraryUpdateData;
             res: {
@@ -1901,7 +2517,88 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/opcache/status': {
+    '/system/log-viewer/api/logs': {
+        get: {
+            req: LogViewerLogsData;
+            res: {
+                200: {
+                    file: LogFileResource | null;
+                    levelCounts: Array<LevelCountResource>;
+                    logs: Array<LogResource>;
+                    columns: string | null;
+                    pagination: {
+                        current_page: string;
+                        first_page_url: string;
+                        from: string;
+                        last_page: string;
+                        last_page_url: string;
+                        links: string;
+                        links_short: string;
+                        next_page_url: string;
+                        path: string;
+                        per_page: string;
+                        prev_page_url: string;
+                        to: string;
+                        total: string;
+                    } | null;
+                    expandAutomatically: string;
+                    cacheRecentlyCleared: string;
+                    hasMoreResults: string;
+                    percentScanned: string;
+                    performance: {
+                        memoryUsage: string;
+                        requestTime: string;
+                        version: string;
+                    };
+                };
+            };
+        };
+    };
+    '/-/horizon/api/masters': {
+        get: {
+            res: {
+                200: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+    };
+    '/-/horizon/api/monitoring': {
+        get: {
+            res: {
+                200: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        post: {
+            res: {
+                200: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+    };
+    '/-/horizon/api/monitoring/{tag}': {
+        get: {
+            req: HorizonMonitoringTagPaginateData;
+            res: {
+                200: {
+                    jobs: string;
+                    total: string;
+                };
+            };
+        };
+        delete: {
+            req: HorizonMonitoringTagDestroyData;
+            res: {
+                200: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+    };
+    '/api/opcache/status': {
         get: {
             res: {
                 200: {
@@ -1962,7 +2659,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/opcache/config': {
+    '/api/opcache/config': {
         get: {
             res: {
                 200: {
@@ -1987,7 +2684,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/opcache/clear': {
+    '/api/opcache/clear': {
         post: {
             res: {
                 200: {
@@ -2005,7 +2702,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/opcache/compile': {
+    '/api/opcache/compile': {
         post: {
             req: OpcacheCompileData;
             res: {
@@ -2025,7 +2722,18 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/queue-metrics': {
+    '/-/horizon/api/jobs/pending': {
+        get: {
+            req: HorizonPendingJobsIndexData;
+            res: {
+                200: {
+                    jobs: string;
+                    total: string;
+                };
+            };
+        };
+    };
+    '/api/queue-metrics': {
         get: {
             req: QueueMetricsShowData;
             res: {
@@ -2095,7 +2803,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/queue-metrics/queues': {
+    '/api/queue-metrics/queues': {
         get: {
             res: {
                 200: Array<{
@@ -2113,7 +2821,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/queue-metrics/metrics': {
+    '/api/queue-metrics/metrics': {
         get: {
             req: QueueMetricsMetricsData;
             res: {
@@ -2161,7 +2869,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/queue-metrics/retry/{id}': {
+    '/api/queue-metrics/retry/{id}': {
         post: {
             req: QueueMetricsRetryJobData;
             res: {
@@ -2214,7 +2922,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/queue-metrics/{id}': {
+    '/api/queue-metrics/{id}': {
         delete: {
             req: QueueMetricsDeleteData;
             res: {
@@ -2234,7 +2942,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/queue-metrics/purge': {
+    '/api/queue-metrics/purge': {
         delete: {
             res: {
                 /**
@@ -2253,7 +2961,45 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/libraries/{library}/songs': {
+    '/-/horizon/api/metrics/queues': {
+        get: {
+            res: {
+                200: Array<(string)>;
+            };
+        };
+    };
+    '/-/horizon/api/metrics/queues/{id}': {
+        get: {
+            req: HorizonQueuesMetricsShowData;
+            res: {
+                200: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+    };
+    '/-/horizon/api/jobs/retry/{id}': {
+        post: {
+            req: HorizonRetryJobsShowData;
+            res: {
+                200: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+    };
+    '/-/horizon/api/jobs/silenced': {
+        get: {
+            req: HorizonSilencedJobsIndexData;
+            res: {
+                200: {
+                    jobs: string;
+                    total: string;
+                };
+            };
+        };
+    };
+    '/api/libraries/{library}/songs': {
         get: {
             req: SongsIndexData;
             res: {
@@ -2341,7 +3087,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/libraries/{library}/songs/{publicId}': {
+    '/api/libraries/{library}/songs/{publicId}': {
         get: {
             req: SongsShowData;
             res: {
@@ -2394,7 +3140,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/libraries/{library}/songs/stream/song/{song}/direct': {
+    '/api/libraries/{library}/songs/stream/song/{song}/direct': {
         get: {
             req: SongsStreamData;
             res: {
@@ -2422,7 +3168,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/system-info': {
+    '/api/system-info': {
         get: {
             res: {
                 200: Array<{
@@ -2444,7 +3190,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/system-info/sys': {
+    '/api/system-info/sys': {
         get: {
             res: {
                 200: {
@@ -2467,7 +3213,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/users': {
+    '/api/users': {
         get: {
             req: UsersIndexData;
             res: {
@@ -2579,7 +3325,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/users/{user}': {
+    '/api/users/{user}': {
         patch: {
             req: UsersUpdateData;
             res: {
@@ -2677,7 +3423,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/users/me': {
+    '/api/users/me': {
         get: {
             res: {
                 /**
@@ -2696,7 +3442,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/users/tokens/{user}': {
+    '/api/users/tokens/{user}': {
         get: {
             req: UserTokenGetUserTokensData;
             res: {
@@ -2766,7 +3512,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/users/tokens/{token}': {
+    '/api/users/tokens/{token}': {
         delete: {
             req: UserTokenRevokeTokenData;
             res: {
@@ -2792,6 +3538,13 @@ export type $OpenApiTs = {
                      */
                     message: string;
                 };
+            };
+        };
+    };
+    '/-/horizon/api/workload': {
+        get: {
+            res: {
+                200: Array<(string)>;
             };
         };
     };

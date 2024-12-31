@@ -14,7 +14,6 @@ import './common/i18n.ts';
 import { DateFormatterProvider } from '@/providers/dayjs-provider.tsx';
 import { queryClient, createIDBPersister } from '@/common/react-query.ts';
 
-
 const reactQueryPersister = createIDBPersister();
 
 ReactDOM.createRoot(document.getElementById('baanderapproot') as HTMLElement).render(

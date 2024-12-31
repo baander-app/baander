@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.1 
 
 import { useMutation, UseMutationOptions, useQuery, UseQueryOptions } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, GenreService, ImageService, JobService, LibraryService, OpCacheService, PasskeyService, QueueService, SongService, SystemInfoService, UserService, UserTokenService } from "../requests/services.gen";
+import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, OpCacheService, PasskeyService, PendingJobsService, QueueMetricsService, QueueService, RetryService, SilencedJobsService, SongService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
 import { AuthenticateUsingPasskeyRequest, CreateLibraryRequest, CreateUserRequest, ForgotPasswordRequest, LoginRequest, RegisterRequest, ResetPasswordRequest, RetryJobRequest, StorePasskeyRequest, UpdateGenreRequest, UpdateLibraryRequest, UpdateUserRequest } from "../requests/types.gen";
 import * as Common from "./common";
 /**
@@ -105,6 +105,104 @@ export const usePasskeyServiceAuthPasskeyOptions = <TData = Common.PasskeyServic
 */
 export const usePasskeyServiceAuthPasskeyRegisterOptions = <TData = Common.PasskeyServiceAuthPasskeyRegisterOptionsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePasskeyServiceAuthPasskeyRegisterOptionsKeyFn(queryKey), queryFn: () => PasskeyService.authPasskeyRegisterOptions() as TData, ...options });
 /**
+* Get all of the batches
+* @returns unknown
+* @throws ApiError
+*/
+export const useBatchesServiceHorizonJobsBatchesIndex = <TData = Common.BatchesServiceHorizonJobsBatchesIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseBatchesServiceHorizonJobsBatchesIndexKeyFn(queryKey), queryFn: () => BatchesService.horizonJobsBatchesIndex() as TData, ...options });
+/**
+* Get the details of a batch by ID
+* @param data The data for the request.
+* @param data.id
+* @returns unknown
+* @throws ApiError
+*/
+export const useBatchesServiceHorizonJobsBatchesShow = <TData = Common.BatchesServiceHorizonJobsBatchesShowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ id }: {
+  id: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseBatchesServiceHorizonJobsBatchesShowKeyFn({ id }, queryKey), queryFn: () => BatchesService.horizonJobsBatchesShow({ id }) as TData, ...options });
+/**
+* Get all of the completed jobs
+* @param data The data for the request.
+* @param data.startingAt
+* @returns unknown
+* @throws ApiError
+*/
+export const useCompletedJobsServiceHorizonCompletedJobsIndex = <TData = Common.CompletedJobsServiceHorizonCompletedJobsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ startingAt }: {
+  startingAt?: string;
+} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseCompletedJobsServiceHorizonCompletedJobsIndexKeyFn({ startingAt }, queryKey), queryFn: () => CompletedJobsService.horizonCompletedJobsIndex({ startingAt }) as TData, ...options });
+/**
+* Get the key performance stats for the dashboard
+* @returns unknown
+* @throws ApiError
+*/
+export const useDashboardStatsServiceHorizonStatsIndex = <TData = Common.DashboardStatsServiceHorizonStatsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseDashboardStatsServiceHorizonStatsIndexKeyFn(queryKey), queryFn: () => DashboardStatsService.horizonStatsIndex() as TData, ...options });
+/**
+* Get all of the failed jobs
+* @param data The data for the request.
+* @param data.tag
+* @returns unknown
+* @throws ApiError
+*/
+export const useFailedJobsServiceHorizonFailedJobsIndex = <TData = Common.FailedJobsServiceHorizonFailedJobsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ tag }: {
+  tag?: string;
+} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseFailedJobsServiceHorizonFailedJobsIndexKeyFn({ tag }, queryKey), queryFn: () => FailedJobsService.horizonFailedJobsIndex({ tag }) as TData, ...options });
+/**
+* Get a failed job instance
+* @param data The data for the request.
+* @param data.id
+* @returns string
+* @throws ApiError
+*/
+export const useFailedJobsServiceHorizonFailedJobsShow = <TData = Common.FailedJobsServiceHorizonFailedJobsShowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ id }: {
+  id: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseFailedJobsServiceHorizonFailedJobsShowKeyFn({ id }, queryKey), queryFn: () => FailedJobsService.horizonFailedJobsShow({ id }) as TData, ...options });
+/**
+* @returns LogFileResource Array of `LogFileResource`
+* @throws ApiError
+*/
+export const useFilesServiceLogViewerFiles = <TData = Common.FilesServiceLogViewerFilesDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseFilesServiceLogViewerFilesKeyFn(queryKey), queryFn: () => FilesService.logViewerFiles() as TData, ...options });
+/**
+* @param data The data for the request.
+* @param data.fileIdentifier
+* @returns unknown
+* @throws ApiError
+*/
+export const useFilesServiceLogViewerFilesRequestDownload = <TData = Common.FilesServiceLogViewerFilesRequestDownloadDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fileIdentifier }: {
+  fileIdentifier: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseFilesServiceLogViewerFilesRequestDownloadKeyFn({ fileIdentifier }, queryKey), queryFn: () => FilesService.logViewerFilesRequestDownload({ fileIdentifier }) as TData, ...options });
+/**
+* @param data The data for the request.
+* @param data.fileIdentifier
+* @returns string
+* @throws ApiError
+*/
+export const useFilesServiceLogViewerFilesDownload = <TData = Common.FilesServiceLogViewerFilesDownloadDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fileIdentifier }: {
+  fileIdentifier: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseFilesServiceLogViewerFilesDownloadKeyFn({ fileIdentifier }, queryKey), queryFn: () => FilesService.logViewerFilesDownload({ fileIdentifier }) as TData, ...options });
+/**
+* @returns LogFolderResource Array of `LogFolderResource`
+* @throws ApiError
+*/
+export const useFoldersServiceLogViewerFolders = <TData = Common.FoldersServiceLogViewerFoldersDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseFoldersServiceLogViewerFoldersKeyFn(queryKey), queryFn: () => FoldersService.logViewerFolders() as TData, ...options });
+/**
+* @param data The data for the request.
+* @param data.folderIdentifier
+* @returns unknown
+* @throws ApiError
+*/
+export const useFoldersServiceLogViewerFoldersRequestDownload = <TData = Common.FoldersServiceLogViewerFoldersRequestDownloadDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ folderIdentifier }: {
+  folderIdentifier: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseFoldersServiceLogViewerFoldersRequestDownloadKeyFn({ folderIdentifier }, queryKey), queryFn: () => FoldersService.logViewerFoldersRequestDownload({ folderIdentifier }) as TData, ...options });
+/**
+* @param data The data for the request.
+* @param data.folderIdentifier
+* @returns string
+* @throws ApiError
+*/
+export const useFoldersServiceLogViewerFoldersDownload = <TData = Common.FoldersServiceLogViewerFoldersDownloadDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ folderIdentifier }: {
+  folderIdentifier: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseFoldersServiceLogViewerFoldersDownloadKeyFn({ folderIdentifier }, queryKey), queryFn: () => FoldersService.logViewerFoldersDownload({ folderIdentifier }) as TData, ...options });
+/**
 * Get a collection of genres
 * @param data The data for the request.
 * @param data.fields Comma seperated string of fields you want to select. If nothing is defined `select *` is default.
@@ -136,6 +234,11 @@ export const useGenreServiceGenresShow = <TData = Common.GenreServiceGenresShowD
   genre: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseGenreServiceGenresShowKeyFn({ genre }, queryKey), queryFn: () => GenreService.genresShow({ genre }) as TData, ...options });
 /**
+* @returns LogViewerHostResource Array of `LogViewerHostResource`
+* @throws ApiError
+*/
+export const useHostsServiceLogViewerHosts = <TData = Common.HostsServiceLogViewerHostsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseHostsServiceLogViewerHostsKeyFn(queryKey), queryFn: () => HostsService.logViewerHosts() as TData, ...options });
+/**
 * Get an image asset
 * @param data The data for the request.
 * @param data.image The image public id
@@ -145,6 +248,32 @@ export const useGenreServiceGenresShow = <TData = Common.GenreServiceGenresShowD
 export const useImageServiceImageServe = <TData = Common.ImageServiceImageServeDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ image }: {
   image: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseImageServiceImageServeKeyFn({ image }, queryKey), queryFn: () => ImageService.imageServe({ image }) as TData, ...options });
+/**
+* Get all of the measured jobs
+* @returns string
+* @throws ApiError
+*/
+export const useJobMetricsServiceHorizonJobsMetricsIndex = <TData = Common.JobMetricsServiceHorizonJobsMetricsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseJobMetricsServiceHorizonJobsMetricsIndexKeyFn(queryKey), queryFn: () => JobMetricsService.horizonJobsMetricsIndex() as TData, ...options });
+/**
+* Get metrics for a given job
+* @param data The data for the request.
+* @param data.id
+* @returns unknown
+* @throws ApiError
+*/
+export const useJobMetricsServiceHorizonJobsMetricsShow = <TData = Common.JobMetricsServiceHorizonJobsMetricsShowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ id }: {
+  id: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseJobMetricsServiceHorizonJobsMetricsShowKeyFn({ id }, queryKey), queryFn: () => JobMetricsService.horizonJobsMetricsShow({ id }) as TData, ...options });
+/**
+* Get the details of a recent job by ID
+* @param data The data for the request.
+* @param data.id
+* @returns string
+* @throws ApiError
+*/
+export const useJobsServiceHorizonJobsShow = <TData = Common.JobsServiceHorizonJobsShowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ id }: {
+  id: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseJobsServiceHorizonJobsShowKeyFn({ id }, queryKey), queryFn: () => JobsService.horizonJobsShow({ id }) as TData, ...options });
 /**
 * Get a collection of media libraries
 * @param data The data for the request.
@@ -158,6 +287,54 @@ export const useLibraryServiceLibrariesIndex = <TData = Common.LibraryServiceLib
   page?: number;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLibraryServiceLibrariesIndexKeyFn({ limit, page }, queryKey), queryFn: () => LibraryService.librariesIndex({ limit, page }) as TData, ...options });
 /**
+* @param data The data for the request.
+* @param data.file
+* @param data.query
+* @param data.direction
+* @param data.log
+* @param data.excludeLevels
+* @param data.excludeFileTypes
+* @param data.perPage
+* @param data.shorterStackTraces
+* @returns unknown
+* @throws ApiError
+*/
+export const useLogsServiceLogViewerLogs = <TData = Common.LogsServiceLogViewerLogsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }: {
+  direction?: string;
+  excludeFileTypes?: string;
+  excludeLevels?: string;
+  file?: string;
+  log?: string;
+  perPage?: string;
+  query?: string;
+  shorterStackTraces?: boolean;
+} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLogsServiceLogViewerLogsKeyFn({ direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }, queryKey), queryFn: () => LogsService.logViewerLogs({ direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }) as TData, ...options });
+/**
+* Get all of the master supervisors and their underlying supervisors
+* @returns unknown
+* @throws ApiError
+*/
+export const useMasterSupervisorServiceHorizonMastersIndex = <TData = Common.MasterSupervisorServiceHorizonMastersIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseMasterSupervisorServiceHorizonMastersIndexKeyFn(queryKey), queryFn: () => MasterSupervisorService.horizonMastersIndex() as TData, ...options });
+/**
+* Get all of the monitored tags and their job counts
+* @returns unknown
+* @throws ApiError
+*/
+export const useMonitoringServiceHorizonMonitoringIndex = <TData = Common.MonitoringServiceHorizonMonitoringIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseMonitoringServiceHorizonMonitoringIndexKeyFn(queryKey), queryFn: () => MonitoringService.horizonMonitoringIndex() as TData, ...options });
+/**
+* Paginate the jobs for a given tag
+* @param data The data for the request.
+* @param data.tag
+* @param data.tag
+* @param data.limit
+* @returns unknown
+* @throws ApiError
+*/
+export const useMonitoringServiceHorizonMonitoringTagPaginate = <TData = Common.MonitoringServiceHorizonMonitoringTagPaginateDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, tag }: {
+  limit?: string;
+  tag?: string;
+} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseMonitoringServiceHorizonMonitoringTagPaginateKeyFn({ limit, tag }, queryKey), queryFn: () => MonitoringService.horizonMonitoringTagPaginate({ limit, tag }) as TData, ...options });
+/**
 * Get status
 * @returns unknown
 * @throws ApiError
@@ -169,6 +346,16 @@ export const useOpCacheServiceOpCacheGetStatus = <TData = Common.OpCacheServiceO
 * @throws ApiError
 */
 export const useOpCacheServiceOpcacheGetConfig = <TData = Common.OpCacheServiceOpcacheGetConfigDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseOpCacheServiceOpcacheGetConfigKeyFn(queryKey), queryFn: () => OpCacheService.opcacheGetConfig() as TData, ...options });
+/**
+* Get all of the pending jobs
+* @param data The data for the request.
+* @param data.startingAt
+* @returns unknown
+* @throws ApiError
+*/
+export const usePendingJobsServiceHorizonPendingJobsIndex = <TData = Common.PendingJobsServiceHorizonPendingJobsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ startingAt }: {
+  startingAt?: string;
+} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePendingJobsServiceHorizonPendingJobsIndexKeyFn({ startingAt }, queryKey), queryFn: () => PendingJobsService.horizonPendingJobsIndex({ startingAt }) as TData, ...options });
 /**
 * Get a collection of monitor entries
 * @param data The data for the request.
@@ -210,6 +397,32 @@ export const useQueueServiceQueueMetricsQueues = <TData = Common.QueueServiceQue
 export const useQueueServiceQueueMetricsMetrics = <TData = Common.QueueServiceQueueMetricsMetricsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ aggregateDays }: {
   aggregateDays?: number;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseQueueServiceQueueMetricsMetricsKeyFn({ aggregateDays }, queryKey), queryFn: () => QueueService.queueMetricsMetrics({ aggregateDays }) as TData, ...options });
+/**
+* Get all of the measured queues
+* @returns string
+* @throws ApiError
+*/
+export const useQueueMetricsServiceHorizonQueuesMetricsIndex = <TData = Common.QueueMetricsServiceHorizonQueuesMetricsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseQueueMetricsServiceHorizonQueuesMetricsIndexKeyFn(queryKey), queryFn: () => QueueMetricsService.horizonQueuesMetricsIndex() as TData, ...options });
+/**
+* Get metrics for a given queue
+* @param data The data for the request.
+* @param data.id
+* @returns unknown
+* @throws ApiError
+*/
+export const useQueueMetricsServiceHorizonQueuesMetricsShow = <TData = Common.QueueMetricsServiceHorizonQueuesMetricsShowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ id }: {
+  id: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseQueueMetricsServiceHorizonQueuesMetricsShowKeyFn({ id }, queryKey), queryFn: () => QueueMetricsService.horizonQueuesMetricsShow({ id }) as TData, ...options });
+/**
+* Get all of the silenced jobs
+* @param data The data for the request.
+* @param data.startingAt
+* @returns unknown
+* @throws ApiError
+*/
+export const useSilencedJobsServiceHorizonSilencedJobsIndex = <TData = Common.SilencedJobsServiceHorizonSilencedJobsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ startingAt }: {
+  startingAt?: string;
+} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSilencedJobsServiceHorizonSilencedJobsIndexKeyFn({ startingAt }, queryKey), queryFn: () => SilencedJobsService.horizonSilencedJobsIndex({ startingAt }) as TData, ...options });
 /**
 * Get a collection of songs
 * @param data The data for the request.
@@ -327,6 +540,12 @@ export const useUserTokenServiceUserTokenGetUserTokens = <TData = Common.UserTok
   user: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseUserTokenServiceUserTokenGetUserTokensKeyFn({ page, perPage, user }, queryKey), queryFn: () => UserTokenService.userTokenGetUserTokens({ page, perPage, user }) as TData, ...options });
 /**
+* Get the current queue workload for the application
+* @returns string
+* @throws ApiError
+*/
+export const useWorkloadServiceHorizonWorkloadIndex = <TData = Common.WorkloadServiceHorizonWorkloadIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseWorkloadServiceHorizonWorkloadIndexKeyFn(queryKey), queryFn: () => WorkloadService.horizonWorkloadIndex() as TData, ...options });
+/**
 * Login
 * @param data The data for the request.
 * @param data.requestBody
@@ -443,6 +662,56 @@ export const usePasskeyServiceAuthPasskeyRegister = <TData = Common.PasskeyServi
   requestBody?: StorePasskeyRequest;
 }, TContext>({ mutationFn: ({ requestBody }) => PasskeyService.authPasskeyRegister({ requestBody }) as unknown as Promise<TData>, ...options });
 /**
+* Retry the given batch
+* @param data The data for the request.
+* @param data.id
+* @returns unknown
+* @throws ApiError
+*/
+export const useBatchesServiceHorizonJobsBatchesRetry = <TData = Common.BatchesServiceHorizonJobsBatchesRetryMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  id: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  id: string;
+}, TContext>({ mutationFn: ({ id }) => BatchesService.horizonJobsBatchesRetry({ id }) as unknown as Promise<TData>, ...options });
+/**
+* @param data The data for the request.
+* @param data.fileIdentifier
+* @returns unknown
+* @throws ApiError
+*/
+export const useFilesServiceLogViewerFilesClearCache = <TData = Common.FilesServiceLogViewerFilesClearCacheMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  fileIdentifier: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  fileIdentifier: string;
+}, TContext>({ mutationFn: ({ fileIdentifier }) => FilesService.logViewerFilesClearCache({ fileIdentifier }) as unknown as Promise<TData>, ...options });
+/**
+* @returns unknown
+* @throws ApiError
+*/
+export const useFilesServiceLogViewerFilesClearCacheAll = <TData = Common.FilesServiceLogViewerFilesClearCacheAllMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, void, TContext>, "mutationFn">) => useMutation<TData, TError, void, TContext>({ mutationFn: () => FilesService.logViewerFilesClearCacheAll() as unknown as Promise<TData>, ...options });
+/**
+* @param data The data for the request.
+* @param data.requestBody
+* @returns unknown
+* @throws ApiError
+*/
+export const useFilesServiceLogViewerFilesDeleteMultipleFiles = <TData = Common.FilesServiceLogViewerFilesDeleteMultipleFilesMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody?: { files?: string; };
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody?: { files?: string; };
+}, TContext>({ mutationFn: ({ requestBody }) => FilesService.logViewerFilesDeleteMultipleFiles({ requestBody }) as unknown as Promise<TData>, ...options });
+/**
+* @param data The data for the request.
+* @param data.folderIdentifier
+* @returns unknown
+* @throws ApiError
+*/
+export const useFoldersServiceLogViewerFoldersClearCache = <TData = Common.FoldersServiceLogViewerFoldersClearCacheMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  folderIdentifier: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  folderIdentifier: string;
+}, TContext>({ mutationFn: ({ folderIdentifier }) => FoldersService.logViewerFoldersClearCache({ folderIdentifier }) as unknown as Promise<TData>, ...options });
+/**
 * Scan a library
 * @param data The data for the request.
 * @param data.slug
@@ -466,6 +735,12 @@ export const useLibraryServiceLibraryCreate = <TData = Common.LibraryServiceLibr
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   requestBody?: CreateLibraryRequest;
 }, TContext>({ mutationFn: ({ requestBody }) => LibraryService.libraryCreate({ requestBody }) as unknown as Promise<TData>, ...options });
+/**
+* Start monitoring the given tag
+* @returns unknown
+* @throws ApiError
+*/
+export const useMonitoringServiceHorizonMonitoringStore = <TData = Common.MonitoringServiceHorizonMonitoringStoreMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, void, TContext>, "mutationFn">) => useMutation<TData, TError, void, TContext>({ mutationFn: () => MonitoringService.horizonMonitoringStore() as unknown as Promise<TData>, ...options });
 /**
 * Clear
 * @returns unknown
@@ -502,6 +777,18 @@ export const useQueueServiceQueueMetricsRetryJob = <TData = Common.QueueServiceQ
   id: string;
   requestBody?: RetryJobRequest;
 }, TContext>({ mutationFn: ({ id, requestBody }) => QueueService.queueMetricsRetryJob({ id, requestBody }) as unknown as Promise<TData>, ...options });
+/**
+* Retry a failed job
+* @param data The data for the request.
+* @param data.id
+* @returns unknown
+* @throws ApiError
+*/
+export const useRetryServiceHorizonRetryJobsShow = <TData = Common.RetryServiceHorizonRetryJobsShowMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  id: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  id: string;
+}, TContext>({ mutationFn: ({ id }) => RetryService.horizonRetryJobsShow({ id }) as unknown as Promise<TData>, ...options });
 /**
 * Create user
 * This is endpoint allows administrators to create users
@@ -558,6 +845,28 @@ export const useUserServiceUsersUpdate = <TData = Common.UserServiceUsersUpdateM
   user: number;
 }, TContext>({ mutationFn: ({ requestBody, user }) => UserService.usersUpdate({ requestBody, user }) as unknown as Promise<TData>, ...options });
 /**
+* @param data The data for the request.
+* @param data.fileIdentifier
+* @returns unknown
+* @throws ApiError
+*/
+export const useFilesServiceLogViewerFilesDelete = <TData = Common.FilesServiceLogViewerFilesDeleteMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  fileIdentifier: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  fileIdentifier: string;
+}, TContext>({ mutationFn: ({ fileIdentifier }) => FilesService.logViewerFilesDelete({ fileIdentifier }) as unknown as Promise<TData>, ...options });
+/**
+* @param data The data for the request.
+* @param data.folderIdentifier
+* @returns unknown
+* @throws ApiError
+*/
+export const useFoldersServiceLogViewerFoldersDelete = <TData = Common.FoldersServiceLogViewerFoldersDeleteMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  folderIdentifier: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  folderIdentifier: string;
+}, TContext>({ mutationFn: ({ folderIdentifier }) => FoldersService.logViewerFoldersDelete({ folderIdentifier }) as unknown as Promise<TData>, ...options });
+/**
 * Delete a genre
 * @param data The data for the request.
 * @param data.genre The genre slug
@@ -575,6 +884,18 @@ export const useGenreServiceGenresDestroy = <TData = Common.GenreServiceGenresDe
 * @throws ApiError
 */
 export const useLibraryServiceLibraryDelete = <TData = Common.LibraryServiceLibraryDeleteMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, void, TContext>, "mutationFn">) => useMutation<TData, TError, void, TContext>({ mutationFn: () => LibraryService.libraryDelete() as unknown as Promise<TData>, ...options });
+/**
+* Stop monitoring the given tag
+* @param data The data for the request.
+* @param data.tag
+* @returns unknown
+* @throws ApiError
+*/
+export const useMonitoringServiceHorizonMonitoringTagDestroy = <TData = Common.MonitoringServiceHorizonMonitoringTagDestroyMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  tag: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  tag: string;
+}, TContext>({ mutationFn: ({ tag }) => MonitoringService.horizonMonitoringTagDestroy({ tag }) as unknown as Promise<TData>, ...options });
 /**
 * Delete by id
 * @param data The data for the request.
