@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import {  } from '@/api-client/queries/infiniteQueries.ts';
+import { useQueueServiceQueueMetricsShowInfinite } from '@/api-client/queries/infiniteQueries.ts';
 import { TableVirtuoso } from 'react-virtuoso';
 import { Box, Button, ButtonGroup, Flex, Modal, Table, Text } from '@mantine/core';
 import { QueueMonitorResource } from '@/api-client/requests';
@@ -15,8 +15,6 @@ export interface JobsList extends React.ComponentPropsWithoutRef<'div'> {
 
 }
 export function JobsList({...rest}: JobsList) {
-  return null;
-
   const { data: jobsData, fetchNextPage, hasNextPage } = useQueueServiceQueueMetricsShowInfinite();
   const [openJob, setOpenJob] = useState<QueueMonitorResource>();
   const [showJobDetails, jobDetailHandlers] = useDisclosure(false);
