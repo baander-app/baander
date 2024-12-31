@@ -1,31 +1,14 @@
-export const statusToName = (value: number) => {
+export const statusToColor = (value: string) => {
   switch (value) {
-    case 0:
-      return 'Running';
-    case 1:
-      return 'Success';
-    case 2:
-      return 'Failed';
-    case 3:
-      return 'Stale';
-    case 4:
-      return 'Queued';
-    default:
-      return 'Unknown';
-  }
-};
-
-export const statusToColor = (value: number) => {
-  switch (value) {
-    case 0:
+    case 'succeeded':
       return 'green';
-    case 1:
+    case 'running':
       return 'blue';
-    case 2:
+    case 'failed':
       return 'red';
-    case 3:
+    case 'stale':
       return 'yellow';
-    case 4:
+    case 'queued':
       return 'indigo';
     default:
       return 'gray';
