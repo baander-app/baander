@@ -1,4 +1,5 @@
 .git
 storage/muzak
+/storage/movies
 node_modules
 vendor

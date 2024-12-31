@@ -20,7 +20,7 @@ import * as Common from "./common";
 * @param data.page Current page
 * @param data.limit Items per page
 * @param data.genres _Extension_ Comma seperated list of genres
-* @returns unknown Json paginated set of `AlbumResource`
+* @returns unknown Paginated set of `AlbumResource`
 * @throws ApiError
 */
 export const useAlbumServiceAlbumsIndexSuspense = <TData = Common.AlbumServiceAlbumsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fields, genres, library, limit, page, relations }: {
@@ -56,7 +56,7 @@ export const useAlbumServiceAlbumsShowSuspense = <TData = Common.AlbumServiceAlb
 * @param data.page Current page
 * @param data.limit Items per page
 * @param data.genres _Extension_ Comma seperated list of genres
-* @returns unknown Json paginated set of `ArtistResource`
+* @returns unknown Paginated set of `ArtistResource`
 * @throws ApiError
 */
 export const useArtistServiceArtistsIndexSuspense = <TData = Common.ArtistServiceArtistsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fields, genres, library, limit, page, relations }: {
@@ -149,7 +149,7 @@ export const useFailedJobsServiceHorizonFailedJobsIndexSuspense = <TData = Commo
 * Get a failed job instance
 * @param data The data for the request.
 * @param data.id
-* @returns string
+* @returns unknown
 * @throws ApiError
 */
 export const useFailedJobsServiceHorizonFailedJobsShowSuspense = <TData = Common.FailedJobsServiceHorizonFailedJobsShowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ id }: {
@@ -212,7 +212,7 @@ export const useFoldersServiceLogViewerFoldersDownloadSuspense = <TData = Common
 * @param data.librarySlug Constrain the query to only fetch genres that are contained within the given library
 * @param data.page Current page
 * @param data.limit Items per page
-* @returns unknown Json paginated set of `GenreResource`
+* @returns unknown Paginated set of `GenreResource`
 * @throws ApiError
 */
 export const useGenreServiceGenresIndexSuspense = <TData = Common.GenreServiceGenresIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fields, librarySlug, limit, page, relations }: {
@@ -249,7 +249,7 @@ export const useImageServiceImageServeSuspense = <TData = Common.ImageServiceIma
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseImageServiceImageServeKeyFn({ image }, queryKey), queryFn: () => ImageService.imageServe({ image }) as TData, ...options });
 /**
 * Get all of the measured jobs
-* @returns string
+* @returns unknown
 * @throws ApiError
 */
 export const useJobMetricsServiceHorizonJobsMetricsIndexSuspense = <TData = Common.JobMetricsServiceHorizonJobsMetricsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseJobMetricsServiceHorizonJobsMetricsIndexKeyFn(queryKey), queryFn: () => JobMetricsService.horizonJobsMetricsIndex() as TData, ...options });
@@ -267,7 +267,7 @@ export const useJobMetricsServiceHorizonJobsMetricsShowSuspense = <TData = Commo
 * Get the details of a recent job by ID
 * @param data The data for the request.
 * @param data.id
-* @returns string
+* @returns unknown
 * @throws ApiError
 */
 export const useJobsServiceHorizonJobsShowSuspense = <TData = Common.JobsServiceHorizonJobsShowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ id }: {
@@ -278,13 +278,23 @@ export const useJobsServiceHorizonJobsShowSuspense = <TData = Common.JobsService
 * @param data The data for the request.
 * @param data.page Current page
 * @param data.limit Items per page
-* @returns unknown Json paginated set of `LibraryResource`
+* @returns unknown Paginated set of `LibraryResource`
 * @throws ApiError
 */
 export const useLibraryServiceLibrariesIndexSuspense = <TData = Common.LibraryServiceLibrariesIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, page }: {
   limit?: number;
   page?: number;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseLibraryServiceLibrariesIndexKeyFn({ limit, page }, queryKey), queryFn: () => LibraryService.librariesIndex({ limit, page }) as TData, ...options });
+/**
+* Show library
+* @param data The data for the request.
+* @param data.slug
+* @returns LibraryResource `LibraryResource`
+* @throws ApiError
+*/
+export const useLibraryServiceLibraryShowSuspense = <TData = Common.LibraryServiceLibraryShowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ slug }: {
+  slug: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseLibraryServiceLibraryShowKeyFn({ slug }, queryKey), queryFn: () => LibraryService.libraryShow({ slug }) as TData, ...options });
 /**
 * @param data The data for the request.
 * @param data.file
@@ -369,7 +379,7 @@ export const usePendingJobsServiceHorizonPendingJobsIndexSuspense = <TData = Com
 * @param data.queue Name of the queue
 * @param data.name Name of the job
 * @param data.queuedFirst Order queued jobs first
-* @returns unknown Json paginated set of `QueueMonitorResource`
+* @returns unknown Paginated set of `QueueMonitorResource`
 * @throws ApiError
 */
 export const useQueueServiceQueueMetricsShowSuspense = <TData = Common.QueueServiceQueueMetricsShowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, name, page, queue, queuedFirst, status }: {
@@ -398,7 +408,7 @@ export const useQueueServiceQueueMetricsMetricsSuspense = <TData = Common.QueueS
 } = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseQueueServiceQueueMetricsMetricsKeyFn({ aggregateDays }, queryKey), queryFn: () => QueueService.queueMetricsMetrics({ aggregateDays }) as TData, ...options });
 /**
 * Get all of the measured queues
-* @returns string
+* @returns unknown
 * @throws ApiError
 */
 export const useQueueMetricsServiceHorizonQueuesMetricsIndexSuspense = <TData = Common.QueueMetricsServiceHorizonQueuesMetricsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseQueueMetricsServiceHorizonQueuesMetricsIndexKeyFn(queryKey), queryFn: () => QueueMetricsService.horizonQueuesMetricsIndex() as TData, ...options });
@@ -435,7 +445,7 @@ export const useSilencedJobsServiceHorizonSilencedJobsIndexSuspense = <TData = C
 * - artists
 * - album.albumArtist
 * - genres
-* @returns unknown Json paginated set of `SongResource`
+* @returns unknown Paginated set of `SongResource`
 * @throws ApiError
 */
 export const useSongServiceSongsIndexSuspense = <TData = Common.SongServiceSongsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ genreNames, genreSlugs, library, limit, page, relations }: {
@@ -497,7 +507,7 @@ export const useSystemInfoServiceSystemInfoSysSuspense = <TData = Common.SystemI
 * @param data.filters JSON object
 * @param data.filterModes JSON object
 * @param data.sorting JSON object
-* @returns unknown Json paginated set of `UserResource`
+* @returns unknown Paginated set of `UserResource`
 * @throws ApiError
 */
 export const useUserServiceUsersIndexSuspense = <TData = Common.UserServiceUsersIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ filterModes, filters, globalFilter, limit, page, sorting }: {
@@ -530,7 +540,7 @@ export const useUserServiceUsersMeSuspense = <TData = Common.UserServiceUsersMeD
 * @param data.user
 * @param data.page
 * @param data.perPage
-* @returns unknown Json paginated set of `PersonalAccessTokenViewResource`
+* @returns unknown Paginated set of `PersonalAccessTokenViewResource`
 * @throws ApiError
 */
 export const useUserTokenServiceUserTokenGetUserTokensSuspense = <TData = Common.UserTokenServiceUserTokenGetUserTokensDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ page, perPage, user }: {
@@ -540,7 +550,7 @@ export const useUserTokenServiceUserTokenGetUserTokensSuspense = <TData = Common
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseUserTokenServiceUserTokenGetUserTokensKeyFn({ page, perPage, user }, queryKey), queryFn: () => UserTokenService.userTokenGetUserTokens({ page, perPage, user }) as TData, ...options });
 /**
 * Get the current queue workload for the application
-* @returns string
+* @returns unknown
 * @throws ApiError
 */
 export const useWorkloadServiceHorizonWorkloadIndexSuspense = <TData = Common.WorkloadServiceHorizonWorkloadIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseWorkloadServiceHorizonWorkloadIndexKeyFn(queryKey), queryFn: () => WorkloadService.horizonWorkloadIndex() as TData, ...options });

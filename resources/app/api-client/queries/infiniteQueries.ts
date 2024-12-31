@@ -20,7 +20,7 @@ import * as Common from "./common";
 * @param data.page Current page
 * @param data.limit Items per page
 * @param data.genres _Extension_ Comma seperated list of genres
-* @returns unknown Json paginated set of `AlbumResource`
+* @returns unknown Paginated set of `AlbumResource`
 * @throws ApiError
 */
 export const useAlbumServiceAlbumsIndexInfinite = <TData = InfiniteData<Common.AlbumServiceAlbumsIndexDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fields, genres, library, limit, relations }: {
@@ -47,7 +47,7 @@ export const useAlbumServiceAlbumsIndexInfinite = <TData = InfiniteData<Common.A
 * @param data.page Current page
 * @param data.limit Items per page
 * @param data.genres _Extension_ Comma seperated list of genres
-* @returns unknown Json paginated set of `ArtistResource`
+* @returns unknown Paginated set of `ArtistResource`
 * @throws ApiError
 */
 export const useArtistServiceArtistsIndexInfinite = <TData = InfiniteData<Common.ArtistServiceArtistsIndexDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fields, genres, library, limit, relations }: {
@@ -72,7 +72,7 @@ export const useArtistServiceArtistsIndexInfinite = <TData = InfiniteData<Common
 * @param data.librarySlug Constrain the query to only fetch genres that are contained within the given library
 * @param data.page Current page
 * @param data.limit Items per page
-* @returns unknown Json paginated set of `GenreResource`
+* @returns unknown Paginated set of `GenreResource`
 * @throws ApiError
 */
 export const useGenreServiceGenresIndexInfinite = <TData = InfiniteData<Common.GenreServiceGenresIndexDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fields, librarySlug, limit, relations }: {
@@ -90,7 +90,7 @@ export const useGenreServiceGenresIndexInfinite = <TData = InfiniteData<Common.G
 * @param data The data for the request.
 * @param data.page Current page
 * @param data.limit Items per page
-* @returns unknown Json paginated set of `LibraryResource`
+* @returns unknown Paginated set of `LibraryResource`
 * @throws ApiError
 */
 export const useLibraryServiceLibrariesIndexInfinite = <TData = InfiniteData<Common.LibraryServiceLibrariesIndexDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit }: {
@@ -114,7 +114,7 @@ export const useLibraryServiceLibrariesIndexInfinite = <TData = InfiniteData<Com
 * @param data.queue Name of the queue
 * @param data.name Name of the job
 * @param data.queuedFirst Order queued jobs first
-* @returns unknown Json paginated set of `QueueMonitorResource`
+* @returns unknown Paginated set of `QueueMonitorResource`
 * @throws ApiError
 */
 export const useQueueServiceQueueMetricsShowInfinite = <TData = InfiniteData<Common.QueueServiceQueueMetricsShowDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, name, queue, queuedFirst, status }: {
@@ -141,7 +141,7 @@ export const useQueueServiceQueueMetricsShowInfinite = <TData = InfiniteData<Com
 * - artists
 * - album.albumArtist
 * - genres
-* @returns unknown Json paginated set of `SongResource`
+* @returns unknown Paginated set of `SongResource`
 * @throws ApiError
 */
 export const useSongServiceSongsIndexInfinite = <TData = InfiniteData<Common.SongServiceSongsIndexDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ genreNames, genreSlugs, library, limit, relations }: {
@@ -164,7 +164,7 @@ export const useSongServiceSongsIndexInfinite = <TData = InfiniteData<Common.Son
 * @param data.filters JSON object
 * @param data.filterModes JSON object
 * @param data.sorting JSON object
-* @returns unknown Json paginated set of `UserResource`
+* @returns unknown Paginated set of `UserResource`
 * @throws ApiError
 */
 export const useUserServiceUsersIndexInfinite = <TData = InfiniteData<Common.UserServiceUsersIndexDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ filterModes, filters, globalFilter, limit, sorting }: {
@@ -184,7 +184,7 @@ export const useUserServiceUsersIndexInfinite = <TData = InfiniteData<Common.Use
 * @param data.user
 * @param data.page
 * @param data.perPage
-* @returns unknown Json paginated set of `PersonalAccessTokenViewResource`
+* @returns unknown Paginated set of `PersonalAccessTokenViewResource`
 * @throws ApiError
 */
 export const useUserTokenServiceUserTokenGetUserTokensInfinite = <TData = InfiniteData<Common.UserTokenServiceUserTokenGetUserTokensDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ perPage, user }: {

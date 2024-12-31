@@ -20,7 +20,7 @@ import * as Common from "./common";
 * @param data.page Current page
 * @param data.limit Items per page
 * @param data.genres _Extension_ Comma seperated list of genres
-* @returns unknown Json paginated set of `AlbumResource`
+* @returns unknown Paginated set of `AlbumResource`
 * @throws ApiError
 */
 export const prefetchUseAlbumServiceAlbumsIndex = (queryClient: QueryClient, { fields, genres, library, limit, page, relations }: {
@@ -56,7 +56,7 @@ export const prefetchUseAlbumServiceAlbumsShow = (queryClient: QueryClient, { al
 * @param data.page Current page
 * @param data.limit Items per page
 * @param data.genres _Extension_ Comma seperated list of genres
-* @returns unknown Json paginated set of `ArtistResource`
+* @returns unknown Paginated set of `ArtistResource`
 * @throws ApiError
 */
 export const prefetchUseArtistServiceArtistsIndex = (queryClient: QueryClient, { fields, genres, library, limit, page, relations }: {
@@ -149,7 +149,7 @@ export const prefetchUseFailedJobsServiceHorizonFailedJobsIndex = (queryClient: 
 * Get a failed job instance
 * @param data The data for the request.
 * @param data.id
-* @returns string
+* @returns unknown
 * @throws ApiError
 */
 export const prefetchUseFailedJobsServiceHorizonFailedJobsShow = (queryClient: QueryClient, { id }: {
@@ -212,7 +212,7 @@ export const prefetchUseFoldersServiceLogViewerFoldersDownload = (queryClient: Q
 * @param data.librarySlug Constrain the query to only fetch genres that are contained within the given library
 * @param data.page Current page
 * @param data.limit Items per page
-* @returns unknown Json paginated set of `GenreResource`
+* @returns unknown Paginated set of `GenreResource`
 * @throws ApiError
 */
 export const prefetchUseGenreServiceGenresIndex = (queryClient: QueryClient, { fields, librarySlug, limit, page, relations }: {
@@ -249,7 +249,7 @@ export const prefetchUseImageServiceImageServe = (queryClient: QueryClient, { im
 }) => queryClient.prefetchQuery({ queryKey: Common.UseImageServiceImageServeKeyFn({ image }), queryFn: () => ImageService.imageServe({ image }) });
 /**
 * Get all of the measured jobs
-* @returns string
+* @returns unknown
 * @throws ApiError
 */
 export const prefetchUseJobMetricsServiceHorizonJobsMetricsIndex = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseJobMetricsServiceHorizonJobsMetricsIndexKeyFn(), queryFn: () => JobMetricsService.horizonJobsMetricsIndex() });
@@ -267,7 +267,7 @@ export const prefetchUseJobMetricsServiceHorizonJobsMetricsShow = (queryClient: 
 * Get the details of a recent job by ID
 * @param data The data for the request.
 * @param data.id
-* @returns string
+* @returns unknown
 * @throws ApiError
 */
 export const prefetchUseJobsServiceHorizonJobsShow = (queryClient: QueryClient, { id }: {
@@ -278,13 +278,23 @@ export const prefetchUseJobsServiceHorizonJobsShow = (queryClient: QueryClient, 
 * @param data The data for the request.
 * @param data.page Current page
 * @param data.limit Items per page
-* @returns unknown Json paginated set of `LibraryResource`
+* @returns unknown Paginated set of `LibraryResource`
 * @throws ApiError
 */
 export const prefetchUseLibraryServiceLibrariesIndex = (queryClient: QueryClient, { limit, page }: {
   limit?: number;
   page?: number;
 } = {}) => queryClient.prefetchQuery({ queryKey: Common.UseLibraryServiceLibrariesIndexKeyFn({ limit, page }), queryFn: () => LibraryService.librariesIndex({ limit, page }) });
+/**
+* Show library
+* @param data The data for the request.
+* @param data.slug
+* @returns LibraryResource `LibraryResource`
+* @throws ApiError
+*/
+export const prefetchUseLibraryServiceLibraryShow = (queryClient: QueryClient, { slug }: {
+  slug: string;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseLibraryServiceLibraryShowKeyFn({ slug }), queryFn: () => LibraryService.libraryShow({ slug }) });
 /**
 * @param data The data for the request.
 * @param data.file
@@ -369,7 +379,7 @@ export const prefetchUsePendingJobsServiceHorizonPendingJobsIndex = (queryClient
 * @param data.queue Name of the queue
 * @param data.name Name of the job
 * @param data.queuedFirst Order queued jobs first
-* @returns unknown Json paginated set of `QueueMonitorResource`
+* @returns unknown Paginated set of `QueueMonitorResource`
 * @throws ApiError
 */
 export const prefetchUseQueueServiceQueueMetricsShow = (queryClient: QueryClient, { limit, name, page, queue, queuedFirst, status }: {
@@ -398,7 +408,7 @@ export const prefetchUseQueueServiceQueueMetricsMetrics = (queryClient: QueryCli
 } = {}) => queryClient.prefetchQuery({ queryKey: Common.UseQueueServiceQueueMetricsMetricsKeyFn({ aggregateDays }), queryFn: () => QueueService.queueMetricsMetrics({ aggregateDays }) });
 /**
 * Get all of the measured queues
-* @returns string
+* @returns unknown
 * @throws ApiError
 */
 export const prefetchUseQueueMetricsServiceHorizonQueuesMetricsIndex = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseQueueMetricsServiceHorizonQueuesMetricsIndexKeyFn(), queryFn: () => QueueMetricsService.horizonQueuesMetricsIndex() });
@@ -435,7 +445,7 @@ export const prefetchUseSilencedJobsServiceHorizonSilencedJobsIndex = (queryClie
 * - artists
 * - album.albumArtist
 * - genres
-* @returns unknown Json paginated set of `SongResource`
+* @returns unknown Paginated set of `SongResource`
 * @throws ApiError
 */
 export const prefetchUseSongServiceSongsIndex = (queryClient: QueryClient, { genreNames, genreSlugs, library, limit, page, relations }: {
@@ -497,7 +507,7 @@ export const prefetchUseSystemInfoServiceSystemInfoSys = (queryClient: QueryClie
 * @param data.filters JSON object
 * @param data.filterModes JSON object
 * @param data.sorting JSON object
-* @returns unknown Json paginated set of `UserResource`
+* @returns unknown Paginated set of `UserResource`
 * @throws ApiError
 */
 export const prefetchUseUserServiceUsersIndex = (queryClient: QueryClient, { filterModes, filters, globalFilter, limit, page, sorting }: {
@@ -530,7 +540,7 @@ export const prefetchUseUserServiceUsersMe = (queryClient: QueryClient) => query
 * @param data.user
 * @param data.page
 * @param data.perPage
-* @returns unknown Json paginated set of `PersonalAccessTokenViewResource`
+* @returns unknown Paginated set of `PersonalAccessTokenViewResource`
 * @throws ApiError
 */
 export const prefetchUseUserTokenServiceUserTokenGetUserTokens = (queryClient: QueryClient, { page, perPage, user }: {
@@ -540,7 +550,7 @@ export const prefetchUseUserTokenServiceUserTokenGetUserTokens = (queryClient: Q
 }) => queryClient.prefetchQuery({ queryKey: Common.UseUserTokenServiceUserTokenGetUserTokensKeyFn({ page, perPage, user }), queryFn: () => UserTokenService.userTokenGetUserTokens({ page, perPage, user }) });
 /**
 * Get the current queue workload for the application
-* @returns string
+* @returns unknown
 * @throws ApiError
 */
 export const prefetchUseWorkloadServiceHorizonWorkloadIndex = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseWorkloadServiceHorizonWorkloadIndexKeyFn(), queryFn: () => WorkloadService.horizonWorkloadIndex() });

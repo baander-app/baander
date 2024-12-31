@@ -20,7 +20,6 @@ class Song extends BaseModel implements DirectStreamableFile
         'album',
         'album.cover',
         'artists',
-        'album',
         'genres',
     ];
 

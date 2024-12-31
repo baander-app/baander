@@ -16,7 +16,7 @@ class ProdStartSwooleCommand extends StartSwooleCommand
                     {--task-workers=2 : The number of task workers that should be available to handle tasks}
                     {--max-requests=500 : The number of requests to process before reloading the server}';
 
-    public $description = 'Dump octane server state file';
+    public $description = 'Dump octane server state file. The start-swoole-server script must always be running.';
 
     public function handle(
         ServerProcessInspector $inspector,

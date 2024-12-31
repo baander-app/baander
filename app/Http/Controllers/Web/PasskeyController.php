@@ -43,8 +43,7 @@ class PasskeyController extends Controller
     public function getOptions(Request $request)
     {
         $action = new GeneratePasskeyAuthenticationOptionsAction();
-        $email = $request->user()->email;
-        $options = $action->execute($email);
+        $options = $action->execute($request->user());
 
         return response()->json($options);
     }

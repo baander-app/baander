@@ -9,8 +9,6 @@ use App\Extensions\BaseBuilder;
  */
 trait IsBaseModel
 {
-    protected $dateFormat = 'Y-m-d H:i:sO';
-
     public function formatForException(): string
     {
         return implode('|', [

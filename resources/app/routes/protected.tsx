@@ -8,6 +8,9 @@ import { AccountRoutes } from '@/features/account/routes/routes.tsx';
 import { DashboardRoutes } from '@/features/dashboard/routes.tsx';
 import { AudioPlayerContextProvider } from '@/features/library-music-player/providers/audio-player-provider.tsx';
 import { UserSettingsRoutes } from '@/features/feature-user-settings/routes/routes.tsx';
+import { useLibraryServiceLibraryShow } from '@/api-client/queries';
+import { usePathParam } from '@/hooks/use-path-param.ts';
+import { LibraryMoviesRoutes } from '@/features/library-movies/routes/_routes.tsx';
 
 const App = () => {
   return (
@@ -33,6 +36,24 @@ const DashboardApp = () => {
   );
 };
 
+const LibraryRoutes = () => {
+  const { library } = usePathParam<{ library: string }>();
+
+  const { data: libraryData, failureReason, isLoading } = useLibraryServiceLibraryShow({ slug: library });
+
+  if (isLoading) return <div>Loading...</div>;
+  if (failureReason) return <div>Error: {failureReason as string}</div>;
+
+  switch (libraryData?.type) {
+    case 'music':
+      return <LibraryMusicRoutes/>;
+    case 'movie':
+      return <LibraryMoviesRoutes/>;
+    default:
+      return <Navigate to="/"/>;
+  }
+};
+
 export const protectedRoutes: RouteObject[] = [
   {
     path: '/',
@@ -40,7 +61,7 @@ export const protectedRoutes: RouteObject[] = [
     children: [
       {
         path: '/library/:library/*',
-        element: <LibraryMusicRoutes/>,
+        element: <LibraryRoutes/>,
       },
       {
         path: '/account/*',

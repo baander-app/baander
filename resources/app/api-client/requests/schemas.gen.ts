@@ -549,9 +549,7 @@ export const $PersonalAccessTokenViewResource = {
         },
         abilities: {
             type: ['array', 'null'],
-            items: {
-                type: 'string'
-            }
+            items: {}
         },
         userAgent: {
             type: ['string', 'null']
@@ -629,9 +627,7 @@ export const $QueueMonitorResource = {
         },
         exception: {
             type: ['array', 'null'],
-            items: {
-                type: 'string'
-            }
+            items: {}
         },
         exception_class: {
             type: ['string', 'null']

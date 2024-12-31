@@ -46,9 +46,23 @@ class LibraryController extends Controller
     }
 
     /**
+     * Show library
+     *
+     * @param string $slug
+     * @return LibraryResource
+     */
+    #[Get('/{slug}', 'api.library.show')]
+    public function show(string $slug)
+    {
+        $library = Library::whereSlug($slug)->firstOrFail();
+
+        return new LibraryResource($library);
+    }
+
+    /**
      * Update a library specified by the provided slug.
      */
-    #[Patch('/:slug', 'api.library.update')]
+    #[Patch('/{slug}', 'api.library.update')]
     public function update(string $slug, UpdateLibraryRequest $request)
     {
         $library = Library::whereSlug($slug)->firstOrFail();

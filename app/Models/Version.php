@@ -10,6 +10,8 @@ class Version extends BaseVersion
 {
     use SoftDeletes, IsBaseModel;
 
+    protected $dateFormat = 'Y-m-d H:i:sO';
+
     protected $table = 'versions';
 
     protected $guarded = [];

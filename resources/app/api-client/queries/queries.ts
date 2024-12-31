@@ -21,7 +21,7 @@ import * as Common from "./common";
 * @param data.page Current page
 * @param data.limit Items per page
 * @param data.genres _Extension_ Comma seperated list of genres
-* @returns unknown Json paginated set of `AlbumResource`
+* @returns unknown Paginated set of `AlbumResource`
 * @throws ApiError
 */
 export const useAlbumServiceAlbumsIndex = <TData = Common.AlbumServiceAlbumsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fields, genres, library, limit, page, relations }: {
@@ -57,7 +57,7 @@ export const useAlbumServiceAlbumsShow = <TData = Common.AlbumServiceAlbumsShowD
 * @param data.page Current page
 * @param data.limit Items per page
 * @param data.genres _Extension_ Comma seperated list of genres
-* @returns unknown Json paginated set of `ArtistResource`
+* @returns unknown Paginated set of `ArtistResource`
 * @throws ApiError
 */
 export const useArtistServiceArtistsIndex = <TData = Common.ArtistServiceArtistsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fields, genres, library, limit, page, relations }: {
@@ -150,7 +150,7 @@ export const useFailedJobsServiceHorizonFailedJobsIndex = <TData = Common.Failed
 * Get a failed job instance
 * @param data The data for the request.
 * @param data.id
-* @returns string
+* @returns unknown
 * @throws ApiError
 */
 export const useFailedJobsServiceHorizonFailedJobsShow = <TData = Common.FailedJobsServiceHorizonFailedJobsShowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ id }: {
@@ -213,7 +213,7 @@ export const useFoldersServiceLogViewerFoldersDownload = <TData = Common.Folders
 * @param data.librarySlug Constrain the query to only fetch genres that are contained within the given library
 * @param data.page Current page
 * @param data.limit Items per page
-* @returns unknown Json paginated set of `GenreResource`
+* @returns unknown Paginated set of `GenreResource`
 * @throws ApiError
 */
 export const useGenreServiceGenresIndex = <TData = Common.GenreServiceGenresIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fields, librarySlug, limit, page, relations }: {
@@ -250,7 +250,7 @@ export const useImageServiceImageServe = <TData = Common.ImageServiceImageServeD
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseImageServiceImageServeKeyFn({ image }, queryKey), queryFn: () => ImageService.imageServe({ image }) as TData, ...options });
 /**
 * Get all of the measured jobs
-* @returns string
+* @returns unknown
 * @throws ApiError
 */
 export const useJobMetricsServiceHorizonJobsMetricsIndex = <TData = Common.JobMetricsServiceHorizonJobsMetricsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseJobMetricsServiceHorizonJobsMetricsIndexKeyFn(queryKey), queryFn: () => JobMetricsService.horizonJobsMetricsIndex() as TData, ...options });
@@ -268,7 +268,7 @@ export const useJobMetricsServiceHorizonJobsMetricsShow = <TData = Common.JobMet
 * Get the details of a recent job by ID
 * @param data The data for the request.
 * @param data.id
-* @returns string
+* @returns unknown
 * @throws ApiError
 */
 export const useJobsServiceHorizonJobsShow = <TData = Common.JobsServiceHorizonJobsShowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ id }: {
@@ -279,13 +279,23 @@ export const useJobsServiceHorizonJobsShow = <TData = Common.JobsServiceHorizonJ
 * @param data The data for the request.
 * @param data.page Current page
 * @param data.limit Items per page
-* @returns unknown Json paginated set of `LibraryResource`
+* @returns unknown Paginated set of `LibraryResource`
 * @throws ApiError
 */
 export const useLibraryServiceLibrariesIndex = <TData = Common.LibraryServiceLibrariesIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, page }: {
   limit?: number;
   page?: number;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLibraryServiceLibrariesIndexKeyFn({ limit, page }, queryKey), queryFn: () => LibraryService.librariesIndex({ limit, page }) as TData, ...options });
+/**
+* Show library
+* @param data The data for the request.
+* @param data.slug
+* @returns LibraryResource `LibraryResource`
+* @throws ApiError
+*/
+export const useLibraryServiceLibraryShow = <TData = Common.LibraryServiceLibraryShowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ slug }: {
+  slug: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLibraryServiceLibraryShowKeyFn({ slug }, queryKey), queryFn: () => LibraryService.libraryShow({ slug }) as TData, ...options });
 /**
 * @param data The data for the request.
 * @param data.file
@@ -370,7 +380,7 @@ export const usePendingJobsServiceHorizonPendingJobsIndex = <TData = Common.Pend
 * @param data.queue Name of the queue
 * @param data.name Name of the job
 * @param data.queuedFirst Order queued jobs first
-* @returns unknown Json paginated set of `QueueMonitorResource`
+* @returns unknown Paginated set of `QueueMonitorResource`
 * @throws ApiError
 */
 export const useQueueServiceQueueMetricsShow = <TData = Common.QueueServiceQueueMetricsShowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, name, page, queue, queuedFirst, status }: {
@@ -399,7 +409,7 @@ export const useQueueServiceQueueMetricsMetrics = <TData = Common.QueueServiceQu
 } = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseQueueServiceQueueMetricsMetricsKeyFn({ aggregateDays }, queryKey), queryFn: () => QueueService.queueMetricsMetrics({ aggregateDays }) as TData, ...options });
 /**
 * Get all of the measured queues
-* @returns string
+* @returns unknown
 * @throws ApiError
 */
 export const useQueueMetricsServiceHorizonQueuesMetricsIndex = <TData = Common.QueueMetricsServiceHorizonQueuesMetricsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseQueueMetricsServiceHorizonQueuesMetricsIndexKeyFn(queryKey), queryFn: () => QueueMetricsService.horizonQueuesMetricsIndex() as TData, ...options });
@@ -436,7 +446,7 @@ export const useSilencedJobsServiceHorizonSilencedJobsIndex = <TData = Common.Si
 * - artists
 * - album.albumArtist
 * - genres
-* @returns unknown Json paginated set of `SongResource`
+* @returns unknown Paginated set of `SongResource`
 * @throws ApiError
 */
 export const useSongServiceSongsIndex = <TData = Common.SongServiceSongsIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ genreNames, genreSlugs, library, limit, page, relations }: {
@@ -498,7 +508,7 @@ export const useSystemInfoServiceSystemInfoSys = <TData = Common.SystemInfoServi
 * @param data.filters JSON object
 * @param data.filterModes JSON object
 * @param data.sorting JSON object
-* @returns unknown Json paginated set of `UserResource`
+* @returns unknown Paginated set of `UserResource`
 * @throws ApiError
 */
 export const useUserServiceUsersIndex = <TData = Common.UserServiceUsersIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ filterModes, filters, globalFilter, limit, page, sorting }: {
@@ -531,7 +541,7 @@ export const useUserServiceUsersMe = <TData = Common.UserServiceUsersMeDefaultRe
 * @param data.user
 * @param data.page
 * @param data.perPage
-* @returns unknown Json paginated set of `PersonalAccessTokenViewResource`
+* @returns unknown Paginated set of `PersonalAccessTokenViewResource`
 * @throws ApiError
 */
 export const useUserTokenServiceUserTokenGetUserTokens = <TData = Common.UserTokenServiceUserTokenGetUserTokensDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ page, perPage, user }: {
@@ -541,7 +551,7 @@ export const useUserTokenServiceUserTokenGetUserTokens = <TData = Common.UserTok
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseUserTokenServiceUserTokenGetUserTokensKeyFn({ page, perPage, user }, queryKey), queryFn: () => UserTokenService.userTokenGetUserTokens({ page, perPage, user }) as TData, ...options });
 /**
 * Get the current queue workload for the application
-* @returns string
+* @returns unknown
 * @throws ApiError
 */
 export const useWorkloadServiceHorizonWorkloadIndex = <TData = Common.WorkloadServiceHorizonWorkloadIndexDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseWorkloadServiceHorizonWorkloadIndexKeyFn(queryKey), queryFn: () => WorkloadService.horizonWorkloadIndex() as TData, ...options });
@@ -553,9 +563,9 @@ export const useWorkloadServiceHorizonWorkloadIndex = <TData = Common.WorkloadSe
 * @throws ApiError
 */
 export const useAuthServiceAuthLogin = <TData = Common.AuthServiceAuthLoginMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  requestBody?: LoginRequest;
+  requestBody: LoginRequest;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  requestBody?: LoginRequest;
+  requestBody: LoginRequest;
 }, TContext>({ mutationFn: ({ requestBody }) => AuthService.authLogin({ requestBody }) as unknown as Promise<TData>, ...options });
 /**
 * Refresh token
@@ -591,9 +601,9 @@ export const useAuthServiceAuthRegister = <TData = Common.AuthServiceAuthRegiste
 * @throws ApiError
 */
 export const useAuthServiceAuthForgotPassword = <TData = Common.AuthServiceAuthForgotPasswordMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  requestBody?: ForgotPasswordRequest;
+  requestBody: ForgotPasswordRequest;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  requestBody?: ForgotPasswordRequest;
+  requestBody: ForgotPasswordRequest;
 }, TContext>({ mutationFn: ({ requestBody }) => AuthService.authForgotPassword({ requestBody }) as unknown as Promise<TData>, ...options });
 /**
 * Reset password
@@ -603,9 +613,9 @@ export const useAuthServiceAuthForgotPassword = <TData = Common.AuthServiceAuthF
 * @throws ApiError
 */
 export const useAuthServiceAuthResetPassword = <TData = Common.AuthServiceAuthResetPasswordMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  requestBody?: ResetPasswordRequest;
+  requestBody: ResetPasswordRequest;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  requestBody?: ResetPasswordRequest;
+  requestBody: ResetPasswordRequest;
 }, TContext>({ mutationFn: ({ requestBody }) => AuthService.authResetPassword({ requestBody }) as unknown as Promise<TData>, ...options });
 /**
 * Verify email
@@ -621,9 +631,9 @@ export const useAuthServiceAuthVerify = <TData = Common.AuthServiceAuthVerifyMut
 * @throws ApiError
 */
 export const useAuthServiceAuthPasskeyLogin = <TData = Common.AuthServiceAuthPasskeyLoginMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  requestBody?: AuthenticateUsingPasskeyRequest;
+  requestBody: AuthenticateUsingPasskeyRequest;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  requestBody?: AuthenticateUsingPasskeyRequest;
+  requestBody: AuthenticateUsingPasskeyRequest;
 }, TContext>({ mutationFn: ({ requestBody }) => AuthService.authPasskeyLogin({ requestBody }) as unknown as Promise<TData>, ...options });
 /**
 * Register passkey
@@ -633,9 +643,9 @@ export const useAuthServiceAuthPasskeyLogin = <TData = Common.AuthServiceAuthPas
 * @throws ApiError
 */
 export const useAuthServiceAuthPasskeyRegister = <TData = Common.AuthServiceAuthPasskeyRegisterMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  requestBody?: StorePasskeyRequest;
+  requestBody: StorePasskeyRequest;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  requestBody?: StorePasskeyRequest;
+  requestBody: StorePasskeyRequest;
 }, TContext>({ mutationFn: ({ requestBody }) => AuthService.authPasskeyRegister({ requestBody }) as unknown as Promise<TData>, ...options });
 /**
 * Login with a passkey
@@ -645,9 +655,9 @@ export const useAuthServiceAuthPasskeyRegister = <TData = Common.AuthServiceAuth
 * @throws ApiError
 */
 export const usePasskeyServiceAuthPasskeyLogin = <TData = Common.PasskeyServiceAuthPasskeyLoginMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  requestBody?: AuthenticateUsingPasskeyRequest;
+  requestBody: AuthenticateUsingPasskeyRequest;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  requestBody?: AuthenticateUsingPasskeyRequest;
+  requestBody: AuthenticateUsingPasskeyRequest;
 }, TContext>({ mutationFn: ({ requestBody }) => PasskeyService.authPasskeyLogin({ requestBody }) as unknown as Promise<TData>, ...options });
 /**
 * Register passkey
@@ -657,9 +667,9 @@ export const usePasskeyServiceAuthPasskeyLogin = <TData = Common.PasskeyServiceA
 * @throws ApiError
 */
 export const usePasskeyServiceAuthPasskeyRegister = <TData = Common.PasskeyServiceAuthPasskeyRegisterMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  requestBody?: StorePasskeyRequest;
+  requestBody: StorePasskeyRequest;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  requestBody?: StorePasskeyRequest;
+  requestBody: StorePasskeyRequest;
 }, TContext>({ mutationFn: ({ requestBody }) => PasskeyService.authPasskeyRegister({ requestBody }) as unknown as Promise<TData>, ...options });
 /**
 * Retry the given batch
@@ -731,9 +741,9 @@ export const useJobServiceJobLibraryScan = <TData = Common.JobServiceJobLibraryS
 * @throws ApiError
 */
 export const useLibraryServiceLibraryCreate = <TData = Common.LibraryServiceLibraryCreateMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  requestBody?: CreateLibraryRequest;
+  requestBody: CreateLibraryRequest;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  requestBody?: CreateLibraryRequest;
+  requestBody: CreateLibraryRequest;
 }, TContext>({ mutationFn: ({ requestBody }) => LibraryService.libraryCreate({ requestBody }) as unknown as Promise<TData>, ...options });
 /**
 * Start monitoring the given tag
@@ -798,9 +808,9 @@ export const useRetryServiceHorizonRetryJobsShow = <TData = Common.RetryServiceH
 * @throws ApiError
 */
 export const useUserServiceUsersStore = <TData = Common.UserServiceUsersStoreMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  requestBody?: CreateUserRequest;
+  requestBody: CreateUserRequest;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  requestBody?: CreateUserRequest;
+  requestBody: CreateUserRequest;
 }, TContext>({ mutationFn: ({ requestBody }) => UserService.usersStore({ requestBody }) as unknown as Promise<TData>, ...options });
 /**
 * Update a genre
@@ -812,23 +822,26 @@ export const useUserServiceUsersStore = <TData = Common.UserServiceUsersStoreMut
 */
 export const useGenreServiceGenresUpdate = <TData = Common.GenreServiceGenresUpdateMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   genre: string;
-  requestBody?: UpdateGenreRequest;
+  requestBody: UpdateGenreRequest;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   genre: string;
-  requestBody?: UpdateGenreRequest;
+  requestBody: UpdateGenreRequest;
 }, TContext>({ mutationFn: ({ genre, requestBody }) => GenreService.genresUpdate({ genre, requestBody }) as unknown as Promise<TData>, ...options });
 /**
 * Update a library specified by the provided slug
 * @param data The data for the request.
+* @param data.slug
 * @param data.requestBody
 * @returns LibraryResource `LibraryResource`
 * @throws ApiError
 */
 export const useLibraryServiceLibraryUpdate = <TData = Common.LibraryServiceLibraryUpdateMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   requestBody?: UpdateLibraryRequest;
+  slug: string;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   requestBody?: UpdateLibraryRequest;
-}, TContext>({ mutationFn: ({ requestBody }) => LibraryService.libraryUpdate({ requestBody }) as unknown as Promise<TData>, ...options });
+  slug: string;
+}, TContext>({ mutationFn: ({ requestBody, slug }) => LibraryService.libraryUpdate({ requestBody, slug }) as unknown as Promise<TData>, ...options });
 /**
 * Update a user
 * @param data The data for the request.

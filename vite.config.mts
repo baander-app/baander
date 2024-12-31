@@ -103,6 +103,9 @@ export default defineConfig(config => {
     define: {
       __APP_ENV__: JSON.stringify(env.APP_ENV),
     },
+    server: {
+      port: 3000,
+    },
     build: {
       sourcemap: false,
       target: ['chrome128', 'firefox128', 'safari16', 'esnext'],
@@ -122,7 +125,6 @@ export default defineConfig(config => {
           plugins: [['babel-plugin-react-compiler', ReactCompilerConfig]],
         },
       }),
-      // @ts-ignore - wrongly typed
       laravelTranslations({ namespace: 'translation' }),
       visualizer({ open: false, template: 'flamegraph', filename: 'bundle-visualization.html' }),
       optimizeCssModules(),
@@ -165,7 +167,7 @@ export default defineConfig(config => {
       preprocessorOptions: {
         scss: {
           api: 'modern-compiler',
-          additionalData: '@import "/resources/app/mantine";',
+          additionalData: '@use "/resources/app/mantine" as *;',
         },
       },
     },

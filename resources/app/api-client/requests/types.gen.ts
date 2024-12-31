@@ -198,7 +198,7 @@ export type NewAccessTokenResource = {
 export type PersonalAccessTokenViewResource = {
     id: number;
     name: string;
-    abilities: Array<(string)> | null;
+    abilities: Array<unknown> | null;
     userAgent: string | null;
     clientName: string | null;
     clientVersion: string | null;
@@ -222,7 +222,7 @@ export type QueueMonitorResource = {
     finished_at_exact: string | null;
     attempt: number;
     progress: number | null;
-    exception: Array<(string)> | null;
+    exception: Array<unknown> | null;
     exception_class: string | null;
     data: string | null;
     status: string;
@@ -339,30 +339,38 @@ export type AlbumsIndexData = {
 
 export type AlbumsIndexResponse = {
     data: Array<AlbumResource>;
-    /**
-     * Total number of items being paginated.
-     */
-    total: number;
-    /**
-     * The number of items for the current page
-     */
-    count: number;
-    /**
-     * The number of items per page
-     */
-    limit: number;
-    /**
-     * The number of current page
-     */
-    currentPage: number;
-    /**
-     * The number of next page
-     */
-    nextPage: number;
-    /**
-     * The number of last page
-     */
-    lastPage: number;
+    meta: {
+        /**
+         * Total number of items being paginated.
+         */
+        total: number;
+        /**
+         * The number of items for the current page
+         */
+        count: number;
+        /**
+         * The number of items per page
+         */
+        limit: number;
+        /**
+         * The number of current page
+         */
+        currentPage: number;
+        /**
+         * The number of next page
+         */
+        nextPage: number;
+        /**
+         * The number of last page
+         */
+        lastPage: number;
+    };
+    links: {
+        first: string | null;
+        last: string | null;
+        prev: string | null;
+        next: string | null;
+    };
 };
 
 export type AlbumsShowData = {
@@ -408,30 +416,38 @@ export type ArtistsIndexData = {
 
 export type ArtistsIndexResponse = {
     data: Array<ArtistResource>;
-    /**
-     * Total number of items being paginated.
-     */
-    total: number;
-    /**
-     * The number of items for the current page
-     */
-    count: number;
-    /**
-     * The number of items per page
-     */
-    limit: number;
-    /**
-     * The number of current page
-     */
-    currentPage: number;
-    /**
-     * The number of next page
-     */
-    nextPage: number;
-    /**
-     * The number of last page
-     */
-    lastPage: number;
+    meta: {
+        /**
+         * Total number of items being paginated.
+         */
+        total: number;
+        /**
+         * The number of items for the current page
+         */
+        count: number;
+        /**
+         * The number of items per page
+         */
+        limit: number;
+        /**
+         * The number of current page
+         */
+        currentPage: number;
+        /**
+         * The number of next page
+         */
+        nextPage: number;
+        /**
+         * The number of last page
+         */
+        lastPage: number;
+    };
+    links: {
+        first: string | null;
+        last: string | null;
+        prev: string | null;
+        next: string | null;
+    };
 };
 
 export type ArtistsShowData = {
@@ -445,7 +461,7 @@ export type ArtistsShowData = {
 export type ArtistsShowResponse = ArtistResource;
 
 export type AuthLoginData = {
-    requestBody?: LoginRequest;
+    requestBody: LoginRequest;
 };
 
 export type AuthLoginResponse = {
@@ -473,7 +489,7 @@ export type AuthRegisterResponse = {
 };
 
 export type AuthForgotPasswordData = {
-    requestBody?: ForgotPasswordRequest;
+    requestBody: ForgotPasswordRequest;
 };
 
 export type AuthForgotPasswordResponse = {
@@ -481,7 +497,7 @@ export type AuthForgotPasswordResponse = {
 };
 
 export type AuthResetPasswordData = {
-    requestBody?: ResetPasswordRequest;
+    requestBody: ResetPasswordRequest;
 };
 
 export type AuthResetPasswordResponse = {
@@ -497,7 +513,7 @@ export type AuthPasskeyOptionsResponse = {
 };
 
 export type AuthPasskeyLoginData = {
-    requestBody?: AuthenticateUsingPasskeyRequest;
+    requestBody: AuthenticateUsingPasskeyRequest;
 };
 
 export type AuthPasskeyLoginResponse = {
@@ -514,12 +530,12 @@ export type AuthPasskeyRegisterOptionsResponse = string | {
 };
 
 export type AuthPasskeyRegisterData = {
-    requestBody?: StorePasskeyRequest;
+    requestBody: StorePasskeyRequest;
 };
 
 export type AuthPasskeyRegisterResponse = {
     message: string;
-} | string;
+};
 
 export type HorizonJobsBatchesIndexResponse = {
     batches: Array<(string)>;
@@ -580,7 +596,7 @@ export type HorizonFailedJobsShowData = {
     id: string;
 };
 
-export type HorizonFailedJobsShowResponse = string;
+export type HorizonFailedJobsShowResponse = unknown;
 
 export type LogViewerFilesResponse = Array<LogFileResource>;
 
@@ -688,30 +704,38 @@ export type GenresIndexData = {
 
 export type GenresIndexResponse = {
     data: Array<GenreResource>;
-    /**
-     * Total number of items being paginated.
-     */
-    total: number;
-    /**
-     * The number of items for the current page
-     */
-    count: number;
-    /**
-     * The number of items per page
-     */
-    limit: number;
-    /**
-     * The number of current page
-     */
-    currentPage: number;
-    /**
-     * The number of next page
-     */
-    nextPage: number;
-    /**
-     * The number of last page
-     */
-    lastPage: number;
+    meta: {
+        /**
+         * Total number of items being paginated.
+         */
+        total: number;
+        /**
+         * The number of items for the current page
+         */
+        count: number;
+        /**
+         * The number of items per page
+         */
+        limit: number;
+        /**
+         * The number of current page
+         */
+        currentPage: number;
+        /**
+         * The number of next page
+         */
+        nextPage: number;
+        /**
+         * The number of last page
+         */
+        lastPage: number;
+    };
+    links: {
+        first: string | null;
+        last: string | null;
+        prev: string | null;
+        next: string | null;
+    };
 };
 
 export type GenresShowData = {
@@ -728,7 +752,7 @@ export type GenresUpdateData = {
      * The genre slug
      */
     genre: string;
-    requestBody?: UpdateGenreRequest;
+    requestBody: UpdateGenreRequest;
 };
 
 export type GenresUpdateResponse = GenreResource;
@@ -761,7 +785,7 @@ export type JobLibraryScanResponse = {
     message: string;
 };
 
-export type HorizonJobsMetricsIndexResponse = Array<(string)>;
+export type HorizonJobsMetricsIndexResponse = Array<unknown>;
 
 export type HorizonJobsMetricsShowData = {
     id: string;
@@ -775,7 +799,7 @@ export type HorizonJobsShowData = {
     id: string;
 };
 
-export type HorizonJobsShowResponse = Array<(string)>;
+export type HorizonJobsShowResponse = Array<unknown>;
 
 export type LibrariesIndexData = {
     /**
@@ -790,40 +814,55 @@ export type LibrariesIndexData = {
 
 export type LibrariesIndexResponse = {
     data: Array<LibraryResource>;
-    /**
-     * Total number of items being paginated.
-     */
-    total: number;
-    /**
-     * The number of items for the current page
-     */
-    count: number;
-    /**
-     * The number of items per page
-     */
-    limit: number;
-    /**
-     * The number of current page
-     */
-    currentPage: number;
-    /**
-     * The number of next page
-     */
-    nextPage: number;
-    /**
-     * The number of last page
-     */
-    lastPage: number;
+    meta: {
+        /**
+         * Total number of items being paginated.
+         */
+        total: number;
+        /**
+         * The number of items for the current page
+         */
+        count: number;
+        /**
+         * The number of items per page
+         */
+        limit: number;
+        /**
+         * The number of current page
+         */
+        currentPage: number;
+        /**
+         * The number of next page
+         */
+        nextPage: number;
+        /**
+         * The number of last page
+         */
+        lastPage: number;
+    };
+    links: {
+        first: string | null;
+        last: string | null;
+        prev: string | null;
+        next: string | null;
+    };
 };
 
 export type LibraryCreateData = {
-    requestBody?: CreateLibraryRequest;
+    requestBody: CreateLibraryRequest;
 };
 
 export type LibraryCreateResponse = LibraryResource;
 
+export type LibraryShowData = {
+    slug: string;
+};
+
+export type LibraryShowResponse = LibraryResource;
+
 export type LibraryUpdateData = {
     requestBody?: UpdateLibraryRequest;
+    slug: string;
 };
 
 export type LibraryUpdateResponse = LibraryResource;
@@ -1020,30 +1059,38 @@ export type QueueMetricsShowData = {
 
 export type QueueMetricsShowResponse = {
     data: Array<QueueMonitorResource>;
-    /**
-     * Total number of items being paginated.
-     */
-    total: number;
-    /**
-     * The number of items for the current page
-     */
-    count: number;
-    /**
-     * The number of items per page
-     */
-    limit: number;
-    /**
-     * The number of current page
-     */
-    currentPage: number;
-    /**
-     * The number of next page
-     */
-    nextPage: number;
-    /**
-     * The number of last page
-     */
-    lastPage: number;
+    meta: {
+        /**
+         * Total number of items being paginated.
+         */
+        total: number;
+        /**
+         * The number of items for the current page
+         */
+        count: number;
+        /**
+         * The number of items per page
+         */
+        limit: number;
+        /**
+         * The number of current page
+         */
+        currentPage: number;
+        /**
+         * The number of next page
+         */
+        nextPage: number;
+        /**
+         * The number of last page
+         */
+        lastPage: number;
+    };
+    links: {
+        first: string | null;
+        last: string | null;
+        prev: string | null;
+        next: string | null;
+    };
 };
 
 export type QueueMetricsQueuesResponse = Array<{
@@ -1084,7 +1131,7 @@ export type QueueMetricsDeleteResponse = null;
 
 export type QueueMetricsPurgeResponse = null;
 
-export type HorizonQueuesMetricsIndexResponse = Array<(string)>;
+export type HorizonQueuesMetricsIndexResponse = Array<unknown>;
 
 export type HorizonQueuesMetricsShowData = {
     id: string;
@@ -1144,30 +1191,38 @@ export type SongsIndexData = {
 
 export type SongsIndexResponse = {
     data: Array<SongResource>;
-    /**
-     * Total number of items being paginated.
-     */
-    total: number;
-    /**
-     * The number of items for the current page
-     */
-    count: number;
-    /**
-     * The number of items per page
-     */
-    limit: number;
-    /**
-     * The number of current page
-     */
-    currentPage: number;
-    /**
-     * The number of next page
-     */
-    nextPage: number;
-    /**
-     * The number of last page
-     */
-    lastPage: number;
+    meta: {
+        /**
+         * Total number of items being paginated.
+         */
+        total: number;
+        /**
+         * The number of items for the current page
+         */
+        count: number;
+        /**
+         * The number of items per page
+         */
+        limit: number;
+        /**
+         * The number of current page
+         */
+        currentPage: number;
+        /**
+         * The number of next page
+         */
+        nextPage: number;
+        /**
+         * The number of last page
+         */
+        lastPage: number;
+    };
+    links: {
+        first: string | null;
+        last: string | null;
+        prev: string | null;
+        next: string | null;
+    };
 };
 
 export type SongsShowData = {
@@ -1246,34 +1301,42 @@ export type UsersIndexData = {
 
 export type UsersIndexResponse = {
     data: Array<UserResource>;
-    /**
-     * Total number of items being paginated.
-     */
-    total: number;
-    /**
-     * The number of items for the current page
-     */
-    count: number;
-    /**
-     * The number of items per page
-     */
-    limit: number;
-    /**
-     * The number of current page
-     */
-    currentPage: number;
-    /**
-     * The number of next page
-     */
-    nextPage: number;
-    /**
-     * The number of last page
-     */
-    lastPage: number;
+    meta: {
+        /**
+         * Total number of items being paginated.
+         */
+        total: number;
+        /**
+         * The number of items for the current page
+         */
+        count: number;
+        /**
+         * The number of items per page
+         */
+        limit: number;
+        /**
+         * The number of current page
+         */
+        currentPage: number;
+        /**
+         * The number of next page
+         */
+        nextPage: number;
+        /**
+         * The number of last page
+         */
+        lastPage: number;
+    };
+    links: {
+        first: string | null;
+        last: string | null;
+        prev: string | null;
+        next: string | null;
+    };
 };
 
 export type UsersStoreData = {
-    requestBody?: CreateUserRequest;
+    requestBody: CreateUserRequest;
 };
 
 export type UsersStoreResponse = UserResource;
@@ -1313,30 +1376,38 @@ export type UserTokenGetUserTokensData = {
 
 export type UserTokenGetUserTokensResponse = {
     data: Array<PersonalAccessTokenViewResource>;
-    /**
-     * Total number of items being paginated.
-     */
-    total: number;
-    /**
-     * The number of items for the current page
-     */
-    count: number;
-    /**
-     * The number of items per page
-     */
-    limit: number;
-    /**
-     * The number of current page
-     */
-    currentPage: number;
-    /**
-     * The number of next page
-     */
-    nextPage: number;
-    /**
-     * The number of last page
-     */
-    lastPage: number;
+    meta: {
+        /**
+         * Total number of items being paginated.
+         */
+        total: number;
+        /**
+         * The number of items for the current page
+         */
+        count: number;
+        /**
+         * The number of items per page
+         */
+        limit: number;
+        /**
+         * The number of current page
+         */
+        currentPage: number;
+        /**
+         * The number of next page
+         */
+        nextPage: number;
+        /**
+         * The number of last page
+         */
+        lastPage: number;
+    };
+    links: {
+        first: string | null;
+        last: string | null;
+        prev: string | null;
+        next: string | null;
+    };
 };
 
 export type UserTokenRevokeTokenData = {
@@ -1348,7 +1419,7 @@ export type UserTokenRevokeTokenData = {
 
 export type UserTokenRevokeTokenResponse = null;
 
-export type HorizonWorkloadIndexResponse = Array<(string)>;
+export type HorizonWorkloadIndexResponse = Array<unknown>;
 
 export type $OpenApiTs = {
     '/api/libraries/{library}/albums': {
@@ -1356,34 +1427,42 @@ export type $OpenApiTs = {
             req: AlbumsIndexData;
             res: {
                 /**
-                 * Json paginated set of `AlbumResource`
+                 * Paginated set of `AlbumResource`
                  */
                 200: {
                     data: Array<AlbumResource>;
-                    /**
-                     * Total number of items being paginated.
-                     */
-                    total: number;
-                    /**
-                     * The number of items for the current page
-                     */
-                    count: number;
-                    /**
-                     * The number of items per page
-                     */
-                    limit: number;
-                    /**
-                     * The number of current page
-                     */
-                    currentPage: number;
-                    /**
-                     * The number of next page
-                     */
-                    nextPage: number;
-                    /**
-                     * The number of last page
-                     */
-                    lastPage: number;
+                    meta: {
+                        /**
+                         * Total number of items being paginated.
+                         */
+                        total: number;
+                        /**
+                         * The number of items for the current page
+                         */
+                        count: number;
+                        /**
+                         * The number of items per page
+                         */
+                        limit: number;
+                        /**
+                         * The number of current page
+                         */
+                        currentPage: number;
+                        /**
+                         * The number of next page
+                         */
+                        nextPage: number;
+                        /**
+                         * The number of last page
+                         */
+                        lastPage: number;
+                    };
+                    links: {
+                        first: string | null;
+                        last: string | null;
+                        prev: string | null;
+                        next: string | null;
+                    };
                 };
                 /**
                  * Unauthenticated
@@ -1464,34 +1543,42 @@ export type $OpenApiTs = {
             req: ArtistsIndexData;
             res: {
                 /**
-                 * Json paginated set of `ArtistResource`
+                 * Paginated set of `ArtistResource`
                  */
                 200: {
                     data: Array<ArtistResource>;
-                    /**
-                     * Total number of items being paginated.
-                     */
-                    total: number;
-                    /**
-                     * The number of items for the current page
-                     */
-                    count: number;
-                    /**
-                     * The number of items per page
-                     */
-                    limit: number;
-                    /**
-                     * The number of current page
-                     */
-                    currentPage: number;
-                    /**
-                     * The number of next page
-                     */
-                    nextPage: number;
-                    /**
-                     * The number of last page
-                     */
-                    lastPage: number;
+                    meta: {
+                        /**
+                         * Total number of items being paginated.
+                         */
+                        total: number;
+                        /**
+                         * The number of items for the current page
+                         */
+                        count: number;
+                        /**
+                         * The number of items per page
+                         */
+                        limit: number;
+                        /**
+                         * The number of current page
+                         */
+                        currentPage: number;
+                        /**
+                         * The number of next page
+                         */
+                        nextPage: number;
+                        /**
+                         * The number of last page
+                         */
+                        lastPage: number;
+                    };
+                    links: {
+                        first: string | null;
+                        last: string | null;
+                        prev: string | null;
+                        next: string | null;
+                    };
                 };
                 /**
                  * Unauthenticated
@@ -1823,8 +1910,8 @@ export type $OpenApiTs = {
             req: AuthPasskeyRegisterData;
             res: {
                 200: {
-    message: string;
-} | string;
+                    message: string;
+                };
                 /**
                  * Unauthenticated
                  */
@@ -1858,9 +1945,9 @@ export type $OpenApiTs = {
                         [key: string]: Array<(string)>;
                     };
                 };
-                500: string | {
-    error: string;
-};
+                500: {
+                    error: string;
+                };
             };
         };
     };
@@ -1941,7 +2028,7 @@ export type $OpenApiTs = {
         get: {
             req: HorizonFailedJobsShowData;
             res: {
-                200: string;
+                200: unknown;
             };
         };
     };
@@ -2101,34 +2188,42 @@ export type $OpenApiTs = {
             req: GenresIndexData;
             res: {
                 /**
-                 * Json paginated set of `GenreResource`
+                 * Paginated set of `GenreResource`
                  */
                 200: {
                     data: Array<GenreResource>;
-                    /**
-                     * Total number of items being paginated.
-                     */
-                    total: number;
-                    /**
-                     * The number of items for the current page
-                     */
-                    count: number;
-                    /**
-                     * The number of items per page
-                     */
-                    limit: number;
-                    /**
-                     * The number of current page
-                     */
-                    currentPage: number;
-                    /**
-                     * The number of next page
-                     */
-                    nextPage: number;
-                    /**
-                     * The number of last page
-                     */
-                    lastPage: number;
+                    meta: {
+                        /**
+                         * Total number of items being paginated.
+                         */
+                        total: number;
+                        /**
+                         * The number of items for the current page
+                         */
+                        count: number;
+                        /**
+                         * The number of items per page
+                         */
+                        limit: number;
+                        /**
+                         * The number of current page
+                         */
+                        currentPage: number;
+                        /**
+                         * The number of next page
+                         */
+                        nextPage: number;
+                        /**
+                         * The number of last page
+                         */
+                        lastPage: number;
+                    };
+                    links: {
+                        first: string | null;
+                        last: string | null;
+                        prev: string | null;
+                        next: string | null;
+                    };
                 };
                 /**
                  * Unauthenticated
@@ -2322,7 +2417,7 @@ export type $OpenApiTs = {
     '/-/horizon/api/metrics/jobs': {
         get: {
             res: {
-                200: Array<(string)>;
+                200: Array<unknown>;
             };
         };
     };
@@ -2340,7 +2435,7 @@ export type $OpenApiTs = {
         get: {
             req: HorizonJobsShowData;
             res: {
-                200: Array<(string)>;
+                200: Array<unknown>;
             };
         };
     };
@@ -2349,34 +2444,42 @@ export type $OpenApiTs = {
             req: LibrariesIndexData;
             res: {
                 /**
-                 * Json paginated set of `LibraryResource`
+                 * Paginated set of `LibraryResource`
                  */
                 200: {
                     data: Array<LibraryResource>;
-                    /**
-                     * Total number of items being paginated.
-                     */
-                    total: number;
-                    /**
-                     * The number of items for the current page
-                     */
-                    count: number;
-                    /**
-                     * The number of items per page
-                     */
-                    limit: number;
-                    /**
-                     * The number of current page
-                     */
-                    currentPage: number;
-                    /**
-                     * The number of next page
-                     */
-                    nextPage: number;
-                    /**
-                     * The number of last page
-                     */
-                    lastPage: number;
+                    meta: {
+                        /**
+                         * Total number of items being paginated.
+                         */
+                        total: number;
+                        /**
+                         * The number of items for the current page
+                         */
+                        count: number;
+                        /**
+                         * The number of items per page
+                         */
+                        limit: number;
+                        /**
+                         * The number of current page
+                         */
+                        currentPage: number;
+                        /**
+                         * The number of next page
+                         */
+                        nextPage: number;
+                        /**
+                         * The number of last page
+                         */
+                        lastPage: number;
+                    };
+                    links: {
+                        first: string | null;
+                        last: string | null;
+                        prev: string | null;
+                        next: string | null;
+                    };
                 };
                 /**
                  * Unauthenticated
@@ -2456,7 +2559,25 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/api/libraries/:slug': {
+    '/api/libraries/{slug}': {
+        get: {
+            req: LibraryShowData;
+            res: {
+                /**
+                 * `LibraryResource`
+                 */
+                200: LibraryResource;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
         patch: {
             req: LibraryUpdateData;
             res: {
@@ -2499,6 +2620,8 @@ export type $OpenApiTs = {
                 };
             };
         };
+    };
+    '/api/libraries/:slug': {
         delete: {
             res: {
                 /**
@@ -2738,34 +2861,42 @@ export type $OpenApiTs = {
             req: QueueMetricsShowData;
             res: {
                 /**
-                 * Json paginated set of `QueueMonitorResource`
+                 * Paginated set of `QueueMonitorResource`
                  */
                 200: {
                     data: Array<QueueMonitorResource>;
-                    /**
-                     * Total number of items being paginated.
-                     */
-                    total: number;
-                    /**
-                     * The number of items for the current page
-                     */
-                    count: number;
-                    /**
-                     * The number of items per page
-                     */
-                    limit: number;
-                    /**
-                     * The number of current page
-                     */
-                    currentPage: number;
-                    /**
-                     * The number of next page
-                     */
-                    nextPage: number;
-                    /**
-                     * The number of last page
-                     */
-                    lastPage: number;
+                    meta: {
+                        /**
+                         * Total number of items being paginated.
+                         */
+                        total: number;
+                        /**
+                         * The number of items for the current page
+                         */
+                        count: number;
+                        /**
+                         * The number of items per page
+                         */
+                        limit: number;
+                        /**
+                         * The number of current page
+                         */
+                        currentPage: number;
+                        /**
+                         * The number of next page
+                         */
+                        nextPage: number;
+                        /**
+                         * The number of last page
+                         */
+                        lastPage: number;
+                    };
+                    links: {
+                        first: string | null;
+                        last: string | null;
+                        prev: string | null;
+                        next: string | null;
+                    };
                 };
                 /**
                  * Unauthenticated
@@ -2964,7 +3095,7 @@ export type $OpenApiTs = {
     '/-/horizon/api/metrics/queues': {
         get: {
             res: {
-                200: Array<(string)>;
+                200: Array<unknown>;
             };
         };
     };
@@ -3004,34 +3135,42 @@ export type $OpenApiTs = {
             req: SongsIndexData;
             res: {
                 /**
-                 * Json paginated set of `SongResource`
+                 * Paginated set of `SongResource`
                  */
                 200: {
                     data: Array<SongResource>;
-                    /**
-                     * Total number of items being paginated.
-                     */
-                    total: number;
-                    /**
-                     * The number of items for the current page
-                     */
-                    count: number;
-                    /**
-                     * The number of items per page
-                     */
-                    limit: number;
-                    /**
-                     * The number of current page
-                     */
-                    currentPage: number;
-                    /**
-                     * The number of next page
-                     */
-                    nextPage: number;
-                    /**
-                     * The number of last page
-                     */
-                    lastPage: number;
+                    meta: {
+                        /**
+                         * Total number of items being paginated.
+                         */
+                        total: number;
+                        /**
+                         * The number of items for the current page
+                         */
+                        count: number;
+                        /**
+                         * The number of items per page
+                         */
+                        limit: number;
+                        /**
+                         * The number of current page
+                         */
+                        currentPage: number;
+                        /**
+                         * The number of next page
+                         */
+                        nextPage: number;
+                        /**
+                         * The number of last page
+                         */
+                        lastPage: number;
+                    };
+                    links: {
+                        first: string | null;
+                        last: string | null;
+                        prev: string | null;
+                        next: string | null;
+                    };
                 };
                 /**
                  * An error
@@ -3218,34 +3357,42 @@ export type $OpenApiTs = {
             req: UsersIndexData;
             res: {
                 /**
-                 * Json paginated set of `UserResource`
+                 * Paginated set of `UserResource`
                  */
                 200: {
                     data: Array<UserResource>;
-                    /**
-                     * Total number of items being paginated.
-                     */
-                    total: number;
-                    /**
-                     * The number of items for the current page
-                     */
-                    count: number;
-                    /**
-                     * The number of items per page
-                     */
-                    limit: number;
-                    /**
-                     * The number of current page
-                     */
-                    currentPage: number;
-                    /**
-                     * The number of next page
-                     */
-                    nextPage: number;
-                    /**
-                     * The number of last page
-                     */
-                    lastPage: number;
+                    meta: {
+                        /**
+                         * Total number of items being paginated.
+                         */
+                        total: number;
+                        /**
+                         * The number of items for the current page
+                         */
+                        count: number;
+                        /**
+                         * The number of items per page
+                         */
+                        limit: number;
+                        /**
+                         * The number of current page
+                         */
+                        currentPage: number;
+                        /**
+                         * The number of next page
+                         */
+                        nextPage: number;
+                        /**
+                         * The number of last page
+                         */
+                        lastPage: number;
+                    };
+                    links: {
+                        first: string | null;
+                        last: string | null;
+                        prev: string | null;
+                        next: string | null;
+                    };
                 };
                 /**
                  * Unauthenticated
@@ -3447,34 +3594,42 @@ export type $OpenApiTs = {
             req: UserTokenGetUserTokensData;
             res: {
                 /**
-                 * Json paginated set of `PersonalAccessTokenViewResource`
+                 * Paginated set of `PersonalAccessTokenViewResource`
                  */
                 200: {
                     data: Array<PersonalAccessTokenViewResource>;
-                    /**
-                     * Total number of items being paginated.
-                     */
-                    total: number;
-                    /**
-                     * The number of items for the current page
-                     */
-                    count: number;
-                    /**
-                     * The number of items per page
-                     */
-                    limit: number;
-                    /**
-                     * The number of current page
-                     */
-                    currentPage: number;
-                    /**
-                     * The number of next page
-                     */
-                    nextPage: number;
-                    /**
-                     * The number of last page
-                     */
-                    lastPage: number;
+                    meta: {
+                        /**
+                         * Total number of items being paginated.
+                         */
+                        total: number;
+                        /**
+                         * The number of items for the current page
+                         */
+                        count: number;
+                        /**
+                         * The number of items per page
+                         */
+                        limit: number;
+                        /**
+                         * The number of current page
+                         */
+                        currentPage: number;
+                        /**
+                         * The number of next page
+                         */
+                        nextPage: number;
+                        /**
+                         * The number of last page
+                         */
+                        lastPage: number;
+                    };
+                    links: {
+                        first: string | null;
+                        last: string | null;
+                        prev: string | null;
+                        next: string | null;
+                    };
                 };
                 /**
                  * Unauthenticated
@@ -3544,7 +3699,7 @@ export type $OpenApiTs = {
     '/-/horizon/api/workload': {
         get: {
             res: {
-                200: Array<(string)>;
+                200: Array<unknown>;
             };
         };
     };

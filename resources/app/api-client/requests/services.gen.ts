@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { AlbumsIndexData, AlbumsIndexResponse, AlbumsShowData, AlbumsShowResponse, ArtistsIndexData, ArtistsIndexResponse, ArtistsShowData, ArtistsShowResponse, AuthLoginData, AuthLoginResponse, AuthRefreshTokenResponse, AuthStreamTokenResponse, AuthRegisterData, AuthRegisterResponse, AuthForgotPasswordData, AuthForgotPasswordResponse, AuthResetPasswordData, AuthResetPasswordResponse, AuthVerifyResponse, AuthPasskeyOptionsResponse, AuthPasskeyLoginData, AuthPasskeyLoginResponse, AuthPasskeyRegisterOptionsResponse, AuthPasskeyRegisterData, AuthPasskeyRegisterResponse, HorizonJobsBatchesIndexResponse, HorizonJobsBatchesShowData, HorizonJobsBatchesShowResponse, HorizonJobsBatchesRetryData, HorizonJobsBatchesRetryResponse, HorizonCompletedJobsIndexData, HorizonCompletedJobsIndexResponse, HorizonStatsIndexResponse, HorizonFailedJobsIndexData, HorizonFailedJobsIndexResponse, HorizonFailedJobsShowData, HorizonFailedJobsShowResponse, LogViewerFilesResponse, LogViewerFilesRequestDownloadData, LogViewerFilesRequestDownloadResponse, LogViewerFilesClearCacheData, LogViewerFilesClearCacheResponse, LogViewerFilesDeleteData, LogViewerFilesDeleteResponse, LogViewerFilesClearCacheAllResponse, LogViewerFilesDeleteMultipleFilesData, LogViewerFilesDeleteMultipleFilesResponse, LogViewerFilesDownloadData, LogViewerFilesDownloadResponse, LogViewerFoldersResponse, LogViewerFoldersRequestDownloadData, LogViewerFoldersRequestDownloadResponse, LogViewerFoldersClearCacheData, LogViewerFoldersClearCacheResponse, LogViewerFoldersDeleteData, LogViewerFoldersDeleteResponse, LogViewerFoldersDownloadData, LogViewerFoldersDownloadResponse, GenresIndexData, GenresIndexResponse, GenresShowData, GenresShowResponse, GenresUpdateData, GenresUpdateResponse, GenresDestroyData, GenresDestroyResponse, LogViewerHostsResponse, ImageServeData, ImageServeResponse, JobLibraryScanData, JobLibraryScanResponse, HorizonJobsMetricsIndexResponse, HorizonJobsMetricsShowData, HorizonJobsMetricsShowResponse, HorizonJobsShowData, HorizonJobsShowResponse, LibrariesIndexData, LibrariesIndexResponse, LibraryCreateData, LibraryCreateResponse, LibraryUpdateData, LibraryUpdateResponse, LibraryDeleteResponse, LogViewerLogsData, LogViewerLogsResponse, HorizonMastersIndexResponse, HorizonMonitoringIndexResponse, HorizonMonitoringStoreResponse, HorizonMonitoringTagPaginateData, HorizonMonitoringTagPaginateResponse, HorizonMonitoringTagDestroyData, HorizonMonitoringTagDestroyResponse, OpCacheGetStatusResponse, OpcacheGetConfigResponse, OpcacheClearResponse, OpcacheCompileData, OpcacheCompileResponse, HorizonPendingJobsIndexData, HorizonPendingJobsIndexResponse, QueueMetricsShowData, QueueMetricsShowResponse, QueueMetricsQueuesResponse, QueueMetricsMetricsData, QueueMetricsMetricsResponse, QueueMetricsRetryJobData, QueueMetricsRetryJobResponse, QueueMetricsDeleteData, QueueMetricsDeleteResponse, QueueMetricsPurgeResponse, HorizonQueuesMetricsIndexResponse, HorizonQueuesMetricsShowData, HorizonQueuesMetricsShowResponse, HorizonRetryJobsShowData, HorizonRetryJobsShowResponse, HorizonSilencedJobsIndexData, HorizonSilencedJobsIndexResponse, SongsIndexData, SongsIndexResponse, SongsShowData, SongsShowResponse, SongsStreamData, SongsStreamResponse, SystemInfoPhpResponse, SystemInfoSysResponse, UsersIndexData, UsersIndexResponse, UsersStoreData, UsersStoreResponse, UsersUpdateData, UsersUpdateResponse, UsersShowData, UsersShowResponse, UsersDestroyData, UsersDestroyResponse, UsersMeResponse, UserTokenGetUserTokensData, UserTokenGetUserTokensResponse, UserTokenRevokeTokenData, UserTokenRevokeTokenResponse, HorizonWorkloadIndexResponse } from './types.gen';
+import type { AlbumsIndexData, AlbumsIndexResponse, AlbumsShowData, AlbumsShowResponse, ArtistsIndexData, ArtistsIndexResponse, ArtistsShowData, ArtistsShowResponse, AuthLoginData, AuthLoginResponse, AuthRefreshTokenResponse, AuthStreamTokenResponse, AuthRegisterData, AuthRegisterResponse, AuthForgotPasswordData, AuthForgotPasswordResponse, AuthResetPasswordData, AuthResetPasswordResponse, AuthVerifyResponse, AuthPasskeyOptionsResponse, AuthPasskeyLoginData, AuthPasskeyLoginResponse, AuthPasskeyRegisterOptionsResponse, AuthPasskeyRegisterData, AuthPasskeyRegisterResponse, HorizonJobsBatchesIndexResponse, HorizonJobsBatchesShowData, HorizonJobsBatchesShowResponse, HorizonJobsBatchesRetryData, HorizonJobsBatchesRetryResponse, HorizonCompletedJobsIndexData, HorizonCompletedJobsIndexResponse, HorizonStatsIndexResponse, HorizonFailedJobsIndexData, HorizonFailedJobsIndexResponse, HorizonFailedJobsShowData, HorizonFailedJobsShowResponse, LogViewerFilesResponse, LogViewerFilesRequestDownloadData, LogViewerFilesRequestDownloadResponse, LogViewerFilesClearCacheData, LogViewerFilesClearCacheResponse, LogViewerFilesDeleteData, LogViewerFilesDeleteResponse, LogViewerFilesClearCacheAllResponse, LogViewerFilesDeleteMultipleFilesData, LogViewerFilesDeleteMultipleFilesResponse, LogViewerFilesDownloadData, LogViewerFilesDownloadResponse, LogViewerFoldersResponse, LogViewerFoldersRequestDownloadData, LogViewerFoldersRequestDownloadResponse, LogViewerFoldersClearCacheData, LogViewerFoldersClearCacheResponse, LogViewerFoldersDeleteData, LogViewerFoldersDeleteResponse, LogViewerFoldersDownloadData, LogViewerFoldersDownloadResponse, GenresIndexData, GenresIndexResponse, GenresShowData, GenresShowResponse, GenresUpdateData, GenresUpdateResponse, GenresDestroyData, GenresDestroyResponse, LogViewerHostsResponse, ImageServeData, ImageServeResponse, JobLibraryScanData, JobLibraryScanResponse, HorizonJobsMetricsIndexResponse, HorizonJobsMetricsShowData, HorizonJobsMetricsShowResponse, HorizonJobsShowData, HorizonJobsShowResponse, LibrariesIndexData, LibrariesIndexResponse, LibraryCreateData, LibraryCreateResponse, LibraryShowData, LibraryShowResponse, LibraryUpdateData, LibraryUpdateResponse, LibraryDeleteResponse, LogViewerLogsData, LogViewerLogsResponse, HorizonMastersIndexResponse, HorizonMonitoringIndexResponse, HorizonMonitoringStoreResponse, HorizonMonitoringTagPaginateData, HorizonMonitoringTagPaginateResponse, HorizonMonitoringTagDestroyData, HorizonMonitoringTagDestroyResponse, OpCacheGetStatusResponse, OpcacheGetConfigResponse, OpcacheClearResponse, OpcacheCompileData, OpcacheCompileResponse, HorizonPendingJobsIndexData, HorizonPendingJobsIndexResponse, QueueMetricsShowData, QueueMetricsShowResponse, QueueMetricsQueuesResponse, QueueMetricsMetricsData, QueueMetricsMetricsResponse, QueueMetricsRetryJobData, QueueMetricsRetryJobResponse, QueueMetricsDeleteData, QueueMetricsDeleteResponse, QueueMetricsPurgeResponse, HorizonQueuesMetricsIndexResponse, HorizonQueuesMetricsShowData, HorizonQueuesMetricsShowResponse, HorizonRetryJobsShowData, HorizonRetryJobsShowResponse, HorizonSilencedJobsIndexData, HorizonSilencedJobsIndexResponse, SongsIndexData, SongsIndexResponse, SongsShowData, SongsShowResponse, SongsStreamData, SongsStreamResponse, SystemInfoPhpResponse, SystemInfoSysResponse, UsersIndexData, UsersIndexResponse, UsersStoreData, UsersStoreResponse, UsersUpdateData, UsersUpdateResponse, UsersShowData, UsersShowResponse, UsersDestroyData, UsersDestroyResponse, UsersMeResponse, UserTokenGetUserTokensData, UserTokenGetUserTokensResponse, UserTokenRevokeTokenData, UserTokenRevokeTokenResponse, HorizonWorkloadIndexResponse } from './types.gen';
 
 export class AlbumService {
     /**
@@ -23,7 +23,7 @@ export class AlbumService {
      * @param data.page Current page
      * @param data.limit Items per page
      * @param data.genres _Extension_ Comma seperated list of genres
-     * @returns unknown Json paginated set of `AlbumResource`
+     * @returns unknown Paginated set of `AlbumResource`
      * @throws ApiError
      */
     public static albumsIndex(data: AlbumsIndexData): CancelablePromise<AlbumsIndexResponse> {
@@ -88,7 +88,7 @@ export class ArtistService {
      * @param data.page Current page
      * @param data.limit Items per page
      * @param data.genres _Extension_ Comma seperated list of genres
-     * @returns unknown Json paginated set of `ArtistResource`
+     * @returns unknown Paginated set of `ArtistResource`
      * @throws ApiError
      */
     public static artistsIndex(data: ArtistsIndexData): CancelablePromise<ArtistsIndexResponse> {
@@ -146,7 +146,7 @@ export class AuthService {
      * @returns unknown
      * @throws ApiError
      */
-    public static authLogin(data: AuthLoginData = {}): CancelablePromise<AuthLoginResponse> {
+    public static authLogin(data: AuthLoginData): CancelablePromise<AuthLoginResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/auth/login',
@@ -219,7 +219,7 @@ export class AuthService {
      * @returns unknown
      * @throws ApiError
      */
-    public static authForgotPassword(data: AuthForgotPasswordData = {}): CancelablePromise<AuthForgotPasswordResponse> {
+    public static authForgotPassword(data: AuthForgotPasswordData): CancelablePromise<AuthForgotPasswordResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/auth/forgotPassword',
@@ -239,7 +239,7 @@ export class AuthService {
      * @returns unknown
      * @throws ApiError
      */
-    public static authResetPassword(data: AuthResetPasswordData = {}): CancelablePromise<AuthResetPasswordResponse> {
+    public static authResetPassword(data: AuthResetPasswordData): CancelablePromise<AuthResetPasswordResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/auth/resetPassword',
@@ -284,7 +284,7 @@ export class AuthService {
      * @returns unknown
      * @throws ApiError
      */
-    public static authPasskeyLogin(data: AuthPasskeyLoginData = {}): CancelablePromise<AuthPasskeyLoginResponse> {
+    public static authPasskeyLogin(data: AuthPasskeyLoginData): CancelablePromise<AuthPasskeyLoginResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/webauthn/passkey',
@@ -319,7 +319,7 @@ export class AuthService {
      * @returns unknown
      * @throws ApiError
      */
-    public static authPasskeyRegister(data: AuthPasskeyRegisterData = {}): CancelablePromise<AuthPasskeyRegisterResponse> {
+    public static authPasskeyRegister(data: AuthPasskeyRegisterData): CancelablePromise<AuthPasskeyRegisterResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/webauthn/passkey/register',
@@ -356,7 +356,7 @@ export class PasskeyService {
      * @returns unknown
      * @throws ApiError
      */
-    public static authPasskeyLogin(data: AuthPasskeyLoginData = {}): CancelablePromise<AuthPasskeyLoginResponse> {
+    public static authPasskeyLogin(data: AuthPasskeyLoginData): CancelablePromise<AuthPasskeyLoginResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/webauthn/passkey',
@@ -391,7 +391,7 @@ export class PasskeyService {
      * @returns unknown
      * @throws ApiError
      */
-    public static authPasskeyRegister(data: AuthPasskeyRegisterData = {}): CancelablePromise<AuthPasskeyRegisterResponse> {
+    public static authPasskeyRegister(data: AuthPasskeyRegisterData): CancelablePromise<AuthPasskeyRegisterResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/webauthn/passkey/register',
@@ -514,7 +514,7 @@ export class FailedJobsService {
      * Get a failed job instance
      * @param data The data for the request.
      * @param data.id
-     * @returns string
+     * @returns unknown
      * @throws ApiError
      */
     public static horizonFailedJobsShow(data: HorizonFailedJobsShowData): CancelablePromise<HorizonFailedJobsShowResponse> {
@@ -735,7 +735,7 @@ export class GenreService {
      * @param data.librarySlug Constrain the query to only fetch genres that are contained within the given library
      * @param data.page Current page
      * @param data.limit Items per page
-     * @returns unknown Json paginated set of `GenreResource`
+     * @returns unknown Paginated set of `GenreResource`
      * @throws ApiError
      */
     public static genresIndex(data: GenresIndexData = {}): CancelablePromise<GenresIndexResponse> {
@@ -890,7 +890,7 @@ export class JobService {
 export class JobMetricsService {
     /**
      * Get all of the measured jobs
-     * @returns string
+     * @returns unknown
      * @throws ApiError
      */
     public static horizonJobsMetricsIndex(): CancelablePromise<HorizonJobsMetricsIndexResponse> {
@@ -924,7 +924,7 @@ export class JobsService {
      * Get the details of a recent job by ID
      * @param data The data for the request.
      * @param data.id
-     * @returns string
+     * @returns unknown
      * @throws ApiError
      */
     public static horizonJobsShow(data: HorizonJobsShowData): CancelablePromise<HorizonJobsShowResponse> {
@@ -945,7 +945,7 @@ export class LibraryService {
      * @param data The data for the request.
      * @param data.page Current page
      * @param data.limit Items per page
-     * @returns unknown Json paginated set of `LibraryResource`
+     * @returns unknown Paginated set of `LibraryResource`
      * @throws ApiError
      */
     public static librariesIndex(data: LibrariesIndexData = {}): CancelablePromise<LibrariesIndexResponse> {
@@ -971,7 +971,7 @@ export class LibraryService {
      * @returns LibraryResource `LibraryResource`
      * @throws ApiError
      */
-    public static libraryCreate(data: LibraryCreateData = {}): CancelablePromise<LibraryCreateResponse> {
+    public static libraryCreate(data: LibraryCreateData): CancelablePromise<LibraryCreateResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/libraries',
@@ -986,16 +986,40 @@ export class LibraryService {
     }
     
     /**
+     * Show library
+     * @param data The data for the request.
+     * @param data.slug
+     * @returns LibraryResource `LibraryResource`
+     * @throws ApiError
+     */
+    public static libraryShow(data: LibraryShowData): CancelablePromise<LibraryShowResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/libraries/{slug}',
+            path: {
+                slug: data.slug
+            },
+            errors: {
+                401: 'Unauthenticated'
+            }
+        });
+    }
+    
+    /**
      * Update a library specified by the provided slug
      * @param data The data for the request.
+     * @param data.slug
      * @param data.requestBody
      * @returns LibraryResource `LibraryResource`
      * @throws ApiError
      */
-    public static libraryUpdate(data: LibraryUpdateData = {}): CancelablePromise<LibraryUpdateResponse> {
+    public static libraryUpdate(data: LibraryUpdateData): CancelablePromise<LibraryUpdateResponse> {
         return __request(OpenAPI, {
             method: 'PATCH',
-            url: '/api/libraries/:slug',
+            url: '/api/libraries/{slug}',
+            path: {
+                slug: data.slug
+            },
             body: data.requestBody,
             mediaType: 'application/json',
             errors: {
@@ -1244,7 +1268,7 @@ export class QueueService {
      * @param data.queue Name of the queue
      * @param data.name Name of the job
      * @param data.queuedFirst Order queued jobs first
-     * @returns unknown Json paginated set of `QueueMonitorResource`
+     * @returns unknown Paginated set of `QueueMonitorResource`
      * @throws ApiError
      */
     public static queueMetricsShow(data: QueueMetricsShowData = {}): CancelablePromise<QueueMetricsShowResponse> {
@@ -1370,7 +1394,7 @@ export class QueueService {
 export class QueueMetricsService {
     /**
      * Get all of the measured queues
-     * @returns string
+     * @returns unknown
      * @throws ApiError
      */
     public static horizonQueuesMetricsIndex(): CancelablePromise<HorizonQueuesMetricsIndexResponse> {
@@ -1453,7 +1477,7 @@ export class SongService {
      * - artists
      * - album.albumArtist
      * - genres
-     * @returns unknown Json paginated set of `SongResource`
+     * @returns unknown Paginated set of `SongResource`
      * @throws ApiError
      */
     public static songsIndex(data: SongsIndexData): CancelablePromise<SongsIndexResponse> {
@@ -1581,7 +1605,7 @@ export class UserService {
      * @param data.filters JSON object
      * @param data.filterModes JSON object
      * @param data.sorting JSON object
-     * @returns unknown Json paginated set of `UserResource`
+     * @returns unknown Paginated set of `UserResource`
      * @throws ApiError
      */
     public static usersIndex(data: UsersIndexData = {}): CancelablePromise<UsersIndexResponse> {
@@ -1612,7 +1636,7 @@ export class UserService {
      * @returns UserResource `UserResource`
      * @throws ApiError
      */
-    public static usersStore(data: UsersStoreData = {}): CancelablePromise<UsersStoreResponse> {
+    public static usersStore(data: UsersStoreData): CancelablePromise<UsersStoreResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/users',
@@ -1717,7 +1741,7 @@ export class UserTokenService {
      * @param data.user
      * @param data.page
      * @param data.perPage
-     * @returns unknown Json paginated set of `PersonalAccessTokenViewResource`
+     * @returns unknown Paginated set of `PersonalAccessTokenViewResource`
      * @throws ApiError
      */
     public static userTokenGetUserTokens(data: UserTokenGetUserTokensData): CancelablePromise<UserTokenGetUserTokensResponse> {
@@ -1765,7 +1789,7 @@ export class UserTokenService {
 export class WorkloadService {
     /**
      * Get the current queue workload for the application
-     * @returns string
+     * @returns unknown
      * @throws ApiError
      */
     public static horizonWorkloadIndex(): CancelablePromise<HorizonWorkloadIndexResponse> {

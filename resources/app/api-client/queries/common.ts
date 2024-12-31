@@ -167,6 +167,12 @@ export const UseLibraryServiceLibrariesIndexKeyFn = ({ limit, page }: {
   limit?: number;
   page?: number;
 } = {}, queryKey?: Array<unknown>) => [useLibraryServiceLibrariesIndexKey, ...(queryKey ?? [{ limit, page }])];
+export type LibraryServiceLibraryShowDefaultResponse = Awaited<ReturnType<typeof LibraryService.libraryShow>>;
+export type LibraryServiceLibraryShowQueryResult<TData = LibraryServiceLibraryShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useLibraryServiceLibraryShowKey = "LibraryServiceLibraryShow";
+export const UseLibraryServiceLibraryShowKeyFn = ({ slug }: {
+  slug: string;
+}, queryKey?: Array<unknown>) => [useLibraryServiceLibraryShowKey, ...(queryKey ?? [{ slug }])];
 export type LogsServiceLogViewerLogsDefaultResponse = Awaited<ReturnType<typeof LogsService.logViewerLogs>>;
 export type LogsServiceLogViewerLogsQueryResult<TData = LogsServiceLogViewerLogsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useLogsServiceLogViewerLogsKey = "LogsServiceLogViewerLogs";

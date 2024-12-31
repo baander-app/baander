@@ -14,7 +14,7 @@ class SetupDevCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'setup:dev';
+    protected $signature = 'setup:dev {--fresh : Drop and re-create database}';
 
     /**
      * The console command description.
@@ -50,7 +50,11 @@ class SetupDevCommand extends Command
 
     private function database()
     {
-        $this->call('migrate');
+        if ($this->option('fresh')) {
+            $this->call('migrate:fresh');
+        } else {
+            $this->call('migrate');
+        }
 
         $this->call('db:seed', [
             '--class' => DatabaseSeeder::class,

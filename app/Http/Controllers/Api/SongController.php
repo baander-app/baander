@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use Illuminate\Support\Arr;
 use App\Extensions\{JsonAnonymousResourceCollection, JsonPaginator};
 use App\Http\Controllers\Controller;
 use App\Models\{Album, Library, Song, TokenAbility};
@@ -41,7 +42,10 @@ class SongController extends Controller
                 return $query->whereGenreSlugs($genreSlugs);
             })->when($genreNames, function ($query) use ($library, $genreNames) {
                 return $query->whereGenreNames($genreNames);
-            })->paginate();
+            })
+            ->orderBy(Album::select('title')->whereColumn('songs.album_id', 'albums.id'))
+            ->orderBy('track')
+            ->paginate();
 
         $songs->each(function (Song $song) use ($library) {
             $song->librarySlug = $library->slug;
