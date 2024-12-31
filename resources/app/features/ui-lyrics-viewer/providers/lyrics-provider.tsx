@@ -14,9 +14,16 @@ LyricsProviderContext.displayName = 'LyricsProviderContext';
 
 const LyricsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [lyrics, _setLyrics] = useState<Lrc>();
+  const {song} = useAudioPlayer();
   const audioLyricsSynchronizer = new AudioLyricSynchronizer();
 
   const { audioRef } = useAudioPlayer();
+
+  useEffect(() => {
+    if (song?.lyrics) {
+     setLyrics(song.lyrics);
+    }
+  }, [song, song?.lyrics, audioLyricsSynchronizer]);
 
   useEffect(() => {
     const handler: ReactEventHandler<HTMLAudioElement> = () => {

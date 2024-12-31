@@ -10,7 +10,8 @@ import { SongResource } from '@/api-client/requests';
 import { VolumeSlider } from '@/features/library-music-player/components/volume-slider/volume-slider.tsx';
 import { useLyrics } from '@/features/ui-lyrics-viewer/providers/lyrics-provider.tsx';
 import { LyricsViewer } from '@/features/ui-lyrics-viewer/lyrics-viewer.tsx';
-import { Affix, Modal } from '@mantine/core';
+import { Affix } from '@mantine/core';
+import { useEffect } from 'react';
 
 export interface PlayerMetaControlsProps {
   song?: SongResource;
@@ -20,6 +21,12 @@ export function PlayerMetaControls({ song }: PlayerMetaControlsProps) {
   const [showWaveform, waveformHandlers] = useDisclosure(false);
   const [showLyrics, lyricHandlers] = useDisclosure(false);
   const { setLyrics } = useLyrics();
+
+  useEffect(() => {
+    if (!song?.lyricsExist) {
+      lyricHandlers.close();
+    }
+  }, [song?.lyricsExist]);
 
   return (
     <>
