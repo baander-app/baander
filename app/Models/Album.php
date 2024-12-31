@@ -6,10 +6,11 @@ use App\Extensions\BaseBuilder;
 use App\Models\Concerns\HasLibraryAccess;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Spatie\Sluggable\{HasSlug, SlugOptions};
+use Overtrue\LaravelVersionable\Versionable;
 
 class Album extends BaseModel
 {
-    use HasFactory, HasLibraryAccess, HasSlug;
+    use HasFactory, HasLibraryAccess, HasSlug, Versionable;
 
     public static array $filterFields = [
       'title',
@@ -35,6 +36,11 @@ class Album extends BaseModel
         'slug',
         'year',
         'directory',
+    ];
+
+    protected $versionable = [
+      'title',
+      'year',
     ];
 
     protected $perPage = 60;

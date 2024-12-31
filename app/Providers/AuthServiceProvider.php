@@ -7,6 +7,7 @@ use App\Auth\Webauthn\WebauthnService;
 use App\Models\PersonalAccessToken;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Passport\Passport;
 use Laravel\Sanctum\Sanctum;
 use Webauthn\AttestationStatement\AttestationStatementSupportManager;
 use Webauthn\AttestationStatement\NoneAttestationStatementSupport;
@@ -40,6 +41,7 @@ class AuthServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Passport::withCookieEncryption();
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
         Gate::define('viewApiDoc', function ($user) {
