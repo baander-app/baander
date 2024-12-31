@@ -23,10 +23,11 @@ const LyricsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     if (song?.lyrics) {
      setLyrics(song.lyrics);
     }
-  }, [song, song?.lyrics, audioLyricsSynchronizer]);
+  }, [song, song?.lyrics]);
 
   useEffect(() => {
     const handler: ReactEventHandler<HTMLAudioElement> = () => {
+      console.log('timeupdate');
       audioLyricsSynchronizer.timeUpdate(audioRef.current.currentTime);
     }
 
@@ -38,7 +39,7 @@ const LyricsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       // @ts-ignore
       audioRefCurrent.removeEventListener('timeupdate', handler);
     };
-  }, [audioRef]);
+  }, []);
 
   const setLyrics = (value?: string | undefined) => {
     if (!value) {
@@ -62,6 +63,7 @@ const LyricsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     </LyricsProviderContext.Provider>
   );
 };
+LyricsProvider.displayName = 'LyricsProvider';
 
 const useLyrics = () => {
   const context = useContext(LyricsProviderContext);

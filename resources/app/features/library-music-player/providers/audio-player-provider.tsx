@@ -110,19 +110,19 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
     handleBufferProgress(e);
   };
 
-  const mute = useCallback(() => {
+  const mute = () => {
     if (audioRef.current) {
       audioRef.current.volume = 0;
       setIsMuted(true);
     }
-  }, [audioRef]);
+  };
 
   const unmute = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.volume = currentVolume / 100;
       setIsMuted(false);
     }
-  }, [audioRef, currentVolume]);
+  }, [currentVolume]);
 
   useEffect(() => {
     const handleCanPlay = () => {
@@ -145,13 +145,13 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
     if (audioRef.current && currentVolume) {
       audioRef.current.volume = currentVolume / 100;
     }
-  }, [audioRef.current, currentVolume]);
+  }, [currentVolume]);
 
   useEffect(() => {
     if (audioRef.current) {
       setAudioRef(audioRef);
     }
-  }, [audioRef, setAudioRef]);
+  }, [setAudioRef]);
 
   useEffect(() => {
     if (currentVolume) {
@@ -209,7 +209,7 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
     audioRef.current.onprogress = (e) => handleBufferProgress(e);
     audioRef.current.play().then(() => {
       setIsPlaying(true);
-    })
+    });
   }, [authenticatedSource]);
 
   return (

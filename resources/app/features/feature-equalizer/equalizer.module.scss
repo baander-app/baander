@@ -1,0 +1,19 @@
+.buttonsContainer {
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+}
+
+.eqContainer {
+  position: relative;
+}
+
+.gridCol {
+  position: relative;
+}
+
+.knobCol {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+}

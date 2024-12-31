@@ -7,6 +7,7 @@ use App\Http\Integrations\Github\BaanderGhApi;
 use App\Http\Resources\Album\AlbumResource;
 use App\Models\Album;
 use App\Packages\PhpInfoParser\Info;
+use App\Services\SystemMetricsCollectorService;
 use Illuminate\Http\Request;
 
 class UIController
@@ -25,16 +26,15 @@ class UIController
 
     public function dbg()
     {
-        $relations = implode(',', Album::$filterRelations);
+        $service = app(SystemMetricsCollectorService::class);
 
-        $albums = Album::query()
-            ->withRelations(Album::$filterRelations, $relations)
-            ->when($relations, function (BaseBuilder $q) use ($relations) {
-                return $q->with(explode(',', $relations));
-            })->with('songs.genres')
-            ->paginate();
+        $metrics = [
+          'memoryUsage' => $service->memoryUsage(),
+          'systemLoad' => $service->systemLoad(),
+          'swooleVm' => $service->swooleVm(),
+        ];
 
-        dd((new AlbumResource($albums->items()[1]))->toArray(request()));
+        dd($metrics);
 
         return view('dbg', [
         ]);

@@ -33,7 +33,6 @@ class QueueMonitorResource extends JsonResource
             'attempt'           => $this->attempt,
             'progress'          => $this->progress,
             'exception'         => $this->exception,
-            'exception_message' => $this->exception_message,
             'exception_class'   => $this->exception_class,
             'data'              => $this->data,
             'status'            => $this->status,

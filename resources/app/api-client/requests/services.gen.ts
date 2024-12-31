@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { AlbumsIndexData, AlbumsIndexResponse, AlbumsShowData, AlbumsShowResponse, ArtistsIndexData, ArtistsIndexResponse, ArtistsShowData, ArtistsShowResponse, AuthLoginData, AuthLoginResponse, AuthRefreshTokenResponse, AuthStreamTokenResponse, AuthRegisterData, AuthRegisterResponse, AuthForgotPasswordData, AuthForgotPasswordResponse, AuthResetPasswordData, AuthResetPasswordResponse, AuthVerifyResponse, GenresIndexData, GenresIndexResponse, GenresShowData, GenresShowResponse, GenresUpdateData, GenresUpdateResponse, GenresDestroyData, GenresDestroyResponse, ImageServeData, ImageServeResponse, JobLibraryScanData, JobLibraryScanResponse, LibrariesIndexData, LibrariesIndexResponse, LibraryCreateData, LibraryCreateResponse, LibraryUpdateData, LibraryUpdateResponse, LibraryDeleteResponse, OpCacheGetStatusResponse, OpcacheGetConfigResponse, OpcacheClearResponse, OpcacheCompileData, OpcacheCompileResponse, QueueMetricsShowData, QueueMetricsShowResponse, QueueMetricsQueuesResponse, QueueMetricsMetricsData, QueueMetricsMetricsResponse, QueueMetricsRetryJobData, QueueMetricsRetryJobResponse, QueueMetricsDeleteData, QueueMetricsDeleteResponse, QueueMetricsPurgeResponse, SongsIndexData, SongsIndexResponse, SongsShowData, SongsShowResponse, SongsStreamData, SongsStreamResponse, SystemInfoPhpResponse, UsersIndexData, UsersIndexResponse, UsersStoreData, UsersStoreResponse, UsersUpdateData, UsersUpdateResponse, UsersShowData, UsersShowResponse, UsersDestroyData, UsersDestroyResponse, UsersMeResponse, UserTokenGetUserTokensData, UserTokenGetUserTokensResponse, UserTokenRevokeTokenData, UserTokenRevokeTokenResponse } from './types.gen';
+import type { AlbumsIndexData, AlbumsIndexResponse, AlbumsShowData, AlbumsShowResponse, ArtistsIndexData, ArtistsIndexResponse, ArtistsShowData, ArtistsShowResponse, AuthLoginData, AuthLoginResponse, AuthRefreshTokenResponse, AuthStreamTokenResponse, AuthRegisterData, AuthRegisterResponse, AuthForgotPasswordData, AuthForgotPasswordResponse, AuthResetPasswordData, AuthResetPasswordResponse, AuthVerifyResponse, GenresIndexData, GenresIndexResponse, GenresShowData, GenresShowResponse, GenresUpdateData, GenresUpdateResponse, GenresDestroyData, GenresDestroyResponse, ImageServeData, ImageServeResponse, JobLibraryScanData, JobLibraryScanResponse, LibrariesIndexData, LibrariesIndexResponse, LibraryCreateData, LibraryCreateResponse, LibraryUpdateData, LibraryUpdateResponse, LibraryDeleteResponse, OpCacheGetStatusResponse, OpcacheGetConfigResponse, OpcacheClearResponse, OpcacheCompileData, OpcacheCompileResponse, QueueMetricsShowData, QueueMetricsShowResponse, QueueMetricsQueuesResponse, QueueMetricsMetricsData, QueueMetricsMetricsResponse, QueueMetricsRetryJobData, QueueMetricsRetryJobResponse, QueueMetricsDeleteData, QueueMetricsDeleteResponse, QueueMetricsPurgeResponse, SongsIndexData, SongsIndexResponse, SongsShowData, SongsShowResponse, SongsStreamData, SongsStreamResponse, SystemInfoPhpResponse, SystemInfoSysResponse, UsersIndexData, UsersIndexResponse, UsersStoreData, UsersStoreResponse, UsersUpdateData, UsersUpdateResponse, UsersShowData, UsersShowResponse, UsersDestroyData, UsersDestroyResponse, UsersMeResponse, UserTokenGetUserTokensData, UserTokenGetUserTokensResponse, UserTokenRevokeTokenData, UserTokenRevokeTokenResponse } from './types.gen';
 
 export class AlbumService {
     /**
@@ -823,6 +823,20 @@ export class SystemInfoService {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/system-info',
+            errors: {
+                401: 'Unauthenticated'
+            }
+        });
+    }
+    
+    /**
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static systemInfoSys(): CancelablePromise<SystemInfoSysResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/system-info/sys',
             errors: {
                 401: 'Unauthenticated'
             }

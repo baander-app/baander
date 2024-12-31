@@ -143,7 +143,6 @@ export type QueueMonitorResource = {
     attempt: number;
     progress: number | null;
     exception: Array<(string)> | null;
-    exception_message: string;
     exception_class: string | null;
     data: string | null;
     status: string;
@@ -829,6 +828,15 @@ export type SystemInfoPhpResponse = Array<{
         value: string | number | boolean | null;
     }>;
 }>;
+
+export type SystemInfoSysResponse = {
+    memoryUsage: number;
+    systemLoadAverage: Array<(number)>;
+    swooleVm: {
+        object_num: number;
+        resource_num: number;
+    };
+};
 
 export type UsersIndexData = {
     /**
@@ -2294,6 +2302,29 @@ export type $OpenApiTs = {
                         value: string | number | boolean | null;
                     }>;
                 }>;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/system-info/sys': {
+        get: {
+            res: {
+                200: {
+                    memoryUsage: number;
+                    systemLoadAverage: Array<(number)>;
+                    swooleVm: {
+                        object_num: number;
+                        resource_num: number;
+                    };
+                };
                 /**
                  * Unauthenticated
                  */

@@ -1,38 +1,30 @@
 import { QueueMonitorResource } from '@/api-client/requests';
-import { Accordion, Box, Table, TableData, Text } from '@mantine/core';
+import { Box, Table, TableData, Text } from '@mantine/core';
 import { JobStatus } from '@/features/dashboard/queue-monitor/components/job-status.tsx';
 
-import styles from './job-details.module.scss';
+import { ErrorBoundary } from 'react-error-boundary';
+import ReactJson from '@microlink/react-json-view';
 
 interface ExceptionDetailsProps {
   job: QueueMonitorResource;
 }
 
-function ExceptionDetails({ job }: ExceptionDetailsProps) {
-
-  const accordionItems = [
-    { title: 'Message', value: job.exception_message },
-    { title: 'Detailed', value: job.exception },
-  ].map((item) => (
-    <Accordion.Item key={item.title} value={item.title}>
-      <Accordion.Control>{item.title}</Accordion.Control>
-      <Accordion.Panel>
-        <pre className={styles.exceptionText}>{item.value}</pre>
-      </Accordion.Panel>
-    </Accordion.Item>
-  ));
+const ExceptionDetails = ({ job }: ExceptionDetailsProps) => {
 
   return (
     <Box>
       <Text size="md">Exception:</Text>
       <Text fw="bold" c="red.8">{job.exception_class}</Text>
 
-      <Accordion>
-        {accordionItems}
-      </Accordion>
+      {job.exception && (
+        <ReactJson
+          src={job.exception}
+          indentWidth={2}
+        />
+      )}
     </Box>
   );
-}
+};
 
 export interface JobDetailsProps {
   job: QueueMonitorResource;
@@ -65,9 +57,12 @@ export function JobDetails({ job }: JobDetailsProps) {
 
       <hr/>
 
-      {job.exception && (
-        <ExceptionDetails job={job}/>
-      )}
+
+      <ErrorBoundary fallback={<div>Something went wrong</div>}>
+        {job.exception && (
+          <ExceptionDetails job={job}/>
+        )}
+      </ErrorBoundary>
     </>
   );
 }
