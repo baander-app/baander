@@ -9,6 +9,7 @@ const menu: LinksGroupProps[] = [
     label: 'Libraries',
     iconName: 'ion:library',
     links: [
+      {label: 'New', to: 'libraries/new'},
       {label: 'Manage', to: 'libraries/list'},
     ],
   },
