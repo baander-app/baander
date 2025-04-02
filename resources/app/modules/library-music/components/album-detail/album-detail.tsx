@@ -11,6 +11,7 @@ import styles from './album-detail.module.scss';
 import { usePathParam } from '@/hooks/use-path-param.ts';
 import { LibraryParams } from '@/modules/library-music/routes/_routes.tsx';
 import { generateBlurhashBackgroundImage } from '@/libs/blurhash/generate-bg-image.ts';
+import { useCallback } from 'react';
 
 interface AlbumDetailProps extends React.HTMLAttributes<HTMLDivElement> {
   albumSlug: string;
@@ -83,12 +84,12 @@ interface AlbumSongProps {
 function AlbumSongs({ songs }: AlbumSongProps) {
   const dispatch = useAppDispatch();
 
-  const onSongClick = (song: SongResource, songs: SongResource[]) => {
-    dispatch(setQueueAndSong({
-      queue: songs,
-      playPublicId: song.public_id,
-    }));
-  };
+  const onSongClick = useCallback((song: SongResource, songs: SongResource[]) => {
+      dispatch(setQueueAndSong({
+        queue: songs,
+        playPublicId: song.public_id,
+      }));
+    }, [dispatch]);
 
   const rows = songs.map((song) => (
     <TrackRow
@@ -96,7 +97,6 @@ function AlbumSongs({ songs }: AlbumSongProps) {
       song={song}
       key={song.public_id}
       onClick={() => {
-        console.log('row clicked');
         onSongClick(song, songs);
       }}
     />

@@ -1,10 +1,11 @@
-import { Box, Flex, ScrollArea, Text }      from '@radix-ui/themes';
-import { NavLink }                          from '@/ui/nav-link';
-import { lazyImport }                       from '@/utils/lazy-import';
-import { Iconify }                          from '@/ui/icons/iconify';
-import styles                               from './root-menu.module.scss';
-import { useMemo }                          from 'react';
-import { useLibraryServiceGetApiLibraries } from '@/api-client/queries';
+import { Box, Button, Dialog, Flex, ScrollArea, Text } from '@radix-ui/themes';
+import { NavLink } from '@/ui/nav-link';
+import { lazyImport } from '@/utils/lazy-import';
+import { Iconify } from '@/ui/icons/iconify';
+import styles from './root-menu.module.scss';
+import { ReactNode, useMemo } from 'react';
+import { useLibraryServiceGetApiLibraries, usePlaylistServiceGetApiPlaylists } from '@/api-client/queries';
+import { CreatePlaylist } from '@/modules/library-music-playlist/create-playlist/create-playlist.tsx';
 
 const { Brand } = lazyImport(() => import('@/ui/brand/Brand'), 'Brand');
 
@@ -17,14 +18,17 @@ interface MenuLink {
 interface MenuSection {
   label: string;
   iconName: string;
+  rightSide?: ReactNode;
   links: MenuLink[];
 }
 
 export function RootMenu() {
-  const { data } = useLibraryServiceGetApiLibraries();
+  const { data: libraryData } = useLibraryServiceGetApiLibraries();
+  const { data: playlistData } = usePlaylistServiceGetApiPlaylists();
 
-  const musicLibraries = useMemo(() => data?.data.filter(library => library.type === 'music') ?? [], [data]);
-  const movieLibraries = useMemo(() => data?.data.filter(library => library.type === 'movie') ?? [], [data]);
+  const musicLibraries = useMemo(() => libraryData?.data.filter(library => library.type === 'music') ?? [], [libraryData]);
+  const movieLibraries = useMemo(() => libraryData?.data.filter(library => library.type === 'movie') ?? [], [libraryData]);
+  const playlists = useMemo(() => playlistData?.data ?? [], [playlistData]);
 
   const librariesMenu: MenuSection[] = useMemo(() => {
     const sections: MenuSection[] = [];
@@ -71,6 +75,44 @@ export function RootMenu() {
       }
     }
 
+    const playlistSection: MenuSection = {
+      label: 'Playlists',
+      iconName: 'heroicons:playlist',
+      rightSide: (
+        <>
+        <Dialog.Root>
+          <Dialog.Trigger>
+            <Button
+              ml="2"
+              variant="ghost"
+            >New</Button>
+          </Dialog.Trigger>
+          <Dialog.Content>
+            <Dialog.Title>Create Playlist</Dialog.Title>
+            <Dialog.Description></Dialog.Description>
+
+            <CreatePlaylist />
+          </Dialog.Content>
+        </Dialog.Root>
+        </>
+      ),
+      links: [
+        {
+          label: 'Create playlist',
+          to: '/playlists/new',
+        },
+      ],
+    };
+
+    for (const playlist of playlists) {
+      playlistSection.links.push({
+        label: playlist.name,
+        to: `/playlists/${playlist.id}`,
+      });
+    }
+
+    sections.push(playlistSection);
+
     return sections;
   }, [musicLibraries]);
 
@@ -91,7 +133,7 @@ export function RootMenu() {
         { label: 'Sessions', to: '/user/settings/sessions' },
         { label: 'Passkeys', to: '/user/settings/passkeys' },
       ],
-    }
+    },
   ];
 
   const menu = [...librariesMenu, ...staticMenu];
@@ -117,6 +159,12 @@ export function RootMenu() {
                 <Flex align="center" gap="1">
                   <Iconify icon={section.iconName} width="20" height="20"/>
                   {section.label}
+
+                  {section?.rightSide && (
+                    <>
+                      {section.rightSide}
+                    </>
+                  )}
                 </Flex>
               </Text>
               <Box className={styles.linksList}>
