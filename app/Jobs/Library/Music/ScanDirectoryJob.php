@@ -168,7 +168,13 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
 
     private function getLyric(SplFileInfo $file, array $lyrics): ?string
     {
-        $lyricPath = pathinfo($file->getRealPath(), PATHINFO_FILENAME) . '.' . Lrc::FILE_EXTENSION;
+        $fullPath = $file->getRealPath();
+        if (!$fullPath) {
+            return null;
+        }
+
+        $pathWithoutFileName = pathinfo($fullPath, PATHINFO_DIRNAME);
+        $lyricPath = $pathWithoutFileName . DIRECTORY_SEPARATOR . pathinfo($fullPath, PATHINFO_FILENAME) . '.' . Lrc::FILE_EXTENSION;
 
         return $lyrics[$lyricPath] ?? (File::exists($lyricPath) ? File::get($lyricPath) : null);
     }
