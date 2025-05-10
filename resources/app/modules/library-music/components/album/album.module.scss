@@ -1,50 +1,50 @@
 .album {
-    display: flex;
-    flex-direction: column;
-    height: auto;
-    width: 200px;
+  display: flex;
+  flex-direction: column;
+  height: auto;
+  width: 200px;
 
-    .title {
-        margin-top: 2px;
-        font-size: clamp(0.85em, 2vw, 1em);
-        font-weight: bold;
-        line-clamp: 3;
-        -webkit-line-clamp: 3;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        color: var(--color-text-primary);
-    }
+  .title {
+    margin-top: 8px;
+    font-size: clamp(0.85em, 2vw, 1em);
+    font-weight: bold;
+    line-clamp: 3;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--color-text-primary);
+  }
 
+  .artist {
+    font-size: 0.9em;
+    color: var(--color-text-secondary);
+    margin-top: 2px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  &:hover {
+    cursor: pointer;
+
+    .title,
     .artist {
-        font-size: 0.9em;
-        color: var(--color-text-secondary);
-        margin-top: 2px;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        overflow: hidden;
+      color: #000;
     }
-
-    &:hover {
-        cursor: pointer;
-
-        .title,
-        .artist {
-            color: #000;
-        }
-    }
+  }
 }
 
 @media (max-width: 600px) {
-    .album {
-        width: 150px;
-    }
+  .album {
+    width: 150px;
+  }
 
-    .title {
-        font-size: 0.9em;
-    }
+  .title {
+    font-size: 0.9em;
+  }
 
-    .artist {
-        font-size: 0.8em;
-    }
+  .artist {
+    font-size: 0.8em;
+  }
 }

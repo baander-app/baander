@@ -140,7 +140,7 @@ export function Equalizer() {
 
   return (
     <Grid className={styles.eqContainer}>
-      <Grid.Col span={3} className={styles.gridCol}>
+      <Grid columns="3" gap="3" className={styles.gridCol}>
         <Power
           className={styles.power}
           isActive={isEqualizerEnabled}
@@ -176,9 +176,9 @@ export function Equalizer() {
         </div>
 
         <Description label="Three band" className="tones"/>
-      </Grid.Col>
+      </Grid>
 
-      <Grid.Col span={4} className={styles.knobCol}>
+      <Grid columns="5" gap="2" className={styles.knobCol}>
 
         <Knob
           className={styles.treble}
@@ -225,27 +225,25 @@ export function Equalizer() {
           onChange={handleMicrophoneChange}
           isEnabled={isEqualizerEnabled && isMicrophoneEnabledEnabled}
         />
-      </Grid.Col>
+      </Grid>
 
 
-      <Grid.Col span={3}>
-        <VfdDisplay
-          className="vfd"
-          isEnabled={isEqualizerEnabled}
-          audioSource={source}
-          isMuted={isMuted}
-          isRepeatEnabled={isRepeatEnabled}
-          isShuffleEnabled={isShuffleEnabled}
-          isMicrophoneEnabled={isMicrophoneEnabled}
-          leftChannel={leftChannel}
-          rightChannel={rightChannel}
-          isStereoEnabled={isStereoEnabled}
-          isKaraokeEnabled={isKaraokeEnabled}
-          frequencies={frequencies}
-          frequencyBars={vfdFrequencyBars}
-          barsMode={barsModeValue}
-        />
-      </Grid.Col>
+      <VfdDisplay
+        className="vfd"
+        isEnabled={isEqualizerEnabled}
+        audioSource={source}
+        isMuted={isMuted}
+        isRepeatEnabled={isRepeatEnabled}
+        isShuffleEnabled={isShuffleEnabled}
+        isMicrophoneEnabled={isMicrophoneEnabled}
+        leftChannel={leftChannel}
+        rightChannel={rightChannel}
+        isStereoEnabled={isStereoEnabled}
+        isKaraokeEnabled={isKaraokeEnabled}
+        frequencies={frequencies}
+        frequencyBars={vfdFrequencyBars}
+        barsMode={barsModeValue}
+      />
 
     </Grid>
   );

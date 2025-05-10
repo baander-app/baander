@@ -9,6 +9,8 @@ import { Box, ContextMenu, Flex, Skeleton } from '@radix-ui/themes';
 import { usePathParam } from '@/hooks/use-path-param.ts';
 import { LibraryParams } from '@/modules/library-music/routes/_routes.tsx';
 import { AlbumResource } from '@/api-client/requests';
+import * as motion from "framer-motion/client"
+
 
 function AlbumContextMenu({ album }: { album: AlbumResource }) {
   return (
@@ -56,7 +58,16 @@ export default function Albums() {
 
       <Box display="block" minHeight="300px" minWidth="300px" className={styles.sidebar} mt="2" mr="2">
         {showAlbumDetail && (
-          <AlbumDetail albumSlug={showAlbumDetail}/>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{
+              duration: 0.3,
+              ease: [0, 0.71, 0.2, 1.01],
+            }}
+          >
+            <AlbumDetail albumSlug={showAlbumDetail}/>
+          </motion.div>
         )}
       </Box>
     </Flex>

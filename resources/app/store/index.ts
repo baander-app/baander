@@ -5,11 +5,13 @@ import { authSlice } from '@/store/users/auth-slice.ts';
 import { equalizerSlice } from '@/store/audio/equalizer.ts';
 import { musicPlayerSlice } from '@/store/music/music-player-slice.ts';
 import { userTableSlice } from '@/store/ui/user-table-slice.ts';
+import { notificationsSlice } from '@/store/notifications/notifications-slice.ts';
 
 const rootReducer = combineSlices(
   authSlice,
   equalizerSlice,
   musicPlayerSlice,
+  notificationsSlice,
   userTableSlice,
 );
 export type RootState = ReturnType<typeof rootReducer>

@@ -19,5 +19,13 @@
 }
 
 .shadow {
-  box-shadow: 0px 0px 17px -11px rgba(0,0,0,0.1),0px 4px 11px 0px rgba(0,0,0,0.1);
+  // HACK: buggy in chrome based browsers
+  &:not(img) {
+    border-radius: 7px;
+    box-shadow: 0px 0px 17px -11px rgba(0,0,0,0.1),0px 4px 11px 0px rgba(0,0,0,0.1);
+  }
+  img {
+    border-radius: 7px;
+    box-shadow: 0px 0px 17px -11px rgba(0,0,0,0.1),0px 4px 11px 0px rgba(0,0,0,0.1);
+  }
 }

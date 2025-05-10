@@ -28,6 +28,7 @@ body, html {
 }
 
 * {
+    text-wrap: pretty;
     box-sizing: border-box;
 }
 

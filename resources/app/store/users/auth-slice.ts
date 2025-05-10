@@ -10,8 +10,8 @@ export const logoutUser = createAsyncThunk('auth/logout', async () => {
     return;
   }
 
-  return AuthService.authLogout({ requestBody: { refreshToken: token.refreshToken.token } });
-})
+  return AuthService.postApiAuthLogout({ requestBody: { refreshToken: token.refreshToken.token } });
+});
 
 export interface UserModel {
   name: string;
@@ -63,7 +63,7 @@ export const authSlice = createSlice({
   extraReducers: builder => {
     builder.addCase(logoutUser.pending, (state) => {
       state.loading = true;
-    })
+    });
     builder.addCase(logoutUser.fulfilled, (state) => {
       state.authenticated = false;
       state.accessToken = null;
@@ -72,7 +72,7 @@ export const authSlice = createSlice({
       state.user = null;
       state.loading = false;
       Token.clear();
-    })
+    });
   },
   selectors: {
     selectIsAuthenticated: auth => auth.authenticated,

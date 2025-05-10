@@ -9,8 +9,6 @@ export function refreshAccessTokenInterceptor() {
       const request = response.config as AccessTokenRequest;
 
       if (response?.status === 401 || response?.status === 403 && !request?._didRetry) {
-        console.warn('retrying')
-
         const requestToken = request.headers.get('Authorization')?.toString().replace('Bearer ', '');
         if (!requestToken) {
           console.error('Unable to find a token on the request');

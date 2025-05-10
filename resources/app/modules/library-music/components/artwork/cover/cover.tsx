@@ -18,7 +18,7 @@ export function Cover({ imgSrc, size, interactive = false }: CoverProps) {
            height={size}
            width={size}
            className={`${interactive ? styles.interactive : undefined}`}
-           style={{ borderRadius: '7px' }} alt=""/>
+           alt=""/>
          : <FallbackImage size={size} interactive={interactive}/>
         }
       </div>
