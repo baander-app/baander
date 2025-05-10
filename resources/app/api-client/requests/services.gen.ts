@@ -3,30 +3,22 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { AlbumsIndexData, AlbumsIndexResponse, AlbumsShowData, AlbumsShowResponse, ArtistsIndexData, ArtistsIndexResponse, ArtistsShowData, ArtistsShowResponse, AuthLoginData, AuthLoginResponse, AuthRefreshTokenResponse, AuthStreamTokenResponse, AuthRegisterData, AuthRegisterResponse, AuthForgotPasswordData, AuthForgotPasswordResponse, AuthResetPasswordData, AuthResetPasswordResponse, AuthVerifyResponse, AuthLogoutData, AuthLogoutResponse, AuthPasskeyOptionsResponse, AuthPasskeyLoginData, AuthPasskeyLoginResponse, AuthPasskeyRegisterOptionsResponse, AuthPasskeyRegisterData, AuthPasskeyRegisterResponse, HorizonJobsBatchesIndexResponse, HorizonJobsBatchesShowData, HorizonJobsBatchesShowResponse, HorizonJobsBatchesRetryData, HorizonJobsBatchesRetryResponse, HorizonCompletedJobsIndexData, HorizonCompletedJobsIndexResponse, HorizonStatsIndexResponse, HorizonFailedJobsIndexData, HorizonFailedJobsIndexResponse, HorizonFailedJobsShowData, HorizonFailedJobsShowResponse, LogViewerFilesResponse, LogViewerFilesRequestDownloadData, LogViewerFilesRequestDownloadResponse, LogViewerFilesClearCacheData, LogViewerFilesClearCacheResponse, LogViewerFilesDeleteData, LogViewerFilesDeleteResponse, LogViewerFilesClearCacheAllResponse, LogViewerFilesDeleteMultipleFilesData, LogViewerFilesDeleteMultipleFilesResponse, LogViewerFilesDownloadData, LogViewerFilesDownloadResponse, LogViewerFoldersResponse, LogViewerFoldersRequestDownloadData, LogViewerFoldersRequestDownloadResponse, LogViewerFoldersClearCacheData, LogViewerFoldersClearCacheResponse, LogViewerFoldersDeleteData, LogViewerFoldersDeleteResponse, LogViewerFoldersDownloadData, LogViewerFoldersDownloadResponse, GenresIndexData, GenresIndexResponse, GenresShowData, GenresShowResponse, GenresUpdateData, GenresUpdateResponse, GenresDestroyData, GenresDestroyResponse, LogViewerHostsResponse, ImageServeData, ImageServeResponse, JobLibraryScanData, JobLibraryScanResponse, HorizonJobsMetricsIndexResponse, HorizonJobsMetricsShowData, HorizonJobsMetricsShowResponse, HorizonJobsShowData, HorizonJobsShowResponse, LibrariesIndexData, LibrariesIndexResponse, LibraryCreateData, LibraryCreateResponse, LibraryShowData, LibraryShowResponse, LibraryUpdateData, LibraryUpdateResponse, LibraryDeleteResponse, LogViewerLogsData, LogViewerLogsResponse, HorizonMastersIndexResponse, HorizonMonitoringIndexResponse, HorizonMonitoringStoreResponse, HorizonMonitoringTagPaginateData, HorizonMonitoringTagPaginateResponse, HorizonMonitoringTagDestroyData, HorizonMonitoringTagDestroyResponse, OpCacheGetStatusResponse, OpcacheGetConfigResponse, OpcacheClearResponse, OpcacheCompileData, OpcacheCompileResponse, HorizonPendingJobsIndexData, HorizonPendingJobsIndexResponse, QueueMetricsShowData, QueueMetricsShowResponse, QueueMetricsQueuesResponse, QueueMetricsMetricsData, QueueMetricsMetricsResponse, QueueMetricsRetryJobData, QueueMetricsRetryJobResponse, QueueMetricsDeleteData, QueueMetricsDeleteResponse, QueueMetricsPurgeResponse, HorizonQueuesMetricsIndexResponse, HorizonQueuesMetricsShowData, HorizonQueuesMetricsShowResponse, HorizonRetryJobsShowData, HorizonRetryJobsShowResponse, HorizonSilencedJobsIndexData, HorizonSilencedJobsIndexResponse, SongsIndexData, SongsIndexResponse, SongsShowData, SongsShowResponse, SongsStreamData, SongsStreamResponse, SystemInfoPhpResponse, SystemInfoSysResponse, UsersIndexData, UsersIndexResponse, UsersStoreData, UsersStoreResponse, UsersUpdateData, UsersUpdateResponse, UsersShowData, UsersShowResponse, UsersDestroyData, UsersDestroyResponse, UsersMeResponse, UserTokenGetUserTokensData, UserTokenGetUserTokensResponse, UserTokenRevokeTokenData, UserTokenRevokeTokenResponse, HorizonWorkloadIndexResponse } from './types.gen';
+import type { GetApiLibrariesByLibraryAlbumsData, GetApiLibrariesByLibraryAlbumsResponse, GetApiLibrariesByLibraryAlbumsByAlbumData, GetApiLibrariesByLibraryAlbumsByAlbumResponse, GetApiLibrariesByLibraryArtistsData, GetApiLibrariesByLibraryArtistsResponse, GetApiLibrariesByLibraryArtistsByArtistData, GetApiLibrariesByLibraryArtistsByArtistResponse, PostApiAuthLoginData, PostApiAuthLoginResponse, PostApiAuthRefreshTokenResponse, PostApiAuthStreamTokenResponse, PostApiAuthRegisterData, PostApiAuthRegisterResponse, PostApiAuthForgotPasswordData, PostApiAuthForgotPasswordResponse, PostApiAuthResetPasswordData, PostApiAuthResetPasswordResponse, PostApiAuthVerifyByIdByHashData, PostApiAuthVerifyByIdByHashResponse, PostApiAuthLogoutData, PostApiAuthLogoutResponse, GetWebauthnPasskeyResponse, PostWebauthnPasskeyData, PostWebauthnPasskeyResponse, GetWebauthnPasskeyRegisterResponse, PostWebauthnPasskeyRegisterData, PostWebauthnPasskeyRegisterResponse, GetHorizonApiBatchesResponse, GetHorizonApiBatchesByIdData, GetHorizonApiBatchesByIdResponse, PostHorizonApiBatchesRetryByIdData, PostHorizonApiBatchesRetryByIdResponse, GetHorizonApiJobsCompletedData, GetHorizonApiJobsCompletedResponse, GetHorizonApiStatsResponse, GetHorizonApiJobsFailedData, GetHorizonApiJobsFailedResponse, GetHorizonApiJobsFailedByIdData, GetHorizonApiJobsFailedByIdResponse, GetSystemLogViewerApiFilesResponse, GetSystemLogViewerApiFilesByFileIdentifierDownloadRequestData, GetSystemLogViewerApiFilesByFileIdentifierDownloadRequestResponse, PostSystemLogViewerApiFilesByFileIdentifierClearCacheData, PostSystemLogViewerApiFilesByFileIdentifierClearCacheResponse, DeleteSystemLogViewerApiFilesByFileIdentifierData, DeleteSystemLogViewerApiFilesByFileIdentifierResponse, PostSystemLogViewerApiClearCacheAllResponse, PostSystemLogViewerApiDeleteMultipleFilesData, PostSystemLogViewerApiDeleteMultipleFilesResponse, GetSystemLogViewerApiFilesByFileIdentifierDownloadData, GetSystemLogViewerApiFilesByFileIdentifierDownloadResponse, GetSystemLogViewerApiFoldersResponse, GetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestData, GetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestResponse, PostSystemLogViewerApiFoldersByFolderIdentifierClearCacheData, PostSystemLogViewerApiFoldersByFolderIdentifierClearCacheResponse, DeleteSystemLogViewerApiFoldersByFolderIdentifierData, DeleteSystemLogViewerApiFoldersByFolderIdentifierResponse, GetSystemLogViewerApiFoldersByFolderIdentifierDownloadData, GetSystemLogViewerApiFoldersByFolderIdentifierDownloadResponse, GetApiGenresData, GetApiGenresResponse, GetApiGenresByGenreData, GetApiGenresByGenreResponse, PatchApiGenresByGenreData, PatchApiGenresByGenreResponse, DeleteApiGenresByGenreData, DeleteApiGenresByGenreResponse, GetSystemLogViewerApiHostsResponse, GetApiImagesByImageData, GetApiImagesByImageResponse, PostApiJobsScanLibraryBySlugData, PostApiJobsScanLibraryBySlugResponse, GetHorizonApiMetricsJobsResponse, GetHorizonApiMetricsJobsByIdData, GetHorizonApiMetricsJobsByIdResponse, GetHorizonApiJobsByIdData, GetHorizonApiJobsByIdResponse, GetApiLibrariesData, GetApiLibrariesResponse, PostApiLibrariesData, PostApiLibrariesResponse, GetApiLibrariesBySlugData, GetApiLibrariesBySlugResponse, PatchApiLibrariesBySlugData, PatchApiLibrariesBySlugResponse, DeleteApiLibrariesBySlugData, DeleteApiLibrariesBySlugResponse, GetSystemLogViewerApiLogsData, GetSystemLogViewerApiLogsResponse, GetHorizonApiMastersResponse, GetHorizonApiMonitoringResponse, PostHorizonApiMonitoringResponse, GetHorizonApiMonitoringByTagData, GetHorizonApiMonitoringByTagResponse, DeleteHorizonApiMonitoringByTagData, DeleteHorizonApiMonitoringByTagResponse, GetApiOpcacheStatusResponse, GetApiOpcacheConfigResponse, PostApiOpcacheClearResponse, PostApiOpcacheCompileData, PostApiOpcacheCompileResponse, GetHorizonApiJobsPendingData, GetHorizonApiJobsPendingResponse, GetApiQueueMetricsData, GetApiQueueMetricsResponse, GetApiQueueMetricsQueuesResponse, GetApiQueueMetricsMetricsData, GetApiQueueMetricsMetricsResponse, PostApiQueueMetricsRetryByIdData, PostApiQueueMetricsRetryByIdResponse, DeleteApiQueueMetricsByIdData, DeleteApiQueueMetricsByIdResponse, DeleteApiQueueMetricsPurgeResponse, GetHorizonApiMetricsQueuesResponse, GetHorizonApiMetricsQueuesByIdData, GetHorizonApiMetricsQueuesByIdResponse, PostHorizonApiJobsRetryByIdData, PostHorizonApiJobsRetryByIdResponse, GetApiSchemasMusicbrainzResponse, GetHorizonApiJobsSilencedData, GetHorizonApiJobsSilencedResponse, GetApiLibrariesByLibrarySongsData, GetApiLibrariesByLibrarySongsResponse, GetApiLibrariesByLibrarySongsByPublicIdData, GetApiLibrariesByLibrarySongsByPublicIdResponse, GetApiLibrariesByLibrarySongsStreamSongBySongDirectData, GetApiLibrariesByLibrarySongsStreamSongBySongDirectResponse, GetApiStreamSessionResponse, PostApiStreamStartData, PostApiStreamStartResponse, PostApiStreamStopData, PostApiStreamStopResponse, PostApiStreamSeekData, PostApiStreamSeekResponse, GetApiSystemInfoResponse, GetApiSystemInfoSysResponse, GetApiUsersData, GetApiUsersResponse, PostApiUsersData, PostApiUsersResponse, PatchApiUsersByUserData, PatchApiUsersByUserResponse, GetApiUsersByUserData, GetApiUsersByUserResponse, DeleteApiUsersByUserData, DeleteApiUsersByUserResponse, GetApiUsersMeResponse, GetApiUsersTokensByUserData, GetApiUsersTokensByUserResponse, DeleteApiUsersTokensByTokenData, DeleteApiUsersTokensByTokenResponse, GetHorizonApiWorkloadResponse } from './types.gen';
 
 export class AlbumService {
     /**
      * Get a collection of albums
      * @param data The data for the request.
      * @param data.library The library slug
-     * @param data.fields Comma seperated string of fields you want to select. If nothing is defined `select *` is default.
-     * - title
-     * - slug
-     * - year
-     * - directory
-     * @param data.relations Comma seperated string of relations
-     * - artists
-     * - cover
-     * - library
-     * - songs
-     * @param data.page Current page
-     * @param data.limit Items per page
-     * @param data.genres _Extension_ Comma seperated list of genres
+     * @param data.fields
+     * @param data.relations
+     * @param data.page
+     * @param data.limit
+     * @param data.genres
      * @returns unknown Paginated set of `AlbumResource`
      * @throws ApiError
      */
-    public static albumsIndex(data: AlbumsIndexData): CancelablePromise<AlbumsIndexResponse> {
+    public static getApiLibrariesByLibraryAlbums(data: GetApiLibrariesByLibraryAlbumsData): CancelablePromise<GetApiLibrariesByLibraryAlbumsResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/libraries/{library}/albums',
@@ -57,7 +49,7 @@ export class AlbumService {
      * @returns AlbumResource `AlbumResource`
      * @throws ApiError
      */
-    public static albumsShow(data: AlbumsShowData): CancelablePromise<AlbumsShowResponse> {
+    public static getApiLibrariesByLibraryAlbumsByAlbum(data: GetApiLibrariesByLibraryAlbumsByAlbumData): CancelablePromise<GetApiLibrariesByLibraryAlbumsByAlbumResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/libraries/{library}/albums/{album}',
@@ -79,19 +71,15 @@ export class ArtistService {
      * Get a collection of artists
      * @param data The data for the request.
      * @param data.library
-     * @param data.fields Comma seperated string of fields you want to select. If nothing is defined `select *` is default.
-     * - title
-     * - slug
-     * @param data.relations Comma seperated string of relations
-     * - portrait
-     * - songs
-     * @param data.page Current page
-     * @param data.limit Items per page
-     * @param data.genres _Extension_ Comma seperated list of genres
+     * @param data.fields
+     * @param data.relations
+     * @param data.page
+     * @param data.limit
+     * @param data.genres
      * @returns unknown Paginated set of `ArtistResource`
      * @throws ApiError
      */
-    public static artistsIndex(data: ArtistsIndexData): CancelablePromise<ArtistsIndexResponse> {
+    public static getApiLibrariesByLibraryArtists(data: GetApiLibrariesByLibraryArtistsData): CancelablePromise<GetApiLibrariesByLibraryArtistsResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/libraries/{library}/artists',
@@ -121,7 +109,7 @@ export class ArtistService {
      * @returns ArtistResource `ArtistResource`
      * @throws ApiError
      */
-    public static artistsShow(data: ArtistsShowData): CancelablePromise<ArtistsShowResponse> {
+    public static getApiLibrariesByLibraryArtistsByArtist(data: GetApiLibrariesByLibraryArtistsByArtistData): CancelablePromise<GetApiLibrariesByLibraryArtistsByArtistResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/libraries/{library}/artists/{artist}',
@@ -146,7 +134,7 @@ export class AuthService {
      * @returns unknown
      * @throws ApiError
      */
-    public static authLogin(data: AuthLoginData): CancelablePromise<AuthLoginResponse> {
+    public static postApiAuthLogin(data: PostApiAuthLoginData): CancelablePromise<PostApiAuthLoginResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/auth/login',
@@ -166,7 +154,7 @@ export class AuthService {
      * @returns unknown
      * @throws ApiError
      */
-    public static authRefreshToken(): CancelablePromise<AuthRefreshTokenResponse> {
+    public static postApiAuthRefreshToken(): CancelablePromise<PostApiAuthRefreshTokenResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/auth/refreshToken',
@@ -182,7 +170,7 @@ export class AuthService {
      * @returns unknown
      * @throws ApiError
      */
-    public static authStreamToken(): CancelablePromise<AuthStreamTokenResponse> {
+    public static postApiAuthStreamToken(): CancelablePromise<PostApiAuthStreamTokenResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/auth/streamToken',
@@ -199,7 +187,7 @@ export class AuthService {
      * @returns unknown
      * @throws ApiError
      */
-    public static authRegister(data: AuthRegisterData = {}): CancelablePromise<AuthRegisterResponse> {
+    public static postApiAuthRegister(data: PostApiAuthRegisterData = {}): CancelablePromise<PostApiAuthRegisterResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/auth/register',
@@ -219,7 +207,7 @@ export class AuthService {
      * @returns unknown
      * @throws ApiError
      */
-    public static authForgotPassword(data: AuthForgotPasswordData): CancelablePromise<AuthForgotPasswordResponse> {
+    public static postApiAuthForgotPassword(data: PostApiAuthForgotPasswordData): CancelablePromise<PostApiAuthForgotPasswordResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/auth/forgotPassword',
@@ -239,7 +227,7 @@ export class AuthService {
      * @returns unknown
      * @throws ApiError
      */
-    public static authResetPassword(data: AuthResetPasswordData): CancelablePromise<AuthResetPasswordResponse> {
+    public static postApiAuthResetPassword(data: PostApiAuthResetPasswordData): CancelablePromise<PostApiAuthResetPasswordResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/auth/resetPassword',
@@ -255,13 +243,23 @@ export class AuthService {
     
     /**
      * Verify email
+     * @param data The data for the request.
+     * @param data.id
+     * @param data.hash
      * @returns UserResource `UserResource`
      * @throws ApiError
      */
-    public static authVerify(): CancelablePromise<AuthVerifyResponse> {
+    public static postApiAuthVerifyByIdByHash(data: PostApiAuthVerifyByIdByHashData): CancelablePromise<PostApiAuthVerifyByIdByHashResponse> {
         return __request(OpenAPI, {
             method: 'POST',
-            url: '/api/auth/verify/:id/:hash'
+            url: '/api/auth/verify/{id}/{hash}',
+            path: {
+                id: data.id,
+                hash: data.hash
+            },
+            errors: {
+                404: 'Not found'
+            }
         });
     }
     
@@ -270,10 +268,10 @@ export class AuthService {
      * Invalidates the current session
      * @param data The data for the request.
      * @param data.requestBody
-     * @returns null No content
+     * @returns void No content
      * @throws ApiError
      */
-    public static authLogout(data: AuthLogoutData = {}): CancelablePromise<AuthLogoutResponse> {
+    public static postApiAuthLogout(data: PostApiAuthLogoutData = {}): CancelablePromise<PostApiAuthLogoutResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/auth/logout',
@@ -292,7 +290,7 @@ export class AuthService {
      * @returns unknown
      * @throws ApiError
      */
-    public static authPasskeyOptions(): CancelablePromise<AuthPasskeyOptionsResponse> {
+    public static getWebauthnPasskey(): CancelablePromise<GetWebauthnPasskeyResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/webauthn/passkey'
@@ -306,7 +304,7 @@ export class AuthService {
      * @returns unknown
      * @throws ApiError
      */
-    public static authPasskeyLogin(data: AuthPasskeyLoginData): CancelablePromise<AuthPasskeyLoginResponse> {
+    public static postWebauthnPasskey(data: PostWebauthnPasskeyData): CancelablePromise<PostWebauthnPasskeyResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/webauthn/passkey',
@@ -324,7 +322,7 @@ export class AuthService {
      * @returns unknown
      * @throws ApiError
      */
-    public static authPasskeyRegisterOptions(): CancelablePromise<AuthPasskeyRegisterOptionsResponse> {
+    public static getWebauthnPasskeyRegister(): CancelablePromise<GetWebauthnPasskeyRegisterResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/webauthn/passkey/register',
@@ -341,7 +339,7 @@ export class AuthService {
      * @returns unknown
      * @throws ApiError
      */
-    public static authPasskeyRegister(data: AuthPasskeyRegisterData): CancelablePromise<AuthPasskeyRegisterResponse> {
+    public static postWebauthnPasskeyRegister(data: PostWebauthnPasskeyRegisterData): CancelablePromise<PostWebauthnPasskeyRegisterResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/webauthn/passkey/register',
@@ -364,7 +362,7 @@ export class PasskeyService {
      * @returns unknown
      * @throws ApiError
      */
-    public static authPasskeyOptions(): CancelablePromise<AuthPasskeyOptionsResponse> {
+    public static getWebauthnPasskey(): CancelablePromise<GetWebauthnPasskeyResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/webauthn/passkey'
@@ -378,7 +376,7 @@ export class PasskeyService {
      * @returns unknown
      * @throws ApiError
      */
-    public static authPasskeyLogin(data: AuthPasskeyLoginData): CancelablePromise<AuthPasskeyLoginResponse> {
+    public static postWebauthnPasskey(data: PostWebauthnPasskeyData): CancelablePromise<PostWebauthnPasskeyResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/webauthn/passkey',
@@ -396,7 +394,7 @@ export class PasskeyService {
      * @returns unknown
      * @throws ApiError
      */
-    public static authPasskeyRegisterOptions(): CancelablePromise<AuthPasskeyRegisterOptionsResponse> {
+    public static getWebauthnPasskeyRegister(): CancelablePromise<GetWebauthnPasskeyRegisterResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/webauthn/passkey/register',
@@ -413,7 +411,7 @@ export class PasskeyService {
      * @returns unknown
      * @throws ApiError
      */
-    public static authPasskeyRegister(data: AuthPasskeyRegisterData): CancelablePromise<AuthPasskeyRegisterResponse> {
+    public static postWebauthnPasskeyRegister(data: PostWebauthnPasskeyRegisterData): CancelablePromise<PostWebauthnPasskeyRegisterResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/webauthn/passkey/register',
@@ -436,7 +434,7 @@ export class BatchesService {
      * @returns unknown
      * @throws ApiError
      */
-    public static horizonJobsBatchesIndex(): CancelablePromise<HorizonJobsBatchesIndexResponse> {
+    public static getHorizonApiBatches(): CancelablePromise<GetHorizonApiBatchesResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/-/horizon/api/batches'
@@ -450,7 +448,7 @@ export class BatchesService {
      * @returns unknown
      * @throws ApiError
      */
-    public static horizonJobsBatchesShow(data: HorizonJobsBatchesShowData): CancelablePromise<HorizonJobsBatchesShowResponse> {
+    public static getHorizonApiBatchesById(data: GetHorizonApiBatchesByIdData): CancelablePromise<GetHorizonApiBatchesByIdResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/-/horizon/api/batches/{id}',
@@ -467,7 +465,7 @@ export class BatchesService {
      * @returns unknown
      * @throws ApiError
      */
-    public static horizonJobsBatchesRetry(data: HorizonJobsBatchesRetryData): CancelablePromise<HorizonJobsBatchesRetryResponse> {
+    public static postHorizonApiBatchesRetryById(data: PostHorizonApiBatchesRetryByIdData): CancelablePromise<PostHorizonApiBatchesRetryByIdResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/-/horizon/api/batches/retry/{id}',
@@ -487,7 +485,7 @@ export class CompletedJobsService {
      * @returns unknown
      * @throws ApiError
      */
-    public static horizonCompletedJobsIndex(data: HorizonCompletedJobsIndexData = {}): CancelablePromise<HorizonCompletedJobsIndexResponse> {
+    public static getHorizonApiJobsCompleted(data: GetHorizonApiJobsCompletedData = {}): CancelablePromise<GetHorizonApiJobsCompletedResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/-/horizon/api/jobs/completed',
@@ -505,7 +503,7 @@ export class DashboardStatsService {
      * @returns unknown
      * @throws ApiError
      */
-    public static horizonStatsIndex(): CancelablePromise<HorizonStatsIndexResponse> {
+    public static getHorizonApiStats(): CancelablePromise<GetHorizonApiStatsResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/-/horizon/api/stats'
@@ -522,7 +520,7 @@ export class FailedJobsService {
      * @returns unknown
      * @throws ApiError
      */
-    public static horizonFailedJobsIndex(data: HorizonFailedJobsIndexData = {}): CancelablePromise<HorizonFailedJobsIndexResponse> {
+    public static getHorizonApiJobsFailed(data: GetHorizonApiJobsFailedData = {}): CancelablePromise<GetHorizonApiJobsFailedResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/-/horizon/api/jobs/failed',
@@ -539,7 +537,7 @@ export class FailedJobsService {
      * @returns unknown
      * @throws ApiError
      */
-    public static horizonFailedJobsShow(data: HorizonFailedJobsShowData): CancelablePromise<HorizonFailedJobsShowResponse> {
+    public static getHorizonApiJobsFailedById(data: GetHorizonApiJobsFailedByIdData): CancelablePromise<GetHorizonApiJobsFailedByIdResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/-/horizon/api/jobs/failed/{id}',
@@ -556,7 +554,7 @@ export class FilesService {
      * @returns LogFileResource Array of `LogFileResource`
      * @throws ApiError
      */
-    public static logViewerFiles(): CancelablePromise<LogViewerFilesResponse> {
+    public static getSystemLogViewerApiFiles(): CancelablePromise<GetSystemLogViewerApiFilesResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/system/log-viewer/api/files'
@@ -569,7 +567,7 @@ export class FilesService {
      * @returns unknown
      * @throws ApiError
      */
-    public static logViewerFilesRequestDownload(data: LogViewerFilesRequestDownloadData): CancelablePromise<LogViewerFilesRequestDownloadResponse> {
+    public static getSystemLogViewerApiFilesByFileIdentifierDownloadRequest(data: GetSystemLogViewerApiFilesByFileIdentifierDownloadRequestData): CancelablePromise<GetSystemLogViewerApiFilesByFileIdentifierDownloadRequestResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/system/log-viewer/api/files/{fileIdentifier}/download/request',
@@ -588,7 +586,7 @@ export class FilesService {
      * @returns unknown
      * @throws ApiError
      */
-    public static logViewerFilesClearCache(data: LogViewerFilesClearCacheData): CancelablePromise<LogViewerFilesClearCacheResponse> {
+    public static postSystemLogViewerApiFilesByFileIdentifierClearCache(data: PostSystemLogViewerApiFilesByFileIdentifierClearCacheData): CancelablePromise<PostSystemLogViewerApiFilesByFileIdentifierClearCacheResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/system/log-viewer/api/files/{fileIdentifier}/clear-cache',
@@ -607,7 +605,7 @@ export class FilesService {
      * @returns unknown
      * @throws ApiError
      */
-    public static logViewerFilesDelete(data: LogViewerFilesDeleteData): CancelablePromise<LogViewerFilesDeleteResponse> {
+    public static deleteSystemLogViewerApiFilesByFileIdentifier(data: DeleteSystemLogViewerApiFilesByFileIdentifierData): CancelablePromise<DeleteSystemLogViewerApiFilesByFileIdentifierResponse> {
         return __request(OpenAPI, {
             method: 'DELETE',
             url: '/system/log-viewer/api/files/{fileIdentifier}',
@@ -621,7 +619,7 @@ export class FilesService {
      * @returns unknown
      * @throws ApiError
      */
-    public static logViewerFilesClearCacheAll(): CancelablePromise<LogViewerFilesClearCacheAllResponse> {
+    public static postSystemLogViewerApiClearCacheAll(): CancelablePromise<PostSystemLogViewerApiClearCacheAllResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/system/log-viewer/api/clear-cache-all'
@@ -634,7 +632,7 @@ export class FilesService {
      * @returns unknown
      * @throws ApiError
      */
-    public static logViewerFilesDeleteMultipleFiles(data: LogViewerFilesDeleteMultipleFilesData = {}): CancelablePromise<LogViewerFilesDeleteMultipleFilesResponse> {
+    public static postSystemLogViewerApiDeleteMultipleFiles(data: PostSystemLogViewerApiDeleteMultipleFilesData = {}): CancelablePromise<PostSystemLogViewerApiDeleteMultipleFilesResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/system/log-viewer/api/delete-multiple-files',
@@ -649,7 +647,7 @@ export class FilesService {
      * @returns string
      * @throws ApiError
      */
-    public static logViewerFilesDownload(data: LogViewerFilesDownloadData): CancelablePromise<LogViewerFilesDownloadResponse> {
+    public static getSystemLogViewerApiFilesByFileIdentifierDownload(data: GetSystemLogViewerApiFilesByFileIdentifierDownloadData): CancelablePromise<GetSystemLogViewerApiFilesByFileIdentifierDownloadResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/system/log-viewer/api/files/{fileIdentifier}/download',
@@ -666,7 +664,7 @@ export class FoldersService {
      * @returns LogFolderResource Array of `LogFolderResource`
      * @throws ApiError
      */
-    public static logViewerFolders(): CancelablePromise<LogViewerFoldersResponse> {
+    public static getSystemLogViewerApiFolders(): CancelablePromise<GetSystemLogViewerApiFoldersResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/system/log-viewer/api/folders'
@@ -679,7 +677,7 @@ export class FoldersService {
      * @returns unknown
      * @throws ApiError
      */
-    public static logViewerFoldersRequestDownload(data: LogViewerFoldersRequestDownloadData): CancelablePromise<LogViewerFoldersRequestDownloadResponse> {
+    public static getSystemLogViewerApiFoldersByFolderIdentifierDownloadRequest(data: GetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestData): CancelablePromise<GetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/system/log-viewer/api/folders/{folderIdentifier}/download/request',
@@ -698,7 +696,7 @@ export class FoldersService {
      * @returns unknown
      * @throws ApiError
      */
-    public static logViewerFoldersClearCache(data: LogViewerFoldersClearCacheData): CancelablePromise<LogViewerFoldersClearCacheResponse> {
+    public static postSystemLogViewerApiFoldersByFolderIdentifierClearCache(data: PostSystemLogViewerApiFoldersByFolderIdentifierClearCacheData): CancelablePromise<PostSystemLogViewerApiFoldersByFolderIdentifierClearCacheResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/system/log-viewer/api/folders/{folderIdentifier}/clear-cache',
@@ -717,7 +715,7 @@ export class FoldersService {
      * @returns unknown
      * @throws ApiError
      */
-    public static logViewerFoldersDelete(data: LogViewerFoldersDeleteData): CancelablePromise<LogViewerFoldersDeleteResponse> {
+    public static deleteSystemLogViewerApiFoldersByFolderIdentifier(data: DeleteSystemLogViewerApiFoldersByFolderIdentifierData): CancelablePromise<DeleteSystemLogViewerApiFoldersByFolderIdentifierResponse> {
         return __request(OpenAPI, {
             method: 'DELETE',
             url: '/system/log-viewer/api/folders/{folderIdentifier}',
@@ -733,7 +731,7 @@ export class FoldersService {
      * @returns string
      * @throws ApiError
      */
-    public static logViewerFoldersDownload(data: LogViewerFoldersDownloadData): CancelablePromise<LogViewerFoldersDownloadResponse> {
+    public static getSystemLogViewerApiFoldersByFolderIdentifierDownload(data: GetSystemLogViewerApiFoldersByFolderIdentifierDownloadData): CancelablePromise<GetSystemLogViewerApiFoldersByFolderIdentifierDownloadResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/system/log-viewer/api/folders/{folderIdentifier}/download',
@@ -749,18 +747,15 @@ export class GenreService {
     /**
      * Get a collection of genres
      * @param data The data for the request.
-     * @param data.fields Comma seperated string of fields you want to select. If nothing is defined `select *` is default.
-     * - name
-     * - slug
-     * @param data.relations Comma seperated string of relations
-     * - songs
-     * @param data.librarySlug Constrain the query to only fetch genres that are contained within the given library
-     * @param data.page Current page
-     * @param data.limit Items per page
+     * @param data.fields
+     * @param data.relations
+     * @param data.librarySlug
+     * @param data.page
+     * @param data.limit
      * @returns unknown Paginated set of `GenreResource`
      * @throws ApiError
      */
-    public static genresIndex(data: GenresIndexData = {}): CancelablePromise<GenresIndexResponse> {
+    public static getApiGenres(data: GetApiGenresData = {}): CancelablePromise<GetApiGenresResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/genres',
@@ -786,7 +781,7 @@ export class GenreService {
      * @returns GenreResource `GenreResource`
      * @throws ApiError
      */
-    public static genresShow(data: GenresShowData): CancelablePromise<GenresShowResponse> {
+    public static getApiGenresByGenre(data: GetApiGenresByGenreData): CancelablePromise<GetApiGenresByGenreResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/genres/{genre}',
@@ -808,7 +803,7 @@ export class GenreService {
      * @returns GenreResource `GenreResource`
      * @throws ApiError
      */
-    public static genresUpdate(data: GenresUpdateData): CancelablePromise<GenresUpdateResponse> {
+    public static patchApiGenresByGenre(data: PatchApiGenresByGenreData): CancelablePromise<PatchApiGenresByGenreResponse> {
         return __request(OpenAPI, {
             method: 'PATCH',
             url: '/api/genres/{genre}',
@@ -830,10 +825,10 @@ export class GenreService {
      * Delete a genre
      * @param data The data for the request.
      * @param data.genre The genre slug
-     * @returns null No content
+     * @returns void No content
      * @throws ApiError
      */
-    public static genresDestroy(data: GenresDestroyData): CancelablePromise<GenresDestroyResponse> {
+    public static deleteApiGenresByGenre(data: DeleteApiGenresByGenreData): CancelablePromise<DeleteApiGenresByGenreResponse> {
         return __request(OpenAPI, {
             method: 'DELETE',
             url: '/api/genres/{genre}',
@@ -854,7 +849,7 @@ export class HostsService {
      * @returns LogViewerHostResource Array of `LogViewerHostResource`
      * @throws ApiError
      */
-    public static logViewerHosts(): CancelablePromise<LogViewerHostsResponse> {
+    public static getSystemLogViewerApiHosts(): CancelablePromise<GetSystemLogViewerApiHostsResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/system/log-viewer/api/hosts'
@@ -871,7 +866,7 @@ export class ImageService {
      * @returns string
      * @throws ApiError
      */
-    public static imageServe(data: ImageServeData): CancelablePromise<ImageServeResponse> {
+    public static getApiImagesByImage(data: GetApiImagesByImageData): CancelablePromise<GetApiImagesByImageResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/images/{image}',
@@ -894,7 +889,7 @@ export class JobService {
      * @returns unknown
      * @throws ApiError
      */
-    public static jobLibraryScan(data: JobLibraryScanData): CancelablePromise<JobLibraryScanResponse> {
+    public static postApiJobsScanLibraryBySlug(data: PostApiJobsScanLibraryBySlugData): CancelablePromise<PostApiJobsScanLibraryBySlugResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/jobs/scanLibrary/{slug}',
@@ -915,7 +910,7 @@ export class JobMetricsService {
      * @returns unknown
      * @throws ApiError
      */
-    public static horizonJobsMetricsIndex(): CancelablePromise<HorizonJobsMetricsIndexResponse> {
+    public static getHorizonApiMetricsJobs(): CancelablePromise<GetHorizonApiMetricsJobsResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/-/horizon/api/metrics/jobs'
@@ -929,7 +924,7 @@ export class JobMetricsService {
      * @returns unknown
      * @throws ApiError
      */
-    public static horizonJobsMetricsShow(data: HorizonJobsMetricsShowData): CancelablePromise<HorizonJobsMetricsShowResponse> {
+    public static getHorizonApiMetricsJobsById(data: GetHorizonApiMetricsJobsByIdData): CancelablePromise<GetHorizonApiMetricsJobsByIdResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/-/horizon/api/metrics/jobs/{id}',
@@ -949,7 +944,7 @@ export class JobsService {
      * @returns unknown
      * @throws ApiError
      */
-    public static horizonJobsShow(data: HorizonJobsShowData): CancelablePromise<HorizonJobsShowResponse> {
+    public static getHorizonApiJobsById(data: GetHorizonApiJobsByIdData): CancelablePromise<GetHorizonApiJobsByIdResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/-/horizon/api/jobs/{id}',
@@ -965,12 +960,12 @@ export class LibraryService {
     /**
      * Get a collection of media libraries
      * @param data The data for the request.
-     * @param data.page Current page
-     * @param data.limit Items per page
+     * @param data.page
+     * @param data.limit
      * @returns unknown Paginated set of `LibraryResource`
      * @throws ApiError
      */
-    public static librariesIndex(data: LibrariesIndexData = {}): CancelablePromise<LibrariesIndexResponse> {
+    public static getApiLibraries(data: GetApiLibrariesData = {}): CancelablePromise<GetApiLibrariesResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/libraries',
@@ -993,7 +988,7 @@ export class LibraryService {
      * @returns LibraryResource `LibraryResource`
      * @throws ApiError
      */
-    public static libraryCreate(data: LibraryCreateData): CancelablePromise<LibraryCreateResponse> {
+    public static postApiLibraries(data: PostApiLibrariesData): CancelablePromise<PostApiLibrariesResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/libraries',
@@ -1014,7 +1009,7 @@ export class LibraryService {
      * @returns LibraryResource `LibraryResource`
      * @throws ApiError
      */
-    public static libraryShow(data: LibraryShowData): CancelablePromise<LibraryShowResponse> {
+    public static getApiLibrariesBySlug(data: GetApiLibrariesBySlugData): CancelablePromise<GetApiLibrariesBySlugResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/libraries/{slug}',
@@ -1035,7 +1030,7 @@ export class LibraryService {
      * @returns LibraryResource `LibraryResource`
      * @throws ApiError
      */
-    public static libraryUpdate(data: LibraryUpdateData): CancelablePromise<LibraryUpdateResponse> {
+    public static patchApiLibrariesBySlug(data: PatchApiLibrariesBySlugData): CancelablePromise<PatchApiLibrariesBySlugResponse> {
         return __request(OpenAPI, {
             method: 'PATCH',
             url: '/api/libraries/{slug}',
@@ -1054,13 +1049,18 @@ export class LibraryService {
     
     /**
      * Delete a library
-     * @returns null No content
+     * @param data The data for the request.
+     * @param data.slug
+     * @returns void No content
      * @throws ApiError
      */
-    public static libraryDelete(): CancelablePromise<LibraryDeleteResponse> {
+    public static deleteApiLibrariesBySlug(data: DeleteApiLibrariesBySlugData): CancelablePromise<DeleteApiLibrariesBySlugResponse> {
         return __request(OpenAPI, {
             method: 'DELETE',
-            url: '/api/libraries/:slug',
+            url: '/api/libraries/{slug}',
+            path: {
+                slug: data.slug
+            },
             errors: {
                 401: 'Unauthenticated'
             }
@@ -1083,7 +1083,7 @@ export class LogsService {
      * @returns unknown
      * @throws ApiError
      */
-    public static logViewerLogs(data: LogViewerLogsData = {}): CancelablePromise<LogViewerLogsResponse> {
+    public static getSystemLogViewerApiLogs(data: GetSystemLogViewerApiLogsData = {}): CancelablePromise<GetSystemLogViewerApiLogsResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/system/log-viewer/api/logs',
@@ -1108,7 +1108,7 @@ export class MasterSupervisorService {
      * @returns unknown
      * @throws ApiError
      */
-    public static horizonMastersIndex(): CancelablePromise<HorizonMastersIndexResponse> {
+    public static getHorizonApiMasters(): CancelablePromise<GetHorizonApiMastersResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/-/horizon/api/masters'
@@ -1123,7 +1123,7 @@ export class MonitoringService {
      * @returns unknown
      * @throws ApiError
      */
-    public static horizonMonitoringIndex(): CancelablePromise<HorizonMonitoringIndexResponse> {
+    public static getHorizonApiMonitoring(): CancelablePromise<GetHorizonApiMonitoringResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/-/horizon/api/monitoring'
@@ -1135,7 +1135,7 @@ export class MonitoringService {
      * @returns unknown
      * @throws ApiError
      */
-    public static horizonMonitoringStore(): CancelablePromise<HorizonMonitoringStoreResponse> {
+    public static postHorizonApiMonitoring(): CancelablePromise<PostHorizonApiMonitoringResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/-/horizon/api/monitoring'
@@ -1146,12 +1146,11 @@ export class MonitoringService {
      * Paginate the jobs for a given tag
      * @param data The data for the request.
      * @param data.tag
-     * @param data.tag
      * @param data.limit
      * @returns unknown
      * @throws ApiError
      */
-    public static horizonMonitoringTagPaginate(data: HorizonMonitoringTagPaginateData): CancelablePromise<HorizonMonitoringTagPaginateResponse> {
+    public static getHorizonApiMonitoringByTag(data: GetHorizonApiMonitoringByTagData): CancelablePromise<GetHorizonApiMonitoringByTagResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/-/horizon/api/monitoring/{tag}',
@@ -1159,7 +1158,6 @@ export class MonitoringService {
                 tag: data.tag
             },
             query: {
-                tag: data.tag,
                 limit: data.limit
             }
         });
@@ -1172,7 +1170,7 @@ export class MonitoringService {
      * @returns unknown
      * @throws ApiError
      */
-    public static horizonMonitoringTagDestroy(data: HorizonMonitoringTagDestroyData): CancelablePromise<HorizonMonitoringTagDestroyResponse> {
+    public static deleteHorizonApiMonitoringByTag(data: DeleteHorizonApiMonitoringByTagData): CancelablePromise<DeleteHorizonApiMonitoringByTagResponse> {
         return __request(OpenAPI, {
             method: 'DELETE',
             url: '/-/horizon/api/monitoring/{tag}',
@@ -1190,7 +1188,7 @@ export class OpCacheService {
      * @returns unknown
      * @throws ApiError
      */
-    public static opCacheGetStatus(): CancelablePromise<OpCacheGetStatusResponse> {
+    public static getApiOpcacheStatus(): CancelablePromise<GetApiOpcacheStatusResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/opcache/status',
@@ -1205,7 +1203,7 @@ export class OpCacheService {
      * @returns unknown
      * @throws ApiError
      */
-    public static opcacheGetConfig(): CancelablePromise<OpcacheGetConfigResponse> {
+    public static getApiOpcacheConfig(): CancelablePromise<GetApiOpcacheConfigResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/opcache/config',
@@ -1220,7 +1218,7 @@ export class OpCacheService {
      * @returns unknown
      * @throws ApiError
      */
-    public static opcacheClear(): CancelablePromise<OpcacheClearResponse> {
+    public static postApiOpcacheClear(): CancelablePromise<PostApiOpcacheClearResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/opcache/clear',
@@ -1234,19 +1232,16 @@ export class OpCacheService {
      * Compile cache
      * @param data The data for the request.
      * @param data.force
-     * @param data.requestBody
      * @returns unknown
      * @throws ApiError
      */
-    public static opcacheCompile(data: OpcacheCompileData = {}): CancelablePromise<OpcacheCompileResponse> {
+    public static postApiOpcacheCompile(data: PostApiOpcacheCompileData = {}): CancelablePromise<PostApiOpcacheCompileResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/opcache/compile',
             query: {
                 force: data.force
             },
-            body: data.requestBody,
-            mediaType: 'application/json',
             errors: {
                 401: 'Unauthenticated'
             }
@@ -1263,7 +1258,7 @@ export class PendingJobsService {
      * @returns unknown
      * @throws ApiError
      */
-    public static horizonPendingJobsIndex(data: HorizonPendingJobsIndexData = {}): CancelablePromise<HorizonPendingJobsIndexResponse> {
+    public static getHorizonApiJobsPending(data: GetHorizonApiJobsPendingData = {}): CancelablePromise<GetHorizonApiJobsPendingResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/-/horizon/api/jobs/pending',
@@ -1279,21 +1274,16 @@ export class QueueService {
     /**
      * Get a collection of monitor entries
      * @param data The data for the request.
-     * @param data.page Current page
-     * @param data.limit Items per page
-     * @param data.status MonitorStatus
-     * - 0=RUNNING
-     * - 1=SUCCEEDED
-     * - 2=FAILED
-     * - 3=STALE
-     * - 4=QUEUED
-     * @param data.queue Name of the queue
-     * @param data.name Name of the job
-     * @param data.queuedFirst Order queued jobs first
+     * @param data.page
+     * @param data.limit
+     * @param data.status
+     * @param data.queue
+     * @param data.name
+     * @param data.queuedFirst
      * @returns unknown Paginated set of `QueueMonitorResource`
      * @throws ApiError
      */
-    public static queueMetricsShow(data: QueueMetricsShowData = {}): CancelablePromise<QueueMetricsShowResponse> {
+    public static getApiQueueMetrics(data: GetApiQueueMetricsData = {}): CancelablePromise<GetApiQueueMetricsResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/queue-metrics',
@@ -1318,7 +1308,7 @@ export class QueueService {
      * @returns unknown
      * @throws ApiError
      */
-    public static queueMetricsQueues(): CancelablePromise<QueueMetricsQueuesResponse> {
+    public static getApiQueueMetricsQueues(): CancelablePromise<GetApiQueueMetricsQueuesResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/queue-metrics/queues',
@@ -1331,11 +1321,11 @@ export class QueueService {
     /**
      * Get a metrics collection
      * @param data The data for the request.
-     * @param data.aggregateDays Days to aggregate
+     * @param data.aggregateDays
      * @returns unknown
      * @throws ApiError
      */
-    public static queueMetricsMetrics(data: QueueMetricsMetricsData = {}): CancelablePromise<QueueMetricsMetricsResponse> {
+    public static getApiQueueMetricsMetrics(data: GetApiQueueMetricsMetricsData = {}): CancelablePromise<GetApiQueueMetricsMetricsResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/queue-metrics/metrics',
@@ -1358,7 +1348,7 @@ export class QueueService {
      * @returns unknown
      * @throws ApiError
      */
-    public static queueMetricsRetryJob(data: QueueMetricsRetryJobData): CancelablePromise<QueueMetricsRetryJobResponse> {
+    public static postApiQueueMetricsRetryById(data: PostApiQueueMetricsRetryByIdData): CancelablePromise<PostApiQueueMetricsRetryByIdResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/queue-metrics/retry/{id}',
@@ -1380,10 +1370,10 @@ export class QueueService {
      * Delete by id
      * @param data The data for the request.
      * @param data.id
-     * @returns null No content
+     * @returns void No content
      * @throws ApiError
      */
-    public static queueMetricsDelete(data: QueueMetricsDeleteData): CancelablePromise<QueueMetricsDeleteResponse> {
+    public static deleteApiQueueMetricsById(data: DeleteApiQueueMetricsByIdData): CancelablePromise<DeleteApiQueueMetricsByIdResponse> {
         return __request(OpenAPI, {
             method: 'DELETE',
             url: '/api/queue-metrics/{id}',
@@ -1398,10 +1388,10 @@ export class QueueService {
     
     /**
      * Purge all records
-     * @returns null No content
+     * @returns void No content
      * @throws ApiError
      */
-    public static queueMetricsPurge(): CancelablePromise<QueueMetricsPurgeResponse> {
+    public static deleteApiQueueMetricsPurge(): CancelablePromise<DeleteApiQueueMetricsPurgeResponse> {
         return __request(OpenAPI, {
             method: 'DELETE',
             url: '/api/queue-metrics/purge',
@@ -1419,7 +1409,7 @@ export class QueueMetricsService {
      * @returns unknown
      * @throws ApiError
      */
-    public static horizonQueuesMetricsIndex(): CancelablePromise<HorizonQueuesMetricsIndexResponse> {
+    public static getHorizonApiMetricsQueues(): CancelablePromise<GetHorizonApiMetricsQueuesResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/-/horizon/api/metrics/queues'
@@ -1433,7 +1423,7 @@ export class QueueMetricsService {
      * @returns unknown
      * @throws ApiError
      */
-    public static horizonQueuesMetricsShow(data: HorizonQueuesMetricsShowData): CancelablePromise<HorizonQueuesMetricsShowResponse> {
+    public static getHorizonApiMetricsQueuesById(data: GetHorizonApiMetricsQueuesByIdData): CancelablePromise<GetHorizonApiMetricsQueuesByIdResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/-/horizon/api/metrics/queues/{id}',
@@ -1453,13 +1443,27 @@ export class RetryService {
      * @returns unknown
      * @throws ApiError
      */
-    public static horizonRetryJobsShow(data: HorizonRetryJobsShowData): CancelablePromise<HorizonRetryJobsShowResponse> {
+    public static postHorizonApiJobsRetryById(data: PostHorizonApiJobsRetryByIdData): CancelablePromise<PostHorizonApiJobsRetryByIdResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/-/horizon/api/jobs/retry/{id}',
             path: {
                 id: data.id
             }
+        });
+    }
+    
+}
+
+export class SchemaService {
+    /**
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static getApiSchemasMusicbrainz(): CancelablePromise<GetApiSchemasMusicbrainzResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/schemas/musicbrainz'
         });
     }
     
@@ -1473,7 +1477,7 @@ export class SilencedJobsService {
      * @returns unknown
      * @throws ApiError
      */
-    public static horizonSilencedJobsIndex(data: HorizonSilencedJobsIndexData = {}): CancelablePromise<HorizonSilencedJobsIndexResponse> {
+    public static getHorizonApiJobsSilenced(data: GetHorizonApiJobsSilencedData = {}): CancelablePromise<GetHorizonApiJobsSilencedResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/-/horizon/api/jobs/silenced',
@@ -1490,19 +1494,15 @@ export class SongService {
      * Get a collection of songs
      * @param data The data for the request.
      * @param data.library The library slug
-     * @param data.page Current page
-     * @param data.limit Items per page
-     * @param data.genreNames Comma seperated list of genre names You can only search for names or slugs. Not both.
-     * @param data.genreSlugs Comma seperated list of genre slugs
-     * @param data.relations Comma seperated string of relations
-     * - album
-     * - artists
-     * - album.albumArtist
-     * - genres
+     * @param data.page
+     * @param data.limit
+     * @param data.genreNames
+     * @param data.genreSlugs
+     * @param data.relations
      * @returns unknown Paginated set of `SongResource`
      * @throws ApiError
      */
-    public static songsIndex(data: SongsIndexData): CancelablePromise<SongsIndexResponse> {
+    public static getApiLibrariesByLibrarySongs(data: GetApiLibrariesByLibrarySongsData): CancelablePromise<GetApiLibrariesByLibrarySongsResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/libraries/{library}/songs',
@@ -1531,15 +1531,11 @@ export class SongService {
      * @param data The data for the request.
      * @param data.library The library slug
      * @param data.publicId
-     * @param data.relations Comma seperated string of relations
-     * - album
-     * - artists
-     * - albumArtist
-     * - genres
+     * @param data.relations
      * @returns SongResource `SongResource`
      * @throws ApiError
      */
-    public static songsShow(data: SongsShowData): CancelablePromise<SongsShowResponse> {
+    public static getApiLibrariesByLibrarySongsByPublicId(data: GetApiLibrariesByLibrarySongsByPublicIdData): CancelablePromise<GetApiLibrariesByLibrarySongsByPublicIdResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/libraries/{library}/songs/{publicId}',
@@ -1568,7 +1564,7 @@ export class SongService {
      * @returns unknown
      * @throws ApiError
      */
-    public static songsStream(data: SongsStreamData): CancelablePromise<SongsStreamResponse> {
+    public static getApiLibrariesByLibrarySongsStreamSongBySongDirect(data: GetApiLibrariesByLibrarySongsStreamSongBySongDirectData): CancelablePromise<GetApiLibrariesByLibrarySongsStreamSongBySongDirectResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/libraries/{library}/songs/stream/song/{song}/direct',
@@ -1585,13 +1581,86 @@ export class SongService {
     
 }
 
+export class StreamService {
+    /**
+     * Generate a unique session ID for streams
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static getApiStreamSession(): CancelablePromise<GetApiStreamSessionResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/stream/session'
+        });
+    }
+    
+    /**
+     * Start a stream
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static postApiStreamStart(data: PostApiStreamStartData = {}): CancelablePromise<PostApiStreamStartResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/stream/start',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                403: 'Authorization error',
+                422: 'Validation error'
+            }
+        });
+    }
+    
+    /**
+     * Stop a stream
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static postApiStreamStop(data: PostApiStreamStopData): CancelablePromise<PostApiStreamStopResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/stream/stop',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation error'
+            }
+        });
+    }
+    
+    /**
+     * Seek within a stream
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static postApiStreamSeek(data: PostApiStreamSeekData): CancelablePromise<PostApiStreamSeekResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/stream/seek',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation error'
+            }
+        });
+    }
+    
+}
+
 export class SystemInfoService {
     /**
      * Get php info
      * @returns unknown
      * @throws ApiError
      */
-    public static systemInfoPhp(): CancelablePromise<SystemInfoPhpResponse> {
+    public static getApiSystemInfo(): CancelablePromise<GetApiSystemInfoResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/system-info',
@@ -1605,7 +1674,7 @@ export class SystemInfoService {
      * @returns unknown
      * @throws ApiError
      */
-    public static systemInfoSys(): CancelablePromise<SystemInfoSysResponse> {
+    public static getApiSystemInfoSys(): CancelablePromise<GetApiSystemInfoSysResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/system-info/sys',
@@ -1621,16 +1690,16 @@ export class UserService {
     /**
      * Get a collection of users
      * @param data The data for the request.
-     * @param data.page Current page
-     * @param data.limit Items per page
+     * @param data.page
+     * @param data.limit
      * @param data.globalFilter
-     * @param data.filters JSON object
-     * @param data.filterModes JSON object
-     * @param data.sorting JSON object
+     * @param data.filters
+     * @param data.filterModes
+     * @param data.sorting
      * @returns unknown Paginated set of `UserResource`
      * @throws ApiError
      */
-    public static usersIndex(data: UsersIndexData = {}): CancelablePromise<UsersIndexResponse> {
+    public static getApiUsers(data: GetApiUsersData = {}): CancelablePromise<GetApiUsersResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/users',
@@ -1658,7 +1727,7 @@ export class UserService {
      * @returns UserResource `UserResource`
      * @throws ApiError
      */
-    public static usersStore(data: UsersStoreData): CancelablePromise<UsersStoreResponse> {
+    public static postApiUsers(data: PostApiUsersData): CancelablePromise<PostApiUsersResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/users',
@@ -1680,7 +1749,7 @@ export class UserService {
      * @returns UserResource `UserResource`
      * @throws ApiError
      */
-    public static usersUpdate(data: UsersUpdateData): CancelablePromise<UsersUpdateResponse> {
+    public static patchApiUsersByUser(data: PatchApiUsersByUserData): CancelablePromise<PatchApiUsersByUserResponse> {
         return __request(OpenAPI, {
             method: 'PATCH',
             url: '/api/users/{user}',
@@ -1705,7 +1774,7 @@ export class UserService {
      * @returns UserResource `UserResource`
      * @throws ApiError
      */
-    public static usersShow(data: UsersShowData): CancelablePromise<UsersShowResponse> {
+    public static getApiUsersByUser(data: GetApiUsersByUserData): CancelablePromise<GetApiUsersByUserResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/users/{user}',
@@ -1723,10 +1792,10 @@ export class UserService {
      * Delete a user
      * @param data The data for the request.
      * @param data.user
-     * @returns null No content
+     * @returns void No content
      * @throws ApiError
      */
-    public static usersDestroy(data: UsersDestroyData): CancelablePromise<UsersDestroyResponse> {
+    public static deleteApiUsersByUser(data: DeleteApiUsersByUserData): CancelablePromise<DeleteApiUsersByUserResponse> {
         return __request(OpenAPI, {
             method: 'DELETE',
             url: '/api/users/{user}',
@@ -1744,7 +1813,7 @@ export class UserService {
      * @returns UserResource `UserResource`
      * @throws ApiError
      */
-    public static usersMe(): CancelablePromise<UsersMeResponse> {
+    public static getApiUsersMe(): CancelablePromise<GetApiUsersMeResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/users/me',
@@ -1766,7 +1835,7 @@ export class UserTokenService {
      * @returns unknown Paginated set of `PersonalAccessTokenViewResource`
      * @throws ApiError
      */
-    public static userTokenGetUserTokens(data: UserTokenGetUserTokensData): CancelablePromise<UserTokenGetUserTokensResponse> {
+    public static getApiUsersTokensByUser(data: GetApiUsersTokensByUserData): CancelablePromise<GetApiUsersTokensByUserResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/users/tokens/{user}',
@@ -1789,10 +1858,10 @@ export class UserTokenService {
      * Revoke a given token
      * @param data The data for the request.
      * @param data.token The token ID
-     * @returns null No content
+     * @returns void No content
      * @throws ApiError
      */
-    public static userTokenRevokeToken(data: UserTokenRevokeTokenData): CancelablePromise<UserTokenRevokeTokenResponse> {
+    public static deleteApiUsersTokensByToken(data: DeleteApiUsersTokensByTokenData): CancelablePromise<DeleteApiUsersTokensByTokenResponse> {
         return __request(OpenAPI, {
             method: 'DELETE',
             url: '/api/users/tokens/{token}',
@@ -1814,7 +1883,7 @@ export class WorkloadService {
      * @returns unknown
      * @throws ApiError
      */
-    public static horizonWorkloadIndex(): CancelablePromise<HorizonWorkloadIndexResponse> {
+    public static getHorizonApiWorkload(): CancelablePromise<GetHorizonApiWorkloadResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/-/horizon/api/workload'

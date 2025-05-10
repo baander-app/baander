@@ -1,26 +1,31 @@
 import { ReactNode } from 'react';
-import { AppShell } from '@mantine/core';
-import { lazyImport } from '@/utils/lazy-import.ts';
+import styles from '../root-layout/root-layout.module.scss';
+import { lazyImport } from '@/utils/lazy-import';
 
 const { DashboardMenu } = lazyImport(() => import('@/layouts/dashboard-layout/components/dashboard-menu.tsx'), 'DashboardMenu');
+const { InlinePlayer } = lazyImport(() => import('@/modules/library-music-player/inline-player/inline-player'), 'InlinePlayer');
 
 export interface DashboardLayoutProps {
   children?: ReactNode;
 }
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
-    <AppShell
-      layout="alt"
-      padding="sm"
-      navbar={{ width: 200, breakpoint: 'sm'}}
-    >
-      <AppShell.Navbar>
+    <div className={styles.shell}>
+      <aside className={styles.sidebar}>
         <DashboardMenu />
-      </AppShell.Navbar>
+      </aside>
 
-      <AppShell.Main>
-        {children}
-      </AppShell.Main>
-    </AppShell>
-  )
+      <main className={styles.main}>
+        <div className={styles.content}>
+          <div className={styles.page}>
+            {children}
+          </div>
+        </div>
+      </main>
+
+      <footer className={styles.footer}>
+        <InlinePlayer />
+      </footer>
+    </div>
+  );
 }

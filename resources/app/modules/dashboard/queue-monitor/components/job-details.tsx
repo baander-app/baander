@@ -1,5 +1,6 @@
 import { QueueMonitorResource } from '@/api-client/requests';
-import { Box, Table, TableData, Text } from '@mantine/core';
+import { Box, Container, Flex, Separator, Text } from '@radix-ui/themes';
+import { Table } from '@radix-ui/themes';
 import { JobStatus } from '@/modules/dashboard/queue-monitor/components/job-status.tsx';
 
 import { ErrorBoundary } from 'react-error-boundary';
@@ -10,18 +11,21 @@ interface ExceptionDetailsProps {
 }
 
 const ExceptionDetails = ({ job }: ExceptionDetailsProps) => {
-
   return (
-    <Box>
-      <Text size="md">Exception:</Text>
-      <Text fw="bold" c="red.8">{job.exception_class}</Text>
+    <Box p="2">
+      <Flex direction="column" gap="2">
+        <Text size="2" weight="bold">Exception:</Text>
+        <Text size="3" color="red" weight="bold">{job.exception_class}</Text>
 
-      {job.exception && (
-        <ReactJson
-          src={job.exception}
-          indentWidth={2}
-        />
-      )}
+        {job.exception && (
+          <Box mt="2">
+            <ReactJson
+              src={job.exception}
+              indentWidth={2}
+            />
+          </Box>
+        )}
+      </Flex>
     </Box>
   );
 };
@@ -31,7 +35,7 @@ export interface JobDetailsProps {
 }
 
 export function JobDetails({ job }: JobDetailsProps) {
-  const tableData: TableData = {
+  const tableData = {
     head: ['Property', 'Value'],
     body: [
       ['id', job.id],
@@ -52,17 +56,31 @@ export function JobDetails({ job }: JobDetailsProps) {
   };
 
   return (
-    <>
-      <Table data={tableData}/>
+    <Container>
+      <Table.Root>
+        <Table.Header>
+          <Table.Row>
+            <Table.ColumnHeaderCell>{tableData.head[0]}</Table.ColumnHeaderCell>
+            <Table.ColumnHeaderCell>{tableData.head[1]}</Table.ColumnHeaderCell>
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          {tableData.body.map((row, index) => (
+            <Table.Row key={index}>
+              <Table.RowHeaderCell>{row[0]}</Table.RowHeaderCell>
+              <Table.Cell>{row[1]}</Table.Cell>
+            </Table.Row>
+          ))}
+        </Table.Body>
+      </Table.Root>
 
-      <hr/>
+      <Separator my="4" size="4" />
 
-
-      <ErrorBoundary fallback={<div>Something went wrong</div>}>
+      <ErrorBoundary fallback={<Box p="2"><Text color="red">Something went wrong</Text></Box>}>
         {job.exception && (
           <ExceptionDetails job={job}/>
         )}
       </ErrorBoundary>
-    </>
+    </Container>
   );
 }

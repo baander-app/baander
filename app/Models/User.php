@@ -67,7 +67,7 @@ class User extends Authenticatable implements HasPasskeys
      * @param array $device
      * @return NewAccessToken
      */
-    public function createToken(string $name, array $abilities = ['*'], DateTimeInterface $expiresAt = null, array $device = [])
+    public function createToken(string $name, array $abilities = ['*'], ?DateTimeInterface $expiresAt = null, array $device = [])
     {
         $plainTextToken = $this->generateTokenString();
         $broadcastToken = Str::replace('-', '', Uuid::uuid4()->toString());

@@ -1,6 +1,5 @@
 import { Icon } from '@iconify/react';
 import styles from './cover.module.scss';
-import { Image } from '@mantine/core';
 
 interface CoverProps {
   imgSrc?: string;
@@ -14,7 +13,7 @@ export function Cover({imgSrc, size, interactive = false}: CoverProps) {
     <>
       <div style={{ height: `${size}px`, width: `${size}px` }}>
         {imgSrc
-          ? <Image src={imgSrc} h={size} w={size} className={`${interactive ? styles.interactive : undefined}`} radius="sm" alt=""/>
+          ? <img src={imgSrc} height={size} width={size} className={`${interactive ? styles.interactive : undefined}`} style={{ borderRadius: '7px' }} alt=""/>
           : <FallbackImage size={size} interactive={interactive}/>
         }
       </div>

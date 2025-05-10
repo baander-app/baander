@@ -1,0 +1,12 @@
+{
+  "name": "baander/transcoder",
+  "type": "application",
+  "require": {
+    "php": "^8.4"
+  },
+  "autoload": {
+    "psr-4": {
+      "Baander\\Transcoder": ["src"]
+    }
+  }
+}

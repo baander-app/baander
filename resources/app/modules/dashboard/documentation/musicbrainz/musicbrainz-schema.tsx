@@ -6,11 +6,11 @@ export function MusicBrainzSchema() {
 
   return (
     <div style={{ height: '100%', width: '100%' }}>
-      {data && <RngVisualizer
-        data={{
-          name: 'MusicBrainz Schema',
-          // children: data,
-        }}/>}
+      {/*{data && <RngVisualizer*/}
+      {/*  data={{*/}
+      {/*    name: 'MusicBrainz Schema',*/}
+      {/*    // children: data,*/}
+      {/*  }}/>}*/}
     </div>
   );
 }

@@ -1,46 +1,50 @@
-.navbarMain {
-    flex: 1;
+.shell {
+    display: grid;
+    grid-template-rows: 1fr auto; /* Main | Footer */
+    grid-template-columns: 250px 1fr; /* Sidebar | Content */
+    height: 100vh;
+    overflow: hidden;
 }
 
-.container {
-    margin-left: var(--mantine-spacing-xs);
-    margin-right: var(--mantine-spacing-xs);
+.sidebar {
+    grid-row: 1 / 3; /* Spans the Sidebar across Main and Footer */
+    grid-column: 1; /* Occupies the first column */
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    overflow: hidden;
 }
 
 .main {
-    margin-bottom: rem(150px);
+    grid-row: 1; /* Occupies the first row */
+    grid-column: 2; /* Starts next to the Sidebar */
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.content {
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+.content > .page {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    box-sizing: border-box;
 }
 
 .footer {
-    padding-top: var(--mantine-spacing-md);
-    padding-bottom: 26px;
-    margin-top: var(--mantine-spacing-md);
-}
-
-.link {
-    display: flex;
-    align-items: center;
-    text-decoration: none;
-    font-size: var(--mantine-font-size-sm);
-    color: light-dark(var(--mantine-color-gray-7), var(--mantine-color-dark-1));
-    padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
-    border-radius: var(--mantine-radius-sm);
-    font-weight: 500;
-
-    &:hover {
-        background-color: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6));
-        color: light-dark(var(--mantine-color-black), var(--mantine-color-white));
-    }
-
-    &[data-active] {
-        &,
-        &:hover {
-            background-color: var(--mantine-color-blue-light);
-            color: var(--mantine-color-blue-light-color);
-
-            .linkIcon {
-                color: var(--mantine-color-blue-light-color);
-            }
-        }
-    }
+    grid-row: 2; /* Positioned below the Main Content */
+    grid-column: 1 / 3; /* Spans the Sidebar and Main Content */
+    height: 85px;
+    flex-shrink: 0;
+    box-sizing: border-box;
 }

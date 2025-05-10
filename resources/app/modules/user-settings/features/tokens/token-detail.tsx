@@ -1,5 +1,5 @@
 import { PersonalAccessTokenViewResource } from '@/api-client/requests';
-import { Group, Paper, Text, Chip, Fieldset, TextInput, Code } from '@mantine/core';
+import { Code, Badge, Card, DataList } from '@radix-ui/themes';
 import { useDateFormatter } from '@/providers/dayjs-provider.tsx';
 
 export interface TokenDetailProps {
@@ -10,39 +10,73 @@ export function TokenDetail({ item }: TokenDetailProps) {
   const { formatDate, fromNow } = useDateFormatter();
 
   return (
-    <Paper>
-      <Fieldset>
-        <TextInput label="Token name" value={item.name ?? ''} readOnly/>
-
-        <Text mt="sm">Abilities</Text>
+    <Card>
+      <DataList.Root>
+        <DataList.Item>
+          <DataList.Label>Name</DataList.Label>
+          <DataList.Value>{item.name}</DataList.Value>
+        </DataList.Item>
 
         {item.abilities && (
-          <Chip.Group multiple>
-            {item.abilities.map((ability, index) => <Chip value={index} key={index}>{ability}</Chip>)}
-          </Chip.Group>
+          <DataList.Item>
+            <DataList.Label>Abilities</DataList.Label>
+            <DataList.Value>
+              {item.abilities && (
+                <>
+                  {item.abilities.map((ability, index) => <Badge key={index} variant="soft" radius="full">{ability}</Badge>)}
+                </>
+              )}
+            </DataList.Value>
+          </DataList.Item>
         )}
-      </Fieldset>
 
-      <Group mt="sm">
-        <Code>{item.userAgent}</Code>
-      </Group>
+        <DataList.Item>
+          <DataList.Label>User Agent</DataList.Label>
+          <DataList.Value>
+            <Code>{item.userAgent}</Code>
+          </DataList.Value>
+        </DataList.Item>
 
-      <Fieldset legend="Client">
-        <TextInput label="Type" value={item.clientType ?? ''} readOnly/>
-        <TextInput label="Name" value={item.clientName ?? ''} readOnly/>
-        <TextInput label="Version" value={item.clientVersion ?? ''} readOnly/>
-      </Fieldset>
+        <DataList.Item>
+          <DataList.Label>Client Type</DataList.Label>
+          <DataList.Value>{item.clientType ?? ''}</DataList.Value>
+        </DataList.Item>
 
-      <Fieldset legend="Device">
-        <TextInput label="OS" value={item.deviceOperatingSystem ?? ''} readOnly/>
-        <TextInput label="Name" value={item.deviceName ?? ''} readOnly/>
-      </Fieldset>
+        <DataList.Item>
+          <DataList.Label>Client Name</DataList.Label>
+          <DataList.Value>{item.clientName ?? ''}</DataList.Value>
+        </DataList.Item>
 
-      <Fieldset legend="Time">
-        <TextInput label="Created" value={formatDate(item.createdAt) ?? ''} readOnly/>
-        <TextInput label="Expires" value={formatDate(item.expiresAt) ?? ''} readOnly/>
-        <TextInput label="Last used" value={fromNow(item.lastUsedAt) ?? ''} readOnly/>
-      </Fieldset>
-    </Paper>
+        <DataList.Item>
+          <DataList.Label>Client Version</DataList.Label>
+          <DataList.Value>{item.clientVersion ?? ''}</DataList.Value>
+        </DataList.Item>
+
+        <DataList.Item>
+          <DataList.Label>Device OS</DataList.Label>
+          <DataList.Value>{item.deviceOperatingSystem ?? ''}</DataList.Value>
+        </DataList.Item>
+
+        <DataList.Item>
+          <DataList.Label>Device Name</DataList.Label>
+          <DataList.Value>{item.deviceName ?? ''}</DataList.Value>
+        </DataList.Item>
+
+        <DataList.Item>
+          <DataList.Label>Created</DataList.Label>
+          <DataList.Value>{formatDate(item.createdAt) ?? ''}</DataList.Value>
+        </DataList.Item>
+
+        <DataList.Item>
+          <DataList.Label>Expires</DataList.Label>
+          <DataList.Value>{formatDate(item.expiresAt) ?? ''}</DataList.Value>
+        </DataList.Item>
+
+        <DataList.Item>
+          <DataList.Label>Last used</DataList.Label>
+          <DataList.Value>{fromNow(item.lastUsedAt) ?? ''}</DataList.Value>
+        </DataList.Item>
+      </DataList.Root>
+    </Card>
   );
 }

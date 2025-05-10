@@ -8,7 +8,7 @@ return [
      * Supported drivers include "gd", "imagick", and "php-vips".
      */
 
-    'driver' => 'gd',
+    'driver' => env('BLURHASH_DRIVER', 'gd'),
 
     /*
      * Components are selected from the image's x and y axis.

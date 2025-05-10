@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Virtuoso } from 'react-virtuoso';
-
+import { Separator, Text } from '@radix-ui/themes';
 import styles from './scroll-list.module.scss';
-import { Divider, Text } from '@mantine/core';
 
 export interface ScrollListItem {
   label: string;
@@ -30,8 +29,8 @@ export function ScrollList({ header, listItems, totalCount, onItemPress, style }
     <div className={styles.scrollList}>
       {header && (
         <>
-          <Text size="sm" className={styles.title}>{header}</Text>
-          <Divider/>
+          <Text size="3" className={styles.title}>{header}</Text>
+          <Separator/>
         </>
       )}
 
@@ -46,6 +45,7 @@ export function ScrollList({ header, listItems, totalCount, onItemPress, style }
             <div
               className={styles.listItem}
               style={{ backgroundColor: activeIndex === index ? '#ccc' : 'unset' }}
+
               onClick={() => {
                 setActiveIndex(index);
                 const item = listItems[index];
@@ -58,7 +58,7 @@ export function ScrollList({ header, listItems, totalCount, onItemPress, style }
                 }
               }}
             >
-              <Text size="sm">{listItems[index].label}</Text>
+              <Text size="3">{listItems[index].label}</Text>
             </div>
           );
         }}

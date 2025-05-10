@@ -460,14 +460,11 @@ export const $LogResource = {
         extra: {
             type: 'string'
         },
-        full_text: {
-            type: 'string'
-        },
         url: {
             type: 'string'
         }
     },
-    required: ['index', 'file_identifier', 'file_position', 'level', 'level_name', 'level_class', 'datetime', 'time', 'message', 'context', 'extra', 'full_text', 'url'],
+    required: ['index', 'file_identifier', 'file_position', 'level', 'level_name', 'level_class', 'datetime', 'time', 'message', 'context', 'extra', 'url'],
     title: 'LogResource'
 } as const;
 
@@ -518,7 +515,7 @@ export const $LoginRequest = {
 export const $LogoutRequest = {
     type: 'object',
     properties: {
-        refreshToken: {
+        refresh_token: {
             type: 'string'
         }
     },
@@ -786,6 +783,48 @@ export const $SongResource = {
     },
     required: ['public_id', 'title', 'year', 'comment', 'disc', 'length', 'durationHuman', 'lyrics', 'lyricsExist', 'modifiedTime', 'path', 'track', 'size', 'sizeHuman', 'mimeType', 'hash', 'createdAt', 'updatedAt'],
     title: 'SongResource'
+} as const;
+
+export const $StartStreamRequest = {
+    type: 'object',
+    properties: {
+        sessionId: {
+            type: 'string'
+        },
+        audioProfile: {
+            type: 'object',
+            properties: {
+                bitrate: {
+                    type: 'integer'
+                },
+                channels: {
+                    type: 'string'
+                },
+                sampleRate: {
+                    type: 'integer'
+                },
+                codec: {
+                    type: 'string'
+                }
+            }
+        },
+        videoProfile: {
+            type: 'object',
+            properties: {
+                height: {
+                    type: 'integer'
+                },
+                width: {
+                    type: 'integer'
+                },
+                bitrate: {
+                    type: 'integer'
+                }
+            }
+        }
+    },
+    required: ['sessionId'],
+    title: 'StartStreamRequest'
 } as const;
 
 export const $StorePasskeyRequest = {

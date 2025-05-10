@@ -1,6 +1,6 @@
-import { Alert, Button } from '@mantine/core';
 import { isPromise } from '@/utils/is-promise.ts';
 import { useCallback } from 'react';
+import Alert from '@/ui/alerts/alert.tsx';
 
 export interface AlertLoadingErrorProps {
   message?: string;
@@ -23,15 +23,13 @@ export function AlertLoadingError({retry, message}: AlertLoadingErrorProps) {
 
   return (
     <Alert
-      variant="light"
       color="red"
-      title="Request failed"
     >
-      {message ?? defaultMessage}
+      <Alert.Title>{message ?? defaultMessage}</Alert.Title>
 
-      {retry && (
-        <Button onClick={() => retryRequest()}>Retry</Button>
-      )}
+      <Alert.Action onClick={retryRequest}>
+        Retry
+      </Alert.Action>
     </Alert>
   )
 }

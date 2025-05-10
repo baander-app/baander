@@ -19,7 +19,7 @@ class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
 
     public function middleware(): array
     {
-        return [(new WithoutOverlapping($this->library->id))->dontRelease()];
+        return [new WithoutOverlapping($this->library->id)->dontRelease()];
     }
 
     public function handle(): void
@@ -37,7 +37,7 @@ class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
 
         $directories->chunk($chunkSize)->each(function ($chunk) use (&$processedDirectories, $totalDirectories, &$chunkSize) {
             foreach ($chunk as $directory) {
-                dispatch(new ScanDirectoryJob(directory: $directory, library: $this->library));
+                ScanDirectoryJob::dispatch($directory, $this->library);
                 $processedDirectories++;
                 $this->queueProgressChunk($totalDirectories, $chunkSize);
             }

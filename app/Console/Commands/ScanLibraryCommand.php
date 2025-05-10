@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Jobs\Library\ScanMusicLibraryJob;
+use App\Jobs\Library\Music\ScanMusicLibraryJob;
 use App\Models\Library;
 use Illuminate\Console\Command;
 
@@ -20,13 +20,15 @@ class ScanLibraryCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Command description';
+    protected $description = 'Scan media library';
 
     /**
      * Execute the console command.
      */
     public function handle()
     {
-        dispatch(new ScanMusicLibraryJob(Library::first()));
+        $library = Library::first();
+
+        dispatch(new ScanMusicLibraryJob(library: $library));
     }
 }

@@ -1,20 +1,21 @@
-import { useLibraryServiceLibrariesIndex } from '@/api-client/queries';
-import { Box, Button, Container, Table, Title } from '@mantine/core';
+import { Box, Button, Container, Heading } from '@radix-ui/themes';
 import { ReactNode, useEffect, useState } from 'react';
 import { JobService } from '@/api-client/requests';
-import { notifications } from '@mantine/notifications';
+import { useToast } from '@/providers/toast-provider.tsx';
+import { useLibraryServiceGetApiLibraries } from '@/api-client/queries';
 
 export function LibrariesList() {
-  const {data} = useLibraryServiceLibrariesIndex();
+  const {data} = useLibraryServiceGetApiLibraries();
   const [rows, setRows] = useState<ReactNode[]>([]);
+  const {showToast} = useToast();
 
   const startScanJob = (slug: string) => {
-    JobService.jobLibraryScan({slug})
+    JobService.postApiJobsScanLibraryBySlug({slug})
       .then(res => {
         if (typeof res !== 'string') {
-          notifications.show({
+          showToast({
             title: 'Library scan',
-            message: res.message,
+            content: res.message,
           });
         }
       });
@@ -23,20 +24,20 @@ export function LibrariesList() {
   useEffect(() => {
     if (data?.data) {
       const items = data.data.map(x => (
-        <Table.Tr key={x.slug}>
-          <Table.Td>{x.name}</Table.Td>
-          <Table.Td>{x.path}</Table.Td>
-          <Table.Td>{x.lastScan}</Table.Td>
-          <Table.Td>{x.createdAt}</Table.Td>
-          <Table.Td>{x.updatedAt}</Table.Td>
-          <Table.Td>
+        <tr key={x.slug}>
+          <td>{x.name}</td>
+          <td>{x.path}</td>
+          <td>{x.lastScan}</td>
+          <td>{x.createdAt}</td>
+          <td>{x.updatedAt}</td>
+          <td>
             <Box>
               <Button
                 onClick={() => startScanJob(x.slug)}
               >Scan</Button>
             </Box>
-          </Table.Td>
-        </Table.Tr>
+          </td>
+        </tr>
       ));
 
       setRows(items);
@@ -44,22 +45,24 @@ export function LibrariesList() {
   }, [data?.data]);
 
   return (
-    <Container fluid>
-      <Title>Libraries - list</Title>
+    <Container mt="3">
+      <Heading>Libraries - list</Heading>
 
-      <Table>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th>Name</Table.Th>
-            <Table.Th>Path</Table.Th>
-            <Table.Th>Last scan</Table.Th>
-            <Table.Th>Created</Table.Th>
-            <Table.Th>Updated</Table.Th>
-            <Table.Th>Actions</Table.Th>
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>{rows}</Table.Tbody>
-      </Table>
+     <Box mt="4">
+       <table>
+         <thead>
+         <tr>
+           <th>Name</th>
+           <th>Path</th>
+           <th>Last scan</th>
+           <th>Created</th>
+           <th>Updated</th>
+           <th>Actions</th>
+         </tr>
+         </thead>
+         <tbody>{rows}</tbody>
+       </table>
+     </Box>
     </Container>
   );
 }

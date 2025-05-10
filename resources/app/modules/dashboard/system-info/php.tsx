@@ -1,37 +1,34 @@
-import { useSystemInfoServiceSystemInfoPhp } from '@/api-client/queries';
-import { Card, Container, SimpleGrid, Text, Title } from '@mantine/core';
+import { useSystemInfoServiceGetApiSystemInfo } from '@/api-client/queries';
+import { Card, Container, Grid, Text, Heading } from '@radix-ui/themes';
 
 import styles from './php.module.scss';
 
 function Section(section: { section: string, values: { key: string, value: string|number|boolean|null }[] }) {
   return (
-    <Card withBorder shadow="sm" radius="md">
-      <Card.Section p="md">
-        <Text fw={500} fz="h2">{section.section}</Text>
-      </Card.Section>
-      <Card.Section mt="sm">
-        <SimpleGrid cols={2} spacing="md" p="md">
+    <Card>
+        <Text weight="medium" size="2">{section.section}</Text>
+
+        <Grid columns="2">
           {section.values.map((item, index) => (
             <Text key={index}><span className={styles.configKey}>{item.key}</span>: {item.value}</Text>
           ))}
-        </SimpleGrid>
-      </Card.Section>
+        </Grid>
     </Card>
   );
 }
 
 export function Php() {
-  const { data } = useSystemInfoServiceSystemInfoPhp();
+  const { data } = useSystemInfoServiceGetApiSystemInfo();
 
   return (
-    <Container fluid>
-      <Title>Php</Title>
+    <Container>
+      <Heading mt="3">Php</Heading>
 
-      <SimpleGrid cols={2} spacing="md" mt="lg">
+      <Grid columns="2" mt="3">
         {data?.map((section, index) => (
           <Section section={section.section} values={section.values} key={index}/>
         ))}
-      </SimpleGrid>
+      </Grid>
     </Container>
   )
 }

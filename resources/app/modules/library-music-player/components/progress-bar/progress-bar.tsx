@@ -1,18 +1,16 @@
-import Slider from 'rc-slider';
-import { SliderProps } from 'rc-slider/lib/Slider';
-import 'rc-slider/assets/index.css';
-import { useMantineTheme } from '@mantine/core';
+import { Slider } from "radix-ui";
+import styles from './progress-bar.module.css';
+import { ChangeEvent } from 'react';
 
-interface ProgressBarProps
-  extends SliderProps {
+
+interface ProgressBarProps {
   duration: number;
   currentProgress: number;
   buffered: number;
   setProgress: (currentProgress: number) => void;
 }
 
-export function ProgressBar({duration, currentProgress, setProgress, buffered, ...rest}: ProgressBarProps) {
-  const theme = useMantineTheme();
+export function ProgressBar({duration, currentProgress, setProgress, buffered}: ProgressBarProps) {
 
   // const progressBarWidth = isNaN(currentProgress / duration)
   //   ? 0
@@ -24,29 +22,26 @@ export function ProgressBar({duration, currentProgress, setProgress, buffered, .
   //   '--buffered-width': bufferedWidth,
   // };
 
-  const onChange = (value: number | number[]) => {
-    setProgress(Number(value));
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault();
+
+    setProgress(Number(e.target.value));
   }
 
   return (
-    <Slider
+    <Slider.Root
+      className={styles.Root}
       min={0}
+      value={[buffered, currentProgress]}
       max={Number(duration)}
-      value={currentProgress}
-      onChange={value => onChange(value)}
-      styles={{
-        handle: {
-          borderColor: theme.colors.gray[5],
-          borderWidth: '1px',
-          height: '12px',
-          width: '12px',
-          marginTop: '-4px',
-        },
-        track: {
-          backgroundColor: theme.colors.gray[4],
-        }
-      }}
-      {...rest}
-    />
+      onChange={handleChange}
+    >
+      <Slider.Track className={styles.Track}>
+        <Slider.Range className={styles.RangeBuffer} />
+        <Slider.Range className={styles.RangeProgress} />
+      </Slider.Track>
+
+      <Slider.Thumb className={styles.Thumb} aria-label="Song progress" />
+    </Slider.Root>
   );
 }

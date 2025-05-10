@@ -13,7 +13,7 @@ class CoverArtArchiveClient
     {
     }
 
-    public function getCoverArtUrl(string $musicBrainzId): string
+    public function getCoverArtUrl(string $musicBrainzId): ?string
     {
         $response = $this->client->getAsync(self::BASE_URL . $musicBrainzId)->wait();
 
@@ -29,5 +29,7 @@ class CoverArtArchiveClient
                 return $image->image;
             }
         }
+
+        return null;
     }
 }

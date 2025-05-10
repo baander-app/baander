@@ -1,5 +1,5 @@
 import { Iconify } from '@/ui/icons/iconify.tsx';
-import { Button } from '@mantine/core';
+import { Button } from '@radix-ui/themes';
 
 export interface PowerProps {
   [key: string]: any;

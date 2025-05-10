@@ -9,8 +9,8 @@ import React, {
 } from 'react';
 import { noop } from '@/utils/noop.ts';
 import { useMusicSource } from '@/providers/music-source-provider';
-import { notifications } from '@mantine/notifications';
 import { SongResource } from '@/api-client/requests';
+import { useToast } from '@/providers/toast-provider.tsx';
 
 interface AudioPlayerContextType {
   audioRef: MutableRefObject<HTMLAudioElement>;
@@ -56,6 +56,7 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
     setAudioRef,
     authenticatedSource,
   } = useMusicSource();
+  const { showToast } = useToast();
 
   const audioRef = useRef<HTMLAudioElement>(new Audio());
 
@@ -176,9 +177,9 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
   useEffect(() => {
     if (isPlaying && isReady) {
       audioRef.current.play().catch((e) => {
-        notifications.show({
+        showToast({
           title: 'Audio player error',
-          message: e?.message ?? 'Unable to autoplay song',
+          content: e?.message ?? 'Unable to autoplay song',
         });
       });
     } else {

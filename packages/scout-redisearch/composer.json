@@ -1,0 +1,34 @@
+{
+  "name": "baander/scout-redisearch",
+  "description": "RediSearch driver for Laravel Scout",
+  "type": "library",
+  "authors": [
+    {
+      "name": "Martin Juul",
+      "email": "code@juul.xyz"
+    }
+  ],
+  "license": "Apache-2.0",
+  "minimum-stability": "stable",
+  "autoload": {
+    "psr-4": {
+      "Baander\\ScoutRediSearch\\": "src/"
+    }
+  },
+  "require": {
+    "php": "^8.4",
+    "ext-redis": "*",
+    "laravel/scout": "^10.0",
+    "illuminate/bus": "^11.0",
+    "illuminate/contracts": "^11.0",
+    "illuminate/database":"^11.0",
+    "illuminate/pagination": "^11.0",
+    "illuminate/queue": "^11.0",
+    "illuminate/support": "^11.0"
+  },
+  "config": {
+    "platform": {
+      "php": "8.4"
+    }
+  }
+}

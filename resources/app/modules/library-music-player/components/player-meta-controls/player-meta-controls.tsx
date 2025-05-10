@@ -2,15 +2,15 @@ import {
   LyricsButton,
   VisualizerButton,
 } from '@/modules/library-music-player/components/player-buttons/player-buttons.tsx';
-import { useDisclosure } from '@mantine/hooks';
 import { Waveform } from '@/ui/waveform/waveform.tsx';
 import styles from './player-meta-controls.module.scss';
 import { SongResource } from '@/api-client/requests';
 import { VolumeSlider } from '@/modules/library-music-player/components/volume-slider/volume-slider.tsx';
 import { useLyrics } from '@/ui/lyrics-viewer/providers/lyrics-provider.tsx';
 import { LyricsViewer } from '@/ui/lyrics-viewer/lyrics-viewer.tsx';
-import { Affix } from '@mantine/core';
 import { useEffect } from 'react';
+import { useDisclosure } from '@/hooks/use-disclosure';
+import { Box } from '@radix-ui/themes';
 
 export interface PlayerMetaControlsProps {
   song?: SongResource;
@@ -22,6 +22,7 @@ export function PlayerMetaControls({ song }: PlayerMetaControlsProps) {
   const { setLyrics } = useLyrics();
 
   useEffect(() => {
+
     if (!song?.lyricsExist) {
       lyricHandlers.close();
     }
@@ -51,9 +52,9 @@ export function PlayerMetaControls({ song }: PlayerMetaControlsProps) {
       )}
 
       {showLyrics && (
-        <Affix position={{ right: 20, bottom: 90 }}>
+        <Box style={{ position: 'absolute', right: 20, bottom: 90 }}>
           <LyricsViewer key="lyrics" />
-        </Affix>
+        </Box>
       )}
     </>
   );

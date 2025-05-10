@@ -1,8 +1,6 @@
 import { useWebauthn } from '@/hooks/use-webauthn.ts';
-import { Button, Group, TextInput } from '@mantine/core';
+import { Button, Flex } from '@radix-ui/themes';
 import { AuthService } from '@/api-client/requests';
-import { useForm } from '@mantine/form';
-import { notifications } from '@mantine/notifications';
 
 type FormValues = {
   name: string,
@@ -50,9 +48,9 @@ export function CreatePasskey() {
         {...form.getInputProps('name')}
       />
 
-      <Group mt="md">
+      <Flex mt="md">
         <Button type="submit">Create</Button>
-      </Group>
+      </Flex>
     </form>
   );
 }

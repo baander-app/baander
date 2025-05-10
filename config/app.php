@@ -174,6 +174,7 @@ return [
          */
         App\Modules\DeviceDetector\DeviceDetectorServiceProvider::class,
         App\Modules\Nanoid\NanoIdServiceProvider::class,
+        App\Modules\BlurHash\BlurHashServiceProvider::class,
         App\Providers\FortifyServiceProvider::class,
 
         /*

@@ -1,4 +1,4 @@
-import { Card, Text } from '@mantine/core';
+import { Card, Text } from '@radix-ui/themes';
 
 export interface MetricCardProps {
   title: string;
@@ -8,13 +8,8 @@ export interface MetricCardProps {
 
 export function MetricCard({ title, formattedValue, formattedPreviousValue }: MetricCardProps) {
   return (
-    <Card
-      shadow="sm"
-      padding="lg"
-      radius="md"
-      withBorder
-    >
-      <Text fw="bold">{title}</Text>
+    <Card>
+      <Text mr="2">{title}</Text>
 
       <Text>{formattedValue}</Text>
 

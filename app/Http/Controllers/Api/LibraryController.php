@@ -75,7 +75,7 @@ class LibraryController extends Controller
     /**
      * Delete a library
      */
-    #[Delete('/:slug', 'api.library.delete')]
+    #[Delete('/{slug}', 'api.library.delete')]
     public function destroy(string $slug)
     {
         Library::whereSlug($slug)->delete();

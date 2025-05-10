@@ -1,0 +1,42 @@
+.shell {
+    display: grid;
+    grid-template-rows: 1fr; /* Only Main, no Footer */
+    grid-template-columns: 250px 1fr; /* Sidebar | Content */
+    height: 100vh;
+    overflow: hidden;
+}
+
+.sidebar {
+    grid-row: 1; /* Spans only the Main row */
+    grid-column: 1; /* Occupies the first column */
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    overflow: hidden;
+}
+
+.main {
+    grid-row: 1; /* Occupies the first row */
+    grid-column: 2; /* Starts next to the Sidebar */
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.content {
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+.content > .page {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    box-sizing: border-box;
+}

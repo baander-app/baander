@@ -1,13 +1,14 @@
-import { Container, Paper, Title, Button, Group, Text } from '@mantine/core';
+import { Button, Container, Flex, Heading, Text } from '@radix-ui/themes';
 import { useAppSelector } from '@/store/hooks.ts';
 import { useCallback } from 'react';
 import { selectAccessToken, selectRefreshToken, selectStreamToken } from '@/store/users/auth-slice.ts';
-import { Icon } from '@iconify/react';
+import { useTestMode } from '@/providers/test-mode-provider.tsx';
 
 export function DevPanel() {
   const accessToken = useAppSelector(selectAccessToken);
   const refreshToken = useAppSelector(selectRefreshToken);
   const streamToken = useAppSelector(selectStreamToken);
+  const { isTestMode, toggleTestMode } = useTestMode();
 
   const copyAccessToken = useCallback(() => {
     if (accessToken && accessToken.token) {
@@ -29,17 +30,25 @@ export function DevPanel() {
 
   return (
     <Container>
-      <Title>Dev Panel</Title>
+      <Heading>Dev Panel</Heading>
 
-      <Paper mt="md">
+      <Flex mt="md">
         <Text>Current tokens</Text>
 
-        <Group>
-          <Button onClick={() => copyAccessToken()} leftSection={<Icon icon="mdi:clipboard"/>}>Access token</Button>
-          <Button onClick={() => copyRefreshToken()} leftSection={<Icon icon="mdi:clipboard"/>}>Refresh token</Button>
-          <Button onClick={() => copyStreamToken()} leftSection={<Icon icon="mdi:clipboard"/>}>Stream token</Button>
-        </Group>
-      </Paper>
+        <Flex>
+          <Button onClick={() => copyAccessToken()}>Access token</Button>
+          <Button onClick={() => copyRefreshToken()}>Refresh token</Button>
+          <Button onClick={() => copyStreamToken()}>Stream token</Button>
+        </Flex>
+      </Flex>
+
+      <Flex>
+        <Text>Test mode</Text>
+
+        <Button onClick={() => toggleTestMode()}>
+          {isTestMode ? 'Disable' : 'Enable'}
+        </Button>
+      </Flex>
     </Container>
   );
 }

@@ -1,4 +1,4 @@
-import { Grid } from '@mantine/core';
+import { Grid } from '@radix-ui/themes';
 import { vfdFrequencyBars } from '@/modules/equalizer/vfd-frequency-bars.ts';
 import { VfdDisplay } from '@/modules/equalizer/components/vfd-display.tsx';
 import { Knob } from '@/modules/equalizer/components/knob.tsx';

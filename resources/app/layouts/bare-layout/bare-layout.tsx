@@ -1,22 +1,19 @@
 import { ReactNode } from 'react';
+import { Flex } from '@radix-ui/themes';
 import { lazyImport } from '@/utils/lazy-import.ts';
-import { AppShell, Flex, Title } from '@mantine/core';
-import { Env } from '@/common/env.ts';
 
-const { BaanderLogo } = lazyImport(() => import('@/ui/branding/baander-logo/baander-logo.tsx'), 'BaanderLogo');
+const { Brand } = lazyImport(() => import('@/ui/brand/Brand.tsx'), 'Brand');
 
 export function BareLayout(props: { children?: ReactNode }) {
   return (
-    <AppShell>
-      <AppShell.Header>
-        <Flex ml="sm">
-          <BaanderLogo/>
-          <Title ml="sm" fw="normal">{Env.appName()}</Title>
-        </Flex>
-      </AppShell.Header>
-      <AppShell.Main h="100">
+    <Flex height="100vh" direction="column" overflowY="auto">
+      <Flex flexBasis="50px" pl="8px">
+        <Brand />
+      </Flex>
+
+      <Flex style={{ flex: 1 }}>
         {props.children}
-      </AppShell.Main>
-    </AppShell>
+      </Flex>
+    </Flex>
   );
 }

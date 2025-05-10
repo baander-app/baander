@@ -3,7 +3,7 @@
 namespace App\Observers;
 
 use App\Models\Image;
-use Bepsvpt\Blurhash\Facades\BlurHash;
+use App\Modules\BlurHash\Facades\BlurHash;
 
 class ImageObserver
 {

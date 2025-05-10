@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useLyrics } from '@/ui/lyrics-viewer/providers/lyrics-provider.tsx';
-import { Box, Text, useMantineTheme } from '@mantine/core';
+import { Box, Text } from '@radix-ui/themes';
 import styles from './lyrics-animation.module.scss';
 
 interface LyricsAnimationProps {
@@ -11,7 +11,6 @@ interface LyricsAnimationProps {
 export const LyricsAnimation: React.FC<LyricsAnimationProps> = ({ currentTime }) => {
   const { synchronizer } = useLyrics();
 
-  const theme = useMantineTheme();
   const [currentLyric, setCurrentLyric] = useState<string>('');
   const [nextLyric, setNextLyric] = useState<string>('');
 
@@ -26,14 +25,17 @@ export const LyricsAnimation: React.FC<LyricsAnimationProps> = ({ currentTime })
   }, [currentTime, synchronizer]);
 
   return (
-    <Box w="inherit" className={styles.lyricContainer}>
+    <Box width="inherit" className={styles.lyricContainer}>
       <AnimatePresence mode="sync">
-        {currentLyric && ( // Only render if there is text
+        {currentLyric && (
           <Text
-            component={motion.p}
-            fz={32}
-            fw={700}
-            c={theme.white}
+            // @ts-expect-error
+            as={motion.p}
+            style={{
+              color: '#fff',
+              fontSize: '32px',
+              fontWeight: 700
+            }}
             className={`${styles.lyricLine} ${styles.currentLyric}`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -45,11 +47,14 @@ export const LyricsAnimation: React.FC<LyricsAnimationProps> = ({ currentTime })
           </Text>
         )}
       </AnimatePresence>
-      {nextLyric && ( // Only render if there is text
+      {nextLyric && (
         <Text
-          component={motion.p}
-          fz={24}
-          c={theme.white}
+          // @ts-expect-error
+          as={motion.p}
+          style={{
+            color: '#fff',
+            fontSize: '24px',
+          }}
           className={`${styles.lyricLine} ${styles.nextLyric}`}
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 0.5, y: 20 }}

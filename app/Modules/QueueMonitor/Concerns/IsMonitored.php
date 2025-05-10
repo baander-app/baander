@@ -59,7 +59,7 @@ trait IsMonitored
     public function queueProgressChunk(int $collectionCount, int $perChunk): void
     {
         $this->queueProgress(
-            ++$this->progressCurrentChunk * $perChunk / $collectionCount * 100,
+            intval(++$this->progressCurrentChunk * $perChunk / $collectionCount * 100),
         );
     }
 

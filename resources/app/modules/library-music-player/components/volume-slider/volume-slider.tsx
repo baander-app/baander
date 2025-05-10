@@ -1,7 +1,8 @@
 import { useAudioPlayer } from '@/modules/library-music-player/providers/audio-player-provider.tsx';
-import { UnstyledButton, Slider, useMantineTheme, Flex } from '@mantine/core';
+import { Slider, Flex, IconButton } from '@radix-ui/themes';
 import { Iconify } from '@/ui/icons/iconify.tsx';
 import { MUSIC_CONTROL_ICON_SIZE } from '@/modules/library-music-player/constants.ts';
+import { ChangeEvent } from 'react';
 
 function getVolumeIcon(isMuted: boolean, volume: number): string {
   if (isMuted || volume === 0) {
@@ -27,23 +28,24 @@ export function VolumeSlider() {
     toggleMuteUnmute,
   } = useAudioPlayer();
 
-  const theme = useMantineTheme();
-
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    setCurrentVolume(Number(e.target.value));
+  }
 
   return (
-    <Flex w={100} mr="xs" align="center" justify="center">
-      <UnstyledButton onClick={() => toggleMuteUnmute()}>
-        <Iconify fontSize={MUSIC_CONTROL_ICON_SIZE} color={theme.colors.gray[7]} icon={getVolumeIcon(isMuted, volume)}/>
-      </UnstyledButton>
+    <Flex width="120px" mr="xs" align="center" justify="center">
+      <IconButton onClick={() => toggleMuteUnmute()} variant="ghost">
+        <Iconify fontSize={MUSIC_CONTROL_ICON_SIZE}  icon={getVolumeIcon(isMuted, volume)}/>
+      </IconButton>
+
 
       <Slider
         min={0}
         max={100}
-        size="sm"
-        value={volume}
-        onChange={value => setCurrentVolume(value)}
-        miw={100}
-        mb={3}
+        // size="sm"
+        defaultValue={[volume]}
+        onChange={handleChange}
       />
     </Flex>
   );

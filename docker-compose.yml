@@ -58,7 +58,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
 
   redis:
-    image: redis:7-alpine
+    image: redis/redis-stack-server:edge
     container_name: baander-redis
     restart: unless-stopped
     networks:

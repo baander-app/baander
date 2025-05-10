@@ -1,18 +1,17 @@
-import React, { useCallback, useState } from 'react';
-import { TableVirtuoso } from 'react-virtuoso';
-import { Modal, Table, Text } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
-import { ContextMenuContent, useContextMenu } from 'mantine-contextmenu';
-import { SongResource } from '@/api-client/requests';
-import { SongDetail } from '@/modules/library-music/components/song-detail/song-detail';
-import { usePathParam } from '@/hooks/use-path-param';
-import { LibraryParams } from '@/modules/library-music/routes/_routes';
-import { useSongServiceSongsIndexInfinite } from '@/api-client/queries/infiniteQueries';
-import { Iconify } from '@/ui/icons/iconify';
-import { useAppDispatch } from '@/store/hooks';
-import { setQueueAndSong } from '@/store/music/music-player-slice';
-import styles from './song-list.module.scss';
-import { TableProps } from '@mantine/core/lib/components/Table/Table';
+import React, { useCallback, useState }                        from 'react';
+import { TableVirtuoso }                                       from 'react-virtuoso';
+import { Box, ContextMenu, Dialog, Text }                      from '@radix-ui/themes';
+import { SongResource }                                        from '@/api-client/requests';
+import {
+  SongDetail,
+}                                                              from '@/modules/library-music/components/song-detail/song-detail';
+import { usePathParam }                                        from '@/hooks/use-path-param';
+import { LibraryParams }                                       from '@/modules/library-music/routes/_routes';
+import { useSongServiceGetApiLibrariesByLibrarySongsInfinite } from '@/api-client/queries/infiniteQueries';
+import { Iconify }                                             from '@/ui/icons/iconify';
+import { useAppDispatch }                                      from '@/store/hooks';
+import { setQueueAndSong }                                     from '@/store/music/music-player-slice';
+import styles                                                  from './song-list.module.scss';
 
 interface ScrollerProps {
   style: React.CSSProperties;
@@ -25,37 +24,21 @@ const Scroller = React.forwardRef<HTMLDivElement, ScrollerProps>(({ style, ...pr
   // <div ref={(r) => ref.current = r}>
   return <div className={styles.scrollbar} style={{ ...style }} ref={ref} {...props} />;
 });
+
 const TableComponents = {
-  // Footer,
   Scroller,
-  Table: (props: TableProps) => <Table {...props} style={{ borderCollapse: 'separate' }}/>,
-  TableHead: Table.Thead,
-  TableRow: Table.Tr,
-  // @ts-ignore
-  TableBody: React.forwardRef((props, ref) => <Table.Tbody {...props} ref={ref}/>),
 };
 
 export function SongList() {
   const { library: libraryParam } = usePathParam<LibraryParams>();
   const dispatch = useAppDispatch();
-  const { data: songData, fetchNextPage, hasNextPage } = useSongServiceSongsIndexInfinite({
+  const { data: songData, fetchNextPage, hasNextPage } = useSongServiceGetApiLibrariesByLibrarySongsInfinite({
     library: libraryParam,
     relations: 'album,album.cover,songs.genres',
   });
   const [activeIndex, setActiveIndex] = useState(0);
-  const { showContextMenu } = useContextMenu();
   const [openedSong, setOpenedSong] = useState<SongResource>();
-  const [opened, { open, close }] = useDisclosure(false);
-
-  const getContextMenuTemplate = useCallback((data: SongResource): ContextMenuContent => [
-    {
-      key: 'info',
-      onClick: () => {
-        setOpenedSong(data);
-        open();
-      },
-    },
-  ], [setOpenedSong, open]);
+  const [open, setOpen] = useState(false);
 
   const onSongClick = useCallback((index: number) => {
     setActiveIndex(index);
@@ -68,90 +51,98 @@ export function SongList() {
     }
   }, [dispatch, songData]);
 
-  const renderTableRow = useCallback((index: number, data: SongResource) => (
-    <React.Fragment
-      key={data.public_id}
-    >
-      <Table.Td
-        className={styles.listItem}
-        style={{ backgroundColor: activeIndex === index ? '#ccc' : 'unset' }}
-        onClick={() => onSongClick(index)}
-        onContextMenu={showContextMenu(getContextMenuTemplate(data))}
-      >
-        <Text size="sm">{data.title}</Text>
-      </Table.Td>
+  const setOpenSong = (e: React.MouseEvent<HTMLDivElement>, song: SongResource) => {
+    e.stopPropagation();
+    setOpenedSong(song);
+    setOpen(true);
+  };
 
-      <Table.Td
+  const renderTableRow = useCallback((index: number, data: SongResource) => (
+    <React.Fragment key={data.public_id}>
+      <td
         className={styles.listItem}
         style={{ backgroundColor: activeIndex === index ? '#ccc' : 'unset' }}
         onClick={() => onSongClick(index)}
-        onContextMenu={showContextMenu(getContextMenuTemplate(data))}
+      >
+        <ContextMenu.Root>
+          <ContextMenu.Trigger>
+            <Box p="0">
+              <Text size="2">{data.title}</Text>
+            </Box>
+          </ContextMenu.Trigger>
+          <ContextMenu.Content size="1">
+            <ContextMenu.Item onClick={() => onSongClick(index)}>Play</ContextMenu.Item>
+            <ContextMenu.Item onClick={(e) => setOpenSong(e, data)}>View info</ContextMenu.Item>
+          </ContextMenu.Content>
+        </ContextMenu.Root>
+      </td>
+
+      <td
+        className={styles.listItem}
+        style={{ backgroundColor: activeIndex === index ? '#ccc' : 'unset' }}
+        onClick={() => onSongClick(index)}
       >
         {data.lyricsExist ? <Iconify icon="arcticons:quicklyric"/> : ''}
-        <Text size="sm">{data.lyricsExist}</Text>
-      </Table.Td>
+        <Text size="2">{data.lyricsExist}</Text>
+      </td>
 
-      <Table.Td
+      <td
         className={styles.listItem}
         style={{ backgroundColor: activeIndex === index ? '#ccc' : 'unset' }}
         onClick={() => onSongClick(index)}
       >
-        <Text size="sm">{
-          data?.album?.title
-        }</Text>
-      </Table.Td>
+        <Text size="2">{data?.album?.title}</Text>
+      </td>
 
-      <Table.Td
+      <td
         className={styles.listItem}
         style={{ backgroundColor: activeIndex === index ? '#ccc' : 'unset' }}
         onClick={() => onSongClick(index)}
-        onContextMenu={showContextMenu(getContextMenuTemplate(data))}
-      >{data.album?.year}</Table.Td>
+      >{data.album?.year}</td>
 
-      <Table.Td
+      <td
         className={styles.listItem}
         style={{ backgroundColor: activeIndex === index ? '#ccc' : 'unset' }}
         onClick={() => onSongClick(index)}
-        onContextMenu={showContextMenu(getContextMenuTemplate(data))}
-      >{data.durationHuman}</Table.Td>
+      >{data.durationHuman}</td>
 
-      <Table.Td
+      <td
         className={styles.listItem}
         style={{ backgroundColor: activeIndex === index ? '#ccc' : 'unset' }}
         onClick={() => onSongClick(index)}
-        onContextMenu={showContextMenu(getContextMenuTemplate(data))}
-      >{data.track}</Table.Td>
+      >{data.track}</td>
     </React.Fragment>
-  ), [activeIndex, getContextMenuTemplate, onSongClick, showContextMenu]);
+  ), [activeIndex, onSongClick]);
 
   return (
     <>
       <TableVirtuoso
         className={styles.scrollList}
-        // @ts-ignore
         components={TableComponents}
         data={songData?.pages.flatMap((page) => page.data)}
-        totalCount={songData?.pages[0].total}
-        useWindowScroll={true}
+        totalCount={songData?.pages[0]?.meta?.total}
         endReached={() => {
           hasNextPage && fetchNextPage();
         }}
         fixedHeaderContent={() => (
-          <Table.Tr>
-            <Table.Th w="50%">Title</Table.Th>
-            <Table.Th w="2%">Lyrics</Table.Th>
-            <Table.Th w="10%">Album</Table.Th>
-            <Table.Th w="5%">Year</Table.Th>
-            <Table.Th w="5%">Length</Table.Th>
-            <Table.Th w="5%">Track</Table.Th>
-          </Table.Tr>
+          <tr>
+            <th>Title</th>
+            <th>Lyrics</th>
+            <th>Album</th>
+            <th>Year</th>
+            <th>Length</th>
+            <th>Track</th>
+          </tr>
         )}
         itemContent={renderTableRow}
+        style={{ width: '100%' }}
       />
 
-      <Modal opened={opened} onClose={close}>
-        {openedSong && <SongDetail publicId={openedSong.public_id}/>}
-      </Modal>
+      <Dialog.Root open={open} onOpenChange={setOpen}>
+        <Dialog.Content>
+          {openedSong && <SongDetail publicId={openedSong.public_id}/>}
+        </Dialog.Content>
+      </Dialog.Root>
     </>
   );
 }

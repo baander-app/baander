@@ -29,6 +29,9 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
     {
     }
 
+    /**
+     * @throws \Throwable
+     */
     public function handle(): void
     {
         $this->queueProgress(0);
@@ -223,7 +226,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         if (!in_array($album->id, $coverJobs)
             && !$album->cover()->exists()
             && !$this->isCoverJobQueued($album, $coverJobs)) {
-            dispatch(new SaveAlbumCoverJob($album))->afterCommit();
+            SaveAlbumCoverJob::dispatch($album)->afterCommit();
             $coverJobs[] = $album->id;
         }
     }

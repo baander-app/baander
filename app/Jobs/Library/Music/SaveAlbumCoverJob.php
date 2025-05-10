@@ -6,7 +6,6 @@ use App\Jobs\BaseJob;
 use App\Models\Album;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
-use Safe\Exceptions\ImageException;
 use Zend_Media_Id3_Frame_Apic;
 use Zend_Media_Id3v2;
 
@@ -29,13 +28,12 @@ class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
      */
     public function middleware(): array
     {
-        return [(new WithoutOverlapping("album_cover_{$this->album->id}"))->dontRelease()];
+        return [new WithoutOverlapping("album_cover_{$this->album->id}")->dontRelease()];
     }
 
     /**
      * Execute the job.
      * @throws \Zend_Media_Id3_Exception
-     * @throws ImageException
      */
     public function handle(): void
     {
@@ -71,9 +69,6 @@ class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
         $this->queueProgress(100);
     }
 
-    /**
-     * @throws ImageException
-     */
     private function createImage(Zend_Media_Id3_Frame_Apic $artwork): array
     {
         $extension = $this->detectFileExtension($artwork->getImageData());

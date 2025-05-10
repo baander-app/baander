@@ -1,36 +1,28 @@
-// generated with @7nohe/openapi-react-query-codegen@1.6.1 
+// generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, OpCacheService, PasskeyService, PendingJobsService, QueueMetricsService, QueueService, SilencedJobsService, SongService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
+import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, OpCacheService, PasskeyService, PendingJobsService, QueueMetricsService, QueueService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
 import * as Common from "./common";
 /**
 * Get a collection of albums
 * @param data The data for the request.
 * @param data.library The library slug
-* @param data.fields Comma seperated string of fields you want to select. If nothing is defined `select *` is default.
-* - title
-* - slug
-* - year
-* - directory
-* @param data.relations Comma seperated string of relations
-* - artists
-* - cover
-* - library
-* - songs
-* @param data.page Current page
-* @param data.limit Items per page
-* @param data.genres _Extension_ Comma seperated list of genres
+* @param data.fields
+* @param data.relations
+* @param data.page
+* @param data.limit
+* @param data.genres
 * @returns unknown Paginated set of `AlbumResource`
 * @throws ApiError
 */
-export const prefetchUseAlbumServiceAlbumsIndex = (queryClient: QueryClient, { fields, genres, library, limit, page, relations }: {
+export const prefetchUseAlbumServiceGetApiLibrariesByLibraryAlbums = (queryClient: QueryClient, { fields, genres, library, limit, page, relations }: {
   fields?: string;
   genres?: string;
   library: string;
   limit?: number;
   page?: number;
   relations?: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseAlbumServiceAlbumsIndexKeyFn({ fields, genres, library, limit, page, relations }), queryFn: () => AlbumService.albumsIndex({ fields, genres, library, limit, page, relations }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseAlbumServiceGetApiLibrariesByLibraryAlbumsKeyFn({ fields, genres, library, limit, page, relations }), queryFn: () => AlbumService.getApiLibrariesByLibraryAlbums({ fields, genres, library, limit, page, relations }) });
 /**
 * Get an album
 * @param data The data for the request.
@@ -39,34 +31,30 @@ export const prefetchUseAlbumServiceAlbumsIndex = (queryClient: QueryClient, { f
 * @returns AlbumResource `AlbumResource`
 * @throws ApiError
 */
-export const prefetchUseAlbumServiceAlbumsShow = (queryClient: QueryClient, { album, library }: {
+export const prefetchUseAlbumServiceGetApiLibrariesByLibraryAlbumsByAlbum = (queryClient: QueryClient, { album, library }: {
   album: string;
   library: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseAlbumServiceAlbumsShowKeyFn({ album, library }), queryFn: () => AlbumService.albumsShow({ album, library }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseAlbumServiceGetApiLibrariesByLibraryAlbumsByAlbumKeyFn({ album, library }), queryFn: () => AlbumService.getApiLibrariesByLibraryAlbumsByAlbum({ album, library }) });
 /**
 * Get a collection of artists
 * @param data The data for the request.
 * @param data.library
-* @param data.fields Comma seperated string of fields you want to select. If nothing is defined `select *` is default.
-* - title
-* - slug
-* @param data.relations Comma seperated string of relations
-* - portrait
-* - songs
-* @param data.page Current page
-* @param data.limit Items per page
-* @param data.genres _Extension_ Comma seperated list of genres
+* @param data.fields
+* @param data.relations
+* @param data.page
+* @param data.limit
+* @param data.genres
 * @returns unknown Paginated set of `ArtistResource`
 * @throws ApiError
 */
-export const prefetchUseArtistServiceArtistsIndex = (queryClient: QueryClient, { fields, genres, library, limit, page, relations }: {
+export const prefetchUseArtistServiceGetApiLibrariesByLibraryArtists = (queryClient: QueryClient, { fields, genres, library, limit, page, relations }: {
   fields?: string;
   genres?: string;
   library: string;
   limit?: number;
   page?: number;
   relations?: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseArtistServiceArtistsIndexKeyFn({ fields, genres, library, limit, page, relations }), queryFn: () => ArtistService.artistsIndex({ fields, genres, library, limit, page, relations }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseArtistServiceGetApiLibrariesByLibraryArtistsKeyFn({ fields, genres, library, limit, page, relations }), queryFn: () => ArtistService.getApiLibrariesByLibraryArtists({ fields, genres, library, limit, page, relations }) });
 /**
 * Get an artist
 * @param data The data for the request.
@@ -75,40 +63,40 @@ export const prefetchUseArtistServiceArtistsIndex = (queryClient: QueryClient, {
 * @returns ArtistResource `ArtistResource`
 * @throws ApiError
 */
-export const prefetchUseArtistServiceArtistsShow = (queryClient: QueryClient, { artist, library }: {
+export const prefetchUseArtistServiceGetApiLibrariesByLibraryArtistsByArtist = (queryClient: QueryClient, { artist, library }: {
   artist: string;
   library: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseArtistServiceArtistsShowKeyFn({ artist, library }), queryFn: () => ArtistService.artistsShow({ artist, library }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseArtistServiceGetApiLibrariesByLibraryArtistsByArtistKeyFn({ artist, library }), queryFn: () => ArtistService.getApiLibrariesByLibraryArtistsByArtist({ artist, library }) });
 /**
 * Get a passkey challenge
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseAuthServiceAuthPasskeyOptions = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAuthServiceAuthPasskeyOptionsKeyFn(), queryFn: () => AuthService.authPasskeyOptions() });
+export const prefetchUseAuthServiceGetWebauthnPasskey = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAuthServiceGetWebauthnPasskeyKeyFn(), queryFn: () => AuthService.getWebauthnPasskey() });
 /**
 * Get passkey registration options
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseAuthServiceAuthPasskeyRegisterOptions = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAuthServiceAuthPasskeyRegisterOptionsKeyFn(), queryFn: () => AuthService.authPasskeyRegisterOptions() });
+export const prefetchUseAuthServiceGetWebauthnPasskeyRegister = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAuthServiceGetWebauthnPasskeyRegisterKeyFn(), queryFn: () => AuthService.getWebauthnPasskeyRegister() });
 /**
 * Get a passkey challenge
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUsePasskeyServiceAuthPasskeyOptions = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UsePasskeyServiceAuthPasskeyOptionsKeyFn(), queryFn: () => PasskeyService.authPasskeyOptions() });
+export const prefetchUsePasskeyServiceGetWebauthnPasskey = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UsePasskeyServiceGetWebauthnPasskeyKeyFn(), queryFn: () => PasskeyService.getWebauthnPasskey() });
 /**
 * Get passkey registration options
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUsePasskeyServiceAuthPasskeyRegisterOptions = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UsePasskeyServiceAuthPasskeyRegisterOptionsKeyFn(), queryFn: () => PasskeyService.authPasskeyRegisterOptions() });
+export const prefetchUsePasskeyServiceGetWebauthnPasskeyRegister = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UsePasskeyServiceGetWebauthnPasskeyRegisterKeyFn(), queryFn: () => PasskeyService.getWebauthnPasskeyRegister() });
 /**
 * Get all of the batches
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseBatchesServiceHorizonJobsBatchesIndex = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseBatchesServiceHorizonJobsBatchesIndexKeyFn(), queryFn: () => BatchesService.horizonJobsBatchesIndex() });
+export const prefetchUseBatchesServiceGetHorizonApiBatches = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseBatchesServiceGetHorizonApiBatchesKeyFn(), queryFn: () => BatchesService.getHorizonApiBatches() });
 /**
 * Get the details of a batch by ID
 * @param data The data for the request.
@@ -116,9 +104,9 @@ export const prefetchUseBatchesServiceHorizonJobsBatchesIndex = (queryClient: Qu
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseBatchesServiceHorizonJobsBatchesShow = (queryClient: QueryClient, { id }: {
+export const prefetchUseBatchesServiceGetHorizonApiBatchesById = (queryClient: QueryClient, { id }: {
   id: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseBatchesServiceHorizonJobsBatchesShowKeyFn({ id }), queryFn: () => BatchesService.horizonJobsBatchesShow({ id }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseBatchesServiceGetHorizonApiBatchesByIdKeyFn({ id }), queryFn: () => BatchesService.getHorizonApiBatchesById({ id }) });
 /**
 * Get all of the completed jobs
 * @param data The data for the request.
@@ -126,15 +114,15 @@ export const prefetchUseBatchesServiceHorizonJobsBatchesShow = (queryClient: Que
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseCompletedJobsServiceHorizonCompletedJobsIndex = (queryClient: QueryClient, { startingAt }: {
+export const prefetchUseCompletedJobsServiceGetHorizonApiJobsCompleted = (queryClient: QueryClient, { startingAt }: {
   startingAt?: string;
-} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseCompletedJobsServiceHorizonCompletedJobsIndexKeyFn({ startingAt }), queryFn: () => CompletedJobsService.horizonCompletedJobsIndex({ startingAt }) });
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseCompletedJobsServiceGetHorizonApiJobsCompletedKeyFn({ startingAt }), queryFn: () => CompletedJobsService.getHorizonApiJobsCompleted({ startingAt }) });
 /**
 * Get the key performance stats for the dashboard
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseDashboardStatsServiceHorizonStatsIndex = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseDashboardStatsServiceHorizonStatsIndexKeyFn(), queryFn: () => DashboardStatsService.horizonStatsIndex() });
+export const prefetchUseDashboardStatsServiceGetHorizonApiStats = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseDashboardStatsServiceGetHorizonApiStatsKeyFn(), queryFn: () => DashboardStatsService.getHorizonApiStats() });
 /**
 * Get all of the failed jobs
 * @param data The data for the request.
@@ -142,9 +130,9 @@ export const prefetchUseDashboardStatsServiceHorizonStatsIndex = (queryClient: Q
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseFailedJobsServiceHorizonFailedJobsIndex = (queryClient: QueryClient, { tag }: {
+export const prefetchUseFailedJobsServiceGetHorizonApiJobsFailed = (queryClient: QueryClient, { tag }: {
   tag?: string;
-} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseFailedJobsServiceHorizonFailedJobsIndexKeyFn({ tag }), queryFn: () => FailedJobsService.horizonFailedJobsIndex({ tag }) });
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseFailedJobsServiceGetHorizonApiJobsFailedKeyFn({ tag }), queryFn: () => FailedJobsService.getHorizonApiJobsFailed({ tag }) });
 /**
 * Get a failed job instance
 * @param data The data for the request.
@@ -152,76 +140,73 @@ export const prefetchUseFailedJobsServiceHorizonFailedJobsIndex = (queryClient: 
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseFailedJobsServiceHorizonFailedJobsShow = (queryClient: QueryClient, { id }: {
+export const prefetchUseFailedJobsServiceGetHorizonApiJobsFailedById = (queryClient: QueryClient, { id }: {
   id: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseFailedJobsServiceHorizonFailedJobsShowKeyFn({ id }), queryFn: () => FailedJobsService.horizonFailedJobsShow({ id }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseFailedJobsServiceGetHorizonApiJobsFailedByIdKeyFn({ id }), queryFn: () => FailedJobsService.getHorizonApiJobsFailedById({ id }) });
 /**
 * @returns LogFileResource Array of `LogFileResource`
 * @throws ApiError
 */
-export const prefetchUseFilesServiceLogViewerFiles = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseFilesServiceLogViewerFilesKeyFn(), queryFn: () => FilesService.logViewerFiles() });
+export const prefetchUseFilesServiceGetSystemLogViewerApiFiles = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseFilesServiceGetSystemLogViewerApiFilesKeyFn(), queryFn: () => FilesService.getSystemLogViewerApiFiles() });
 /**
 * @param data The data for the request.
 * @param data.fileIdentifier
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseFilesServiceLogViewerFilesRequestDownload = (queryClient: QueryClient, { fileIdentifier }: {
+export const prefetchUseFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadRequest = (queryClient: QueryClient, { fileIdentifier }: {
   fileIdentifier: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseFilesServiceLogViewerFilesRequestDownloadKeyFn({ fileIdentifier }), queryFn: () => FilesService.logViewerFilesRequestDownload({ fileIdentifier }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadRequestKeyFn({ fileIdentifier }), queryFn: () => FilesService.getSystemLogViewerApiFilesByFileIdentifierDownloadRequest({ fileIdentifier }) });
 /**
 * @param data The data for the request.
 * @param data.fileIdentifier
 * @returns string
 * @throws ApiError
 */
-export const prefetchUseFilesServiceLogViewerFilesDownload = (queryClient: QueryClient, { fileIdentifier }: {
+export const prefetchUseFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownload = (queryClient: QueryClient, { fileIdentifier }: {
   fileIdentifier: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseFilesServiceLogViewerFilesDownloadKeyFn({ fileIdentifier }), queryFn: () => FilesService.logViewerFilesDownload({ fileIdentifier }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadKeyFn({ fileIdentifier }), queryFn: () => FilesService.getSystemLogViewerApiFilesByFileIdentifierDownload({ fileIdentifier }) });
 /**
 * @returns LogFolderResource Array of `LogFolderResource`
 * @throws ApiError
 */
-export const prefetchUseFoldersServiceLogViewerFolders = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseFoldersServiceLogViewerFoldersKeyFn(), queryFn: () => FoldersService.logViewerFolders() });
+export const prefetchUseFoldersServiceGetSystemLogViewerApiFolders = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseFoldersServiceGetSystemLogViewerApiFoldersKeyFn(), queryFn: () => FoldersService.getSystemLogViewerApiFolders() });
 /**
 * @param data The data for the request.
 * @param data.folderIdentifier
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseFoldersServiceLogViewerFoldersRequestDownload = (queryClient: QueryClient, { folderIdentifier }: {
+export const prefetchUseFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequest = (queryClient: QueryClient, { folderIdentifier }: {
   folderIdentifier: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseFoldersServiceLogViewerFoldersRequestDownloadKeyFn({ folderIdentifier }), queryFn: () => FoldersService.logViewerFoldersRequestDownload({ folderIdentifier }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestKeyFn({ folderIdentifier }), queryFn: () => FoldersService.getSystemLogViewerApiFoldersByFolderIdentifierDownloadRequest({ folderIdentifier }) });
 /**
 * @param data The data for the request.
 * @param data.folderIdentifier
 * @returns string
 * @throws ApiError
 */
-export const prefetchUseFoldersServiceLogViewerFoldersDownload = (queryClient: QueryClient, { folderIdentifier }: {
+export const prefetchUseFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownload = (queryClient: QueryClient, { folderIdentifier }: {
   folderIdentifier: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseFoldersServiceLogViewerFoldersDownloadKeyFn({ folderIdentifier }), queryFn: () => FoldersService.logViewerFoldersDownload({ folderIdentifier }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadKeyFn({ folderIdentifier }), queryFn: () => FoldersService.getSystemLogViewerApiFoldersByFolderIdentifierDownload({ folderIdentifier }) });
 /**
 * Get a collection of genres
 * @param data The data for the request.
-* @param data.fields Comma seperated string of fields you want to select. If nothing is defined `select *` is default.
-* - name
-* - slug
-* @param data.relations Comma seperated string of relations
-* - songs
-* @param data.librarySlug Constrain the query to only fetch genres that are contained within the given library
-* @param data.page Current page
-* @param data.limit Items per page
+* @param data.fields
+* @param data.relations
+* @param data.librarySlug
+* @param data.page
+* @param data.limit
 * @returns unknown Paginated set of `GenreResource`
 * @throws ApiError
 */
-export const prefetchUseGenreServiceGenresIndex = (queryClient: QueryClient, { fields, librarySlug, limit, page, relations }: {
+export const prefetchUseGenreServiceGetApiGenres = (queryClient: QueryClient, { fields, librarySlug, limit, page, relations }: {
   fields?: string;
   librarySlug?: string;
   limit?: number;
   page?: number;
   relations?: string;
-} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseGenreServiceGenresIndexKeyFn({ fields, librarySlug, limit, page, relations }), queryFn: () => GenreService.genresIndex({ fields, librarySlug, limit, page, relations }) });
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseGenreServiceGetApiGenresKeyFn({ fields, librarySlug, limit, page, relations }), queryFn: () => GenreService.getApiGenres({ fields, librarySlug, limit, page, relations }) });
 /**
 * Get a genre
 * @param data The data for the request.
@@ -229,14 +214,14 @@ export const prefetchUseGenreServiceGenresIndex = (queryClient: QueryClient, { f
 * @returns GenreResource `GenreResource`
 * @throws ApiError
 */
-export const prefetchUseGenreServiceGenresShow = (queryClient: QueryClient, { genre }: {
+export const prefetchUseGenreServiceGetApiGenresByGenre = (queryClient: QueryClient, { genre }: {
   genre: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseGenreServiceGenresShowKeyFn({ genre }), queryFn: () => GenreService.genresShow({ genre }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseGenreServiceGetApiGenresByGenreKeyFn({ genre }), queryFn: () => GenreService.getApiGenresByGenre({ genre }) });
 /**
 * @returns LogViewerHostResource Array of `LogViewerHostResource`
 * @throws ApiError
 */
-export const prefetchUseHostsServiceLogViewerHosts = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseHostsServiceLogViewerHostsKeyFn(), queryFn: () => HostsService.logViewerHosts() });
+export const prefetchUseHostsServiceGetSystemLogViewerApiHosts = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseHostsServiceGetSystemLogViewerApiHostsKeyFn(), queryFn: () => HostsService.getSystemLogViewerApiHosts() });
 /**
 * Get an image asset
 * @param data The data for the request.
@@ -244,15 +229,15 @@ export const prefetchUseHostsServiceLogViewerHosts = (queryClient: QueryClient) 
 * @returns string
 * @throws ApiError
 */
-export const prefetchUseImageServiceImageServe = (queryClient: QueryClient, { image }: {
+export const prefetchUseImageServiceGetApiImagesByImage = (queryClient: QueryClient, { image }: {
   image: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseImageServiceImageServeKeyFn({ image }), queryFn: () => ImageService.imageServe({ image }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseImageServiceGetApiImagesByImageKeyFn({ image }), queryFn: () => ImageService.getApiImagesByImage({ image }) });
 /**
 * Get all of the measured jobs
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseJobMetricsServiceHorizonJobsMetricsIndex = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseJobMetricsServiceHorizonJobsMetricsIndexKeyFn(), queryFn: () => JobMetricsService.horizonJobsMetricsIndex() });
+export const prefetchUseJobMetricsServiceGetHorizonApiMetricsJobs = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseJobMetricsServiceGetHorizonApiMetricsJobsKeyFn(), queryFn: () => JobMetricsService.getHorizonApiMetricsJobs() });
 /**
 * Get metrics for a given job
 * @param data The data for the request.
@@ -260,9 +245,9 @@ export const prefetchUseJobMetricsServiceHorizonJobsMetricsIndex = (queryClient:
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseJobMetricsServiceHorizonJobsMetricsShow = (queryClient: QueryClient, { id }: {
+export const prefetchUseJobMetricsServiceGetHorizonApiMetricsJobsById = (queryClient: QueryClient, { id }: {
   id: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseJobMetricsServiceHorizonJobsMetricsShowKeyFn({ id }), queryFn: () => JobMetricsService.horizonJobsMetricsShow({ id }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseJobMetricsServiceGetHorizonApiMetricsJobsByIdKeyFn({ id }), queryFn: () => JobMetricsService.getHorizonApiMetricsJobsById({ id }) });
 /**
 * Get the details of a recent job by ID
 * @param data The data for the request.
@@ -270,21 +255,21 @@ export const prefetchUseJobMetricsServiceHorizonJobsMetricsShow = (queryClient: 
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseJobsServiceHorizonJobsShow = (queryClient: QueryClient, { id }: {
+export const prefetchUseJobsServiceGetHorizonApiJobsById = (queryClient: QueryClient, { id }: {
   id: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseJobsServiceHorizonJobsShowKeyFn({ id }), queryFn: () => JobsService.horizonJobsShow({ id }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseJobsServiceGetHorizonApiJobsByIdKeyFn({ id }), queryFn: () => JobsService.getHorizonApiJobsById({ id }) });
 /**
 * Get a collection of media libraries
 * @param data The data for the request.
-* @param data.page Current page
-* @param data.limit Items per page
+* @param data.page
+* @param data.limit
 * @returns unknown Paginated set of `LibraryResource`
 * @throws ApiError
 */
-export const prefetchUseLibraryServiceLibrariesIndex = (queryClient: QueryClient, { limit, page }: {
+export const prefetchUseLibraryServiceGetApiLibraries = (queryClient: QueryClient, { limit, page }: {
   limit?: number;
   page?: number;
-} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseLibraryServiceLibrariesIndexKeyFn({ limit, page }), queryFn: () => LibraryService.librariesIndex({ limit, page }) });
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseLibraryServiceGetApiLibrariesKeyFn({ limit, page }), queryFn: () => LibraryService.getApiLibraries({ limit, page }) });
 /**
 * Show library
 * @param data The data for the request.
@@ -292,9 +277,9 @@ export const prefetchUseLibraryServiceLibrariesIndex = (queryClient: QueryClient
 * @returns LibraryResource `LibraryResource`
 * @throws ApiError
 */
-export const prefetchUseLibraryServiceLibraryShow = (queryClient: QueryClient, { slug }: {
+export const prefetchUseLibraryServiceGetApiLibrariesBySlug = (queryClient: QueryClient, { slug }: {
   slug: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseLibraryServiceLibraryShowKeyFn({ slug }), queryFn: () => LibraryService.libraryShow({ slug }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseLibraryServiceGetApiLibrariesBySlugKeyFn({ slug }), queryFn: () => LibraryService.getApiLibrariesBySlug({ slug }) });
 /**
 * @param data The data for the request.
 * @param data.file
@@ -308,7 +293,7 @@ export const prefetchUseLibraryServiceLibraryShow = (queryClient: QueryClient, {
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseLogsServiceLogViewerLogs = (queryClient: QueryClient, { direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }: {
+export const prefetchUseLogsServiceGetSystemLogViewerApiLogs = (queryClient: QueryClient, { direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }: {
   direction?: string;
   excludeFileTypes?: string;
   excludeLevels?: string;
@@ -317,44 +302,43 @@ export const prefetchUseLogsServiceLogViewerLogs = (queryClient: QueryClient, { 
   perPage?: string;
   query?: string;
   shorterStackTraces?: boolean;
-} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseLogsServiceLogViewerLogsKeyFn({ direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }), queryFn: () => LogsService.logViewerLogs({ direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }) });
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseLogsServiceGetSystemLogViewerApiLogsKeyFn({ direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }), queryFn: () => LogsService.getSystemLogViewerApiLogs({ direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }) });
 /**
 * Get all of the master supervisors and their underlying supervisors
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseMasterSupervisorServiceHorizonMastersIndex = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseMasterSupervisorServiceHorizonMastersIndexKeyFn(), queryFn: () => MasterSupervisorService.horizonMastersIndex() });
+export const prefetchUseMasterSupervisorServiceGetHorizonApiMasters = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseMasterSupervisorServiceGetHorizonApiMastersKeyFn(), queryFn: () => MasterSupervisorService.getHorizonApiMasters() });
 /**
 * Get all of the monitored tags and their job counts
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseMonitoringServiceHorizonMonitoringIndex = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseMonitoringServiceHorizonMonitoringIndexKeyFn(), queryFn: () => MonitoringService.horizonMonitoringIndex() });
+export const prefetchUseMonitoringServiceGetHorizonApiMonitoring = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseMonitoringServiceGetHorizonApiMonitoringKeyFn(), queryFn: () => MonitoringService.getHorizonApiMonitoring() });
 /**
 * Paginate the jobs for a given tag
 * @param data The data for the request.
-* @param data.tag
 * @param data.tag
 * @param data.limit
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseMonitoringServiceHorizonMonitoringTagPaginate = (queryClient: QueryClient, { limit, tag }: {
+export const prefetchUseMonitoringServiceGetHorizonApiMonitoringByTag = (queryClient: QueryClient, { limit, tag }: {
   limit?: string;
-  tag?: string;
-} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseMonitoringServiceHorizonMonitoringTagPaginateKeyFn({ limit, tag }), queryFn: () => MonitoringService.horizonMonitoringTagPaginate({ limit, tag }) });
+  tag: string;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseMonitoringServiceGetHorizonApiMonitoringByTagKeyFn({ limit, tag }), queryFn: () => MonitoringService.getHorizonApiMonitoringByTag({ limit, tag }) });
 /**
 * Get status
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseOpCacheServiceOpCacheGetStatus = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseOpCacheServiceOpCacheGetStatusKeyFn(), queryFn: () => OpCacheService.opCacheGetStatus() });
+export const prefetchUseOpCacheServiceGetApiOpcacheStatus = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseOpCacheServiceGetApiOpcacheStatusKeyFn(), queryFn: () => OpCacheService.getApiOpcacheStatus() });
 /**
 * Get config
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseOpCacheServiceOpcacheGetConfig = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseOpCacheServiceOpcacheGetConfigKeyFn(), queryFn: () => OpCacheService.opcacheGetConfig() });
+export const prefetchUseOpCacheServiceGetApiOpcacheConfig = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseOpCacheServiceGetApiOpcacheConfigKeyFn(), queryFn: () => OpCacheService.getApiOpcacheConfig() });
 /**
 * Get all of the pending jobs
 * @param data The data for the request.
@@ -362,56 +346,51 @@ export const prefetchUseOpCacheServiceOpcacheGetConfig = (queryClient: QueryClie
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUsePendingJobsServiceHorizonPendingJobsIndex = (queryClient: QueryClient, { startingAt }: {
+export const prefetchUsePendingJobsServiceGetHorizonApiJobsPending = (queryClient: QueryClient, { startingAt }: {
   startingAt?: string;
-} = {}) => queryClient.prefetchQuery({ queryKey: Common.UsePendingJobsServiceHorizonPendingJobsIndexKeyFn({ startingAt }), queryFn: () => PendingJobsService.horizonPendingJobsIndex({ startingAt }) });
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UsePendingJobsServiceGetHorizonApiJobsPendingKeyFn({ startingAt }), queryFn: () => PendingJobsService.getHorizonApiJobsPending({ startingAt }) });
 /**
 * Get a collection of monitor entries
 * @param data The data for the request.
-* @param data.page Current page
-* @param data.limit Items per page
-* @param data.status MonitorStatus
-* - 0=RUNNING
-* - 1=SUCCEEDED
-* - 2=FAILED
-* - 3=STALE
-* - 4=QUEUED
-* @param data.queue Name of the queue
-* @param data.name Name of the job
-* @param data.queuedFirst Order queued jobs first
+* @param data.page
+* @param data.limit
+* @param data.status
+* @param data.queue
+* @param data.name
+* @param data.queuedFirst
 * @returns unknown Paginated set of `QueueMonitorResource`
 * @throws ApiError
 */
-export const prefetchUseQueueServiceQueueMetricsShow = (queryClient: QueryClient, { limit, name, page, queue, queuedFirst, status }: {
+export const prefetchUseQueueServiceGetApiQueueMetrics = (queryClient: QueryClient, { limit, name, page, queue, queuedFirst, status }: {
   limit?: number;
   name?: string;
   page?: number;
   queue?: string;
   queuedFirst?: boolean;
   status?: "running" | "succeeded" | "failed" | "stale" | "queued";
-} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseQueueServiceQueueMetricsShowKeyFn({ limit, name, page, queue, queuedFirst, status }), queryFn: () => QueueService.queueMetricsShow({ limit, name, page, queue, queuedFirst, status }) });
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseQueueServiceGetApiQueueMetricsKeyFn({ limit, name, page, queue, queuedFirst, status }), queryFn: () => QueueService.getApiQueueMetrics({ limit, name, page, queue, queuedFirst, status }) });
 /**
 * Get a list of queue names
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseQueueServiceQueueMetricsQueues = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseQueueServiceQueueMetricsQueuesKeyFn(), queryFn: () => QueueService.queueMetricsQueues() });
+export const prefetchUseQueueServiceGetApiQueueMetricsQueues = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseQueueServiceGetApiQueueMetricsQueuesKeyFn(), queryFn: () => QueueService.getApiQueueMetricsQueues() });
 /**
 * Get a metrics collection
 * @param data The data for the request.
-* @param data.aggregateDays Days to aggregate
+* @param data.aggregateDays
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseQueueServiceQueueMetricsMetrics = (queryClient: QueryClient, { aggregateDays }: {
+export const prefetchUseQueueServiceGetApiQueueMetricsMetrics = (queryClient: QueryClient, { aggregateDays }: {
   aggregateDays?: number;
-} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseQueueServiceQueueMetricsMetricsKeyFn({ aggregateDays }), queryFn: () => QueueService.queueMetricsMetrics({ aggregateDays }) });
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseQueueServiceGetApiQueueMetricsMetricsKeyFn({ aggregateDays }), queryFn: () => QueueService.getApiQueueMetricsMetrics({ aggregateDays }) });
 /**
 * Get all of the measured queues
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseQueueMetricsServiceHorizonQueuesMetricsIndex = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseQueueMetricsServiceHorizonQueuesMetricsIndexKeyFn(), queryFn: () => QueueMetricsService.horizonQueuesMetricsIndex() });
+export const prefetchUseQueueMetricsServiceGetHorizonApiMetricsQueues = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseQueueMetricsServiceGetHorizonApiMetricsQueuesKeyFn(), queryFn: () => QueueMetricsService.getHorizonApiMetricsQueues() });
 /**
 * Get metrics for a given queue
 * @param data The data for the request.
@@ -419,9 +398,14 @@ export const prefetchUseQueueMetricsServiceHorizonQueuesMetricsIndex = (queryCli
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseQueueMetricsServiceHorizonQueuesMetricsShow = (queryClient: QueryClient, { id }: {
+export const prefetchUseQueueMetricsServiceGetHorizonApiMetricsQueuesById = (queryClient: QueryClient, { id }: {
   id: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseQueueMetricsServiceHorizonQueuesMetricsShowKeyFn({ id }), queryFn: () => QueueMetricsService.horizonQueuesMetricsShow({ id }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseQueueMetricsServiceGetHorizonApiMetricsQueuesByIdKeyFn({ id }), queryFn: () => QueueMetricsService.getHorizonApiMetricsQueuesById({ id }) });
+/**
+* @returns unknown
+* @throws ApiError
+*/
+export const prefetchUseSchemaServiceGetApiSchemasMusicbrainz = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSchemaServiceGetApiSchemasMusicbrainzKeyFn(), queryFn: () => SchemaService.getApiSchemasMusicbrainz() });
 /**
 * Get all of the silenced jobs
 * @param data The data for the request.
@@ -429,51 +413,43 @@ export const prefetchUseQueueMetricsServiceHorizonQueuesMetricsShow = (queryClie
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseSilencedJobsServiceHorizonSilencedJobsIndex = (queryClient: QueryClient, { startingAt }: {
+export const prefetchUseSilencedJobsServiceGetHorizonApiJobsSilenced = (queryClient: QueryClient, { startingAt }: {
   startingAt?: string;
-} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseSilencedJobsServiceHorizonSilencedJobsIndexKeyFn({ startingAt }), queryFn: () => SilencedJobsService.horizonSilencedJobsIndex({ startingAt }) });
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseSilencedJobsServiceGetHorizonApiJobsSilencedKeyFn({ startingAt }), queryFn: () => SilencedJobsService.getHorizonApiJobsSilenced({ startingAt }) });
 /**
 * Get a collection of songs
 * @param data The data for the request.
 * @param data.library The library slug
-* @param data.page Current page
-* @param data.limit Items per page
-* @param data.genreNames Comma seperated list of genre names You can only search for names or slugs. Not both.
-* @param data.genreSlugs Comma seperated list of genre slugs
-* @param data.relations Comma seperated string of relations
-* - album
-* - artists
-* - album.albumArtist
-* - genres
+* @param data.page
+* @param data.limit
+* @param data.genreNames
+* @param data.genreSlugs
+* @param data.relations
 * @returns unknown Paginated set of `SongResource`
 * @throws ApiError
 */
-export const prefetchUseSongServiceSongsIndex = (queryClient: QueryClient, { genreNames, genreSlugs, library, limit, page, relations }: {
+export const prefetchUseSongServiceGetApiLibrariesByLibrarySongs = (queryClient: QueryClient, { genreNames, genreSlugs, library, limit, page, relations }: {
   genreNames?: string;
   genreSlugs?: string;
   library: string;
   limit?: number;
   page?: number;
   relations?: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseSongServiceSongsIndexKeyFn({ genreNames, genreSlugs, library, limit, page, relations }), queryFn: () => SongService.songsIndex({ genreNames, genreSlugs, library, limit, page, relations }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseSongServiceGetApiLibrariesByLibrarySongsKeyFn({ genreNames, genreSlugs, library, limit, page, relations }), queryFn: () => SongService.getApiLibrariesByLibrarySongs({ genreNames, genreSlugs, library, limit, page, relations }) });
 /**
 * Get a song by public id
 * @param data The data for the request.
 * @param data.library The library slug
 * @param data.publicId
-* @param data.relations Comma seperated string of relations
-* - album
-* - artists
-* - albumArtist
-* - genres
+* @param data.relations
 * @returns SongResource `SongResource`
 * @throws ApiError
 */
-export const prefetchUseSongServiceSongsShow = (queryClient: QueryClient, { library, publicId, relations }: {
+export const prefetchUseSongServiceGetApiLibrariesByLibrarySongsByPublicId = (queryClient: QueryClient, { library, publicId, relations }: {
   library: string;
   publicId: string;
   relations?: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseSongServiceSongsShowKeyFn({ library, publicId, relations }), queryFn: () => SongService.songsShow({ library, publicId, relations }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseSongServiceGetApiLibrariesByLibrarySongsByPublicIdKeyFn({ library, publicId, relations }), queryFn: () => SongService.getApiLibrariesByLibrarySongsByPublicId({ library, publicId, relations }) });
 /**
 * Direct stream the song
 * Requires token with "access-stream"
@@ -483,41 +459,47 @@ export const prefetchUseSongServiceSongsShow = (queryClient: QueryClient, { libr
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseSongServiceSongsStream = (queryClient: QueryClient, { library, song }: {
+export const prefetchUseSongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirect = (queryClient: QueryClient, { library, song }: {
   library: string;
   song: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseSongServiceSongsStreamKeyFn({ library, song }), queryFn: () => SongService.songsStream({ library, song }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseSongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirectKeyFn({ library, song }), queryFn: () => SongService.getApiLibrariesByLibrarySongsStreamSongBySongDirect({ library, song }) });
+/**
+* Generate a unique session ID for streams
+* @returns unknown
+* @throws ApiError
+*/
+export const prefetchUseStreamServiceGetApiStreamSession = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseStreamServiceGetApiStreamSessionKeyFn(), queryFn: () => StreamService.getApiStreamSession() });
 /**
 * Get php info
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseSystemInfoServiceSystemInfoPhp = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSystemInfoServiceSystemInfoPhpKeyFn(), queryFn: () => SystemInfoService.systemInfoPhp() });
+export const prefetchUseSystemInfoServiceGetApiSystemInfo = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSystemInfoServiceGetApiSystemInfoKeyFn(), queryFn: () => SystemInfoService.getApiSystemInfo() });
 /**
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseSystemInfoServiceSystemInfoSys = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSystemInfoServiceSystemInfoSysKeyFn(), queryFn: () => SystemInfoService.systemInfoSys() });
+export const prefetchUseSystemInfoServiceGetApiSystemInfoSys = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSystemInfoServiceGetApiSystemInfoSysKeyFn(), queryFn: () => SystemInfoService.getApiSystemInfoSys() });
 /**
 * Get a collection of users
 * @param data The data for the request.
-* @param data.page Current page
-* @param data.limit Items per page
+* @param data.page
+* @param data.limit
 * @param data.globalFilter
-* @param data.filters JSON object
-* @param data.filterModes JSON object
-* @param data.sorting JSON object
+* @param data.filters
+* @param data.filterModes
+* @param data.sorting
 * @returns unknown Paginated set of `UserResource`
 * @throws ApiError
 */
-export const prefetchUseUserServiceUsersIndex = (queryClient: QueryClient, { filterModes, filters, globalFilter, limit, page, sorting }: {
+export const prefetchUseUserServiceGetApiUsers = (queryClient: QueryClient, { filterModes, filters, globalFilter, limit, page, sorting }: {
   filterModes?: string;
   filters?: string;
   globalFilter?: string;
   limit?: number;
   page?: number;
   sorting?: string;
-} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseUserServiceUsersIndexKeyFn({ filterModes, filters, globalFilter, limit, page, sorting }), queryFn: () => UserService.usersIndex({ filterModes, filters, globalFilter, limit, page, sorting }) });
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseUserServiceGetApiUsersKeyFn({ filterModes, filters, globalFilter, limit, page, sorting }), queryFn: () => UserService.getApiUsers({ filterModes, filters, globalFilter, limit, page, sorting }) });
 /**
 * Get small user detail info
 * @param data The data for the request.
@@ -525,15 +507,15 @@ export const prefetchUseUserServiceUsersIndex = (queryClient: QueryClient, { fil
 * @returns UserResource `UserResource`
 * @throws ApiError
 */
-export const prefetchUseUserServiceUsersShow = (queryClient: QueryClient, { user }: {
+export const prefetchUseUserServiceGetApiUsersByUser = (queryClient: QueryClient, { user }: {
   user: number;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseUserServiceUsersShowKeyFn({ user }), queryFn: () => UserService.usersShow({ user }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseUserServiceGetApiUsersByUserKeyFn({ user }), queryFn: () => UserService.getApiUsersByUser({ user }) });
 /**
 * Get the authenticated user
 * @returns UserResource `UserResource`
 * @throws ApiError
 */
-export const prefetchUseUserServiceUsersMe = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseUserServiceUsersMeKeyFn(), queryFn: () => UserService.usersMe() });
+export const prefetchUseUserServiceGetApiUsersMe = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseUserServiceGetApiUsersMeKeyFn(), queryFn: () => UserService.getApiUsersMe() });
 /**
 * Get a collection of tokens
 * @param data The data for the request.
@@ -543,14 +525,14 @@ export const prefetchUseUserServiceUsersMe = (queryClient: QueryClient) => query
 * @returns unknown Paginated set of `PersonalAccessTokenViewResource`
 * @throws ApiError
 */
-export const prefetchUseUserTokenServiceUserTokenGetUserTokens = (queryClient: QueryClient, { page, perPage, user }: {
+export const prefetchUseUserTokenServiceGetApiUsersTokensByUser = (queryClient: QueryClient, { page, perPage, user }: {
   page?: number;
   perPage?: number;
   user: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseUserTokenServiceUserTokenGetUserTokensKeyFn({ page, perPage, user }), queryFn: () => UserTokenService.userTokenGetUserTokens({ page, perPage, user }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseUserTokenServiceGetApiUsersTokensByUserKeyFn({ page, perPage, user }), queryFn: () => UserTokenService.getApiUsersTokensByUser({ page, perPage, user }) });
 /**
 * Get the current queue workload for the application
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseWorkloadServiceHorizonWorkloadIndex = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseWorkloadServiceHorizonWorkloadIndexKeyFn(), queryFn: () => WorkloadService.horizonWorkloadIndex() });
+export const prefetchUseWorkloadServiceGetHorizonApiWorkload = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseWorkloadServiceGetHorizonApiWorkloadKeyFn(), queryFn: () => WorkloadService.getHorizonApiWorkload() });

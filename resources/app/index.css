@@ -1,16 +1,49 @@
+@import "reset.css";
+@import "@radix-ui/themes/styles.css";
+@import "theme/dark/accent.css";
+@import "theme/dark/background.css";
+@import "theme/dark/gray.css";
+@import "theme/dark/text.css";
+@import "theme/light/accent.css";
+@import "theme/light/background.css";
+@import "theme/light/gray.css";
+@import "theme/light/text.css";
+
 :root {
-    --layout-default-body-padding: 12px 12px 90px 12px;
     --progress-width: 0;
     --buffered-width: 0;
+    --color-text-primary: #0b0e0c;
 }
 
-body {
-    height: 100%;
+html, body {
+    margin: 0;
+    height: 100vh;
+    color: var(--color-text-primary);
+    background-color: var(--color-background);
+}
+
+body, html {
+    margin: 0;
+    padding: 0;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+.radix-themes {
+    --default-font-family: 'Inter Variable', sans-serif;
+    --default-letter-spacing: -0.03em;
+}
+
+.rt-Button, a {
+    cursor: pointer;
+}
+
+table {
     width: 100%;
 }
 
-
-#baanderapproot {
-    height: 100%;
-    margin: 0;
+th, td {
+    word-wrap: break-word;
 }

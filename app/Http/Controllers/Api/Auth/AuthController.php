@@ -173,7 +173,7 @@ class AuthController
      * Verify email
      * @unauthenticated
      */
-    #[Post('verify/:id/:hash')]
+    #[Post('verify/{id}/{hash}', 'auth.verifyEmail')]
     public function verify(int $id, string $hash)
     {
         $user = User::query()->findOrFail($id);

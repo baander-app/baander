@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Box, useMantineTheme } from '@mantine/core';
+import { Box } from '@radix-ui/themes';
 import { LyricsAnimation } from '@/ui/lyrics-viewer/components/lyrics-animation.tsx';
 import { useAudioPlayer } from '@/modules/library-music-player/providers/audio-player-provider.tsx';
 
@@ -10,7 +10,6 @@ const AnimatedBackground = motion.div;
 export function LyricsViewer() {
   const { currentProgress } = useAudioPlayer();
   const { song } = useAudioPlayer();
-  const theme = useMantineTheme();
 
   const backgroundVariants = {
     initial: {
@@ -26,9 +25,9 @@ export function LyricsViewer() {
 
   return (
     <Box
-      color={theme.white}
-      h={{ base: 400, lg: 600 }}
-      w={{ base: 400, lg: 600 }}
+      style={{ color: '#fff' }}
+      // h={{ base: 400, lg: 600 }}
+      // w={{ base: 400, lg: 600 }}
       className={styles.lyricsContainer}
     >
       <AnimatedBackground

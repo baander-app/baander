@@ -1,20 +1,15 @@
+import { ColumnDef, getCoreRowModel, getSortedRowModel, SortingState, useReactTable } from '@tanstack/react-table';
 import { useMemo, useState } from 'react';
-import {
-  MantineReactTable,
-  MRT_ColumnDef,
-  MRT_ColumnFilterFnsState,
-  MRT_ColumnFiltersState,
-  MRT_PaginationState,
-  MRT_SortingState, useMantineReactTable,
-} from 'mantine-react-table';
-import { UserResource } from '@/api-client/requests';
-import { useUserServiceUsersIndex } from '@/api-client/queries';
-import { stringify } from '@/utils/json.ts';
-import { ActionIcon, Tooltip } from '@mantine/core';
 import { Iconify } from '@/ui/icons/iconify.tsx';
+import { useUserServiceGetApiUsers } from '@/api-client/queries';
+import { stringify } from '@/utils/json.ts';
+import { UserResource } from '@/api-client/requests';
+import { Tooltip } from 'radix-ui';
+import { Button, Flex, Text } from '@radix-ui/themes';
+import  { Table } from '@radix-ui/themes';
 
 export function UserTable() {
-  const columns = useMemo<MRT_ColumnDef<UserResource>[]>(
+  const columns = useMemo<ColumnDef<UserResource>[]>(
     () => [
       {
         accessorKey: 'name',
@@ -40,88 +35,120 @@ export function UserTable() {
     [],
   );
 
-  const [columnFilters, setColumnFilters] = useState<MRT_ColumnFiltersState>(
-    [],
-  );
-  const [columnFilterFns, setColumnFilterFns] = //filter modes
-    useState<MRT_ColumnFilterFnsState>(
-      Object.fromEntries(
-        columns.map(({ accessorKey }) => [accessorKey, 'contains']),
-      ),
-    );
-  const [globalFilter, setGlobalFilter] = useState('');
-  const [sorting, setSorting] = useState<MRT_SortingState>([]);
-  const [pagination, setPagination] = useState<MRT_PaginationState>({
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [pagination, setPagination] = useState({
     pageIndex: 0,
     pageSize: 30,
   });
 
-  const { data, isError, isFetching, isLoading, refetch } = useUserServiceUsersIndex({
+  const { data, isLoading, refetch } = useUserServiceGetApiUsers({
     sorting: stringify(sorting),
-    filters: stringify(columnFilters),
-    filterModes: stringify(columnFilterFns),
     page: pagination.pageIndex,
     limit: pagination.pageSize,
   });
 
   const fetchedUsers = data?.data ?? [];
-  const totalRowCount = data?.total ?? 0;
 
-  const table = useMantineReactTable({
-    columns,
+  const table = useReactTable({
     data: fetchedUsers,
-    enableColumnFilterModes: true,
-    columnFilterModeOptions: ['contains', 'startsWith', 'endsWith'],
-    initialState: { showColumnFilters: true },
-    manualFiltering: true,
-    manualPagination: true,
-    manualSorting: true,
-    mantineToolbarAlertBannerProps:
-      isError
-      ? { color: 'red', children: 'Error loading data' }
-      : undefined,
-    onColumnFilterFnsChange: setColumnFilterFns,
-    onColumnFiltersChange: setColumnFilters,
-    onGlobalFilterChange: setGlobalFilter,
-    onPaginationChange: setPagination,
-    onSortingChange: setSorting,
-    renderTopToolbarCustomActions: () => (
-      <Tooltip label="Refresh Data">
-        <ActionIcon
-          variant="transparent"
-          radius="lg"
-          onClick={() => refetch()}
-          size="md"
-          loading={isLoading}
-        >
-          <Iconify icon="eva:refresh-fill" fontSize={36} />
-        </ActionIcon>
-      </Tooltip>
-    ),
-    rowCount: totalRowCount,
+    rowCount: data?.meta?.total,
+    columns,
     state: {
-      columnFilterFns,
-      columnFilters,
-      globalFilter,
-      isLoading,
-      pagination,
-      showAlertBanner: isError,
-      showProgressBars: isFetching,
       sorting,
+      pagination,
     },
-    mantineTableProps: {
-      withTableBorder: false,
-    },
-    mantinePaperProps: {
-      shadow: 'none',
-      withBorder: false,
-      radius: 'md'
-    },
+    manualSorting: true,
+    manualPagination: true,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    onSortingChange: setSorting,
+    onPaginationChange: setPagination,
   });
 
+
   return (
-    <MantineReactTable
-      table={table}
-    />
+    <>
+      <Flex justify="end" mb="2">
+        <Tooltip.Root>
+          <Tooltip.Trigger asChild>
+            <Button onClick={() => refetch()} disabled={isLoading}>
+              <Iconify icon="eva:refresh-fill"/>
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Portal>
+            <Tooltip.Content>
+              Refresh
+            </Tooltip.Content>
+          </Tooltip.Portal>
+        </Tooltip.Root>
+      </Flex>
+
+      <Table.Root>
+        <Table.Header>
+          <Table.Row>
+            {table.getHeaderGroups()[0]?.headers.map((header, index) => (
+              <Table.ColumnHeaderCell key={index}>
+                {header.isPlaceholder ? null : (
+                  <Flex 
+                    style={{ cursor: header.column.getCanSort() ? 'pointer' : 'default' }}
+                    onClick={header.column.getToggleSortingHandler()}
+                  >
+                    {header.column.columnDef.header instanceof Function
+                      ? header.column.columnDef.header(header.getContext())
+                      : header.column.columnDef.header}
+                    {header.column.getIsSorted() === 'asc' 
+                      ? ' 🔼' 
+                      : header.column.getIsSorted() === 'desc' 
+                        ? ' 🔽' 
+                        : ''}
+                  </Flex>
+                )}
+              </Table.ColumnHeaderCell>
+            ))}
+          </Table.Row>
+        </Table.Header>
+
+        <Table.Body>
+          {table.getRowModel().rows.map((row, rowIndex) => (
+            <Table.Row key={rowIndex}>
+              {row.getVisibleCells().map((cell, cellIndex) => (
+                cellIndex === 0 ? (
+                  <Table.RowHeaderCell key={cellIndex}>
+                    {cell.column.columnDef.cell instanceof Function
+                      ? cell.column.columnDef.cell(cell.getContext())
+                      : cell.getValue()}
+                  </Table.RowHeaderCell>
+                ) : (
+                  <Table.Cell key={cellIndex}>
+                    {cell.column.columnDef.cell instanceof Function
+                      ? cell.column.columnDef.cell(cell.getContext())
+                      : cell.getValue()}
+                  </Table.Cell>
+                )
+              ))}
+            </Table.Row>
+          ))}
+        </Table.Body>
+      </Table.Root>
+
+      <Flex justify="between" align="center" mt="4">
+        <Button 
+          onClick={() => table.previousPage()}
+          disabled={!table.getCanPreviousPage()}
+        >
+          Previous
+        </Button>
+        <Text>
+          Page {table.getState().pagination.pageIndex + 1} of{' '}
+          {table.getPageCount()}
+        </Text>
+        <Button
+          onClick={() => table.nextPage()}
+          disabled={!table.getCanNextPage()}
+        >
+          Next
+        </Button>
+      </Flex>
+    </>
   );
 }

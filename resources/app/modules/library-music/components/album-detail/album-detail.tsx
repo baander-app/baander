@@ -1,7 +1,7 @@
 import { Cover } from '@/modules/library-music/components/artwork/cover';
-import { useAlbumServiceAlbumsShow } from '@/api-client/queries';
+import { useAlbumServiceGetApiLibrariesByLibraryAlbumsByAlbum } from '@/api-client/queries';
 import { SongResource } from '@/api-client/requests';
-import { Table, Text, Card, Group, Flex, Box, ScrollArea, Skeleton, BoxProps } from '@mantine/core';
+import { Text, Card, Flex, Box, ScrollArea, Skeleton } from '@radix-ui/themes';
 import { AlertLoadingError } from '@/ui/alerts/alert-loading-error.tsx';
 import { useAppDispatch } from '@/store/hooks.ts';
 import { setQueueAndSong } from '@/store/music/music-player-slice.ts';
@@ -12,13 +12,13 @@ import { usePathParam } from '@/hooks/use-path-param.ts';
 import { LibraryParams } from '@/modules/library-music/routes/_routes.tsx';
 import { generateBlurhashBackgroundImage } from '@/libs/blurhash/generate-bg-image.ts';
 
-interface AlbumDetailProps extends BoxProps {
+interface AlbumDetailProps extends React.HTMLAttributes<HTMLDivElement> {
   albumSlug: string;
 }
 
 export function AlbumDetail({ albumSlug, ...rest }: AlbumDetailProps) {
   const { library } = usePathParam<LibraryParams>();
-  const { data, isFetching, isLoadingError, refetch } = useAlbumServiceAlbumsShow({
+  const { data, isFetching, isLoadingError, refetch } = useAlbumServiceGetApiLibrariesByLibraryAlbumsByAlbum({
     album: albumSlug,
     library: library,
   });
@@ -27,7 +27,7 @@ export function AlbumDetail({ albumSlug, ...rest }: AlbumDetailProps) {
   const blurhash = data?.cover && generateBlurhashBackgroundImage(data.cover.blurhash, 128, 128);
 
   return (
-    <Box {...rest}>
+    <Box {...rest} minWidth="35%">
       {isFetching && <AlbumDetailSkeleton/>}
       {isLoadingError && <AlertLoadingError retry={async () => {
         await refetch();
@@ -52,7 +52,7 @@ export function AlbumDetail({ albumSlug, ...rest }: AlbumDetailProps) {
                 </Box>
 
                 <Flex p="sm" align="start" direction="column" justify="center">
-                  <Text size="lg" fw="600">{data?.title}</Text>
+                  <Text size="6" weight="bold">{data?.title}</Text>
                   {data?.artists && (
                     <Text >{data.artists.map(x => x.name).join(', ')}</Text>
                   )}
@@ -63,9 +63,9 @@ export function AlbumDetail({ albumSlug, ...rest }: AlbumDetailProps) {
                 <Box></Box>
               </Flex>
 
-              <Group>
+              <Flex>
                 {data?.songs && <AlbumSongs title={data.title} coverUrl={data.cover?.url} songs={data.songs}/>}
-              </Group>
+              </Flex>
             </div>
           </div>
         </Card>
@@ -104,17 +104,17 @@ function AlbumSongs({ songs }: AlbumSongProps) {
 
   return (
     <>
-      <ScrollArea mih="inherit" w="100%">
-        <Table highlightOnHover>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Track</Table.Th>
-              <Table.Th>Title</Table.Th>
-              <Table.Th>Duration</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>{rows}</Table.Tbody>
-        </Table>
+      <ScrollArea>
+        <table>
+          <thead>
+            <tr>
+              <th>Track</th>
+              <th>Title</th>
+              <th>Duration</th>
+            </tr>
+          </thead>
+          <tbody>{rows}</tbody>
+        </table>
       </ScrollArea>
     </>
   );
@@ -123,32 +123,30 @@ function AlbumSongs({ songs }: AlbumSongProps) {
 
 function AlbumDetailSkeleton() {
   return (
-    <Card w={500}>
-      <Card.Section>
-        <Flex>
-          <Box p="sm">
-            <Skeleton height={180} width={180}/>
-          </Box>
+    <Card>
+      <Flex>
+        <Box p="sm">
+          <Skeleton height="180px" width="180px" />
+        </Box>
 
-          <Box p="sm" w="100%">
-            <Skeleton height={16} mt="sm"/>
-            <Flex>
-              <Skeleton height={8} mt="sm" width={50}/>
-              <Skeleton height={8} mt="sm" ml="sm" width={50}/>
-            </Flex>
-          </Box>
-        </Flex>
-      </Card.Section>
+        <Box p="sm" width="100%">
+          <Skeleton height="16px" mt="sm"/>
+          <Flex>
+            <Skeleton height="8px" mt="sm" width="50px"/>
+            <Skeleton height="8px" mt="sm" ml="sm" width="50px"/>
+          </Flex>
+        </Box>
+      </Flex>
 
-      <Group>
-        <Skeleton height={16}/>
-        <Skeleton height={16}/>
-        <Skeleton height={16}/>
-        <Skeleton height={16}/>
-        <Skeleton height={16}/>
-        <Skeleton height={16}/>
-        <Skeleton height={16}/>
-      </Group>
+      <Flex>
+        <Skeleton height="16px"/>
+        <Skeleton height="16px"/>
+        <Skeleton height="16px"/>
+        <Skeleton height="16px"/>
+        <Skeleton height="16px"/>
+        <Skeleton height="16px"/>
+        <Skeleton height="16px"/>
+      </Flex>
     </Card>
   );
 }

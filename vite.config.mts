@@ -167,7 +167,6 @@ export default defineConfig(config => {
       preprocessorOptions: {
         scss: {
           api: 'modern-compiler',
-          additionalData: '@use "/resources/app/mantine" as *;',
         },
       },
     },

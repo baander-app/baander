@@ -1,9 +1,9 @@
 import { ScrollList, ScrollListItem } from '@/modules/library-music/components/scroll-list';
-import { Box, Flex } from '@mantine/core';
+import { Flex } from '@radix-ui/themes';
 import {
-  useAlbumServiceAlbumsIndex,
-  useArtistServiceArtistsIndex,
-  useGenreServiceGenresIndex,
+  useAlbumServiceGetApiLibrariesByLibraryAlbums,
+  useArtistServiceGetApiLibrariesByLibraryArtists,
+  useGenreServiceGetApiGenres,
 } from '@/api-client/queries';
 import { useEffect, useState } from 'react';
 import { SongList } from '@/modules/library-music/components/song-list/song-list.tsx';
@@ -15,7 +15,7 @@ import { LibraryParams } from '@/modules/library-music/routes/_routes.tsx';
 export default function Songs() {
   const { library } = usePathParam<LibraryParams>();
 
-  const { data: genreData } = useGenreServiceGenresIndex({ librarySlug: library });
+  const { data: genreData } = useGenreServiceGetApiGenres({ librarySlug: library });
   const [genres, setGenres] = useState<ScrollListItem[]>([]);
   const [selectedGenres, setSelectedGenres] = useState<ScrollListItem | undefined>();
 
@@ -30,7 +30,7 @@ export default function Songs() {
     }
   }, [genreData]);
 
-  const { data: albumData } = useAlbumServiceAlbumsIndex({
+  const { data: albumData } = useAlbumServiceGetApiLibrariesByLibraryAlbums({
     library,
     genres: selectedGenres?.key ?? undefined,
   });
@@ -46,7 +46,7 @@ export default function Songs() {
     }
   }, [albumData]);
 
-  const { data: artistData } = useArtistServiceArtistsIndex({ library });
+  const { data: artistData } = useArtistServiceGetApiLibrariesByLibraryArtists({ library });
   const [artists, setArtists] = useState<ScrollListItem[]>([]);
 
   useEffect(() => {
@@ -60,13 +60,13 @@ export default function Songs() {
   }, [artistData]);
 
   return (
-    <Box>
-      <Flex justify="space-between" m="-12px">
+    <>
+      <Flex style={{ width: '100vw' }}>
         <ScrollList
           header="Genres"
           listItems={genres}
           totalCount={genres.length}
-          style={{ height: 150, flexGrow: 1 }}
+          style={{ height: 150 }}
           onItemPress={item => setSelectedGenres(item)}
         />
 
@@ -85,10 +85,8 @@ export default function Songs() {
         />
       </Flex>
 
-      <Box className={styles.songListContainer}>
-        <SongList/>
-      </Box>
-    </Box>
+      <SongList/>
+    </>
   );
 
 }
