@@ -1,48 +1,4 @@
-.facePlateGrid {
-  height: 100%;
-  align-items: center;
-}
-
-.innerContainer {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  height: 100%;
-}
-
-.trackTitle {
-  color: var(--gray-1);
-  text-align: center;
-  margin-bottom: 8px;
-}
-
-.trackDetails {
-  color: var(--gray-color);
-  margin-bottom: 16px;
-}
-
 .progressContainer {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
   width: 100%;
-  margin-top: 16px;
-}
-
-@media (max-width: 768px) {
-  .facePlateGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .innerContainer {
-    align-items: center;
-  }
-
-  .trackTitle {
-    font-size: 1.25rem;
-  }
-
-  .progressContainer {
-    margin-top: 12px;
-  }
 }

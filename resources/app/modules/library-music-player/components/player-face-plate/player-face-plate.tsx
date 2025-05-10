@@ -34,25 +34,24 @@ export function PlayerFacePlate({
   const artistNames = viewModel.artists?.join(', ');
 
   return (
-    <Grid className={styles.facePlateGrid} columns="auto 1fr" gap="1">
-      <Cover imgSrc={viewModel.coverUrl} size={100} />
+    <Flex flexGrow="2" align="center">
+      <Cover imgSrc={viewModel.coverUrl} size={64} />
 
       <Flex
         direction="column"
-        className={styles.innerContainer}
-        style={{ justifyContent: 'center', height: '100%' }}
+        width="100%"
+        ml="3"
       >
         <Flex
           direction="column"
           justify="center"
           align="center"
-          style={{ flex: 1, textAlign: 'center' }}
         >
-          <Text weight="bold" size="2" className={styles.trackTitle}>
+          <Text weight="bold" size="2">
             {viewModel?.title}
           </Text>
 
-          <Text size="1" className={styles.trackDetails}>
+          <Text size="1">
             {viewModel.album ? `${viewModel.album}` : ''}
             {artistNames ? ` | ${artistNames}` : ''}
           </Text>
@@ -62,7 +61,6 @@ export function PlayerFacePlate({
           direction="row"
           className={styles.progressContainer}
           align="center"
-          style={{ justifyContent: 'space-between', width: '100%' }}
         >
           <Text size="2" mr="2">
             {elapsedDisplay}
@@ -80,7 +78,7 @@ export function PlayerFacePlate({
           </Text>
         </Flex>
       </Flex>
-    </Grid>
+    </Flex>
   );
 }
 

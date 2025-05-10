@@ -90,7 +90,7 @@ class Album extends BaseModel
 
     public function songs()
     {
-        return $this->hasMany(Song::class);
+        return $this->hasMany(Song::class)->orderByNullsLast('track');
     }
 
     protected function scopeWhereGenreNames(BaseBuilder $q, array $names)

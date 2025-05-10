@@ -24,11 +24,11 @@ function AlbumContextMenu({ album }: { album: AlbumResource }) {
 export default function Albums() {
   const { library: libraryParam } = usePathParam<LibraryParams>();
   const [showAlbumDetail, setShowAlbumDetail] = useState<string | null>(null);
-  const { data, isLoading } = useAlbumServiceGetApiLibrariesByLibraryAlbums({ library: libraryParam, relations: 'cover' });
+  const { data, isLoading } = useAlbumServiceGetApiLibrariesByLibraryAlbums({ library: libraryParam, relations: 'artists,cover' });
 
   return (
-    <Flex justify="between" align="stretch">
-      <Box p="6px" className={styles.grid}>
+    <Flex justify="between" align="stretch" className={styles.albumsLayout}>
+      <Box m="3" className={styles.grid}>
         <CoverGrid>
           {isLoading && <AlbumsSkeleton/>}
           {data?.data && (
@@ -39,7 +39,7 @@ export default function Albums() {
                     <ContextMenu.Trigger>
                       <Album
                         title={album.title}
-                        primaryArtist={album?.artists?.map(x => x.name).join(',')}
+                        primaryArtist={album?.artists?.map(x => x.name).join(',') ?? 'Unknown'}
                         imgSrc={album?.cover?.url ?? undefined}
                         onClick={() => setShowAlbumDetail(album.slug)}
                       />
@@ -54,9 +54,11 @@ export default function Albums() {
         </CoverGrid>
       </Box>
 
-      {showAlbumDetail && (
-        <AlbumDetail albumSlug={showAlbumDetail}/>
-      )}
+      <Box display="block" minHeight="300px" minWidth="300px" className={styles.sidebar} mt="2" mr="2">
+        {showAlbumDetail && (
+          <AlbumDetail albumSlug={showAlbumDetail}/>
+        )}
+      </Box>
     </Flex>
   );
 }

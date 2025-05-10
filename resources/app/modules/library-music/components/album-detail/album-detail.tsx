@@ -18,7 +18,7 @@ interface AlbumDetailProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export function AlbumDetail({ albumSlug, ...rest }: AlbumDetailProps) {
   const { library } = usePathParam<LibraryParams>();
-  const { data, isFetching, isLoadingError, refetch } = useAlbumServiceGetApiLibrariesByLibraryAlbumsByAlbum({
+  const { data, isLoadingError, refetch } = useAlbumServiceGetApiLibrariesByLibraryAlbumsByAlbum({
     album: albumSlug,
     library: library,
   });
@@ -27,8 +27,8 @@ export function AlbumDetail({ albumSlug, ...rest }: AlbumDetailProps) {
   const blurhash = data?.cover && generateBlurhashBackgroundImage(data.cover.blurhash, 128, 128);
 
   return (
-    <Box {...rest} minWidth="35%">
-      {isFetching && <AlbumDetailSkeleton/>}
+    <Box {...rest}>
+      {/*TODO: fix popin{isFetching && <AlbumDetailSkeleton/>}*/}
       {isLoadingError && <AlertLoadingError retry={async () => {
         await refetch();
       }}/>}
@@ -47,7 +47,7 @@ export function AlbumDetail({ albumSlug, ...rest }: AlbumDetailProps) {
           <div className={styles.content}>
             <div>
               <Flex align="stretch">
-                <Box p="sm">
+                <Box p="3">
                   <Cover imgSrc={data?.cover?.url} size={180}/>
                 </Box>
 
@@ -105,7 +105,7 @@ function AlbumSongs({ songs }: AlbumSongProps) {
   return (
     <>
       <ScrollArea>
-        <table>
+        <table >
           <thead>
             <tr>
               <th>Track</th>

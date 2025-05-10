@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 
 import Artists from '@/modules/library-music/routes/artists.tsx';
 import Albums  from '@/modules/library-music/routes/albums.tsx';
@@ -10,6 +10,7 @@ export const LibraryMusicRoutes = () => {
       <Route path="/artists" element={<Artists/>}></Route>
       <Route path="/albums" element={<Albums/>}></Route>
       <Route path="/songs" element={<Songs/>}></Route>
+      <Route path="/*" element={<Navigate to="/" />} />
     </Routes>
   );
 };

@@ -1,7 +1,5 @@
-import { Slider } from "radix-ui";
+import { Slider } from 'radix-ui';
 import styles from './progress-bar.module.css';
-import { ChangeEvent } from 'react';
-
 
 interface ProgressBarProps {
   duration: number;
@@ -10,7 +8,7 @@ interface ProgressBarProps {
   setProgress: (currentProgress: number) => void;
 }
 
-export function ProgressBar({duration, currentProgress, setProgress, buffered}: ProgressBarProps) {
+export function ProgressBar({ duration, currentProgress, setProgress }: ProgressBarProps) {
 
   // const progressBarWidth = isNaN(currentProgress / duration)
   //   ? 0
@@ -22,26 +20,20 @@ export function ProgressBar({duration, currentProgress, setProgress, buffered}: 
   //   '--buffered-width': bufferedWidth,
   // };
 
-  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
-    e.preventDefault();
-
-    setProgress(Number(e.target.value));
-  }
-
   return (
     <Slider.Root
       className={styles.Root}
       min={0}
-      value={[buffered, currentProgress]}
+      defaultValue={[currentProgress]}
       max={Number(duration)}
-      onChange={handleChange}
+      onValueChange={(progress) => setProgress(progress[0])}
     >
       <Slider.Track className={styles.Track}>
-        <Slider.Range className={styles.RangeBuffer} />
-        <Slider.Range className={styles.RangeProgress} />
+        <Slider.Range className={styles.RangeProgress}/>
+        {/*<Slider.Range className={styles.RangeProgress}/>*/}
       </Slider.Track>
 
-      <Slider.Thumb className={styles.Thumb} aria-label="Song progress" />
+      <Slider.Thumb className={styles.Thumb} aria-label="Song progress"/>
     </Slider.Root>
   );
 }

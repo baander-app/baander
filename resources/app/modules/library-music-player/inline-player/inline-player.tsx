@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { Grid } from '@radix-ui/themes';
+import { Flex } from '@radix-ui/themes';
 import { useMusicSource } from '@/providers/music-source-provider';
 // import { useEcho } from '@/providers/echo-provider.tsx';
 import { PlayerStateInput } from '@/services/libraries/player-state.ts';
@@ -77,10 +77,8 @@ export function InlinePlayer() {
   };
 
   const coverUrl = useMemo(() => {
-    return song?.album?.coverUrl;
+    return song?.album?.cover?.url ?? '';
   }, [song]);
-
-  // const artist = useMemo(() => song && song.artists, [song]);
 
   const artistNames = useMemo(() => {
     return song && song?.artists?.map(artist => artist.name);
@@ -92,8 +90,10 @@ export function InlinePlayer() {
 
   return (
     <>
+
+
       <LyricsProvider>
-        <Grid columns="3fr 3fr 3fr" gap="1" width="100%">
+        <Flex justify="center" flexGrow="1" style={{flexGrow: 1}}>
           <PlayerControls
             isPlaying={isPlaying}
             togglePlayPause={() => togglePlayPause()}
@@ -113,8 +113,9 @@ export function InlinePlayer() {
           />
 
           <PlayerMetaControls song={song}/>
-        </Grid>
+        </Flex>
       </LyricsProvider>
+
     </>
   );
 }
