@@ -96,7 +96,6 @@ final class Zend_Media_Id3v2 extends Zend_Media_Id3_Object
      * @param Array $options The options array.
      * @throws Zend_Media_Id3_Exception if given file descriptor is not valid
      * @todo  Only limited subset of flags are processed.
-     * @todo  Utilize the SEEK frame and search for a footer to find the tag
      * @todo  Utilize the LINK frame to fetch frames from other sources
      */
     public function __construct($filename = null, $options = [])
@@ -214,6 +213,30 @@ final class Zend_Media_Id3v2 extends Zend_Media_Id3_Object
                 $this->_frames[$frame->getIdentifier()] = [];
             }
             $this->_frames[$frame->getIdentifier()][] = $frame;
+        }
+
+        // Utilize the SEEK frame to find the footer if present
+        if (isset($this->_frames['SEEK']) && count($this->_frames['SEEK']) > 0) {
+            $seekFrame = $this->_frames['SEEK'][0];
+            $minimumOffset = $seekFrame->getMinimumOffset();
+
+            // Save current position
+            $currentOffset = $this->_reader->getOffset();
+
+            // Calculate the position of the next tag
+            $nextTagOffset = $startOffset + 10 + $tagSize + $minimumOffset;
+            $this->_reader->setOffset($nextTagOffset);
+
+            // Check if there's a footer at the calculated position
+            if ($this->_reader->read(3) == '3DI') {
+                // Found a footer, create a footer object
+                if (!$this->hasFooter()) {
+                    $this->_footer = new Zend_Media_Id3_Header($this->_reader, $options);
+                }
+            }
+
+            // Restore the original position
+            $this->_reader->setOffset($currentOffset);
         }
     }
 

@@ -13,7 +13,7 @@ class BlurHashServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->scoped('blurhash', function (Application $app) {
-            $config = $app->get('blurhash');
+            $config = $app->get('config')->get('blurhash');
 
             return new BlurHash(
                 $config['driver'] ?? 'gd',

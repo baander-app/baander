@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "2454744da1b2366b92922d722fa39cae",
+    "content-hash": "4bc8059e93a22a7d3c8bb68d0844d602",
     "packages": [
         {
             "name": "amphp/amp",
@@ -2832,21 +2832,21 @@
         },
         {
             "name": "hidehalo/nanoid-php",
-            "version": "1.1.13",
+            "version": "2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/hidehalo/nanoid-php.git",
-                "reference": "3fc7c949f4e655939cc30e7110d658af3dbb0e30"
+                "reference": "3aa4f874d36e2368a57b2ad4c9ca1abe13514e66"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/hidehalo/nanoid-php/zipball/3fc7c949f4e655939cc30e7110d658af3dbb0e30",
-                "reference": "3fc7c949f4e655939cc30e7110d658af3dbb0e30",
+                "url": "https://api.github.com/repos/hidehalo/nanoid-php/zipball/3aa4f874d36e2368a57b2ad4c9ca1abe13514e66",
+                "reference": "3aa4f874d36e2368a57b2ad4c9ca1abe13514e66",
                 "shasum": ""
             },
             "require": {
                 "paragonie/random_compat": ">=2.0",
-                "php": "~5.6|~7.0|~8.0"
+                "php": "~7.1|~8.0"
             },
             "require-dev": {
                 "phpunit/phpunit": ">=5.6",
@@ -2883,9 +2883,9 @@
             ],
             "support": {
                 "issues": "https://github.com/hidehalo/nanoid-php/issues",
-                "source": "https://github.com/hidehalo/nanoid-php/tree/1.1.13"
+                "source": "https://github.com/hidehalo/nanoid-php/tree/2.0"
             },
-            "time": "2022-08-04T12:07:12+00:00"
+            "time": "2024-11-04T03:00:05+00:00"
         },
         {
             "name": "intervention/gif",
@@ -12609,24 +12609,22 @@
         },
         {
             "name": "tpetry/laravel-postgresql-enhanced",
-            "version": "2.4.1",
+            "version": "3.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/tpetry/laravel-postgresql-enhanced.git",
-                "reference": "e4745fb416e2ca648b8fc80deba29b9832c5d5b8"
+                "reference": "816f36fc3b3e0a3daf90f61d8d9dd76eb15ec6f4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/tpetry/laravel-postgresql-enhanced/zipball/e4745fb416e2ca648b8fc80deba29b9832c5d5b8",
-                "reference": "e4745fb416e2ca648b8fc80deba29b9832c5d5b8",
+                "url": "https://api.github.com/repos/tpetry/laravel-postgresql-enhanced/zipball/816f36fc3b3e0a3daf90f61d8d9dd76eb15ec6f4",
+                "reference": "816f36fc3b3e0a3daf90f61d8d9dd76eb15ec6f4",
                 "shasum": ""
             },
             "require": {
                 "doctrine/dbal": "^2.6|^3.5|^4.0",
-                "illuminate/container": "^6.0|^7.0|^8.0|^9.0|^10.0|^11.0|^12.0",
                 "illuminate/database": "^6.0|^7.0|^8.79|^9.0|^10.0|^11.0|^12.0",
-                "illuminate/events": "^6.0|^7.0|^8.0|^9.0|^10.0|^11.0|^12.0",
-                "illuminate/support": "^6.0|^7.0|^8.0|^9.0|^10.0|^11.0|^12.0",
+                "laravel/framework": "*",
                 "php": "^8.0",
                 "spatie/regex": "^2.0|^3.0"
             },
@@ -12677,9 +12675,9 @@
             ],
             "support": {
                 "issues": "https://github.com/tpetry/laravel-postgresql-enhanced/issues",
-                "source": "https://github.com/tpetry/laravel-postgresql-enhanced/tree/2.4.1"
+                "source": "https://github.com/tpetry/laravel-postgresql-enhanced/tree/3.0.0"
             },
-            "time": "2025-04-11T07:00:36+00:00"
+            "time": "2025-04-23T10:19:01+00:00"
         },
         {
             "name": "vlucas/phpdotenv",

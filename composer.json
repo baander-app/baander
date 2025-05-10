@@ -31,7 +31,7 @@
     "dedoc/scramble": "^v0.12.9",
     "ergebnis/clock": "^2.10.0",
     "guzzlehttp/guzzle": "^7.9.2",
-    "hidehalo/nanoid-php": "^1.1.13",
+    "hidehalo/nanoid-php": "^2.0",
     "intervention/image": "^3.11.1",
     "justinrainbow/json-schema": "^6.1.0",
     "laravel/fortify": "^v1.25.4",
@@ -60,7 +60,7 @@
     "stevebauman/unfinalize": "^v2.1.1",
     "symfony/string": "^v7.2.0",
     "tightenco/ziggy": "^v2.5.1",
-    "tpetry/laravel-postgresql-enhanced": "^2.3.0",
+    "tpetry/laravel-postgresql-enhanced": "^3.0",
     "web-auth/webauthn-lib": "^5.1.2",
     "xenos/musicbrainz": "@dev",
     "zend/php-reader": "@dev"

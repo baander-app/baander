@@ -6,6 +6,7 @@ use App\Models\Concerns\HasLibraryAccess;
 use App\Modules\Eloquent\BaseBuilder;
 use App\Modules\Translation\LocaleString;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Overtrue\LaravelVersionable\Versionable;
 use Spatie\Sluggable\{HasSlug, SlugOptions};
 
@@ -77,7 +78,7 @@ class Album extends BaseModel
             ->using(AlbumArtist::class);
     }
 
-    public function cover()
+    public function cover(): MorphOne
     {
         return $this->morphOne(Image::class, 'imageable');
     }

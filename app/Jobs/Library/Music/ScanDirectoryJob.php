@@ -2,17 +2,18 @@
 
 namespace App\Jobs\Library\Music;
 
-use App\Modules\Translation\LocaleString;
-use Arr;
-use SplFileInfo;
 use App\Extensions\StrExt;
 use App\Jobs\BaseJob;
 use App\Models\{Album, Artist, Genre, Library, Song};
 use App\Modules\Lyrics\Lrc;
-use App\Modules\MetaAudio\{MetaAudio, Mp3, Tagger};
+use App\Modules\MediaMeta\MediaMeta;
+use App\Modules\Translation\LocaleString;
+use Arr;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\{DB, File, Log};
 use Illuminate\Support\LazyCollection;
+use SplFileInfo;
 
 class ScanDirectoryJob extends BaseJob implements ShouldQueue
 {
@@ -20,13 +21,22 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
     public const string GENRE_SEPARATOR = ';';
     private const int BATCH_SIZE = 50;
 
-    private Tagger $tagger;
-
     public function __construct(
         public string  $directory,
         public Library $library,
     )
     {
+    }
+
+    /**
+     * Get the middleware the job should pass through.
+     *
+     * @return array<int, object>
+     */
+    public function middleware(): array
+    {
+        $sha = hash('sha256', $this->directory);
+        return [new WithoutOverlapping("scan_music_directory_$sha")->dontRelease()];
     }
 
     /**
@@ -37,9 +47,6 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         $this->queueProgress(0);
 
         DB::transaction(function () {
-            $this->tagger = new Tagger();
-            $this->tagger->addDefaultModules();
-
             $files = LazyCollection::make(File::files($this->directory));
             $this->processFiles($files);
         });
@@ -56,7 +63,8 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         $fileCount = $files->count();
 
         $files->each(function (SplFileInfo $file) use (&$songs, &$coverJobs, &$lyrics, &$processedFiles, &$fileCount) {
-            $this->processFile($file, $songs, $coverJobs, $lyrics);
+            $mediaMeta = new MediaMeta($file->getRealPath());
+            $this->processFile($mediaMeta, $file, $songs, $coverJobs, $lyrics);
 
             if (count($songs) >= self::BATCH_SIZE) {
                 $this->batchSaveSongs($songs);
@@ -92,7 +100,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         }
     }
 
-    private function processFile(SplFileInfo $file, array &$songs, array &$coverJobs, array &$lyrics): void
+    private function processFile(MediaMeta $mediaMeta, SplFileInfo $file, array &$songs, array &$coverJobs, array &$lyrics): void
     {
         try {
             $filePath = $file->getRealPath();
@@ -102,45 +110,50 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
                 return;
             }
 
-            $hash = sha1_file($filePath);
-            $metaAudio = new MetaAudio($file);
+            $hash = hash('sha256', $filePath);
 
-            if (!$metaAudio->isAudioFile() || Song::whereHash($hash)->exists()) {
+            if (!$mediaMeta->isAudioFile() || Song::whereHash($hash)->exists()) {
                 return;
             }
 
-            if ($songData = $this->processMetadata(metaAudio: $metaAudio, filePath: $filePath, hash: $hash, file: $file, lyrics: $lyrics, coverJobs: $coverJobs)) {
+            if ($songData = $this->processMetadata(mediaMeta: $mediaMeta, filePath: $filePath, hash: $hash, file: $file, lyrics: $lyrics, coverJobs: $coverJobs)) {
                 $songs[] = $songData;
             }
         } catch (\Exception $e) {
             Log::error("Failed to process file: {$file->getRealPath()}", [
-                'exception' => $e,
+                'isReadable' => $file->isReadable(),
+                'isFile'     => $file->isFile(),
+                'exception'  => $e,
             ]);
         }
     }
 
-    private function processMetadata(MetaAudio $metaAudio, string $filePath, string $hash, SplFileInfo $file, array &$lyrics, array &$coverJobs): ?array
+    private function processMetadata(MediaMeta $mediaMeta, string $filePath, string $hash, SplFileInfo $file, array &$lyrics, array &$coverJobs): ?array
     {
         try {
-            $meta = $this->tagger->open($filePath);
             $directoryName = basename(File::basename($file));
-            $album = $this->findOrCreateAlbum(meta: $meta, directoryName: $directoryName);
+            $album = $this->findOrCreateAlbum(directoryName: $directoryName, albumTitle: $mediaMeta->getAlbum(), year: $mediaMeta->getYear());
 
             if (!$album) {
                 return null;
             }
 
-            $songAttributes = $this->makeSongAttributes(meta: $meta, file: $file, metaAudio: $metaAudio, hash: $hash, lyric: $this->getLyric($file, $lyrics));
+            $songAttributes = $this->makeSongAttributes(mediaMeta: $mediaMeta, file: $file, hash: $hash, lyric: $this->getLyric($file, $lyrics));
             if ($songAttributes) {
                 $this->queueCoverJob($album, $coverJobs);
 
                 $cleanBadNames = fn($v) => trim($v) !== '' && $v !== null;
 
+                $artists = $mediaMeta->getArtist();
+                $artists = is_array($artists) ? array_filter($mediaMeta->getArtist(), $cleanBadNames) : array_filter(explode(self::ARTIST_SEPARATOR, $artists ?? ''), $cleanBadNames);
+                $artistIds = $this->getArtistIds($artists);
+                $album->artists()->sync($artistIds);
+
                 return [
                     'attributes' => $songAttributes,
                     'album'      => $album,
-                    'artists'    => array_filter(explode(self::ARTIST_SEPARATOR, $meta->getArtist() ?? ''), $cleanBadNames),
-                    'genres'     => array_filter(explode(self::GENRE_SEPARATOR, $meta->getGenre()), $cleanBadNames),
+                    'artists'    => $artists,
+                    'genres'     => array_filter(explode(self::GENRE_SEPARATOR, $mediaMeta->getGenre() ?? ''), $cleanBadNames),
                 ];
             }
 
@@ -160,16 +173,16 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         return $lyrics[$lyricPath] ?? (File::exists($lyricPath) ? File::get($lyricPath) : null);
     }
 
-    private function findOrCreateAlbum(Mp3 $meta, string $directoryName): ?Album
+    private function findOrCreateAlbum(string $directoryName, string|null $albumTitle = null, int|null $year = null): ?Album
     {
-        $title = $meta->getAlbumTitle() ?? $meta->getAlbum();
+        $title = $albumTitle;
         $album = Album::whereTitle($title)->whereLibraryId($this->library->id)->first();
         $fallback = $this->isSongInBaseDirectory($directoryName) ? LocaleString::delimitString('library.album.fallback') : $directoryName;
 
         if (!$album) {
             $album = new Album([
                 'title' => $title ?: $fallback,
-                'year'  => $meta->getYear() ?: null,
+                'year'  => $year,
             ]);
             $album->library()->associate($this->library);
 
@@ -186,21 +199,21 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         return $album;
     }
 
-    private function makeSongAttributes(Mp3 $meta, SplFileInfo $file, MetaAudio $metaAudio, string $hash, ?string $lyric): ?array
+    private function makeSongAttributes(MediaMeta $mediaMeta, SplFileInfo $file, string $hash, ?string $lyric): ?array
     {
-        $mimeType = $metaAudio->mimeType();
+        $mimeType = $mediaMeta->getMimeType();
 
         if (!$mimeType) {
             return null;
         }
 
         return [
-            'title'         => $meta->getTitle() ?? $file->getBasename(),
-            'track'         => $meta->getTrackNumber(),
-            'length'        => $metaAudio->probeLength(),
-            'lyrics'        => StrExt::convertToUtf8($lyric),
+            'title'         => $mediaMeta->getTitle() ?? $file->getBasename(),
+            'track'         => $mediaMeta->getTrackNumber(),
+            'length'        => $mediaMeta->probeLength(),
+            'lyrics'        => $lyric ? StrExt::convertToUtf8($lyric) : null,
             'path'          => $file->getRealPath(),
-            'mime_type'     => $metaAudio->mimeType(),
+            'mime_type'     => $mediaMeta->getMimeType(),
             'modified_time' => $file->getMTime(),
             'size'          => is_int($file->getSize()) ? $file->getSize() : 0,
             'hash'          => $hash,
