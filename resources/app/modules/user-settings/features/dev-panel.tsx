@@ -39,8 +39,10 @@ export function DevPanel() {
         message: 'Test notification',
       },
       {
+        title: 'Test title',
         type: 'success',
         message: 'Test success notification',
+        toast: true,
       },
       {
         type: 'warning',

@@ -2,7 +2,6 @@ import { ColumnDef, getCoreRowModel, getSortedRowModel, SortingState, useReactTa
 import { useMemo, useState } from 'react';
 import { Iconify } from '@/ui/icons/iconify.tsx';
 import { useUserServiceGetApiUsers } from '@/api-client/queries';
-import { stringify } from '@/utils/json.ts';
 import { UserResource } from '@/api-client/requests';
 import { Tooltip } from 'radix-ui';
 import { Button, Flex, Text } from '@radix-ui/themes';
@@ -42,7 +41,7 @@ export function UserTable() {
   });
 
   const { data, isLoading, refetch } = useUserServiceGetApiUsers({
-    sorting: stringify(sorting),
+    sorting: JSON.stringify(sorting),
     page: pagination.pageIndex,
     limit: pagination.pageSize,
   });

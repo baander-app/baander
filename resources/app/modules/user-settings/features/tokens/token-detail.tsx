@@ -1,13 +1,14 @@
 import { PersonalAccessTokenViewResource } from '@/api-client/requests';
 import { Code, Badge, Card, DataList } from '@radix-ui/themes';
 import { useDateFormatter } from '@/providers/dayjs-provider.tsx';
+import { DateTime } from '@/ui/dates/date-time.tsx';
 
 export interface TokenDetailProps {
   item: PersonalAccessTokenViewResource;
 }
 
 export function TokenDetail({ item }: TokenDetailProps) {
-  const { formatDate, fromNow } = useDateFormatter();
+  const { fromNow } = useDateFormatter();
 
   return (
     <Card>
@@ -64,12 +65,16 @@ export function TokenDetail({ item }: TokenDetailProps) {
 
         <DataList.Item>
           <DataList.Label>Created</DataList.Label>
-          <DataList.Value>{formatDate(item.createdAt) ?? ''}</DataList.Value>
+          <DataList.Value>
+            <DateTime date={item.createdAt ?? ''} />
+          </DataList.Value>
         </DataList.Item>
 
         <DataList.Item>
           <DataList.Label>Expires</DataList.Label>
-          <DataList.Value>{formatDate(item.expiresAt) ?? ''}</DataList.Value>
+          <DataList.Value>
+            <DateTime date={item.expiresAt ?? ''} />
+          </DataList.Value>
         </DataList.Item>
 
         <DataList.Item>

@@ -187,7 +187,7 @@ export class AuthService {
      * @returns unknown
      * @throws ApiError
      */
-    public static postApiAuthRegister(data: PostApiAuthRegisterData = {}): CancelablePromise<PostApiAuthRegisterResponse> {
+    public static postApiAuthRegister(data: PostApiAuthRegisterData): CancelablePromise<PostApiAuthRegisterResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/auth/register',

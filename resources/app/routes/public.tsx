@@ -1,9 +1,8 @@
-import { lazyImport } from '@/utils/lazy-import.ts';
 import { BareLayout } from '@/layouts/bare-layout/bare-layout.tsx';
-import { Outlet } from 'react-router-dom';
+import { Navigate, Outlet } from 'react-router-dom';
 import { AuthorizeRoutes } from '@/modules/authorize/routes.tsx';
-
-const {AuthRoutes} = lazyImport(() => import('@/modules/auth/routes'), 'AuthRoutes');
+import Login from '@/modules/auth/routes/login.tsx';
+import { AuthRoutes } from '@/modules/auth/routes/_routes.tsx';
 
 const App = () => {
   return (
@@ -15,12 +14,13 @@ const App = () => {
 
 export const publicRoutes = [
   {
-    path: '/*',
+    path: '/',
     element: <App/>,
     children: [
-      {path: '', element: <AuthRoutes/>},
-      {path: 'authorize/*', element: <AuthorizeRoutes/>},
-      {path: '*', element: <AuthRoutes/>},
+      { path: '', element: <Login/> },
+      { path: 'auth/*', element: <AuthRoutes/> },
+      { path: 'authorize/*', element: <AuthorizeRoutes/> },
+      { path: '*', element: <Navigate to="/"/> },
     ],
   },
 ];

@@ -43,7 +43,6 @@ function NotificationList({ notifications }: NotificationListProps) {
             <NotificationCard
               notification={notification}
               key={notification.id}
-              style={{ marginTop: '4px' }}
             />
           ))}
         </Flex>

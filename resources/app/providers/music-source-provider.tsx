@@ -1,4 +1,4 @@
-import React, { MutableRefObject, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { RefObject, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { noop } from '@/utils/noop.ts';
 import { useStreamToken } from '@/hooks/use-stream-token.ts';
 import { useAppDispatch, useAppSelector } from '@/store/hooks.ts';
@@ -6,8 +6,8 @@ import { playNextSong, selectSong } from '@/store/music/music-player-slice.ts';
 
 interface MusicSourceContextType {
   authenticatedSource: string | undefined;
-  audioRef: MutableRefObject<HTMLAudioElement | null> | undefined;
-  setAudioRef: (audioRef: MutableRefObject<HTMLAudioElement | null>) => void;
+  audioRef: RefObject<HTMLAudioElement | null> | undefined;
+  setAudioRef: (audioRef: RefObject<HTMLAudioElement | null>) => void;
 }
 
 export const MusicSourceContext = React.createContext<MusicSourceContextType>({
@@ -22,7 +22,7 @@ export function MusicSourceProvider({ children }: { children: React.ReactNode })
   const { streamToken } = useStreamToken();
 
   const currentSong = useAppSelector(selectSong);
-  const [audioRef, setAudioRef] = useState<MutableRefObject<HTMLAudioElement | null>>();
+  const [audioRef, setAudioRef] = useState<RefObject<HTMLAudioElement | null>>();
 
   const authenticatedSource = useMemo(() => {
     if (currentSong?.stream && streamToken) {

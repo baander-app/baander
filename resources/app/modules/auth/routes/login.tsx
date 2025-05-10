@@ -1,12 +1,11 @@
-import React, { SyntheticEvent } from 'react';
-import { Token } from '@/services/auth/token.ts';
+import { SyntheticEvent } from 'react';
 import { useAppDispatch } from '@/store/hooks.ts';
-import { setAccessToken, setIsAuthenticated, setRefreshToken } from '@/store/users/auth-slice.ts';
-import { AuthService, OpenAPI } from '@/api-client/requests';
+import { loginUser } from '@/store/users/auth-slice.ts';
 import { Box, Button, Flex, Text, TextField } from '@radix-ui/themes';
 import styles from './login.module.scss';
 import { VinylSpinAnimation } from '@/ui/animations/vinyl-spin-animation/vinyl-spin-animation.tsx';
 import { Form } from 'radix-ui';
+import { Link } from 'react-router-dom';
 
 export default function Login() {
   const dispatch = useAppDispatch();
@@ -18,19 +17,7 @@ export default function Login() {
     const email = formData.email.value;
     const password = formData.password.value;
 
-    try {
-      const res = await AuthService.postApiAuthLogin({
-        requestBody: { email, password },
-      });
-
-      Token.set(res);
-      OpenAPI.TOKEN = res.accessToken.token;
-      dispatch(setIsAuthenticated(true));
-      dispatch(setAccessToken(res.accessToken));
-      dispatch(setRefreshToken(res.refreshToken));
-    } catch {
-      return;
-    }
+    dispatch(loginUser({ email, password }));
   };
 
   return (
@@ -45,7 +32,7 @@ export default function Login() {
 
         <Form.Root className={styles.form} onSubmit={onSubmit}>
           <Box className={styles.animationSection}>
-            <VinylSpinAnimation className={styles.animation} />
+            <VinylSpinAnimation className={styles.animation}/>
           </Box>
 
           <Flex direction="column" gap="3">
@@ -76,17 +63,17 @@ export default function Login() {
         </Form.Root>
 
         <Flex direction="row" justify="between" className={styles.links}>
-          <a>
+          <Link to="/auth/forgot-password">
             <Text size="3">
               Forgot Password?
             </Text>
-          </a>
+          </Link>
 
-          <a>
+          <Link to="/auth/create-account">
             <Text size="3">
               Create an Account
             </Text>
-          </a>
+          </Link>
         </Flex>
       </Flex>
     </Flex>

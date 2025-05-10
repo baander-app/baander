@@ -571,9 +571,9 @@ export const useAuthServicePostApiAuthStreamToken = <TData = Common.AuthServiceP
 * @throws ApiError
 */
 export const useAuthServicePostApiAuthRegister = <TData = Common.AuthServicePostApiAuthRegisterMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  requestBody?: RegisterRequest & { name?: string; };
+  requestBody: RegisterRequest;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  requestBody?: RegisterRequest & { name?: string; };
+  requestBody: RegisterRequest;
 }, TContext>({ mutationFn: ({ requestBody }) => AuthService.postApiAuthRegister({ requestBody }) as unknown as Promise<TData>, ...options });
 /**
 * Request reset password link

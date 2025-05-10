@@ -23,6 +23,9 @@ interface MusicPlayerSlice {
     frequencies: number[];
     bufferSize: number;
   };
+  lyrics: {
+    offsetMs: number;
+  };
 }
 
 const initialState: MusicPlayerSlice = {
@@ -45,6 +48,9 @@ const initialState: MusicPlayerSlice = {
     rightChannel: 0,
     frequencies: [],
     bufferSize: 0,
+  },
+  lyrics: {
+    offsetMs: -150,
   },
 };
 
@@ -123,6 +129,9 @@ export const musicPlayerSlice = createSlice({
     setBufferSize: (state, action: PayloadAction<number>) => {
       state.analysis.bufferSize = action.payload;
     },
+    setLyricsOffset: (state, action: PayloadAction<{ ms: number }>) => {
+      state.lyrics.offsetMs = action.payload.ms;
+    },
   },
   selectors: {
     selectSong: (sliceState) =>
@@ -151,6 +160,7 @@ export const {
   setRightChannel,
   setFrequencies,
   setBufferSize,
+  setLyricsOffset,
 } = musicPlayerSlice.actions;
 
 export const {

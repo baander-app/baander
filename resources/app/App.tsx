@@ -3,14 +3,26 @@ import { BrowserRouter } from 'react-router-dom';
 import '@fontsource-variable/inter';
 import '@fontsource-variable/source-code-pro';
 
-import { AppRoutes }           from '@/routes';
-// import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { AppRoutes } from '@/routes';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { MusicSourceProvider } from '@/providers/music-source-provider';
-import { HelmetProvider }      from 'react-helmet-async';
-import { Theme }               from '@radix-ui/themes';
+import { HelmetProvider } from 'react-helmet-async';
+import { Button, Text, Theme } from '@radix-ui/themes';
+import { Toast } from 'radix-ui';
+import { useAppDispatch, useAppSelector } from '@/store/hooks.ts';
+import styles from './app.module.scss';
+import { removeToast } from '@/store/notifications/notifications-slice.ts';
+import { Iconify } from './ui/icons/iconify';
 
 
 function App() {
+  const { toasts } = useAppSelector(state => state.notifications);
+  const dispatch = useAppDispatch();
+
+  const dispatchRemoveToast = (id: string) => {
+    dispatch(removeToast({ id }));
+  };
+
   return (
     <HelmetProvider>
       <Theme
@@ -18,13 +30,46 @@ function App() {
         panelBackground="solid"
         radius="full"
       >
-        <MusicSourceProvider>
-          <BrowserRouter future={{v7_startTransition: true, v7_relativeSplatPath: true}}>
-            <AppRoutes/>
-          </BrowserRouter>
+        <Toast.Provider swipeDirection="right">
+          <MusicSourceProvider>
+            <BrowserRouter>
+              <AppRoutes/>
+            </BrowserRouter>
 
-          {/*<ReactQueryDevtools/>*/}
-        </MusicSourceProvider>
+            <ReactQueryDevtools/>
+
+            <Toast.Root></Toast.Root>
+          </MusicSourceProvider>
+
+          {toasts.map((toast) => (
+            <Toast.Root
+              key={toast.id}
+              duration={toast.duration}
+              className={styles.ToastRoot}
+              onOpenChange={(isOpen) => {
+                if (!isOpen) dispatchRemoveToast(toast.id);
+              }}
+            >
+              {toast.title && (<Toast.Title className={styles.ToastTitle}>{toast.title}</Toast.Title>)}
+
+              <Toast.Description className={styles.ToastDescription}>
+                <Text>{toast.message}</Text>
+              </Toast.Description>
+
+              <Toast.Action
+                className={styles.ToastAction}
+                altText="Clear"
+                asChild
+              >
+                <Button variant="ghost">
+                  <Iconify icon="ion:close" />
+                </Button>
+              </Toast.Action>
+            </Toast.Root>
+          ))}
+
+          <Toast.Viewport className={styles.ToastViewport}/>
+        </Toast.Provider>
       </Theme>
     </HelmetProvider>
   );

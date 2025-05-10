@@ -56,7 +56,6 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
 
     private function processFiles(LazyCollection $files): void
     {
-        $lyrics = [];
         $coverJobs = [];
         $songs = [];
         $processedFiles = 0;
@@ -100,15 +99,10 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         }
     }
 
-    private function processFile(MediaMeta $mediaMeta, SplFileInfo $file, array &$songs, array &$coverJobs, array &$lyrics): void
+    private function processFile(MediaMeta $mediaMeta, SplFileInfo $file, array &$songs, array &$coverJobs): void
     {
         try {
             $filePath = $file->getRealPath();
-
-            if ($file->getExtension() === Lrc::FILE_EXTENSION) {
-                $lyrics[$filePath] = $file;
-                return;
-            }
 
             $hash = hash('sha256', $filePath);
 
@@ -116,7 +110,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
                 return;
             }
 
-            if ($songData = $this->processMetadata(mediaMeta: $mediaMeta, filePath: $filePath, hash: $hash, file: $file, lyrics: $lyrics, coverJobs: $coverJobs)) {
+            if ($songData = $this->processMetadata(mediaMeta: $mediaMeta, filePath: $filePath, hash: $hash, file: $file, coverJobs: $coverJobs)) {
                 $songs[] = $songData;
             }
         } catch (\Exception $e) {
@@ -128,7 +122,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         }
     }
 
-    private function processMetadata(MediaMeta $mediaMeta, string $filePath, string $hash, SplFileInfo $file, array &$lyrics, array &$coverJobs): ?array
+    private function processMetadata(MediaMeta $mediaMeta, string $filePath, string $hash, SplFileInfo $file, array &$coverJobs): ?array
     {
         try {
             $directoryName = basename(File::basename($file));
@@ -138,7 +132,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
                 return null;
             }
 
-            $songAttributes = $this->makeSongAttributes(mediaMeta: $mediaMeta, file: $file, hash: $hash, lyric: $this->getLyric($file, $lyrics));
+            $songAttributes = $this->makeSongAttributes(mediaMeta: $mediaMeta, file: $file, hash: $hash, lyric: $this->getLyric($file));
             if ($songAttributes) {
                 $this->queueCoverJob($album, $coverJobs);
 
@@ -166,7 +160,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         }
     }
 
-    private function getLyric(SplFileInfo $file, array $lyrics): ?string
+    private function getLyric(SplFileInfo $file): ?string
     {
         $fullPath = $file->getRealPath();
         if (!$fullPath) {
@@ -176,7 +170,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         $pathWithoutFileName = pathinfo($fullPath, PATHINFO_DIRNAME);
         $lyricPath = $pathWithoutFileName . DIRECTORY_SEPARATOR . pathinfo($fullPath, PATHINFO_FILENAME) . '.' . Lrc::FILE_EXTENSION;
 
-        return $lyrics[$lyricPath] ?? (File::exists($lyricPath) ? File::get($lyricPath) : null);
+        return File::exists($lyricPath) ? File::get($lyricPath) : null;
     }
 
     private function findOrCreateAlbum(string $directoryName, string|null $albumTitle = null, int|null $year = null): ?Album

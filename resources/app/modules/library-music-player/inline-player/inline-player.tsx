@@ -90,8 +90,6 @@ export function InlinePlayer() {
 
   return (
     <>
-
-
       <LyricsProvider>
         <Flex justify="center" flexGrow="1" style={{flexGrow: 1}}>
           <PlayerControls
@@ -111,7 +109,6 @@ export function InlinePlayer() {
               album: album?.title,
             }}
           />
-
           <PlayerMetaControls song={song}/>
         </Flex>
       </LyricsProvider>

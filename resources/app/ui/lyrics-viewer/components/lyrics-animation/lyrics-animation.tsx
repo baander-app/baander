@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'motion/react';
 import { useLyrics } from '@/ui/lyrics-viewer/providers/lyrics-provider.tsx';
-import { Box, Text } from '@radix-ui/themes';
+import { Box } from '@radix-ui/themes';
 import styles from './lyrics-animation.module.scss';
 
 interface LyricsAnimationProps {
@@ -28,14 +28,7 @@ export const LyricsAnimation: React.FC<LyricsAnimationProps> = ({ currentTime })
     <Box width="inherit" className={styles.lyricContainer}>
       <AnimatePresence mode="sync">
         {currentLyric && (
-          <Text
-            // @ts-expect-error
-            as={motion.p}
-            style={{
-              color: '#fff',
-              fontSize: '32px',
-              fontWeight: 700
-            }}
+          <motion.p
             className={`${styles.lyricLine} ${styles.currentLyric}`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -44,17 +37,11 @@ export const LyricsAnimation: React.FC<LyricsAnimationProps> = ({ currentTime })
             key={currentLyric}
           >
             {currentLyric}
-          </Text>
+          </motion.p>
         )}
       </AnimatePresence>
       {nextLyric && (
-        <Text
-          // @ts-expect-error
-          as={motion.p}
-          style={{
-            color: '#fff',
-            fontSize: '24px',
-          }}
+        <motion.p
           className={`${styles.lyricLine} ${styles.nextLyric}`}
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 0.5, y: 20 }}
@@ -62,7 +49,7 @@ export const LyricsAnimation: React.FC<LyricsAnimationProps> = ({ currentTime })
           key={nextLyric}
         >
           {nextLyric}
-        </Text>
+        </motion.p>
       )}
     </Box>
   );

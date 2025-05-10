@@ -112,7 +112,7 @@ export function SongDetail({ publicId }: SongDetailProps) {
         <Text>{path}</Text>
         <Text>{durationHuman}</Text>
         <Text>{sizeHuman}</Text>
-        <Text><DateTime time={createdAt!}/></Text>
+        <Text><DateTime date={createdAt!}/></Text>
         <Text>{updatedAt}</Text>
       </Box>
     </Grid>

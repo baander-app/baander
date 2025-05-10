@@ -659,6 +659,10 @@ export const $QueueMonitorResource = {
 export const $RegisterRequest = {
     type: 'object',
     properties: {
+        name: {
+            type: 'string',
+            maxLength: 255
+        },
         email: {
             type: 'string',
             format: 'email',
@@ -671,7 +675,7 @@ export const $RegisterRequest = {
             type: 'string'
         }
     },
-    required: ['email', 'password', 'password_confirmation'],
+    required: ['name', 'email', 'password', 'password_confirmation'],
     title: 'RegisterRequest'
 } as const;
 

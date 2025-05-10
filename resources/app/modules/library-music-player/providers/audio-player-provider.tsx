@@ -1,19 +1,11 @@
-import React, {
-  MutableRefObject,
-  ReactEventHandler,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import React, { ReactEventHandler, RefObject, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { noop } from '@/utils/noop.ts';
 import { useMusicSource } from '@/providers/music-source-provider';
 import { SongResource } from '@/api-client/requests';
 import { useToast } from '@/providers/toast-provider.tsx';
 
 interface AudioPlayerContextType {
-  audioRef: MutableRefObject<HTMLAudioElement>;
+  audioRef: RefObject<HTMLAudioElement>;
   isPlaying: boolean;
   play: () => void;
   duration: number;
@@ -32,7 +24,7 @@ interface AudioPlayerContextType {
 }
 
 export const AudioPlayerContext = React.createContext<AudioPlayerContextType>({
-  audioRef: null as unknown as MutableRefObject<HTMLAudioElement>,
+  audioRef: null as unknown as RefObject<HTMLAudioElement>,
   isPlaying: false,
   play: () => noop(),
   duration: 0,

@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import styles from './dashboard-layout.module.scss';
+import styles from '../root-layout/root-layout.module.scss';
 import { lazyImport } from '@/utils/lazy-import';
 
 const { DashboardMenu } = lazyImport(() => import('@/layouts/dashboard-layout/components/dashboard-menu.tsx'), 'DashboardMenu');

@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { CSSProperties } from 'react';
 
 export const BeachBall = () => {
@@ -33,7 +33,7 @@ export const BeachBall = () => {
 
   return (
     <motion.div
-      style={ballStyle}
+      // style={ballStyle}
       transition={transitionValues}
       animate={{
         rotate: [0, 360],

@@ -233,6 +233,7 @@ export type QueueMonitorResource = {
 };
 
 export type RegisterRequest = {
+    name: string;
     email: string;
     password: string;
     password_confirmation: string;
@@ -439,8 +440,8 @@ export type PostApiAuthLoginData = {
 };
 
 export type PostApiAuthLoginResponse = {
-    accessToken: string;
-    refreshToken: string;
+    accessToken: NewAccessTokenResource;
+    refreshToken: NewAccessTokenResource;
 };
 
 export type PostApiAuthRefreshTokenResponse = {
@@ -452,14 +453,12 @@ export type PostApiAuthStreamTokenResponse = {
 };
 
 export type PostApiAuthRegisterData = {
-    requestBody?: RegisterRequest & {
-    name?: string;
-};
+    requestBody: RegisterRequest;
 };
 
 export type PostApiAuthRegisterResponse = {
-    accessToken: string;
-    refreshToken: string;
+    accessToken: NewAccessTokenResource;
+    refreshToken: NewAccessTokenResource;
 };
 
 export type PostApiAuthForgotPasswordData = {
@@ -1588,8 +1587,8 @@ export type $OpenApiTs = {
             req: PostApiAuthLoginData;
             res: {
                 200: {
-                    accessToken: string;
-                    refreshToken: string;
+                    accessToken: NewAccessTokenResource;
+                    refreshToken: NewAccessTokenResource;
                 };
                 /**
                  * An error
@@ -1668,8 +1667,8 @@ export type $OpenApiTs = {
             req: PostApiAuthRegisterData;
             res: {
                 200: {
-                    accessToken: string;
-                    refreshToken: string;
+                    accessToken: NewAccessTokenResource;
+                    refreshToken: NewAccessTokenResource;
                 };
                 /**
                  * Authorization error
