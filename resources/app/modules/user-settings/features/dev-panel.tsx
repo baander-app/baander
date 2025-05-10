@@ -1,4 +1,4 @@
-import { Button, Container, Flex, Heading, Text } from '@radix-ui/themes';
+import { Box, Button, Container, Flex, Heading, Text } from '@radix-ui/themes';
 import { useAppSelector } from '@/store/hooks.ts';
 import { useCallback } from 'react';
 import { selectAccessToken, selectRefreshToken, selectStreamToken } from '@/store/users/auth-slice.ts';
@@ -32,22 +32,24 @@ export function DevPanel() {
     <Container>
       <Heading>Dev Panel</Heading>
 
-      <Flex mt="md">
+      <Flex mt="2" direction="column">
         <Text>Current tokens</Text>
 
-        <Flex>
+        <Flex gap="2" mt="2">
           <Button onClick={() => copyAccessToken()}>Access token</Button>
           <Button onClick={() => copyRefreshToken()}>Refresh token</Button>
           <Button onClick={() => copyStreamToken()}>Stream token</Button>
         </Flex>
       </Flex>
 
-      <Flex>
+      <Flex direction="column" mt="2">
         <Text>Test mode</Text>
 
-        <Button onClick={() => toggleTestMode()}>
-          {isTestMode ? 'Disable' : 'Enable'}
-        </Button>
+        <Box mt="2">
+          <Button onClick={() => toggleTestMode()}>
+            {isTestMode ? 'Disable' : 'Enable'}
+          </Button>
+        </Box>
       </Flex>
     </Container>
   );

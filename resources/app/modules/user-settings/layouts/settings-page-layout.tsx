@@ -8,7 +8,7 @@ export interface SettingsPageLayoutProps {
 export function SettingsPageLayout({title, children}: SettingsPageLayoutProps) {
   return (
     <Container>
-      <Heading>{title}</Heading>
+      <Heading mt="2" mb="2">{title}</Heading>
 
       <main>{children}</main>
     </Container>
