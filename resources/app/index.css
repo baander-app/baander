@@ -1,18 +1,26 @@
 @import "reset.css";
 @import "@radix-ui/themes/styles.css";
-@import "theme/dark/accent.css";
-@import "theme/dark/background.css";
-@import "theme/dark/gray.css";
-@import "theme/dark/text.css";
-@import "theme/light/accent.css";
-@import "theme/light/background.css";
-@import "theme/light/gray.css";
-@import "theme/light/text.css";
+/*@import "theme/dark/accent.css";*/
+/*@import "theme/dark/background.css";*/
+/*@import "theme/dark/gray.css";*/
+/*@import "theme/dark/text.css";*/
+/*@import "theme/light/accent.css";*/
+/*@import "theme/light/background.css";*/
+/*@import "theme/light/gray.css";*/
+/*@import "theme/light/text.css";*/
 
 :root {
     --progress-width: 0;
     --buffered-width: 0;
     --color-text-primary: #0b0e0c;
+    --color-text-secondary: #6b7280;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --color-text-primary: #f3f4f6;
+        --color-text-secondary: #d1d5db;
+    }
 }
 
 html, body {

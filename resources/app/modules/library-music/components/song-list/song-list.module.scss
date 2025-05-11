@@ -3,6 +3,7 @@
   border-bottom: 1px solid #e0dddd;
   overflow-x: auto;
   max-width: 100%;
+  height: calc(100vh - 260px);
 
   .title {
     margin-left: 3px;
@@ -14,9 +15,6 @@
     border-collapse: collapse;
   }
 
-  thead {
-    background-color: #fff;
-  }
 
   th {
     background-color: var(--red-1);
@@ -47,11 +45,16 @@
 
 .listItem {
   cursor: pointer;
-  border-bottom: 1px solid #e0dddd;
 }
 
-.header {
+.titleCell {
   display: flex;
+  align-items: center;
+}
+
+.titleCellNowPlayingIcon {
+  color: var(--accent-8);
+  margin-right: 8px;
 }
 
 .scrollbar {

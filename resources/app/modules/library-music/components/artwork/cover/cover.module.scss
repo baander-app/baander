@@ -18,6 +18,12 @@
   position: relative;
 }
 
+@media (prefers-color-scheme: dark) {
+  .coverFallBack {
+    background-color: #222;
+  }
+}
+
 .shadow {
   // HACK: buggy in chrome based browsers
   &:not(img) {

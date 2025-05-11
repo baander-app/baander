@@ -26,7 +26,9 @@ export async function refreshToken(type: 'access' | 'stream') {
     } catch (e) {
       NotificationFacade.create({
         type: 'error',
+        title: 'Authentication error',
         message: 'Failed to refresh access token',
+        toast: true,
       });
 
       throw e;
@@ -44,6 +46,7 @@ export async function refreshToken(type: 'access' | 'stream') {
     } catch (e) {
       NotificationFacade.create({
         type: 'error',
+        title: 'Authentication error',
         message: 'Failed to refresh stream token',
       });
 

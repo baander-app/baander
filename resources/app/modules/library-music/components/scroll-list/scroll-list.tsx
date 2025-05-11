@@ -43,8 +43,7 @@ export function ScrollList({ header, listItems, totalCount, onItemPress, style }
         itemContent={(index) => {
           return (
             <div
-              className={styles.listItem}
-              style={{ backgroundColor: activeIndex === index ? '#ccc' : 'unset' }}
+              className={`${styles.listItem} ${activeIndex === index ? styles.activeItem : ''}`}
 
               onClick={() => {
                 setActiveIndex(index);

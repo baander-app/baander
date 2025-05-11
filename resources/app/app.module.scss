@@ -29,6 +29,12 @@
   align-items: center;
 }
 
+@media (prefers-color-scheme: dark) {
+  .ToastRoot {
+    background-color: var(--slate-10);
+  }
+}
+
 .ToastRoot[data-state="open"] {
   animation: slideIn 150ms cubic-bezier(0.16, 1, 0.3, 1);
 }

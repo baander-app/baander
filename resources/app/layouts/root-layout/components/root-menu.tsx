@@ -79,7 +79,7 @@ export function RootMenu() {
       label: 'Navigation',
       iconName: 'heroicons:home',
       links: [
-        { label: 'Dashboard', to: '/dashboard' },
+        { label: 'Dashboard', to: '/dashboard/home' },
       ],
     },
     {

@@ -4,7 +4,6 @@ import { Token } from '@/services/auth/token.ts';
 import Echo from 'laravel-echo';
 import { PusherPrivateChannel } from 'laravel-echo/dist/channel/pusher-private-channel';
 import { PusherConnectionState } from '@/providers/echo-provider.types.ts';
-import { useToast } from '@/providers/toast-provider.tsx';
 
 interface EchoContextType {
   echo: Echo<any> | undefined;
@@ -23,7 +22,6 @@ export function EchoContextProvider({ children }: { children: React.ReactNode })
   const [echo, setEcho] = useState<Echo<any>>();
   const [connectionState, setConnectionState] = useState<PusherConnectionState>('initialized');
   const [playerStateChannel, setPlayerStateChannel] = useState<PusherPrivateChannel | undefined>(undefined);
-  const {showToast} = useToast();
 
   useEffect(() => {
     window.Pusher = Pusher;
@@ -54,10 +52,10 @@ export function EchoContextProvider({ children }: { children: React.ReactNode })
       echo
         .private('notifications')
         .listen('LibraryScanCompleted', (data: { notification: { title: string, body: string } }) => {
-          showToast({
-            title: data.notification.title,
-            content: data.notification.body,
-          });
+          // showToast({
+          //   title: data.notification.title,
+          //   content: data.notification.body,
+          // });
         });
 
       const token = Token.get()?.accessToken.token;

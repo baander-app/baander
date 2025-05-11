@@ -7,7 +7,6 @@ import {
 } from '@/api-client/queries';
 import { useEffect, useState } from 'react';
 import { SongList } from '@/modules/library-music/components/song-list/song-list.tsx';
-import styles from './songs.module.scss';
 import { GenreResource } from '@/api-client/requests';
 import { usePathParam } from '@/hooks/use-path-param.ts';
 import { LibraryParams } from '@/modules/library-music/routes/_routes.tsx';

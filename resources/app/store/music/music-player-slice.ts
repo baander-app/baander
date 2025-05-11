@@ -5,6 +5,7 @@ import { PlaybackSource } from '@/modules/equalizer/models/playback-source.ts';
 interface MusicPlayerSlice {
   queue: SongResource[];
   currentSongIndex: number;
+  currentSongPublicId: string | null;
   progress: number;
   isPlaying: boolean;
   isMuted: boolean;
@@ -31,6 +32,7 @@ interface MusicPlayerSlice {
 const initialState: MusicPlayerSlice = {
   queue: [],
   currentSongIndex: -1,
+  currentSongPublicId: null,
   progress: 0,
   isPlaying: false,
   isMuted: false,
@@ -74,6 +76,7 @@ export const musicPlayerSlice = createSlice({
       state.source = PlaybackSource.LIBRARY;
       state.queue = action.payload.queue;
       state.currentSongIndex = state.queue.findIndex(song => song.public_id === action.payload.playPublicId);
+      state.currentSongPublicId = action.payload.playPublicId;
     },
     removeSongFromQueue: (state, action: PayloadAction<number>) => {
       state.queue.splice(action.payload, 1);
@@ -84,6 +87,7 @@ export const musicPlayerSlice = createSlice({
       } else {
         state.currentSongIndex = 0; // Loop back to the start if at the end
       }
+      state.currentSongPublicId = state.queue[state.currentSongIndex].public_id;
     },
     playPreviousSong: (state) => {
       if (state.currentSongIndex > 0) {
@@ -91,10 +95,12 @@ export const musicPlayerSlice = createSlice({
       } else {
         state.currentSongIndex = state.queue.length - 1; // Loop back to the end if at the start
       }
+      state.currentSongPublicId = state.queue[state.currentSongIndex].public_id;
     },
     setCurrentSongIndex: (state, action: PayloadAction<number>) => {
       if (action.payload >= 0 && action.payload < state.queue.length) {
         state.currentSongIndex = action.payload;
+        state.currentSongPublicId = state.queue[state.currentSongIndex].public_id;
       }
     },
     setIsShuffleEnabled: (state, action: PayloadAction<boolean>) => {

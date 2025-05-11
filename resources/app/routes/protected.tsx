@@ -11,6 +11,7 @@ import { useLibraryServiceGetApiLibrariesBySlug } from '@/api-client/queries';
 import { usePathParam } from '@/hooks/use-path-param.ts';
 import { LibraryMoviesRoutes } from '@/modules/library-movies/routes/_routes.tsx';
 import { LibraryType } from '@/models/library-type.ts';
+import { Overview } from '@/modules/overview/overview.tsx';
 
 const App = () => {
   return (
@@ -59,6 +60,10 @@ export const protectedRoutes: RouteObject[] = [
     path: '/',
     element: <App/>,
     children: [
+      {
+        path: '/',
+        element: <Overview />
+      },
       {
         path: '/library/:library/*',
         element: <LibraryRoutes/>,

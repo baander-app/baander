@@ -2,7 +2,8 @@ import React, { ReactEventHandler, RefObject, useCallback, useContext, useEffect
 import { noop } from '@/utils/noop.ts';
 import { useMusicSource } from '@/providers/music-source-provider';
 import { SongResource } from '@/api-client/requests';
-import { useToast } from '@/providers/toast-provider.tsx';
+import { useAppDispatch } from '@/store/hooks.ts';
+import { createNotification } from '@/store/notifications/notifications-slice.ts';
 
 interface AudioPlayerContextType {
   audioRef: RefObject<HTMLAudioElement>;
@@ -44,11 +45,11 @@ export const AudioPlayerContext = React.createContext<AudioPlayerContextType>({
 AudioPlayerContext.displayName = 'AudioPlayerContext';
 
 export function AudioPlayerContextProvider({ children }: { children: React.ReactNode }) {
+  const dispatch = useAppDispatch();
   const {
     setAudioRef,
     authenticatedSource,
   } = useMusicSource();
-  const { showToast } = useToast();
 
   const audioRef = useRef<HTMLAudioElement>(new Audio());
 
@@ -169,10 +170,12 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
   useEffect(() => {
     if (isPlaying && isReady) {
       audioRef.current.play().catch((e) => {
-        showToast({
+        dispatch(createNotification({
+          type: 'error',
           title: 'Audio player error',
-          content: e?.message ?? 'Unable to autoplay song',
-        });
+          message: e?.message ?? 'Unable to autoplay song',
+          toast: true,
+        }));
       });
     } else {
       audioRef.current.pause();

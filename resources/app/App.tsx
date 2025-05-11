@@ -17,6 +17,7 @@ import { Iconify } from './ui/icons/iconify';
 
 function App() {
   const { toasts } = useAppSelector(state => state.notifications);
+  const {theme} = useAppSelector(state => state.ui);
   const dispatch = useAppDispatch();
 
   const dispatchRemoveToast = (id: string) => {
@@ -29,47 +30,46 @@ function App() {
         accentColor="red"
         panelBackground="solid"
         radius="full"
+        appearance={theme}
       >
-        <Toast.Provider swipeDirection="right">
-          <MusicSourceProvider>
-            <BrowserRouter>
-              <AppRoutes/>
-            </BrowserRouter>
+        <MusicSourceProvider>
+          <BrowserRouter>
+            <AppRoutes/>
+          </BrowserRouter>
 
-            <ReactQueryDevtools/>
+          <ReactQueryDevtools/>
 
-            <Toast.Root></Toast.Root>
-          </MusicSourceProvider>
+          <Toast.Root></Toast.Root>
+        </MusicSourceProvider>
 
-          {toasts.map((toast) => (
-            <Toast.Root
-              key={toast.id}
-              duration={toast.duration}
-              className={styles.ToastRoot}
-              onOpenChange={(isOpen) => {
-                if (!isOpen) dispatchRemoveToast(toast.id);
-              }}
+        {toasts.map((toast) => (
+          <Toast.Root
+            key={toast.id}
+            duration={toast.duration}
+            className={styles.ToastRoot}
+            onOpenChange={(isOpen) => {
+              if (!isOpen) dispatchRemoveToast(toast.id);
+            }}
+          >
+            {toast.title && (<Toast.Title className={styles.ToastTitle}>{toast.title}</Toast.Title>)}
+
+            <Toast.Description className={styles.ToastDescription}>
+              <Text>{toast.message}</Text>
+            </Toast.Description>
+
+            <Toast.Action
+              className={styles.ToastAction}
+              altText="Clear"
+              asChild
             >
-              {toast.title && (<Toast.Title className={styles.ToastTitle}>{toast.title}</Toast.Title>)}
+              <Button variant="ghost">
+                <Iconify icon="ion:close"/>
+              </Button>
+            </Toast.Action>
+          </Toast.Root>
+        ))}
 
-              <Toast.Description className={styles.ToastDescription}>
-                <Text>{toast.message}</Text>
-              </Toast.Description>
-
-              <Toast.Action
-                className={styles.ToastAction}
-                altText="Clear"
-                asChild
-              >
-                <Button variant="ghost">
-                  <Iconify icon="ion:close" />
-                </Button>
-              </Toast.Action>
-            </Toast.Root>
-          ))}
-
-          <Toast.Viewport className={styles.ToastViewport}/>
-        </Toast.Provider>
+        <Toast.Viewport className={styles.ToastViewport}/>
       </Theme>
     </HelmetProvider>
   );

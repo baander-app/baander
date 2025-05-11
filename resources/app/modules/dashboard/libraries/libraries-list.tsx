@@ -1,22 +1,25 @@
 import { Box, Button, Container, Heading } from '@radix-ui/themes';
 import { ReactNode, useEffect, useState } from 'react';
 import { JobService } from '@/api-client/requests';
-import { useToast } from '@/providers/toast-provider.tsx';
 import { useLibraryServiceGetApiLibraries } from '@/api-client/queries';
+import { useAppDispatch } from '@/store/hooks.ts';
+import { createNotification } from '@/store/notifications/notifications-slice.ts';
 
 export function LibrariesList() {
   const {data} = useLibraryServiceGetApiLibraries();
   const [rows, setRows] = useState<ReactNode[]>([]);
-  const {showToast} = useToast();
+  const dispatch = useAppDispatch();
 
   const startScanJob = (slug: string) => {
     JobService.postApiJobsScanLibraryBySlug({slug})
       .then(res => {
         if (typeof res !== 'string') {
-          showToast({
+          dispatch(createNotification({
+            type: 'info',
             title: 'Library scan',
-            content: res.message,
-          });
+            message: res.message,
+            toast: true,
+          }));
         }
       });
   };
