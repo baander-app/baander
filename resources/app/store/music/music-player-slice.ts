@@ -5,6 +5,7 @@ import { PlaybackSource } from '@/modules/equalizer/models/playback-source.ts';
 interface MusicPlayerSlice {
   queue: SongResource[];
   currentSongIndex: number;
+  currentSongPublicId: string | null;
   progress: number;
   isPlaying: boolean;
   isMuted: boolean;
@@ -23,11 +24,15 @@ interface MusicPlayerSlice {
     frequencies: number[];
     bufferSize: number;
   };
+  lyrics: {
+    offsetMs: number;
+  };
 }
 
 const initialState: MusicPlayerSlice = {
   queue: [],
   currentSongIndex: -1,
+  currentSongPublicId: null,
   progress: 0,
   isPlaying: false,
   isMuted: false,
@@ -45,6 +50,9 @@ const initialState: MusicPlayerSlice = {
     rightChannel: 0,
     frequencies: [],
     bufferSize: 0,
+  },
+  lyrics: {
+    offsetMs: -150,
   },
 };
 
@@ -68,6 +76,7 @@ export const musicPlayerSlice = createSlice({
       state.source = PlaybackSource.LIBRARY;
       state.queue = action.payload.queue;
       state.currentSongIndex = state.queue.findIndex(song => song.public_id === action.payload.playPublicId);
+      state.currentSongPublicId = action.payload.playPublicId;
     },
     removeSongFromQueue: (state, action: PayloadAction<number>) => {
       state.queue.splice(action.payload, 1);
@@ -78,6 +87,7 @@ export const musicPlayerSlice = createSlice({
       } else {
         state.currentSongIndex = 0; // Loop back to the start if at the end
       }
+      state.currentSongPublicId = state.queue[state.currentSongIndex].public_id;
     },
     playPreviousSong: (state) => {
       if (state.currentSongIndex > 0) {
@@ -85,10 +95,12 @@ export const musicPlayerSlice = createSlice({
       } else {
         state.currentSongIndex = state.queue.length - 1; // Loop back to the end if at the start
       }
+      state.currentSongPublicId = state.queue[state.currentSongIndex].public_id;
     },
     setCurrentSongIndex: (state, action: PayloadAction<number>) => {
       if (action.payload >= 0 && action.payload < state.queue.length) {
         state.currentSongIndex = action.payload;
+        state.currentSongPublicId = state.queue[state.currentSongIndex].public_id;
       }
     },
     setIsShuffleEnabled: (state, action: PayloadAction<boolean>) => {
@@ -123,6 +135,9 @@ export const musicPlayerSlice = createSlice({
     setBufferSize: (state, action: PayloadAction<number>) => {
       state.analysis.bufferSize = action.payload;
     },
+    setLyricsOffset: (state, action: PayloadAction<{ ms: number }>) => {
+      state.lyrics.offsetMs = action.payload.ms;
+    },
   },
   selectors: {
     selectSong: (sliceState) =>
@@ -151,6 +166,7 @@ export const {
   setRightChannel,
   setFrequencies,
   setBufferSize,
+  setLyricsOffset,
 } = musicPlayerSlice.actions;
 
 export const {

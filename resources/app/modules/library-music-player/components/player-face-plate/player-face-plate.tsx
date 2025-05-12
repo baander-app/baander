@@ -1,17 +1,24 @@
-import { Flex, Grid, Text } from '@mantine/core';
+import { Flex, Grid, Text } from '@radix-ui/themes';
 import { ProgressBar } from '@/modules/library-music-player/components/progress-bar/progress-bar.tsx';
 import { formatDuration } from '@/utils/time/format-duration.ts';
-import { SongResource } from '@/api-client/requests';
 import { Cover } from '@/modules/library-music/components/artwork/cover';
-
 import styles from './player-face-plate.module.scss';
+import { withTestMode } from '@/providers/test-mode-provider.tsx';
+
+export interface PlayerFacePlateViewModel {
+  coverUrl: string;
+  title: string;
+  artists: string[];
+  artist: string;
+  album: string;
+}
 
 export interface PlayerFacePlateProps {
   buffered: number;
   duration: number;
   currentProgress: number;
   setProgress: (progress: number) => void;
-  song?: SongResource;
+  viewModel: Partial<PlayerFacePlateViewModel>;
 }
 
 export function PlayerFacePlate({
@@ -19,50 +26,67 @@ export function PlayerFacePlate({
                                   duration,
                                   currentProgress,
                                   setProgress,
-                                  song,
+                                  viewModel,
                                 }: PlayerFacePlateProps) {
   const durationDisplay = formatDuration(duration);
   const elapsedDisplay = formatDuration(currentProgress);
 
-  const artistNames = song && song?.artists?.map(artist => artist.name);
+  const artistNames = viewModel.artists?.join(', ');
 
   return (
-    <Grid className={styles.facePlateGrid} gutter={0} style={{ '--grid-margin': 'unset' }} bg="gray.1">
-      <Grid.Col span={1}>
-        <Cover imgSrc={song?.album?.coverUrl} size={72}/>
-      </Grid.Col>
+    <Flex flexGrow="2" align="center">
+      <Cover imgSrc={viewModel.coverUrl} size={64} />
 
-      <Grid.Col span={11} pb="xs" pr="xs">
-        <Flex direction="column" className={styles.innerContainer} >
-          <Flex justify="center" align="center" direction="column">
-            <Text fw="700" fz="sm" className={styles.trackTitle}>{song?.title ?? ''}</Text>
+      <Flex
+        direction="column"
+        width="100%"
+        ml="3"
+      >
+        <Flex
+          direction="column"
+          justify="center"
+          align="center"
+        >
+          <Text weight="bold" size="2">
+            {viewModel?.title}
+          </Text>
 
-            <Flex>
-              {song?.album?.title && (
-                <Text fz="xs" className={styles.trackTitle}>{song?.album?.title ?? ''}</Text>
-              )}
-              {artistNames && artistNames.length > 0 ? (
-                <Text fz="xs">&nbsp;| {artistNames}</Text>
-              ) : <Text>&nbsp;</Text>}
-            </Flex>
-
-          </Flex>
-
-          <Flex direction="row" className={styles.progressContainer}>
-            <Text fz="xs" pr="xs">{elapsedDisplay}</Text>
-
-            <ProgressBar
-              className={styles.progressBar}
-              duration={duration}
-              currentProgress={currentProgress}
-              buffered={buffered}
-              setProgress={(e) => setProgress(e)}
-            />
-
-            <Text fz="xs" pl="xs">{durationDisplay}</Text>
-          </Flex>
+          <Text size="1">
+            {viewModel.album ? `${viewModel.album}` : ''}
+            {artistNames ? ` | ${artistNames}` : ''}
+          </Text>
         </Flex>
-      </Grid.Col>
-    </Grid>
+
+        <Flex
+          direction="row"
+          className={styles.progressContainer}
+          align="center"
+        >
+          <Text size="2" mr="2">
+            {elapsedDisplay}
+          </Text>
+
+          <ProgressBar
+            duration={duration}
+            currentProgress={currentProgress}
+            buffered={buffered}
+            setProgress={setProgress}
+          />
+
+          <Text size="2" ml="2">
+            {durationDisplay}
+          </Text>
+        </Flex>
+      </Flex>
+    </Flex>
   );
 }
+
+// Wrap the component with withTestMode and pass the viewModel type as a plain object
+export default withTestMode(PlayerFacePlate, {
+  coverUrl: '',
+  title: '',
+  artists: [''],
+  artist: '',
+  album: '',
+});

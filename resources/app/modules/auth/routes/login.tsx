@@ -1,98 +1,80 @@
-import { Token } from '@/services/auth/token.ts';
+import { SyntheticEvent } from 'react';
 import { useAppDispatch } from '@/store/hooks.ts';
-import { setAccessToken, setIsAuthenticated, setRefreshToken } from '@/store/users/auth-slice.ts';
-import { AuthService, OpenAPI } from '@/api-client/requests';
-import {
-  Box,
-  Button,
-  Flex,
-  Paper,
-  PasswordInput,
-  Text,
-  TextInput,
-  Title,
-} from '@mantine/core';
-import { useForm } from '@mantine/form';
+import { loginUser } from '@/store/users/auth-slice.ts';
+import { Box, Button, Flex, Text, TextField } from '@radix-ui/themes';
 import styles from './login.module.scss';
 import { VinylSpinAnimation } from '@/ui/animations/vinyl-spin-animation/vinyl-spin-animation.tsx';
-
-type LoginInput = {
-  email: string;
-  password: string;
-}
+import { Form } from 'radix-ui';
+import { Link } from 'react-router-dom';
 
 export default function Login() {
   const dispatch = useAppDispatch();
 
-  const form = useForm({
-    initialValues: {
-      email: '',
-      password: '',
-    },
-    validate: {
-      email: (val) => (/^\S+@\S+$/.test(val) ? null : 'Invalid email'),
-      password: (val) => (val.length <= 6 ? 'Password should include at least 6 characters' : null),
-    },
+  const onSubmit = async (event: SyntheticEvent<HTMLFormElement>) => {
+    event.preventDefault();
 
-  });
+    const formData = event.target;
+    const email = formData.email.value;
+    const password = formData.password.value;
 
-  const onSubmit = async (formData: LoginInput) => {
-    const res = await AuthService.authLogin({
-      requestBody: {
-        email: formData.email,
-        password: formData.password,
-      },
-    });
-
-    Token.set(res);
-    OpenAPI.TOKEN = res.accessToken.token;
-    dispatch(setIsAuthenticated(true));
-    dispatch(setAccessToken(res.accessToken));
-    dispatch(setRefreshToken(res.refreshToken));
+    dispatch(loginUser({ email, password }));
   };
 
   return (
     <Flex direction="row" className={styles.loginContainer}>
-      <Paper className={styles.form} radius={0} p={30}>
-        <form onSubmit={form.onSubmit(values => onSubmit(values))}>
-          <Title order={2} className={styles.title} ta="center" mt="md" mb={50}>
-            Login to Bånder
-          </Title>
+      <Flex direction="column" gap="3" className={styles.formContent}>
+        <Text size="7" weight="bold" align="center" className={styles.welcomeText}>
+          Welcome Back!
+        </Text>
+        <Text size="4" align="center" color="gray" className={styles.tagline}>
+          Sign in to continue to your account
+        </Text>
 
-          <TextInput
-            required
-            label="Email"
-            placeholder="user@baander.app"
-            value={form.values.email}
-            onChange={(e) => form.setFieldValue('email', e.currentTarget.value)}
-            error={form.errors.email && 'Invalid email'}
-            radius="md"
-          />
+        <Form.Root className={styles.form} onSubmit={onSubmit}>
+          <Box className={styles.animationSection}>
+            <VinylSpinAnimation className={styles.animation}/>
+          </Box>
 
-          <PasswordInput
-            required
-            label="Password"
-            placeholder="******"
-            value={form.values.password}
-            onChange={(e) => form.setFieldValue('password', e.currentTarget.value)}
-            error={form.errors.password && 'Password should include at least 6 characters'}
-            radius="md"
-          />
+          <Flex direction="column" gap="3">
+            <Form.Field className={styles.Field} name="email">
+              <Form.Label className={styles.Label}>Email</Form.Label>
+              <Form.Control asChild>
+                <TextField.Root type="email" radius="large" size="3" required>
+                  <TextField.Slot></TextField.Slot>
+                </TextField.Root>
+              </Form.Control>
+            </Form.Field>
 
-          <Button type="submit" fullWidth mt="xl" size="md" radius="xl">
-            Login
-          </Button>
-        </form>
-      </Paper>
+            <Form.Field className={styles.Field} name="password">
+              <Form.Label className={styles.Label}>Password</Form.Label>
+              <Form.Control asChild>
+                <TextField.Root type="password" radius="large" size="3" required>
+                  <TextField.Slot></TextField.Slot>
+                </TextField.Root>
+              </Form.Control>
+            </Form.Field>
 
-      <Flex justify="center" w="100%">
-        <Box p={30}>
-          <VinylSpinAnimation
-            className={styles.animation}
-          />
+            <Form.Submit asChild>
+              <Button variant="solid" size="3" className={styles.Button}>
+                Login
+              </Button>
+            </Form.Submit>
+          </Flex>
+        </Form.Root>
 
-          <Text ta="center">Awaiting tunes...</Text>
-        </Box>
+        <Flex direction="row" justify="between" className={styles.links}>
+          <Link to="/auth/forgot-password">
+            <Text size="3">
+              Forgot Password?
+            </Text>
+          </Link>
+
+          <Link to="/auth/create-account">
+            <Text size="3">
+              Create an Account
+            </Text>
+          </Link>
+        </Flex>
       </Flex>
     </Flex>
   );

@@ -1,12 +1,14 @@
 import { Lrc } from './lrc';
 
 export class AudioLyricSynchronizer {
-  offset: boolean;
+  useOffset: boolean;
+  defaultOffset: number;
   private _currentIndex: number;
   lrc!: Lrc;
 
-  constructor(lrc: Lrc = new Lrc(), offset: boolean = true) {
-    this.offset = offset;
+  constructor(lrc: Lrc = new Lrc(), useOffset: boolean = true, defaultOffset: number = -150) {
+    this.useOffset = useOffset;
+    this.defaultOffset = defaultOffset; // Default offset in milliseconds
     this._currentIndex = -1;
     this.setLrc(lrc);
   }
@@ -24,22 +26,40 @@ export class AudioLyricSynchronizer {
    * Updates LRC by aligning the offset and sorting lyrics.
    */
   lrcUpdate(): void {
-    if (this.offset) {
+    if (this.useOffset) {
       this._offsetAlign();
     }
     this._sort();
   }
 
   /**
-   * Aligns the offset if it exists in LRC info.
+   * Aligns the offset if it exists in LRC info, otherwise uses the default offset.
    */
   private _offsetAlign(): void {
+    let offsetMs: number;
+
     if ('offset' in this.lrc.info) {
-      const offset = parseInt(this.lrc.info.offset) / 1000;
-      if (!isNaN(offset)) {
-        this.lrc.offset(offset);
-        delete this.lrc.info.offset;
+      offsetMs = parseInt(this.lrc.info.offset);
+      if (isNaN(offsetMs)) {
+        offsetMs = this.defaultOffset;
       }
+      delete this.lrc.info.offset;
+    } else {
+      offsetMs = this.defaultOffset;
+    }
+
+    // Convert milliseconds to seconds for the lrc.offset() method
+    this.lrc.offset(offsetMs / 1000);
+  }
+
+  /**
+   * Sets a new default offset value
+   * @param offsetMs - The new default offset in milliseconds
+   */
+  setDefaultOffset(offsetMs: number): void {
+    this.defaultOffset = offsetMs;
+    if (this.useOffset) {
+      this.lrcUpdate();
     }
   }
 

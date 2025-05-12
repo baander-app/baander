@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { Container, Title } from '@mantine/core';
+import { Container, Heading } from '@radix-ui/themes';
 
 export interface SettingsPageLayoutProps {
   title: string;
@@ -7,8 +7,8 @@ export interface SettingsPageLayoutProps {
 }
 export function SettingsPageLayout({title, children}: SettingsPageLayoutProps) {
   return (
-    <Container fluid>
-      <Title order={1}>{title}</Title>
+    <Container>
+      <Heading mt="2" mb="2">{title}</Heading>
 
       <main>{children}</main>
     </Container>

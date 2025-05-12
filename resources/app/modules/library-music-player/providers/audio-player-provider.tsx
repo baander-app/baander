@@ -1,19 +1,12 @@
-import React, {
-  MutableRefObject,
-  ReactEventHandler,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import React, { ReactEventHandler, RefObject, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { noop } from '@/utils/noop.ts';
 import { useMusicSource } from '@/providers/music-source-provider';
-import { notifications } from '@mantine/notifications';
 import { SongResource } from '@/api-client/requests';
+import { useAppDispatch } from '@/store/hooks.ts';
+import { createNotification } from '@/store/notifications/notifications-slice.ts';
 
 interface AudioPlayerContextType {
-  audioRef: MutableRefObject<HTMLAudioElement>;
+  audioRef: RefObject<HTMLAudioElement>;
   isPlaying: boolean;
   play: () => void;
   duration: number;
@@ -32,7 +25,7 @@ interface AudioPlayerContextType {
 }
 
 export const AudioPlayerContext = React.createContext<AudioPlayerContextType>({
-  audioRef: null as unknown as MutableRefObject<HTMLAudioElement>,
+  audioRef: null as unknown as RefObject<HTMLAudioElement>,
   isPlaying: false,
   play: () => noop(),
   duration: 0,
@@ -52,6 +45,7 @@ export const AudioPlayerContext = React.createContext<AudioPlayerContextType>({
 AudioPlayerContext.displayName = 'AudioPlayerContext';
 
 export function AudioPlayerContextProvider({ children }: { children: React.ReactNode }) {
+  const dispatch = useAppDispatch();
   const {
     setAudioRef,
     authenticatedSource,
@@ -176,10 +170,12 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
   useEffect(() => {
     if (isPlaying && isReady) {
       audioRef.current.play().catch((e) => {
-        notifications.show({
+        dispatch(createNotification({
+          type: 'error',
           title: 'Audio player error',
           message: e?.message ?? 'Unable to autoplay song',
-        });
+          toast: true,
+        }));
       });
     } else {
       audioRef.current.pause();

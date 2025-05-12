@@ -1,7 +1,6 @@
 import * as React from 'react';
-import cx from 'clsx';
 import { NavLink, RelativeRoutingType, To } from 'react-router-dom';
-import { Button, ButtonProps } from '@mantine/core';
+import { Button, ButtonProps } from '@radix-ui/themes';
 
 interface LinkButtonProps extends ButtonProps  {
   children: React.ReactNode;
@@ -15,24 +14,22 @@ interface LinkButtonProps extends ButtonProps  {
 
 export function LinkButton({children, to, reloadDocument, replace, state, preventScrollReset, relative, ...rest}: LinkButtonProps) {
   return (
+    <NavLink
+      to={to}
+      reloadDocument={reloadDocument}
+      replace={replace}
+      state={state}
+      preventScrollReset={preventScrollReset}
+      relative={relative}
+      // className={({isActive}) =>
+      //   clsx(className, {'active-class': isActive})
+      // }
+    >
     <Button
       {...rest}
-      renderRoot={({className, ...others}) => (
-        <NavLink
-          to={to}
-          reloadDocument={reloadDocument}
-          replace={replace}
-          state={state}
-          preventScrollReset={preventScrollReset}
-          relative={relative}
-          className={({isActive}) =>
-            cx(className, {'active-class': isActive})
-          }
-          {...others}
-        />
-      )}
     >
       {children}
     </Button>
+    </NavLink>
   );
 }

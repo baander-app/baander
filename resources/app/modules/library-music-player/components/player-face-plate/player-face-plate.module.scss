@@ -1,18 +1,4 @@
-.facePlateGrid {
-  border-radius: 3px;
-}
-
-.innerContainer {
-  height: 100%;
-  margin-left: 10px;
-  margin-top: 0.5em;
-}
-
 .progressContainer {
-  align-items: center;
-  margin-top: auto;
-}
-
-.progressBar {
+  justify-content: space-between;
   width: 100%;
 }

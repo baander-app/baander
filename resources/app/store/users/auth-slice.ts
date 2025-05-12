@@ -1,7 +1,8 @@
-// import { createAppSlice } from '@/store/create-app-slice.ts';
-import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createAppSlice } from '@/store/create-app-slice.ts';
+import { createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { Token } from '@/services/auth/token.ts';
-import { AuthService, NewAccessTokenResource } from '@/api-client/requests';
+import { AuthService, NewAccessTokenResource, RegisterRequest } from '@/api-client/requests';
+import { clearAuthState, setAuthState } from '@/store/users/auth-slice.utils.ts';
 
 export const logoutUser = createAsyncThunk('auth/logout', async () => {
   const token = Token.get();
@@ -10,8 +11,20 @@ export const logoutUser = createAsyncThunk('auth/logout', async () => {
     return;
   }
 
-  return AuthService.authLogout({ requestBody: { refreshToken: token.refreshToken.token } });
-})
+  return AuthService.postApiAuthLogout({ requestBody: { refreshToken: token.refreshToken?.token } });
+});
+
+export const createUser = createAsyncThunk('auth/register', async (options: RegisterRequest) => {
+  return AuthService.postApiAuthRegister({
+    requestBody: options,
+  });
+});
+
+export const loginUser = createAsyncThunk('auth/login', (options: { email: string, password: string }) => {
+  return AuthService.postApiAuthLogin({
+    requestBody: options,
+  });
+});
 
 export interface UserModel {
   name: string;
@@ -19,7 +32,7 @@ export interface UserModel {
   isAdmin: boolean;
 }
 
-export interface UserSliceState {
+export interface AuthSliceState {
   authenticated: boolean;
   accessToken: NewAccessTokenResource | null;
   refreshToken: NewAccessTokenResource | null;
@@ -28,7 +41,7 @@ export interface UserSliceState {
   loading: boolean;
 }
 
-const initialState: UserSliceState = {
+const initialState: AuthSliceState = {
   authenticated: false,
   accessToken: null,
   refreshToken: null,
@@ -37,7 +50,7 @@ const initialState: UserSliceState = {
   loading: false,
 };
 
-export const authSlice = createSlice({
+export const authSlice = createAppSlice({
   name: 'auth',
   initialState,
   reducers: {
@@ -63,16 +76,25 @@ export const authSlice = createSlice({
   extraReducers: builder => {
     builder.addCase(logoutUser.pending, (state) => {
       state.loading = true;
-    })
+    });
     builder.addCase(logoutUser.fulfilled, (state) => {
-      state.authenticated = false;
-      state.accessToken = null;
-      state.refreshToken = null;
-      state.streamToken = null;
-      state.user = null;
-      state.loading = false;
-      Token.clear();
-    })
+      clearAuthState(state);
+    });
+    builder.addCase(logoutUser.rejected, (state) => {
+      clearAuthState(state);
+    });
+    builder.addCase(createUser.pending, (state) => {
+      state.loading = true;
+    });
+    builder.addCase(createUser.fulfilled, (state, action) => {
+      setAuthState(state, action.payload);
+    });
+    builder.addCase(loginUser.pending, (state) => {
+      state.loading = true;
+    });
+    builder.addCase(loginUser.fulfilled, (state, action) => {
+      setAuthState(state, action.payload);
+    });
   },
   selectors: {
     selectIsAuthenticated: auth => auth.authenticated,

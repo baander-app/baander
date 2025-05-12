@@ -1,5 +1,4 @@
 import { DefaultError, DefaultOptions, Query, QueryCache, QueryClient } from '@tanstack/react-query';
-import { notifications } from '@mantine/notifications';
 import { get, set, del } from 'idb-keyval';
 import {
   PersistedClient,
@@ -10,10 +9,7 @@ import { Env } from '@/common/env.ts';
 const queryCache = new QueryCache({
   onError: (error: DefaultError, query: Query<unknown, unknown, unknown>) => {
     if (query.state.data !== undefined) {
-      notifications.show({
-        title: 'Query error',
-        message: `${error.message}`,
-      });
+      console.error(error);
     }
   },
 });

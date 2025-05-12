@@ -8,8 +8,6 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
 
 abstract class BasePivot extends Pivot
 {
-    use PivotEventTrait;
-
     public $incrementing = true;
     protected $dateFormat = 'Y-m-d H:i:sO';
 

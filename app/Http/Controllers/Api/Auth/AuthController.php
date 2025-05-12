@@ -33,8 +33,8 @@ class AuthController
      * @unauthenticated
      *
      * @response array{
-     *   accessToken: string,
-     *   refreshToken: string
+     *   accessToken: NewAccessTokenResource,
+     *   refreshToken: NewAccessTokenResource
      * }
      */
     #[Post('login', 'auth.login')]
@@ -84,7 +84,9 @@ class AuthController
      * Needs refresh token with ability "issue-access-token"
      *
      * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
+     * @response array{
+     *     streamToken: NewAccessTokenResource,
+     * }
      */
     #[Post('streamToken', 'auth.streamToken', ['auth:sanctum', 'ability:' . TokenAbility::ISSUE_ACCESS_TOKEN->value])]
     public function getStreamToken(Request $request)
@@ -108,8 +110,8 @@ class AuthController
      * @unauthenticated
      *
      * @response array{
-     *   accessToken: string,
-     *   refreshToken: string
+     *   accessToken: NewAccessTokenResource,
+     *   refreshToken: NewAccessTokenResource
      * }
      */
     #[Post('register', 'auth.register')]
@@ -173,7 +175,7 @@ class AuthController
      * Verify email
      * @unauthenticated
      */
-    #[Post('verify/:id/:hash')]
+    #[Post('verify/{id}/{hash}', 'auth.verifyEmail')]
     public function verify(int $id, string $hash)
     {
         $user = User::query()->findOrFail($id);
@@ -199,12 +201,12 @@ class AuthController
     {
         $accessToken = $request->user()->currentAccessToken()->token;
         if ($accessToken) {
-            Queue::push(new RevokeTokenJob($accessToken));
+            RevokeTokenJob::dispatch($accessToken);
         }
 
         $refreshToken = $request->get('refreshToken');
         if ($refreshToken) {
-            Queue::push(new RevokeTokenJob($refreshToken));
+            RevokeTokenJob::dispatch($refreshToken);
         }
 
         return response(null, Response::HTTP_NO_CONTENT);

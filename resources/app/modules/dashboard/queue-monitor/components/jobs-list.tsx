@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
-import { useQueueServiceQueueMetricsShowInfinite } from '@/api-client/queries/infiniteQueries.ts';
+import { useQueueServiceGetApiQueueMetricsInfinite } from '@/api-client/queries/infiniteQueries.ts';
 import { TableVirtuoso } from 'react-virtuoso';
-import { Box, Button, ButtonGroup, Flex, Modal, Table, Text } from '@mantine/core';
+import { Button, Dialog, Flex, Text } from '@radix-ui/themes';
 import { QueueMonitorResource } from '@/api-client/requests';
 import { JobStatus } from '@/modules/dashboard/queue-monitor/components/job-status.tsx';
-import { TableProps } from '@mantine/core/lib/components/Table/Table';
-import { useDisclosure } from '@mantine/hooks';
 import dayjs from 'dayjs';
 
 import styles from './jobs-list.module.scss';
@@ -15,9 +13,8 @@ export interface JobsList extends React.ComponentPropsWithoutRef<'div'> {
 
 }
 export function JobsList({...rest}: JobsList) {
-  const { data: jobsData, fetchNextPage, hasNextPage } = useQueueServiceQueueMetricsShowInfinite();
+  const { data: jobsData, fetchNextPage, hasNextPage } = useQueueServiceGetApiQueueMetricsInfinite();
   const [openJob, setOpenJob] = useState<QueueMonitorResource>();
-  const [showJobDetails, jobDetailHandlers] = useDisclosure(false);
 
   const getDuration = (start: string | null, end: string | null) => {
     if (start && end) {
@@ -33,83 +30,77 @@ export function JobsList({...rest}: JobsList) {
     return '';
   };
 
-  const openModal = (job: QueueMonitorResource) => {
-    setOpenJob(job);
-    jobDetailHandlers.open();
-  }
-
-  const closeModal = () => {
-    jobDetailHandlers.close();
-    setOpenJob(undefined);
-  }
-
   return (
     <div {...rest}>
-      <TableVirtuoso
-        className={styles.scrollList}
-        data={jobsData?.pages?.flatMap(job => job.data)}
-        totalCount={jobsData?.pages[0].total}
-        // @ts-ignore
-        components={TableComponents}
-        useWindowScroll={true}
-        endReached={() => {
-          hasNextPage && fetchNextPage();
-        }}
-        fixedHeaderContent={() => (
-          <Table.Tr>
-            <Table.Td w="5%">Job</Table.Td>
-            <Table.Td w="5%">Details</Table.Td>
-            <Table.Td w="5%">Progress</Table.Td>
-            <Table.Td w="5%">Duration</Table.Td>
-            <Table.Td w="5%">Status</Table.Td>
-            <Table.Td w="8%">Actions</Table.Td>
-          </Table.Tr>
-        )}
-        itemContent={(_index, data: QueueMonitorResource) => {
-          return (
-            <React.Fragment key={data.id}>
-              <Table.Td>
-                <Text>{data.name}</Text>
-              </Table.Td>
-              <Table.Td>
-                <Flex direction="column" gap="sm">
-                  <Box>
-                    <Text fz="xs"><span className={styles.bold}>Queue</span>: {data.queue}</Text>
-                    <Text fz="xs"><span className={styles.bold}>Attempt</span>: {data.attempt}</Text>
-                  </Box>
-                </Flex>
-              </Table.Td>
-              <Table.Td>
-                {data.progress && (<Text>{data.progress}%</Text>)}
-              </Table.Td>
-              <Table.Td>
-                {getDuration(data.started_at, data.finished_at)}
-              </Table.Td>
-              <Table.Td>
-                <JobStatus status={data.status}/>
-              </Table.Td>
-              <Table.Td>
-                <ButtonGroup>
-                  <Button color="gray.2" onClick={() => openModal(data)}>View</Button>
-                  <Button color="blue.2">Retry</Button>
-                  <Button color="red">Delete</Button>
-                </ButtonGroup>
-              </Table.Td>
-            </React.Fragment>
-          );
-        }}
-      />
+      <Dialog.Root>
+        <TableVirtuoso
+          className={styles.scrollList}
+          data={jobsData?.pages?.flatMap(job => job.data)}
+          totalCount={jobsData?.pages[0]?.meta?.total}
+          // @ts-ignore
+          components={TableComponents}
+          useWindowScroll={true}
+          endReached={() => {
+            hasNextPage && fetchNextPage();
+          }}
+          fixedHeaderContent={() => (
+            <tr>
+              <td width="5%">Job</td>
+              <td width="5%">Details</td>
+              <td width="5%">Progress</td>
+              <td width="5%">Duration</td>
+              <td width="5%">Status</td>
+              <td width="8%">Actions</td>
+            </tr>
+          )}
+          itemContent={(_index, data: QueueMonitorResource) => {
+            return (
+              <React.Fragment key={data.id}>
+                <td>
+                  <Text>{data.name}</Text>
+                </td>
+                <td>
+                  <Flex direction="column" gap="sm">
+                    <Text size="2"><span className={styles.bold}>Queue</span>: {data.queue}</Text>
+                    <Text size="2"><span className={styles.bold}>Attempt</span>: {data.attempt}</Text>
+                  </Flex>
+                </td>
+                <td>
+                  {data.progress && (<Text>{data.progress}%</Text>)}
+                </td>
+                <td>
+                  {getDuration(data.started_at, data.finished_at)}
+                </td>
+                <td>
+                  <JobStatus status={data.status}/>
+                </td>
+                <td>
+                  <Flex gap="2" align="center">
+                    <Dialog.Trigger>
+                      <Button color="gray" onClick={() => setOpenJob(data)}>View</Button>
+                    </Dialog.Trigger>
+                    <Button color="blue">Retry</Button>
+                    <Button color="red">Delete</Button>
+                  </Flex>
+                </td>
+              </React.Fragment>
+            );
+          }}
+        />
 
-      <Modal
-        opened={showJobDetails}
-        onClose={() => closeModal()}
-        fullScreen
-        title={openJob && <Text fw="bold">Job details | {openJob.name}</Text>}
-      >
-        {(showJobDetails && openJob) && (
-          <JobDetails job={openJob} />
-        )}
-      </Modal>
+        <Dialog.Content>
+          <Dialog.Title>{ openJob?.name ?? 'Job' }</Dialog.Title>
+          <Dialog.Description>See the details about the job</Dialog.Description>
+
+          {openJob && <JobDetails job={openJob} />}
+
+          <Flex gap="3" mt="4" justify="end">
+            <Dialog.Close>
+              <Button onClick={() => setOpenJob(undefined)}>Close</Button>
+            </Dialog.Close>
+          </Flex>
+        </Dialog.Content>
+      </Dialog.Root>
     </div>
   );
 }
@@ -127,9 +118,4 @@ const Scroller = React.forwardRef<HTMLDivElement, ScrollerProps>(({ style, ...pr
 });
 const TableComponents = {
   Scroller,
-  Table: (props: TableProps) => <Table {...props} style={{ borderCollapse: 'separate' }}/>,
-  TableHead: Table.Thead,
-  TableRow: Table.Tr,
-  // @ts-ignore
-  TableBody: React.forwardRef((props, ref) => <Table.Tbody {...props} ref={ref}/>),
 }

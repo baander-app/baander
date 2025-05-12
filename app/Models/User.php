@@ -3,8 +3,6 @@
 namespace App\Models;
 
 use App\Auth\Role;
-use App\Models\Player\PlayerQueue;
-use App\Models\Player\PlayerState;
 use App\Modules\Webauthn\Concerns\HasPasskeys;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -67,7 +65,7 @@ class User extends Authenticatable implements HasPasskeys
      * @param array $device
      * @return NewAccessToken
      */
-    public function createToken(string $name, array $abilities = ['*'], DateTimeInterface $expiresAt = null, array $device = [])
+    public function createToken(string $name, array $abilities = ['*'], ?DateTimeInterface $expiresAt = null, array $device = [])
     {
         $plainTextToken = $this->generateTokenString();
         $broadcastToken = Str::replace('-', '', Uuid::uuid4()->toString());
@@ -101,16 +99,6 @@ class User extends Authenticatable implements HasPasskeys
     {
         return $this->belongsToMany(Library::class)
             ->using(UserLibrary::class);
-    }
-
-    public function playerStates()
-    {
-        return $this->hasMany(PlayerState::class);
-    }
-
-    public function playerQueues()
-    {
-        return $this->hasMany(PlayerQueue::class);
     }
 
     public function userMediaActivities()

@@ -24,20 +24,23 @@ help: ## Shows available commands with description
 
 build: ## Build dev environment
 ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@HOST_UID=$(HOST_UID) HOST_GID=$(HOST_GID) WEB_PORT_HTTP=$(WEB_PORT_HTTP) WEB_PORT_SSL=$(WEB_PORT_SSL) XDEBUG_CONFIG=$(XDEBUG_CONFIG) XDEBUG_VERSION=$(XDEBUG_VERSION) docker compose -f docker-compose.yml build
+	@HOST_UID=$(HOST_UID) HOST_GID=$(HOST_GID) WEB_PORT_HTTP=$(WEB_PORT_HTTP) WEB_PORT_SSL=$(WEB_PORT_SSL) XDEBUG_CONFIG=$(XDEBUG_CONFIG) XDEBUG_VERSION=$(XDEBUG_VERSION) docker compose -f docker-compose.yml build --progress=plain
 else
 	$(ERROR_ONLY_FOR_HOST)
 endif
 
 build-clean: ## Build dev environment
 ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@HOST_UID=$(HOST_UID) HOST_GID=$(HOST_GID) WEB_PORT_HTTP=$(WEB_PORT_HTTP) WEB_PORT_SSL=$(WEB_PORT_SSL) XDEBUG_CONFIG=$(XDEBUG_CONFIG) XDEBUG_VERSION=$(XDEBUG_VERSION) docker compose -f docker-compose.yml build --no-cache
+	@HOST_UID=$(HOST_UID) HOST_GID=$(HOST_GID) WEB_PORT_HTTP=$(WEB_PORT_HTTP) WEB_PORT_SSL=$(WEB_PORT_SSL) XDEBUG_CONFIG=$(XDEBUG_CONFIG) XDEBUG_VERSION=$(XDEBUG_VERSION) docker compose -f docker-compose.yml build --progress=plain --no-cache
 else
 	$(ERROR_ONLY_FOR_HOST)
 endif
 
 build-ffmpeg: ## Build the ffmpeg Docker image
-	cd docker/ffmpeg; docker build --tag martinjuul/ffmpeg-baander-static:latest .; cd ../..
+	cd docker/ffmpeg; docker build --progress=plain --tag martinjuul/ffmpeg-baander-static:latest .; cd ../..
+
+build-all:
+	build-ffmpeg build-clean
 
 start: ## Start dev environment
 ifeq ($(INSIDE_DOCKER_CONTAINER), 0)

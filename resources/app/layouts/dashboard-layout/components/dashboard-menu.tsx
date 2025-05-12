@@ -1,14 +1,26 @@
-import { ScrollArea, Text, Divider, Flex } from '@mantine/core';
-import { LinksGroup, LinksGroupProps } from '@/ui/nav-bar-links-group/nav-bar-links-group.tsx';
+import { Box, Flex, ScrollArea, Text } from '@radix-ui/themes';
 import { NavLink } from '@/ui/nav-link.tsx';
 import { lazyImport } from '@/utils/lazy-import.ts';
+import { Iconify } from '@/ui/icons/iconify.tsx';
+import styles from './dashboard-menu.module.scss';
 
 const {BaanderLogo} = lazyImport(() => import('@/ui/branding/baander-logo/baander-logo.tsx'), 'BaanderLogo');
 
-import styles from './dashboard-menu.module.scss';
+interface MenuLink {
+  label: string;
+  to?: string;
+  href?: string;
+}
 
+interface MenuSection {
+  label: string;
+  iconName: string;
+  links: MenuLink[];
+}
 
-const menu: LinksGroupProps[] = [
+type Menu = MenuSection[];
+
+const menu: Menu = [
   {
     label: 'Libraries',
     iconName: 'ion:library',
@@ -45,27 +57,55 @@ const menu: LinksGroupProps[] = [
 ];
 
 export function DashboardMenu() {
-  const links = menu.map((item) => <div key={item.label} className={styles.space}><LinksGroup {...item}/></div>);
-
   return (
-    <nav className={styles.navbar}>
-      <div className={styles.header}>
-        <Flex align="center">
-          <BaanderLogo/>
-          <Text ml="sm" fw={500}>Dashboard</Text>
-        </Flex>
-      </div>
+    <Box className={styles.sidebar}>
+      <Flex align="center" justify="center" py="4">
+        <BaanderLogo />
+      </Flex>
 
-      <ScrollArea className={styles.links}>
-        <NavLink to="/" label="Home"/>
+      <ScrollArea>
+        <Box className={styles.menuContainer}>
+          <NavLink to="/" className={styles.homeLink}>
+            <Flex align="center" gap="2">
+              <Iconify icon="heroicons:home" />
+              <Text>Home</Text>
+            </Flex>
+          </NavLink>
 
-        <Divider/>
-
-        <div className={styles.linksInner}>{links}</div>
+          {menu.map((section: MenuSection, index: number) => (
+            <Box key={index} className={styles.menuSection}>
+              <Text className={styles.sectionTitle}>
+                <Flex align="center" gap="2">
+                  <Iconify icon={section.iconName} />
+                  {section.label}
+                </Flex>
+              </Text>
+              <Box className={styles.linksList}>
+                {section.links.map((link: MenuLink, linkIndex: number) => (
+                  link.to ? (
+                    <NavLink 
+                      key={linkIndex} 
+                      to={link.to} 
+                      className={styles.menuLink}
+                      activeClassName={styles.activeLink}
+                    >
+                      {link.label}
+                    </NavLink>
+                  ) : link.href ? (
+                    <a 
+                      key={linkIndex} 
+                      href={link.href} 
+                      className={styles.menuLink}
+                    >
+                      {link.label}
+                    </a>
+                  ) : null
+                ))}
+              </Box>
+            </Box>
+          ))}
+        </Box>
       </ScrollArea>
-
-      <div className={styles.footer}>
-      </div>
-    </nav>
+    </Box>
   );
 }

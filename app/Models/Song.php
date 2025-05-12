@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasLibraryAccess;
-use App\Models\Player\PlayerState;
 use App\Modules\Eloquent\BaseBuilder;
 use App\Modules\Http\Concerns\DirectStreamableFile;
 use App\Modules\Nanoid\Concerns\HasNanoPublicId;
@@ -79,11 +78,6 @@ class Song extends BaseModel implements DirectStreamableFile
     public function userMediaActivies()
     {
         return $this->morphToMany(UserMediaActivity::class, 'userMediaActivityable');
-    }
-
-    public function playerStates()
-    {
-        return $this->morphToMany(PlayerState::class, 'playable');
     }
 
     public function genres()

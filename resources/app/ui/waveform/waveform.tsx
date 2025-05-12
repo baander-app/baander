@@ -4,8 +4,9 @@ import WaveSurfer from 'wavesurfer.js';
 // @ts-ignore
 import Hover from 'wavesurfer.js/dist/plugins/hover.esm.js'
 import { useMusicSource } from '@/providers/music-source-provider.tsx';
-import { CloseButton, Loader, Text } from '@mantine/core';
 import styles from './waveform.module.scss';
+import { CloseButton }   from '../buttons/close-button';
+import { Spinner, Text } from '@radix-ui/themes';
 
 export interface WaveformProps {
   onClose: () => void;
@@ -45,12 +46,6 @@ export function Waveform({ onClose }: WaveformProps) {
   }, [waveSurferRef.current]);
 
   useEffect(() => {
-    if (waveSurfer && musicSource.audioRef?.current) {
-      waveSurfer.setMediaElement(musicSource.audioRef.current);
-    }
-  }, [waveSurfer, musicSource.audioRef?.current]);
-
-  useEffect(() => {
     if (waveSurfer && musicSource.authenticatedSource) {
       setIsLoading(true);
 
@@ -87,14 +82,15 @@ export function Waveform({ onClose }: WaveformProps) {
         });
         updatePosition(position);
       }}
+      className={styles.dnd}
     >
       <div className={styles.container}>
         <div className={styles.titleBar}>
-          <Text fw="bold">Waveform</Text>
+          <Text>Waveform</Text>
           <CloseButton onClick={() => onClose()} />
         </div>
 
-        {isLoading && <Loader color="indigo" type="dots"/>}
+        {isLoading && <Spinner />}
 
         <div>
           <div ref={waveSurferRef}></div>

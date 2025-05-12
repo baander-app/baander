@@ -1,0 +1,27 @@
+.lyricLine {
+  width: 97%;
+  text-align: center;
+  position: absolute;
+  padding: 12px;
+  margin-left: 8px;
+  margin-right: 8px;
+  background-color: rgba(0, 0, 0, .25);
+  border-radius: 12px;
+  color: #e3e3e3;
+  font-weight: var(--font-weight-bold);
+}
+
+.currentLyric {
+  top: 40%; /* Center the current lyric */
+  left: 0;
+  transform: translateY(-50%);
+  font-size: var(--font-size-6);
+}
+
+.nextLyric {
+  top: 60%; /* Place next lyric below current lyric */
+  left: 0;
+  transform: translateY(-50%);
+  color: #e3e3e3;
+  font-size: var(--font-size-3);
+}

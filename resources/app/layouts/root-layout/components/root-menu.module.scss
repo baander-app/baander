@@ -1,0 +1,73 @@
+.sidebar {
+  width: 250px;
+  height: 100%;
+  background-color: var(--color-panel);
+  border-right: 1px solid var(--gray-5);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.menuContainer {
+  padding: 1rem;
+}
+
+.homeLink {
+  display: block;
+  padding: 0.875rem 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: 4px;
+  color: var(--gray-12);
+  text-decoration: none;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: var(--gray-4);
+  }
+}
+
+.menuSection {
+  margin-top: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.sectionTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--gray-11);
+  margin-bottom: 0.75rem;
+  padding: 0.75rem 0 0.5rem;
+}
+
+.linksList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.menuLink {
+  display: block;
+  padding: 0.75rem 1rem;
+  margin-left: 0.5rem;
+  border-radius: 4px;
+  color: var(--gray-11);
+  text-decoration: none;
+  font-size: 0.875rem;
+  transition: background-color 0.2s, color 0.2s;
+
+  &:hover {
+    background-color: var(--gray-4);
+    color: var(--gray-12);
+  }
+}
+
+.activeLink {
+  background-color: var(--accent-3);
+  color: var(--accent-11);
+  font-weight: 500;
+
+  &:hover {
+    background-color: var(--accent-4);
+    color: var(--accent-11);
+  }
+}

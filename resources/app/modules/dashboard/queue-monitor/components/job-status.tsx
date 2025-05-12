@@ -1,4 +1,4 @@
-import { Badge } from '@mantine/core';
+import { Badge } from '@radix-ui/themes';
 import { statusToColor } from '@/utils/job-status.ts';
 
 export interface JobStatusProps {

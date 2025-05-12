@@ -27,7 +27,7 @@ RUN set -xe && \
 
 # Install all the dependencies and enable PHP modules
 RUN set -xe \
-    && curl -sL https://deb.nodesource.com/setup_20.x  | bash - \
+    && curl -sL https://deb.nodesource.com/setup_22.x  | bash - \
     && DEBIAN_FRONTEND=noninteractive apt-get update -qq \
     && DEBIAN_FRONTEND=noninteractive apt-get upgrade -yqq \
     && DEBIAN_FRONTEND=noninteractive apt-get install -yqq -o=Dpkg::Use-Pty=0 \
@@ -84,7 +84,9 @@ RUN set -xe && \
       pdo_pgsql \
       pgsql \
       sockets \
-      zip
+      zip \
+      shmop \
+      sysvmsg
 
 RUN set -xe \
     && pecl channel-update pecl.php.net \

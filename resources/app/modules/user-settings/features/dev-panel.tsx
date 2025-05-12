@@ -1,13 +1,18 @@
-import { Container, Paper, Title, Button, Group, Text } from '@mantine/core';
-import { useAppSelector } from '@/store/hooks.ts';
+import { Box, Button, Container, Flex, Heading, Text } from '@radix-ui/themes';
+import { useAppDispatch, useAppSelector } from '@/store/hooks.ts';
 import { useCallback } from 'react';
 import { selectAccessToken, selectRefreshToken, selectStreamToken } from '@/store/users/auth-slice.ts';
-import { Icon } from '@iconify/react';
+import { useTestMode } from '@/providers/test-mode-provider.tsx';
+import { CreateNotification } from '@/modules/notifications/models.ts';
+import { createNotification } from '@/store/notifications/notifications-slice.ts';
 
 export function DevPanel() {
+  const dispatch = useAppDispatch();
+
   const accessToken = useAppSelector(selectAccessToken);
   const refreshToken = useAppSelector(selectRefreshToken);
   const streamToken = useAppSelector(selectStreamToken);
+  const { isTestMode, toggleTestMode } = useTestMode();
 
   const copyAccessToken = useCallback(() => {
     if (accessToken && accessToken.token) {
@@ -27,19 +32,64 @@ export function DevPanel() {
     }
   }, [streamToken]);
 
+  const addTestNotification = () => {
+    const notifications: CreateNotification[] = [
+      {
+        type: 'info',
+        message: 'Test notification',
+      },
+      {
+        title: 'Test title',
+        type: 'success',
+        message: 'Test success notification',
+        toast: true,
+      },
+      {
+        type: 'warning',
+        message: 'Test warning notification',
+      },
+      {
+        type: 'error',
+        message: 'Test error notification',
+      }
+    ]
+
+    notifications.forEach((notification) => {
+      dispatch(createNotification(notification));
+    })
+  }
+
   return (
     <Container>
-      <Title>Dev Panel</Title>
+      <Heading>Dev Panel</Heading>
 
-      <Paper mt="md">
+      <Flex mt="2" direction="column">
         <Text>Current tokens</Text>
 
-        <Group>
-          <Button onClick={() => copyAccessToken()} leftSection={<Icon icon="mdi:clipboard"/>}>Access token</Button>
-          <Button onClick={() => copyRefreshToken()} leftSection={<Icon icon="mdi:clipboard"/>}>Refresh token</Button>
-          <Button onClick={() => copyStreamToken()} leftSection={<Icon icon="mdi:clipboard"/>}>Stream token</Button>
-        </Group>
-      </Paper>
+        <Flex gap="2" mt="2">
+          <Button onClick={() => copyAccessToken()}>Access token</Button>
+          <Button onClick={() => copyRefreshToken()}>Refresh token</Button>
+          <Button onClick={() => copyStreamToken()}>Stream token</Button>
+        </Flex>
+      </Flex>
+
+      <Flex direction="column" mt="2">
+        <Text>Test mode</Text>
+
+        <Box mt="2">
+          <Button onClick={() => toggleTestMode()}>
+            {isTestMode ? 'Disable' : 'Enable'}
+          </Button>
+        </Box>
+      </Flex>
+
+      <Flex direction="column" mt="2">
+        <Text weight="bold">Add test notifications</Text>
+
+        <Box mt="2">
+          <Button onClick={() => addTestNotification()}>Add</Button>
+        </Box>
+      </Flex>
     </Container>
   );
 }

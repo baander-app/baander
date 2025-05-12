@@ -1,182 +1,182 @@
-// generated with @7nohe/openapi-react-query-codegen@1.6.1 
+// generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, OpCacheService, PasskeyService, PendingJobsService, QueueMetricsService, QueueService, RetryService, SilencedJobsService, SongService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
-export type AlbumServiceAlbumsIndexDefaultResponse = Awaited<ReturnType<typeof AlbumService.albumsIndex>>;
-export type AlbumServiceAlbumsIndexQueryResult<TData = AlbumServiceAlbumsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useAlbumServiceAlbumsIndexKey = "AlbumServiceAlbumsIndex";
-export const UseAlbumServiceAlbumsIndexKeyFn = ({ fields, genres, library, limit, page, relations }: {
+import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, RetryService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
+export type AlbumServiceGetApiLibrariesByLibraryAlbumsDefaultResponse = Awaited<ReturnType<typeof AlbumService.getApiLibrariesByLibraryAlbums>>;
+export type AlbumServiceGetApiLibrariesByLibraryAlbumsQueryResult<TData = AlbumServiceGetApiLibrariesByLibraryAlbumsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAlbumServiceGetApiLibrariesByLibraryAlbumsKey = "AlbumServiceGetApiLibrariesByLibraryAlbums";
+export const UseAlbumServiceGetApiLibrariesByLibraryAlbumsKeyFn = ({ fields, genres, library, limit, page, relations }: {
   fields?: string;
   genres?: string;
   library: string;
   limit?: number;
   page?: number;
   relations?: string;
-}, queryKey?: Array<unknown>) => [useAlbumServiceAlbumsIndexKey, ...(queryKey ?? [{ fields, genres, library, limit, page, relations }])];
-export type AlbumServiceAlbumsShowDefaultResponse = Awaited<ReturnType<typeof AlbumService.albumsShow>>;
-export type AlbumServiceAlbumsShowQueryResult<TData = AlbumServiceAlbumsShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useAlbumServiceAlbumsShowKey = "AlbumServiceAlbumsShow";
-export const UseAlbumServiceAlbumsShowKeyFn = ({ album, library }: {
+}, queryKey?: Array<unknown>) => [useAlbumServiceGetApiLibrariesByLibraryAlbumsKey, ...(queryKey ?? [{ fields, genres, library, limit, page, relations }])];
+export type AlbumServiceGetApiLibrariesByLibraryAlbumsByAlbumDefaultResponse = Awaited<ReturnType<typeof AlbumService.getApiLibrariesByLibraryAlbumsByAlbum>>;
+export type AlbumServiceGetApiLibrariesByLibraryAlbumsByAlbumQueryResult<TData = AlbumServiceGetApiLibrariesByLibraryAlbumsByAlbumDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAlbumServiceGetApiLibrariesByLibraryAlbumsByAlbumKey = "AlbumServiceGetApiLibrariesByLibraryAlbumsByAlbum";
+export const UseAlbumServiceGetApiLibrariesByLibraryAlbumsByAlbumKeyFn = ({ album, library }: {
   album: string;
   library: string;
-}, queryKey?: Array<unknown>) => [useAlbumServiceAlbumsShowKey, ...(queryKey ?? [{ album, library }])];
-export type ArtistServiceArtistsIndexDefaultResponse = Awaited<ReturnType<typeof ArtistService.artistsIndex>>;
-export type ArtistServiceArtistsIndexQueryResult<TData = ArtistServiceArtistsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useArtistServiceArtistsIndexKey = "ArtistServiceArtistsIndex";
-export const UseArtistServiceArtistsIndexKeyFn = ({ fields, genres, library, limit, page, relations }: {
+}, queryKey?: Array<unknown>) => [useAlbumServiceGetApiLibrariesByLibraryAlbumsByAlbumKey, ...(queryKey ?? [{ album, library }])];
+export type ArtistServiceGetApiLibrariesByLibraryArtistsDefaultResponse = Awaited<ReturnType<typeof ArtistService.getApiLibrariesByLibraryArtists>>;
+export type ArtistServiceGetApiLibrariesByLibraryArtistsQueryResult<TData = ArtistServiceGetApiLibrariesByLibraryArtistsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useArtistServiceGetApiLibrariesByLibraryArtistsKey = "ArtistServiceGetApiLibrariesByLibraryArtists";
+export const UseArtistServiceGetApiLibrariesByLibraryArtistsKeyFn = ({ fields, genres, library, limit, page, relations }: {
   fields?: string;
   genres?: string;
   library: string;
   limit?: number;
   page?: number;
   relations?: string;
-}, queryKey?: Array<unknown>) => [useArtistServiceArtistsIndexKey, ...(queryKey ?? [{ fields, genres, library, limit, page, relations }])];
-export type ArtistServiceArtistsShowDefaultResponse = Awaited<ReturnType<typeof ArtistService.artistsShow>>;
-export type ArtistServiceArtistsShowQueryResult<TData = ArtistServiceArtistsShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useArtistServiceArtistsShowKey = "ArtistServiceArtistsShow";
-export const UseArtistServiceArtistsShowKeyFn = ({ artist, library }: {
+}, queryKey?: Array<unknown>) => [useArtistServiceGetApiLibrariesByLibraryArtistsKey, ...(queryKey ?? [{ fields, genres, library, limit, page, relations }])];
+export type ArtistServiceGetApiLibrariesByLibraryArtistsByArtistDefaultResponse = Awaited<ReturnType<typeof ArtistService.getApiLibrariesByLibraryArtistsByArtist>>;
+export type ArtistServiceGetApiLibrariesByLibraryArtistsByArtistQueryResult<TData = ArtistServiceGetApiLibrariesByLibraryArtistsByArtistDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useArtistServiceGetApiLibrariesByLibraryArtistsByArtistKey = "ArtistServiceGetApiLibrariesByLibraryArtistsByArtist";
+export const UseArtistServiceGetApiLibrariesByLibraryArtistsByArtistKeyFn = ({ artist, library }: {
   artist: string;
   library: string;
-}, queryKey?: Array<unknown>) => [useArtistServiceArtistsShowKey, ...(queryKey ?? [{ artist, library }])];
-export type AuthServiceAuthPasskeyOptionsDefaultResponse = Awaited<ReturnType<typeof AuthService.authPasskeyOptions>>;
-export type AuthServiceAuthPasskeyOptionsQueryResult<TData = AuthServiceAuthPasskeyOptionsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useAuthServiceAuthPasskeyOptionsKey = "AuthServiceAuthPasskeyOptions";
-export const UseAuthServiceAuthPasskeyOptionsKeyFn = (queryKey?: Array<unknown>) => [useAuthServiceAuthPasskeyOptionsKey, ...(queryKey ?? [])];
-export type AuthServiceAuthPasskeyRegisterOptionsDefaultResponse = Awaited<ReturnType<typeof AuthService.authPasskeyRegisterOptions>>;
-export type AuthServiceAuthPasskeyRegisterOptionsQueryResult<TData = AuthServiceAuthPasskeyRegisterOptionsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useAuthServiceAuthPasskeyRegisterOptionsKey = "AuthServiceAuthPasskeyRegisterOptions";
-export const UseAuthServiceAuthPasskeyRegisterOptionsKeyFn = (queryKey?: Array<unknown>) => [useAuthServiceAuthPasskeyRegisterOptionsKey, ...(queryKey ?? [])];
-export type PasskeyServiceAuthPasskeyOptionsDefaultResponse = Awaited<ReturnType<typeof PasskeyService.authPasskeyOptions>>;
-export type PasskeyServiceAuthPasskeyOptionsQueryResult<TData = PasskeyServiceAuthPasskeyOptionsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const usePasskeyServiceAuthPasskeyOptionsKey = "PasskeyServiceAuthPasskeyOptions";
-export const UsePasskeyServiceAuthPasskeyOptionsKeyFn = (queryKey?: Array<unknown>) => [usePasskeyServiceAuthPasskeyOptionsKey, ...(queryKey ?? [])];
-export type PasskeyServiceAuthPasskeyRegisterOptionsDefaultResponse = Awaited<ReturnType<typeof PasskeyService.authPasskeyRegisterOptions>>;
-export type PasskeyServiceAuthPasskeyRegisterOptionsQueryResult<TData = PasskeyServiceAuthPasskeyRegisterOptionsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const usePasskeyServiceAuthPasskeyRegisterOptionsKey = "PasskeyServiceAuthPasskeyRegisterOptions";
-export const UsePasskeyServiceAuthPasskeyRegisterOptionsKeyFn = (queryKey?: Array<unknown>) => [usePasskeyServiceAuthPasskeyRegisterOptionsKey, ...(queryKey ?? [])];
-export type BatchesServiceHorizonJobsBatchesIndexDefaultResponse = Awaited<ReturnType<typeof BatchesService.horizonJobsBatchesIndex>>;
-export type BatchesServiceHorizonJobsBatchesIndexQueryResult<TData = BatchesServiceHorizonJobsBatchesIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useBatchesServiceHorizonJobsBatchesIndexKey = "BatchesServiceHorizonJobsBatchesIndex";
-export const UseBatchesServiceHorizonJobsBatchesIndexKeyFn = (queryKey?: Array<unknown>) => [useBatchesServiceHorizonJobsBatchesIndexKey, ...(queryKey ?? [])];
-export type BatchesServiceHorizonJobsBatchesShowDefaultResponse = Awaited<ReturnType<typeof BatchesService.horizonJobsBatchesShow>>;
-export type BatchesServiceHorizonJobsBatchesShowQueryResult<TData = BatchesServiceHorizonJobsBatchesShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useBatchesServiceHorizonJobsBatchesShowKey = "BatchesServiceHorizonJobsBatchesShow";
-export const UseBatchesServiceHorizonJobsBatchesShowKeyFn = ({ id }: {
+}, queryKey?: Array<unknown>) => [useArtistServiceGetApiLibrariesByLibraryArtistsByArtistKey, ...(queryKey ?? [{ artist, library }])];
+export type AuthServiceGetWebauthnPasskeyDefaultResponse = Awaited<ReturnType<typeof AuthService.getWebauthnPasskey>>;
+export type AuthServiceGetWebauthnPasskeyQueryResult<TData = AuthServiceGetWebauthnPasskeyDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAuthServiceGetWebauthnPasskeyKey = "AuthServiceGetWebauthnPasskey";
+export const UseAuthServiceGetWebauthnPasskeyKeyFn = (queryKey?: Array<unknown>) => [useAuthServiceGetWebauthnPasskeyKey, ...(queryKey ?? [])];
+export type AuthServiceGetWebauthnPasskeyRegisterDefaultResponse = Awaited<ReturnType<typeof AuthService.getWebauthnPasskeyRegister>>;
+export type AuthServiceGetWebauthnPasskeyRegisterQueryResult<TData = AuthServiceGetWebauthnPasskeyRegisterDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAuthServiceGetWebauthnPasskeyRegisterKey = "AuthServiceGetWebauthnPasskeyRegister";
+export const UseAuthServiceGetWebauthnPasskeyRegisterKeyFn = (queryKey?: Array<unknown>) => [useAuthServiceGetWebauthnPasskeyRegisterKey, ...(queryKey ?? [])];
+export type PasskeyServiceGetWebauthnPasskeyDefaultResponse = Awaited<ReturnType<typeof PasskeyService.getWebauthnPasskey>>;
+export type PasskeyServiceGetWebauthnPasskeyQueryResult<TData = PasskeyServiceGetWebauthnPasskeyDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const usePasskeyServiceGetWebauthnPasskeyKey = "PasskeyServiceGetWebauthnPasskey";
+export const UsePasskeyServiceGetWebauthnPasskeyKeyFn = (queryKey?: Array<unknown>) => [usePasskeyServiceGetWebauthnPasskeyKey, ...(queryKey ?? [])];
+export type PasskeyServiceGetWebauthnPasskeyRegisterDefaultResponse = Awaited<ReturnType<typeof PasskeyService.getWebauthnPasskeyRegister>>;
+export type PasskeyServiceGetWebauthnPasskeyRegisterQueryResult<TData = PasskeyServiceGetWebauthnPasskeyRegisterDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const usePasskeyServiceGetWebauthnPasskeyRegisterKey = "PasskeyServiceGetWebauthnPasskeyRegister";
+export const UsePasskeyServiceGetWebauthnPasskeyRegisterKeyFn = (queryKey?: Array<unknown>) => [usePasskeyServiceGetWebauthnPasskeyRegisterKey, ...(queryKey ?? [])];
+export type BatchesServiceGetHorizonApiBatchesDefaultResponse = Awaited<ReturnType<typeof BatchesService.getHorizonApiBatches>>;
+export type BatchesServiceGetHorizonApiBatchesQueryResult<TData = BatchesServiceGetHorizonApiBatchesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useBatchesServiceGetHorizonApiBatchesKey = "BatchesServiceGetHorizonApiBatches";
+export const UseBatchesServiceGetHorizonApiBatchesKeyFn = (queryKey?: Array<unknown>) => [useBatchesServiceGetHorizonApiBatchesKey, ...(queryKey ?? [])];
+export type BatchesServiceGetHorizonApiBatchesByIdDefaultResponse = Awaited<ReturnType<typeof BatchesService.getHorizonApiBatchesById>>;
+export type BatchesServiceGetHorizonApiBatchesByIdQueryResult<TData = BatchesServiceGetHorizonApiBatchesByIdDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useBatchesServiceGetHorizonApiBatchesByIdKey = "BatchesServiceGetHorizonApiBatchesById";
+export const UseBatchesServiceGetHorizonApiBatchesByIdKeyFn = ({ id }: {
   id: string;
-}, queryKey?: Array<unknown>) => [useBatchesServiceHorizonJobsBatchesShowKey, ...(queryKey ?? [{ id }])];
-export type CompletedJobsServiceHorizonCompletedJobsIndexDefaultResponse = Awaited<ReturnType<typeof CompletedJobsService.horizonCompletedJobsIndex>>;
-export type CompletedJobsServiceHorizonCompletedJobsIndexQueryResult<TData = CompletedJobsServiceHorizonCompletedJobsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useCompletedJobsServiceHorizonCompletedJobsIndexKey = "CompletedJobsServiceHorizonCompletedJobsIndex";
-export const UseCompletedJobsServiceHorizonCompletedJobsIndexKeyFn = ({ startingAt }: {
+}, queryKey?: Array<unknown>) => [useBatchesServiceGetHorizonApiBatchesByIdKey, ...(queryKey ?? [{ id }])];
+export type CompletedJobsServiceGetHorizonApiJobsCompletedDefaultResponse = Awaited<ReturnType<typeof CompletedJobsService.getHorizonApiJobsCompleted>>;
+export type CompletedJobsServiceGetHorizonApiJobsCompletedQueryResult<TData = CompletedJobsServiceGetHorizonApiJobsCompletedDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useCompletedJobsServiceGetHorizonApiJobsCompletedKey = "CompletedJobsServiceGetHorizonApiJobsCompleted";
+export const UseCompletedJobsServiceGetHorizonApiJobsCompletedKeyFn = ({ startingAt }: {
   startingAt?: string;
-} = {}, queryKey?: Array<unknown>) => [useCompletedJobsServiceHorizonCompletedJobsIndexKey, ...(queryKey ?? [{ startingAt }])];
-export type DashboardStatsServiceHorizonStatsIndexDefaultResponse = Awaited<ReturnType<typeof DashboardStatsService.horizonStatsIndex>>;
-export type DashboardStatsServiceHorizonStatsIndexQueryResult<TData = DashboardStatsServiceHorizonStatsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useDashboardStatsServiceHorizonStatsIndexKey = "DashboardStatsServiceHorizonStatsIndex";
-export const UseDashboardStatsServiceHorizonStatsIndexKeyFn = (queryKey?: Array<unknown>) => [useDashboardStatsServiceHorizonStatsIndexKey, ...(queryKey ?? [])];
-export type FailedJobsServiceHorizonFailedJobsIndexDefaultResponse = Awaited<ReturnType<typeof FailedJobsService.horizonFailedJobsIndex>>;
-export type FailedJobsServiceHorizonFailedJobsIndexQueryResult<TData = FailedJobsServiceHorizonFailedJobsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useFailedJobsServiceHorizonFailedJobsIndexKey = "FailedJobsServiceHorizonFailedJobsIndex";
-export const UseFailedJobsServiceHorizonFailedJobsIndexKeyFn = ({ tag }: {
+} = {}, queryKey?: Array<unknown>) => [useCompletedJobsServiceGetHorizonApiJobsCompletedKey, ...(queryKey ?? [{ startingAt }])];
+export type DashboardStatsServiceGetHorizonApiStatsDefaultResponse = Awaited<ReturnType<typeof DashboardStatsService.getHorizonApiStats>>;
+export type DashboardStatsServiceGetHorizonApiStatsQueryResult<TData = DashboardStatsServiceGetHorizonApiStatsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useDashboardStatsServiceGetHorizonApiStatsKey = "DashboardStatsServiceGetHorizonApiStats";
+export const UseDashboardStatsServiceGetHorizonApiStatsKeyFn = (queryKey?: Array<unknown>) => [useDashboardStatsServiceGetHorizonApiStatsKey, ...(queryKey ?? [])];
+export type FailedJobsServiceGetHorizonApiJobsFailedDefaultResponse = Awaited<ReturnType<typeof FailedJobsService.getHorizonApiJobsFailed>>;
+export type FailedJobsServiceGetHorizonApiJobsFailedQueryResult<TData = FailedJobsServiceGetHorizonApiJobsFailedDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useFailedJobsServiceGetHorizonApiJobsFailedKey = "FailedJobsServiceGetHorizonApiJobsFailed";
+export const UseFailedJobsServiceGetHorizonApiJobsFailedKeyFn = ({ tag }: {
   tag?: string;
-} = {}, queryKey?: Array<unknown>) => [useFailedJobsServiceHorizonFailedJobsIndexKey, ...(queryKey ?? [{ tag }])];
-export type FailedJobsServiceHorizonFailedJobsShowDefaultResponse = Awaited<ReturnType<typeof FailedJobsService.horizonFailedJobsShow>>;
-export type FailedJobsServiceHorizonFailedJobsShowQueryResult<TData = FailedJobsServiceHorizonFailedJobsShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useFailedJobsServiceHorizonFailedJobsShowKey = "FailedJobsServiceHorizonFailedJobsShow";
-export const UseFailedJobsServiceHorizonFailedJobsShowKeyFn = ({ id }: {
+} = {}, queryKey?: Array<unknown>) => [useFailedJobsServiceGetHorizonApiJobsFailedKey, ...(queryKey ?? [{ tag }])];
+export type FailedJobsServiceGetHorizonApiJobsFailedByIdDefaultResponse = Awaited<ReturnType<typeof FailedJobsService.getHorizonApiJobsFailedById>>;
+export type FailedJobsServiceGetHorizonApiJobsFailedByIdQueryResult<TData = FailedJobsServiceGetHorizonApiJobsFailedByIdDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useFailedJobsServiceGetHorizonApiJobsFailedByIdKey = "FailedJobsServiceGetHorizonApiJobsFailedById";
+export const UseFailedJobsServiceGetHorizonApiJobsFailedByIdKeyFn = ({ id }: {
   id: string;
-}, queryKey?: Array<unknown>) => [useFailedJobsServiceHorizonFailedJobsShowKey, ...(queryKey ?? [{ id }])];
-export type FilesServiceLogViewerFilesDefaultResponse = Awaited<ReturnType<typeof FilesService.logViewerFiles>>;
-export type FilesServiceLogViewerFilesQueryResult<TData = FilesServiceLogViewerFilesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useFilesServiceLogViewerFilesKey = "FilesServiceLogViewerFiles";
-export const UseFilesServiceLogViewerFilesKeyFn = (queryKey?: Array<unknown>) => [useFilesServiceLogViewerFilesKey, ...(queryKey ?? [])];
-export type FilesServiceLogViewerFilesRequestDownloadDefaultResponse = Awaited<ReturnType<typeof FilesService.logViewerFilesRequestDownload>>;
-export type FilesServiceLogViewerFilesRequestDownloadQueryResult<TData = FilesServiceLogViewerFilesRequestDownloadDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useFilesServiceLogViewerFilesRequestDownloadKey = "FilesServiceLogViewerFilesRequestDownload";
-export const UseFilesServiceLogViewerFilesRequestDownloadKeyFn = ({ fileIdentifier }: {
+}, queryKey?: Array<unknown>) => [useFailedJobsServiceGetHorizonApiJobsFailedByIdKey, ...(queryKey ?? [{ id }])];
+export type FilesServiceGetSystemLogViewerApiFilesDefaultResponse = Awaited<ReturnType<typeof FilesService.getSystemLogViewerApiFiles>>;
+export type FilesServiceGetSystemLogViewerApiFilesQueryResult<TData = FilesServiceGetSystemLogViewerApiFilesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useFilesServiceGetSystemLogViewerApiFilesKey = "FilesServiceGetSystemLogViewerApiFiles";
+export const UseFilesServiceGetSystemLogViewerApiFilesKeyFn = (queryKey?: Array<unknown>) => [useFilesServiceGetSystemLogViewerApiFilesKey, ...(queryKey ?? [])];
+export type FilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadRequestDefaultResponse = Awaited<ReturnType<typeof FilesService.getSystemLogViewerApiFilesByFileIdentifierDownloadRequest>>;
+export type FilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadRequestQueryResult<TData = FilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadRequestDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadRequestKey = "FilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadRequest";
+export const UseFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadRequestKeyFn = ({ fileIdentifier }: {
   fileIdentifier: string;
-}, queryKey?: Array<unknown>) => [useFilesServiceLogViewerFilesRequestDownloadKey, ...(queryKey ?? [{ fileIdentifier }])];
-export type FilesServiceLogViewerFilesDownloadDefaultResponse = Awaited<ReturnType<typeof FilesService.logViewerFilesDownload>>;
-export type FilesServiceLogViewerFilesDownloadQueryResult<TData = FilesServiceLogViewerFilesDownloadDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useFilesServiceLogViewerFilesDownloadKey = "FilesServiceLogViewerFilesDownload";
-export const UseFilesServiceLogViewerFilesDownloadKeyFn = ({ fileIdentifier }: {
+}, queryKey?: Array<unknown>) => [useFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadRequestKey, ...(queryKey ?? [{ fileIdentifier }])];
+export type FilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadDefaultResponse = Awaited<ReturnType<typeof FilesService.getSystemLogViewerApiFilesByFileIdentifierDownload>>;
+export type FilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadQueryResult<TData = FilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadKey = "FilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownload";
+export const UseFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadKeyFn = ({ fileIdentifier }: {
   fileIdentifier: string;
-}, queryKey?: Array<unknown>) => [useFilesServiceLogViewerFilesDownloadKey, ...(queryKey ?? [{ fileIdentifier }])];
-export type FoldersServiceLogViewerFoldersDefaultResponse = Awaited<ReturnType<typeof FoldersService.logViewerFolders>>;
-export type FoldersServiceLogViewerFoldersQueryResult<TData = FoldersServiceLogViewerFoldersDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useFoldersServiceLogViewerFoldersKey = "FoldersServiceLogViewerFolders";
-export const UseFoldersServiceLogViewerFoldersKeyFn = (queryKey?: Array<unknown>) => [useFoldersServiceLogViewerFoldersKey, ...(queryKey ?? [])];
-export type FoldersServiceLogViewerFoldersRequestDownloadDefaultResponse = Awaited<ReturnType<typeof FoldersService.logViewerFoldersRequestDownload>>;
-export type FoldersServiceLogViewerFoldersRequestDownloadQueryResult<TData = FoldersServiceLogViewerFoldersRequestDownloadDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useFoldersServiceLogViewerFoldersRequestDownloadKey = "FoldersServiceLogViewerFoldersRequestDownload";
-export const UseFoldersServiceLogViewerFoldersRequestDownloadKeyFn = ({ folderIdentifier }: {
+}, queryKey?: Array<unknown>) => [useFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadKey, ...(queryKey ?? [{ fileIdentifier }])];
+export type FoldersServiceGetSystemLogViewerApiFoldersDefaultResponse = Awaited<ReturnType<typeof FoldersService.getSystemLogViewerApiFolders>>;
+export type FoldersServiceGetSystemLogViewerApiFoldersQueryResult<TData = FoldersServiceGetSystemLogViewerApiFoldersDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useFoldersServiceGetSystemLogViewerApiFoldersKey = "FoldersServiceGetSystemLogViewerApiFolders";
+export const UseFoldersServiceGetSystemLogViewerApiFoldersKeyFn = (queryKey?: Array<unknown>) => [useFoldersServiceGetSystemLogViewerApiFoldersKey, ...(queryKey ?? [])];
+export type FoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestDefaultResponse = Awaited<ReturnType<typeof FoldersService.getSystemLogViewerApiFoldersByFolderIdentifierDownloadRequest>>;
+export type FoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestQueryResult<TData = FoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestKey = "FoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequest";
+export const UseFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestKeyFn = ({ folderIdentifier }: {
   folderIdentifier: string;
-}, queryKey?: Array<unknown>) => [useFoldersServiceLogViewerFoldersRequestDownloadKey, ...(queryKey ?? [{ folderIdentifier }])];
-export type FoldersServiceLogViewerFoldersDownloadDefaultResponse = Awaited<ReturnType<typeof FoldersService.logViewerFoldersDownload>>;
-export type FoldersServiceLogViewerFoldersDownloadQueryResult<TData = FoldersServiceLogViewerFoldersDownloadDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useFoldersServiceLogViewerFoldersDownloadKey = "FoldersServiceLogViewerFoldersDownload";
-export const UseFoldersServiceLogViewerFoldersDownloadKeyFn = ({ folderIdentifier }: {
+}, queryKey?: Array<unknown>) => [useFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestKey, ...(queryKey ?? [{ folderIdentifier }])];
+export type FoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadDefaultResponse = Awaited<ReturnType<typeof FoldersService.getSystemLogViewerApiFoldersByFolderIdentifierDownload>>;
+export type FoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadQueryResult<TData = FoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadKey = "FoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownload";
+export const UseFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadKeyFn = ({ folderIdentifier }: {
   folderIdentifier: string;
-}, queryKey?: Array<unknown>) => [useFoldersServiceLogViewerFoldersDownloadKey, ...(queryKey ?? [{ folderIdentifier }])];
-export type GenreServiceGenresIndexDefaultResponse = Awaited<ReturnType<typeof GenreService.genresIndex>>;
-export type GenreServiceGenresIndexQueryResult<TData = GenreServiceGenresIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useGenreServiceGenresIndexKey = "GenreServiceGenresIndex";
-export const UseGenreServiceGenresIndexKeyFn = ({ fields, librarySlug, limit, page, relations }: {
+}, queryKey?: Array<unknown>) => [useFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadKey, ...(queryKey ?? [{ folderIdentifier }])];
+export type GenreServiceGetApiGenresDefaultResponse = Awaited<ReturnType<typeof GenreService.getApiGenres>>;
+export type GenreServiceGetApiGenresQueryResult<TData = GenreServiceGetApiGenresDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useGenreServiceGetApiGenresKey = "GenreServiceGetApiGenres";
+export const UseGenreServiceGetApiGenresKeyFn = ({ fields, librarySlug, limit, page, relations }: {
   fields?: string;
   librarySlug?: string;
   limit?: number;
   page?: number;
   relations?: string;
-} = {}, queryKey?: Array<unknown>) => [useGenreServiceGenresIndexKey, ...(queryKey ?? [{ fields, librarySlug, limit, page, relations }])];
-export type GenreServiceGenresShowDefaultResponse = Awaited<ReturnType<typeof GenreService.genresShow>>;
-export type GenreServiceGenresShowQueryResult<TData = GenreServiceGenresShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useGenreServiceGenresShowKey = "GenreServiceGenresShow";
-export const UseGenreServiceGenresShowKeyFn = ({ genre }: {
+} = {}, queryKey?: Array<unknown>) => [useGenreServiceGetApiGenresKey, ...(queryKey ?? [{ fields, librarySlug, limit, page, relations }])];
+export type GenreServiceGetApiGenresByGenreDefaultResponse = Awaited<ReturnType<typeof GenreService.getApiGenresByGenre>>;
+export type GenreServiceGetApiGenresByGenreQueryResult<TData = GenreServiceGetApiGenresByGenreDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useGenreServiceGetApiGenresByGenreKey = "GenreServiceGetApiGenresByGenre";
+export const UseGenreServiceGetApiGenresByGenreKeyFn = ({ genre }: {
   genre: string;
-}, queryKey?: Array<unknown>) => [useGenreServiceGenresShowKey, ...(queryKey ?? [{ genre }])];
-export type HostsServiceLogViewerHostsDefaultResponse = Awaited<ReturnType<typeof HostsService.logViewerHosts>>;
-export type HostsServiceLogViewerHostsQueryResult<TData = HostsServiceLogViewerHostsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useHostsServiceLogViewerHostsKey = "HostsServiceLogViewerHosts";
-export const UseHostsServiceLogViewerHostsKeyFn = (queryKey?: Array<unknown>) => [useHostsServiceLogViewerHostsKey, ...(queryKey ?? [])];
-export type ImageServiceImageServeDefaultResponse = Awaited<ReturnType<typeof ImageService.imageServe>>;
-export type ImageServiceImageServeQueryResult<TData = ImageServiceImageServeDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useImageServiceImageServeKey = "ImageServiceImageServe";
-export const UseImageServiceImageServeKeyFn = ({ image }: {
+}, queryKey?: Array<unknown>) => [useGenreServiceGetApiGenresByGenreKey, ...(queryKey ?? [{ genre }])];
+export type HostsServiceGetSystemLogViewerApiHostsDefaultResponse = Awaited<ReturnType<typeof HostsService.getSystemLogViewerApiHosts>>;
+export type HostsServiceGetSystemLogViewerApiHostsQueryResult<TData = HostsServiceGetSystemLogViewerApiHostsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useHostsServiceGetSystemLogViewerApiHostsKey = "HostsServiceGetSystemLogViewerApiHosts";
+export const UseHostsServiceGetSystemLogViewerApiHostsKeyFn = (queryKey?: Array<unknown>) => [useHostsServiceGetSystemLogViewerApiHostsKey, ...(queryKey ?? [])];
+export type ImageServiceGetApiImagesByImageDefaultResponse = Awaited<ReturnType<typeof ImageService.getApiImagesByImage>>;
+export type ImageServiceGetApiImagesByImageQueryResult<TData = ImageServiceGetApiImagesByImageDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useImageServiceGetApiImagesByImageKey = "ImageServiceGetApiImagesByImage";
+export const UseImageServiceGetApiImagesByImageKeyFn = ({ image }: {
   image: string;
-}, queryKey?: Array<unknown>) => [useImageServiceImageServeKey, ...(queryKey ?? [{ image }])];
-export type JobMetricsServiceHorizonJobsMetricsIndexDefaultResponse = Awaited<ReturnType<typeof JobMetricsService.horizonJobsMetricsIndex>>;
-export type JobMetricsServiceHorizonJobsMetricsIndexQueryResult<TData = JobMetricsServiceHorizonJobsMetricsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useJobMetricsServiceHorizonJobsMetricsIndexKey = "JobMetricsServiceHorizonJobsMetricsIndex";
-export const UseJobMetricsServiceHorizonJobsMetricsIndexKeyFn = (queryKey?: Array<unknown>) => [useJobMetricsServiceHorizonJobsMetricsIndexKey, ...(queryKey ?? [])];
-export type JobMetricsServiceHorizonJobsMetricsShowDefaultResponse = Awaited<ReturnType<typeof JobMetricsService.horizonJobsMetricsShow>>;
-export type JobMetricsServiceHorizonJobsMetricsShowQueryResult<TData = JobMetricsServiceHorizonJobsMetricsShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useJobMetricsServiceHorizonJobsMetricsShowKey = "JobMetricsServiceHorizonJobsMetricsShow";
-export const UseJobMetricsServiceHorizonJobsMetricsShowKeyFn = ({ id }: {
+}, queryKey?: Array<unknown>) => [useImageServiceGetApiImagesByImageKey, ...(queryKey ?? [{ image }])];
+export type JobMetricsServiceGetHorizonApiMetricsJobsDefaultResponse = Awaited<ReturnType<typeof JobMetricsService.getHorizonApiMetricsJobs>>;
+export type JobMetricsServiceGetHorizonApiMetricsJobsQueryResult<TData = JobMetricsServiceGetHorizonApiMetricsJobsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useJobMetricsServiceGetHorizonApiMetricsJobsKey = "JobMetricsServiceGetHorizonApiMetricsJobs";
+export const UseJobMetricsServiceGetHorizonApiMetricsJobsKeyFn = (queryKey?: Array<unknown>) => [useJobMetricsServiceGetHorizonApiMetricsJobsKey, ...(queryKey ?? [])];
+export type JobMetricsServiceGetHorizonApiMetricsJobsByIdDefaultResponse = Awaited<ReturnType<typeof JobMetricsService.getHorizonApiMetricsJobsById>>;
+export type JobMetricsServiceGetHorizonApiMetricsJobsByIdQueryResult<TData = JobMetricsServiceGetHorizonApiMetricsJobsByIdDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useJobMetricsServiceGetHorizonApiMetricsJobsByIdKey = "JobMetricsServiceGetHorizonApiMetricsJobsById";
+export const UseJobMetricsServiceGetHorizonApiMetricsJobsByIdKeyFn = ({ id }: {
   id: string;
-}, queryKey?: Array<unknown>) => [useJobMetricsServiceHorizonJobsMetricsShowKey, ...(queryKey ?? [{ id }])];
-export type JobsServiceHorizonJobsShowDefaultResponse = Awaited<ReturnType<typeof JobsService.horizonJobsShow>>;
-export type JobsServiceHorizonJobsShowQueryResult<TData = JobsServiceHorizonJobsShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useJobsServiceHorizonJobsShowKey = "JobsServiceHorizonJobsShow";
-export const UseJobsServiceHorizonJobsShowKeyFn = ({ id }: {
+}, queryKey?: Array<unknown>) => [useJobMetricsServiceGetHorizonApiMetricsJobsByIdKey, ...(queryKey ?? [{ id }])];
+export type JobsServiceGetHorizonApiJobsByIdDefaultResponse = Awaited<ReturnType<typeof JobsService.getHorizonApiJobsById>>;
+export type JobsServiceGetHorizonApiJobsByIdQueryResult<TData = JobsServiceGetHorizonApiJobsByIdDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useJobsServiceGetHorizonApiJobsByIdKey = "JobsServiceGetHorizonApiJobsById";
+export const UseJobsServiceGetHorizonApiJobsByIdKeyFn = ({ id }: {
   id: string;
-}, queryKey?: Array<unknown>) => [useJobsServiceHorizonJobsShowKey, ...(queryKey ?? [{ id }])];
-export type LibraryServiceLibrariesIndexDefaultResponse = Awaited<ReturnType<typeof LibraryService.librariesIndex>>;
-export type LibraryServiceLibrariesIndexQueryResult<TData = LibraryServiceLibrariesIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useLibraryServiceLibrariesIndexKey = "LibraryServiceLibrariesIndex";
-export const UseLibraryServiceLibrariesIndexKeyFn = ({ limit, page }: {
+}, queryKey?: Array<unknown>) => [useJobsServiceGetHorizonApiJobsByIdKey, ...(queryKey ?? [{ id }])];
+export type LibraryServiceGetApiLibrariesDefaultResponse = Awaited<ReturnType<typeof LibraryService.getApiLibraries>>;
+export type LibraryServiceGetApiLibrariesQueryResult<TData = LibraryServiceGetApiLibrariesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useLibraryServiceGetApiLibrariesKey = "LibraryServiceGetApiLibraries";
+export const UseLibraryServiceGetApiLibrariesKeyFn = ({ limit, page }: {
   limit?: number;
   page?: number;
-} = {}, queryKey?: Array<unknown>) => [useLibraryServiceLibrariesIndexKey, ...(queryKey ?? [{ limit, page }])];
-export type LibraryServiceLibraryShowDefaultResponse = Awaited<ReturnType<typeof LibraryService.libraryShow>>;
-export type LibraryServiceLibraryShowQueryResult<TData = LibraryServiceLibraryShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useLibraryServiceLibraryShowKey = "LibraryServiceLibraryShow";
-export const UseLibraryServiceLibraryShowKeyFn = ({ slug }: {
+} = {}, queryKey?: Array<unknown>) => [useLibraryServiceGetApiLibrariesKey, ...(queryKey ?? [{ limit, page }])];
+export type LibraryServiceGetApiLibrariesBySlugDefaultResponse = Awaited<ReturnType<typeof LibraryService.getApiLibrariesBySlug>>;
+export type LibraryServiceGetApiLibrariesBySlugQueryResult<TData = LibraryServiceGetApiLibrariesBySlugDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useLibraryServiceGetApiLibrariesBySlugKey = "LibraryServiceGetApiLibrariesBySlug";
+export const UseLibraryServiceGetApiLibrariesBySlugKeyFn = ({ slug }: {
   slug: string;
-}, queryKey?: Array<unknown>) => [useLibraryServiceLibraryShowKey, ...(queryKey ?? [{ slug }])];
-export type LogsServiceLogViewerLogsDefaultResponse = Awaited<ReturnType<typeof LogsService.logViewerLogs>>;
-export type LogsServiceLogViewerLogsQueryResult<TData = LogsServiceLogViewerLogsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useLogsServiceLogViewerLogsKey = "LogsServiceLogViewerLogs";
-export const UseLogsServiceLogViewerLogsKeyFn = ({ direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }: {
+}, queryKey?: Array<unknown>) => [useLibraryServiceGetApiLibrariesBySlugKey, ...(queryKey ?? [{ slug }])];
+export type LogsServiceGetSystemLogViewerApiLogsDefaultResponse = Awaited<ReturnType<typeof LogsService.getSystemLogViewerApiLogs>>;
+export type LogsServiceGetSystemLogViewerApiLogsQueryResult<TData = LogsServiceGetSystemLogViewerApiLogsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useLogsServiceGetSystemLogViewerApiLogsKey = "LogsServiceGetSystemLogViewerApiLogs";
+export const UseLogsServiceGetSystemLogViewerApiLogsKeyFn = ({ direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }: {
   direction?: string;
   excludeFileTypes?: string;
   excludeLevels?: string;
@@ -185,174 +185,217 @@ export const UseLogsServiceLogViewerLogsKeyFn = ({ direction, excludeFileTypes, 
   perPage?: string;
   query?: string;
   shorterStackTraces?: boolean;
-} = {}, queryKey?: Array<unknown>) => [useLogsServiceLogViewerLogsKey, ...(queryKey ?? [{ direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }])];
-export type MasterSupervisorServiceHorizonMastersIndexDefaultResponse = Awaited<ReturnType<typeof MasterSupervisorService.horizonMastersIndex>>;
-export type MasterSupervisorServiceHorizonMastersIndexQueryResult<TData = MasterSupervisorServiceHorizonMastersIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useMasterSupervisorServiceHorizonMastersIndexKey = "MasterSupervisorServiceHorizonMastersIndex";
-export const UseMasterSupervisorServiceHorizonMastersIndexKeyFn = (queryKey?: Array<unknown>) => [useMasterSupervisorServiceHorizonMastersIndexKey, ...(queryKey ?? [])];
-export type MonitoringServiceHorizonMonitoringIndexDefaultResponse = Awaited<ReturnType<typeof MonitoringService.horizonMonitoringIndex>>;
-export type MonitoringServiceHorizonMonitoringIndexQueryResult<TData = MonitoringServiceHorizonMonitoringIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useMonitoringServiceHorizonMonitoringIndexKey = "MonitoringServiceHorizonMonitoringIndex";
-export const UseMonitoringServiceHorizonMonitoringIndexKeyFn = (queryKey?: Array<unknown>) => [useMonitoringServiceHorizonMonitoringIndexKey, ...(queryKey ?? [])];
-export type MonitoringServiceHorizonMonitoringTagPaginateDefaultResponse = Awaited<ReturnType<typeof MonitoringService.horizonMonitoringTagPaginate>>;
-export type MonitoringServiceHorizonMonitoringTagPaginateQueryResult<TData = MonitoringServiceHorizonMonitoringTagPaginateDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useMonitoringServiceHorizonMonitoringTagPaginateKey = "MonitoringServiceHorizonMonitoringTagPaginate";
-export const UseMonitoringServiceHorizonMonitoringTagPaginateKeyFn = ({ limit, tag }: {
+} = {}, queryKey?: Array<unknown>) => [useLogsServiceGetSystemLogViewerApiLogsKey, ...(queryKey ?? [{ direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }])];
+export type MasterSupervisorServiceGetHorizonApiMastersDefaultResponse = Awaited<ReturnType<typeof MasterSupervisorService.getHorizonApiMasters>>;
+export type MasterSupervisorServiceGetHorizonApiMastersQueryResult<TData = MasterSupervisorServiceGetHorizonApiMastersDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useMasterSupervisorServiceGetHorizonApiMastersKey = "MasterSupervisorServiceGetHorizonApiMasters";
+export const UseMasterSupervisorServiceGetHorizonApiMastersKeyFn = (queryKey?: Array<unknown>) => [useMasterSupervisorServiceGetHorizonApiMastersKey, ...(queryKey ?? [])];
+export type MonitoringServiceGetHorizonApiMonitoringDefaultResponse = Awaited<ReturnType<typeof MonitoringService.getHorizonApiMonitoring>>;
+export type MonitoringServiceGetHorizonApiMonitoringQueryResult<TData = MonitoringServiceGetHorizonApiMonitoringDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useMonitoringServiceGetHorizonApiMonitoringKey = "MonitoringServiceGetHorizonApiMonitoring";
+export const UseMonitoringServiceGetHorizonApiMonitoringKeyFn = (queryKey?: Array<unknown>) => [useMonitoringServiceGetHorizonApiMonitoringKey, ...(queryKey ?? [])];
+export type MonitoringServiceGetHorizonApiMonitoringByTagDefaultResponse = Awaited<ReturnType<typeof MonitoringService.getHorizonApiMonitoringByTag>>;
+export type MonitoringServiceGetHorizonApiMonitoringByTagQueryResult<TData = MonitoringServiceGetHorizonApiMonitoringByTagDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useMonitoringServiceGetHorizonApiMonitoringByTagKey = "MonitoringServiceGetHorizonApiMonitoringByTag";
+export const UseMonitoringServiceGetHorizonApiMonitoringByTagKeyFn = ({ limit, tag }: {
   limit?: string;
-  tag?: string;
-} = {}, queryKey?: Array<unknown>) => [useMonitoringServiceHorizonMonitoringTagPaginateKey, ...(queryKey ?? [{ limit, tag }])];
-export type OpCacheServiceOpCacheGetStatusDefaultResponse = Awaited<ReturnType<typeof OpCacheService.opCacheGetStatus>>;
-export type OpCacheServiceOpCacheGetStatusQueryResult<TData = OpCacheServiceOpCacheGetStatusDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useOpCacheServiceOpCacheGetStatusKey = "OpCacheServiceOpCacheGetStatus";
-export const UseOpCacheServiceOpCacheGetStatusKeyFn = (queryKey?: Array<unknown>) => [useOpCacheServiceOpCacheGetStatusKey, ...(queryKey ?? [])];
-export type OpCacheServiceOpcacheGetConfigDefaultResponse = Awaited<ReturnType<typeof OpCacheService.opcacheGetConfig>>;
-export type OpCacheServiceOpcacheGetConfigQueryResult<TData = OpCacheServiceOpcacheGetConfigDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useOpCacheServiceOpcacheGetConfigKey = "OpCacheServiceOpcacheGetConfig";
-export const UseOpCacheServiceOpcacheGetConfigKeyFn = (queryKey?: Array<unknown>) => [useOpCacheServiceOpcacheGetConfigKey, ...(queryKey ?? [])];
-export type PendingJobsServiceHorizonPendingJobsIndexDefaultResponse = Awaited<ReturnType<typeof PendingJobsService.horizonPendingJobsIndex>>;
-export type PendingJobsServiceHorizonPendingJobsIndexQueryResult<TData = PendingJobsServiceHorizonPendingJobsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const usePendingJobsServiceHorizonPendingJobsIndexKey = "PendingJobsServiceHorizonPendingJobsIndex";
-export const UsePendingJobsServiceHorizonPendingJobsIndexKeyFn = ({ startingAt }: {
+  tag: string;
+}, queryKey?: Array<unknown>) => [useMonitoringServiceGetHorizonApiMonitoringByTagKey, ...(queryKey ?? [{ limit, tag }])];
+export type OpCacheServiceGetApiOpcacheStatusDefaultResponse = Awaited<ReturnType<typeof OpCacheService.getApiOpcacheStatus>>;
+export type OpCacheServiceGetApiOpcacheStatusQueryResult<TData = OpCacheServiceGetApiOpcacheStatusDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useOpCacheServiceGetApiOpcacheStatusKey = "OpCacheServiceGetApiOpcacheStatus";
+export const UseOpCacheServiceGetApiOpcacheStatusKeyFn = (queryKey?: Array<unknown>) => [useOpCacheServiceGetApiOpcacheStatusKey, ...(queryKey ?? [])];
+export type OpCacheServiceGetApiOpcacheConfigDefaultResponse = Awaited<ReturnType<typeof OpCacheService.getApiOpcacheConfig>>;
+export type OpCacheServiceGetApiOpcacheConfigQueryResult<TData = OpCacheServiceGetApiOpcacheConfigDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useOpCacheServiceGetApiOpcacheConfigKey = "OpCacheServiceGetApiOpcacheConfig";
+export const UseOpCacheServiceGetApiOpcacheConfigKeyFn = (queryKey?: Array<unknown>) => [useOpCacheServiceGetApiOpcacheConfigKey, ...(queryKey ?? [])];
+export type PendingJobsServiceGetHorizonApiJobsPendingDefaultResponse = Awaited<ReturnType<typeof PendingJobsService.getHorizonApiJobsPending>>;
+export type PendingJobsServiceGetHorizonApiJobsPendingQueryResult<TData = PendingJobsServiceGetHorizonApiJobsPendingDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const usePendingJobsServiceGetHorizonApiJobsPendingKey = "PendingJobsServiceGetHorizonApiJobsPending";
+export const UsePendingJobsServiceGetHorizonApiJobsPendingKeyFn = ({ startingAt }: {
   startingAt?: string;
-} = {}, queryKey?: Array<unknown>) => [usePendingJobsServiceHorizonPendingJobsIndexKey, ...(queryKey ?? [{ startingAt }])];
-export type QueueServiceQueueMetricsShowDefaultResponse = Awaited<ReturnType<typeof QueueService.queueMetricsShow>>;
-export type QueueServiceQueueMetricsShowQueryResult<TData = QueueServiceQueueMetricsShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useQueueServiceQueueMetricsShowKey = "QueueServiceQueueMetricsShow";
-export const UseQueueServiceQueueMetricsShowKeyFn = ({ limit, name, page, queue, queuedFirst, status }: {
+} = {}, queryKey?: Array<unknown>) => [usePendingJobsServiceGetHorizonApiJobsPendingKey, ...(queryKey ?? [{ startingAt }])];
+export type PlaylistServiceGetApiPlaylistsDefaultResponse = Awaited<ReturnType<typeof PlaylistService.getApiPlaylists>>;
+export type PlaylistServiceGetApiPlaylistsQueryResult<TData = PlaylistServiceGetApiPlaylistsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const usePlaylistServiceGetApiPlaylistsKey = "PlaylistServiceGetApiPlaylists";
+export const UsePlaylistServiceGetApiPlaylistsKeyFn = (queryKey?: Array<unknown>) => [usePlaylistServiceGetApiPlaylistsKey, ...(queryKey ?? [])];
+export type PlaylistServiceGetApiPlaylistsByPlaylistDefaultResponse = Awaited<ReturnType<typeof PlaylistService.getApiPlaylistsByPlaylist>>;
+export type PlaylistServiceGetApiPlaylistsByPlaylistQueryResult<TData = PlaylistServiceGetApiPlaylistsByPlaylistDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const usePlaylistServiceGetApiPlaylistsByPlaylistKey = "PlaylistServiceGetApiPlaylistsByPlaylist";
+export const UsePlaylistServiceGetApiPlaylistsByPlaylistKeyFn = ({ playlist }: {
+  playlist: string;
+}, queryKey?: Array<unknown>) => [usePlaylistServiceGetApiPlaylistsByPlaylistKey, ...(queryKey ?? [{ playlist }])];
+export type PlaylistServiceGetApiPlaylistsByPlaylistStatisticsDefaultResponse = Awaited<ReturnType<typeof PlaylistService.getApiPlaylistsByPlaylistStatistics>>;
+export type PlaylistServiceGetApiPlaylistsByPlaylistStatisticsQueryResult<TData = PlaylistServiceGetApiPlaylistsByPlaylistStatisticsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const usePlaylistServiceGetApiPlaylistsByPlaylistStatisticsKey = "PlaylistServiceGetApiPlaylistsByPlaylistStatistics";
+export const UsePlaylistServiceGetApiPlaylistsByPlaylistStatisticsKeyFn = ({ playlist }: {
+  playlist: string;
+}, queryKey?: Array<unknown>) => [usePlaylistServiceGetApiPlaylistsByPlaylistStatisticsKey, ...(queryKey ?? [{ playlist }])];
+export type QueueServiceGetApiQueueMetricsDefaultResponse = Awaited<ReturnType<typeof QueueService.getApiQueueMetrics>>;
+export type QueueServiceGetApiQueueMetricsQueryResult<TData = QueueServiceGetApiQueueMetricsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useQueueServiceGetApiQueueMetricsKey = "QueueServiceGetApiQueueMetrics";
+export const UseQueueServiceGetApiQueueMetricsKeyFn = ({ limit, name, page, queue, queuedFirst, status }: {
   limit?: number;
   name?: string;
   page?: number;
   queue?: string;
   queuedFirst?: boolean;
   status?: "running" | "succeeded" | "failed" | "stale" | "queued";
-} = {}, queryKey?: Array<unknown>) => [useQueueServiceQueueMetricsShowKey, ...(queryKey ?? [{ limit, name, page, queue, queuedFirst, status }])];
-export type QueueServiceQueueMetricsQueuesDefaultResponse = Awaited<ReturnType<typeof QueueService.queueMetricsQueues>>;
-export type QueueServiceQueueMetricsQueuesQueryResult<TData = QueueServiceQueueMetricsQueuesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useQueueServiceQueueMetricsQueuesKey = "QueueServiceQueueMetricsQueues";
-export const UseQueueServiceQueueMetricsQueuesKeyFn = (queryKey?: Array<unknown>) => [useQueueServiceQueueMetricsQueuesKey, ...(queryKey ?? [])];
-export type QueueServiceQueueMetricsMetricsDefaultResponse = Awaited<ReturnType<typeof QueueService.queueMetricsMetrics>>;
-export type QueueServiceQueueMetricsMetricsQueryResult<TData = QueueServiceQueueMetricsMetricsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useQueueServiceQueueMetricsMetricsKey = "QueueServiceQueueMetricsMetrics";
-export const UseQueueServiceQueueMetricsMetricsKeyFn = ({ aggregateDays }: {
+} = {}, queryKey?: Array<unknown>) => [useQueueServiceGetApiQueueMetricsKey, ...(queryKey ?? [{ limit, name, page, queue, queuedFirst, status }])];
+export type QueueServiceGetApiQueueMetricsQueuesDefaultResponse = Awaited<ReturnType<typeof QueueService.getApiQueueMetricsQueues>>;
+export type QueueServiceGetApiQueueMetricsQueuesQueryResult<TData = QueueServiceGetApiQueueMetricsQueuesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useQueueServiceGetApiQueueMetricsQueuesKey = "QueueServiceGetApiQueueMetricsQueues";
+export const UseQueueServiceGetApiQueueMetricsQueuesKeyFn = (queryKey?: Array<unknown>) => [useQueueServiceGetApiQueueMetricsQueuesKey, ...(queryKey ?? [])];
+export type QueueServiceGetApiQueueMetricsMetricsDefaultResponse = Awaited<ReturnType<typeof QueueService.getApiQueueMetricsMetrics>>;
+export type QueueServiceGetApiQueueMetricsMetricsQueryResult<TData = QueueServiceGetApiQueueMetricsMetricsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useQueueServiceGetApiQueueMetricsMetricsKey = "QueueServiceGetApiQueueMetricsMetrics";
+export const UseQueueServiceGetApiQueueMetricsMetricsKeyFn = ({ aggregateDays }: {
   aggregateDays?: number;
-} = {}, queryKey?: Array<unknown>) => [useQueueServiceQueueMetricsMetricsKey, ...(queryKey ?? [{ aggregateDays }])];
-export type QueueMetricsServiceHorizonQueuesMetricsIndexDefaultResponse = Awaited<ReturnType<typeof QueueMetricsService.horizonQueuesMetricsIndex>>;
-export type QueueMetricsServiceHorizonQueuesMetricsIndexQueryResult<TData = QueueMetricsServiceHorizonQueuesMetricsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useQueueMetricsServiceHorizonQueuesMetricsIndexKey = "QueueMetricsServiceHorizonQueuesMetricsIndex";
-export const UseQueueMetricsServiceHorizonQueuesMetricsIndexKeyFn = (queryKey?: Array<unknown>) => [useQueueMetricsServiceHorizonQueuesMetricsIndexKey, ...(queryKey ?? [])];
-export type QueueMetricsServiceHorizonQueuesMetricsShowDefaultResponse = Awaited<ReturnType<typeof QueueMetricsService.horizonQueuesMetricsShow>>;
-export type QueueMetricsServiceHorizonQueuesMetricsShowQueryResult<TData = QueueMetricsServiceHorizonQueuesMetricsShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useQueueMetricsServiceHorizonQueuesMetricsShowKey = "QueueMetricsServiceHorizonQueuesMetricsShow";
-export const UseQueueMetricsServiceHorizonQueuesMetricsShowKeyFn = ({ id }: {
+} = {}, queryKey?: Array<unknown>) => [useQueueServiceGetApiQueueMetricsMetricsKey, ...(queryKey ?? [{ aggregateDays }])];
+export type QueueMetricsServiceGetHorizonApiMetricsQueuesDefaultResponse = Awaited<ReturnType<typeof QueueMetricsService.getHorizonApiMetricsQueues>>;
+export type QueueMetricsServiceGetHorizonApiMetricsQueuesQueryResult<TData = QueueMetricsServiceGetHorizonApiMetricsQueuesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useQueueMetricsServiceGetHorizonApiMetricsQueuesKey = "QueueMetricsServiceGetHorizonApiMetricsQueues";
+export const UseQueueMetricsServiceGetHorizonApiMetricsQueuesKeyFn = (queryKey?: Array<unknown>) => [useQueueMetricsServiceGetHorizonApiMetricsQueuesKey, ...(queryKey ?? [])];
+export type QueueMetricsServiceGetHorizonApiMetricsQueuesByIdDefaultResponse = Awaited<ReturnType<typeof QueueMetricsService.getHorizonApiMetricsQueuesById>>;
+export type QueueMetricsServiceGetHorizonApiMetricsQueuesByIdQueryResult<TData = QueueMetricsServiceGetHorizonApiMetricsQueuesByIdDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useQueueMetricsServiceGetHorizonApiMetricsQueuesByIdKey = "QueueMetricsServiceGetHorizonApiMetricsQueuesById";
+export const UseQueueMetricsServiceGetHorizonApiMetricsQueuesByIdKeyFn = ({ id }: {
   id: string;
-}, queryKey?: Array<unknown>) => [useQueueMetricsServiceHorizonQueuesMetricsShowKey, ...(queryKey ?? [{ id }])];
-export type SilencedJobsServiceHorizonSilencedJobsIndexDefaultResponse = Awaited<ReturnType<typeof SilencedJobsService.horizonSilencedJobsIndex>>;
-export type SilencedJobsServiceHorizonSilencedJobsIndexQueryResult<TData = SilencedJobsServiceHorizonSilencedJobsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useSilencedJobsServiceHorizonSilencedJobsIndexKey = "SilencedJobsServiceHorizonSilencedJobsIndex";
-export const UseSilencedJobsServiceHorizonSilencedJobsIndexKeyFn = ({ startingAt }: {
+}, queryKey?: Array<unknown>) => [useQueueMetricsServiceGetHorizonApiMetricsQueuesByIdKey, ...(queryKey ?? [{ id }])];
+export type SchemaServiceGetApiSchemasMusicbrainzDefaultResponse = Awaited<ReturnType<typeof SchemaService.getApiSchemasMusicbrainz>>;
+export type SchemaServiceGetApiSchemasMusicbrainzQueryResult<TData = SchemaServiceGetApiSchemasMusicbrainzDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSchemaServiceGetApiSchemasMusicbrainzKey = "SchemaServiceGetApiSchemasMusicbrainz";
+export const UseSchemaServiceGetApiSchemasMusicbrainzKeyFn = (queryKey?: Array<unknown>) => [useSchemaServiceGetApiSchemasMusicbrainzKey, ...(queryKey ?? [])];
+export type SilencedJobsServiceGetHorizonApiJobsSilencedDefaultResponse = Awaited<ReturnType<typeof SilencedJobsService.getHorizonApiJobsSilenced>>;
+export type SilencedJobsServiceGetHorizonApiJobsSilencedQueryResult<TData = SilencedJobsServiceGetHorizonApiJobsSilencedDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSilencedJobsServiceGetHorizonApiJobsSilencedKey = "SilencedJobsServiceGetHorizonApiJobsSilenced";
+export const UseSilencedJobsServiceGetHorizonApiJobsSilencedKeyFn = ({ startingAt }: {
   startingAt?: string;
-} = {}, queryKey?: Array<unknown>) => [useSilencedJobsServiceHorizonSilencedJobsIndexKey, ...(queryKey ?? [{ startingAt }])];
-export type SongServiceSongsIndexDefaultResponse = Awaited<ReturnType<typeof SongService.songsIndex>>;
-export type SongServiceSongsIndexQueryResult<TData = SongServiceSongsIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useSongServiceSongsIndexKey = "SongServiceSongsIndex";
-export const UseSongServiceSongsIndexKeyFn = ({ genreNames, genreSlugs, library, limit, page, relations }: {
+} = {}, queryKey?: Array<unknown>) => [useSilencedJobsServiceGetHorizonApiJobsSilencedKey, ...(queryKey ?? [{ startingAt }])];
+export type SongServiceGetApiLibrariesByLibrarySongsDefaultResponse = Awaited<ReturnType<typeof SongService.getApiLibrariesByLibrarySongs>>;
+export type SongServiceGetApiLibrariesByLibrarySongsQueryResult<TData = SongServiceGetApiLibrariesByLibrarySongsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSongServiceGetApiLibrariesByLibrarySongsKey = "SongServiceGetApiLibrariesByLibrarySongs";
+export const UseSongServiceGetApiLibrariesByLibrarySongsKeyFn = ({ genreNames, genreSlugs, library, limit, page, relations }: {
   genreNames?: string;
   genreSlugs?: string;
   library: string;
   limit?: number;
   page?: number;
   relations?: string;
-}, queryKey?: Array<unknown>) => [useSongServiceSongsIndexKey, ...(queryKey ?? [{ genreNames, genreSlugs, library, limit, page, relations }])];
-export type SongServiceSongsShowDefaultResponse = Awaited<ReturnType<typeof SongService.songsShow>>;
-export type SongServiceSongsShowQueryResult<TData = SongServiceSongsShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useSongServiceSongsShowKey = "SongServiceSongsShow";
-export const UseSongServiceSongsShowKeyFn = ({ library, publicId, relations }: {
+}, queryKey?: Array<unknown>) => [useSongServiceGetApiLibrariesByLibrarySongsKey, ...(queryKey ?? [{ genreNames, genreSlugs, library, limit, page, relations }])];
+export type SongServiceGetApiLibrariesByLibrarySongsByPublicIdDefaultResponse = Awaited<ReturnType<typeof SongService.getApiLibrariesByLibrarySongsByPublicId>>;
+export type SongServiceGetApiLibrariesByLibrarySongsByPublicIdQueryResult<TData = SongServiceGetApiLibrariesByLibrarySongsByPublicIdDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSongServiceGetApiLibrariesByLibrarySongsByPublicIdKey = "SongServiceGetApiLibrariesByLibrarySongsByPublicId";
+export const UseSongServiceGetApiLibrariesByLibrarySongsByPublicIdKeyFn = ({ library, publicId, relations }: {
   library: string;
   publicId: string;
   relations?: string;
-}, queryKey?: Array<unknown>) => [useSongServiceSongsShowKey, ...(queryKey ?? [{ library, publicId, relations }])];
-export type SongServiceSongsStreamDefaultResponse = Awaited<ReturnType<typeof SongService.songsStream>>;
-export type SongServiceSongsStreamQueryResult<TData = SongServiceSongsStreamDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useSongServiceSongsStreamKey = "SongServiceSongsStream";
-export const UseSongServiceSongsStreamKeyFn = ({ library, song }: {
+}, queryKey?: Array<unknown>) => [useSongServiceGetApiLibrariesByLibrarySongsByPublicIdKey, ...(queryKey ?? [{ library, publicId, relations }])];
+export type SongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirectDefaultResponse = Awaited<ReturnType<typeof SongService.getApiLibrariesByLibrarySongsStreamSongBySongDirect>>;
+export type SongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirectQueryResult<TData = SongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirectDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirectKey = "SongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirect";
+export const UseSongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirectKeyFn = ({ library, song }: {
   library: string;
   song: string;
-}, queryKey?: Array<unknown>) => [useSongServiceSongsStreamKey, ...(queryKey ?? [{ library, song }])];
-export type SystemInfoServiceSystemInfoPhpDefaultResponse = Awaited<ReturnType<typeof SystemInfoService.systemInfoPhp>>;
-export type SystemInfoServiceSystemInfoPhpQueryResult<TData = SystemInfoServiceSystemInfoPhpDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useSystemInfoServiceSystemInfoPhpKey = "SystemInfoServiceSystemInfoPhp";
-export const UseSystemInfoServiceSystemInfoPhpKeyFn = (queryKey?: Array<unknown>) => [useSystemInfoServiceSystemInfoPhpKey, ...(queryKey ?? [])];
-export type SystemInfoServiceSystemInfoSysDefaultResponse = Awaited<ReturnType<typeof SystemInfoService.systemInfoSys>>;
-export type SystemInfoServiceSystemInfoSysQueryResult<TData = SystemInfoServiceSystemInfoSysDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useSystemInfoServiceSystemInfoSysKey = "SystemInfoServiceSystemInfoSys";
-export const UseSystemInfoServiceSystemInfoSysKeyFn = (queryKey?: Array<unknown>) => [useSystemInfoServiceSystemInfoSysKey, ...(queryKey ?? [])];
-export type UserServiceUsersIndexDefaultResponse = Awaited<ReturnType<typeof UserService.usersIndex>>;
-export type UserServiceUsersIndexQueryResult<TData = UserServiceUsersIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useUserServiceUsersIndexKey = "UserServiceUsersIndex";
-export const UseUserServiceUsersIndexKeyFn = ({ filterModes, filters, globalFilter, limit, page, sorting }: {
+}, queryKey?: Array<unknown>) => [useSongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirectKey, ...(queryKey ?? [{ library, song }])];
+export type StreamServiceGetApiStreamSessionDefaultResponse = Awaited<ReturnType<typeof StreamService.getApiStreamSession>>;
+export type StreamServiceGetApiStreamSessionQueryResult<TData = StreamServiceGetApiStreamSessionDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useStreamServiceGetApiStreamSessionKey = "StreamServiceGetApiStreamSession";
+export const UseStreamServiceGetApiStreamSessionKeyFn = (queryKey?: Array<unknown>) => [useStreamServiceGetApiStreamSessionKey, ...(queryKey ?? [])];
+export type SystemInfoServiceGetApiSystemInfoDefaultResponse = Awaited<ReturnType<typeof SystemInfoService.getApiSystemInfo>>;
+export type SystemInfoServiceGetApiSystemInfoQueryResult<TData = SystemInfoServiceGetApiSystemInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSystemInfoServiceGetApiSystemInfoKey = "SystemInfoServiceGetApiSystemInfo";
+export const UseSystemInfoServiceGetApiSystemInfoKeyFn = (queryKey?: Array<unknown>) => [useSystemInfoServiceGetApiSystemInfoKey, ...(queryKey ?? [])];
+export type SystemInfoServiceGetApiSystemInfoSysDefaultResponse = Awaited<ReturnType<typeof SystemInfoService.getApiSystemInfoSys>>;
+export type SystemInfoServiceGetApiSystemInfoSysQueryResult<TData = SystemInfoServiceGetApiSystemInfoSysDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSystemInfoServiceGetApiSystemInfoSysKey = "SystemInfoServiceGetApiSystemInfoSys";
+export const UseSystemInfoServiceGetApiSystemInfoSysKeyFn = (queryKey?: Array<unknown>) => [useSystemInfoServiceGetApiSystemInfoSysKey, ...(queryKey ?? [])];
+export type UserServiceGetApiUsersDefaultResponse = Awaited<ReturnType<typeof UserService.getApiUsers>>;
+export type UserServiceGetApiUsersQueryResult<TData = UserServiceGetApiUsersDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useUserServiceGetApiUsersKey = "UserServiceGetApiUsers";
+export const UseUserServiceGetApiUsersKeyFn = ({ filterModes, filters, globalFilter, limit, page, sorting }: {
   filterModes?: string;
   filters?: string;
   globalFilter?: string;
   limit?: number;
   page?: number;
   sorting?: string;
-} = {}, queryKey?: Array<unknown>) => [useUserServiceUsersIndexKey, ...(queryKey ?? [{ filterModes, filters, globalFilter, limit, page, sorting }])];
-export type UserServiceUsersShowDefaultResponse = Awaited<ReturnType<typeof UserService.usersShow>>;
-export type UserServiceUsersShowQueryResult<TData = UserServiceUsersShowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useUserServiceUsersShowKey = "UserServiceUsersShow";
-export const UseUserServiceUsersShowKeyFn = ({ user }: {
+} = {}, queryKey?: Array<unknown>) => [useUserServiceGetApiUsersKey, ...(queryKey ?? [{ filterModes, filters, globalFilter, limit, page, sorting }])];
+export type UserServiceGetApiUsersByUserDefaultResponse = Awaited<ReturnType<typeof UserService.getApiUsersByUser>>;
+export type UserServiceGetApiUsersByUserQueryResult<TData = UserServiceGetApiUsersByUserDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useUserServiceGetApiUsersByUserKey = "UserServiceGetApiUsersByUser";
+export const UseUserServiceGetApiUsersByUserKeyFn = ({ user }: {
   user: number;
-}, queryKey?: Array<unknown>) => [useUserServiceUsersShowKey, ...(queryKey ?? [{ user }])];
-export type UserServiceUsersMeDefaultResponse = Awaited<ReturnType<typeof UserService.usersMe>>;
-export type UserServiceUsersMeQueryResult<TData = UserServiceUsersMeDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useUserServiceUsersMeKey = "UserServiceUsersMe";
-export const UseUserServiceUsersMeKeyFn = (queryKey?: Array<unknown>) => [useUserServiceUsersMeKey, ...(queryKey ?? [])];
-export type UserTokenServiceUserTokenGetUserTokensDefaultResponse = Awaited<ReturnType<typeof UserTokenService.userTokenGetUserTokens>>;
-export type UserTokenServiceUserTokenGetUserTokensQueryResult<TData = UserTokenServiceUserTokenGetUserTokensDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useUserTokenServiceUserTokenGetUserTokensKey = "UserTokenServiceUserTokenGetUserTokens";
-export const UseUserTokenServiceUserTokenGetUserTokensKeyFn = ({ page, perPage, user }: {
+}, queryKey?: Array<unknown>) => [useUserServiceGetApiUsersByUserKey, ...(queryKey ?? [{ user }])];
+export type UserServiceGetApiUsersMeDefaultResponse = Awaited<ReturnType<typeof UserService.getApiUsersMe>>;
+export type UserServiceGetApiUsersMeQueryResult<TData = UserServiceGetApiUsersMeDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useUserServiceGetApiUsersMeKey = "UserServiceGetApiUsersMe";
+export const UseUserServiceGetApiUsersMeKeyFn = (queryKey?: Array<unknown>) => [useUserServiceGetApiUsersMeKey, ...(queryKey ?? [])];
+export type UserTokenServiceGetApiUsersTokensByUserDefaultResponse = Awaited<ReturnType<typeof UserTokenService.getApiUsersTokensByUser>>;
+export type UserTokenServiceGetApiUsersTokensByUserQueryResult<TData = UserTokenServiceGetApiUsersTokensByUserDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useUserTokenServiceGetApiUsersTokensByUserKey = "UserTokenServiceGetApiUsersTokensByUser";
+export const UseUserTokenServiceGetApiUsersTokensByUserKeyFn = ({ page, perPage, user }: {
   page?: number;
   perPage?: number;
   user: string;
-}, queryKey?: Array<unknown>) => [useUserTokenServiceUserTokenGetUserTokensKey, ...(queryKey ?? [{ page, perPage, user }])];
-export type WorkloadServiceHorizonWorkloadIndexDefaultResponse = Awaited<ReturnType<typeof WorkloadService.horizonWorkloadIndex>>;
-export type WorkloadServiceHorizonWorkloadIndexQueryResult<TData = WorkloadServiceHorizonWorkloadIndexDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useWorkloadServiceHorizonWorkloadIndexKey = "WorkloadServiceHorizonWorkloadIndex";
-export const UseWorkloadServiceHorizonWorkloadIndexKeyFn = (queryKey?: Array<unknown>) => [useWorkloadServiceHorizonWorkloadIndexKey, ...(queryKey ?? [])];
-export type AuthServiceAuthLoginMutationResult = Awaited<ReturnType<typeof AuthService.authLogin>>;
-export type AuthServiceAuthRefreshTokenMutationResult = Awaited<ReturnType<typeof AuthService.authRefreshToken>>;
-export type AuthServiceAuthStreamTokenMutationResult = Awaited<ReturnType<typeof AuthService.authStreamToken>>;
-export type AuthServiceAuthRegisterMutationResult = Awaited<ReturnType<typeof AuthService.authRegister>>;
-export type AuthServiceAuthForgotPasswordMutationResult = Awaited<ReturnType<typeof AuthService.authForgotPassword>>;
-export type AuthServiceAuthResetPasswordMutationResult = Awaited<ReturnType<typeof AuthService.authResetPassword>>;
-export type AuthServiceAuthVerifyMutationResult = Awaited<ReturnType<typeof AuthService.authVerify>>;
-export type AuthServiceAuthLogoutMutationResult = Awaited<ReturnType<typeof AuthService.authLogout>>;
-export type AuthServiceAuthPasskeyLoginMutationResult = Awaited<ReturnType<typeof AuthService.authPasskeyLogin>>;
-export type AuthServiceAuthPasskeyRegisterMutationResult = Awaited<ReturnType<typeof AuthService.authPasskeyRegister>>;
-export type PasskeyServiceAuthPasskeyLoginMutationResult = Awaited<ReturnType<typeof PasskeyService.authPasskeyLogin>>;
-export type PasskeyServiceAuthPasskeyRegisterMutationResult = Awaited<ReturnType<typeof PasskeyService.authPasskeyRegister>>;
-export type BatchesServiceHorizonJobsBatchesRetryMutationResult = Awaited<ReturnType<typeof BatchesService.horizonJobsBatchesRetry>>;
-export type FilesServiceLogViewerFilesClearCacheMutationResult = Awaited<ReturnType<typeof FilesService.logViewerFilesClearCache>>;
-export type FilesServiceLogViewerFilesClearCacheAllMutationResult = Awaited<ReturnType<typeof FilesService.logViewerFilesClearCacheAll>>;
-export type FilesServiceLogViewerFilesDeleteMultipleFilesMutationResult = Awaited<ReturnType<typeof FilesService.logViewerFilesDeleteMultipleFiles>>;
-export type FoldersServiceLogViewerFoldersClearCacheMutationResult = Awaited<ReturnType<typeof FoldersService.logViewerFoldersClearCache>>;
-export type JobServiceJobLibraryScanMutationResult = Awaited<ReturnType<typeof JobService.jobLibraryScan>>;
-export type LibraryServiceLibraryCreateMutationResult = Awaited<ReturnType<typeof LibraryService.libraryCreate>>;
-export type MonitoringServiceHorizonMonitoringStoreMutationResult = Awaited<ReturnType<typeof MonitoringService.horizonMonitoringStore>>;
-export type OpCacheServiceOpcacheClearMutationResult = Awaited<ReturnType<typeof OpCacheService.opcacheClear>>;
-export type OpCacheServiceOpcacheCompileMutationResult = Awaited<ReturnType<typeof OpCacheService.opcacheCompile>>;
-export type QueueServiceQueueMetricsRetryJobMutationResult = Awaited<ReturnType<typeof QueueService.queueMetricsRetryJob>>;
-export type RetryServiceHorizonRetryJobsShowMutationResult = Awaited<ReturnType<typeof RetryService.horizonRetryJobsShow>>;
-export type UserServiceUsersStoreMutationResult = Awaited<ReturnType<typeof UserService.usersStore>>;
-export type GenreServiceGenresUpdateMutationResult = Awaited<ReturnType<typeof GenreService.genresUpdate>>;
-export type LibraryServiceLibraryUpdateMutationResult = Awaited<ReturnType<typeof LibraryService.libraryUpdate>>;
-export type UserServiceUsersUpdateMutationResult = Awaited<ReturnType<typeof UserService.usersUpdate>>;
-export type FilesServiceLogViewerFilesDeleteMutationResult = Awaited<ReturnType<typeof FilesService.logViewerFilesDelete>>;
-export type FoldersServiceLogViewerFoldersDeleteMutationResult = Awaited<ReturnType<typeof FoldersService.logViewerFoldersDelete>>;
-export type GenreServiceGenresDestroyMutationResult = Awaited<ReturnType<typeof GenreService.genresDestroy>>;
-export type LibraryServiceLibraryDeleteMutationResult = Awaited<ReturnType<typeof LibraryService.libraryDelete>>;
-export type MonitoringServiceHorizonMonitoringTagDestroyMutationResult = Awaited<ReturnType<typeof MonitoringService.horizonMonitoringTagDestroy>>;
-export type QueueServiceQueueMetricsDeleteMutationResult = Awaited<ReturnType<typeof QueueService.queueMetricsDelete>>;
-export type QueueServiceQueueMetricsPurgeMutationResult = Awaited<ReturnType<typeof QueueService.queueMetricsPurge>>;
-export type UserServiceUsersDestroyMutationResult = Awaited<ReturnType<typeof UserService.usersDestroy>>;
-export type UserTokenServiceUserTokenRevokeTokenMutationResult = Awaited<ReturnType<typeof UserTokenService.userTokenRevokeToken>>;
+}, queryKey?: Array<unknown>) => [useUserTokenServiceGetApiUsersTokensByUserKey, ...(queryKey ?? [{ page, perPage, user }])];
+export type WorkloadServiceGetHorizonApiWorkloadDefaultResponse = Awaited<ReturnType<typeof WorkloadService.getHorizonApiWorkload>>;
+export type WorkloadServiceGetHorizonApiWorkloadQueryResult<TData = WorkloadServiceGetHorizonApiWorkloadDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useWorkloadServiceGetHorizonApiWorkloadKey = "WorkloadServiceGetHorizonApiWorkload";
+export const UseWorkloadServiceGetHorizonApiWorkloadKeyFn = (queryKey?: Array<unknown>) => [useWorkloadServiceGetHorizonApiWorkloadKey, ...(queryKey ?? [])];
+export type AuthServicePostApiAuthLoginMutationResult = Awaited<ReturnType<typeof AuthService.postApiAuthLogin>>;
+export type AuthServicePostApiAuthRefreshTokenMutationResult = Awaited<ReturnType<typeof AuthService.postApiAuthRefreshToken>>;
+export type AuthServicePostApiAuthStreamTokenMutationResult = Awaited<ReturnType<typeof AuthService.postApiAuthStreamToken>>;
+export type AuthServicePostApiAuthRegisterMutationResult = Awaited<ReturnType<typeof AuthService.postApiAuthRegister>>;
+export type AuthServicePostApiAuthForgotPasswordMutationResult = Awaited<ReturnType<typeof AuthService.postApiAuthForgotPassword>>;
+export type AuthServicePostApiAuthResetPasswordMutationResult = Awaited<ReturnType<typeof AuthService.postApiAuthResetPassword>>;
+export type AuthServicePostApiAuthVerifyByIdByHashMutationResult = Awaited<ReturnType<typeof AuthService.postApiAuthVerifyByIdByHash>>;
+export type AuthServicePostApiAuthLogoutMutationResult = Awaited<ReturnType<typeof AuthService.postApiAuthLogout>>;
+export type AuthServicePostWebauthnPasskeyMutationResult = Awaited<ReturnType<typeof AuthService.postWebauthnPasskey>>;
+export type AuthServicePostWebauthnPasskeyRegisterMutationResult = Awaited<ReturnType<typeof AuthService.postWebauthnPasskeyRegister>>;
+export type PasskeyServicePostWebauthnPasskeyMutationResult = Awaited<ReturnType<typeof PasskeyService.postWebauthnPasskey>>;
+export type PasskeyServicePostWebauthnPasskeyRegisterMutationResult = Awaited<ReturnType<typeof PasskeyService.postWebauthnPasskeyRegister>>;
+export type BatchesServicePostHorizonApiBatchesRetryByIdMutationResult = Awaited<ReturnType<typeof BatchesService.postHorizonApiBatchesRetryById>>;
+export type FilesServicePostSystemLogViewerApiFilesByFileIdentifierClearCacheMutationResult = Awaited<ReturnType<typeof FilesService.postSystemLogViewerApiFilesByFileIdentifierClearCache>>;
+export type FilesServicePostSystemLogViewerApiClearCacheAllMutationResult = Awaited<ReturnType<typeof FilesService.postSystemLogViewerApiClearCacheAll>>;
+export type FilesServicePostSystemLogViewerApiDeleteMultipleFilesMutationResult = Awaited<ReturnType<typeof FilesService.postSystemLogViewerApiDeleteMultipleFiles>>;
+export type FoldersServicePostSystemLogViewerApiFoldersByFolderIdentifierClearCacheMutationResult = Awaited<ReturnType<typeof FoldersService.postSystemLogViewerApiFoldersByFolderIdentifierClearCache>>;
+export type JobServicePostApiJobsScanLibraryBySlugMutationResult = Awaited<ReturnType<typeof JobService.postApiJobsScanLibraryBySlug>>;
+export type LibraryServicePostApiLibrariesMutationResult = Awaited<ReturnType<typeof LibraryService.postApiLibraries>>;
+export type MonitoringServicePostHorizonApiMonitoringMutationResult = Awaited<ReturnType<typeof MonitoringService.postHorizonApiMonitoring>>;
+export type OpCacheServicePostApiOpcacheClearMutationResult = Awaited<ReturnType<typeof OpCacheService.postApiOpcacheClear>>;
+export type OpCacheServicePostApiOpcacheCompileMutationResult = Awaited<ReturnType<typeof OpCacheService.postApiOpcacheCompile>>;
+export type PlaylistServicePostApiPlaylistsMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylists>>;
+export type PlaylistServicePostApiPlaylistsByPlaylistSongsBySongMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylistsByPlaylistSongsBySong>>;
+export type PlaylistServicePostApiPlaylistsByPlaylistReorderMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylistsByPlaylistReorder>>;
+export type PlaylistServicePostApiPlaylistsByPlaylistCollaboratorsMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylistsByPlaylistCollaborators>>;
+export type PlaylistServicePostApiPlaylistsByPlaylistCloneMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylistsByPlaylistClone>>;
+export type PlaylistServicePostApiPlaylistsByPlaylistStatisticsRecordViewMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylistsByPlaylistStatisticsRecordView>>;
+export type PlaylistServicePostApiPlaylistsByPlaylistStatisticsRecordPlayMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylistsByPlaylistStatisticsRecordPlay>>;
+export type PlaylistServicePostApiPlaylistsByPlaylistStatisticsRecordShareMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylistsByPlaylistStatisticsRecordShare>>;
+export type PlaylistServicePostApiPlaylistsByPlaylistStatisticsRecordFavoriteMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylistsByPlaylistStatisticsRecordFavorite>>;
+export type PlaylistServicePostApiPlaylistsByPlaylistSmartMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylistsByPlaylistSmart>>;
+export type PlaylistServicePostApiPlaylistsByPlaylistSmartSyncMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylistsByPlaylistSmartSync>>;
+export type QueueServicePostApiQueueMetricsRetryByIdMutationResult = Awaited<ReturnType<typeof QueueService.postApiQueueMetricsRetryById>>;
+export type RetryServicePostHorizonApiJobsRetryByIdMutationResult = Awaited<ReturnType<typeof RetryService.postHorizonApiJobsRetryById>>;
+export type StreamServicePostApiStreamStartMutationResult = Awaited<ReturnType<typeof StreamService.postApiStreamStart>>;
+export type StreamServicePostApiStreamStopMutationResult = Awaited<ReturnType<typeof StreamService.postApiStreamStop>>;
+export type StreamServicePostApiStreamSeekMutationResult = Awaited<ReturnType<typeof StreamService.postApiStreamSeek>>;
+export type UserServicePostApiUsersMutationResult = Awaited<ReturnType<typeof UserService.postApiUsers>>;
+export type PlaylistServicePutApiPlaylistsByPlaylistMutationResult = Awaited<ReturnType<typeof PlaylistService.putApiPlaylistsByPlaylist>>;
+export type PlaylistServicePutApiPlaylistsByPlaylistSmartMutationResult = Awaited<ReturnType<typeof PlaylistService.putApiPlaylistsByPlaylistSmart>>;
+export type GenreServicePatchApiGenresByGenreMutationResult = Awaited<ReturnType<typeof GenreService.patchApiGenresByGenre>>;
+export type LibraryServicePatchApiLibrariesBySlugMutationResult = Awaited<ReturnType<typeof LibraryService.patchApiLibrariesBySlug>>;
+export type UserServicePatchApiUsersByUserMutationResult = Awaited<ReturnType<typeof UserService.patchApiUsersByUser>>;
+export type FilesServiceDeleteSystemLogViewerApiFilesByFileIdentifierMutationResult = Awaited<ReturnType<typeof FilesService.deleteSystemLogViewerApiFilesByFileIdentifier>>;
+export type FoldersServiceDeleteSystemLogViewerApiFoldersByFolderIdentifierMutationResult = Awaited<ReturnType<typeof FoldersService.deleteSystemLogViewerApiFoldersByFolderIdentifier>>;
+export type GenreServiceDeleteApiGenresByGenreMutationResult = Awaited<ReturnType<typeof GenreService.deleteApiGenresByGenre>>;
+export type LibraryServiceDeleteApiLibrariesBySlugMutationResult = Awaited<ReturnType<typeof LibraryService.deleteApiLibrariesBySlug>>;
+export type MonitoringServiceDeleteHorizonApiMonitoringByTagMutationResult = Awaited<ReturnType<typeof MonitoringService.deleteHorizonApiMonitoringByTag>>;
+export type PlaylistServiceDeleteApiPlaylistsByPlaylistMutationResult = Awaited<ReturnType<typeof PlaylistService.deleteApiPlaylistsByPlaylist>>;
+export type PlaylistServiceDeleteApiPlaylistsByPlaylistSongsBySongMutationResult = Awaited<ReturnType<typeof PlaylistService.deleteApiPlaylistsByPlaylistSongsBySong>>;
+export type PlaylistServiceDeleteApiPlaylistsByPlaylistCollaboratorsByUserMutationResult = Awaited<ReturnType<typeof PlaylistService.deleteApiPlaylistsByPlaylistCollaboratorsByUser>>;
+export type QueueServiceDeleteApiQueueMetricsByIdMutationResult = Awaited<ReturnType<typeof QueueService.deleteApiQueueMetricsById>>;
+export type QueueServiceDeleteApiQueueMetricsPurgeMutationResult = Awaited<ReturnType<typeof QueueService.deleteApiQueueMetricsPurge>>;
+export type UserServiceDeleteApiUsersByUserMutationResult = Awaited<ReturnType<typeof UserService.deleteApiUsersByUser>>;
+export type UserTokenServiceDeleteApiUsersTokensByTokenMutationResult = Awaited<ReturnType<typeof UserTokenService.deleteApiUsersTokensByToken>>;

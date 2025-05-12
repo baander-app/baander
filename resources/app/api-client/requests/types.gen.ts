@@ -62,6 +62,23 @@ export type CreateLibraryRequest = {
     order: number;
 };
 
+export type CreatePlaylistRequest = {
+    name: string;
+    description?: string | null;
+    is_public?: boolean;
+};
+
+export type CreateSmartPlaylistRequest = {
+    name: string;
+    description?: string | null;
+    is_public?: boolean;
+    rules: Array<Array<{
+        field: string;
+        operator: string;
+        value: string;
+    }>>;
+};
+
 export type CreateUserRequest = {
     name: string;
     email: string;
@@ -168,7 +185,6 @@ export type LogResource = {
     message: string;
     context: string;
     extra: string;
-    full_text: string;
     url: string;
 };
 
@@ -188,7 +204,7 @@ export type LoginRequest = {
 };
 
 export type LogoutRequest = {
-    refreshToken?: string;
+    refresh_token?: string;
 };
 
 export type NewAccessTokenResource = {
@@ -213,6 +229,43 @@ export type PersonalAccessTokenViewResource = {
     updatedAt: string | null;
 };
 
+export type PlaylistResource = {
+    id: string;
+    name: string;
+    description: string | null;
+    isPublic: string;
+    isCollaborative: string;
+    isSmart: string;
+    smartRules?: Array<unknown> | null;
+    cover?: ImageResource;
+    createdAt: string | null;
+    updatedAt: string | null;
+    songsCount?: number;
+    statistics?: {
+        views: number;
+        plays: number;
+        shares: number;
+        favorites: number;
+    };
+    songs?: Array<SongResource>;
+    owner?: {
+        email: string;
+        name: string;
+    };
+    collaborators?: string;
+};
+
+export type PlaylistStatistic = {
+    id: number;
+    playlist_id: number;
+    views: number;
+    plays: number;
+    shares: number;
+    favorites: number;
+    created_at: string | null;
+    updated_at: string | null;
+};
+
 export type QueueMonitorResource = {
     id: number;
     job_id: string;
@@ -234,6 +287,7 @@ export type QueueMonitorResource = {
 };
 
 export type RegisterRequest = {
+    name: string;
     email: string;
     password: string;
     password_confirmation: string;
@@ -275,6 +329,21 @@ export type SongResource = {
     artists?: Array<ArtistResource>;
 };
 
+export type StartStreamRequest = {
+    sessionId: string;
+    audioProfile?: {
+        bitrate?: number;
+        channels?: string;
+        sampleRate?: number;
+        codec?: string;
+    };
+    videoProfile?: {
+        height?: number;
+        width?: number;
+        bitrate?: number;
+    };
+};
+
 export type StorePasskeyRequest = {
     name: string;
     passkey: string;
@@ -291,6 +360,20 @@ export type UpdateLibraryRequest = {
     order?: number;
 };
 
+export type UpdatePlaylistRequest = {
+    name?: string;
+    description?: string | null;
+    is_public?: boolean;
+};
+
+export type UpdateSmartPlaylistRulesRequest = {
+    rules: Array<Array<{
+        field: string;
+        operator: string;
+        value: string;
+    }>>;
+};
+
 export type UpdateUserRequest = {
     email?: string;
     password?: string;
@@ -304,42 +387,19 @@ export type UserResource = {
     updatedAt: string | null;
 };
 
-export type AlbumsIndexData = {
-    /**
-     * Comma seperated string of fields you want to select. If nothing is defined `select *` is default.
-     * - title
-     * - slug
-     * - year
-     * - directory
-     */
+export type GetApiLibrariesByLibraryAlbumsData = {
     fields?: string;
-    /**
-     * _Extension_ Comma seperated list of genres
-     */
     genres?: string;
     /**
      * The library slug
      */
     library: string;
-    /**
-     * Items per page
-     */
     limit?: number;
-    /**
-     * Current page
-     */
     page?: number;
-    /**
-     * Comma seperated string of relations
-     * - artists
-     * - cover
-     * - library
-     * - songs
-     */
     relations?: string;
 };
 
-export type AlbumsIndexResponse = {
+export type GetApiLibrariesByLibraryAlbumsResponse = {
     data: Array<AlbumResource>;
     meta: {
         /**
@@ -375,7 +435,7 @@ export type AlbumsIndexResponse = {
     };
 };
 
-export type AlbumsShowData = {
+export type GetApiLibrariesByLibraryAlbumsByAlbumData = {
     /**
      * The album slug
      */
@@ -386,37 +446,18 @@ export type AlbumsShowData = {
     library: string;
 };
 
-export type AlbumsShowResponse = AlbumResource;
+export type GetApiLibrariesByLibraryAlbumsByAlbumResponse = AlbumResource;
 
-export type ArtistsIndexData = {
-    /**
-     * Comma seperated string of fields you want to select. If nothing is defined `select *` is default.
-     * - title
-     * - slug
-     */
+export type GetApiLibrariesByLibraryArtistsData = {
     fields?: string;
-    /**
-     * _Extension_ Comma seperated list of genres
-     */
     genres?: string;
     library: string;
-    /**
-     * Items per page
-     */
     limit?: number;
-    /**
-     * Current page
-     */
     page?: number;
-    /**
-     * Comma seperated string of relations
-     * - portrait
-     * - songs
-     */
     relations?: string;
 };
 
-export type ArtistsIndexResponse = {
+export type GetApiLibrariesByLibraryArtistsResponse = {
     data: Array<ArtistResource>;
     meta: {
         /**
@@ -452,7 +493,7 @@ export type ArtistsIndexResponse = {
     };
 };
 
-export type ArtistsShowData = {
+export type GetApiLibrariesByLibraryArtistsByArtistData = {
     /**
      * The artist slug
      */
@@ -460,122 +501,127 @@ export type ArtistsShowData = {
     library: string;
 };
 
-export type ArtistsShowResponse = ArtistResource;
+export type GetApiLibrariesByLibraryArtistsByArtistResponse = ArtistResource;
 
-export type AuthLoginData = {
+export type PostApiAuthLoginData = {
     requestBody: LoginRequest;
 };
 
-export type AuthLoginResponse = [
-    NewAccessTokenResource,
-    NewAccessTokenResource
-];
-
-export type AuthRefreshTokenResponse = [
-    NewAccessTokenResource
-];
-
-export type AuthStreamTokenResponse = [
-    NewAccessTokenResource
-];
-
-export type AuthRegisterData = {
-    requestBody?: RegisterRequest & {
-    name?: string;
-};
+export type PostApiAuthLoginResponse = {
+    accessToken: NewAccessTokenResource;
+    refreshToken: NewAccessTokenResource;
 };
 
-export type AuthRegisterResponse = [
-    NewAccessTokenResource,
-    NewAccessTokenResource
-];
+export type PostApiAuthRefreshTokenResponse = {
+    accessToken: NewAccessTokenResource;
+};
 
-export type AuthForgotPasswordData = {
+export type PostApiAuthStreamTokenResponse = {
+    streamToken: NewAccessTokenResource;
+};
+
+export type PostApiAuthRegisterData = {
+    requestBody: RegisterRequest;
+};
+
+export type PostApiAuthRegisterResponse = {
+    accessToken: NewAccessTokenResource;
+    refreshToken: NewAccessTokenResource;
+};
+
+export type PostApiAuthForgotPasswordData = {
     requestBody: ForgotPasswordRequest;
 };
 
-export type AuthForgotPasswordResponse = {
+export type PostApiAuthForgotPasswordResponse = {
     message: string;
 };
 
-export type AuthResetPasswordData = {
+export type PostApiAuthResetPasswordData = {
     requestBody: ResetPasswordRequest;
 };
 
-export type AuthResetPasswordResponse = {
+export type PostApiAuthResetPasswordResponse = {
     message: string;
 };
 
-export type AuthVerifyResponse = UserResource;
-
-export type AuthLogoutData = {
-    requestBody?: LogoutRequest;
+export type PostApiAuthVerifyByIdByHashData = {
+    hash: string;
+    id: number;
 };
 
-export type AuthLogoutResponse = null;
+export type PostApiAuthVerifyByIdByHashResponse = UserResource;
 
-export type AuthPasskeyOptionsResponse = {
+export type PostApiAuthLogoutData = {
+    requestBody?: LogoutRequest & {
+    refreshToken?: string;
+};
+};
+
+export type PostApiAuthLogoutResponse = void;
+
+export type GetWebauthnPasskeyResponse = {
     challenge: string;
     rpId: string;
     allowCredentials: Array<(string)>;
 };
 
-export type AuthPasskeyLoginData = {
+export type PostWebauthnPasskeyData = {
     requestBody: AuthenticateUsingPasskeyRequest;
 };
 
-export type AuthPasskeyLoginResponse = [
-    {
+export type PostWebauthnPasskeyResponse = {
+    accessToken: {
         [key: string]: unknown;
-    },
-    {
+    };
+    refreshToken: {
         [key: string]: unknown;
-    }
-] | string;
+    };
+} | string;
 
-export type AuthPasskeyRegisterOptionsResponse = string | {
+export type GetWebauthnPasskeyRegisterResponse = string | {
     [key: string]: unknown;
 };
 
-export type AuthPasskeyRegisterData = {
+export type PostWebauthnPasskeyRegisterData = {
     requestBody: StorePasskeyRequest;
 };
 
-export type AuthPasskeyRegisterResponse = {
+export type PostWebauthnPasskeyRegisterResponse = {
     message: string;
 };
 
-export type HorizonJobsBatchesIndexResponse = {
+export type GetHorizonApiBatchesResponse = {
     batches: Array<(string)>;
 };
 
-export type HorizonJobsBatchesShowData = {
+export type GetHorizonApiBatchesByIdData = {
     id: string;
 };
 
-export type HorizonJobsBatchesShowResponse = {
+export type GetHorizonApiBatchesByIdResponse = {
     batch: string;
     failedJobs: string;
 };
 
-export type HorizonJobsBatchesRetryData = {
+export type PostHorizonApiBatchesRetryByIdData = {
     id: string;
 };
 
-export type HorizonJobsBatchesRetryResponse = {
+export type PostHorizonApiBatchesRetryByIdResponse = {
     [key: string]: unknown;
 };
 
-export type HorizonCompletedJobsIndexData = {
+export type GetHorizonApiJobsCompletedData = {
     startingAt?: string;
 };
 
-export type HorizonCompletedJobsIndexResponse = {
+export type GetHorizonApiJobsCompletedResponse = {
     jobs: string;
     total: string;
 };
 
-export type HorizonStatsIndexResponse = {
+export type GetHorizonApiStatsResponse = {
     failedJobs: string;
     jobsPerMinute: string;
     pausedMasters: string | 0;
@@ -591,126 +637,108 @@ export type HorizonStatsIndexResponse = {
     wait: string;
 };
 
-export type HorizonFailedJobsIndexData = {
+export type GetHorizonApiJobsFailedData = {
     tag?: string;
 };
 
-export type HorizonFailedJobsIndexResponse = {
+export type GetHorizonApiJobsFailedResponse = {
     jobs: string;
     total: string;
 };
 
-export type HorizonFailedJobsShowData = {
+export type GetHorizonApiJobsFailedByIdData = {
     id: string;
 };
 
-export type HorizonFailedJobsShowResponse = unknown;
+export type GetHorizonApiJobsFailedByIdResponse = unknown;
 
-export type LogViewerFilesResponse = Array<LogFileResource>;
+export type GetSystemLogViewerApiFilesResponse = Array<LogFileResource>;
 
-export type LogViewerFilesRequestDownloadData = {
+export type GetSystemLogViewerApiFilesByFileIdentifierDownloadRequestData = {
     fileIdentifier: string;
 };
 
-export type LogViewerFilesRequestDownloadResponse = {
+export type GetSystemLogViewerApiFilesByFileIdentifierDownloadRequestResponse = {
     url: string;
 };
 
-export type LogViewerFilesClearCacheData = {
+export type PostSystemLogViewerApiFilesByFileIdentifierClearCacheData = {
     fileIdentifier: string;
 };
 
-export type LogViewerFilesClearCacheResponse = {
+export type PostSystemLogViewerApiFilesByFileIdentifierClearCacheResponse = {
     success: boolean;
 };
 
-export type LogViewerFilesDeleteData = {
+export type DeleteSystemLogViewerApiFilesByFileIdentifierData = {
     fileIdentifier: string;
 };
 
-export type LogViewerFilesDeleteResponse = {
+export type DeleteSystemLogViewerApiFilesByFileIdentifierResponse = {
     success: boolean;
 };
 
-export type LogViewerFilesClearCacheAllResponse = {
+export type PostSystemLogViewerApiClearCacheAllResponse = {
     success: boolean;
 };
 
-export type LogViewerFilesDeleteMultipleFilesData = {
+export type PostSystemLogViewerApiDeleteMultipleFilesData = {
     requestBody?: {
         files?: string;
     };
 };
 
-export type LogViewerFilesDeleteMultipleFilesResponse = {
+export type PostSystemLogViewerApiDeleteMultipleFilesResponse = {
     success: boolean;
 };
 
-export type LogViewerFilesDownloadData = {
+export type GetSystemLogViewerApiFilesByFileIdentifierDownloadData = {
     fileIdentifier: string;
 };
 
-export type LogViewerFilesDownloadResponse = string;
+export type GetSystemLogViewerApiFilesByFileIdentifierDownloadResponse = string;
 
-export type LogViewerFoldersResponse = Array<LogFolderResource>;
+export type GetSystemLogViewerApiFoldersResponse = Array<LogFolderResource>;
 
-export type LogViewerFoldersRequestDownloadData = {
+export type GetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestData = {
     folderIdentifier: string;
 };
 
-export type LogViewerFoldersRequestDownloadResponse = {
+export type GetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestResponse = {
     url: string;
 };
 
-export type LogViewerFoldersClearCacheData = {
+export type PostSystemLogViewerApiFoldersByFolderIdentifierClearCacheData = {
     folderIdentifier: string;
 };
 
-export type LogViewerFoldersClearCacheResponse = {
+export type PostSystemLogViewerApiFoldersByFolderIdentifierClearCacheResponse = {
     success: boolean;
 };
 
-export type LogViewerFoldersDeleteData = {
+export type DeleteSystemLogViewerApiFoldersByFolderIdentifierData = {
     folderIdentifier: string;
 };
 
-export type LogViewerFoldersDeleteResponse = {
+export type DeleteSystemLogViewerApiFoldersByFolderIdentifierResponse = {
     success: boolean;
 };
 
-export type LogViewerFoldersDownloadData = {
+export type GetSystemLogViewerApiFoldersByFolderIdentifierDownloadData = {
     folderIdentifier: string;
 };
 
-export type LogViewerFoldersDownloadResponse = string;
+export type GetSystemLogViewerApiFoldersByFolderIdentifierDownloadResponse = string;
 
-export type GenresIndexData = {
-    /**
-     * Comma seperated string of fields you want to select. If nothing is defined `select *` is default.
-     * - name
-     * - slug
-     */
+export type GetApiGenresData = {
     fields?: string;
-    /**
-     * Constrain the query to only fetch genres that are contained within the given library
-     */
     librarySlug?: string;
-    /**
-     * Items per page
-     */
     limit?: number;
-    /**
-     * Current page
-     */
     page?: number;
-    /**
-     * Comma seperated string of relations
-     * - songs
-     */
     relations?: string;
 };
 
-export type GenresIndexResponse = {
+export type GetApiGenresResponse = {
     data: Array<GenreResource>;
     meta: {
         /**
@@ -746,16 +774,16 @@ export type GenresIndexResponse = {
     };
 };
 
-export type GenresShowData = {
+export type GetApiGenresByGenreData = {
     /**
      * The genre slug
      */
     genre: string;
 };
 
-export type GenresShowResponse = GenreResource;
+export type GetApiGenresByGenreResponse = GenreResource;
 
-export type GenresUpdateData = {
+export type PatchApiGenresByGenreData = {
     /**
      * The genre slug
      */
@@ -763,64 +791,58 @@ export type GenresUpdateData = {
     requestBody: UpdateGenreRequest;
 };
 
-export type GenresUpdateResponse = GenreResource;
+export type PatchApiGenresByGenreResponse = GenreResource;
 
-export type GenresDestroyData = {
+export type DeleteApiGenresByGenreData = {
     /**
      * The genre slug
      */
     genre: string;
 };
 
-export type GenresDestroyResponse = null;
+export type DeleteApiGenresByGenreResponse = void;
 
-export type LogViewerHostsResponse = Array<LogViewerHostResource>;
+export type GetSystemLogViewerApiHostsResponse = Array<LogViewerHostResource>;
 
-export type ImageServeData = {
+export type GetApiImagesByImageData = {
     /**
      * The image public id
      */
     image: string;
 };
 
-export type ImageServeResponse = string;
+export type GetApiImagesByImageResponse = string;
 
-export type JobLibraryScanData = {
+export type PostApiJobsScanLibraryBySlugData = {
     slug: string;
 };
 
-export type JobLibraryScanResponse = {
+export type PostApiJobsScanLibraryBySlugResponse = {
     message: string;
 };
 
-export type HorizonJobsMetricsIndexResponse = Array<unknown>;
+export type GetHorizonApiMetricsJobsResponse = Array<unknown>;
 
-export type HorizonJobsMetricsShowData = {
+export type GetHorizonApiMetricsJobsByIdData = {
     id: string;
 };
 
-export type HorizonJobsMetricsShowResponse = {
+export type GetHorizonApiMetricsJobsByIdResponse = {
     [key: string]: unknown;
 };
 
-export type HorizonJobsShowData = {
+export type GetHorizonApiJobsByIdData = {
     id: string;
 };
 
-export type HorizonJobsShowResponse = Array<unknown>;
+export type GetHorizonApiJobsByIdResponse = Array<unknown>;
 
-export type LibrariesIndexData = {
-    /**
-     * Items per page
-     */
+export type GetApiLibrariesData = {
     limit?: number;
-    /**
-     * Current page
-     */
     page?: number;
 };
 
-export type LibrariesIndexResponse = {
+export type GetApiLibrariesResponse = {
     data: Array<LibraryResource>;
     meta: {
         /**
@@ -856,28 +878,32 @@ export type LibrariesIndexResponse = {
     };
 };
 
-export type LibraryCreateData = {
+export type PostApiLibrariesData = {
     requestBody: CreateLibraryRequest;
 };
 
-export type LibraryCreateResponse = LibraryResource;
+export type PostApiLibrariesResponse = LibraryResource;
 
-export type LibraryShowData = {
+export type GetApiLibrariesBySlugData = {
     slug: string;
 };
 
-export type LibraryShowResponse = LibraryResource;
+export type GetApiLibrariesBySlugResponse = LibraryResource;
 
-export type LibraryUpdateData = {
+export type PatchApiLibrariesBySlugData = {
     requestBody?: UpdateLibraryRequest;
     slug: string;
 };
 
-export type LibraryUpdateResponse = LibraryResource;
+export type PatchApiLibrariesBySlugResponse = LibraryResource;
 
-export type LibraryDeleteResponse = null;
+export type DeleteApiLibrariesBySlugData = {
+    slug: string;
+};
 
-export type LogViewerLogsData = {
+export type DeleteApiLibrariesBySlugResponse = void;
+
+export type GetSystemLogViewerApiLogsData = {
     direction?: string;
     excludeFileTypes?: string;
     excludeLevels?: string;
@@ -888,7 +914,7 @@ export type LogViewerLogsData = {
     shorterStackTraces?: boolean;
 };
 
-export type LogViewerLogsResponse = {
+export type GetSystemLogViewerApiLogsResponse = {
     file: LogFileResource | null;
     levelCounts: Array<LevelCountResource>;
     logs: Array<LogResource>;
@@ -919,38 +945,37 @@ export type LogViewerLogsResponse = {
     };
 };
 
-export type HorizonMastersIndexResponse = {
+export type GetHorizonApiMastersResponse = {
     [key: string]: unknown;
 };
 
-export type HorizonMonitoringIndexResponse = {
+export type GetHorizonApiMonitoringResponse = {
     [key: string]: unknown;
 };
 
-export type HorizonMonitoringStoreResponse = {
+export type PostHorizonApiMonitoringResponse = {
     [key: string]: unknown;
 };
 
-export type HorizonMonitoringTagPaginateData = {
+export type GetHorizonApiMonitoringByTagData = {
     limit?: string;
     tag: string;
-    tag?: string;
 };
 
-export type HorizonMonitoringTagPaginateResponse = {
+export type GetHorizonApiMonitoringByTagResponse = {
     jobs: string;
     total: string;
 };
 
-export type HorizonMonitoringTagDestroyData = {
+export type DeleteHorizonApiMonitoringByTagData = {
     tag: string;
 };
 
-export type HorizonMonitoringTagDestroyResponse = {
+export type DeleteHorizonApiMonitoringByTagResponse = {
     [key: string]: unknown;
 };
 
-export type OpCacheGetStatusResponse = {
+export type GetApiOpcacheStatusResponse = {
     opcache_enabled: boolean;
     file_cache: string;
     file_cache_only: boolean;
@@ -997,7 +1022,7 @@ export type OpCacheGetStatusResponse = {
     };
 };
 
-export type OpcacheGetConfigResponse = {
+export type GetApiOpcacheConfigResponse = {
     directives: {
         property: number | boolean | string;
     };
@@ -1008,64 +1033,272 @@ export type OpcacheGetConfigResponse = {
     blacklist: Array<(string)>;
 };
 
-export type OpcacheClearResponse = {
+export type PostApiOpcacheClearResponse = {
     success: boolean;
 };
 
-export type OpcacheCompileData = {
+export type PostApiOpcacheCompileData = {
     force?: string;
-    requestBody?: {
-        [key: string]: unknown;
-    };
 };
 
-export type OpcacheCompileResponse = {
+export type PostApiOpcacheCompileResponse = {
     totalFiles: number;
     compiled: number;
 };
 
-export type HorizonPendingJobsIndexData = {
+export type GetHorizonApiJobsPendingData = {
     startingAt?: string;
 };
 
-export type HorizonPendingJobsIndexResponse = {
+export type GetHorizonApiJobsPendingResponse = {
     jobs: string;
     total: string;
 };
 
-export type QueueMetricsShowData = {
+export type GetApiPlaylistsResponse = {
+    data: Array<PlaylistResource>;
+    meta: {
+        /**
+         * Total number of items being paginated.
+         */
+        total: number;
+        /**
+         * The number of items for the current page
+         */
+        count: number;
+        /**
+         * The number of items per page
+         */
+        limit: number;
+        /**
+         * The number of current page
+         */
+        currentPage: number;
+        /**
+         * The number of next page
+         */
+        nextPage: number;
+        /**
+         * The number of last page
+         */
+        lastPage: number;
+    };
+    links: {
+        first: string | null;
+        last: string | null;
+        prev: string | null;
+        next: string | null;
+    };
+};
+
+export type PostApiPlaylistsData = {
+    requestBody: CreatePlaylistRequest;
+};
+
+export type PostApiPlaylistsResponse = PlaylistResource;
+
+export type GetApiPlaylistsByPlaylistData = {
     /**
-     * Items per page
+     * The playlist public id
      */
+    playlist: string;
+};
+
+export type GetApiPlaylistsByPlaylistResponse = PlaylistResource;
+
+export type PutApiPlaylistsByPlaylistData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+    requestBody?: UpdatePlaylistRequest;
+};
+
+export type PutApiPlaylistsByPlaylistResponse = PlaylistResource;
+
+export type DeleteApiPlaylistsByPlaylistData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+};
+
+export type DeleteApiPlaylistsByPlaylistResponse = void;
+
+export type PostApiPlaylistsByPlaylistSongsBySongData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+    /**
+     * The song public id
+     */
+    song: string;
+};
+
+export type PostApiPlaylistsByPlaylistSongsBySongResponse = {
+    message: string;
+};
+
+export type DeleteApiPlaylistsByPlaylistSongsBySongData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+    /**
+     * The song public id
+     */
+    song: string;
+};
+
+export type DeleteApiPlaylistsByPlaylistSongsBySongResponse = {
+    message: string;
+};
+
+export type PostApiPlaylistsByPlaylistReorderData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+    requestBody: {
+        song_ids: Array<(number)>;
+    };
+};
+
+export type PostApiPlaylistsByPlaylistReorderResponse = {
+    message: string;
+};
+
+export type PostApiPlaylistsByPlaylistCollaboratorsData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+    requestBody: {
+        user_id: number;
+        role?: 'editor' | 'contributor';
+    };
+};
+
+export type PostApiPlaylistsByPlaylistCollaboratorsResponse = {
+    message: string;
+};
+
+export type DeleteApiPlaylistsByPlaylistCollaboratorsByUserData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+    /**
+     * The user ID
+     */
+    user: number;
+};
+
+export type DeleteApiPlaylistsByPlaylistCollaboratorsByUserResponse = {
+    message: string;
+};
+
+export type PostApiPlaylistsByPlaylistCloneData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+};
+
+export type PostApiPlaylistsByPlaylistCloneResponse = PlaylistResource;
+
+export type GetApiPlaylistsByPlaylistStatisticsData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+};
+
+export type GetApiPlaylistsByPlaylistStatisticsResponse = PlaylistStatistic;
+
+export type PostApiPlaylistsByPlaylistStatisticsRecordViewData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+};
+
+export type PostApiPlaylistsByPlaylistStatisticsRecordViewResponse = {
+    message: string;
+};
+
+export type PostApiPlaylistsByPlaylistStatisticsRecordPlayData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+};
+
+export type PostApiPlaylistsByPlaylistStatisticsRecordPlayResponse = {
+    message: string;
+};
+
+export type PostApiPlaylistsByPlaylistStatisticsRecordShareData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+};
+
+export type PostApiPlaylistsByPlaylistStatisticsRecordShareResponse = {
+    message: string;
+};
+
+export type PostApiPlaylistsByPlaylistStatisticsRecordFavoriteData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+};
+
+export type PostApiPlaylistsByPlaylistStatisticsRecordFavoriteResponse = {
+    message: string;
+};
+
+export type PostApiPlaylistsByPlaylistSmartData = {
+    playlist: string;
+    requestBody: CreateSmartPlaylistRequest;
+};
+
+export type PostApiPlaylistsByPlaylistSmartResponse = PlaylistResource;
+
+export type PutApiPlaylistsByPlaylistSmartData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+    requestBody: UpdateSmartPlaylistRulesRequest;
+};
+
+export type PutApiPlaylistsByPlaylistSmartResponse = PlaylistResource;
+
+export type PostApiPlaylistsByPlaylistSmartSyncData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+};
+
+export type PostApiPlaylistsByPlaylistSmartSyncResponse = {
+    message: string;
+};
+
+export type GetApiQueueMetricsData = {
     limit?: number;
-    /**
-     * Name of the job
-     */
     name?: string;
-    /**
-     * Current page
-     */
     page?: number;
-    /**
-     * Name of the queue
-     */
     queue?: string;
-    /**
-     * Order queued jobs first
-     */
     queuedFirst?: boolean;
-    /**
-     * MonitorStatus
-     * - 0=RUNNING
-     * - 1=SUCCEEDED
-     * - 2=FAILED
-     * - 3=STALE
-     * - 4=QUEUED
-     */
     status?: 'running' | 'succeeded' | 'failed' | 'stale' | 'queued';
 };
 
-export type QueueMetricsShowResponse = {
+export type GetApiQueueMetricsResponse = {
     data: Array<QueueMonitorResource>;
     meta: {
         /**
@@ -1101,18 +1334,15 @@ export type QueueMetricsShowResponse = {
     };
 };
 
-export type QueueMetricsQueuesResponse = Array<{
+export type GetApiQueueMetricsQueuesResponse = Array<{
     name: string;
 }>;
 
-export type QueueMetricsMetricsData = {
-    /**
-     * Days to aggregate
-     */
+export type GetApiQueueMetricsMetricsData = {
     aggregateDays?: number;
 };
 
-export type QueueMetricsMetricsResponse = Array<{
+export type GetApiQueueMetricsMetricsResponse = Array<{
     title: string;
     value: number;
     previousValue: number | null;
@@ -1121,83 +1351,66 @@ export type QueueMetricsMetricsResponse = Array<{
     formattedPreviousValue: string | null;
 }>;
 
-export type QueueMetricsRetryJobData = {
+export type PostApiQueueMetricsRetryByIdData = {
     id: string;
     requestBody?: RetryJobRequest;
 };
 
-export type QueueMetricsRetryJobResponse = {
+export type PostApiQueueMetricsRetryByIdResponse = {
     status: string;
     message: string;
 };
 
-export type QueueMetricsDeleteData = {
+export type DeleteApiQueueMetricsByIdData = {
     id: string;
 };
 
-export type QueueMetricsDeleteResponse = null;
+export type DeleteApiQueueMetricsByIdResponse = void;
 
-export type QueueMetricsPurgeResponse = null;
+export type DeleteApiQueueMetricsPurgeResponse = void;
 
-export type HorizonQueuesMetricsIndexResponse = Array<unknown>;
+export type GetHorizonApiMetricsQueuesResponse = Array<unknown>;
 
-export type HorizonQueuesMetricsShowData = {
+export type GetHorizonApiMetricsQueuesByIdData = {
     id: string;
 };
 
-export type HorizonQueuesMetricsShowResponse = {
+export type GetHorizonApiMetricsQueuesByIdResponse = {
     [key: string]: unknown;
 };
 
-export type HorizonRetryJobsShowData = {
+export type PostHorizonApiJobsRetryByIdData = {
     id: string;
 };
 
-export type HorizonRetryJobsShowResponse = {
+export type PostHorizonApiJobsRetryByIdResponse = {
     [key: string]: unknown;
 };
 
-export type HorizonSilencedJobsIndexData = {
+export type GetApiSchemasMusicbrainzResponse = Array<Array<unknown>>;
+
+export type GetHorizonApiJobsSilencedData = {
     startingAt?: string;
 };
 
-export type HorizonSilencedJobsIndexResponse = {
+export type GetHorizonApiJobsSilencedResponse = {
     jobs: string;
     total: string;
 };
 
-export type SongsIndexData = {
-    /**
-     * Comma seperated list of genre names You can only search for names or slugs. Not both.
-     */
+export type GetApiLibrariesByLibrarySongsData = {
     genreNames?: string;
-    /**
-     * Comma seperated list of genre slugs
-     */
     genreSlugs?: string;
     /**
      * The library slug
      */
     library: string;
-    /**
-     * Items per page
-     */
     limit?: number;
-    /**
-     * Current page
-     */
     page?: number;
-    /**
-     * Comma seperated string of relations
-     * - album
-     * - artists
-     * - album.albumArtist
-     * - genres
-     */
     relations?: string;
 };
 
-export type SongsIndexResponse = {
+export type GetApiLibrariesByLibrarySongsResponse = {
     data: Array<SongResource>;
     meta: {
         /**
@@ -1233,25 +1446,18 @@ export type SongsIndexResponse = {
     };
 };
 
-export type SongsShowData = {
+export type GetApiLibrariesByLibrarySongsByPublicIdData = {
     /**
      * The library slug
      */
     library: string;
     publicId: string;
-    /**
-     * Comma seperated string of relations
-     * - album
-     * - artists
-     * - albumArtist
-     * - genres
-     */
     relations?: string;
 };
 
-export type SongsShowResponse = SongResource;
+export type GetApiLibrariesByLibrarySongsByPublicIdResponse = SongResource;
 
-export type SongsStreamData = {
+export type GetApiLibrariesByLibrarySongsStreamSongBySongDirectData = {
     /**
      * The library slug
      */
@@ -1262,11 +1468,51 @@ export type SongsStreamData = {
     song: string;
 };
 
-export type SongsStreamResponse = {
+export type GetApiLibrariesByLibrarySongsStreamSongBySongDirectResponse = {
     [key: string]: unknown;
 };
 
-export type SystemInfoPhpResponse = Array<{
+export type GetApiStreamSessionResponse = {
+    session_id: string;
+};
+
+export type PostApiStreamStartData = {
+    requestBody?: StartStreamRequest & {
+    session_id?: string;
+    options?: string;
+    protocol?: string;
+    start_time?: string;
+};
+};
+
+export type PostApiStreamStartResponse = {
+    message: string;
+    session_id: string;
+};
+
+export type PostApiStreamStopData = {
+    requestBody: {
+        session_id: string;
+    };
+};
+
+export type PostApiStreamStopResponse = {
+    message: string;
+};
+
+export type PostApiStreamSeekData = {
+    requestBody: {
+        session_id: string;
+        options: Array<(string)>;
+        seek_time: number;
+    };
+};
+
+export type PostApiStreamSeekResponse = {
+    message: string;
+};
+
+export type GetApiSystemInfoResponse = Array<{
     section: string;
     values: Array<{
         key: string;
@@ -1274,7 +1520,7 @@ export type SystemInfoPhpResponse = Array<{
     }>;
 }>;
 
-export type SystemInfoSysResponse = {
+export type GetApiSystemInfoSysResponse = {
     memoryUsage: number;
     systemLoadAverage: Array<(number)>;
     swooleVm: {
@@ -1283,31 +1529,16 @@ export type SystemInfoSysResponse = {
     };
 };
 
-export type UsersIndexData = {
-    /**
-     * JSON object
-     */
+export type GetApiUsersData = {
     filterModes?: string;
-    /**
-     * JSON object
-     */
     filters?: string;
     globalFilter?: string;
-    /**
-     * Items per page
-     */
     limit?: number;
-    /**
-     * Current page
-     */
     page?: number;
-    /**
-     * JSON object
-     */
     sorting?: string;
 };
 
-export type UsersIndexResponse = {
+export type GetApiUsersResponse = {
     data: Array<UserResource>;
     meta: {
         /**
@@ -1343,13 +1574,13 @@ export type UsersIndexResponse = {
     };
 };
 
-export type UsersStoreData = {
+export type PostApiUsersData = {
     requestBody: CreateUserRequest;
 };
 
-export type UsersStoreResponse = UserResource;
+export type PostApiUsersResponse = UserResource;
 
-export type UsersUpdateData = {
+export type PatchApiUsersByUserData = {
     requestBody?: UpdateUserRequest;
     /**
      * The user ID
@@ -1357,32 +1588,32 @@ export type UsersUpdateData = {
     user: number;
 };
 
-export type UsersUpdateResponse = UserResource;
+export type PatchApiUsersByUserResponse = UserResource;
 
-export type UsersShowData = {
+export type GetApiUsersByUserData = {
     /**
      * The user ID
      */
     user: number;
 };
 
-export type UsersShowResponse = UserResource;
+export type GetApiUsersByUserResponse = UserResource;
 
-export type UsersDestroyData = {
+export type DeleteApiUsersByUserData = {
     user: string;
 };
 
-export type UsersDestroyResponse = null;
+export type DeleteApiUsersByUserResponse = void;
 
-export type UsersMeResponse = UserResource;
+export type GetApiUsersMeResponse = UserResource;
 
-export type UserTokenGetUserTokensData = {
+export type GetApiUsersTokensByUserData = {
     page?: number;
     perPage?: number;
     user: string;
 };
 
-export type UserTokenGetUserTokensResponse = {
+export type GetApiUsersTokensByUserResponse = {
     data: Array<PersonalAccessTokenViewResource>;
     meta: {
         /**
@@ -1418,21 +1649,21 @@ export type UserTokenGetUserTokensResponse = {
     };
 };
 
-export type UserTokenRevokeTokenData = {
+export type DeleteApiUsersTokensByTokenData = {
     /**
      * The token ID
      */
     token: number;
 };
 
-export type UserTokenRevokeTokenResponse = null;
+export type DeleteApiUsersTokensByTokenResponse = void;
 
-export type HorizonWorkloadIndexResponse = Array<unknown>;
+export type GetHorizonApiWorkloadResponse = Array<unknown>;
 
 export type $OpenApiTs = {
     '/api/libraries/{library}/albums': {
         get: {
-            req: AlbumsIndexData;
+            req: GetApiLibrariesByLibraryAlbumsData;
             res: {
                 /**
                  * Paginated set of `AlbumResource`
@@ -1519,7 +1750,7 @@ export type $OpenApiTs = {
     };
     '/api/libraries/{library}/albums/{album}': {
         get: {
-            req: AlbumsShowData;
+            req: GetApiLibrariesByLibraryAlbumsByAlbumData;
             res: {
                 /**
                  * `AlbumResource`
@@ -1548,7 +1779,7 @@ export type $OpenApiTs = {
     };
     '/api/libraries/{library}/artists': {
         get: {
-            req: ArtistsIndexData;
+            req: GetApiLibrariesByLibraryArtistsData;
             res: {
                 /**
                  * Paginated set of `ArtistResource`
@@ -1626,7 +1857,7 @@ export type $OpenApiTs = {
     };
     '/api/libraries/{library}/artists/{artist}': {
         get: {
-            req: ArtistsShowData;
+            req: GetApiLibrariesByLibraryArtistsByArtistData;
             res: {
                 /**
                  * `ArtistResource`
@@ -1655,12 +1886,12 @@ export type $OpenApiTs = {
     };
     '/api/auth/login': {
         post: {
-            req: AuthLoginData;
+            req: PostApiAuthLoginData;
             res: {
-                200: [
-                    NewAccessTokenResource,
-                    NewAccessTokenResource
-                ];
+                200: {
+                    accessToken: NewAccessTokenResource;
+                    refreshToken: NewAccessTokenResource;
+                };
                 /**
                  * An error
                  */
@@ -1700,9 +1931,9 @@ export type $OpenApiTs = {
     '/api/auth/refreshToken': {
         post: {
             res: {
-                200: [
-                    NewAccessTokenResource
-                ];
+                200: {
+                    accessToken: NewAccessTokenResource;
+                };
                 /**
                  * Unauthenticated
                  */
@@ -1718,9 +1949,9 @@ export type $OpenApiTs = {
     '/api/auth/streamToken': {
         post: {
             res: {
-                200: [
-                    NewAccessTokenResource
-                ];
+                200: {
+                    streamToken: NewAccessTokenResource;
+                };
                 /**
                  * Unauthenticated
                  */
@@ -1735,12 +1966,12 @@ export type $OpenApiTs = {
     };
     '/api/auth/register': {
         post: {
-            req: AuthRegisterData;
+            req: PostApiAuthRegisterData;
             res: {
-                200: [
-                    NewAccessTokenResource,
-                    NewAccessTokenResource
-                ];
+                200: {
+                    accessToken: NewAccessTokenResource;
+                    refreshToken: NewAccessTokenResource;
+                };
                 /**
                  * Authorization error
                  */
@@ -1770,7 +2001,7 @@ export type $OpenApiTs = {
     };
     '/api/auth/forgotPassword': {
         post: {
-            req: AuthForgotPasswordData;
+            req: PostApiAuthForgotPasswordData;
             res: {
                 200: {
                     message: string;
@@ -1804,7 +2035,7 @@ export type $OpenApiTs = {
     };
     '/api/auth/resetPassword': {
         post: {
-            req: AuthResetPasswordData;
+            req: PostApiAuthResetPasswordData;
             res: {
                 200: {
                     message: string;
@@ -1845,24 +2076,34 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/api/auth/verify/:id/:hash': {
+    '/api/auth/verify/{id}/{hash}': {
         post: {
+            req: PostApiAuthVerifyByIdByHashData;
             res: {
                 /**
                  * `UserResource`
                  */
                 200: UserResource;
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
             };
         };
     };
     '/api/auth/logout': {
         post: {
-            req: AuthLogoutData;
+            req: PostApiAuthLogoutData;
             res: {
                 /**
                  * No content
                  */
-                204: null;
+                204: void;
                 /**
                  * Unauthenticated
                  */
@@ -1910,16 +2151,16 @@ export type $OpenApiTs = {
             };
         };
         post: {
-            req: AuthPasskeyLoginData;
+            req: PostWebauthnPasskeyData;
             res: {
-                200: [
-    {
+                200: {
+    accessToken: {
         [key: string]: unknown;
-    },
-    {
+    };
+    refreshToken: {
         [key: string]: unknown;
-    }
-] | string;
+    };
+} | string;
                 401: {
                     message: string;
                 };
@@ -1959,7 +2200,7 @@ export type $OpenApiTs = {
             };
         };
         post: {
-            req: AuthPasskeyRegisterData;
+            req: PostWebauthnPasskeyRegisterData;
             res: {
                 200: {
                     message: string;
@@ -2014,7 +2255,7 @@ export type $OpenApiTs = {
     };
     '/-/horizon/api/batches/{id}': {
         get: {
-            req: HorizonJobsBatchesShowData;
+            req: GetHorizonApiBatchesByIdData;
             res: {
                 200: {
                     batch: string;
@@ -2025,7 +2266,7 @@ export type $OpenApiTs = {
     };
     '/-/horizon/api/batches/retry/{id}': {
         post: {
-            req: HorizonJobsBatchesRetryData;
+            req: PostHorizonApiBatchesRetryByIdData;
             res: {
                 200: {
                     [key: string]: unknown;
@@ -2035,7 +2276,7 @@ export type $OpenApiTs = {
     };
     '/-/horizon/api/jobs/completed': {
         get: {
-            req: HorizonCompletedJobsIndexData;
+            req: GetHorizonApiJobsCompletedData;
             res: {
                 200: {
                     jobs: string;
@@ -2067,7 +2308,7 @@ export type $OpenApiTs = {
     };
     '/-/horizon/api/jobs/failed': {
         get: {
-            req: HorizonFailedJobsIndexData;
+            req: GetHorizonApiJobsFailedData;
             res: {
                 200: {
                     jobs: string;
@@ -2078,7 +2319,7 @@ export type $OpenApiTs = {
     };
     '/-/horizon/api/jobs/failed/{id}': {
         get: {
-            req: HorizonFailedJobsShowData;
+            req: GetHorizonApiJobsFailedByIdData;
             res: {
                 200: unknown;
             };
@@ -2096,7 +2337,7 @@ export type $OpenApiTs = {
     };
     '/system/log-viewer/api/files/{fileIdentifier}/download/request': {
         get: {
-            req: LogViewerFilesRequestDownloadData;
+            req: GetSystemLogViewerApiFilesByFileIdentifierDownloadRequestData;
             res: {
                 200: {
                     url: string;
@@ -2115,7 +2356,7 @@ export type $OpenApiTs = {
     };
     '/system/log-viewer/api/files/{fileIdentifier}/clear-cache': {
         post: {
-            req: LogViewerFilesClearCacheData;
+            req: PostSystemLogViewerApiFilesByFileIdentifierClearCacheData;
             res: {
                 200: {
                     success: boolean;
@@ -2134,7 +2375,7 @@ export type $OpenApiTs = {
     };
     '/system/log-viewer/api/files/{fileIdentifier}': {
         delete: {
-            req: LogViewerFilesDeleteData;
+            req: DeleteSystemLogViewerApiFilesByFileIdentifierData;
             res: {
                 200: {
                     success: boolean;
@@ -2153,7 +2394,7 @@ export type $OpenApiTs = {
     };
     '/system/log-viewer/api/delete-multiple-files': {
         post: {
-            req: LogViewerFilesDeleteMultipleFilesData;
+            req: PostSystemLogViewerApiDeleteMultipleFilesData;
             res: {
                 200: {
                     success: boolean;
@@ -2163,7 +2404,7 @@ export type $OpenApiTs = {
     };
     '/system/log-viewer/api/files/{fileIdentifier}/download': {
         get: {
-            req: LogViewerFilesDownloadData;
+            req: GetSystemLogViewerApiFilesByFileIdentifierDownloadData;
             res: {
                 200: string;
             };
@@ -2181,7 +2422,7 @@ export type $OpenApiTs = {
     };
     '/system/log-viewer/api/folders/{folderIdentifier}/download/request': {
         get: {
-            req: LogViewerFoldersRequestDownloadData;
+            req: GetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestData;
             res: {
                 200: {
                     url: string;
@@ -2200,7 +2441,7 @@ export type $OpenApiTs = {
     };
     '/system/log-viewer/api/folders/{folderIdentifier}/clear-cache': {
         post: {
-            req: LogViewerFoldersClearCacheData;
+            req: PostSystemLogViewerApiFoldersByFolderIdentifierClearCacheData;
             res: {
                 200: {
                     success: boolean;
@@ -2219,7 +2460,7 @@ export type $OpenApiTs = {
     };
     '/system/log-viewer/api/folders/{folderIdentifier}': {
         delete: {
-            req: LogViewerFoldersDeleteData;
+            req: DeleteSystemLogViewerApiFoldersByFolderIdentifierData;
             res: {
                 200: {
                     success: boolean;
@@ -2229,7 +2470,7 @@ export type $OpenApiTs = {
     };
     '/system/log-viewer/api/folders/{folderIdentifier}/download': {
         get: {
-            req: LogViewerFoldersDownloadData;
+            req: GetSystemLogViewerApiFoldersByFolderIdentifierDownloadData;
             res: {
                 200: string;
             };
@@ -2237,7 +2478,7 @@ export type $OpenApiTs = {
     };
     '/api/genres': {
         get: {
-            req: GenresIndexData;
+            req: GetApiGenresData;
             res: {
                 /**
                  * Paginated set of `GenreResource`
@@ -2315,7 +2556,7 @@ export type $OpenApiTs = {
     };
     '/api/genres/{genre}': {
         get: {
-            req: GenresShowData;
+            req: GetApiGenresByGenreData;
             res: {
                 /**
                  * `GenreResource`
@@ -2342,7 +2583,7 @@ export type $OpenApiTs = {
             };
         };
         patch: {
-            req: GenresUpdateData;
+            req: PatchApiGenresByGenreData;
             res: {
                 /**
                  * `GenreResource`
@@ -2393,12 +2634,12 @@ export type $OpenApiTs = {
             };
         };
         delete: {
-            req: GenresDestroyData;
+            req: DeleteApiGenresByGenreData;
             res: {
                 /**
                  * No content
                  */
-                204: null;
+                204: void;
                 /**
                  * Unauthenticated
                  */
@@ -2432,7 +2673,7 @@ export type $OpenApiTs = {
     };
     '/api/images/{image}': {
         get: {
-            req: ImageServeData;
+            req: GetApiImagesByImageData;
             res: {
                 200: string;
                 /**
@@ -2449,7 +2690,7 @@ export type $OpenApiTs = {
     };
     '/api/jobs/scanLibrary/{slug}': {
         post: {
-            req: JobLibraryScanData;
+            req: PostApiJobsScanLibraryBySlugData;
             res: {
                 200: {
                     message: string;
@@ -2475,7 +2716,7 @@ export type $OpenApiTs = {
     };
     '/-/horizon/api/metrics/jobs/{id}': {
         get: {
-            req: HorizonJobsMetricsShowData;
+            req: GetHorizonApiMetricsJobsByIdData;
             res: {
                 200: {
                     [key: string]: unknown;
@@ -2485,7 +2726,7 @@ export type $OpenApiTs = {
     };
     '/-/horizon/api/jobs/{id}': {
         get: {
-            req: HorizonJobsShowData;
+            req: GetHorizonApiJobsByIdData;
             res: {
                 200: Array<unknown>;
             };
@@ -2493,7 +2734,7 @@ export type $OpenApiTs = {
     };
     '/api/libraries': {
         get: {
-            req: LibrariesIndexData;
+            req: GetApiLibrariesData;
             res: {
                 /**
                  * Paginated set of `LibraryResource`
@@ -2569,7 +2810,7 @@ export type $OpenApiTs = {
             };
         };
         post: {
-            req: LibraryCreateData;
+            req: PostApiLibrariesData;
             res: {
                 /**
                  * `LibraryResource`
@@ -2613,7 +2854,7 @@ export type $OpenApiTs = {
     };
     '/api/libraries/{slug}': {
         get: {
-            req: LibraryShowData;
+            req: GetApiLibrariesBySlugData;
             res: {
                 /**
                  * `LibraryResource`
@@ -2631,7 +2872,7 @@ export type $OpenApiTs = {
             };
         };
         patch: {
-            req: LibraryUpdateData;
+            req: PatchApiLibrariesBySlugData;
             res: {
                 /**
                  * `LibraryResource`
@@ -2672,14 +2913,13 @@ export type $OpenApiTs = {
                 };
             };
         };
-    };
-    '/api/libraries/:slug': {
         delete: {
+            req: DeleteApiLibrariesBySlugData;
             res: {
                 /**
                  * No content
                  */
-                204: null;
+                204: void;
                 /**
                  * Unauthenticated
                  */
@@ -2694,7 +2934,7 @@ export type $OpenApiTs = {
     };
     '/system/log-viewer/api/logs': {
         get: {
-            req: LogViewerLogsData;
+            req: GetSystemLogViewerApiLogsData;
             res: {
                 200: {
                     file: LogFileResource | null;
@@ -2756,7 +2996,7 @@ export type $OpenApiTs = {
     };
     '/-/horizon/api/monitoring/{tag}': {
         get: {
-            req: HorizonMonitoringTagPaginateData;
+            req: GetHorizonApiMonitoringByTagData;
             res: {
                 200: {
                     jobs: string;
@@ -2765,7 +3005,7 @@ export type $OpenApiTs = {
             };
         };
         delete: {
-            req: HorizonMonitoringTagDestroyData;
+            req: DeleteHorizonApiMonitoringByTagData;
             res: {
                 200: {
                     [key: string]: unknown;
@@ -2879,7 +3119,7 @@ export type $OpenApiTs = {
     };
     '/api/opcache/compile': {
         post: {
-            req: OpcacheCompileData;
+            req: PostApiOpcacheCompileData;
             res: {
                 200: {
                     totalFiles: number;
@@ -2899,7 +3139,7 @@ export type $OpenApiTs = {
     };
     '/-/horizon/api/jobs/pending': {
         get: {
-            req: HorizonPendingJobsIndexData;
+            req: GetHorizonApiJobsPendingData;
             res: {
                 200: {
                     jobs: string;
@@ -2908,9 +3148,816 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/playlists': {
+        get: {
+            res: {
+                /**
+                 * Paginated set of `PlaylistResource`
+                 */
+                200: {
+                    data: Array<PlaylistResource>;
+                    meta: {
+                        /**
+                         * Total number of items being paginated.
+                         */
+                        total: number;
+                        /**
+                         * The number of items for the current page
+                         */
+                        count: number;
+                        /**
+                         * The number of items per page
+                         */
+                        limit: number;
+                        /**
+                         * The number of current page
+                         */
+                        currentPage: number;
+                        /**
+                         * The number of next page
+                         */
+                        nextPage: number;
+                        /**
+                         * The number of last page
+                         */
+                        lastPage: number;
+                    };
+                    links: {
+                        first: string | null;
+                        last: string | null;
+                        prev: string | null;
+                        next: string | null;
+                    };
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+        post: {
+            req: PostApiPlaylistsData;
+            res: {
+                /**
+                 * `PlaylistResource`
+                 */
+                200: PlaylistResource;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}': {
+        get: {
+            req: GetApiPlaylistsByPlaylistData;
+            res: {
+                /**
+                 * `PlaylistResource`
+                 */
+                200: PlaylistResource;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+        put: {
+            req: PutApiPlaylistsByPlaylistData;
+            res: {
+                /**
+                 * `PlaylistResource`
+                 */
+                200: PlaylistResource;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+            };
+        };
+        delete: {
+            req: DeleteApiPlaylistsByPlaylistData;
+            res: {
+                /**
+                 * No content
+                 */
+                204: void;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/songs/{song}': {
+        post: {
+            req: PostApiPlaylistsByPlaylistSongsBySongData;
+            res: {
+                200: {
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+        delete: {
+            req: DeleteApiPlaylistsByPlaylistSongsBySongData;
+            res: {
+                200: {
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/reorder': {
+        post: {
+            req: PostApiPlaylistsByPlaylistReorderData;
+            res: {
+                200: {
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/collaborators': {
+        post: {
+            req: PostApiPlaylistsByPlaylistCollaboratorsData;
+            res: {
+                200: {
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/collaborators/{user}': {
+        delete: {
+            req: DeleteApiPlaylistsByPlaylistCollaboratorsByUserData;
+            res: {
+                200: {
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/clone': {
+        post: {
+            req: PostApiPlaylistsByPlaylistCloneData;
+            res: {
+                /**
+                 * `PlaylistResource`
+                 */
+                200: PlaylistResource;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/statistics': {
+        get: {
+            req: GetApiPlaylistsByPlaylistStatisticsData;
+            res: {
+                /**
+                 * `PlaylistStatistic`
+                 */
+                200: PlaylistStatistic;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/statistics/record/view': {
+        post: {
+            req: PostApiPlaylistsByPlaylistStatisticsRecordViewData;
+            res: {
+                200: {
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/statistics/record/play': {
+        post: {
+            req: PostApiPlaylistsByPlaylistStatisticsRecordPlayData;
+            res: {
+                200: {
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/statistics/record/share': {
+        post: {
+            req: PostApiPlaylistsByPlaylistStatisticsRecordShareData;
+            res: {
+                200: {
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/statistics/record/favorite': {
+        post: {
+            req: PostApiPlaylistsByPlaylistStatisticsRecordFavoriteData;
+            res: {
+                200: {
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/smart': {
+        post: {
+            req: PostApiPlaylistsByPlaylistSmartData;
+            res: {
+                /**
+                 * `PlaylistResource`
+                 */
+                200: PlaylistResource;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+            };
+        };
+        put: {
+            req: PutApiPlaylistsByPlaylistSmartData;
+            res: {
+                /**
+                 * `PlaylistResource`
+                 */
+                200: PlaylistResource;
+                /**
+                 * An error
+                 */
+                400: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/smart/sync': {
+        post: {
+            req: PostApiPlaylistsByPlaylistSmartSyncData;
+            res: {
+                200: {
+                    message: string;
+                };
+                /**
+                 * An error
+                 */
+                400: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
     '/api/queue-metrics': {
         get: {
-            req: QueueMetricsShowData;
+            req: GetApiQueueMetricsData;
             res: {
                 /**
                  * Paginated set of `QueueMonitorResource`
@@ -3006,7 +4053,7 @@ export type $OpenApiTs = {
     };
     '/api/queue-metrics/metrics': {
         get: {
-            req: QueueMetricsMetricsData;
+            req: GetApiQueueMetricsMetricsData;
             res: {
                 200: Array<{
                     title: string;
@@ -3054,7 +4101,7 @@ export type $OpenApiTs = {
     };
     '/api/queue-metrics/retry/{id}': {
         post: {
-            req: QueueMetricsRetryJobData;
+            req: PostApiQueueMetricsRetryByIdData;
             res: {
                 200: {
     status: string;
@@ -3107,12 +4154,12 @@ export type $OpenApiTs = {
     };
     '/api/queue-metrics/{id}': {
         delete: {
-            req: QueueMetricsDeleteData;
+            req: DeleteApiQueueMetricsByIdData;
             res: {
                 /**
                  * No content
                  */
-                204: null;
+                204: void;
                 /**
                  * Unauthenticated
                  */
@@ -3131,7 +4178,7 @@ export type $OpenApiTs = {
                 /**
                  * No content
                  */
-                204: null;
+                204: void;
                 /**
                  * Unauthenticated
                  */
@@ -3153,7 +4200,7 @@ export type $OpenApiTs = {
     };
     '/-/horizon/api/metrics/queues/{id}': {
         get: {
-            req: HorizonQueuesMetricsShowData;
+            req: GetHorizonApiMetricsQueuesByIdData;
             res: {
                 200: {
                     [key: string]: unknown;
@@ -3163,7 +4210,7 @@ export type $OpenApiTs = {
     };
     '/-/horizon/api/jobs/retry/{id}': {
         post: {
-            req: HorizonRetryJobsShowData;
+            req: PostHorizonApiJobsRetryByIdData;
             res: {
                 200: {
                     [key: string]: unknown;
@@ -3171,9 +4218,16 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/schemas/musicbrainz': {
+        get: {
+            res: {
+                200: Array<Array<unknown>>;
+            };
+        };
+    };
     '/-/horizon/api/jobs/silenced': {
         get: {
-            req: HorizonSilencedJobsIndexData;
+            req: GetHorizonApiJobsSilencedData;
             res: {
                 200: {
                     jobs: string;
@@ -3184,7 +4238,7 @@ export type $OpenApiTs = {
     };
     '/api/libraries/{library}/songs': {
         get: {
-            req: SongsIndexData;
+            req: GetApiLibrariesByLibrarySongsData;
             res: {
                 /**
                  * Paginated set of `SongResource`
@@ -3280,7 +4334,7 @@ export type $OpenApiTs = {
     };
     '/api/libraries/{library}/songs/{publicId}': {
         get: {
-            req: SongsShowData;
+            req: GetApiLibrariesByLibrarySongsByPublicIdData;
             res: {
                 /**
                  * `SongResource`
@@ -3333,7 +4387,7 @@ export type $OpenApiTs = {
     };
     '/api/libraries/{library}/songs/stream/song/{song}/direct': {
         get: {
-            req: SongsStreamData;
+            req: GetApiLibrariesByLibrarySongsStreamSongBySongDirectData;
             res: {
                 200: {
                     [key: string]: unknown;
@@ -3355,6 +4409,100 @@ export type $OpenApiTs = {
                      * Error overview.
                      */
                     message: string;
+                };
+            };
+        };
+    };
+    '/api/stream/session': {
+        get: {
+            res: {
+                200: {
+                    session_id: string;
+                };
+            };
+        };
+    };
+    '/api/stream/start': {
+        post: {
+            req: PostApiStreamStartData;
+            res: {
+                200: {
+                    message: string;
+                    session_id: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+            };
+        };
+    };
+    '/api/stream/stop': {
+        post: {
+            req: PostApiStreamStopData;
+            res: {
+                200: {
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+            };
+        };
+    };
+    '/api/stream/seek': {
+        post: {
+            req: PostApiStreamSeekData;
+            res: {
+                200: {
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
                 };
             };
         };
@@ -3406,7 +4554,7 @@ export type $OpenApiTs = {
     };
     '/api/users': {
         get: {
-            req: UsersIndexData;
+            req: GetApiUsersData;
             res: {
                 /**
                  * Paginated set of `UserResource`
@@ -3482,7 +4630,7 @@ export type $OpenApiTs = {
             };
         };
         post: {
-            req: UsersStoreData;
+            req: PostApiUsersData;
             res: {
                 /**
                  * `UserResource`
@@ -3526,7 +4674,7 @@ export type $OpenApiTs = {
     };
     '/api/users/{user}': {
         patch: {
-            req: UsersUpdateData;
+            req: PatchApiUsersByUserData;
             res: {
                 /**
                  * `UserResource`
@@ -3577,7 +4725,7 @@ export type $OpenApiTs = {
             };
         };
         get: {
-            req: UsersShowData;
+            req: GetApiUsersByUserData;
             res: {
                 /**
                  * `UserResource`
@@ -3604,12 +4752,12 @@ export type $OpenApiTs = {
             };
         };
         delete: {
-            req: UsersDestroyData;
+            req: DeleteApiUsersByUserData;
             res: {
                 /**
                  * No content
                  */
-                204: null;
+                204: void;
                 /**
                  * Unauthenticated
                  */
@@ -3643,7 +4791,7 @@ export type $OpenApiTs = {
     };
     '/api/users/tokens/{user}': {
         get: {
-            req: UserTokenGetUserTokensData;
+            req: GetApiUsersTokensByUserData;
             res: {
                 /**
                  * Paginated set of `PersonalAccessTokenViewResource`
@@ -3721,12 +4869,12 @@ export type $OpenApiTs = {
     };
     '/api/users/tokens/{token}': {
         delete: {
-            req: UserTokenRevokeTokenData;
+            req: DeleteApiUsersTokensByTokenData;
             res: {
                 /**
                  * No content
                  */
-                204: null;
+                204: void;
                 /**
                  * Unauthenticated
                  */

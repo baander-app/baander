@@ -1,0 +1,23 @@
+{
+  "name": "baander/redis-stack",
+  "type": "library",
+  "description": "Supporting code for redis extensions",
+  "license": "Apache-2.0",
+  "authors": [{
+    "name": "Martin Juul"
+  }],
+  "require": {
+    "php": "^8.4",
+    "ext-redis": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "Baander\\RedisStack\\": "src/"
+    }
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "preferred-install": "dist",
+    "sort-packages": true
+  }
+}

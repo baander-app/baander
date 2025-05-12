@@ -1,5 +1,5 @@
-import { decodeBlurHash } from 'fast-blurhash';
 import { CanvasHTMLAttributes, useEffect, useRef } from 'react';
+import { decodeBlurHash } from 'fast-blurhash';
 
 export interface BlurHashCanvasProps extends CanvasHTMLAttributes<HTMLCanvasElement> {
   hash: string;

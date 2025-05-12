@@ -7,26 +7,35 @@ import './index.css';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 // @ts-ignore
 import { Ziggy } from './ziggy.js';
-// @ts-ignore
-globalThis.Ziggy = Ziggy;
 import './bootstrap.ts';
 import './common/i18n.ts';
 import { DateFormatterProvider } from '@/providers/dayjs-provider.tsx';
-import { queryClient, createIDBPersister } from '@/common/react-query.ts';
+import { createIDBPersister, queryClient } from '@/common/react-query.ts';
+import { RadixProvider } from '@/providers/radix-provider.tsx';
+import { Reset } from '@radix-ui/themes';
+import { TestModeProvider } from '@/providers/test-mode-provider.tsx';
+// @ts-ignore
+globalThis.Ziggy = Ziggy;
 
 const reactQueryPersister = createIDBPersister();
 
 ReactDOM.createRoot(document.getElementById('baanderapproot') as HTMLElement).render(
   <React.StrictMode>
-    <PersistQueryClientProvider
-      client={queryClient}
-      persistOptions={{ buster: 'baander', persister: reactQueryPersister }}
-    >
-      <Provider store={store}>
-        <DateFormatterProvider>
-          <App/>
-        </DateFormatterProvider>
-      </Provider>
-    </PersistQueryClientProvider>
+    <TestModeProvider>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={{ buster: 'baander', persister: reactQueryPersister }}
+      >
+        <Provider store={store}>
+          <DateFormatterProvider>
+            <RadixProvider>
+              <Reset>
+                <App/>
+              </Reset>
+            </RadixProvider>
+          </DateFormatterProvider>
+        </Provider>
+      </PersistQueryClientProvider>
+    </TestModeProvider>
   </React.StrictMode>,
 );

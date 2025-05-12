@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import { Circle, Group, Layer, Line, Rect, Stage, Text } from 'react-konva';
 import { hierarchy, Tree } from '@visx/hierarchy';
 import { Zoom } from '@visx/zoom';

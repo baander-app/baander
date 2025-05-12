@@ -1,15 +1,15 @@
+import React from 'react';
 import { SongResource } from '@/api-client/requests';
-import { Table, TableTrProps } from '@mantine/core';
 
-export interface TrackRowProps extends TableTrProps {
+export interface TrackRowProps extends React.HTMLAttributes<HTMLTableRowElement> {
   song: SongResource;
 }
 export function TrackRow({song, ...rest}: TrackRowProps) {
   return (
-    <Table.Tr {...rest}>
-      <Table.Td>{song.track}</Table.Td>
-      <Table.Td>{song.title}</Table.Td>
-      <Table.Td>{song.durationHuman}</Table.Td>
-    </Table.Tr>
+    <tr {...rest}>
+      <td>{song.track}</td>
+      <td>{song.title}</td>
+      <td>{song.durationHuman}</td>
+    </tr>
   )
 }

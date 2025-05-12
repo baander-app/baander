@@ -5,7 +5,7 @@ import { Overview } from '@/modules/library-movies/routes/overview.tsx';
 export const LibraryMoviesRoutes = () => {
   return (
     <Routes>
-      <Route path="/" element={<Overview/>}/>
+      <Route path="/overview" element={<Overview/>}/>
     </Routes>
   );
 };

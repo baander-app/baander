@@ -1,14 +1,22 @@
-import { useSongServiceSongsShow } from '@/api-client/queries';
-import { Box, NumberInput, SimpleGrid, Text, Textarea, TextInput, Loader, Alert, SimpleGridProps } from '@mantine/core';
+import { useSongServiceGetApiLibrariesByLibrarySongsByPublicId } from '@/api-client/queries';
+import {
+  Box,
+  Callout,
+  Grid,
+  Spinner,
+  Text,
+  TextArea,
+  TextField,
+} from '@radix-ui/themes';
 import { DateTime } from '@/ui/dates/date-time.tsx';
 import { useEffect, useState } from 'react';
 
-export interface SongDetailProps extends SimpleGridProps {
+export interface SongDetailProps {
   publicId: string;
 }
 
-export function SongDetail({ publicId, ...rest }: SongDetailProps) {
-  const { data, error, isLoading } = useSongServiceSongsShow({ library: 'music', publicId });
+export function SongDetail({ publicId }: SongDetailProps) {
+  const { data, error, isLoading } = useSongServiceGetApiLibrariesByLibrarySongsByPublicId({ library: 'music', publicId });
 
   const [title, setTitle] = useState('');
   const [year, setYear] = useState<number | ''>('');
@@ -27,55 +35,76 @@ export function SongDetail({ publicId, ...rest }: SongDetailProps) {
     }
   }, [data]);
 
-  if (isLoading) return <Loader />;
+  if (isLoading) return <Spinner/>;
 
-  if (error) return <Alert color="red">{error?.message}</Alert>;
+  if (error) {
+    return (
+      <Callout.Root color="red">
+        <Callout.Text>{error?.message}</Callout.Text>
+      </Callout.Root>
+    );
+  }
 
   if (!data) return <Text>No data available</Text>;
 
   const { public_id, path, durationHuman, sizeHuman, createdAt, updatedAt } = data;
 
   return (
-    <SimpleGrid cols={2} {...rest}>
+    <Grid columns="2">
       <Box>
-        <TextInput
-          label="Title"
-          value={title}
-          onChange={(event) => setTitle(event.currentTarget.value)}
-        />
+        <TextField.Root>
+          <label>Title</label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </TextField.Root>
 
-        <NumberInput
-          label="Year"
-          value={year}
-          onChange={(value) => setYear(value)}
-          allowNegative={false}
-          min={0}
-          max={9999}
-        />
 
-        <NumberInput
-          label="Disc number"
-          value={disc}
-          onChange={(value) => setDisc(value)}
-          allowNegative={false}
-          min={0}
-          max={9999}
-        />
+        <TextField.Root>
+          <label>Year</label>
+          <input
+            type="number"
+            value={year}
+            onChange={(e) => setYear(e.target.value)}
+            min={0}
+            max={9999}
+          />
+        </TextField.Root>
 
-        <NumberInput
-          label="Track number"
-          value={track}
-          onChange={(value) => setTrack(value)}
-          allowNegative={false}
-          min={0}
-          max={9999}
-        />
+        <TextField.Root>
+          <label>Disc number</label>
 
-        <Textarea
-          label="Comment"
-          value={comment}
-          onChange={(event) => setComment(event.currentTarget.value)}
-        />
+          <input
+            type="number"
+            value={disc}
+            onChange={(e) => setDisc(e.target.value)}
+            min={0}
+            max={9999}
+          />
+        </TextField.Root>
+
+        <TextField.Root>
+          <label>Track number</label>
+
+          <input
+            type="number"
+            value={track}
+            onChange={(e) => setTrack(e.target.value)}
+            min={0}
+            max={9999}
+          />
+        </TextField.Root>
+
+        <TextField.Root>
+          <label>Comment</label>
+
+          <TextArea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+          />
+        </TextField.Root>
       </Box>
 
       <Box>
@@ -83,9 +112,9 @@ export function SongDetail({ publicId, ...rest }: SongDetailProps) {
         <Text>{path}</Text>
         <Text>{durationHuman}</Text>
         <Text>{sizeHuman}</Text>
-        <Text><DateTime time={createdAt!} /></Text>
+        <Text><DateTime date={createdAt!}/></Text>
         <Text>{updatedAt}</Text>
       </Box>
-    </SimpleGrid>
+    </Grid>
   );
 }

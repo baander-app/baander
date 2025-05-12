@@ -1,4 +1,4 @@
-import { AuthLoginResponse, NewAccessTokenResource } from '@/api-client/requests';
+import { NewAccessTokenResource, PostApiAuthLoginResponse } from '@/api-client/requests';
 
 const LOCAL_STORAGE_KEY = 'baander_token';
 const LOCAL_STORAGE_KEY_STREAM = 'baander_stream_token';
@@ -10,7 +10,7 @@ export const Token = {
       return undefined;
     }
 
-    return JSON.parse(token) as AuthLoginResponse;
+    return JSON.parse(token) as PostApiAuthLoginResponse;
   },
   getStreamToken() {
     const token = localStorage.getItem(LOCAL_STORAGE_KEY_STREAM);
@@ -20,7 +20,7 @@ export const Token = {
 
     return JSON.parse(token) as NewAccessTokenResource;
   },
-  set(token: AuthLoginResponse) {
+  set(token: PostApiAuthLoginResponse) {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(token));
   },
   setStreamToken(token: NewAccessTokenResource) {

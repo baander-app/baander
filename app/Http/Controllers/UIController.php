@@ -3,13 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Baander;
-use MusicBrainz\Filter\PageFilter;
-use MusicBrainz\Filter\Search\RecordingFilter;
-use MusicBrainz\Filter\Search\ReleaseFilter;
-use MusicBrainz\MusicBrainz;
-use MusicBrainz\Supplement\Lookup\RecordingFields;
-use MusicBrainz\Value\MBID;
-use MusicBrainz\Value\Name;
+use App\Models\Album;
+use App\Modules\MediaMeta\MediaMeta;
 
 class UIController
 {
@@ -22,29 +17,11 @@ class UIController
 
     public function dbg()
     {
-        $musicBrainz = app(MusicBrainz::class);
+        $album = Album::first();
+        $song = $album->songs()->first();
 
-        $filter = new RecordingFilter();
-        $filter->addRecordingNameWithoutAccents(new Name('Teenage dream'));
-        $filter->addArtistNameWithoutAccents(new Name('Katy Perry'));
+        $meta = new MediaMeta($song->path);
 
-        $pageFilter = new PageFilter(0, 1);
-
-        $recording = $musicBrainz->api()->search()->recording($filter, $pageFilter);
-
-        $mbid = $recording[0]->recording->getMBID();
-
-        $fields = (new RecordingFields)
-            ->includeReleaseRelations()
-            ->includeRecordingRelations()
-            ->includeArtistRelations();
-
-        $res = $musicBrainz->api()->lookup()->recording(new MBID($mbid), $fields);
-
-        dd($res);
-
-        return view('dbg', [
-            'release' => $release,
-        ]);
+        dd($meta->getArtist());
     }
 }

@@ -35,7 +35,7 @@ class Library extends BaseModel
         return 'slug';
     }
 
-    public function updateLastScan(Carbon $date = null): void
+    public function updateLastScan(?Carbon $date = null): void
     {
         $this->update([
             'last_scan' => $date ?? now(),

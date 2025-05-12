@@ -2,6 +2,7 @@ import React, { createContext, ReactEventHandler, ReactNode, useContext, useEffe
 import { Lrc } from '@/libs/lyrics/lrc.ts';
 import { AudioLyricSynchronizer } from '@/libs/lyrics/audio-lyric-synchronizer.ts';
 import { useAudioPlayer } from '@/modules/library-music-player/providers/audio-player-provider.tsx';
+import { useAppSelector } from '@/store/hooks.ts';
 
 interface LyricsProviderContextProps {
   lyrics: Lrc | undefined;
@@ -13,22 +14,30 @@ const LyricsProviderContext = createContext<LyricsProviderContextProps | undefin
 LyricsProviderContext.displayName = 'LyricsProviderContext';
 
 const LyricsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { lyrics: lyricOptions } = useAppSelector(state => state.musicPlayer);
+
   const [lyrics, _setLyrics] = useState<Lrc>();
-  const {song} = useAudioPlayer();
+  const { song } = useAudioPlayer();
   const audioLyricsSynchronizer = new AudioLyricSynchronizer();
 
   const { audioRef } = useAudioPlayer();
 
   useEffect(() => {
+    if (lyricOptions.offsetMs && audioLyricsSynchronizer.defaultOffset !== lyricOptions.offsetMs) {
+      audioLyricsSynchronizer.setDefaultOffset(lyricOptions.offsetMs);
+    }
+  }, [lyricOptions, audioLyricsSynchronizer]);
+
+  useEffect(() => {
     if (song?.lyrics) {
-     setLyrics(song.lyrics);
+      setLyrics(song.lyrics);
     }
   }, [song, song?.lyrics]);
 
   useEffect(() => {
     const handler: ReactEventHandler<HTMLAudioElement> = () => {
       audioLyricsSynchronizer.timeUpdate(audioRef.current.currentTime);
-    }
+    };
 
     const audioRefCurrent = audioRef.current;
     // @ts-ignore

@@ -1,4 +1,4 @@
-import { Box, Container, Title } from '@mantine/core';
+import { Box, Container, Heading } from '@radix-ui/themes';
 import { JobsList } from '@/modules/dashboard/queue-monitor/components/jobs-list.tsx';
 import { Metrics } from '@/modules/dashboard/queue-monitor/components/metrics.tsx';
 
@@ -6,13 +6,14 @@ import { Metrics } from '@/modules/dashboard/queue-monitor/components/metrics.ts
 export function QueueMonitor() {
 
   return (
-    <Container fluid>
-      <Title>Queue monitor</Title>
+    <Container>
+      <Heading mt="3">Queue monitor</Heading>
 
-      <Title ta="center" size="h2" fz="md">Metrics</Title>
+      <Heading align="center" size="2" weight="medium">Metrics</Heading>
+
       <Metrics />
 
-      <Box mt="md">
+      <Box mt="5">
         <JobsList/>
       </Box>
     </Container>

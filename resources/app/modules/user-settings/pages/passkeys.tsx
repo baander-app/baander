@@ -1,24 +1,35 @@
-import { Button, Container, Modal, Title } from '@mantine/core';
+import { Button, Container, Dialog, Heading, Inset } from '@radix-ui/themes';
 import { CreatePasskey } from '@/modules/user-settings/features/passkeys/create-passkey.tsx';
-import { useDisclosure } from '@mantine/hooks';
 
 export function Passkeys() {
-  const [createPasskeyOpen, passkeyModalHandlers] = useDisclosure();
 
   return (
     <>
-      <Container fluid>
-        <Title>Passkeys</Title>
+      <Dialog.Root>
+        <Container>
+          <Heading>Passkeys</Heading>
 
-        <Button onClick={() => passkeyModalHandlers.open()}>Create</Button>
+          <Dialog.Trigger>
+            <Button>Create</Button>
+          </Dialog.Trigger>
 
-      </Container>
+        </Container>
 
-      <Modal opened={createPasskeyOpen} onClose={() => passkeyModalHandlers.close()}>
-        <Modal.Body>
-          <CreatePasskey/>
-        </Modal.Body>
-      </Modal>
+        <Dialog.Content>
+          <Dialog.Title>Create passkey</Dialog.Title>
+
+          <Inset side="x" my="5">
+            <CreatePasskey/>
+          </Inset>
+
+
+          <Dialog.Close>
+            <Button variant="soft" color="gray">
+              Close
+            </Button>
+          </Dialog.Close>
+        </Dialog.Content>
+      </Dialog.Root>
     </>
   );
 }

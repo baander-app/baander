@@ -34,7 +34,7 @@ class JsonPaginatorExtension extends TypeToSchemaExtension
 
         $type = new OpenApiObjectType;
 
-        $type->addProperty('data', (new ArrayType())->setItems($collectingType))
+        $type->addProperty('data', (new ArrayType)->setItems($collectingType))
             ->addProperty('total', (new IntegerType)->setDescription('Total number of items being paginated.'))
             ->addProperty('count', (new IntegerType)->setDescription('The number of items for the current page'))
             ->addProperty('limit', (new IntegerType)->setDescription('The number of items per page'))

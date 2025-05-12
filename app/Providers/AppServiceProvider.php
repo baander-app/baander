@@ -5,11 +5,12 @@ namespace App\Providers;
 use App\Baander;
 use App\Repositories\Cache\CacheRepositoryInterface;
 use App\Repositories\Cache\LaravelCacheRepository;
+use Baander\RedisStack\RedisStack;
 use Ergebnis\Clock\SystemClock;
 use GuzzleHttp\Client;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\{DB, Log, URL};
+use Illuminate\Support\Facades\{DB, Log, Redis, URL};
 use Illuminate\Support\ServiceProvider;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\ImageManager;
@@ -34,6 +35,10 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->scoped(ImageManager::class, function () {
             return new ImageManager(new Driver());
+        });
+
+        $this->app->scoped(RedisStack::class, function (Application $app) {
+            return new RedisStack(Redis::connection()->client());
         });
 
         $this->app->scoped(MusicBrainz::class, function (Application $app) {

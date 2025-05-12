@@ -12,6 +12,16 @@
     cursor: pointer;
 }
 
+.activeItem {
+    background-color: #ccc;
+}
+
+@media (prefers-color-scheme: dark) {
+    .activeItem {
+        background-color: #333;
+    }
+}
+
 .scrollbar {
     --sb-track-color: 'transparent';
     --sb-thumb-color: #828282;

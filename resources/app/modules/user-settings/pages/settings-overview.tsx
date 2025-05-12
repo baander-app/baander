@@ -1,41 +1,32 @@
 import { SettingsPageLayout } from '@/modules/user-settings/layouts/settings-page-layout.tsx';
-import { LinkButton } from '@/ui/link-button.tsx';
-import { Box, Container } from '@mantine/core';
+import { Box, Button } from '@radix-ui/themes';
 import { DevPanel } from '@/modules/user-settings/features/dev-panel.tsx';
-import { useAppDispatch } from '@/store/hooks.ts';
-import styles from '@/layouts/root-layout/components/user-menu.module.scss';
+import { useAppDispatch, useAppSelector } from '@/store/hooks.ts';
 import { logoutUser } from '@/store/users/auth-slice.ts';
+import { setTheme } from '@/store/users/ui-slice.ts';
 
 export function SettingsOverview() {
+  const { theme } = useAppSelector(state => state.ui);
   const dispatch = useAppDispatch();
+
+  const toggleTheme = () => {
+    dispatch(setTheme(theme === 'light' ? 'dark' : 'light'));
+  }
 
   return (
     <SettingsPageLayout title="Settings">
+      <a href="#" onClick={() => dispatch(logoutUser())}>
+        <span>Logout</span>
+      </a>
 
-      <Container>
-        <Box mt="xl">
-          <LinkButton to="passkeys">
-            Passkeys
-          </LinkButton>
-        </Box>
+      <Box>
+        <Button onClick={() => toggleTheme()}>Toggle Theme</Button>
+      </Box>
 
-        <Box mt="xl">
-          <LinkButton to="sessions">
-            Sessions
-          </LinkButton>
-        </Box>
-
-        <Box mt="xl">
-          <a className={styles.link} href="#" onClick={() => dispatch(logoutUser())}>
-            <span>Logout</span>
-          </a>
-        </Box>
-
-        <Box mt="xl">
-          <DevPanel/>
-        </Box>
-      </Container>
+      <Box mt="2">
+        <DevPanel/>
+      </Box>
 
     </SettingsPageLayout>
-  )
+  );
 }

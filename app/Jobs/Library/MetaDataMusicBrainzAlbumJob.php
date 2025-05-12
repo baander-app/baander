@@ -11,6 +11,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use MusicBrainz\Filter\PageFilter;
 use MusicBrainz\Filter\Search\ReleaseFilter;
 use MusicBrainz\MusicBrainz;
@@ -43,7 +44,7 @@ class MetaDataMusicBrainzAlbumJob extends BaseJob implements ShouldQueue
         try {
             $artistList = $musicBrainz->api()->search()->release($releaseFilter, $pageFilter);
         } catch (\Throwable $e) {
-            $this->logger()->warning($e->getMessage());
+            Log::warning($e->getMessage());
             $this->delete();
             return;
         }
