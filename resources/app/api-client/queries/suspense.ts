@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryOptions, useSuspenseQuery } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, OpCacheService, PasskeyService, PendingJobsService, QueueMetricsService, QueueService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
+import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
 import * as Common from "./common";
 /**
 * Get a collection of albums
@@ -349,6 +349,30 @@ export const useOpCacheServiceGetApiOpcacheConfigSuspense = <TData = Common.OpCa
 export const usePendingJobsServiceGetHorizonApiJobsPendingSuspense = <TData = Common.PendingJobsServiceGetHorizonApiJobsPendingDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ startingAt }: {
   startingAt?: string;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UsePendingJobsServiceGetHorizonApiJobsPendingKeyFn({ startingAt }, queryKey), queryFn: () => PendingJobsService.getHorizonApiJobsPending({ startingAt }) as TData, ...options });
+/**
+* Get a collection of playlists
+* @returns unknown Paginated set of `PlaylistResource`
+* @throws ApiError
+*/
+export const usePlaylistServiceGetApiPlaylistsSuspense = <TData = Common.PlaylistServiceGetApiPlaylistsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UsePlaylistServiceGetApiPlaylistsKeyFn(queryKey), queryFn: () => PlaylistService.getApiPlaylists() as TData, ...options });
+/**
+* @param data The data for the request.
+* @param data.playlist The playlist public id
+* @returns PlaylistResource `PlaylistResource`
+* @throws ApiError
+*/
+export const usePlaylistServiceGetApiPlaylistsByPlaylistSuspense = <TData = Common.PlaylistServiceGetApiPlaylistsByPlaylistDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ playlist }: {
+  playlist: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UsePlaylistServiceGetApiPlaylistsByPlaylistKeyFn({ playlist }, queryKey), queryFn: () => PlaylistService.getApiPlaylistsByPlaylist({ playlist }) as TData, ...options });
+/**
+* @param data The data for the request.
+* @param data.playlist The playlist public id
+* @returns PlaylistStatistic `PlaylistStatistic`
+* @throws ApiError
+*/
+export const usePlaylistServiceGetApiPlaylistsByPlaylistStatisticsSuspense = <TData = Common.PlaylistServiceGetApiPlaylistsByPlaylistStatisticsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ playlist }: {
+  playlist: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UsePlaylistServiceGetApiPlaylistsByPlaylistStatisticsKeyFn({ playlist }, queryKey), queryFn: () => PlaylistService.getApiPlaylistsByPlaylistStatistics({ playlist }) as TData, ...options });
 /**
 * Get a collection of monitor entries
 * @param data The data for the request.

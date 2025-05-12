@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, OpCacheService, PasskeyService, PendingJobsService, QueueMetricsService, QueueService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
+import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
 import * as Common from "./common";
 /**
 * Get a collection of albums
@@ -349,6 +349,30 @@ export const prefetchUseOpCacheServiceGetApiOpcacheConfig = (queryClient: QueryC
 export const prefetchUsePendingJobsServiceGetHorizonApiJobsPending = (queryClient: QueryClient, { startingAt }: {
   startingAt?: string;
 } = {}) => queryClient.prefetchQuery({ queryKey: Common.UsePendingJobsServiceGetHorizonApiJobsPendingKeyFn({ startingAt }), queryFn: () => PendingJobsService.getHorizonApiJobsPending({ startingAt }) });
+/**
+* Get a collection of playlists
+* @returns unknown Paginated set of `PlaylistResource`
+* @throws ApiError
+*/
+export const prefetchUsePlaylistServiceGetApiPlaylists = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UsePlaylistServiceGetApiPlaylistsKeyFn(), queryFn: () => PlaylistService.getApiPlaylists() });
+/**
+* @param data The data for the request.
+* @param data.playlist The playlist public id
+* @returns PlaylistResource `PlaylistResource`
+* @throws ApiError
+*/
+export const prefetchUsePlaylistServiceGetApiPlaylistsByPlaylist = (queryClient: QueryClient, { playlist }: {
+  playlist: string;
+}) => queryClient.prefetchQuery({ queryKey: Common.UsePlaylistServiceGetApiPlaylistsByPlaylistKeyFn({ playlist }), queryFn: () => PlaylistService.getApiPlaylistsByPlaylist({ playlist }) });
+/**
+* @param data The data for the request.
+* @param data.playlist The playlist public id
+* @returns PlaylistStatistic `PlaylistStatistic`
+* @throws ApiError
+*/
+export const prefetchUsePlaylistServiceGetApiPlaylistsByPlaylistStatistics = (queryClient: QueryClient, { playlist }: {
+  playlist: string;
+}) => queryClient.prefetchQuery({ queryKey: Common.UsePlaylistServiceGetApiPlaylistsByPlaylistStatisticsKeyFn({ playlist }), queryFn: () => PlaylistService.getApiPlaylistsByPlaylistStatistics({ playlist }) });
 /**
 * Get a collection of monitor entries
 * @param data The data for the request.

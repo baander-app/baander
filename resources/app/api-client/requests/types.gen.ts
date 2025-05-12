@@ -62,6 +62,23 @@ export type CreateLibraryRequest = {
     order: number;
 };
 
+export type CreatePlaylistRequest = {
+    name: string;
+    description?: string | null;
+    is_public?: boolean;
+};
+
+export type CreateSmartPlaylistRequest = {
+    name: string;
+    description?: string | null;
+    is_public?: boolean;
+    rules: Array<Array<{
+        field: string;
+        operator: string;
+        value: string;
+    }>>;
+};
+
 export type CreateUserRequest = {
     name: string;
     email: string;
@@ -212,6 +229,43 @@ export type PersonalAccessTokenViewResource = {
     updatedAt: string | null;
 };
 
+export type PlaylistResource = {
+    id: string;
+    name: string;
+    description: string | null;
+    isPublic: string;
+    isCollaborative: string;
+    isSmart: string;
+    smartRules?: Array<unknown> | null;
+    cover?: ImageResource;
+    createdAt: string | null;
+    updatedAt: string | null;
+    songsCount?: number;
+    statistics?: {
+        views: number;
+        plays: number;
+        shares: number;
+        favorites: number;
+    };
+    songs?: Array<SongResource>;
+    owner?: {
+        email: string;
+        name: string;
+    };
+    collaborators?: string;
+};
+
+export type PlaylistStatistic = {
+    id: number;
+    playlist_id: number;
+    views: number;
+    plays: number;
+    shares: number;
+    favorites: number;
+    created_at: string | null;
+    updated_at: string | null;
+};
+
 export type QueueMonitorResource = {
     id: number;
     job_id: string;
@@ -304,6 +358,20 @@ export type UpdateLibraryRequest = {
     path?: string;
     type?: LibraryType;
     order?: number;
+};
+
+export type UpdatePlaylistRequest = {
+    name?: string;
+    description?: string | null;
+    is_public?: boolean;
+};
+
+export type UpdateSmartPlaylistRulesRequest = {
+    rules: Array<Array<{
+        field: string;
+        operator: string;
+        value: string;
+    }>>;
 };
 
 export type UpdateUserRequest = {
@@ -985,6 +1053,240 @@ export type GetHorizonApiJobsPendingData = {
 export type GetHorizonApiJobsPendingResponse = {
     jobs: string;
     total: string;
+};
+
+export type GetApiPlaylistsResponse = {
+    data: Array<PlaylistResource>;
+    meta: {
+        /**
+         * Total number of items being paginated.
+         */
+        total: number;
+        /**
+         * The number of items for the current page
+         */
+        count: number;
+        /**
+         * The number of items per page
+         */
+        limit: number;
+        /**
+         * The number of current page
+         */
+        currentPage: number;
+        /**
+         * The number of next page
+         */
+        nextPage: number;
+        /**
+         * The number of last page
+         */
+        lastPage: number;
+    };
+    links: {
+        first: string | null;
+        last: string | null;
+        prev: string | null;
+        next: string | null;
+    };
+};
+
+export type PostApiPlaylistsData = {
+    requestBody: CreatePlaylistRequest;
+};
+
+export type PostApiPlaylistsResponse = PlaylistResource;
+
+export type GetApiPlaylistsByPlaylistData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+};
+
+export type GetApiPlaylistsByPlaylistResponse = PlaylistResource;
+
+export type PutApiPlaylistsByPlaylistData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+    requestBody?: UpdatePlaylistRequest;
+};
+
+export type PutApiPlaylistsByPlaylistResponse = PlaylistResource;
+
+export type DeleteApiPlaylistsByPlaylistData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+};
+
+export type DeleteApiPlaylistsByPlaylistResponse = void;
+
+export type PostApiPlaylistsByPlaylistSongsBySongData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+    /**
+     * The song public id
+     */
+    song: string;
+};
+
+export type PostApiPlaylistsByPlaylistSongsBySongResponse = {
+    message: string;
+};
+
+export type DeleteApiPlaylistsByPlaylistSongsBySongData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+    /**
+     * The song public id
+     */
+    song: string;
+};
+
+export type DeleteApiPlaylistsByPlaylistSongsBySongResponse = {
+    message: string;
+};
+
+export type PostApiPlaylistsByPlaylistReorderData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+    requestBody: {
+        song_ids: Array<(number)>;
+    };
+};
+
+export type PostApiPlaylistsByPlaylistReorderResponse = {
+    message: string;
+};
+
+export type PostApiPlaylistsByPlaylistCollaboratorsData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+    requestBody: {
+        user_id: number;
+        role?: 'editor' | 'contributor';
+    };
+};
+
+export type PostApiPlaylistsByPlaylistCollaboratorsResponse = {
+    message: string;
+};
+
+export type DeleteApiPlaylistsByPlaylistCollaboratorsByUserData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+    /**
+     * The user ID
+     */
+    user: number;
+};
+
+export type DeleteApiPlaylistsByPlaylistCollaboratorsByUserResponse = {
+    message: string;
+};
+
+export type PostApiPlaylistsByPlaylistCloneData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+};
+
+export type PostApiPlaylistsByPlaylistCloneResponse = PlaylistResource;
+
+export type GetApiPlaylistsByPlaylistStatisticsData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+};
+
+export type GetApiPlaylistsByPlaylistStatisticsResponse = PlaylistStatistic;
+
+export type PostApiPlaylistsByPlaylistStatisticsRecordViewData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+};
+
+export type PostApiPlaylistsByPlaylistStatisticsRecordViewResponse = {
+    message: string;
+};
+
+export type PostApiPlaylistsByPlaylistStatisticsRecordPlayData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+};
+
+export type PostApiPlaylistsByPlaylistStatisticsRecordPlayResponse = {
+    message: string;
+};
+
+export type PostApiPlaylistsByPlaylistStatisticsRecordShareData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+};
+
+export type PostApiPlaylistsByPlaylistStatisticsRecordShareResponse = {
+    message: string;
+};
+
+export type PostApiPlaylistsByPlaylistStatisticsRecordFavoriteData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+};
+
+export type PostApiPlaylistsByPlaylistStatisticsRecordFavoriteResponse = {
+    message: string;
+};
+
+export type PostApiPlaylistsByPlaylistSmartData = {
+    playlist: string;
+    requestBody: CreateSmartPlaylistRequest;
+};
+
+export type PostApiPlaylistsByPlaylistSmartResponse = PlaylistResource;
+
+export type PutApiPlaylistsByPlaylistSmartData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+    requestBody: UpdateSmartPlaylistRulesRequest;
+};
+
+export type PutApiPlaylistsByPlaylistSmartResponse = PlaylistResource;
+
+export type PostApiPlaylistsByPlaylistSmartSyncData = {
+    /**
+     * The playlist public id
+     */
+    playlist: string;
+};
+
+export type PostApiPlaylistsByPlaylistSmartSyncResponse = {
+    message: string;
 };
 
 export type GetApiQueueMetricsData = {
@@ -2842,6 +3144,813 @@ export type $OpenApiTs = {
                 200: {
                     jobs: string;
                     total: string;
+                };
+            };
+        };
+    };
+    '/api/playlists': {
+        get: {
+            res: {
+                /**
+                 * Paginated set of `PlaylistResource`
+                 */
+                200: {
+                    data: Array<PlaylistResource>;
+                    meta: {
+                        /**
+                         * Total number of items being paginated.
+                         */
+                        total: number;
+                        /**
+                         * The number of items for the current page
+                         */
+                        count: number;
+                        /**
+                         * The number of items per page
+                         */
+                        limit: number;
+                        /**
+                         * The number of current page
+                         */
+                        currentPage: number;
+                        /**
+                         * The number of next page
+                         */
+                        nextPage: number;
+                        /**
+                         * The number of last page
+                         */
+                        lastPage: number;
+                    };
+                    links: {
+                        first: string | null;
+                        last: string | null;
+                        prev: string | null;
+                        next: string | null;
+                    };
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+        post: {
+            req: PostApiPlaylistsData;
+            res: {
+                /**
+                 * `PlaylistResource`
+                 */
+                200: PlaylistResource;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}': {
+        get: {
+            req: GetApiPlaylistsByPlaylistData;
+            res: {
+                /**
+                 * `PlaylistResource`
+                 */
+                200: PlaylistResource;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+        put: {
+            req: PutApiPlaylistsByPlaylistData;
+            res: {
+                /**
+                 * `PlaylistResource`
+                 */
+                200: PlaylistResource;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+            };
+        };
+        delete: {
+            req: DeleteApiPlaylistsByPlaylistData;
+            res: {
+                /**
+                 * No content
+                 */
+                204: void;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/songs/{song}': {
+        post: {
+            req: PostApiPlaylistsByPlaylistSongsBySongData;
+            res: {
+                200: {
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+        delete: {
+            req: DeleteApiPlaylistsByPlaylistSongsBySongData;
+            res: {
+                200: {
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/reorder': {
+        post: {
+            req: PostApiPlaylistsByPlaylistReorderData;
+            res: {
+                200: {
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/collaborators': {
+        post: {
+            req: PostApiPlaylistsByPlaylistCollaboratorsData;
+            res: {
+                200: {
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/collaborators/{user}': {
+        delete: {
+            req: DeleteApiPlaylistsByPlaylistCollaboratorsByUserData;
+            res: {
+                200: {
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/clone': {
+        post: {
+            req: PostApiPlaylistsByPlaylistCloneData;
+            res: {
+                /**
+                 * `PlaylistResource`
+                 */
+                200: PlaylistResource;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/statistics': {
+        get: {
+            req: GetApiPlaylistsByPlaylistStatisticsData;
+            res: {
+                /**
+                 * `PlaylistStatistic`
+                 */
+                200: PlaylistStatistic;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/statistics/record/view': {
+        post: {
+            req: PostApiPlaylistsByPlaylistStatisticsRecordViewData;
+            res: {
+                200: {
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/statistics/record/play': {
+        post: {
+            req: PostApiPlaylistsByPlaylistStatisticsRecordPlayData;
+            res: {
+                200: {
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/statistics/record/share': {
+        post: {
+            req: PostApiPlaylistsByPlaylistStatisticsRecordShareData;
+            res: {
+                200: {
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/statistics/record/favorite': {
+        post: {
+            req: PostApiPlaylistsByPlaylistStatisticsRecordFavoriteData;
+            res: {
+                200: {
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/smart': {
+        post: {
+            req: PostApiPlaylistsByPlaylistSmartData;
+            res: {
+                /**
+                 * `PlaylistResource`
+                 */
+                200: PlaylistResource;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+            };
+        };
+        put: {
+            req: PutApiPlaylistsByPlaylistSmartData;
+            res: {
+                /**
+                 * `PlaylistResource`
+                 */
+                200: PlaylistResource;
+                /**
+                 * An error
+                 */
+                400: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+            };
+        };
+    };
+    '/api/playlists/{playlist}/smart/sync': {
+        post: {
+            req: PostApiPlaylistsByPlaylistSmartSyncData;
+            res: {
+                200: {
+                    message: string;
+                };
+                /**
+                 * An error
+                 */
+                400: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
                 };
             };
         };

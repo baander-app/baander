@@ -1,8 +1,8 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { useMutation, UseMutationOptions, useQuery, UseQueryOptions } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, OpCacheService, PasskeyService, PendingJobsService, QueueMetricsService, QueueService, RetryService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
-import { AuthenticateUsingPasskeyRequest, CreateLibraryRequest, CreateUserRequest, ForgotPasswordRequest, LoginRequest, LogoutRequest, RegisterRequest, ResetPasswordRequest, RetryJobRequest, StartStreamRequest, StorePasskeyRequest, UpdateGenreRequest, UpdateLibraryRequest, UpdateUserRequest } from "../requests/types.gen";
+import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, RetryService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
+import { AuthenticateUsingPasskeyRequest, CreateLibraryRequest, CreatePlaylistRequest, CreateSmartPlaylistRequest, CreateUserRequest, ForgotPasswordRequest, LoginRequest, LogoutRequest, RegisterRequest, ResetPasswordRequest, RetryJobRequest, StartStreamRequest, StorePasskeyRequest, UpdateGenreRequest, UpdateLibraryRequest, UpdatePlaylistRequest, UpdateSmartPlaylistRulesRequest, UpdateUserRequest } from "../requests/types.gen";
 import * as Common from "./common";
 /**
 * Get a collection of albums
@@ -350,6 +350,30 @@ export const useOpCacheServiceGetApiOpcacheConfig = <TData = Common.OpCacheServi
 export const usePendingJobsServiceGetHorizonApiJobsPending = <TData = Common.PendingJobsServiceGetHorizonApiJobsPendingDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ startingAt }: {
   startingAt?: string;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePendingJobsServiceGetHorizonApiJobsPendingKeyFn({ startingAt }, queryKey), queryFn: () => PendingJobsService.getHorizonApiJobsPending({ startingAt }) as TData, ...options });
+/**
+* Get a collection of playlists
+* @returns unknown Paginated set of `PlaylistResource`
+* @throws ApiError
+*/
+export const usePlaylistServiceGetApiPlaylists = <TData = Common.PlaylistServiceGetApiPlaylistsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePlaylistServiceGetApiPlaylistsKeyFn(queryKey), queryFn: () => PlaylistService.getApiPlaylists() as TData, ...options });
+/**
+* @param data The data for the request.
+* @param data.playlist The playlist public id
+* @returns PlaylistResource `PlaylistResource`
+* @throws ApiError
+*/
+export const usePlaylistServiceGetApiPlaylistsByPlaylist = <TData = Common.PlaylistServiceGetApiPlaylistsByPlaylistDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ playlist }: {
+  playlist: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePlaylistServiceGetApiPlaylistsByPlaylistKeyFn({ playlist }, queryKey), queryFn: () => PlaylistService.getApiPlaylistsByPlaylist({ playlist }) as TData, ...options });
+/**
+* @param data The data for the request.
+* @param data.playlist The playlist public id
+* @returns PlaylistStatistic `PlaylistStatistic`
+* @throws ApiError
+*/
+export const usePlaylistServiceGetApiPlaylistsByPlaylistStatistics = <TData = Common.PlaylistServiceGetApiPlaylistsByPlaylistStatisticsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ playlist }: {
+  playlist: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePlaylistServiceGetApiPlaylistsByPlaylistStatisticsKeyFn({ playlist }, queryKey), queryFn: () => PlaylistService.getApiPlaylistsByPlaylistStatistics({ playlist }) as TData, ...options });
 /**
 * Get a collection of monitor entries
 * @param data The data for the request.
@@ -774,6 +798,139 @@ export const useOpCacheServicePostApiOpcacheCompile = <TData = Common.OpCacheSer
   force?: string;
 }, TContext>({ mutationFn: ({ force }) => OpCacheService.postApiOpcacheCompile({ force }) as unknown as Promise<TData>, ...options });
 /**
+* @param data The data for the request.
+* @param data.requestBody
+* @returns PlaylistResource `PlaylistResource`
+* @throws ApiError
+*/
+export const usePlaylistServicePostApiPlaylists = <TData = Common.PlaylistServicePostApiPlaylistsMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: CreatePlaylistRequest;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: CreatePlaylistRequest;
+}, TContext>({ mutationFn: ({ requestBody }) => PlaylistService.postApiPlaylists({ requestBody }) as unknown as Promise<TData>, ...options });
+/**
+* @param data The data for the request.
+* @param data.playlist The playlist public id
+* @param data.song The song public id
+* @returns unknown
+* @throws ApiError
+*/
+export const usePlaylistServicePostApiPlaylistsByPlaylistSongsBySong = <TData = Common.PlaylistServicePostApiPlaylistsByPlaylistSongsBySongMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  playlist: string;
+  song: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  playlist: string;
+  song: string;
+}, TContext>({ mutationFn: ({ playlist, song }) => PlaylistService.postApiPlaylistsByPlaylistSongsBySong({ playlist, song }) as unknown as Promise<TData>, ...options });
+/**
+* @param data The data for the request.
+* @param data.playlist The playlist public id
+* @param data.requestBody
+* @returns unknown
+* @throws ApiError
+*/
+export const usePlaylistServicePostApiPlaylistsByPlaylistReorder = <TData = Common.PlaylistServicePostApiPlaylistsByPlaylistReorderMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  playlist: string;
+  requestBody: { song_ids: Array<(number)>; };
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  playlist: string;
+  requestBody: { song_ids: Array<(number)>; };
+}, TContext>({ mutationFn: ({ playlist, requestBody }) => PlaylistService.postApiPlaylistsByPlaylistReorder({ playlist, requestBody }) as unknown as Promise<TData>, ...options });
+/**
+* @param data The data for the request.
+* @param data.playlist The playlist public id
+* @param data.requestBody
+* @returns unknown
+* @throws ApiError
+*/
+export const usePlaylistServicePostApiPlaylistsByPlaylistCollaborators = <TData = Common.PlaylistServicePostApiPlaylistsByPlaylistCollaboratorsMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  playlist: string;
+  requestBody: { user_id: number; role?: "editor" | "contributor"; };
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  playlist: string;
+  requestBody: { user_id: number; role?: "editor" | "contributor"; };
+}, TContext>({ mutationFn: ({ playlist, requestBody }) => PlaylistService.postApiPlaylistsByPlaylistCollaborators({ playlist, requestBody }) as unknown as Promise<TData>, ...options });
+/**
+* @param data The data for the request.
+* @param data.playlist The playlist public id
+* @returns PlaylistResource `PlaylistResource`
+* @throws ApiError
+*/
+export const usePlaylistServicePostApiPlaylistsByPlaylistClone = <TData = Common.PlaylistServicePostApiPlaylistsByPlaylistCloneMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  playlist: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  playlist: string;
+}, TContext>({ mutationFn: ({ playlist }) => PlaylistService.postApiPlaylistsByPlaylistClone({ playlist }) as unknown as Promise<TData>, ...options });
+/**
+* @param data The data for the request.
+* @param data.playlist The playlist public id
+* @returns unknown
+* @throws ApiError
+*/
+export const usePlaylistServicePostApiPlaylistsByPlaylistStatisticsRecordView = <TData = Common.PlaylistServicePostApiPlaylistsByPlaylistStatisticsRecordViewMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  playlist: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  playlist: string;
+}, TContext>({ mutationFn: ({ playlist }) => PlaylistService.postApiPlaylistsByPlaylistStatisticsRecordView({ playlist }) as unknown as Promise<TData>, ...options });
+/**
+* @param data The data for the request.
+* @param data.playlist The playlist public id
+* @returns unknown
+* @throws ApiError
+*/
+export const usePlaylistServicePostApiPlaylistsByPlaylistStatisticsRecordPlay = <TData = Common.PlaylistServicePostApiPlaylistsByPlaylistStatisticsRecordPlayMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  playlist: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  playlist: string;
+}, TContext>({ mutationFn: ({ playlist }) => PlaylistService.postApiPlaylistsByPlaylistStatisticsRecordPlay({ playlist }) as unknown as Promise<TData>, ...options });
+/**
+* @param data The data for the request.
+* @param data.playlist The playlist public id
+* @returns unknown
+* @throws ApiError
+*/
+export const usePlaylistServicePostApiPlaylistsByPlaylistStatisticsRecordShare = <TData = Common.PlaylistServicePostApiPlaylistsByPlaylistStatisticsRecordShareMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  playlist: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  playlist: string;
+}, TContext>({ mutationFn: ({ playlist }) => PlaylistService.postApiPlaylistsByPlaylistStatisticsRecordShare({ playlist }) as unknown as Promise<TData>, ...options });
+/**
+* @param data The data for the request.
+* @param data.playlist The playlist public id
+* @returns unknown
+* @throws ApiError
+*/
+export const usePlaylistServicePostApiPlaylistsByPlaylistStatisticsRecordFavorite = <TData = Common.PlaylistServicePostApiPlaylistsByPlaylistStatisticsRecordFavoriteMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  playlist: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  playlist: string;
+}, TContext>({ mutationFn: ({ playlist }) => PlaylistService.postApiPlaylistsByPlaylistStatisticsRecordFavorite({ playlist }) as unknown as Promise<TData>, ...options });
+/**
+* @param data The data for the request.
+* @param data.playlist
+* @param data.requestBody
+* @returns PlaylistResource `PlaylistResource`
+* @throws ApiError
+*/
+export const usePlaylistServicePostApiPlaylistsByPlaylistSmart = <TData = Common.PlaylistServicePostApiPlaylistsByPlaylistSmartMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  playlist: string;
+  requestBody: CreateSmartPlaylistRequest;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  playlist: string;
+  requestBody: CreateSmartPlaylistRequest;
+}, TContext>({ mutationFn: ({ playlist, requestBody }) => PlaylistService.postApiPlaylistsByPlaylistSmart({ playlist, requestBody }) as unknown as Promise<TData>, ...options });
+/**
+* @param data The data for the request.
+* @param data.playlist The playlist public id
+* @returns unknown
+* @throws ApiError
+*/
+export const usePlaylistServicePostApiPlaylistsByPlaylistSmartSync = <TData = Common.PlaylistServicePostApiPlaylistsByPlaylistSmartSyncMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  playlist: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  playlist: string;
+}, TContext>({ mutationFn: ({ playlist }) => PlaylistService.postApiPlaylistsByPlaylistSmartSync({ playlist }) as unknown as Promise<TData>, ...options });
+/**
 * Retry a job
 * @param data The data for the request.
 * @param data.id
@@ -849,6 +1006,34 @@ export const useUserServicePostApiUsers = <TData = Common.UserServicePostApiUser
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   requestBody: CreateUserRequest;
 }, TContext>({ mutationFn: ({ requestBody }) => UserService.postApiUsers({ requestBody }) as unknown as Promise<TData>, ...options });
+/**
+* @param data The data for the request.
+* @param data.playlist The playlist public id
+* @param data.requestBody
+* @returns PlaylistResource `PlaylistResource`
+* @throws ApiError
+*/
+export const usePlaylistServicePutApiPlaylistsByPlaylist = <TData = Common.PlaylistServicePutApiPlaylistsByPlaylistMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  playlist: string;
+  requestBody?: UpdatePlaylistRequest;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  playlist: string;
+  requestBody?: UpdatePlaylistRequest;
+}, TContext>({ mutationFn: ({ playlist, requestBody }) => PlaylistService.putApiPlaylistsByPlaylist({ playlist, requestBody }) as unknown as Promise<TData>, ...options });
+/**
+* @param data The data for the request.
+* @param data.playlist The playlist public id
+* @param data.requestBody
+* @returns PlaylistResource `PlaylistResource`
+* @throws ApiError
+*/
+export const usePlaylistServicePutApiPlaylistsByPlaylistSmart = <TData = Common.PlaylistServicePutApiPlaylistsByPlaylistSmartMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  playlist: string;
+  requestBody: UpdateSmartPlaylistRulesRequest;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  playlist: string;
+  requestBody: UpdateSmartPlaylistRulesRequest;
+}, TContext>({ mutationFn: ({ playlist, requestBody }) => PlaylistService.putApiPlaylistsByPlaylistSmart({ playlist, requestBody }) as unknown as Promise<TData>, ...options });
 /**
 * Update a genre
 * @param data The data for the request.
@@ -952,6 +1137,45 @@ export const useMonitoringServiceDeleteHorizonApiMonitoringByTag = <TData = Comm
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   tag: string;
 }, TContext>({ mutationFn: ({ tag }) => MonitoringService.deleteHorizonApiMonitoringByTag({ tag }) as unknown as Promise<TData>, ...options });
+/**
+* @param data The data for the request.
+* @param data.playlist The playlist public id
+* @returns void No content
+* @throws ApiError
+*/
+export const usePlaylistServiceDeleteApiPlaylistsByPlaylist = <TData = Common.PlaylistServiceDeleteApiPlaylistsByPlaylistMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  playlist: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  playlist: string;
+}, TContext>({ mutationFn: ({ playlist }) => PlaylistService.deleteApiPlaylistsByPlaylist({ playlist }) as unknown as Promise<TData>, ...options });
+/**
+* @param data The data for the request.
+* @param data.playlist The playlist public id
+* @param data.song The song public id
+* @returns unknown
+* @throws ApiError
+*/
+export const usePlaylistServiceDeleteApiPlaylistsByPlaylistSongsBySong = <TData = Common.PlaylistServiceDeleteApiPlaylistsByPlaylistSongsBySongMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  playlist: string;
+  song: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  playlist: string;
+  song: string;
+}, TContext>({ mutationFn: ({ playlist, song }) => PlaylistService.deleteApiPlaylistsByPlaylistSongsBySong({ playlist, song }) as unknown as Promise<TData>, ...options });
+/**
+* @param data The data for the request.
+* @param data.playlist The playlist public id
+* @param data.user The user ID
+* @returns unknown
+* @throws ApiError
+*/
+export const usePlaylistServiceDeleteApiPlaylistsByPlaylistCollaboratorsByUser = <TData = Common.PlaylistServiceDeleteApiPlaylistsByPlaylistCollaboratorsByUserMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  playlist: string;
+  user: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  playlist: string;
+  user: number;
+}, TContext>({ mutationFn: ({ playlist, user }) => PlaylistService.deleteApiPlaylistsByPlaylistCollaboratorsByUser({ playlist, user }) as unknown as Promise<TData>, ...options });
 /**
 * Delete by id
 * @param data The data for the request.

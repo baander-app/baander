@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, OpCacheService, PasskeyService, PendingJobsService, QueueMetricsService, QueueService, RetryService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
+import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, RetryService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
 export type AlbumServiceGetApiLibrariesByLibraryAlbumsDefaultResponse = Awaited<ReturnType<typeof AlbumService.getApiLibrariesByLibraryAlbums>>;
 export type AlbumServiceGetApiLibrariesByLibraryAlbumsQueryResult<TData = AlbumServiceGetApiLibrariesByLibraryAlbumsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAlbumServiceGetApiLibrariesByLibraryAlbumsKey = "AlbumServiceGetApiLibrariesByLibraryAlbums";
@@ -215,6 +215,22 @@ export const usePendingJobsServiceGetHorizonApiJobsPendingKey = "PendingJobsServ
 export const UsePendingJobsServiceGetHorizonApiJobsPendingKeyFn = ({ startingAt }: {
   startingAt?: string;
 } = {}, queryKey?: Array<unknown>) => [usePendingJobsServiceGetHorizonApiJobsPendingKey, ...(queryKey ?? [{ startingAt }])];
+export type PlaylistServiceGetApiPlaylistsDefaultResponse = Awaited<ReturnType<typeof PlaylistService.getApiPlaylists>>;
+export type PlaylistServiceGetApiPlaylistsQueryResult<TData = PlaylistServiceGetApiPlaylistsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const usePlaylistServiceGetApiPlaylistsKey = "PlaylistServiceGetApiPlaylists";
+export const UsePlaylistServiceGetApiPlaylistsKeyFn = (queryKey?: Array<unknown>) => [usePlaylistServiceGetApiPlaylistsKey, ...(queryKey ?? [])];
+export type PlaylistServiceGetApiPlaylistsByPlaylistDefaultResponse = Awaited<ReturnType<typeof PlaylistService.getApiPlaylistsByPlaylist>>;
+export type PlaylistServiceGetApiPlaylistsByPlaylistQueryResult<TData = PlaylistServiceGetApiPlaylistsByPlaylistDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const usePlaylistServiceGetApiPlaylistsByPlaylistKey = "PlaylistServiceGetApiPlaylistsByPlaylist";
+export const UsePlaylistServiceGetApiPlaylistsByPlaylistKeyFn = ({ playlist }: {
+  playlist: string;
+}, queryKey?: Array<unknown>) => [usePlaylistServiceGetApiPlaylistsByPlaylistKey, ...(queryKey ?? [{ playlist }])];
+export type PlaylistServiceGetApiPlaylistsByPlaylistStatisticsDefaultResponse = Awaited<ReturnType<typeof PlaylistService.getApiPlaylistsByPlaylistStatistics>>;
+export type PlaylistServiceGetApiPlaylistsByPlaylistStatisticsQueryResult<TData = PlaylistServiceGetApiPlaylistsByPlaylistStatisticsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const usePlaylistServiceGetApiPlaylistsByPlaylistStatisticsKey = "PlaylistServiceGetApiPlaylistsByPlaylistStatistics";
+export const UsePlaylistServiceGetApiPlaylistsByPlaylistStatisticsKeyFn = ({ playlist }: {
+  playlist: string;
+}, queryKey?: Array<unknown>) => [usePlaylistServiceGetApiPlaylistsByPlaylistStatisticsKey, ...(queryKey ?? [{ playlist }])];
 export type QueueServiceGetApiQueueMetricsDefaultResponse = Awaited<ReturnType<typeof QueueService.getApiQueueMetrics>>;
 export type QueueServiceGetApiQueueMetricsQueryResult<TData = QueueServiceGetApiQueueMetricsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useQueueServiceGetApiQueueMetricsKey = "QueueServiceGetApiQueueMetrics";
@@ -349,12 +365,25 @@ export type LibraryServicePostApiLibrariesMutationResult = Awaited<ReturnType<ty
 export type MonitoringServicePostHorizonApiMonitoringMutationResult = Awaited<ReturnType<typeof MonitoringService.postHorizonApiMonitoring>>;
 export type OpCacheServicePostApiOpcacheClearMutationResult = Awaited<ReturnType<typeof OpCacheService.postApiOpcacheClear>>;
 export type OpCacheServicePostApiOpcacheCompileMutationResult = Awaited<ReturnType<typeof OpCacheService.postApiOpcacheCompile>>;
+export type PlaylistServicePostApiPlaylistsMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylists>>;
+export type PlaylistServicePostApiPlaylistsByPlaylistSongsBySongMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylistsByPlaylistSongsBySong>>;
+export type PlaylistServicePostApiPlaylistsByPlaylistReorderMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylistsByPlaylistReorder>>;
+export type PlaylistServicePostApiPlaylistsByPlaylistCollaboratorsMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylistsByPlaylistCollaborators>>;
+export type PlaylistServicePostApiPlaylistsByPlaylistCloneMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylistsByPlaylistClone>>;
+export type PlaylistServicePostApiPlaylistsByPlaylistStatisticsRecordViewMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylistsByPlaylistStatisticsRecordView>>;
+export type PlaylistServicePostApiPlaylistsByPlaylistStatisticsRecordPlayMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylistsByPlaylistStatisticsRecordPlay>>;
+export type PlaylistServicePostApiPlaylistsByPlaylistStatisticsRecordShareMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylistsByPlaylistStatisticsRecordShare>>;
+export type PlaylistServicePostApiPlaylistsByPlaylistStatisticsRecordFavoriteMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylistsByPlaylistStatisticsRecordFavorite>>;
+export type PlaylistServicePostApiPlaylistsByPlaylistSmartMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylistsByPlaylistSmart>>;
+export type PlaylistServicePostApiPlaylistsByPlaylistSmartSyncMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylistsByPlaylistSmartSync>>;
 export type QueueServicePostApiQueueMetricsRetryByIdMutationResult = Awaited<ReturnType<typeof QueueService.postApiQueueMetricsRetryById>>;
 export type RetryServicePostHorizonApiJobsRetryByIdMutationResult = Awaited<ReturnType<typeof RetryService.postHorizonApiJobsRetryById>>;
 export type StreamServicePostApiStreamStartMutationResult = Awaited<ReturnType<typeof StreamService.postApiStreamStart>>;
 export type StreamServicePostApiStreamStopMutationResult = Awaited<ReturnType<typeof StreamService.postApiStreamStop>>;
 export type StreamServicePostApiStreamSeekMutationResult = Awaited<ReturnType<typeof StreamService.postApiStreamSeek>>;
 export type UserServicePostApiUsersMutationResult = Awaited<ReturnType<typeof UserService.postApiUsers>>;
+export type PlaylistServicePutApiPlaylistsByPlaylistMutationResult = Awaited<ReturnType<typeof PlaylistService.putApiPlaylistsByPlaylist>>;
+export type PlaylistServicePutApiPlaylistsByPlaylistSmartMutationResult = Awaited<ReturnType<typeof PlaylistService.putApiPlaylistsByPlaylistSmart>>;
 export type GenreServicePatchApiGenresByGenreMutationResult = Awaited<ReturnType<typeof GenreService.patchApiGenresByGenre>>;
 export type LibraryServicePatchApiLibrariesBySlugMutationResult = Awaited<ReturnType<typeof LibraryService.patchApiLibrariesBySlug>>;
 export type UserServicePatchApiUsersByUserMutationResult = Awaited<ReturnType<typeof UserService.patchApiUsersByUser>>;
@@ -363,6 +392,9 @@ export type FoldersServiceDeleteSystemLogViewerApiFoldersByFolderIdentifierMutat
 export type GenreServiceDeleteApiGenresByGenreMutationResult = Awaited<ReturnType<typeof GenreService.deleteApiGenresByGenre>>;
 export type LibraryServiceDeleteApiLibrariesBySlugMutationResult = Awaited<ReturnType<typeof LibraryService.deleteApiLibrariesBySlug>>;
 export type MonitoringServiceDeleteHorizonApiMonitoringByTagMutationResult = Awaited<ReturnType<typeof MonitoringService.deleteHorizonApiMonitoringByTag>>;
+export type PlaylistServiceDeleteApiPlaylistsByPlaylistMutationResult = Awaited<ReturnType<typeof PlaylistService.deleteApiPlaylistsByPlaylist>>;
+export type PlaylistServiceDeleteApiPlaylistsByPlaylistSongsBySongMutationResult = Awaited<ReturnType<typeof PlaylistService.deleteApiPlaylistsByPlaylistSongsBySong>>;
+export type PlaylistServiceDeleteApiPlaylistsByPlaylistCollaboratorsByUserMutationResult = Awaited<ReturnType<typeof PlaylistService.deleteApiPlaylistsByPlaylistCollaboratorsByUser>>;
 export type QueueServiceDeleteApiQueueMetricsByIdMutationResult = Awaited<ReturnType<typeof QueueService.deleteApiQueueMetricsById>>;
 export type QueueServiceDeleteApiQueueMetricsPurgeMutationResult = Awaited<ReturnType<typeof QueueService.deleteApiQueueMetricsPurge>>;
 export type UserServiceDeleteApiUsersByUserMutationResult = Awaited<ReturnType<typeof UserService.deleteApiUsersByUser>>;
