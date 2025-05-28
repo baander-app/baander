@@ -4,7 +4,7 @@ import { lazyImport } from '@/utils/lazy-import';
 import { RootMenu } from '@/layouts/root-layout/components/root-menu';
 import { NotificationArea } from '@/modules/notifications/notification-area.tsx';
 
-const { InlinePlayer } = lazyImport(() => import('@/modules/library-music-player/inline-player/inline-player'), 'InlinePlayer');
+const { InlinePlayer } = lazyImport(() => import('@/modules/library-music-player/inline-player.tsx'), 'InlinePlayer');
 
 export function RootLayout(props: { children?: ReactNode }) {
   return (

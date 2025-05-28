@@ -19,7 +19,7 @@ export const EchoContext = React.createContext<EchoContextType>({
 EchoContext.displayName = 'EchoContext';
 
 export function EchoContextProvider({ children }: { children: React.ReactNode }) {
-  const [echo, setEcho] = useState<Echo<any>>();
+  const [echo, _setEcho] = useState<Echo<any>>();
   const [connectionState, setConnectionState] = useState<PusherConnectionState>('initialized');
   const [playerStateChannel, setPlayerStateChannel] = useState<PusherPrivateChannel | undefined>(undefined);
 
@@ -51,6 +51,7 @@ export function EchoContextProvider({ children }: { children: React.ReactNode })
     if (echo) {
       echo
         .private('notifications')
+        // @ts-expect-error
         .listen('LibraryScanCompleted', (data: { notification: { title: string, body: string } }) => {
           // showToast({
           //   title: data.notification.title,

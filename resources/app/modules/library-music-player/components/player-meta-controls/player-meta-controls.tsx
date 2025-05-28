@@ -12,7 +12,7 @@ import { useEffect } from 'react';
 import { useDisclosure } from '@/hooks/use-disclosure';
 import { Box, Button, Flex } from '@radix-ui/themes';
 import { Iconify } from '@/ui/icons/iconify.tsx';
-import { AudioStatsOverlay, AudioStats } from '@/ui/audio-stats/audio-stats.tsx';
+import { AudioStats } from '@/ui/audio-stats/audio-stats.tsx';
 import { useAudioPlayer } from '@/modules/library-music-player/providers/audio-player-provider.tsx';
 
 export interface PlayerMetaControlsProps {
@@ -44,7 +44,8 @@ export function PlayerMetaControls({ song }: PlayerMetaControlsProps) {
         />
 
         <LyricsButton
-          aria-disabled={song?.lyricsExist ?? false}
+          aria-disabled={song?.lyricsExist === false}
+          className={styles.lyrics}
           onClick={() => {
             song?.lyrics && setLyrics(song.lyrics);
             lyricHandlers.toggle();

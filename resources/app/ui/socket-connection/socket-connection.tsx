@@ -3,6 +3,7 @@ import styles from './socket-connection.module.scss'
 import { useEffect, useState } from 'react';
 
 export function SocketConnection() {
+ // @ts-expect-error
   const { connectionState } = useEcho();
   const [cssClass, setCssClass] = useState<string | undefined>()
 

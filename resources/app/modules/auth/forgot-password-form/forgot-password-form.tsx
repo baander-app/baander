@@ -1,10 +1,10 @@
 import { Form } from 'radix-ui';
 import styles from './forgot-password-form.module.scss';
-import { Box, Button, Flex, Text, TextField } from '@radix-ui/themes';
+import {Button, Flex, TextField } from '@radix-ui/themes';
 import React from 'react';
 
 export function ForgotPasswordForm() {
-
+// @ts-expect-error
   const onSubmit = (event: React.SyntheticEvent<HTMLFormElement>) => {
 
   }

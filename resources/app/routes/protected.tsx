@@ -62,7 +62,7 @@ export const protectedRoutes: RouteObject[] = [
     children: [
       {
         path: '/',
-        element: <Overview />
+        element: <Overview title="Albums" />
       },
       {
         path: '/library/:library/*',

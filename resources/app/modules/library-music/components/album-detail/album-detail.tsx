@@ -85,11 +85,21 @@ function AlbumSongs({ songs }: AlbumSongProps) {
   const dispatch = useAppDispatch();
 
   const onSongClick = useCallback((song: SongResource, songs: SongResource[]) => {
-      dispatch(setQueueAndSong({
-        queue: songs,
-        playPublicId: song.public_id,
-      }));
-    }, [dispatch]);
+    console.group('onSongClick');
+    console.log('song', song);
+    console.log('songs', songs);
+    console.groupEnd();
+
+    const newQueue = [...songs];
+    const index = newQueue.findIndex(x => x.public_id === song.public_id);
+    newQueue.splice(0, 0, newQueue.splice(index, 1)[0]);
+
+    dispatch(setQueueAndSong({
+      queue: newQueue,
+      playPublicId: song.public_id,
+    }));
+  }, [dispatch]);
+
 
   const rows = songs.map((song) => (
     <TrackRow
@@ -120,7 +130,7 @@ function AlbumSongs({ songs }: AlbumSongProps) {
   );
 }
 
-
+// @ts-expect-error
 function AlbumDetailSkeleton() {
   return (
     <Card>

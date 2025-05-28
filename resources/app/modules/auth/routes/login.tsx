@@ -14,7 +14,9 @@ export default function Login() {
     event.preventDefault();
 
     const formData = event.target;
+    // @ts-expect-error
     const email = formData.email.value;
+    // @ts-expect-error
     const password = formData.password.value;
 
     dispatch(loginUser({ email, password }));

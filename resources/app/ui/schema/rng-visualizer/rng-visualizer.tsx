@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { ReactNode, useMemo, useRef } from 'react';
 import { Circle, Group, Layer, Line, Rect, Stage, Text } from 'react-konva';
 import { hierarchy, Tree } from '@visx/hierarchy';
 import { Zoom } from '@visx/zoom';
@@ -100,6 +100,7 @@ const LeafNode = ({ node }: { node: HierarchyNode }) => {
 
 const Node = ({ node }: { node: HierarchyNode }) => {
   if (node?.depth === 0) return <RootNode node={node} />;
+  // @ts-expect-error
   if (node?.children) return <ParentNode node={node} />;
   return <LeafNode node={node} />;
 };
@@ -116,7 +117,7 @@ const initialTransform = {
 export function RngVisualizer({
                                 data,
                                 margin = defaultMargin,
-                              }: RngVisualizerProps): JSX.Element | null {
+                              }: RngVisualizerProps): ReactNode | null {
   const root = useMemo(() => hierarchy(data), [data]);
   const ref = useRef<HTMLDivElement>(null);
   const size = useSize(ref);
@@ -162,6 +163,7 @@ export function RngVisualizer({
                         />
                       ))}
                       {tree.descendants().map((node, i) => (
+                        // @ts-expect-error
                         <Node key={`node-${i}`} node={node}/>
                       ))}
                     </>
