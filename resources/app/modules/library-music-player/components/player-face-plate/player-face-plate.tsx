@@ -1,4 +1,4 @@
-import { Flex, Grid, Text } from '@radix-ui/themes';
+import { Flex, Text } from '@radix-ui/themes';
 import { ProgressBar } from '@/modules/library-music-player/components/progress-bar/progress-bar.tsx';
 import { formatDuration } from '@/utils/time/format-duration.ts';
 import { Cover } from '@/modules/library-music/components/artwork/cover';

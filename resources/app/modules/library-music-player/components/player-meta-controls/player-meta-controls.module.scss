@@ -5,3 +5,21 @@
   height: 100%;
   flex-grow: 1;
 }
+
+.lyrics {
+  background-color: transparent;
+  border: unset;
+  cursor: pointer;
+  color: var(--accent-10);
+  transition: color 150ms ease-in-out;
+
+  &:hover {
+    color: var(--primary-text-hover);
+  }
+
+  &[aria-disabled="true"] {
+    color: var(--gray-4);
+    pointer-events: none;
+    cursor: not-allowed;
+  }
+}

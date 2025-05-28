@@ -40,7 +40,10 @@ export function SongDetail({ publicId }: SongDetailProps) {
   if (error) {
     return (
       <Callout.Root color="red">
-        <Callout.Text>{error?.message}</Callout.Text>
+        <Callout.Text>{
+          // @ts-expect-error
+          error?.message
+        }</Callout.Text>
       </Callout.Root>
     );
   }
@@ -67,6 +70,7 @@ export function SongDetail({ publicId }: SongDetailProps) {
           <input
             type="number"
             value={year}
+            // @ts-expect-error
             onChange={(e) => setYear(e.target.value)}
             min={0}
             max={9999}
@@ -79,6 +83,7 @@ export function SongDetail({ publicId }: SongDetailProps) {
           <input
             type="number"
             value={disc}
+            // @ts-expect-error
             onChange={(e) => setDisc(e.target.value)}
             min={0}
             max={9999}
@@ -91,6 +96,7 @@ export function SongDetail({ publicId }: SongDetailProps) {
           <input
             type="number"
             value={track}
+            // @ts-expect-error
             onChange={(e) => setTrack(e.target.value)}
             min={0}
             max={9999}

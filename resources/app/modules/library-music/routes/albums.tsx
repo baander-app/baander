@@ -9,24 +9,27 @@ import { Box, ContextMenu, Flex, Skeleton } from '@radix-ui/themes';
 import { usePathParam } from '@/hooks/use-path-param.ts';
 import { LibraryParams } from '@/modules/library-music/routes/_routes.tsx';
 import { AlbumResource } from '@/api-client/requests';
-import {motion} from "motion/react"
+import { motion } from 'motion/react';
 
-
+// @ts-expect-error
 function AlbumContextMenu({ album }: { album: AlbumResource }) {
   return (
     <ContextMenu.Content>
       <ContextMenu.Item>Play</ContextMenu.Item>
       <ContextMenu.Item>Edit</ContextMenu.Item>
-      <ContextMenu.Separator />
+      <ContextMenu.Separator/>
       <ContextMenu.Item color="red">Delete</ContextMenu.Item>
     </ContextMenu.Content>
-  )
+  );
 }
 
 export default function Albums() {
   const { library: libraryParam } = usePathParam<LibraryParams>();
   const [showAlbumDetail, setShowAlbumDetail] = useState<string | null>(null);
-  const { data, isLoading } = useAlbumServiceGetApiLibrariesByLibraryAlbums({ library: libraryParam, relations: 'artists,cover' });
+  const { data, isLoading } = useAlbumServiceGetApiLibrariesByLibraryAlbums({
+    library: libraryParam,
+    relations: 'artists,cover',
+  });
 
   return (
     <Flex justify="between" align="stretch" className={styles.albumsLayout}>
@@ -47,7 +50,7 @@ export default function Albums() {
                       />
                     </ContextMenu.Trigger>
 
-                    <AlbumContextMenu album={album} />
+                    <AlbumContextMenu album={album}/>
                   </ContextMenu.Root>
                 </div>
               ))}

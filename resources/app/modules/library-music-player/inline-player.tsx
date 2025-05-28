@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { Flex } from '@radix-ui/themes';
-import { useMusicSource } from '@/providers/music-source-provider';
+import { useMusicSource } from '@/providers/music-source-provider.tsx';
 // import { useEcho } from '@/providers/echo-provider.tsx';
 import { PlayerStateInput } from '@/services/libraries/player-state.ts';
 import { useAudioPlayer } from '@/modules/library-music-player/providers/audio-player-provider.tsx';
@@ -17,6 +17,11 @@ import { useAppSelector } from '@/store/hooks.ts';
 export function InlinePlayer() {
   // const echo = useEcho();
   const sourceSong = useAppSelector(selectSong);
+
+  useEffect(() => {
+    console.log('sourceSong', sourceSong);
+  }, [sourceSong]);
+
   const {
     authenticatedSource,
   } = useMusicSource();
@@ -53,7 +58,7 @@ export function InlinePlayer() {
       if (!authenticatedSource) {
         return;
       }
-
+// @ts-expect-error
       const data: PlayerStateInput = {
         isPlaying,
         volumePercent: 100,

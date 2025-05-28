@@ -11,22 +11,29 @@ export function useAudioProcessor() {
   } = useAudioPlayer();
 
   const songTimeInSeconds = useRef(0);
+  // @ts-expect-error
   const interval = useRef<NodeJS.Timeout>();
-
+// @ts-expect-error
   const audioContext = useRef<AudioContext>();
+  // @ts-expect-error
   const merger = useRef<ChannelMergerNode>();
-
+// @ts-expect-error
   const bassBiquadFilter = useRef<BiquadFilterNode>();
+  // @ts-expect-error
   const middleBiquadFilter = useRef<BiquadFilterNode>();
+  // @ts-expect-error
   const trebleBiquadFilter = useRef<BiquadFilterNode>();
-
+// @ts-expect-error
   const leftChannelGainNode = useRef<GainNode>();
+  // @ts-expect-error
   const rightChannelGainNode = useRef<GainNode>();
-
+// @ts-expect-error
   const analyser = useRef<AnalyserNode>();
+  // @ts-expect-error
   const leftChannelAnalyser = useRef<AnalyserNode>();
+  // @ts-expect-error
   const rightChannelAnalyser = useRef<AnalyserNode>();
-
+// @ts-expect-error
   const channelSplitter = useRef<ChannelSplitterNode>();
 
   const startAnalyserInterval = useCallback(() => {

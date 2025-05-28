@@ -29,10 +29,6 @@
         "*"
       ]
     },
-    "typeRoots": [
-      "./resources/app/types",
-      "./node_modules/@types"
-    ]
   },
   "include": [
     "resources/app"

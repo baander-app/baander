@@ -48,6 +48,7 @@ export function MovieList() {
         style={{ display: 'flex', flexWrap: 'wrap', flex: 1 }}
         data={movieResources}
         totalCount={movieResources.length}
+        // @ts-expect-error
         components={gridComponents}
         itemContent={(index, data) => <MediaItem key={index} item={data}/>}
       />

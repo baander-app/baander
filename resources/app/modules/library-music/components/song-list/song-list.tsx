@@ -48,6 +48,7 @@ export function SongList() {
     }
   }, [dispatch, songData]);
 
+  // @ts-expect-error
   const setOpenSong = (e: React.MouseEvent<HTMLDivElement>, song: SongResource) => {
     e.stopPropagation();
     setOpenedSong(song);

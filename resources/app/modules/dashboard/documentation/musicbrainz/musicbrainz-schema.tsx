@@ -1,5 +1,4 @@
 
-import { RngVisualizer } from '@/ui/schema/rng-visualizer/rng-visualizer.tsx';
 
 export function MusicBrainzSchema() {
   // const { data } = useSchemaServiceSchemaFetchSchema();

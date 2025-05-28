@@ -4,7 +4,11 @@ import { Carousel } from '@/ui/carousel/carousel.tsx';
 import { ReactNode, useEffect, useState } from 'react';
 import { Album } from '@/modules/library-music/components/album';
 
-export function Overview() {
+export interface OverviewProps {
+  title: string;
+}
+
+export function Overview({title}: OverviewProps) {
   const { data } = useAlbumServiceGetApiLibrariesByLibraryAlbums({
     library: 'music',
     relations: 'cover,artists',
@@ -20,11 +24,13 @@ export function Overview() {
 
   return (
     <Flex direction="column" px="3">
-      <Heading mt="3">Overview</Heading>
-
       <Section title="Albums">
+        <Heading mb="2">{title}</Heading>
+
         {albums.length > 0 && (
-          <Carousel slides={albums} options={{
+          <Carousel
+            slides={albums}
+            options={{
             slidesToScroll: 9,
           }}/>
         )}

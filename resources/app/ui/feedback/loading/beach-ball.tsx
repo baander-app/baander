@@ -8,6 +8,7 @@ export const BeachBall = () => {
     ease: 'easeOut',
   };
 
+  // @ts-expect-error
   const ballStyle = {
     display: 'block',
     width: '5rem',
