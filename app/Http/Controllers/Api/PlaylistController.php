@@ -10,6 +10,7 @@ use App\Http\Requests\Playlist\{CreatePlaylistRequest,
     UpdateSmartPlaylistRulesRequest};
 use App\Http\Resources\Playlist\PlaylistResource;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Auth;
 use App\Models\{Playlist, PlaylistStatistic, Song, TokenAbility, User};
 use Illuminate\Http\Request;
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Post, Prefix, Put};

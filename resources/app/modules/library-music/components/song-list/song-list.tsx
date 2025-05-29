@@ -110,8 +110,7 @@ export function SongList() {
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 34,
-    overscan: 5,
+    estimateSize: () => 24 ,
   });
 
   useEffect(() => {
