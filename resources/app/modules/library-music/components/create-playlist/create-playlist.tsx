@@ -9,11 +9,8 @@ interface PlaylistForm {
 
 export function CreatePlaylist() {
   const {
-    // @ts-expect-error
     register,
-    // @ts-expect-error
     handleSubmit,
-    // @ts-expect-error
     formState: { errors },
   } = useForm<PlaylistForm>();
 

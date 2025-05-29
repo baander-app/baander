@@ -356,6 +356,7 @@ export const ensureUsePendingJobsServiceGetHorizonApiJobsPendingData = (queryCli
 */
 export const ensureUsePlaylistServiceGetApiPlaylistsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UsePlaylistServiceGetApiPlaylistsKeyFn(), queryFn: () => PlaylistService.getApiPlaylists() });
 /**
+* Show a playlist
 * @param data The data for the request.
 * @param data.playlist The playlist public id
 * @returns PlaylistResource `PlaylistResource`
@@ -365,6 +366,7 @@ export const ensureUsePlaylistServiceGetApiPlaylistsByPlaylistData = (queryClien
   playlist: string;
 }) => queryClient.ensureQueryData({ queryKey: Common.UsePlaylistServiceGetApiPlaylistsByPlaylistKeyFn({ playlist }), queryFn: () => PlaylistService.getApiPlaylistsByPlaylist({ playlist }) });
 /**
+* Get statistics
 * @param data The data for the request.
 * @param data.playlist The playlist public id
 * @returns PlaylistStatistic `PlaylistStatistic`

@@ -17,6 +17,9 @@ class Playlist extends BaseModel
         'name',
         'description',
         'is_public',
+        'is_smart',
+        'is_collaborative',
+        'smart_rules',
     ];
 
     protected $casts = [

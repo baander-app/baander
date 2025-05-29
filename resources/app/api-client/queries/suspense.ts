@@ -356,6 +356,7 @@ export const usePendingJobsServiceGetHorizonApiJobsPendingSuspense = <TData = Co
 */
 export const usePlaylistServiceGetApiPlaylistsSuspense = <TData = Common.PlaylistServiceGetApiPlaylistsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UsePlaylistServiceGetApiPlaylistsKeyFn(queryKey), queryFn: () => PlaylistService.getApiPlaylists() as TData, ...options });
 /**
+* Show a playlist
 * @param data The data for the request.
 * @param data.playlist The playlist public id
 * @returns PlaylistResource `PlaylistResource`
@@ -365,6 +366,7 @@ export const usePlaylistServiceGetApiPlaylistsByPlaylistSuspense = <TData = Comm
   playlist: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UsePlaylistServiceGetApiPlaylistsByPlaylistKeyFn({ playlist }, queryKey), queryFn: () => PlaylistService.getApiPlaylistsByPlaylist({ playlist }) as TData, ...options });
 /**
+* Get statistics
 * @param data The data for the request.
 * @param data.playlist The playlist public id
 * @returns PlaylistStatistic `PlaylistStatistic`

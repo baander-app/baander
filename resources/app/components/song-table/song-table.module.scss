@@ -1,25 +1,13 @@
-.songListTable {
-  height: calc(100vh - 260px);
-  border-bottom: 1px solid #e0dddd;
-}
-
 .scrollList {
   border-right: 1px solid #e0dddd;
-  border-bottom: 1px solid #e0dddd;
   overflow-x: auto;
   max-width: 100%;
-  height: calc(100vh - 260px);
-
-  .title {
-    margin-left: 3px;
-  }
-
+  
   table {
     border-spacing: unset;
     table-layout: fixed;
     border-collapse: collapse;
   }
-
 
   th {
     background-color: var(--red-1);
@@ -48,6 +36,20 @@
   }
 }
 
+.header {
+  padding: 8px;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.description {
+  margin: 4px 0 0;
+  font-size: 0.875rem;
+}
+
 .listItem {
   cursor: pointer;
 }
@@ -60,6 +62,12 @@
 .titleCellNowPlayingIcon {
   color: var(--accent-8);
   margin-right: 8px;
+}
+
+.titleCellTitle {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .scrollbar {

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Song;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
 
 class SmartPlaylistService
@@ -12,7 +13,7 @@ class SmartPlaylistService
         $query = Song::query();
 
         foreach ($rules as $ruleGroup) {
-            $query->where(function ($q) use ($ruleGroup) {
+            $query->where(function (Builder  $q) use ($ruleGroup) {
                 foreach ($ruleGroup as $rule) {
                     $this->applyRule($q, $rule);
                 }
@@ -22,7 +23,7 @@ class SmartPlaylistService
         return $query->get();
     }
 
-    protected function applyRule($query, array $rule)
+    protected function applyRule(Builder $query, array $rule)
     {
         $field = $rule['field'];
         $operator = $rule['operator'];
@@ -40,11 +41,13 @@ class SmartPlaylistService
         }
     }
 
-    protected function applyGenreRule($query, $operator, $value)
+    protected function applyGenreRule(Builder $query, $operator, $value)
     {
+        dump($value, $operator, $value);
+
         if ($operator === 'is') {
-            return $query->whereHas('genres', function ($q) use ($value) {
-                $q->whereIn('name', Arr::wrap($value));
+            return $query->whereHas('genres', function (Builder $q) use ($value) {
+                return $q->whereIn('name', Arr::wrap($value));
             });
         }
 
@@ -73,10 +76,14 @@ class SmartPlaylistService
     protected function applyNumericRule($query, $field, $operator, $value)
     {
         switch ($operator) {
-            case 'is': return $query->where($field, $value);
-            case 'isNot': return $query->where($field, '!=', $value);
-            case 'greaterThan': return $query->where($field, '>', $value);
-            case 'lessThan': return $query->where($field, '<', $value);
+            case 'is':
+                return $query->where($field, $value);
+            case 'isNot':
+                return $query->where($field, '!=', $value);
+            case 'greaterThan':
+                return $query->where($field, '>', $value);
+            case 'lessThan':
+                return $query->where($field, '<', $value);
             case 'between':
                 return $query->whereBetween($field, $value);
         }

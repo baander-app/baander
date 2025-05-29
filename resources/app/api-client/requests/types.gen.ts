@@ -1261,12 +1261,11 @@ export type PostApiPlaylistsByPlaylistStatisticsRecordFavoriteResponse = {
     message: string;
 };
 
-export type PostApiPlaylistsByPlaylistSmartData = {
-    playlist: string;
+export type PostApiPlaylistsSmartData = {
     requestBody: CreateSmartPlaylistRequest;
 };
 
-export type PostApiPlaylistsByPlaylistSmartResponse = PlaylistResource;
+export type PostApiPlaylistsSmartResponse = PlaylistResource;
 
 export type PutApiPlaylistsByPlaylistSmartData = {
     /**
@@ -3805,9 +3804,9 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/api/playlists/{playlist}/smart': {
+    '/api/playlists/smart': {
         post: {
-            req: PostApiPlaylistsByPlaylistSmartData;
+            req: PostApiPlaylistsSmartData;
             res: {
                 /**
                  * `PlaylistResource`
@@ -3848,6 +3847,8 @@ export type $OpenApiTs = {
                 };
             };
         };
+    };
+    '/api/playlists/{playlist}/smart': {
         put: {
             req: PutApiPlaylistsByPlaylistSmartData;
             res: {

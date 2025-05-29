@@ -1,14 +1,13 @@
-.songListTable {
-  height: calc(100vh - 260px);
-  border-bottom: 1px solid #e0dddd;
+.playlistTable {
+  height: calc(100vh - 90px);
 }
 
 .scrollList {
   border-right: 1px solid #e0dddd;
-  border-bottom: 1px solid #e0dddd;
   overflow-x: auto;
   max-width: 100%;
-  height: calc(100vh - 260px);
+  height: calc(100vh - 90px);
+  padding: 6px;
 
   .title {
     margin-left: 3px;

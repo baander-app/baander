@@ -47,7 +47,6 @@
 
 .menuLink {
   display: block;
-  padding: 0.75rem 1rem;
   margin-left: 0.5rem;
   border-radius: 4px;
   color: var(--gray-11);
@@ -69,5 +68,49 @@
   &:hover {
     background-color: var(--accent-4);
     color: var(--accent-11);
+  }
+}
+
+.subsectionHeader {
+  font-weight: 600;
+  color: var(--gray-12);
+
+  &:hover {
+    color: var(--gray-12);
+  }
+}
+
+.subsectionItem {
+  padding-left: 0.5rem !important;
+  font-size: 0.8125rem !important;
+  margin-left: 0.3rem !important;
+}
+
+.innerSectionItem {
+  padding-left: 1.5rem;
+  font-size: 0.8rem;
+  margin-left: 3rem;
+  color: var(--gray-10);
+}
+
+.innerSectionHeader {
+  font-weight: 500;
+  font-size: 0.8125rem;
+  margin-left: 2.5rem;
+  color: var(--gray-11);
+
+  &:hover {
+    color: var(--gray-12);
+  }
+}
+
+.deepestLevelItem {
+  padding-left: 1.5rem;
+  font-size: 0.75rem;
+  margin-left: 4rem;
+  color: var(--gray-9);
+
+  &:hover {
+    color: var(--gray-11);
   }
 }

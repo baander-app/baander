@@ -356,6 +356,7 @@ export const prefetchUsePendingJobsServiceGetHorizonApiJobsPending = (queryClien
 */
 export const prefetchUsePlaylistServiceGetApiPlaylists = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UsePlaylistServiceGetApiPlaylistsKeyFn(), queryFn: () => PlaylistService.getApiPlaylists() });
 /**
+* Show a playlist
 * @param data The data for the request.
 * @param data.playlist The playlist public id
 * @returns PlaylistResource `PlaylistResource`
@@ -365,6 +366,7 @@ export const prefetchUsePlaylistServiceGetApiPlaylistsByPlaylist = (queryClient:
   playlist: string;
 }) => queryClient.prefetchQuery({ queryKey: Common.UsePlaylistServiceGetApiPlaylistsByPlaylistKeyFn({ playlist }), queryFn: () => PlaylistService.getApiPlaylistsByPlaylist({ playlist }) });
 /**
+* Get statistics
 * @param data The data for the request.
 * @param data.playlist The playlist public id
 * @returns PlaylistStatistic `PlaylistStatistic`
