@@ -1,7 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Dialog } from '@radix-ui/themes';
 import { SongResource } from '@/api-client/requests';
-import { SongDetail } from '@/modules/library-music/components/song-detail/song-detail';
 import { Iconify } from '@/ui/icons/iconify';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setQueueAndSong } from '@/store/music/music-player-slice';
@@ -19,8 +17,8 @@ import styles from './song-table.module.scss';
 
 export interface SongTableProps {
   songs: SongResource[];
-  title?: string;
-  description?: string;
+  title?: string | null;
+  description?: string | null;
   onFetchNextPage?: () => void;
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
@@ -37,8 +35,6 @@ export function SongTable({
   className,
 }: SongTableProps) {
   const dispatch = useAppDispatch();
-  const [openedSong, setOpenedSong] = useState<SongResource>();
-  const [open, setOpen] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const onSongClick = useCallback((publicId: string) => {
@@ -52,13 +48,6 @@ export function SongTable({
       }));
     }
   }, [dispatch, songs]);
-
-  // @ts-expect-error
-  const setOpenSong = (e: React.MouseEvent<HTMLDivElement>, song: SongResource) => {
-    e.stopPropagation();
-    setOpenedSong(song);
-    setOpen(true);
-  };
 
   const columns = useMemo<Array<ColumnDef<SongResource>>>(
     () => [
@@ -166,6 +155,7 @@ export function SongTable({
                         width: header.getSize(),
                         position: 'sticky',
                         top: 0,
+                        cursor: 'pointer'
                       }}
                     >
                       {header.isPlaceholder ? null : (
@@ -225,12 +215,6 @@ export function SongTable({
           </table>
         </div>
       </div>
-
-      <Dialog.Root open={open} onOpenChange={setOpen}>
-        <Dialog.Content>
-          {openedSong && <SongDetail publicId={openedSong.public_id}/>}
-        </Dialog.Content>
-      </Dialog.Root>
     </>
   );
 }

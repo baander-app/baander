@@ -25,8 +25,6 @@ class SongResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $streamUrl = $this->getStream();
-
         return [
             'public_id'     => $this->public_id,
             'title'         => $this->title,
@@ -44,33 +42,11 @@ class SongResource extends JsonResource
             'sizeHuman'     => humanize_bytes($this->size),
             'mimeType'      => $this->mime_type,
             'hash'          => $this->hash,
-            $this->mergeWhen($streamUrl, [
-                'stream' => $streamUrl,
-            ]),
-            $this->mergeWhen($this->librarySlug, [
-                'librarySlug' => $this->librarySlug,
-            ]),
+            'streamUrl' => route('api.stream.song-direct', ['song' => $this->public_id]),
             'createdAt'     => $this->created_at,
             'updatedAt'     => $this->updated_at,
             'album'         => AlbumWithoutSongsResource::make($this->whenLoaded('album')),
             'artists'       => ArtistResource::collection($this->whenLoaded('artists')),
         ];
-    }
-
-    private function getStream()
-    {
-        $value = $this->when(isset($this->librarySlug), fn() => route('api.songs.stream', ['library' => $this->librarySlug, 'song' => $this->public_id]));
-
-        if ($value) {
-            return $value;
-        }
-
-        $value = $this->whenLoaded('album.library', fn() => route('api.songs.stream', ['library' => $this->album->library, 'song' => $this->public_id]));
-
-        if ($value) {
-            return $value;
-        }
-
-        return null;
     }
 }

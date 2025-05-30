@@ -1,0 +1,82 @@
+.container {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+.ruleGroup {
+  background-color: var(--gray-3);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.ruleGroupTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.ruleList {
+  margin-top: 0.5rem;
+}
+
+.rule {
+  background-color: var(--gray-2);
+  border-radius: 6px;
+  padding: 0.5rem;
+}
+
+.valueInput {
+  flex: 1;
+
+  /* Styling for the between operator inputs */
+  & > div {
+    flex: 1;
+  }
+}
+
+.emptyState {
+  text-align: center;
+  color: var(--gray-9);
+  padding: 2rem;
+  background-color: var(--gray-2);
+  border-radius: 8px;
+}
+
+.error {
+  color: var(--red-9);
+  font-size: 12px;
+  margin-top: 0.25rem;
+}
+
+.valueInput {
+  flex: 1;
+}
+
+.autocompleteDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  background-color: var(--color-panel-solid);
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+  max-height: 200px;
+  overflow: auto;
+}
+
+.suggestionItem {
+  padding: 8px;
+  cursor: pointer;
+  color: var(--white);
+
+  &:hover {
+    background-color: var(--gray-10);
+    color: white;
+  }
+}
+
+.dropDownTrigger {
+  cursor: pointer;
+}

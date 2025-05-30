@@ -1,0 +1,31 @@
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.formGroup {
+  margin-bottom: 1rem;
+}
+
+.label {
+  display: block;
+  width: 100%;
+}
+
+.title {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.input {
+  width: 100%;
+}
+
+.error {
+  margin-top: 0.25rem;
+}
+
+.submitButton {
+  margin-top: 1rem;
+}

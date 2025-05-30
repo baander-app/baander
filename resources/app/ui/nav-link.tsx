@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { ReactNode } from 'react';
 import { Link as RouterNavLink, RelativeRoutingType, To } from 'react-router-dom';
-import { Link as RadixLink } from '@radix-ui/themes';
+import { Box, Link as RadixLink } from '@radix-ui/themes';
 import { clsx } from 'clsx';
 
 interface NavLinkProps {
@@ -35,7 +35,7 @@ export function NavLink({
                           ...rest
                         }: NavLinkProps) {
   return (
-    <div>
+    <Box>
       {leftSection && <div>{leftSection}</div>}
       <RadixLink asChild>
         <RouterNavLink
@@ -58,6 +58,6 @@ export function NavLink({
         </RouterNavLink>
       </RadixLink>
       {rightSection && <div>{rightSection}</div>}
-    </div>
+    </Box>
   );
 }

@@ -167,10 +167,14 @@ export const useFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadSu
   fileIdentifier: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadKeyFn({ fileIdentifier }, queryKey), queryFn: () => FilesService.getSystemLogViewerApiFilesByFileIdentifierDownload({ fileIdentifier }) as TData, ...options });
 /**
+* @param data The data for the request.
+* @param data.direction
 * @returns LogFolderResource Array of `LogFolderResource`
 * @throws ApiError
 */
-export const useFoldersServiceGetSystemLogViewerApiFoldersSuspense = <TData = Common.FoldersServiceGetSystemLogViewerApiFoldersDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseFoldersServiceGetSystemLogViewerApiFoldersKeyFn(queryKey), queryFn: () => FoldersService.getSystemLogViewerApiFolders() as TData, ...options });
+export const useFoldersServiceGetSystemLogViewerApiFoldersSuspense = <TData = Common.FoldersServiceGetSystemLogViewerApiFoldersDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ direction }: {
+  direction?: string;
+} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseFoldersServiceGetSystemLogViewerApiFoldersKeyFn({ direction }, queryKey), queryFn: () => FoldersService.getSystemLogViewerApiFolders({ direction }) as TData, ...options });
 /**
 * @param data The data for the request.
 * @param data.folderIdentifier
@@ -359,12 +363,14 @@ export const usePlaylistServiceGetApiPlaylistsSuspense = <TData = Common.Playlis
 * Show a playlist
 * @param data The data for the request.
 * @param data.playlist The playlist public id
+* @param data.relations
 * @returns PlaylistResource `PlaylistResource`
 * @throws ApiError
 */
-export const usePlaylistServiceGetApiPlaylistsByPlaylistSuspense = <TData = Common.PlaylistServiceGetApiPlaylistsByPlaylistDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ playlist }: {
+export const usePlaylistServiceGetApiPlaylistsByPlaylistSuspense = <TData = Common.PlaylistServiceGetApiPlaylistsByPlaylistDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ playlist, relations }: {
   playlist: string;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UsePlaylistServiceGetApiPlaylistsByPlaylistKeyFn({ playlist }, queryKey), queryFn: () => PlaylistService.getApiPlaylistsByPlaylist({ playlist }) as TData, ...options });
+  relations?: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UsePlaylistServiceGetApiPlaylistsByPlaylistKeyFn({ playlist, relations }, queryKey), queryFn: () => PlaylistService.getApiPlaylistsByPlaylist({ playlist, relations }) as TData, ...options });
 /**
 * Get statistics
 * @param data The data for the request.
@@ -477,24 +483,16 @@ export const useSongServiceGetApiLibrariesByLibrarySongsByPublicIdSuspense = <TD
   relations?: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseSongServiceGetApiLibrariesByLibrarySongsByPublicIdKeyFn({ library, publicId, relations }, queryKey), queryFn: () => SongService.getApiLibrariesByLibrarySongsByPublicId({ library, publicId, relations }) as TData, ...options });
 /**
-* Direct stream the song
+* Direct stream the song.
 * Requires token with "access-stream"
 * @param data The data for the request.
-* @param data.library The library slug
 * @param data.song The song public id
 * @returns unknown
 * @throws ApiError
 */
-export const useSongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirectSuspense = <TData = Common.SongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirectDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ library, song }: {
-  library: string;
+export const useStreamServiceGetApiStreamSongBySongDirectSuspense = <TData = Common.StreamServiceGetApiStreamSongBySongDirectDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ song }: {
   song: string;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseSongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirectKeyFn({ library, song }, queryKey), queryFn: () => SongService.getApiLibrariesByLibrarySongsStreamSongBySongDirect({ library, song }) as TData, ...options });
-/**
-* Generate a unique session ID for streams
-* @returns unknown
-* @throws ApiError
-*/
-export const useStreamServiceGetApiStreamSessionSuspense = <TData = Common.StreamServiceGetApiStreamSessionDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseStreamServiceGetApiStreamSessionKeyFn(queryKey), queryFn: () => StreamService.getApiStreamSession() as TData, ...options });
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseStreamServiceGetApiStreamSongBySongDirectKeyFn({ song }, queryKey), queryFn: () => StreamService.getApiStreamSongBySongDirect({ song }) as TData, ...options });
 /**
 * Get php info
 * @returns unknown

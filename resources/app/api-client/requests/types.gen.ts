@@ -321,27 +321,11 @@ export type SongResource = {
     sizeHuman: string;
     mimeType: string;
     hash: string | null;
-    stream?: string | null;
-    librarySlug?: string;
+    streamUrl: string;
     createdAt: string | null;
     updatedAt: string | null;
     album?: AlbumWithoutSongsResource;
     artists?: Array<ArtistResource>;
-};
-
-export type StartStreamRequest = {
-    sessionId: string;
-    audioProfile?: {
-        bitrate?: number;
-        channels?: string;
-        sampleRate?: number;
-        codec?: string;
-    };
-    videoProfile?: {
-        height?: number;
-        width?: number;
-        bitrate?: number;
-    };
 };
 
 export type StorePasskeyRequest = {
@@ -542,7 +526,7 @@ export type PostApiAuthResetPasswordData = {
 };
 
 export type PostApiAuthResetPasswordResponse = {
-    message: string;
+    message: 'Password reset successfully.';
 };
 
 export type PostApiAuthVerifyByIdByHashData = {
@@ -588,7 +572,7 @@ export type PostWebauthnPasskeyRegisterData = {
 };
 
 export type PostWebauthnPasskeyRegisterResponse = {
-    message: string;
+    message: 'Passkey successfully stored';
 };
 
 export type GetHorizonApiBatchesResponse = {
@@ -697,6 +681,10 @@ export type GetSystemLogViewerApiFilesByFileIdentifierDownloadData = {
 };
 
 export type GetSystemLogViewerApiFilesByFileIdentifierDownloadResponse = string;
+
+export type GetSystemLogViewerApiFoldersData = {
+    direction?: string;
+};
 
 export type GetSystemLogViewerApiFoldersResponse = Array<LogFolderResource>;
 
@@ -818,7 +806,7 @@ export type PostApiJobsScanLibraryBySlugData = {
 };
 
 export type PostApiJobsScanLibraryBySlugResponse = {
-    message: string;
+    message: 'Job started successfully';
 };
 
 export type GetHorizonApiMetricsJobsResponse = Array<unknown>;
@@ -1102,6 +1090,7 @@ export type GetApiPlaylistsByPlaylistData = {
      * The playlist public id
      */
     playlist: string;
+    relations?: string;
 };
 
 export type GetApiPlaylistsByPlaylistResponse = PlaylistResource;
@@ -1137,7 +1126,7 @@ export type PostApiPlaylistsByPlaylistSongsBySongData = {
 };
 
 export type PostApiPlaylistsByPlaylistSongsBySongResponse = {
-    message: string;
+    message: 'Song added to playlist';
 };
 
 export type DeleteApiPlaylistsByPlaylistSongsBySongData = {
@@ -1152,7 +1141,7 @@ export type DeleteApiPlaylistsByPlaylistSongsBySongData = {
 };
 
 export type DeleteApiPlaylistsByPlaylistSongsBySongResponse = {
-    message: string;
+    message: 'Song removed from playlist';
 };
 
 export type PostApiPlaylistsByPlaylistReorderData = {
@@ -1166,7 +1155,7 @@ export type PostApiPlaylistsByPlaylistReorderData = {
 };
 
 export type PostApiPlaylistsByPlaylistReorderResponse = {
-    message: string;
+    message: 'Playlist reordered';
 };
 
 export type PostApiPlaylistsByPlaylistCollaboratorsData = {
@@ -1181,7 +1170,7 @@ export type PostApiPlaylistsByPlaylistCollaboratorsData = {
 };
 
 export type PostApiPlaylistsByPlaylistCollaboratorsResponse = {
-    message: string;
+    message: 'Collaborator added';
 };
 
 export type DeleteApiPlaylistsByPlaylistCollaboratorsByUserData = {
@@ -1196,7 +1185,7 @@ export type DeleteApiPlaylistsByPlaylistCollaboratorsByUserData = {
 };
 
 export type DeleteApiPlaylistsByPlaylistCollaboratorsByUserResponse = {
-    message: string;
+    message: 'Collaborator removed';
 };
 
 export type PostApiPlaylistsByPlaylistCloneData = {
@@ -1225,7 +1214,7 @@ export type PostApiPlaylistsByPlaylistStatisticsRecordViewData = {
 };
 
 export type PostApiPlaylistsByPlaylistStatisticsRecordViewResponse = {
-    message: string;
+    message: 'View recorded';
 };
 
 export type PostApiPlaylistsByPlaylistStatisticsRecordPlayData = {
@@ -1236,7 +1225,7 @@ export type PostApiPlaylistsByPlaylistStatisticsRecordPlayData = {
 };
 
 export type PostApiPlaylistsByPlaylistStatisticsRecordPlayResponse = {
-    message: string;
+    message: 'Play recorded';
 };
 
 export type PostApiPlaylistsByPlaylistStatisticsRecordShareData = {
@@ -1247,7 +1236,7 @@ export type PostApiPlaylistsByPlaylistStatisticsRecordShareData = {
 };
 
 export type PostApiPlaylistsByPlaylistStatisticsRecordShareResponse = {
-    message: string;
+    message: 'Share recorded';
 };
 
 export type PostApiPlaylistsByPlaylistStatisticsRecordFavoriteData = {
@@ -1258,7 +1247,7 @@ export type PostApiPlaylistsByPlaylistStatisticsRecordFavoriteData = {
 };
 
 export type PostApiPlaylistsByPlaylistStatisticsRecordFavoriteResponse = {
-    message: string;
+    message: 'Favorite recorded';
 };
 
 export type PostApiPlaylistsSmartData = {
@@ -1285,7 +1274,7 @@ export type PostApiPlaylistsByPlaylistSmartSyncData = {
 };
 
 export type PostApiPlaylistsByPlaylistSmartSyncResponse = {
-    message: string;
+    message: 'Smart playlist synced';
 };
 
 export type GetApiQueueMetricsData = {
@@ -1356,8 +1345,11 @@ export type PostApiQueueMetricsRetryByIdData = {
 };
 
 export type PostApiQueueMetricsRetryByIdResponse = {
-    status: string;
-    message: string;
+    status: 'success';
+    message: 'Job has been successfully retried';
+} | {
+    status: 'failed';
+    message: 'An error occurred while executing the job';
 };
 
 export type DeleteApiQueueMetricsByIdData = {
@@ -1456,59 +1448,15 @@ export type GetApiLibrariesByLibrarySongsByPublicIdData = {
 
 export type GetApiLibrariesByLibrarySongsByPublicIdResponse = SongResource;
 
-export type GetApiLibrariesByLibrarySongsStreamSongBySongDirectData = {
-    /**
-     * The library slug
-     */
-    library: string;
+export type GetApiStreamSongBySongDirectData = {
     /**
      * The song public id
      */
     song: string;
 };
 
-export type GetApiLibrariesByLibrarySongsStreamSongBySongDirectResponse = {
+export type GetApiStreamSongBySongDirectResponse = {
     [key: string]: unknown;
-};
-
-export type GetApiStreamSessionResponse = {
-    session_id: string;
-};
-
-export type PostApiStreamStartData = {
-    requestBody?: StartStreamRequest & {
-    session_id?: string;
-    options?: string;
-    protocol?: string;
-    start_time?: string;
-};
-};
-
-export type PostApiStreamStartResponse = {
-    message: string;
-    session_id: string;
-};
-
-export type PostApiStreamStopData = {
-    requestBody: {
-        session_id: string;
-    };
-};
-
-export type PostApiStreamStopResponse = {
-    message: string;
-};
-
-export type PostApiStreamSeekData = {
-    requestBody: {
-        session_id: string;
-        options: Array<(string)>;
-        seek_time: number;
-    };
-};
-
-export type PostApiStreamSeekResponse = {
-    message: string;
 };
 
 export type GetApiSystemInfoResponse = Array<{
@@ -2037,7 +1985,7 @@ export type $OpenApiTs = {
             req: PostApiAuthResetPasswordData;
             res: {
                 200: {
-                    message: string;
+                    message: 'Password reset successfully.';
                 };
                 /**
                  * An error
@@ -2202,7 +2150,7 @@ export type $OpenApiTs = {
             req: PostWebauthnPasskeyRegisterData;
             res: {
                 200: {
-                    message: string;
+                    message: 'Passkey successfully stored';
                 };
                 /**
                  * Unauthenticated
@@ -2238,7 +2186,7 @@ export type $OpenApiTs = {
                     };
                 };
                 500: {
-                    error: string;
+                    error: 'Could not store passkey';
                 };
             };
         };
@@ -2342,6 +2290,15 @@ export type $OpenApiTs = {
                     url: string;
                 };
                 /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
                  * Not found
                  */
                 404: {
@@ -2379,6 +2336,15 @@ export type $OpenApiTs = {
                 200: {
                     success: boolean;
                 };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
             };
         };
     };
@@ -2411,6 +2377,7 @@ export type $OpenApiTs = {
     };
     '/system/log-viewer/api/folders': {
         get: {
+            req: GetSystemLogViewerApiFoldersData;
             res: {
                 /**
                  * Array of `LogFolderResource`
@@ -2425,6 +2392,15 @@ export type $OpenApiTs = {
             res: {
                 200: {
                     url: string;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
                 };
                 /**
                  * Not found
@@ -2463,6 +2439,15 @@ export type $OpenApiTs = {
             res: {
                 200: {
                     success: boolean;
+                };
+                /**
+                 * Authorization error
+                 */
+                403: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
                 };
             };
         };
@@ -2692,7 +2677,7 @@ export type $OpenApiTs = {
             req: PostApiJobsScanLibraryBySlugData;
             res: {
                 200: {
-                    message: string;
+                    message: 'Job started successfully';
                 };
                 /**
                  * Unauthenticated
@@ -3277,6 +3262,21 @@ export type $OpenApiTs = {
                      */
                     message: string;
                 };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
             };
         };
         put: {
@@ -3372,7 +3372,7 @@ export type $OpenApiTs = {
             req: PostApiPlaylistsByPlaylistSongsBySongData;
             res: {
                 200: {
-                    message: string;
+                    message: 'Song added to playlist';
                 };
                 /**
                  * Unauthenticated
@@ -3407,7 +3407,7 @@ export type $OpenApiTs = {
             req: DeleteApiPlaylistsByPlaylistSongsBySongData;
             res: {
                 200: {
-                    message: string;
+                    message: 'Song removed from playlist';
                 };
                 /**
                  * Unauthenticated
@@ -3444,7 +3444,7 @@ export type $OpenApiTs = {
             req: PostApiPlaylistsByPlaylistReorderData;
             res: {
                 200: {
-                    message: string;
+                    message: 'Playlist reordered';
                 };
                 /**
                  * Unauthenticated
@@ -3496,7 +3496,7 @@ export type $OpenApiTs = {
             req: PostApiPlaylistsByPlaylistCollaboratorsData;
             res: {
                 200: {
-                    message: string;
+                    message: 'Collaborator added';
                 };
                 /**
                  * Unauthenticated
@@ -3548,7 +3548,7 @@ export type $OpenApiTs = {
             req: DeleteApiPlaylistsByPlaylistCollaboratorsByUserData;
             res: {
                 200: {
-                    message: string;
+                    message: 'Collaborator removed';
                 };
                 /**
                  * Unauthenticated
@@ -3661,7 +3661,7 @@ export type $OpenApiTs = {
             req: PostApiPlaylistsByPlaylistStatisticsRecordViewData;
             res: {
                 200: {
-                    message: string;
+                    message: 'View recorded';
                 };
                 /**
                  * Unauthenticated
@@ -3698,7 +3698,7 @@ export type $OpenApiTs = {
             req: PostApiPlaylistsByPlaylistStatisticsRecordPlayData;
             res: {
                 200: {
-                    message: string;
+                    message: 'Play recorded';
                 };
                 /**
                  * Unauthenticated
@@ -3735,7 +3735,7 @@ export type $OpenApiTs = {
             req: PostApiPlaylistsByPlaylistStatisticsRecordShareData;
             res: {
                 200: {
-                    message: string;
+                    message: 'Share recorded';
                 };
                 /**
                  * Unauthenticated
@@ -3772,7 +3772,7 @@ export type $OpenApiTs = {
             req: PostApiPlaylistsByPlaylistStatisticsRecordFavoriteData;
             res: {
                 200: {
-                    message: string;
+                    message: 'Favorite recorded';
                 };
                 /**
                  * Unauthenticated
@@ -3915,7 +3915,7 @@ export type $OpenApiTs = {
             req: PostApiPlaylistsByPlaylistSmartSyncData;
             res: {
                 200: {
-                    message: string;
+                    message: 'Smart playlist synced';
                 };
                 /**
                  * An error
@@ -4105,8 +4105,11 @@ export type $OpenApiTs = {
             req: PostApiQueueMetricsRetryByIdData;
             res: {
                 200: {
-    status: string;
-    message: string;
+    status: 'success';
+    message: 'Job has been successfully retried';
+} | {
+    status: 'failed';
+    message: 'An error occurred while executing the job';
 };
                 /**
                  * An error
@@ -4386,9 +4389,9 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/api/libraries/{library}/songs/stream/song/{song}/direct': {
+    '/api/stream/song/{song}/direct': {
         get: {
-            req: GetApiLibrariesByLibrarySongsStreamSongBySongDirectData;
+            req: GetApiStreamSongBySongDirectData;
             res: {
                 200: {
                     [key: string]: unknown;
@@ -4410,100 +4413,6 @@ export type $OpenApiTs = {
                      * Error overview.
                      */
                     message: string;
-                };
-            };
-        };
-    };
-    '/api/stream/session': {
-        get: {
-            res: {
-                200: {
-                    session_id: string;
-                };
-            };
-        };
-    };
-    '/api/stream/start': {
-        post: {
-            req: PostApiStreamStartData;
-            res: {
-                200: {
-                    message: string;
-                    session_id: string;
-                };
-                /**
-                 * Authorization error
-                 */
-                403: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
-                 * Validation error
-                 */
-                422: {
-                    /**
-                     * Errors overview.
-                     */
-                    message: string;
-                    /**
-                     * A detailed description of each field that failed validation.
-                     */
-                    errors: {
-                        [key: string]: Array<(string)>;
-                    };
-                };
-            };
-        };
-    };
-    '/api/stream/stop': {
-        post: {
-            req: PostApiStreamStopData;
-            res: {
-                200: {
-                    message: string;
-                };
-                /**
-                 * Validation error
-                 */
-                422: {
-                    /**
-                     * Errors overview.
-                     */
-                    message: string;
-                    /**
-                     * A detailed description of each field that failed validation.
-                     */
-                    errors: {
-                        [key: string]: Array<(string)>;
-                    };
-                };
-            };
-        };
-    };
-    '/api/stream/seek': {
-        post: {
-            req: PostApiStreamSeekData;
-            res: {
-                200: {
-                    message: string;
-                };
-                /**
-                 * Validation error
-                 */
-                422: {
-                    /**
-                     * Errors overview.
-                     */
-                    message: string;
-                    /**
-                     * A detailed description of each field that failed validation.
-                     */
-                    errors: {
-                        [key: string]: Array<(string)>;
-                    };
                 };
             };
         };

@@ -30,6 +30,13 @@ const menu: Menu = [
     ],
   },
   {
+    label: 'Music',
+    iconName: 'ion:musical-notes',
+    links: [
+      {label: 'Tasks', to: 'music/tasks'},
+    ],
+  },
+  {
     label: 'Users',
     iconName: 'heroicons:user-circle-solid',
     links: [

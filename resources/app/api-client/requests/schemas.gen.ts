@@ -935,10 +935,7 @@ export const $SongResource = {
         hash: {
             type: ['string', 'null']
         },
-        stream: {
-            type: ['string', 'null']
-        },
-        librarySlug: {
+        streamUrl: {
             type: 'string'
         },
         createdAt: {
@@ -959,50 +956,8 @@ export const $SongResource = {
             }
         }
     },
-    required: ['public_id', 'title', 'year', 'comment', 'disc', 'length', 'durationHuman', 'lyrics', 'lyricsExist', 'modifiedTime', 'path', 'track', 'size', 'sizeHuman', 'mimeType', 'hash', 'createdAt', 'updatedAt'],
+    required: ['public_id', 'title', 'year', 'comment', 'disc', 'length', 'durationHuman', 'lyrics', 'lyricsExist', 'modifiedTime', 'path', 'track', 'size', 'sizeHuman', 'mimeType', 'hash', 'streamUrl', 'createdAt', 'updatedAt'],
     title: 'SongResource'
-} as const;
-
-export const $StartStreamRequest = {
-    type: 'object',
-    properties: {
-        sessionId: {
-            type: 'string'
-        },
-        audioProfile: {
-            type: 'object',
-            properties: {
-                bitrate: {
-                    type: 'integer'
-                },
-                channels: {
-                    type: 'string'
-                },
-                sampleRate: {
-                    type: 'integer'
-                },
-                codec: {
-                    type: 'string'
-                }
-            }
-        },
-        videoProfile: {
-            type: 'object',
-            properties: {
-                height: {
-                    type: 'integer'
-                },
-                width: {
-                    type: 'integer'
-                },
-                bitrate: {
-                    type: 'integer'
-                }
-            }
-        }
-    },
-    required: ['sessionId'],
-    title: 'StartStreamRequest'
 } as const;
 
 export const $StorePasskeyRequest = {

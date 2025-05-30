@@ -11,6 +11,15 @@ class Playlist extends BaseModel
 {
     use HasFactory, HasNanoPublicId;
 
+    public static $filterRelations = [
+        'cover',
+        'songs',
+        'songs.artists',
+        'songs.album',
+        'songs.genres',
+        'songs.cover'
+    ];
+
     protected $fillable = [
         'public_id',
         'user_id',

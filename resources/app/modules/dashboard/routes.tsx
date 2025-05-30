@@ -6,6 +6,7 @@ import { QueueMonitor } from '@/modules/dashboard/queue-monitor/queue-monitor.ts
 import { UsersList } from '@/modules/dashboard/users/users-list.tsx';
 import { Php } from '@/modules/dashboard/system-info/php.tsx';
 import { DashboardHome } from '@/modules/dashboard/dashboard-home/dashboard-home.tsx';
+import { MusicTasks } from '@/modules/dashboard/music/MusicTasks.tsx';
 
 export const DashboardRoutes = () => {
   return (
@@ -13,6 +14,8 @@ export const DashboardRoutes = () => {
       <Route path="/home" element={<DashboardHome/>}/>
       <Route path="libraries/list" element={<LibrariesList/>}/>
       <Route path="libraries/new" element={<LibrariesNew/>}/>
+
+      <Route path="music/tasks" element={<MusicTasks />} />
 
       <Route path="system/log-viewer" element={<LogViewer/>}/>
       <Route path="system/queue-monitor" element={<QueueMonitor/>}/>

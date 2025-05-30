@@ -1,12 +1,16 @@
-import { Box, Button, Dialog, Flex, ScrollArea, Text } from '@radix-ui/themes';
+import { Box, Button, ContextMenu, Dialog, Flex, ScrollArea, Text } from '@radix-ui/themes';
 import { NavLink } from '@/ui/nav-link';
 import { lazyImport } from '@/utils/lazy-import';
 import { Iconify } from '@/ui/icons/iconify';
 import styles from './root-menu.module.scss';
 import { ReactNode, useMemo } from 'react';
 import { useLibraryServiceGetApiLibraries, usePlaylistServiceGetApiPlaylists } from '@/api-client/queries';
-import { CreatePlaylist } from '@/modules/library-music/components/create-playlist/create-playlist.tsx';
+import { CreatePlaylist } from '@/modules/library-music-playlists/components/create-playlist/create-playlist.tsx';
+import { CreateSmartPlaylist } from '@/modules/library-music-playlists/components/create-smart-playlist/create-smart-playlist.tsx';
 import { LibraryResource, PlaylistResource } from '@/api-client/requests/types.gen';
+import {
+  PlaylistLayoutContextMenu
+} from '@/modules/library-music-playlists/components/context-menu/playlist-layout-context-menu/playlist-layout-context-menu.tsx';
 
 const { Brand } = lazyImport(() => import('@/ui/brand/Brand'), 'Brand');
 
@@ -18,6 +22,7 @@ interface MenuLink {
   isInnerSectionItem?: boolean;
   isDeepestLevelItem?: boolean;
   isTextOnly?: boolean;
+  type?: 'playlist';
 }
 
 interface MenuSection {
@@ -29,7 +34,7 @@ interface MenuSection {
 
 export function RootMenu() {
   const { data: libraryData } = useLibraryServiceGetApiLibraries();
-  const { data: playlistData } = usePlaylistServiceGetApiPlaylists();
+  const { data: playlistData } = usePlaylistServiceGetApiPlaylists(['playlists']);
 
   const musicLibraries: LibraryResource[] = useMemo(() => libraryData?.data.filter(library => library.type === 'music') ?? [], [libraryData]);
   const movieLibraries: LibraryResource[] = useMemo(() => libraryData?.data.filter(library => library.type === 'movie') ?? [], [libraryData]);
@@ -43,11 +48,11 @@ export function RootMenu() {
       iconName: 'ion:musical-notes',
       links: [],
       rightSide: (
-        <>
+        <Flex gap="1">
           <Dialog.Root>
             <Dialog.Trigger>
               <Button
-                ml="2"
+                size="1"
                 variant="ghost"
               >New</Button>
             </Dialog.Trigger>
@@ -58,7 +63,22 @@ export function RootMenu() {
               <CreatePlaylist />
             </Dialog.Content>
           </Dialog.Root>
-        </>
+
+          <Dialog.Root>
+            <Dialog.Trigger>
+              <Button
+                size="1"
+                variant="ghost"
+              >Smart</Button>
+            </Dialog.Trigger>
+            <Dialog.Content>
+              <Dialog.Title>Create Smart Playlist</Dialog.Title>
+              <Dialog.Description>Smart playlists automatically update based on rules you define.</Dialog.Description>
+
+              <CreateSmartPlaylist />
+            </Dialog.Content>
+          </Dialog.Root>
+        </Flex>
       ),
     };
 
@@ -101,83 +121,13 @@ export function RootMenu() {
       isTextOnly: true,
     });
 
-    // Add individual playlists
-    // Group playlists by first letter for demonstration purposes
-    const playlistsByLetter = playlists.reduce<Record<string, PlaylistResource[]>>((acc, playlist) => {
-      const firstLetter = playlist.name.charAt(0).toUpperCase();
-      if (!acc[firstLetter]) {
-        acc[firstLetter] = [];
-      }
-      acc[firstLetter].push(playlist);
-      return acc;
-    }, {});
-
-    // Add playlist groups as inner sections
-    Object.keys(playlistsByLetter).sort().forEach(letter => {
-      // Add letter as an inner section header
-      if (playlistsByLetter[letter].length > 1) {
-        musicSection.links.push({
-          label: `${letter}`,
-          isSubsectionHeader: true,
-          isInnerSectionItem: true,
-          isTextOnly: true,
-        });
-
-        // Group playlists by length for demonstration of deepest level
-        const playlistsByLength = playlistsByLetter[letter].reduce<Record<string, PlaylistResource[]>>((acc, playlist) => {
-          // Group by name length (short, medium, long) for demonstration
-          let lengthCategory = 'Medium';
-          if (playlist.name.length < 6) {
-            lengthCategory = 'Short';
-          } else if (playlist.name.length > 10) {
-            lengthCategory = 'Long';
-          }
-
-          if (!acc[lengthCategory]) {
-            acc[lengthCategory] = [];
-          }
-          acc[lengthCategory].push(playlist);
-          return acc;
-        }, {});
-
-        // Add length categories as groups
-        Object.keys(playlistsByLength).sort().forEach(lengthCategory => {
-          if (playlistsByLength[lengthCategory].length > 1) {
-            // Add length category as a group header
-            musicSection.links.push({
-              label: `${lengthCategory} Names`,
-              isInnerSectionItem: true,
-              isTextOnly: true,
-            });
-
-            // Add playlists in this group as deepest level items
-            playlistsByLength[lengthCategory].forEach(playlist => {
-              musicSection.links.push({
-                label: playlist.name,
-                to: `/playlists/music/${playlist.id}`,
-                isDeepestLevelItem: true,
-              });
-            });
-          } else {
-            // If there's only one playlist in this length category, don't create a group
-            playlistsByLength[lengthCategory].forEach(playlist => {
-              musicSection.links.push({
-                label: playlist.name,
-                to: `/playlists/music/${playlist.id}`,
-                isInnerSectionItem: true,
-              });
-            });
-          }
-        });
-      } else {
-        // If there's only one playlist with this letter, don't create a group
-        playlistsByLetter[letter].forEach(playlist => {
-          musicSection.links.push({
-            label: playlist.name,
-            to: `/playlists/music/${playlist.id}`,
-          });
-        });
-      }
+    // Add individual playlists directly by title
+    playlists.forEach(playlist => {
+      musicSection.links.push({
+        label: playlist.name,
+        to: `/playlists/music/${playlist.id}`,
+        type: 'playlist',
+      });
     });
 
     // Add the music section to the menu
@@ -288,10 +238,29 @@ export function RootMenu() {
                       <Text
                         key={linkIndex}
                         className={linkClassName}
+                        aria-disabled
                       >
                         {link.label}
                       </Text>
                     );
+                  }
+
+                  if (link.to && link.type === 'playlist') {
+                    return (
+                      <ContextMenu.Root key={linkIndex}>
+                        <ContextMenu.Trigger>
+                          <NavLink
+                            key={linkIndex}
+                            to={link.to}
+                            className={linkClassName}
+                            activeClassName={styles.activeLink}
+                          >
+                            {link.label}
+                          </NavLink>
+                        </ContextMenu.Trigger>
+                        <PlaylistLayoutContextMenu id={link.to.split('/').at(-1)} />
+                      </ContextMenu.Root>
+                    )
                   }
 
                   // Otherwise, render it as a link

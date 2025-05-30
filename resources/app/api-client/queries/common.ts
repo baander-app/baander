@@ -105,7 +105,9 @@ export const UseFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadKe
 export type FoldersServiceGetSystemLogViewerApiFoldersDefaultResponse = Awaited<ReturnType<typeof FoldersService.getSystemLogViewerApiFolders>>;
 export type FoldersServiceGetSystemLogViewerApiFoldersQueryResult<TData = FoldersServiceGetSystemLogViewerApiFoldersDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useFoldersServiceGetSystemLogViewerApiFoldersKey = "FoldersServiceGetSystemLogViewerApiFolders";
-export const UseFoldersServiceGetSystemLogViewerApiFoldersKeyFn = (queryKey?: Array<unknown>) => [useFoldersServiceGetSystemLogViewerApiFoldersKey, ...(queryKey ?? [])];
+export const UseFoldersServiceGetSystemLogViewerApiFoldersKeyFn = ({ direction }: {
+  direction?: string;
+} = {}, queryKey?: Array<unknown>) => [useFoldersServiceGetSystemLogViewerApiFoldersKey, ...(queryKey ?? [{ direction }])];
 export type FoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestDefaultResponse = Awaited<ReturnType<typeof FoldersService.getSystemLogViewerApiFoldersByFolderIdentifierDownloadRequest>>;
 export type FoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestQueryResult<TData = FoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestKey = "FoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequest";
@@ -222,9 +224,10 @@ export const UsePlaylistServiceGetApiPlaylistsKeyFn = (queryKey?: Array<unknown>
 export type PlaylistServiceGetApiPlaylistsByPlaylistDefaultResponse = Awaited<ReturnType<typeof PlaylistService.getApiPlaylistsByPlaylist>>;
 export type PlaylistServiceGetApiPlaylistsByPlaylistQueryResult<TData = PlaylistServiceGetApiPlaylistsByPlaylistDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const usePlaylistServiceGetApiPlaylistsByPlaylistKey = "PlaylistServiceGetApiPlaylistsByPlaylist";
-export const UsePlaylistServiceGetApiPlaylistsByPlaylistKeyFn = ({ playlist }: {
+export const UsePlaylistServiceGetApiPlaylistsByPlaylistKeyFn = ({ playlist, relations }: {
   playlist: string;
-}, queryKey?: Array<unknown>) => [usePlaylistServiceGetApiPlaylistsByPlaylistKey, ...(queryKey ?? [{ playlist }])];
+  relations?: string;
+}, queryKey?: Array<unknown>) => [usePlaylistServiceGetApiPlaylistsByPlaylistKey, ...(queryKey ?? [{ playlist, relations }])];
 export type PlaylistServiceGetApiPlaylistsByPlaylistStatisticsDefaultResponse = Awaited<ReturnType<typeof PlaylistService.getApiPlaylistsByPlaylistStatistics>>;
 export type PlaylistServiceGetApiPlaylistsByPlaylistStatisticsQueryResult<TData = PlaylistServiceGetApiPlaylistsByPlaylistStatisticsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const usePlaylistServiceGetApiPlaylistsByPlaylistStatisticsKey = "PlaylistServiceGetApiPlaylistsByPlaylistStatistics";
@@ -291,17 +294,12 @@ export const UseSongServiceGetApiLibrariesByLibrarySongsByPublicIdKeyFn = ({ lib
   publicId: string;
   relations?: string;
 }, queryKey?: Array<unknown>) => [useSongServiceGetApiLibrariesByLibrarySongsByPublicIdKey, ...(queryKey ?? [{ library, publicId, relations }])];
-export type SongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirectDefaultResponse = Awaited<ReturnType<typeof SongService.getApiLibrariesByLibrarySongsStreamSongBySongDirect>>;
-export type SongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirectQueryResult<TData = SongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirectDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useSongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirectKey = "SongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirect";
-export const UseSongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirectKeyFn = ({ library, song }: {
-  library: string;
+export type StreamServiceGetApiStreamSongBySongDirectDefaultResponse = Awaited<ReturnType<typeof StreamService.getApiStreamSongBySongDirect>>;
+export type StreamServiceGetApiStreamSongBySongDirectQueryResult<TData = StreamServiceGetApiStreamSongBySongDirectDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useStreamServiceGetApiStreamSongBySongDirectKey = "StreamServiceGetApiStreamSongBySongDirect";
+export const UseStreamServiceGetApiStreamSongBySongDirectKeyFn = ({ song }: {
   song: string;
-}, queryKey?: Array<unknown>) => [useSongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirectKey, ...(queryKey ?? [{ library, song }])];
-export type StreamServiceGetApiStreamSessionDefaultResponse = Awaited<ReturnType<typeof StreamService.getApiStreamSession>>;
-export type StreamServiceGetApiStreamSessionQueryResult<TData = StreamServiceGetApiStreamSessionDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useStreamServiceGetApiStreamSessionKey = "StreamServiceGetApiStreamSession";
-export const UseStreamServiceGetApiStreamSessionKeyFn = (queryKey?: Array<unknown>) => [useStreamServiceGetApiStreamSessionKey, ...(queryKey ?? [])];
+}, queryKey?: Array<unknown>) => [useStreamServiceGetApiStreamSongBySongDirectKey, ...(queryKey ?? [{ song }])];
 export type SystemInfoServiceGetApiSystemInfoDefaultResponse = Awaited<ReturnType<typeof SystemInfoService.getApiSystemInfo>>;
 export type SystemInfoServiceGetApiSystemInfoQueryResult<TData = SystemInfoServiceGetApiSystemInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSystemInfoServiceGetApiSystemInfoKey = "SystemInfoServiceGetApiSystemInfo";
@@ -378,9 +376,6 @@ export type PlaylistServicePostApiPlaylistsSmartMutationResult = Awaited<ReturnT
 export type PlaylistServicePostApiPlaylistsByPlaylistSmartSyncMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylistsByPlaylistSmartSync>>;
 export type QueueServicePostApiQueueMetricsRetryByIdMutationResult = Awaited<ReturnType<typeof QueueService.postApiQueueMetricsRetryById>>;
 export type RetryServicePostHorizonApiJobsRetryByIdMutationResult = Awaited<ReturnType<typeof RetryService.postHorizonApiJobsRetryById>>;
-export type StreamServicePostApiStreamStartMutationResult = Awaited<ReturnType<typeof StreamService.postApiStreamStart>>;
-export type StreamServicePostApiStreamStopMutationResult = Awaited<ReturnType<typeof StreamService.postApiStreamStop>>;
-export type StreamServicePostApiStreamSeekMutationResult = Awaited<ReturnType<typeof StreamService.postApiStreamSeek>>;
 export type UserServicePostApiUsersMutationResult = Awaited<ReturnType<typeof UserService.postApiUsers>>;
 export type PlaylistServicePutApiPlaylistsByPlaylistMutationResult = Awaited<ReturnType<typeof PlaylistService.putApiPlaylistsByPlaylist>>;
 export type PlaylistServicePutApiPlaylistsByPlaylistSmartMutationResult = Awaited<ReturnType<typeof PlaylistService.putApiPlaylistsByPlaylistSmart>>;

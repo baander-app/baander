@@ -75,19 +75,4 @@ class SongController extends Controller
 
         return new SongResource($song);
     }
-
-    /**
-     * Direct stream the song
-     *
-     * Requires token with "access-stream"
-     *
-     * @param Library $library
-     * @param Song $song
-     * @return BinaryFileResponse
-     */
-    #[Get('/stream/song/{song}/direct', 'api.songs.stream', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_STREAM->value])]
-    public function directStream(Library $library, Song $song)
-    {
-        return response()->file($song->getPath());
-    }
 }

@@ -2,7 +2,7 @@
 
 import { useMutation, UseMutationOptions, useQuery, UseQueryOptions } from "@tanstack/react-query";
 import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, RetryService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
-import { AuthenticateUsingPasskeyRequest, CreateLibraryRequest, CreatePlaylistRequest, CreateSmartPlaylistRequest, CreateUserRequest, ForgotPasswordRequest, LoginRequest, LogoutRequest, RegisterRequest, ResetPasswordRequest, RetryJobRequest, StartStreamRequest, StorePasskeyRequest, UpdateGenreRequest, UpdateLibraryRequest, UpdatePlaylistRequest, UpdateSmartPlaylistRulesRequest, UpdateUserRequest } from "../requests/types.gen";
+import { AuthenticateUsingPasskeyRequest, CreateLibraryRequest, CreatePlaylistRequest, CreateSmartPlaylistRequest, CreateUserRequest, ForgotPasswordRequest, LoginRequest, LogoutRequest, RegisterRequest, ResetPasswordRequest, RetryJobRequest, StorePasskeyRequest, UpdateGenreRequest, UpdateLibraryRequest, UpdatePlaylistRequest, UpdateSmartPlaylistRulesRequest, UpdateUserRequest } from "../requests/types.gen";
 import * as Common from "./common";
 /**
 * Get a collection of albums
@@ -168,10 +168,14 @@ export const useFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownload =
   fileIdentifier: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadKeyFn({ fileIdentifier }, queryKey), queryFn: () => FilesService.getSystemLogViewerApiFilesByFileIdentifierDownload({ fileIdentifier }) as TData, ...options });
 /**
+* @param data The data for the request.
+* @param data.direction
 * @returns LogFolderResource Array of `LogFolderResource`
 * @throws ApiError
 */
-export const useFoldersServiceGetSystemLogViewerApiFolders = <TData = Common.FoldersServiceGetSystemLogViewerApiFoldersDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseFoldersServiceGetSystemLogViewerApiFoldersKeyFn(queryKey), queryFn: () => FoldersService.getSystemLogViewerApiFolders() as TData, ...options });
+export const useFoldersServiceGetSystemLogViewerApiFolders = <TData = Common.FoldersServiceGetSystemLogViewerApiFoldersDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ direction }: {
+  direction?: string;
+} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseFoldersServiceGetSystemLogViewerApiFoldersKeyFn({ direction }, queryKey), queryFn: () => FoldersService.getSystemLogViewerApiFolders({ direction }) as TData, ...options });
 /**
 * @param data The data for the request.
 * @param data.folderIdentifier
@@ -360,12 +364,14 @@ export const usePlaylistServiceGetApiPlaylists = <TData = Common.PlaylistService
 * Show a playlist
 * @param data The data for the request.
 * @param data.playlist The playlist public id
+* @param data.relations
 * @returns PlaylistResource `PlaylistResource`
 * @throws ApiError
 */
-export const usePlaylistServiceGetApiPlaylistsByPlaylist = <TData = Common.PlaylistServiceGetApiPlaylistsByPlaylistDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ playlist }: {
+export const usePlaylistServiceGetApiPlaylistsByPlaylist = <TData = Common.PlaylistServiceGetApiPlaylistsByPlaylistDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ playlist, relations }: {
   playlist: string;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePlaylistServiceGetApiPlaylistsByPlaylistKeyFn({ playlist }, queryKey), queryFn: () => PlaylistService.getApiPlaylistsByPlaylist({ playlist }) as TData, ...options });
+  relations?: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePlaylistServiceGetApiPlaylistsByPlaylistKeyFn({ playlist, relations }, queryKey), queryFn: () => PlaylistService.getApiPlaylistsByPlaylist({ playlist, relations }) as TData, ...options });
 /**
 * Get statistics
 * @param data The data for the request.
@@ -478,24 +484,16 @@ export const useSongServiceGetApiLibrariesByLibrarySongsByPublicId = <TData = Co
   relations?: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSongServiceGetApiLibrariesByLibrarySongsByPublicIdKeyFn({ library, publicId, relations }, queryKey), queryFn: () => SongService.getApiLibrariesByLibrarySongsByPublicId({ library, publicId, relations }) as TData, ...options });
 /**
-* Direct stream the song
+* Direct stream the song.
 * Requires token with "access-stream"
 * @param data The data for the request.
-* @param data.library The library slug
 * @param data.song The song public id
 * @returns unknown
 * @throws ApiError
 */
-export const useSongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirect = <TData = Common.SongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirectDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ library, song }: {
-  library: string;
+export const useStreamServiceGetApiStreamSongBySongDirect = <TData = Common.StreamServiceGetApiStreamSongBySongDirectDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ song }: {
   song: string;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirectKeyFn({ library, song }, queryKey), queryFn: () => SongService.getApiLibrariesByLibrarySongsStreamSongBySongDirect({ library, song }) as TData, ...options });
-/**
-* Generate a unique session ID for streams
-* @returns unknown
-* @throws ApiError
-*/
-export const useStreamServiceGetApiStreamSession = <TData = Common.StreamServiceGetApiStreamSessionDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseStreamServiceGetApiStreamSessionKeyFn(queryKey), queryFn: () => StreamService.getApiStreamSession() as TData, ...options });
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseStreamServiceGetApiStreamSongBySongDirectKeyFn({ song }, queryKey), queryFn: () => StreamService.getApiStreamSongBySongDirect({ song }) as TData, ...options });
 /**
 * Get php info
 * @returns unknown
@@ -967,42 +965,6 @@ export const useRetryServicePostHorizonApiJobsRetryById = <TData = Common.RetryS
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   id: string;
 }, TContext>({ mutationFn: ({ id }) => RetryService.postHorizonApiJobsRetryById({ id }) as unknown as Promise<TData>, ...options });
-/**
-* Start a stream
-* @param data The data for the request.
-* @param data.requestBody
-* @returns unknown
-* @throws ApiError
-*/
-export const useStreamServicePostApiStreamStart = <TData = Common.StreamServicePostApiStreamStartMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  requestBody?: StartStreamRequest & { session_id?: string; options?: string; protocol?: string; start_time?: string; };
-}, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  requestBody?: StartStreamRequest & { session_id?: string; options?: string; protocol?: string; start_time?: string; };
-}, TContext>({ mutationFn: ({ requestBody }) => StreamService.postApiStreamStart({ requestBody }) as unknown as Promise<TData>, ...options });
-/**
-* Stop a stream
-* @param data The data for the request.
-* @param data.requestBody
-* @returns unknown
-* @throws ApiError
-*/
-export const useStreamServicePostApiStreamStop = <TData = Common.StreamServicePostApiStreamStopMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  requestBody: { session_id: string; };
-}, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  requestBody: { session_id: string; };
-}, TContext>({ mutationFn: ({ requestBody }) => StreamService.postApiStreamStop({ requestBody }) as unknown as Promise<TData>, ...options });
-/**
-* Seek within a stream
-* @param data The data for the request.
-* @param data.requestBody
-* @returns unknown
-* @throws ApiError
-*/
-export const useStreamServicePostApiStreamSeek = <TData = Common.StreamServicePostApiStreamSeekMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  requestBody: { session_id: string; options: Array<(string)>; seek_time: number; };
-}, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  requestBody: { session_id: string; options: Array<(string)>; seek_time: number; };
-}, TContext>({ mutationFn: ({ requestBody }) => StreamService.postApiStreamSeek({ requestBody }) as unknown as Promise<TData>, ...options });
 /**
 * Create user
 * This is endpoint allows administrators to create users

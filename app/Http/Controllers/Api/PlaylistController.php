@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Playlist\{CreatePlaylistRequest,
     CreateSmartPlaylistRequest,
+    PlaylistShowRequest,
     UpdatePlaylistRequest,
     UpdateSmartPlaylistRulesRequest};
 use App\Http\Resources\Playlist\PlaylistResource;
@@ -64,11 +65,11 @@ class PlaylistController extends Controller
      * @return PlaylistResource
      */
     #[Get('{playlist}', 'api.playlist.show', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
-    public function show(Playlist $playlist)
+    public function show(PlaylistShowRequest $request, Playlist $playlist)
     {
         $this->authorize('view', $playlist);
 
-        $playlist->loadMissing('cover', 'songs', 'songs.artists');
+        $playlist->loadMissing('cover', 'songs', 'songs.artists', 'songs.album');
 
         return new PlaylistResource($playlist);
     }

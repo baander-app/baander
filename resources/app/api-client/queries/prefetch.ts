@@ -167,10 +167,14 @@ export const prefetchUseFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDo
   fileIdentifier: string;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadKeyFn({ fileIdentifier }), queryFn: () => FilesService.getSystemLogViewerApiFilesByFileIdentifierDownload({ fileIdentifier }) });
 /**
+* @param data The data for the request.
+* @param data.direction
 * @returns LogFolderResource Array of `LogFolderResource`
 * @throws ApiError
 */
-export const prefetchUseFoldersServiceGetSystemLogViewerApiFolders = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseFoldersServiceGetSystemLogViewerApiFoldersKeyFn(), queryFn: () => FoldersService.getSystemLogViewerApiFolders() });
+export const prefetchUseFoldersServiceGetSystemLogViewerApiFolders = (queryClient: QueryClient, { direction }: {
+  direction?: string;
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseFoldersServiceGetSystemLogViewerApiFoldersKeyFn({ direction }), queryFn: () => FoldersService.getSystemLogViewerApiFolders({ direction }) });
 /**
 * @param data The data for the request.
 * @param data.folderIdentifier
@@ -359,12 +363,14 @@ export const prefetchUsePlaylistServiceGetApiPlaylists = (queryClient: QueryClie
 * Show a playlist
 * @param data The data for the request.
 * @param data.playlist The playlist public id
+* @param data.relations
 * @returns PlaylistResource `PlaylistResource`
 * @throws ApiError
 */
-export const prefetchUsePlaylistServiceGetApiPlaylistsByPlaylist = (queryClient: QueryClient, { playlist }: {
+export const prefetchUsePlaylistServiceGetApiPlaylistsByPlaylist = (queryClient: QueryClient, { playlist, relations }: {
   playlist: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UsePlaylistServiceGetApiPlaylistsByPlaylistKeyFn({ playlist }), queryFn: () => PlaylistService.getApiPlaylistsByPlaylist({ playlist }) });
+  relations?: string;
+}) => queryClient.prefetchQuery({ queryKey: Common.UsePlaylistServiceGetApiPlaylistsByPlaylistKeyFn({ playlist, relations }), queryFn: () => PlaylistService.getApiPlaylistsByPlaylist({ playlist, relations }) });
 /**
 * Get statistics
 * @param data The data for the request.
@@ -477,24 +483,16 @@ export const prefetchUseSongServiceGetApiLibrariesByLibrarySongsByPublicId = (qu
   relations?: string;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseSongServiceGetApiLibrariesByLibrarySongsByPublicIdKeyFn({ library, publicId, relations }), queryFn: () => SongService.getApiLibrariesByLibrarySongsByPublicId({ library, publicId, relations }) });
 /**
-* Direct stream the song
+* Direct stream the song.
 * Requires token with "access-stream"
 * @param data The data for the request.
-* @param data.library The library slug
 * @param data.song The song public id
 * @returns unknown
 * @throws ApiError
 */
-export const prefetchUseSongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirect = (queryClient: QueryClient, { library, song }: {
-  library: string;
+export const prefetchUseStreamServiceGetApiStreamSongBySongDirect = (queryClient: QueryClient, { song }: {
   song: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseSongServiceGetApiLibrariesByLibrarySongsStreamSongBySongDirectKeyFn({ library, song }), queryFn: () => SongService.getApiLibrariesByLibrarySongsStreamSongBySongDirect({ library, song }) });
-/**
-* Generate a unique session ID for streams
-* @returns unknown
-* @throws ApiError
-*/
-export const prefetchUseStreamServiceGetApiStreamSession = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseStreamServiceGetApiStreamSessionKeyFn(), queryFn: () => StreamService.getApiStreamSession() });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseStreamServiceGetApiStreamSongBySongDirectKeyFn({ song }), queryFn: () => StreamService.getApiStreamSongBySongDirect({ song }) });
 /**
 * Get php info
 * @returns unknown
