@@ -25,4 +25,9 @@ class LaravelCacheRepository implements CacheRepositoryInterface
     {
         empty($tags) ? Cache::forget($key) : Cache::tags($tags)->forget($key);
     }
+
+    public function hashKey(string $key)
+    {
+        return hash('sha256', $key);
+    }
 }

@@ -189,7 +189,7 @@ return [
         App\Providers\HorizonServiceProvider::class,
         App\Providers\RouteServiceProvider::class,
         App\Providers\ScrambleServiceProvider::class,
-        App\Providers\MicroserviceProvider::class,
+        App\Providers\RecommendationServiceProvider::class,
     ])->toArray(),
 
     /*

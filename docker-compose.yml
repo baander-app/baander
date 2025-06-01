@@ -41,6 +41,7 @@ services:
       - 'host.docker.internal:host-gateway'
     volumes:
       - ./:/var/www/html:cached
+      - ./docker/general/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf:ro
     networks:
       - baander-backtier
 

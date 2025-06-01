@@ -13,6 +13,8 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         $schedule->command('horizon:snapshot')->everyFiveMinutes()->onOneServer();
+        $schedule->command('sanctum:tokens clean')->daily();
+        $schedule->command('sanctum:tokens cache')->weekly();
     }
 
     /**

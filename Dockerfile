@@ -15,7 +15,7 @@ ARG INSIDE_DOCKER_CONTAINER=1
 ENV INSIDE_DOCKER_CONTAINER=$INSIDE_DOCKER_CONTAINER
 ARG XDEBUG_CONFIG=main
 ENV XDEBUG_CONFIG=$XDEBUG_CONFIG
-ARG XDEBUG_VERSION=3.4.1
+ARG XDEBUG_VERSION=3.4.3
 ENV XDEBUG_VERSION=$XDEBUG_VERSION
 
 # Check environment
@@ -91,10 +91,14 @@ RUN set -xe && \
 RUN set -xe \
     && pecl channel-update pecl.php.net \
     && mkdir -p /usr/local/src/pecl \
-    # var_representation
-    && pecl bundle -d /usr/local/src/pecl var_representation \
-    && docker-php-ext-configure /usr/local/src/pecl/var_representation \
-    && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/var_representation \
+    # protobuf
+    && pecl bundle -d /usr/local/src/pecl protobuf \
+    && docker-php-ext-configure /usr/local/src/pecl/protobuf \
+    && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/protobuf \
+    # grpc
+    && pecl bundle -d /usr/local/src/pecl grpc \
+    && docker-php-ext-configure /usr/local/src/pecl/grpc \
+    && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/grpc \
     # jsonpath
     && pecl bundle -d /usr/local/src/pecl jsonpath \
     && docker-php-ext-configure /usr/local/src/pecl/jsonpath \

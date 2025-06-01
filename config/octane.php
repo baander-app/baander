@@ -50,6 +50,14 @@ return [
         'options' => [
             'log_file'           => storage_path('logs/swoole_http.log'),
         ],
+        'swoole_env' => [
+            'OTEL_PHP_AUTOLOAD_ENABLED=true',
+            'OTEL_SERVICE_NAME=BAANDER',
+            'OTEL_TRACES_EXPORTER=otlp',
+            'OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf',
+            'OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318',
+            'OTEL_PROPAGATORS=baggage,tracecontext'
+        ]
     ],
 
     /*

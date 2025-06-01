@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Baander;
 use App\Models\Album;
+use App\Models\Song;
 use App\Modules\MediaMeta\MediaMeta;
 
 class UIController
@@ -17,11 +18,13 @@ class UIController
 
     public function dbg()
     {
-        $album = Album::first();
-        $song = $album->songs()->first();
+        $data = Song::find(1);
 
-        $meta = new MediaMeta($song->path);
+        $rec = $data->getRecommendations('same_genre');
 
-        dd($meta->getArtist());
+        dd([
+            'song' => $data->toArray(),
+            'recom' => $rec->each(fn($a) => $a->get('title'))->toArray(),
+        ]);
     }
 }

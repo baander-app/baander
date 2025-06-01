@@ -83,4 +83,23 @@ return [
         'validate_csrf_token'  => Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Redis Configuration
+    |--------------------------------------------------------------------------
+    */
+    'token_cache' => [
+        'enabled' => env('SANCTUM_REDIS_ENABLED', true),
+        'store' => env('SANCTUM_CACHE_STORE', 'redis'),
+        'prefix' => env('SANCTUM_CACHE_PREFIX', 'sanctum_token:'),
+        'ttl' => (int) env('SANCTUM_CACHE_TTL', 1440), // Default 24 hours (1440 minutes)
+    ],
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Token Invalidation on Logout
+    |--------------------------------------------------------------------------
+    */
+    'invalidate_on_logout' => (bool) env('SANCTUM_INVALIDATE_ON_LOGOUT', true),
 ];

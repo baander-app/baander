@@ -64,7 +64,6 @@ class AuthController
     public function refreshToken(Request $request)
     {
         $device = PersonalAccessToken::prepareDeviceFromRequest($request);
-        $tokenName = 'access_token';
 
         $accessToken = $request->user()->createToken(
             name: 'access_token',
