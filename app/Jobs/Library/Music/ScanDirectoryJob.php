@@ -63,7 +63,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
 
         $files->each(function (SplFileInfo $file) use (&$songs, &$coverJobs, &$lyrics, &$processedFiles, &$fileCount) {
             $mediaMeta = new MediaMeta($file->getRealPath());
-            $this->processFile($mediaMeta, $file, $songs, $coverJobs, $lyrics);
+            $this->processFile($mediaMeta, $file, $songs, $coverJobs);
 
             if (count($songs) >= self::BATCH_SIZE) {
                 $this->batchSaveSongs($songs);
@@ -78,6 +78,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
 
         $this->queueProgress(100);
         $this->queueData(['processedFiles' => $processedFiles, 'fileCount' => $fileCount]);
+        $this->delete();
     }
 
 

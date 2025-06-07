@@ -3,14 +3,14 @@
 namespace App\Providers;
 
 use App\Baander;
+use App\Http\Integrations\Transcoder\TranscoderClient;
 use App\Repositories\Cache\CacheRepositoryInterface;
 use App\Repositories\Cache\LaravelCacheRepository;
-use Baander\RedisStack\RedisStack;
 use Ergebnis\Clock\SystemClock;
 use GuzzleHttp\Client;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\{DB, Log, Redis, URL};
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\ImageManager;
@@ -37,10 +37,6 @@ class AppServiceProvider extends ServiceProvider
             return new ImageManager(new Driver());
         });
 
-        $this->app->scoped(RedisStack::class, function (Application $app) {
-            return new RedisStack(Redis::connection()->client());
-        });
-
         $this->app->scoped(MusicBrainz::class, function (Application $app) {
             $guzzle = new GuzzleHttpAdapter(new Client());
             $musicBrainz = new MusicBrainz($guzzle, $app->get(LoggerInterface::class)->channel('buggregator'));
@@ -49,6 +45,14 @@ class AppServiceProvider extends ServiceProvider
                 ->setUserAgent('Baander server/' . Baander::VERSION);
 
             return $musicBrainz;
+        });
+
+        $this->app->scoped(TranscoderClient::class, function (Application $app) {
+            $guzzle = new Client();
+            return new TranscoderClient(
+                client: $guzzle,
+                baseUrl: 'http://' . config('transcoder.host') . ':' . config('transcoder.port'),
+            );
         });
     }
 

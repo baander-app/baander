@@ -90,8 +90,7 @@
   "autoload": {
     "psr-4": {
       "App\\": "app/",
-      "Baander\\Common\\": "packages/common/src/",
-      "Baander\\Transcoder\\": "packages/transcoder/src/",
+      "Baander\\RedisStack\\": "packages/redis-stack/src/",
       "Database\\Factories\\": "database/factories/",
       "Database\\Seeders\\": "database/seeders/"
     },

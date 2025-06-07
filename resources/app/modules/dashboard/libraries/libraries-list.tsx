@@ -28,7 +28,7 @@ export function LibrariesList() {
     if (data?.data) {
       const items = data.data.map(x => (
         <tr key={x.slug}>
-          <td>{x.name}</td>
+          <td>{x.name} ({x.type})</td>
           <td>{x.path}</td>
           <td>{x.lastScan}</td>
           <td>{x.createdAt}</td>

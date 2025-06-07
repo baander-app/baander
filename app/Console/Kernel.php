@@ -2,6 +2,7 @@
 
 namespace App\Console;
 
+use App\Jobs\Library\Metadata\ProbeQueueChecker;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -15,6 +16,7 @@ class Kernel extends ConsoleKernel
         $schedule->command('horizon:snapshot')->everyFiveMinutes()->onOneServer();
         $schedule->command('sanctum:tokens clean')->daily();
         $schedule->command('sanctum:tokens cache')->weekly();
+        $schedule->job(new ProbeQueueChecker())->everyMinute();
     }
 
     /**

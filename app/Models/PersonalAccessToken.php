@@ -57,10 +57,10 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
      * @param  mixed  $tokenable
      * @param  string  $name
      * @param  array  $abilities
-     * @param  \DateTimeInterface|null  $expiresAt
+     * @param \DateTimeInterface|null $expiresAt
      * @return \Laravel\Sanctum\NewAccessToken
      */
-    public static function createToken($tokenable, string $name, array $abilities = ['*'], \DateTimeInterface $expiresAt = null)
+    public static function createToken($tokenable, string $name, array $abilities = ['*'], ?\DateTimeInterface $expiresAt = null)
     {
         $plainTextToken = Str::random(40);
 

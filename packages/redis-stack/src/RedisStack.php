@@ -13,10 +13,10 @@ class RedisStack
     protected Redis $redis;
     private static LoggerInterface $logger;
 
-    public function __construct(Redis $redis, ?LoggerInterface $logger)
+    public function __construct(Redis $redis, ?LoggerInterface $logger = null)
     {
         $this->redis = $redis;
-        self::$logger = $logger;
+        self::$logger = $logger ?? \Log::getLogger();
     }
 
     public static function getLogger(): ?LoggerInterface

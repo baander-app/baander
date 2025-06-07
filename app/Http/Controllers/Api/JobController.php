@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Exceptions\Jobs\Manager\CouldNotFindJobException;
 use App\Http\Controllers\Controller;
 use App\Jobs\Library\Music\ScanMusicLibraryJob;
+use App\Jobs\Movies\ScanMovieLibraryJob;
 use App\Models\{Library, TokenAbility};
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Bus\DispatchesJobs;
@@ -37,7 +38,10 @@ class JobController extends Controller
             throw CouldNotFindJobException::throwFromController($e);
         }
 
-        $job = new ScanMusicLibraryJob($library);
+        $job = match ($library->type) {
+            'movie' => new ScanMovieLibraryJob($library),
+            'music' => new ScanMusicLibraryJob($library),
+        };
         $this->dispatch($job);
 
         return [

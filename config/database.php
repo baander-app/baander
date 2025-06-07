@@ -92,7 +92,7 @@ return [
 
         'options' => [
             'cluster'     => env('REDIS_CLUSTER', 'redis'),
-            'prefix'      => env('REDIS_PREFIX', 'baander_database_'),
+            'prefix'      => env('REDIS_PREFIX', ''),
             'serializer'  => Redis::SERIALIZER_IGBINARY,
             'compression' => Redis::COMPRESSION_ZSTD,
         ],

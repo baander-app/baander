@@ -40,6 +40,7 @@ services:
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     volumes:
+      - /mnt/c/baander-library:/storage/baander-library
       - ./:/var/www/html:cached
       - ./docker/general/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf:ro
     networks:
@@ -82,3 +83,4 @@ services:
 networks:
   baander-backtier:
     name: baander-backtier
+    external: true
