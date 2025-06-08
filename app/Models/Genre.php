@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Spatie\Sluggable\{HasSlug, SlugOptions};
+use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 
 class Genre extends BaseModel
 {
-    use HasFactory, HasSlug;
+    use HasFactory, HasSlug, HasRecursiveRelationships;
 
     public static array $filterFields = [
         'name',

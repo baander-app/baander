@@ -207,6 +207,16 @@ export type LogoutRequest = {
     refresh_token?: string;
 };
 
+export type MovieResource = {
+    title: string;
+    slug: string;
+    year: number | null;
+    summary: string | null;
+    created_at: string | null;
+    updated_at: string | null;
+    videos_count?: string;
+};
+
 export type NewAccessTokenResource = {
     token: string;
     abilities: string;
@@ -555,12 +565,8 @@ export type PostWebauthnPasskeyData = {
 };
 
 export type PostWebauthnPasskeyResponse = {
-    accessToken: {
-        [key: string]: unknown;
-    };
-    refreshToken: {
-        [key: string]: unknown;
-    };
+    accessToken: NewAccessTokenResource;
+    refreshToken: NewAccessTokenResource;
 } | string;
 
 export type GetWebauthnPasskeyRegisterResponse = string | {
@@ -962,6 +968,62 @@ export type DeleteHorizonApiMonitoringByTagData = {
 export type DeleteHorizonApiMonitoringByTagResponse = {
     [key: string]: unknown;
 };
+
+export type GetApiLibrariesByLibraryMoviesData = {
+    /**
+     * The library slug
+     */
+    library: string;
+};
+
+export type GetApiLibrariesByLibraryMoviesResponse = {
+    data: Array<MovieResource>;
+    meta: {
+        /**
+         * Total number of items being paginated.
+         */
+        total: number;
+        /**
+         * The number of items for the current page
+         */
+        count: number;
+        /**
+         * The number of items per page
+         */
+        limit: number;
+        /**
+         * The number of current page
+         */
+        currentPage: number;
+        /**
+         * The number of next page
+         */
+        nextPage: number;
+        /**
+         * The number of last page
+         */
+        lastPage: number;
+    };
+    links: {
+        first: string | null;
+        last: string | null;
+        prev: string | null;
+        next: string | null;
+    };
+};
+
+export type GetApiLibrariesByLibraryMoviesByMovieData = {
+    /**
+     * The library slug
+     */
+    library: string;
+    /**
+     * The movie slug
+     */
+    movie: string;
+};
+
+export type GetApiLibrariesByLibraryMoviesByMovieResponse = MovieResource;
 
 export type GetApiOpcacheStatusResponse = {
     opcache_enabled: boolean;
@@ -1660,15 +1722,6 @@ export type $OpenApiTs = {
                     message: string;
                 };
                 /**
-                 * Authorization error
-                 */
-                403: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
                  * Not found
                  */
                 404: {
@@ -1776,15 +1829,6 @@ export type $OpenApiTs = {
                     message: string;
                 };
                 /**
-                 * Authorization error
-                 */
-                403: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
                  * Validation error
                  */
                 422: {
@@ -1843,15 +1887,6 @@ export type $OpenApiTs = {
                  * An error
                  */
                 401: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
-                 * Authorization error
-                 */
-                403: {
                     /**
                      * Error overview.
                      */
@@ -1920,15 +1955,6 @@ export type $OpenApiTs = {
                     refreshToken: NewAccessTokenResource;
                 };
                 /**
-                 * Authorization error
-                 */
-                403: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
                  * Validation error
                  */
                 422: {
@@ -1951,15 +1977,6 @@ export type $OpenApiTs = {
             req: PostApiAuthForgotPasswordData;
             res: {
                 200: {
-                    message: string;
-                };
-                /**
-                 * Authorization error
-                 */
-                403: {
-                    /**
-                     * Error overview.
-                     */
                     message: string;
                 };
                 /**
@@ -1991,15 +2008,6 @@ export type $OpenApiTs = {
                  * An error
                  */
                 400: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
-                 * Authorization error
-                 */
-                403: {
                     /**
                      * Error overview.
                      */
@@ -2061,15 +2069,6 @@ export type $OpenApiTs = {
                     message: string;
                 };
                 /**
-                 * Authorization error
-                 */
-                403: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
                  * Validation error
                  */
                 422: {
@@ -2101,12 +2100,8 @@ export type $OpenApiTs = {
             req: PostWebauthnPasskeyData;
             res: {
                 200: {
-    accessToken: {
-        [key: string]: unknown;
-    };
-    refreshToken: {
-        [key: string]: unknown;
-    };
+    accessToken: NewAccessTokenResource;
+    refreshToken: NewAccessTokenResource;
 } | string;
                 401: {
                     message: string;
@@ -2156,15 +2151,6 @@ export type $OpenApiTs = {
                  * Unauthenticated
                  */
                 401: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
-                 * Authorization error
-                 */
-                403: {
                     /**
                      * Error overview.
                      */
@@ -2512,15 +2498,6 @@ export type $OpenApiTs = {
                     message: string;
                 };
                 /**
-                 * Authorization error
-                 */
-                403: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
                  * Validation error
                  */
                 422: {
@@ -2577,15 +2554,6 @@ export type $OpenApiTs = {
                  * Unauthenticated
                  */
                 401: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
-                 * Authorization error
-                 */
-                403: {
                     /**
                      * Error overview.
                      */
@@ -2768,15 +2736,6 @@ export type $OpenApiTs = {
                     message: string;
                 };
                 /**
-                 * Authorization error
-                 */
-                403: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
                  * Validation error
                  */
                 422: {
@@ -2804,15 +2763,6 @@ export type $OpenApiTs = {
                  * Unauthenticated
                  */
                 401: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
-                 * Authorization error
-                 */
-                403: {
                     /**
                      * Error overview.
                      */
@@ -2993,6 +2943,98 @@ export type $OpenApiTs = {
             res: {
                 200: {
                     [key: string]: unknown;
+                };
+            };
+        };
+    };
+    '/api/libraries/{library}/movies': {
+        get: {
+            req: GetApiLibrariesByLibraryMoviesData;
+            res: {
+                /**
+                 * Paginated set of `MovieResource`
+                 */
+                200: {
+                    data: Array<MovieResource>;
+                    meta: {
+                        /**
+                         * Total number of items being paginated.
+                         */
+                        total: number;
+                        /**
+                         * The number of items for the current page
+                         */
+                        count: number;
+                        /**
+                         * The number of items per page
+                         */
+                        limit: number;
+                        /**
+                         * The number of current page
+                         */
+                        currentPage: number;
+                        /**
+                         * The number of next page
+                         */
+                        nextPage: number;
+                        /**
+                         * The number of last page
+                         */
+                        lastPage: number;
+                    };
+                    links: {
+                        first: string | null;
+                        last: string | null;
+                        prev: string | null;
+                        next: string | null;
+                    };
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/libraries/{library}/movies/{movie}': {
+        get: {
+            req: GetApiLibrariesByLibraryMoviesByMovieData;
+            res: {
+                /**
+                 * `MovieResource`
+                 */
+                200: MovieResource;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
                 };
             };
         };
@@ -3195,15 +3237,6 @@ export type $OpenApiTs = {
                  * Unauthenticated
                  */
                 401: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
-                 * Authorization error
-                 */
-                403: {
                     /**
                      * Error overview.
                      */
@@ -3822,15 +3855,6 @@ export type $OpenApiTs = {
                     message: string;
                 };
                 /**
-                 * Authorization error
-                 */
-                403: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
                  * Validation error
                  */
                 422: {
@@ -4008,15 +4032,6 @@ export type $OpenApiTs = {
                     message: string;
                 };
                 /**
-                 * Authorization error
-                 */
-                403: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
                  * Validation error
                  */
                 422: {
@@ -4074,15 +4089,6 @@ export type $OpenApiTs = {
                     message: string;
                 };
                 /**
-                 * Authorization error
-                 */
-                403: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
                  * Validation error
                  */
                 422: {
@@ -4124,15 +4130,6 @@ export type $OpenApiTs = {
                  * Unauthenticated
                  */
                 401: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
-                 * Authorization error
-                 */
-                403: {
                     /**
                      * Error overview.
                      */
@@ -4301,15 +4298,6 @@ export type $OpenApiTs = {
                     message: string;
                 };
                 /**
-                 * Authorization error
-                 */
-                403: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
                  * Not found
                  */
                 404: {
@@ -4348,15 +4336,6 @@ export type $OpenApiTs = {
                  * Unauthenticated
                  */
                 401: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
-                 * Authorization error
-                 */
-                403: {
                     /**
                      * Error overview.
                      */
@@ -4514,15 +4493,6 @@ export type $OpenApiTs = {
                     message: string;
                 };
                 /**
-                 * Authorization error
-                 */
-                403: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
                  * Validation error
                  */
                 422: {
@@ -4550,15 +4520,6 @@ export type $OpenApiTs = {
                  * Unauthenticated
                  */
                 401: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
-                 * Authorization error
-                 */
-                403: {
                     /**
                      * Error overview.
                      */
@@ -4594,15 +4555,6 @@ export type $OpenApiTs = {
                  * Unauthenticated
                  */
                 401: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
-                 * Authorization error
-                 */
-                403: {
                     /**
                      * Error overview.
                      */
@@ -4745,15 +4697,6 @@ export type $OpenApiTs = {
                  * Unauthenticated
                  */
                 401: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
-                 * Authorization error
-                 */
-                403: {
                     /**
                      * Error overview.
                      */

@@ -1,8 +1,7 @@
 <?php
 
 use Laravel\Octane\Contracts\OperationTerminated;
-use Laravel\Octane\Events\{
-    RequestHandled,
+use Laravel\Octane\Events\{RequestHandled,
     RequestReceived,
     RequestTerminated,
     TaskReceived,
@@ -11,20 +10,14 @@ use Laravel\Octane\Events\{
     TickTerminated,
     WorkerErrorOccurred,
     WorkerStarting,
-    WorkerStopping
-};
-use Laravel\Octane\Listeners\{
-    CloseMonologHandlers,
-    CollectGarbage,
-    DisconnectFromDatabases,
+    WorkerStopping};
+use Laravel\Octane\Listeners\{CloseMonologHandlers,
     EnsureUploadedFilesAreValid,
     EnsureUploadedFilesCanBeMoved,
     FlushOnce,
     FlushTemporaryContainerInstances,
-    FlushUploadedFiles,
     ReportException,
-    StopWorkerIfNecessary
-};
+    StopWorkerIfNecessary};
 use Laravel\Octane\Octane;
 
 return [
@@ -45,19 +38,11 @@ return [
     'server' => env('OCTANE_SERVER', 'swoole'),
 
     'swoole' => [
-        'command'            => '/var/www/html/start-swoole-server',
-        'show_fatal_error'   => env('OCTANE_SHOW_FATAL_ERROR', true),
-        'options' => [
-            'log_file'           => storage_path('logs/swoole_http.log'),
+        'command'          => '/var/www/html/start-swoole-server',
+        'show_fatal_error' => env('OCTANE_SHOW_FATAL_ERROR', true),
+        'options'          => [
+            'log_file' => storage_path('logs/swoole_http.log'),
         ],
-        'swoole_env' => [
-            'OTEL_PHP_AUTOLOAD_ENABLED=true',
-            'OTEL_SERVICE_NAME=BAANDER',
-            'OTEL_TRACES_EXPORTER=otlp',
-            'OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf',
-            'OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318',
-            'OTEL_PROPAGATORS=baggage,tracecontext'
-        ]
     ],
 
     /*
@@ -170,6 +155,33 @@ return [
     */
 
     'tables' => [
+        'apm_queue_transactions:200' => [
+            'start_time' => 'float',
+            'job_name'   => 'string:255',
+            'queue_name' => 'string:255',
+            'connection' => 'string:255',
+        ],
+        'metrics_state:1000' => [
+            'timer_id' => 'int',
+            'running' => 'int',
+        ],
+        'job_resource_monitor:5000' => [
+            'samples' => 'int',
+            'cpu_avg' => 'float',
+            'memory_avg' => 'float',
+            'cpu_peak' => 'float',
+            'memory_peak' => 'float',
+            'cpu_min' => 'float',
+            'memory_min' => 'float',
+            'started_at' => 'int',
+            'last_updated' => 'int',
+            'last_cpu' => 'float',
+            'last_memory' => 'float',
+            'memory_mb' => 'float',
+            'status' => 'string:20',
+            'finished_at' => 'int',
+        ],
+
     ],
 
     /*

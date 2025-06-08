@@ -258,7 +258,7 @@ export function RootMenu() {
                             {link.label}
                           </NavLink>
                         </ContextMenu.Trigger>
-                        <PlaylistLayoutContextMenu id={link.to.split('/').at(-1)} />
+                        <PlaylistLayoutContextMenu id={link.to.split('/').at(-1)!} />
                       </ContextMenu.Root>
                     )
                   }

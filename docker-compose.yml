@@ -45,9 +45,14 @@ services:
       - ./docker/general/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf:ro
     networks:
       - baander-backtier
+#    environment:
+#      - ELASTIC_APM_SERVER_URL=https://192.168.50.151:8200
+#      - ELASTIC_APM_SERVICE_NAME=baander
+#      - ELASTIC_APM_VERIFY_SERVER_CERT=false
+#      - ELASTIC_APM_SECRET_TOKEN=jPEaWP9B6JqXPNVJ
 
   postgres:
-    image: postgres:16.3-bookworm
+    image: postgres:17.5-bookworm
     container_name: baander-postgres
     restart: unless-stopped
     networks:

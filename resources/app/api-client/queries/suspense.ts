@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryOptions, useSuspenseQuery } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
+import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, MovieService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
 import * as Common from "./common";
 /**
 * Get a collection of albums
@@ -331,6 +331,28 @@ export const useMonitoringServiceGetHorizonApiMonitoringByTagSuspense = <TData =
   limit?: string;
   tag: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseMonitoringServiceGetHorizonApiMonitoringByTagKeyFn({ limit, tag }, queryKey), queryFn: () => MonitoringService.getHorizonApiMonitoringByTag({ limit, tag }) as TData, ...options });
+/**
+* Get a collection of movies
+* @param data The data for the request.
+* @param data.library The library slug
+* @returns unknown Paginated set of `MovieResource`
+* @throws ApiError
+*/
+export const useMovieServiceGetApiLibrariesByLibraryMoviesSuspense = <TData = Common.MovieServiceGetApiLibrariesByLibraryMoviesDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ library }: {
+  library: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseMovieServiceGetApiLibrariesByLibraryMoviesKeyFn({ library }, queryKey), queryFn: () => MovieService.getApiLibrariesByLibraryMovies({ library }) as TData, ...options });
+/**
+* Get a movie
+* @param data The data for the request.
+* @param data.library The library slug
+* @param data.movie The movie slug
+* @returns MovieResource `MovieResource`
+* @throws ApiError
+*/
+export const useMovieServiceGetApiLibrariesByLibraryMoviesByMovieSuspense = <TData = Common.MovieServiceGetApiLibrariesByLibraryMoviesByMovieDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ library, movie }: {
+  library: string;
+  movie: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseMovieServiceGetApiLibrariesByLibraryMoviesByMovieKeyFn({ library, movie }, queryKey), queryFn: () => MovieService.getApiLibrariesByLibraryMoviesByMovie({ library, movie }) as TData, ...options });
 /**
 * Get status
 * @returns unknown

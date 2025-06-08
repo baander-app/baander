@@ -8,7 +8,7 @@ class Baander
 
     public static function getPeerName(): string
     {
-        return config('app.name') . ' v' . Baander::VERSION;
+        return config('app.name') . '/v' . Baander::VERSION;
     }
 
     public static function getAppInfo(): array

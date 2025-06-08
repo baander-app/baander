@@ -1,8 +1,8 @@
 import { forwardRef } from 'react';
 import { VirtuosoGrid, Components } from 'react-virtuoso';
 import { MediaItem } from '@/ui/media-library/media-item/media-item.tsx';
-import { MovieResource } from '@/modules/library-movies/modes.ts';
-import { movieResources } from '@/modules/library-movies/mock.ts';
+import { useMovieServiceGetApiLibrariesByLibraryMovies } from '@/api-client/queries';
+import { MovieResource } from '@/api-client/requests';
 
 // Ensure that this stays out of the component,
 // Otherwise the grid will remount with each render due to new component instances.
@@ -39,15 +39,20 @@ const gridComponents: Components<MovieResource> = {
 ;
 
 export function MovieList() {
+  const {
+    data,
+  } = useMovieServiceGetApiLibrariesByLibraryMovies({
+    library: 'movies'
+  })
 
 
   return (
     <>
 
       <VirtuosoGrid
-        style={{ display: 'flex', flexWrap: 'wrap', flex: 1 }}
-        data={movieResources}
-        totalCount={movieResources.length}
+        style={{ display: 'flex', flexWrap: 'wrap', flex: 1, overflowY: 'unset' }}
+        data={data?.data ?? []}
+        totalCount={data?.meta.total}
         // @ts-expect-error
         components={gridComponents}
         itemContent={(index, data) => <MediaItem key={index} item={data}/>}

@@ -37,6 +37,8 @@ class Album extends BaseModel
         'title',
         'slug',
         'year',
+        'mbid',
+        'discogs_id',
     ];
 
     protected $versionable = [

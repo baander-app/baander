@@ -1,6 +1,5 @@
 import { RootLayout } from '@/layouts/root-layout/root-layout.tsx';
 import { Navigate, Outlet, RouteObject } from 'react-router-dom';
-import { EchoContextProvider } from '@/providers/echo-provider.tsx';
 import { Suspense } from 'react';
 import { LibraryMusicRoutes } from '@/modules/library-music/routes/_routes.tsx';
 import { DashboardLayout } from '@/layouts/dashboard-layout/dashboard-layout.tsx';
@@ -16,15 +15,13 @@ import { LibraryMusicPlaylistsRoutes } from '@/modules/library-music-playlists/_
 
 const App = () => {
   return (
-    <EchoContextProvider>
-      <AudioPlayerContextProvider>
-        <RootLayout>
-          <Suspense>
-            <Outlet/>
-          </Suspense>
-        </RootLayout>
-      </AudioPlayerContextProvider>
-    </EchoContextProvider>
+    <AudioPlayerContextProvider>
+      <RootLayout>
+        <Suspense>
+          <Outlet/>
+        </Suspense>
+      </RootLayout>
+    </AudioPlayerContextProvider>
   );
 };
 

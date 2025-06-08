@@ -1,3 +1,4 @@
+
 import { BrowserRouter } from 'react-router-dom';
 
 import '@fontsource-variable/inter';
@@ -13,12 +14,43 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks.ts';
 import styles from './app.module.scss';
 import { removeToast } from '@/store/notifications/notifications-slice.ts';
 import { Iconify } from './ui/icons/iconify';
+import { useEffect } from 'react';
+import { apm } from '@/services/apm.ts';
+import { useApmRouteTracking } from '@/hooks/use-apm-route-tracking';
+import { ApmErrorBoundary } from '@/components/apm/apm-error-boundary';
+import { withApmInstrumentation } from '@/components/apm/with-apm-instrumentation';
 
+// Create a wrapper component that uses the hook
+function AppWithRouteTracking() {
+  useApmRouteTracking();
 
-function App() {
+  return (
+    <ApmErrorBoundary>
+      <AppRoutes />
+    </ApmErrorBoundary>
+  );
+}
+
+// Instrument the main app component
+const InstrumentedApp = withApmInstrumentation(function App() {
   const { toasts } = useAppSelector(state => state.notifications);
-  const {theme} = useAppSelector(state => state.ui);
+  const { theme } = useAppSelector(state => state.ui);
+  const { user } = useAppSelector(state => state.auth);
   const dispatch = useAppDispatch();
+
+  useEffect(() => {
+    if (user) {
+      apm.setUserContext({
+        email: user.email,
+        username: user.name,
+      });
+    } else {
+      apm.setUserContext({
+        email: undefined,
+        username: undefined,
+      })
+    }
+  }, [user]);
 
   const dispatchRemoveToast = (id: string) => {
     dispatch(removeToast({ id }));
@@ -34,7 +66,7 @@ function App() {
       >
         <MusicSourceProvider>
           <BrowserRouter>
-            <AppRoutes/>
+            <AppWithRouteTracking />
           </BrowserRouter>
 
           <ReactQueryDevtools/>
@@ -73,6 +105,6 @@ function App() {
       </Theme>
     </HelmetProvider>
   );
-}
+}, 'App');
 
-export default App;
+export default InstrumentedApp;

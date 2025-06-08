@@ -1,5 +1,5 @@
 import { Box, Text } from '@radix-ui/themes';
-import { MovieResource } from '@/modules/library-movies/modes.ts';
+import { MovieResource } from '@/api-client/requests';
 
 export interface MediaItemProps {
   item: MovieResource;
@@ -7,7 +7,7 @@ export interface MediaItemProps {
 export function MediaItem({ item }: MediaItemProps) {
   return (
     <Box>
-      <img src={item.poster ?? 'https://placehold.co/200x400'} />
+      <img src={'https://placehold.co/180x260'}  alt=""/>
 
       <Text>{item.title}</Text>
     </Box>

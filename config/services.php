@@ -10,8 +10,7 @@ return [
     'tastedive' => [
         'api_key' => env('TASTE_DIVE_API_KEY'),
     ],
-    'respool'   => [
-        'host'             => 'http://127.0.0.1:43243',
-        'certificate_path' => realpath(__DIR__ . '/../services/re-spool/localhost.pem'),
-    ],
+    'discogs' => [
+        'api_key' => env('DISCOGS_API_KEY'),
+    ]
 ];

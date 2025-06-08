@@ -44,6 +44,8 @@ class Song extends BaseModel implements DirectStreamableFile, Recommendable
         'comment',
         'hash',
         'librarySlug',
+        'mbid',
+        'discogs_id',
     ];
 
     public function getRouteKeyName(): string

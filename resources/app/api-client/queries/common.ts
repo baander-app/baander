@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, RetryService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
+import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, MovieService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, RetryService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
 export type AlbumServiceGetApiLibrariesByLibraryAlbumsDefaultResponse = Awaited<ReturnType<typeof AlbumService.getApiLibrariesByLibraryAlbums>>;
 export type AlbumServiceGetApiLibrariesByLibraryAlbumsQueryResult<TData = AlbumServiceGetApiLibrariesByLibraryAlbumsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAlbumServiceGetApiLibrariesByLibraryAlbumsKey = "AlbumServiceGetApiLibrariesByLibraryAlbums";
@@ -203,6 +203,19 @@ export const UseMonitoringServiceGetHorizonApiMonitoringByTagKeyFn = ({ limit, t
   limit?: string;
   tag: string;
 }, queryKey?: Array<unknown>) => [useMonitoringServiceGetHorizonApiMonitoringByTagKey, ...(queryKey ?? [{ limit, tag }])];
+export type MovieServiceGetApiLibrariesByLibraryMoviesDefaultResponse = Awaited<ReturnType<typeof MovieService.getApiLibrariesByLibraryMovies>>;
+export type MovieServiceGetApiLibrariesByLibraryMoviesQueryResult<TData = MovieServiceGetApiLibrariesByLibraryMoviesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useMovieServiceGetApiLibrariesByLibraryMoviesKey = "MovieServiceGetApiLibrariesByLibraryMovies";
+export const UseMovieServiceGetApiLibrariesByLibraryMoviesKeyFn = ({ library }: {
+  library: string;
+}, queryKey?: Array<unknown>) => [useMovieServiceGetApiLibrariesByLibraryMoviesKey, ...(queryKey ?? [{ library }])];
+export type MovieServiceGetApiLibrariesByLibraryMoviesByMovieDefaultResponse = Awaited<ReturnType<typeof MovieService.getApiLibrariesByLibraryMoviesByMovie>>;
+export type MovieServiceGetApiLibrariesByLibraryMoviesByMovieQueryResult<TData = MovieServiceGetApiLibrariesByLibraryMoviesByMovieDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useMovieServiceGetApiLibrariesByLibraryMoviesByMovieKey = "MovieServiceGetApiLibrariesByLibraryMoviesByMovie";
+export const UseMovieServiceGetApiLibrariesByLibraryMoviesByMovieKeyFn = ({ library, movie }: {
+  library: string;
+  movie: string;
+}, queryKey?: Array<unknown>) => [useMovieServiceGetApiLibrariesByLibraryMoviesByMovieKey, ...(queryKey ?? [{ library, movie }])];
 export type OpCacheServiceGetApiOpcacheStatusDefaultResponse = Awaited<ReturnType<typeof OpCacheService.getApiOpcacheStatus>>;
 export type OpCacheServiceGetApiOpcacheStatusQueryResult<TData = OpCacheServiceGetApiOpcacheStatusDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useOpCacheServiceGetApiOpcacheStatusKey = "OpCacheServiceGetApiOpcacheStatus";

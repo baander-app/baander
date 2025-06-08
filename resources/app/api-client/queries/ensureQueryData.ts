@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
+import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, MovieService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
 import * as Common from "./common";
 /**
 * Get a collection of albums
@@ -331,6 +331,28 @@ export const ensureUseMonitoringServiceGetHorizonApiMonitoringByTagData = (query
   limit?: string;
   tag: string;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseMonitoringServiceGetHorizonApiMonitoringByTagKeyFn({ limit, tag }), queryFn: () => MonitoringService.getHorizonApiMonitoringByTag({ limit, tag }) });
+/**
+* Get a collection of movies
+* @param data The data for the request.
+* @param data.library The library slug
+* @returns unknown Paginated set of `MovieResource`
+* @throws ApiError
+*/
+export const ensureUseMovieServiceGetApiLibrariesByLibraryMoviesData = (queryClient: QueryClient, { library }: {
+  library: string;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseMovieServiceGetApiLibrariesByLibraryMoviesKeyFn({ library }), queryFn: () => MovieService.getApiLibrariesByLibraryMovies({ library }) });
+/**
+* Get a movie
+* @param data The data for the request.
+* @param data.library The library slug
+* @param data.movie The movie slug
+* @returns MovieResource `MovieResource`
+* @throws ApiError
+*/
+export const ensureUseMovieServiceGetApiLibrariesByLibraryMoviesByMovieData = (queryClient: QueryClient, { library, movie }: {
+  library: string;
+  movie: string;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseMovieServiceGetApiLibrariesByLibraryMoviesByMovieKeyFn({ library, movie }), queryFn: () => MovieService.getApiLibrariesByLibraryMoviesByMovie({ library, movie }) });
 /**
 * Get status
 * @returns unknown

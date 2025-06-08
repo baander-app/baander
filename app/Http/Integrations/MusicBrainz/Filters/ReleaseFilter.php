@@ -13,6 +13,18 @@ class ReleaseFilter extends BaseFilter
         parent::__construct($limit, $offset);
     }
 
+    public function setTitle(?string $title): ReleaseFilter
+    {
+        $this->title = $title;
+        return $this;
+    }
+
+    public function setArtistName(?string $artistName): ReleaseFilter
+    {
+        $this->artistName = $artistName;
+        return $this;
+    }
+
     protected function buildQuery(): array
     {
         $query = [];

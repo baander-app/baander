@@ -579,6 +579,37 @@ export const $LogoutRequest = {
     title: 'LogoutRequest'
 } as const;
 
+export const $MovieResource = {
+    type: 'object',
+    properties: {
+        title: {
+            type: 'string'
+        },
+        slug: {
+            type: 'string'
+        },
+        year: {
+            type: ['integer', 'null']
+        },
+        summary: {
+            type: ['string', 'null']
+        },
+        created_at: {
+            type: ['string', 'null'],
+            format: 'date-time'
+        },
+        updated_at: {
+            type: ['string', 'null'],
+            format: 'date-time'
+        },
+        videos_count: {
+            type: 'string'
+        }
+    },
+    required: ['title', 'slug', 'year', 'summary', 'created_at', 'updated_at'],
+    title: 'MovieResource'
+} as const;
+
 export const $NewAccessTokenResource = {
     type: 'object',
     properties: {
@@ -634,8 +665,7 @@ export const $PersonalAccessTokenViewResource = {
             format: 'date-time'
         },
         expiresAt: {
-            type: ['string', 'null'],
-            format: 'date-time'
+            type: ['string', 'null']
         },
         createdAt: {
             type: ['string', 'null'],

@@ -1,4 +1,4 @@
-FROM php:zts-bookworm
+FROM php:bookworm
 
 COPY --from=martinjuul/ffmpeg-baander-static /usr/src/ffmpeg-build-script/workspace/bin/ffmpeg /bin/ffmpeg
 COPY --from=martinjuul/ffmpeg-baander-static /usr/src/ffmpeg-build-script/workspace/bin/ffprobe /bin/ffprobe
@@ -31,8 +31,10 @@ RUN set -xe \
     && DEBIAN_FRONTEND=noninteractive apt-get update -qq \
     && DEBIAN_FRONTEND=noninteractive apt-get upgrade -yqq \
     && DEBIAN_FRONTEND=noninteractive apt-get install -yqq -o=Dpkg::Use-Pty=0 \
+      ca-certificates \
       cron \
       curl \
+      wget \
       git \
       nano \
       nodejs \
@@ -136,9 +138,9 @@ RUN set -xe \
     && docker-php-ext-configure /usr/local/src/pecl/yaml \
     && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/yaml \
     # parallel
-    && pecl bundle -d /usr/local/src/pecl parallel \
-    && docker-php-ext-configure /usr/local/src/pecl/parallel \
-    && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/parallel \
+#    && pecl bundle -d /usr/local/src/pecl parallel \
+#    && docker-php-ext-configure /usr/local/src/pecl/parallel \
+#    && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/parallel \
     # uv
     && pecl bundle -d /usr/local/src/pecl uv \
     && docker-php-ext-configure /usr/local/src/pecl/uv \
@@ -147,6 +149,10 @@ RUN set -xe \
     && pecl bundle -d /usr/local/src/pecl swoole \
     && docker-php-ext-configure /usr/local/src/pecl/swoole --enable-sockets --enable-swoole-curl --enable-cares --enable-swoole-pgsql \
     && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/swoole \
+    # elastic apm
+    && wget https://github.com/elastic/apm-agent-php/releases/download/v1.15.0/apm-agent-php_1.15.0_amd64.deb \
+    && dpkg -i apm-agent-php_1.15.0_amd64.deb \
+    && rm apm-agent-php_1.15.0_amd64.deb \
     && rm -rf /usr/local/src/pecl \
     && rm -rf /tmp/* \
     && rm -rf /var/list/apt/* \
@@ -164,16 +170,21 @@ RUN set -xe \
 # put php config for Laravel
 #COPY ./docker/$BUILD_ARGUMENT_ENV/php.ini /usr/local/etc/php/php.ini
 
+COPY ./docker/dev/ca.crt /usr/local/share/ca-certificates/ca-self.crt
+
+RUN set -xe \
+    && update-ca-certificates
+
 # install Xdebug in case dev/test environment
 #COPY ./docker/general/do_we_need_xdebug.sh /tmp/
 #COPY ./docker/dev/xdebug-${XDEBUG_CONFIG}.ini /tmp/xdebug.ini
 #RUN chmod u+x /tmp/do_we_need_xdebug.sh && /tmp/do_we_need_xdebug.sh
 
-COPY /docker/dev/xdebug-main.ini /docker/dev/xdebug.ini
-
-RUN set -xe \
-    && pecl install xdebug-3.4.0 \
-    && mv /docker/dev/xdebug.ini /usr/local/etc/php/conf.d/
+#COPY /docker/dev/xdebug-main.ini /docker/dev/xdebug.ini
+#
+#RUN set -xe \
+#    && pecl install xdebug-3.4.0 \
+#    && mv /docker/dev/xdebug.ini /usr/local/etc/php/conf.d/
 
 # install composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer

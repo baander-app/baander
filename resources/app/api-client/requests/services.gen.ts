@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { GetApiLibrariesByLibraryAlbumsData, GetApiLibrariesByLibraryAlbumsResponse, GetApiLibrariesByLibraryAlbumsByAlbumData, GetApiLibrariesByLibraryAlbumsByAlbumResponse, GetApiLibrariesByLibraryArtistsData, GetApiLibrariesByLibraryArtistsResponse, GetApiLibrariesByLibraryArtistsByArtistData, GetApiLibrariesByLibraryArtistsByArtistResponse, PostApiAuthLoginData, PostApiAuthLoginResponse, PostApiAuthRefreshTokenResponse, PostApiAuthStreamTokenResponse, PostApiAuthRegisterData, PostApiAuthRegisterResponse, PostApiAuthForgotPasswordData, PostApiAuthForgotPasswordResponse, PostApiAuthResetPasswordData, PostApiAuthResetPasswordResponse, PostApiAuthVerifyByIdByHashData, PostApiAuthVerifyByIdByHashResponse, PostApiAuthLogoutData, PostApiAuthLogoutResponse, GetWebauthnPasskeyResponse, PostWebauthnPasskeyData, PostWebauthnPasskeyResponse, GetWebauthnPasskeyRegisterResponse, PostWebauthnPasskeyRegisterData, PostWebauthnPasskeyRegisterResponse, GetHorizonApiBatchesResponse, GetHorizonApiBatchesByIdData, GetHorizonApiBatchesByIdResponse, PostHorizonApiBatchesRetryByIdData, PostHorizonApiBatchesRetryByIdResponse, GetHorizonApiJobsCompletedData, GetHorizonApiJobsCompletedResponse, GetHorizonApiStatsResponse, GetHorizonApiJobsFailedData, GetHorizonApiJobsFailedResponse, GetHorizonApiJobsFailedByIdData, GetHorizonApiJobsFailedByIdResponse, GetSystemLogViewerApiFilesResponse, GetSystemLogViewerApiFilesByFileIdentifierDownloadRequestData, GetSystemLogViewerApiFilesByFileIdentifierDownloadRequestResponse, PostSystemLogViewerApiFilesByFileIdentifierClearCacheData, PostSystemLogViewerApiFilesByFileIdentifierClearCacheResponse, DeleteSystemLogViewerApiFilesByFileIdentifierData, DeleteSystemLogViewerApiFilesByFileIdentifierResponse, PostSystemLogViewerApiClearCacheAllResponse, PostSystemLogViewerApiDeleteMultipleFilesData, PostSystemLogViewerApiDeleteMultipleFilesResponse, GetSystemLogViewerApiFilesByFileIdentifierDownloadData, GetSystemLogViewerApiFilesByFileIdentifierDownloadResponse, GetSystemLogViewerApiFoldersData, GetSystemLogViewerApiFoldersResponse, GetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestData, GetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestResponse, PostSystemLogViewerApiFoldersByFolderIdentifierClearCacheData, PostSystemLogViewerApiFoldersByFolderIdentifierClearCacheResponse, DeleteSystemLogViewerApiFoldersByFolderIdentifierData, DeleteSystemLogViewerApiFoldersByFolderIdentifierResponse, GetSystemLogViewerApiFoldersByFolderIdentifierDownloadData, GetSystemLogViewerApiFoldersByFolderIdentifierDownloadResponse, GetApiGenresData, GetApiGenresResponse, GetApiGenresByGenreData, GetApiGenresByGenreResponse, PatchApiGenresByGenreData, PatchApiGenresByGenreResponse, DeleteApiGenresByGenreData, DeleteApiGenresByGenreResponse, GetSystemLogViewerApiHostsResponse, GetApiImagesByImageData, GetApiImagesByImageResponse, PostApiJobsScanLibraryBySlugData, PostApiJobsScanLibraryBySlugResponse, GetHorizonApiMetricsJobsResponse, GetHorizonApiMetricsJobsByIdData, GetHorizonApiMetricsJobsByIdResponse, GetHorizonApiJobsByIdData, GetHorizonApiJobsByIdResponse, GetApiLibrariesData, GetApiLibrariesResponse, PostApiLibrariesData, PostApiLibrariesResponse, GetApiLibrariesBySlugData, GetApiLibrariesBySlugResponse, PatchApiLibrariesBySlugData, PatchApiLibrariesBySlugResponse, DeleteApiLibrariesBySlugData, DeleteApiLibrariesBySlugResponse, GetSystemLogViewerApiLogsData, GetSystemLogViewerApiLogsResponse, GetHorizonApiMastersResponse, GetHorizonApiMonitoringResponse, PostHorizonApiMonitoringResponse, GetHorizonApiMonitoringByTagData, GetHorizonApiMonitoringByTagResponse, DeleteHorizonApiMonitoringByTagData, DeleteHorizonApiMonitoringByTagResponse, GetApiOpcacheStatusResponse, GetApiOpcacheConfigResponse, PostApiOpcacheClearResponse, PostApiOpcacheCompileData, PostApiOpcacheCompileResponse, GetHorizonApiJobsPendingData, GetHorizonApiJobsPendingResponse, GetApiPlaylistsResponse, PostApiPlaylistsData, PostApiPlaylistsResponse, GetApiPlaylistsByPlaylistData, GetApiPlaylistsByPlaylistResponse, PutApiPlaylistsByPlaylistData, PutApiPlaylistsByPlaylistResponse, DeleteApiPlaylistsByPlaylistData, DeleteApiPlaylistsByPlaylistResponse, PostApiPlaylistsByPlaylistSongsBySongData, PostApiPlaylistsByPlaylistSongsBySongResponse, DeleteApiPlaylistsByPlaylistSongsBySongData, DeleteApiPlaylistsByPlaylistSongsBySongResponse, PostApiPlaylistsByPlaylistReorderData, PostApiPlaylistsByPlaylistReorderResponse, PostApiPlaylistsByPlaylistCollaboratorsData, PostApiPlaylistsByPlaylistCollaboratorsResponse, DeleteApiPlaylistsByPlaylistCollaboratorsByUserData, DeleteApiPlaylistsByPlaylistCollaboratorsByUserResponse, PostApiPlaylistsByPlaylistCloneData, PostApiPlaylistsByPlaylistCloneResponse, GetApiPlaylistsByPlaylistStatisticsData, GetApiPlaylistsByPlaylistStatisticsResponse, PostApiPlaylistsByPlaylistStatisticsRecordViewData, PostApiPlaylistsByPlaylistStatisticsRecordViewResponse, PostApiPlaylistsByPlaylistStatisticsRecordPlayData, PostApiPlaylistsByPlaylistStatisticsRecordPlayResponse, PostApiPlaylistsByPlaylistStatisticsRecordShareData, PostApiPlaylistsByPlaylistStatisticsRecordShareResponse, PostApiPlaylistsByPlaylistStatisticsRecordFavoriteData, PostApiPlaylistsByPlaylistStatisticsRecordFavoriteResponse, PostApiPlaylistsSmartData, PostApiPlaylistsSmartResponse, PutApiPlaylistsByPlaylistSmartData, PutApiPlaylistsByPlaylistSmartResponse, PostApiPlaylistsByPlaylistSmartSyncData, PostApiPlaylistsByPlaylistSmartSyncResponse, GetApiQueueMetricsData, GetApiQueueMetricsResponse, GetApiQueueMetricsQueuesResponse, GetApiQueueMetricsMetricsData, GetApiQueueMetricsMetricsResponse, PostApiQueueMetricsRetryByIdData, PostApiQueueMetricsRetryByIdResponse, DeleteApiQueueMetricsByIdData, DeleteApiQueueMetricsByIdResponse, DeleteApiQueueMetricsPurgeResponse, GetHorizonApiMetricsQueuesResponse, GetHorizonApiMetricsQueuesByIdData, GetHorizonApiMetricsQueuesByIdResponse, PostHorizonApiJobsRetryByIdData, PostHorizonApiJobsRetryByIdResponse, GetApiSchemasMusicbrainzResponse, GetHorizonApiJobsSilencedData, GetHorizonApiJobsSilencedResponse, GetApiLibrariesByLibrarySongsData, GetApiLibrariesByLibrarySongsResponse, GetApiLibrariesByLibrarySongsByPublicIdData, GetApiLibrariesByLibrarySongsByPublicIdResponse, GetApiStreamSongBySongDirectData, GetApiStreamSongBySongDirectResponse, GetApiSystemInfoResponse, GetApiSystemInfoSysResponse, GetApiUsersData, GetApiUsersResponse, PostApiUsersData, PostApiUsersResponse, PatchApiUsersByUserData, PatchApiUsersByUserResponse, GetApiUsersByUserData, GetApiUsersByUserResponse, DeleteApiUsersByUserData, DeleteApiUsersByUserResponse, GetApiUsersMeResponse, GetApiUsersTokensByUserData, GetApiUsersTokensByUserResponse, DeleteApiUsersTokensByTokenData, DeleteApiUsersTokensByTokenResponse, GetHorizonApiWorkloadResponse } from './types.gen';
+import type { GetApiLibrariesByLibraryAlbumsData, GetApiLibrariesByLibraryAlbumsResponse, GetApiLibrariesByLibraryAlbumsByAlbumData, GetApiLibrariesByLibraryAlbumsByAlbumResponse, GetApiLibrariesByLibraryArtistsData, GetApiLibrariesByLibraryArtistsResponse, GetApiLibrariesByLibraryArtistsByArtistData, GetApiLibrariesByLibraryArtistsByArtistResponse, PostApiAuthLoginData, PostApiAuthLoginResponse, PostApiAuthRefreshTokenResponse, PostApiAuthStreamTokenResponse, PostApiAuthRegisterData, PostApiAuthRegisterResponse, PostApiAuthForgotPasswordData, PostApiAuthForgotPasswordResponse, PostApiAuthResetPasswordData, PostApiAuthResetPasswordResponse, PostApiAuthVerifyByIdByHashData, PostApiAuthVerifyByIdByHashResponse, PostApiAuthLogoutData, PostApiAuthLogoutResponse, GetWebauthnPasskeyResponse, PostWebauthnPasskeyData, PostWebauthnPasskeyResponse, GetWebauthnPasskeyRegisterResponse, PostWebauthnPasskeyRegisterData, PostWebauthnPasskeyRegisterResponse, GetHorizonApiBatchesResponse, GetHorizonApiBatchesByIdData, GetHorizonApiBatchesByIdResponse, PostHorizonApiBatchesRetryByIdData, PostHorizonApiBatchesRetryByIdResponse, GetHorizonApiJobsCompletedData, GetHorizonApiJobsCompletedResponse, GetHorizonApiStatsResponse, GetHorizonApiJobsFailedData, GetHorizonApiJobsFailedResponse, GetHorizonApiJobsFailedByIdData, GetHorizonApiJobsFailedByIdResponse, GetSystemLogViewerApiFilesResponse, GetSystemLogViewerApiFilesByFileIdentifierDownloadRequestData, GetSystemLogViewerApiFilesByFileIdentifierDownloadRequestResponse, PostSystemLogViewerApiFilesByFileIdentifierClearCacheData, PostSystemLogViewerApiFilesByFileIdentifierClearCacheResponse, DeleteSystemLogViewerApiFilesByFileIdentifierData, DeleteSystemLogViewerApiFilesByFileIdentifierResponse, PostSystemLogViewerApiClearCacheAllResponse, PostSystemLogViewerApiDeleteMultipleFilesData, PostSystemLogViewerApiDeleteMultipleFilesResponse, GetSystemLogViewerApiFilesByFileIdentifierDownloadData, GetSystemLogViewerApiFilesByFileIdentifierDownloadResponse, GetSystemLogViewerApiFoldersData, GetSystemLogViewerApiFoldersResponse, GetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestData, GetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestResponse, PostSystemLogViewerApiFoldersByFolderIdentifierClearCacheData, PostSystemLogViewerApiFoldersByFolderIdentifierClearCacheResponse, DeleteSystemLogViewerApiFoldersByFolderIdentifierData, DeleteSystemLogViewerApiFoldersByFolderIdentifierResponse, GetSystemLogViewerApiFoldersByFolderIdentifierDownloadData, GetSystemLogViewerApiFoldersByFolderIdentifierDownloadResponse, GetApiGenresData, GetApiGenresResponse, GetApiGenresByGenreData, GetApiGenresByGenreResponse, PatchApiGenresByGenreData, PatchApiGenresByGenreResponse, DeleteApiGenresByGenreData, DeleteApiGenresByGenreResponse, GetSystemLogViewerApiHostsResponse, GetApiImagesByImageData, GetApiImagesByImageResponse, PostApiJobsScanLibraryBySlugData, PostApiJobsScanLibraryBySlugResponse, GetHorizonApiMetricsJobsResponse, GetHorizonApiMetricsJobsByIdData, GetHorizonApiMetricsJobsByIdResponse, GetHorizonApiJobsByIdData, GetHorizonApiJobsByIdResponse, GetApiLibrariesData, GetApiLibrariesResponse, PostApiLibrariesData, PostApiLibrariesResponse, GetApiLibrariesBySlugData, GetApiLibrariesBySlugResponse, PatchApiLibrariesBySlugData, PatchApiLibrariesBySlugResponse, DeleteApiLibrariesBySlugData, DeleteApiLibrariesBySlugResponse, GetSystemLogViewerApiLogsData, GetSystemLogViewerApiLogsResponse, GetHorizonApiMastersResponse, GetHorizonApiMonitoringResponse, PostHorizonApiMonitoringResponse, GetHorizonApiMonitoringByTagData, GetHorizonApiMonitoringByTagResponse, DeleteHorizonApiMonitoringByTagData, DeleteHorizonApiMonitoringByTagResponse, GetApiLibrariesByLibraryMoviesData, GetApiLibrariesByLibraryMoviesResponse, GetApiLibrariesByLibraryMoviesByMovieData, GetApiLibrariesByLibraryMoviesByMovieResponse, GetApiOpcacheStatusResponse, GetApiOpcacheConfigResponse, PostApiOpcacheClearResponse, PostApiOpcacheCompileData, PostApiOpcacheCompileResponse, GetHorizonApiJobsPendingData, GetHorizonApiJobsPendingResponse, GetApiPlaylistsResponse, PostApiPlaylistsData, PostApiPlaylistsResponse, GetApiPlaylistsByPlaylistData, GetApiPlaylistsByPlaylistResponse, PutApiPlaylistsByPlaylistData, PutApiPlaylistsByPlaylistResponse, DeleteApiPlaylistsByPlaylistData, DeleteApiPlaylistsByPlaylistResponse, PostApiPlaylistsByPlaylistSongsBySongData, PostApiPlaylistsByPlaylistSongsBySongResponse, DeleteApiPlaylistsByPlaylistSongsBySongData, DeleteApiPlaylistsByPlaylistSongsBySongResponse, PostApiPlaylistsByPlaylistReorderData, PostApiPlaylistsByPlaylistReorderResponse, PostApiPlaylistsByPlaylistCollaboratorsData, PostApiPlaylistsByPlaylistCollaboratorsResponse, DeleteApiPlaylistsByPlaylistCollaboratorsByUserData, DeleteApiPlaylistsByPlaylistCollaboratorsByUserResponse, PostApiPlaylistsByPlaylistCloneData, PostApiPlaylistsByPlaylistCloneResponse, GetApiPlaylistsByPlaylistStatisticsData, GetApiPlaylistsByPlaylistStatisticsResponse, PostApiPlaylistsByPlaylistStatisticsRecordViewData, PostApiPlaylistsByPlaylistStatisticsRecordViewResponse, PostApiPlaylistsByPlaylistStatisticsRecordPlayData, PostApiPlaylistsByPlaylistStatisticsRecordPlayResponse, PostApiPlaylistsByPlaylistStatisticsRecordShareData, PostApiPlaylistsByPlaylistStatisticsRecordShareResponse, PostApiPlaylistsByPlaylistStatisticsRecordFavoriteData, PostApiPlaylistsByPlaylistStatisticsRecordFavoriteResponse, PostApiPlaylistsSmartData, PostApiPlaylistsSmartResponse, PutApiPlaylistsByPlaylistSmartData, PutApiPlaylistsByPlaylistSmartResponse, PostApiPlaylistsByPlaylistSmartSyncData, PostApiPlaylistsByPlaylistSmartSyncResponse, GetApiQueueMetricsData, GetApiQueueMetricsResponse, GetApiQueueMetricsQueuesResponse, GetApiQueueMetricsMetricsData, GetApiQueueMetricsMetricsResponse, PostApiQueueMetricsRetryByIdData, PostApiQueueMetricsRetryByIdResponse, DeleteApiQueueMetricsByIdData, DeleteApiQueueMetricsByIdResponse, DeleteApiQueueMetricsPurgeResponse, GetHorizonApiMetricsQueuesResponse, GetHorizonApiMetricsQueuesByIdData, GetHorizonApiMetricsQueuesByIdResponse, PostHorizonApiJobsRetryByIdData, PostHorizonApiJobsRetryByIdResponse, GetApiSchemasMusicbrainzResponse, GetHorizonApiJobsSilencedData, GetHorizonApiJobsSilencedResponse, GetApiLibrariesByLibrarySongsData, GetApiLibrariesByLibrarySongsResponse, GetApiLibrariesByLibrarySongsByPublicIdData, GetApiLibrariesByLibrarySongsByPublicIdResponse, GetApiStreamSongBySongDirectData, GetApiStreamSongBySongDirectResponse, GetApiSystemInfoResponse, GetApiSystemInfoSysResponse, GetApiUsersData, GetApiUsersResponse, PostApiUsersData, PostApiUsersResponse, PatchApiUsersByUserData, PatchApiUsersByUserResponse, GetApiUsersByUserData, GetApiUsersByUserResponse, DeleteApiUsersByUserData, DeleteApiUsersByUserResponse, GetApiUsersMeResponse, GetApiUsersTokensByUserData, GetApiUsersTokensByUserResponse, DeleteApiUsersTokensByTokenData, DeleteApiUsersTokensByTokenResponse, GetHorizonApiWorkloadResponse } from './types.gen';
 
 export class AlbumService {
     /**
@@ -34,7 +34,6 @@ export class AlbumService {
             },
             errors: {
                 401: 'Unauthenticated',
-                403: 'Authorization error',
                 404: 'Not found',
                 422: 'Validation error'
             }
@@ -95,7 +94,6 @@ export class ArtistService {
             },
             errors: {
                 401: 'Unauthenticated',
-                403: 'Authorization error',
                 422: 'Validation error'
             }
         });
@@ -142,7 +140,6 @@ export class AuthService {
             mediaType: 'application/json',
             errors: {
                 401: 'An error',
-                403: 'Authorization error',
                 422: 'Validation error'
             }
         });
@@ -194,7 +191,6 @@ export class AuthService {
             body: data.requestBody,
             mediaType: 'application/json',
             errors: {
-                403: 'Authorization error',
                 422: 'Validation error'
             }
         });
@@ -214,7 +210,6 @@ export class AuthService {
             body: data.requestBody,
             mediaType: 'application/json',
             errors: {
-                403: 'Authorization error',
                 422: 'Validation error'
             }
         });
@@ -235,7 +230,6 @@ export class AuthService {
             mediaType: 'application/json',
             errors: {
                 400: 'An error',
-                403: 'Authorization error',
                 422: 'Validation error'
             }
         });
@@ -279,7 +273,6 @@ export class AuthService {
             mediaType: 'application/json',
             errors: {
                 401: 'Unauthenticated',
-                403: 'Authorization error',
                 422: 'Validation error'
             }
         });
@@ -347,7 +340,6 @@ export class AuthService {
             mediaType: 'application/json',
             errors: {
                 401: 'Unauthenticated',
-                403: 'Authorization error',
                 422: 'Validation error',
                 500: ''
             }
@@ -419,7 +411,6 @@ export class PasskeyService {
             mediaType: 'application/json',
             errors: {
                 401: 'Unauthenticated',
-                403: 'Authorization error',
                 422: 'Validation error',
                 500: ''
             }
@@ -781,7 +772,6 @@ export class GenreService {
             },
             errors: {
                 401: 'Unauthenticated',
-                403: 'Authorization error',
                 422: 'Validation error'
             }
         });
@@ -827,7 +817,6 @@ export class GenreService {
             mediaType: 'application/json',
             errors: {
                 401: 'Unauthenticated',
-                403: 'Authorization error',
                 404: 'Not found',
                 422: 'Validation error'
             }
@@ -988,7 +977,6 @@ export class LibraryService {
             },
             errors: {
                 401: 'Unauthenticated',
-                403: 'Authorization error',
                 422: 'Validation error'
             }
         });
@@ -1009,7 +997,6 @@ export class LibraryService {
             mediaType: 'application/json',
             errors: {
                 401: 'Unauthenticated',
-                403: 'Authorization error',
                 422: 'Validation error'
             }
         });
@@ -1195,6 +1182,53 @@ export class MonitoringService {
     
 }
 
+export class MovieService {
+    /**
+     * Get a collection of movies
+     * @param data The data for the request.
+     * @param data.library The library slug
+     * @returns unknown Paginated set of `MovieResource`
+     * @throws ApiError
+     */
+    public static getApiLibrariesByLibraryMovies(data: GetApiLibrariesByLibraryMoviesData): CancelablePromise<GetApiLibrariesByLibraryMoviesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/libraries/{library}/movies',
+            path: {
+                library: data.library
+            },
+            errors: {
+                401: 'Unauthenticated',
+                404: 'Not found'
+            }
+        });
+    }
+    
+    /**
+     * Get a movie
+     * @param data The data for the request.
+     * @param data.library The library slug
+     * @param data.movie The movie slug
+     * @returns MovieResource `MovieResource`
+     * @throws ApiError
+     */
+    public static getApiLibrariesByLibraryMoviesByMovie(data: GetApiLibrariesByLibraryMoviesByMovieData): CancelablePromise<GetApiLibrariesByLibraryMoviesByMovieResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/libraries/{library}/movies/{movie}',
+            path: {
+                library: data.library,
+                movie: data.movie
+            },
+            errors: {
+                401: 'Unauthenticated',
+                404: 'Not found'
+            }
+        });
+    }
+    
+}
+
 export class OpCacheService {
     /**
      * Get status
@@ -1314,7 +1348,6 @@ export class PlaylistService {
             mediaType: 'application/json',
             errors: {
                 401: 'Unauthenticated',
-                403: 'Authorization error',
                 422: 'Validation error'
             }
         });
@@ -1666,7 +1699,6 @@ export class PlaylistService {
             mediaType: 'application/json',
             errors: {
                 401: 'Unauthenticated',
-                403: 'Authorization error',
                 422: 'Validation error'
             }
         });
@@ -1751,7 +1783,6 @@ export class QueueService {
             },
             errors: {
                 401: 'Unauthenticated',
-                403: 'Authorization error',
                 422: 'Validation error'
             }
         });
@@ -1788,7 +1819,6 @@ export class QueueService {
             },
             errors: {
                 401: 'Unauthenticated',
-                403: 'Authorization error',
                 422: 'Validation error'
             }
         });
@@ -1814,7 +1844,6 @@ export class QueueService {
             errors: {
                 400: 'An error',
                 401: 'Unauthenticated',
-                403: 'Authorization error',
                 422: 'Validation error'
             }
         });
@@ -1973,7 +2002,6 @@ export class SongService {
             errors: {
                 400: 'An error',
                 401: 'Unauthenticated',
-                403: 'Authorization error',
                 404: 'Not found',
                 422: 'Validation error'
             }
@@ -2002,7 +2030,6 @@ export class SongService {
             },
             errors: {
                 401: 'Unauthenticated',
-                403: 'Authorization error',
                 404: 'Not found',
                 422: 'Validation error'
             }
@@ -2095,7 +2122,6 @@ export class UserService {
             },
             errors: {
                 401: 'Unauthenticated',
-                403: 'Authorization error',
                 422: 'Validation error'
             }
         });
@@ -2117,7 +2143,6 @@ export class UserService {
             mediaType: 'application/json',
             errors: {
                 401: 'Unauthenticated',
-                403: 'Authorization error',
                 422: 'Validation error'
             }
         });
@@ -2142,7 +2167,6 @@ export class UserService {
             mediaType: 'application/json',
             errors: {
                 401: 'Unauthenticated',
-                403: 'Authorization error',
                 404: 'Not found',
                 422: 'Validation error'
             }
@@ -2230,7 +2254,6 @@ export class UserTokenService {
             },
             errors: {
                 401: 'Unauthenticated',
-                403: 'Authorization error',
                 422: 'Validation error'
             }
         });

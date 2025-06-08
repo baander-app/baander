@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('genres', function (Blueprint $table) {
             $table->id();
+            $table->bigInteger('parent_id')->nullable();
 
             $table->caseInsensitiveText('name')->index();
             $table->text('slug')->unique();

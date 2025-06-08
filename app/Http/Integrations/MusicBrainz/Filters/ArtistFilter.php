@@ -14,6 +14,24 @@ class ArtistFilter extends BaseFilter
         parent::__construct($limit, $offset);
     }
 
+    public function setName(?string $name): ArtistFilter
+    {
+        $this->name = $name;
+        return $this;
+    }
+
+    public function setCountry(?string $country): ArtistFilter
+    {
+        $this->country = $country;
+        return $this;
+    }
+
+    public function setType(?string $type): ArtistFilter
+    {
+        $this->type = $type;
+        return $this;
+    }
+
     protected function buildQuery(): array
     {
         $query = [];

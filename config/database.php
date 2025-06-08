@@ -133,22 +133,13 @@ return [
             'database' => env('QUEUE_HORIZON_DB', '3'),
         ],
 
-        'pulse' => [
-            'url'      => env('REDIS_URL'),
-            'host'     => env('REDIS_HOST', '127.0.0.1'),
-            'username' => env('REDIS_USERNAME'),
-            'password' => env('REDIS_PASSWORD'),
-            'port'     => env('REDIS_PORT', '6379'),
-            'database' => env('REDIS_PULSE_DB', '4'),
-        ],
-
         'secret' => [
             'url'      => env('REDIS_URL'),
             'host'     => env('REDIS_HOST', '127.0.0.1'),
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),
             'port'     => env('REDIS_PORT', '6379'),
-            'database' => env('REDIS_PULSE_DB', '5'),
+            'database' => env('REDIS_SECRET_DB', '5'),
         ],
 
         'transcodes' => [

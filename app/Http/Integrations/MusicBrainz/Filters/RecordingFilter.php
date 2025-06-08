@@ -13,6 +13,18 @@ class RecordingFilter extends BaseFilter
         parent::__construct($limit, $offset);
     }
 
+    public function setTitle(?string $title): RecordingFilter
+    {
+        $this->title = $title;
+        return $this;
+    }
+
+    public function setArtistName(?string $artistName): RecordingFilter
+    {
+        $this->artistName = $artistName;
+        return $this;
+    }
+
     protected function buildQuery(): array
     {
         $query = [];

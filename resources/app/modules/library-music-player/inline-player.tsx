@@ -1,7 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { Flex } from '@radix-ui/themes';
 import { useMusicSource } from '@/providers/music-source-provider.tsx';
-// import { useEcho } from '@/providers/echo-provider.tsx';
 import { PlayerStateInput } from '@/services/libraries/player-state.ts';
 import { useAudioPlayer } from '@/modules/library-music-player/providers/audio-player-provider.tsx';
 import { useSongServiceGetApiLibrariesByLibrarySongsByPublicId } from '@/api-client/queries';
@@ -15,7 +14,6 @@ import { selectSong } from '@/store/music/music-player-slice.ts';
 import { useAppSelector } from '@/store/hooks.ts';
 
 export function InlinePlayer() {
-  // const echo = useEcho();
   const sourceSong = useAppSelector(selectSong);
 
   useEffect(() => {
@@ -26,9 +24,9 @@ export function InlinePlayer() {
     authenticatedSource,
   } = useMusicSource();
 
-  const canQuery = Boolean(sourceSong && sourceSong?.librarySlug && sourceSong?.public_id);
+  const canQuery = Boolean(sourceSong?.public_id);
   const { data: song } = useSongServiceGetApiLibrariesByLibrarySongsByPublicId({
-    library: sourceSong?.librarySlug!,
+    library: 'music',
     publicId: sourceSong?.public_id!,
     relations: 'album,album.cover,artists',
   }, undefined, { enabled: canQuery });
@@ -64,8 +62,6 @@ export function InlinePlayer() {
         volumePercent: 100,
         progressMs: currentProgress,
       };
-
-      // echo.playerStateChannel?.whisper('playerState', data);
     }, 5000);
 
     return () => {
