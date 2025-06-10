@@ -96,7 +96,19 @@ class OctaneApmManager
                 'stack_trace_limit' => 50,
             ],
             'context'         => [
-                'sanitize_field_names' => ['password', 'token', 'secret', 'key', 'auth', 'authorization'],
+                'sanitize_field_names' => [
+                    'password',
+                    'token',
+                    'secret',
+                    'key',
+                    'auth',
+                    'authorization',
+                    '_token',
+                    '_secret',
+                    '_key',
+                    '_auth',
+                    '_authorization',
+                ],
             ],
             'ignore_patterns' => [
                 'routes'      => [],

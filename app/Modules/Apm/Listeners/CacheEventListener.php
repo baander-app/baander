@@ -27,27 +27,59 @@ class CacheEventListener
             return;
         }
 
-        $this->recordCacheOperation('hit', $event->key, $event->tags ?? []);
+        $this->recordCacheOperation('hit', $event->key, $event->storeName, $event->tags ?? []);
     }
 
     /**
-     * Record a cache operation as a span
+     * Handle cache miss event
      */
-    private function recordCacheOperation(string $operation, string $key, array $tags = [], ?int $ttl = null): void
+    public function handleCacheMissed(CacheMissed $event): void
+    {
+        if (!config('apm.monitoring.cache', true)) {
+            return;
+        }
+
+        $this->recordCacheOperation('miss', $event->key, $event->storeName, $event->tags ?? []);
+    }
+
+    /**
+     * Handle key written event
+     */
+    public function handleKeyWritten(KeyWritten $event): void
+    {
+        if (!config('apm.monitoring.cache', true)) {
+            return;
+        }
+
+        $this->recordCacheOperation('write', $event->key, $event->storeName, $event->tags ?? [], $event->seconds ?? null);
+    }
+
+    /**
+     * Handle key forgotten event
+     */
+    public function handleKeyForgotten(KeyForgotten $event): void
+    {
+        if (!config('apm.monitoring.cache', true)) {
+            return;
+        }
+
+        $this->recordCacheOperation('delete', $event->key, $event->storeName, $event->tags ?? []);
+    }
+
+    /**
+     * Record a cache operation as a simple span
+     */
+    private function recordCacheOperation(string $operation, string $key, string $storeName, array $tags = [], ?int $ttl = null): void
     {
         try {
             /** @var OctaneApmManager $manager */
             $manager = App::make(OctaneApmManager::class);
 
-            $span = $manager->createSpan(
-                "cache {$operation}",
-                'cache',
-                config('cache.default'),
-                $operation,
-            );
+            // Create a simple span
+            $span = $manager->createSpan("redis $operation $key", 'db.redis', $storeName, $operation);
 
             if ($span) {
-                $this->addCacheContext($span, $operation, $key, $tags, $ttl);
+                $this->addCacheContext($manager, $span, $operation, $key, $storeName, $tags, $ttl);
                 $span->setOutcome('success');
                 $span->end();
             }
@@ -63,96 +95,40 @@ class CacheEventListener
     /**
      * Add cache context to span
      */
-    private function addCacheContext($span, string $operation, string $key, array $tags, ?int $ttl): void
+    private function addCacheContext(OctaneApmManager $manager, $span, string $operation, string $key, string $storeName, array $tags, ?int $ttl): void
     {
         $context = [
             'cache' => [
-                'key'       => $this->sanitizeKey($key),
+                'key'       => $key,
                 'operation' => $operation,
-                'store'     => config('cache.default'),
+                'store'     => $storeName,
             ],
         ];
 
         if (!empty($tags)) {
-            $context['cache']['tags'] = array_map([$this, 'sanitizeKey'], $tags);
+            $context['cache']['tags'] = $tags;
         }
 
         if ($ttl !== null) {
             $context['cache']['ttl_seconds'] = $ttl;
         }
 
-        $span->setContext($context);
+        // Add context to the transaction via manager
+        $manager->addCustomContext($context);
 
-        // Add tags
-        $span->setTag('cache.operation', $operation);
-        $span->setTag('cache.store', config('cache.default'));
+        // Add labels to the span using addSpanTag
+        $manager->addSpanTag($span, 'cache.operation', $operation);
+        $manager->addSpanTag($span, 'cache.store', $storeName);
+        $manager->addSpanTag($span, 'cache.key', $key);
 
         if ($operation === 'hit') {
-            $span->setTag('cache.hit', 'true');
+            $manager->addSpanTag($span, 'cache.hit', 'true');
         } else if ($operation === 'miss') {
-            $span->setTag('cache.hit', 'false');
-        }
-    }
-
-    /**
-     * Sanitize cache key to remove sensitive information
-     */
-    private function sanitizeKey(string $key): string
-    {
-        // Truncate very long keys
-        if (strlen($key) > 100) {
-            return substr($key, 0, 100) . '... [TRUNCATED]';
+            $manager->addSpanTag($span, 'cache.hit', 'false');
         }
 
-        // Check for potentially sensitive patterns and hash them
-        $sensitivePatterns = [
-            '/user[_-]?(\d+)/i',
-            '/email[_-]?([^_\s]+@[^_\s]+)/i',
-            '/token[_-]?([a-f0-9]{32,})/i',
-        ];
-
-        foreach ($sensitivePatterns as $pattern) {
-            $key = preg_replace_callback($pattern, function ($matches) {
-                return $matches[0][0] . '_' . substr(md5($matches[1]), 0, 8);
-            }, $key);
+        if ($ttl !== null) {
+            $manager->addSpanTag($span, 'cache.ttl_seconds', (string)$ttl);
         }
-
-        return $key;
-    }
-
-    /**
-     * Handle cache miss event
-     */
-    public function handleCacheMissed(CacheMissed $event): void
-    {
-        if (!config('apm.monitoring.cache', true)) {
-            return;
-        }
-
-        $this->recordCacheOperation('miss', $event->key, $event->tags ?? []);
-    }
-
-    /**
-     * Handle key written event
-     */
-    public function handleKeyWritten(KeyWritten $event): void
-    {
-        if (!config('apm.monitoring.cache', true)) {
-            return;
-        }
-
-        $this->recordCacheOperation('write', $event->key, $event->tags ?? [], $event->seconds ?? null);
-    }
-
-    /**
-     * Handle key forgotten event
-     */
-    public function handleKeyForgotten(KeyForgotten $event): void
-    {
-        if (!config('apm.monitoring.cache', true)) {
-            return;
-        }
-
-        $this->recordCacheOperation('delete', $event->key, $event->tags ?? []);
     }
 }

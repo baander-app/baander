@@ -205,7 +205,7 @@ return [
     */
 
     'aliases' => Facade::defaultAliases()->merge([
-
+        'Apm' => App\Modules\Apm\Apm::class,
     ])->toArray(),
 
 ];

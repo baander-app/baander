@@ -66,9 +66,9 @@
     "zend/php-reader": "@dev"
   },
   "require-dev": {
+    "cweagans/composer-patches": "^1.7",
     "doctrine/dbal": "^4.2.2",
     "fakerphp/faker": "^v1.24.1",
-    "inspector-apm/inspector-laravel": "^4.11.1",
     "laracraft-tech/laravel-schema-rules": "^v1.5.0",
     "mockery/mockery": "^1.6.12",
     "nikic/php-parser": "^v5.4.0",
@@ -139,6 +139,7 @@
     "preferred-install": "dist",
     "sort-packages": true,
     "allow-plugins": {
+      "cweagans/composer-patches": true,
       "pestphp/pest-plugin": true,
       "php-http/discovery": true,
       "tbachert/spi": true

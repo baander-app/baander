@@ -19,6 +19,7 @@ class StreamController
     #[Get('/song/{song}/direct', 'api.stream.song-direct', [
         'auth:sanctum',
         'ability:' . TokenAbility::ACCESS_STREAM->value,
+        'track-downloads'
     ])]
     public function songDirect(Song $song)
     {

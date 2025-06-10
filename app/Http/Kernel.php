@@ -24,6 +24,7 @@ class Kernel extends HttpKernel
         //        \App\Http\Middleware\SecurityHeadersMiddleware::class,
         \App\Modules\Apm\Middleware\ApmMiddleware::class,
         \App\Modules\Apm\Middleware\SwooleMetricsSampler::class,
+        'track-downloads' => \App\Modules\Apm\Middleware\TrackDownloadsMiddleware::class,
     ];
 
     /**
@@ -40,7 +41,6 @@ class Kernel extends HttpKernel
             \App\Http\Middleware\VerifyCsrfToken::class,
             //            \App\Http\Middleware\AddContentSecurityPolicyHeaders::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
-            \App\Http\Middleware\InspectorMonitoringMiddleware::class,
         ],
 
         'api' => [
@@ -48,7 +48,6 @@ class Kernel extends HttpKernel
             \App\Http\Middleware\ConvertQueryTokenToHeaderMiddleware::class,
             \Illuminate\Routing\Middleware\ThrottleRequests::class . ':api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
-            \App\Http\Middleware\InspectorMonitoringMiddleware::class,
         ],
 
         'public-api' => [

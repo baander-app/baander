@@ -7,8 +7,8 @@ use App\Modules\Apm\Listeners\{AuthenticationListener,
     CacheEventListener,
     DatabaseQueryListener,
     DefaultTerminatedHandler,
+    FilesystemListener,
     HttpClientListener,
-    OctaneMetricsListener,
     QueueListener,
     RedisListener,
     RequestReceivedHandler,
@@ -27,102 +27,22 @@ use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Cache\Events\{CacheHit, CacheMissed, KeyForgotten, KeyWritten};
 use Illuminate\Contracts\Events\Dispatcher;
-use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Client\Events\{ConnectionFailed, RequestSending, ResponseReceived};
 use Illuminate\Queue\Events\{JobExceptionOccurred, JobFailed, JobProcessed, JobProcessing, JobQueued};
 use Illuminate\Redis\Events\CommandExecuted;
 use Illuminate\Support\ServiceProvider;
-use Laravel\Octane\Events\{RequestReceived,
+use Laravel\Octane\Events\{RequestHandled,
+    RequestReceived,
     RequestTerminated,
     TaskReceived,
     TaskTerminated,
     TickReceived,
     TickTerminated,
-    WorkerStarting,
-    WorkerStopping};
+    WorkerStarting};
 use Psr\Log\LoggerInterface;
 
 class ElasticApmAgentServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
-    public function register(): void
-    {
-        // Register the APM manager as singleton
-        $this->app->singleton(OctaneApmManager::class, function ($app) {
-            $logger = $app->bound(LoggerInterface::class) ? $app->make(LoggerInterface::class) : null;
-            $config = $this->buildApmConfig($app);
-            return new OctaneApmManager($logger, $config);
-        });
-
-        // Register all listeners as singletons
-        $this->registerListeners();
-
-        $this->app->bind(SwooleMetricsCollector::class, function ($app) {
-            return new SwooleMetricsCollector(
-                $app->make(OctaneApmManager::class),
-                $app->make(LoggerInterface::class),
-            );
-        });
-
-        // For the metrics service, we need to be more careful since it holds state
-        $this->app->bind(SwooleMetricsService::class, function ($app) {
-            return new SwooleMetricsService(
-                $app->make(SwooleMetricsCollector::class),
-            );
-        });
-
-        $this->app->bind(OctaneMetricsListener::class, function ($app) {
-            return new OctaneMetricsListener();
-        });
-
-    }
-
-    /**
-     * Build APM configuration
-     */
-    private function buildApmConfig($app): array
-    {
-        $config = $app->make('config')->get('apm', []);
-
-        // Set defaults from app config if not set
-        $config['service_name'] = $config['service_name'] ?? $app->make('config')->get('app.name', 'unknown');
-        $config['environment'] = $config['environment'] ?? $app->make('config')->get('app.env', 'unknown');
-        $config['service_version'] = $config['service_version'] ?? $app->version() ?? 'unknown';
-
-        // Ensure sampling rate is valid
-        $config['sampling_rate'] = max(0.0, min(1.0, (float)($config['sampling_rate'] ?? 1.0)));
-
-        return $config;
-    }
-
-    /**
-     * Register all event listeners as singletons
-     */
-    private function registerListeners(): void
-    {
-        $listeners = [
-            DatabaseQueryListener::class,
-            DefaultTerminatedHandler::class,
-            RequestReceivedHandler::class,
-            RequestWorkerStartHandler::class,
-            TaskReceivedHandler::class,
-            TickReceivedHandler::class,
-            HttpClientListener::class,
-            CacheEventListener::class,
-            RedisListener::class,
-            QueueListener::class,
-        ];
-
-        foreach ($listeners as $listener) {
-            $this->app->singleton($listener, function ($app) use ($listener) {
-                $logger = $app->bound(LoggerInterface::class) ? $app->make(LoggerInterface::class) : null;
-                return new $listener($logger);
-            });
-        }
-    }
-
     /**
      * Bootstrap any application services.
      */
@@ -138,6 +58,10 @@ class ElasticApmAgentServiceProvider extends ServiceProvider
         $this->registerEventListeners();
         $this->warmApmManager();
         $this->logApmInitialization();
+
+        if (config('apm.monitoring.filesystem', true)) {
+            $this->app->make(FilesystemListener::class);
+        }
     }
 
     /**
@@ -192,16 +116,20 @@ class ElasticApmAgentServiceProvider extends ServiceProvider
         try {
             // Octane events
             $this->registerOctaneEvents($dispatcher);
-            $this->registerOctaneMetrics();
 
             if (config('apm.monitoring.auth', true)) {
                 $this->registerAuthEvents($dispatcher);
             }
 
-            // Database events
-            if (config('apm.monitoring.database', true)) {
-                $this->registerDatabaseEvents($dispatcher);
+            // Register the database query listener
+            if ($this->app->make('config')->get('apm.monitoring.database', true)) {
+                $this->app->make(DatabaseQueryListener::class)->register();
             }
+
+            if ($this->app->make('config')->get('apm.monitoring.eloquent_events', true)) {
+                $this->app->make(DatabaseQueryListener::class)->registerEloquentEventListeners();
+            }
+
 
             if (config('apm.monitoring.redis', true)) {
                 $this->registerRedisEvents($dispatcher);
@@ -239,6 +167,7 @@ class ElasticApmAgentServiceProvider extends ServiceProvider
         $octaneEvents = [
             RequestReceived::class   => RequestReceivedHandler::class,
             RequestTerminated::class => DefaultTerminatedHandler::class,
+            RequestHandled::class    => DefaultTerminatedHandler::class,
             WorkerStarting::class    => RequestWorkerStartHandler::class,
             TaskReceived::class      => TaskReceivedHandler::class,
             TaskTerminated::class    => DefaultTerminatedHandler::class,
@@ -249,20 +178,6 @@ class ElasticApmAgentServiceProvider extends ServiceProvider
         foreach ($octaneEvents as $event => $listener) {
             if (class_exists($event)) {
                 $dispatcher->listen($event, $listener);
-            }
-        }
-    }
-
-    private function registerOctaneMetrics()
-    {
-        $events = [
-            WorkerStarting::class => [OctaneMetricsListener::class, 'handleWorkerStarting'],
-            WorkerStopping::class => [OctaneMetricsListener::class, 'handleWorkerStopping'],
-        ];
-
-        foreach ($events as $event => $listener) {
-            if (class_exists($event)) {
-                $this->app->make(Dispatcher::class)->listen($event, $listener);
             }
         }
     }
@@ -288,16 +203,90 @@ class ElasticApmAgentServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register database events
+     * Register any application services.
      */
-    private function registerDatabaseEvents(Dispatcher $dispatcher): void
+    public function register(): void
     {
-        $dispatcher->listen(QueryExecuted::class, DatabaseQueryListener::class);
+        // Register the APM manager as singleton
+        $this->app->singleton(OctaneApmManager::class, function ($app) {
+            $logger = $app->bound(LoggerInterface::class) ? $app->make(LoggerInterface::class) : null;
+            $config = $this->buildApmConfig($app);
+            return new OctaneApmManager($logger, $config);
+        });
+
+        $this->app->alias(OctaneApmManager::class, 'apm');
+
+        // Register all listeners as singletons
+        $this->registerListeners();
+
+        $this->app->bind(SwooleMetricsCollector::class, function ($app) {
+            return new SwooleMetricsCollector(
+                $app->make(OctaneApmManager::class),
+                $app->make(LoggerInterface::class),
+            );
+        });
+
+        // For the metrics service, we need to be more careful since it holds state
+        $this->app->bind(SwooleMetricsService::class, function ($app) {
+            return new SwooleMetricsService(
+                $app->make(SwooleMetricsCollector::class),
+            );
+        });
+
+        $this->app->singleton(FilesystemListener::class, function ($app) {
+            return new FilesystemListener(
+                $app->make(OctaneApmManager::class)
+            );
+        });
+    }
+
+    /**
+     * Build APM configuration
+     */
+    private function buildApmConfig($app): array
+    {
+        $config = $app->make('config')->get('apm', []);
+
+        // Set defaults from app config if not set
+        $config['service_name'] = $config['service_name'] ?? $app->make('config')->get('app.name', 'unknown');
+        $config['environment'] = $config['environment'] ?? $app->make('config')->get('app.env', 'unknown');
+        $config['service_version'] = $config['service_version'] ?? $app->version() ?? 'unknown';
+
+        // Ensure sampling rate is valid
+        $config['sampling_rate'] = max(0.0, min(1.0, (float)($config['sampling_rate'] ?? 1.0)));
+
+        return $config;
+    }
+
+    /**
+     * Register all event listeners as singletons
+     */
+    private function registerListeners(): void
+    {
+        $listeners = [
+            DatabaseQueryListener::class,
+            DefaultTerminatedHandler::class,
+            RequestReceivedHandler::class,
+            RequestWorkerStartHandler::class,
+            TaskReceivedHandler::class,
+            TickReceivedHandler::class,
+            HttpClientListener::class,
+            CacheEventListener::class,
+            RedisListener::class,
+            QueueListener::class,
+        ];
+
+        foreach ($listeners as $listener) {
+            $this->app->singleton($listener, function ($app) use ($listener) {
+                $logger = $app->bound(LoggerInterface::class) ? $app->make(LoggerInterface::class) : null;
+                return new $listener($logger);
+            });
+        }
     }
 
     private function registerRedisEvents(Dispatcher $dispatcher): void
     {
-        $dispatcher->listen(CommandExecuted::class, RedisListener::class);
+        $dispatcher->listen(CommandExecuted::class, [RedisListener::class, 'handle']);;
     }
 
     /**

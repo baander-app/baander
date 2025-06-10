@@ -2,19 +2,16 @@
 
 namespace App\Modules\Apm\Listeners;
 
-use App\Modules\Apm\Apm;
+use App\Modules\Apm\OctaneApmManager;
+use Elastic\Apm\SpanInterface;
 use Illuminate\Redis\Events\CommandExecuted;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Log;
 use Psr\Log\LoggerInterface;
 use Throwable;
 
 class RedisListener
 {
-    /**
-     * Active Redis spans indexed by connection name
-     */
-    private array $activeSpans = [];
-
     /**
      * Constructor
      */
@@ -27,12 +24,19 @@ class RedisListener
      */
     public function handle(CommandExecuted $event): void
     {
-        if (!Apm::isEnabled()) {
+        if (!config('apm.monitoring.redis', true)) {
             return;
         }
 
         try {
-            $this->recordRedisCommand($event);
+            /** @var OctaneApmManager $manager */
+            $manager = App::make(OctaneApmManager::class);
+
+            if (!$manager->isEnabled()) {
+                return;
+            }
+
+            $this->recordRedisCommand($manager, $event);
         } catch (Throwable $e) {
             Log::error('Failed to record Redis command in APM', [
                 'error'      => $e->getMessage(),
@@ -45,13 +49,13 @@ class RedisListener
     /**
      * Record Redis command execution
      */
-    private function recordRedisCommand(CommandExecuted $event): void
+    private function recordRedisCommand(OctaneApmManager $manager, CommandExecuted $event): void
     {
         $commandName = strtoupper($event->command);
         $spanName = "redis.{$commandName}";
 
         // Create span for the Redis operation
-        $span = Apm::createSpan(
+        $span = $manager->createSpan(
             name: $spanName,
             type: 'db',
             subtype: 'redis',
@@ -72,7 +76,7 @@ class RedisListener
     /**
      * Add Redis-specific context to the span
      */
-    private function addRedisContext($span, CommandExecuted $event): void
+    private function addRedisContext(SpanInterface $span, CommandExecuted $event): void
     {
         // Add basic Redis information
         $span->context()->setLabel('redis.command', strtoupper($event->command));
@@ -90,12 +94,7 @@ class RedisListener
         // Add database context if available
         $span->context()->db()->setStatement($this->buildRedisStatement($event));
 
-        // Set destination context
-        $span->context()->destination()->setService(
-            name: 'redis',
-            resource: $event->connectionName ?? 'default',
-            type: 'db',
-        );
+        $span->setOutcome('success');
     }
 
     /**
@@ -169,140 +168,5 @@ class RedisListener
         // For other commands, just return the command name with parameter count
         $paramCount = count($event->parameters);
         return "{$command} ({$paramCount} params)";
-    }
-
-    /**
-     * Start tracking a Redis operation (for long-running operations)
-     */
-    public function startRedisOperation(string $connectionName, string $operation): void
-    {
-        if (!Apm::isEnabled()) {
-            return;
-        }
-
-        try {
-            $spanName = "redis.{$operation}";
-            $span = Apm::beginAndStoreSpan($spanName, 'db');
-
-            if ($span) {
-                $this->activeSpans[$connectionName] = $span;
-
-                // Add context
-                $span->context()->setLabel('redis.operation', $operation);
-                $span->context()->setLabel('redis.connection', $connectionName);
-
-                // Set destination
-                $span->context()->destination()->setService(
-                    name: 'redis',
-                    resource: $connectionName,
-                    type: 'db',
-                );
-            }
-        } catch (Throwable $e) {
-            Log::error('Failed to start Redis operation tracking', [
-                'error'      => $e->getMessage(),
-                'connection' => $connectionName,
-                'operation'  => $operation,
-            ]);
-        }
-    }
-
-    /**
-     * End tracking a Redis operation
-     */
-    public function endRedisOperation(string $connectionName, bool $success = true, ?string $error = null): void
-    {
-        if (!Apm::isEnabled() || !isset($this->activeSpans[$connectionName])) {
-            return;
-        }
-
-        try {
-            $span = $this->activeSpans[$connectionName];
-
-            // Add result context
-            $span->context()->setLabel('redis.success', $success ? 'true' : 'false');
-
-            if (!$success && $error) {
-                $span->context()->setLabel('redis.error', $error);
-                $span->setOutcome('failure');
-            } else {
-                $span->setOutcome('success');
-            }
-
-            Apm::endStoredSpan($connectionName);
-            unset($this->activeSpans[$connectionName]);
-        } catch (Throwable $e) {
-            Log::error('Failed to end Redis operation tracking', [
-                'error'      => $e->getMessage(),
-                'connection' => $connectionName,
-            ]);
-        }
-    }
-
-    /**
-     * Record Redis connection event
-     */
-    public function recordRedisConnection(string $connectionName, bool $success, ?string $error = null): void
-    {
-        if (!Apm::isEnabled()) {
-            return;
-        }
-
-        try {
-            $span = Apm::createSpan(
-                name: 'redis.connect',
-                type: 'db',
-                subtype: 'redis',
-                action: 'connect',
-            );
-
-            if ($span) {
-                $span->context()->setLabel('redis.connection', $connectionName);
-                $span->context()->setLabel('redis.connect.success', $success ? 'true' : 'false');
-
-                if (!$success && $error) {
-                    $span->context()->setLabel('redis.connect.error', $error);
-                    $span->setOutcome('failure');
-                } else {
-                    $span->setOutcome('success');
-                }
-
-                $span->context()->destination()->setService(
-                    name: 'redis',
-                    resource: $connectionName,
-                    type: 'db',
-                );
-
-                $span->end();
-            }
-        } catch (Throwable $e) {
-            Log::error('Failed to record Redis connection', [
-                'error'      => $e->getMessage(),
-                'connection' => $connectionName,
-                'success'    => $success,
-            ]);
-        }
-    }
-
-    /**
-     * Record Redis error
-     */
-    public function recordRedisError(Throwable $exception, array $context = []): void
-    {
-        if (!Apm::isEnabled()) {
-            return;
-        }
-
-        try {
-            Apm::recordException($exception, array_merge($context, [
-                'component' => 'redis',
-                'type'      => 'redis_error',
-            ]));
-        } catch (Throwable $e) {
-            Log::error('Failed to record Redis error in APM', [
-                'error'          => $e->getMessage(),
-                'original_error' => $exception->getMessage(),
-            ]);
-        }
     }
 }

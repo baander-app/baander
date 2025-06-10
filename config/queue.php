@@ -42,24 +42,19 @@ return [
             'after_commit' => false,
         ],
 
-        'beanstalkd' => [
-            'driver'       => 'beanstalkd',
-            'host'         => 'localhost',
-            'queue'        => 'default',
-            'retry_after'  => 90,
-            'block_for'    => 0,
+        'redis' => [
+            'driver' => 'redis',
+            'connection' => 'default',
+            'queue' => env('REDIS_QUEUE', 'default'),
+            'retry_after' => 90,
+            'block_for' => null,
             'after_commit' => false,
         ],
 
-        'redis' => [
-            'driver'       => 'redis',
-            'connection'   => 'horizon',
-            'queue'        => env('REDIS_QUEUE', 'default'),
-            'retry_after'  => 90,
-            'block_for'    => null,
-            'after_commit' => true,
+        // Development connection using Octane task workers
+        'octane' => [
+            'driver' => 'sync', // Uses Octane's task workers when available
         ],
-
     ],
 
     /*

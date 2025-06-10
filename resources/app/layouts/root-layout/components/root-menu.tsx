@@ -3,11 +3,12 @@ import { NavLink } from '@/ui/nav-link';
 import { lazyImport } from '@/utils/lazy-import';
 import { Iconify } from '@/ui/icons/iconify';
 import styles from './root-menu.module.scss';
-import { ReactNode, useMemo } from 'react';
+import { ReactNode, useMemo, useCallback } from 'react';
 import { useLibraryServiceGetApiLibraries, usePlaylistServiceGetApiPlaylists } from '@/api-client/queries';
 import { CreatePlaylist } from '@/modules/library-music-playlists/components/create-playlist/create-playlist.tsx';
 import { CreateSmartPlaylist } from '@/modules/library-music-playlists/components/create-smart-playlist/create-smart-playlist.tsx';
 import { LibraryResource, PlaylistResource } from '@/api-client/requests/types.gen';
+import { useApmUserInteractions } from '@/services/apm-user-interactions';
 import {
   PlaylistLayoutContextMenu
 } from '@/modules/library-music-playlists/components/context-menu/playlist-layout-context-menu/playlist-layout-context-menu.tsx';
@@ -35,9 +36,27 @@ interface MenuSection {
 export function RootMenu() {
   const { data: libraryData } = useLibraryServiceGetApiLibraries();
   const { data: playlistData } = usePlaylistServiceGetApiPlaylists(['playlists']);
+  const { trackNavigation, trackButtonClick } = useApmUserInteractions();
 
-  const musicLibraries: LibraryResource[] = useMemo(() => libraryData?.data.filter(library => library.type === 'music') ?? [], [libraryData]);
-  const movieLibraries: LibraryResource[] = useMemo(() => libraryData?.data.filter(library => library.type === 'movie') ?? [], [libraryData]);
+  // Handler for tracking menu navigation
+  const handleNavigation = useCallback((destination: string, label: string, section?: string) => {
+    trackNavigation(destination, {
+      menuItem: label,
+      section: section || 'main',
+      timestamp: new Date().toISOString(),
+    });
+  }, [trackNavigation]);
+
+  // Handler for tracking button clicks
+  const handleButtonClick = useCallback((buttonName: string, section?: string) => {
+    trackButtonClick(buttonName, {
+      section: section || 'main',
+      timestamp: new Date().toISOString(),
+    });
+  }, [trackButtonClick]);
+
+  const musicLibraries: LibraryResource[] = useMemo(() => libraryData?.data?.filter(library => library?.type === 'music') ?? [], [libraryData]);
+  const movieLibraries: LibraryResource[] = useMemo(() => libraryData?.data?.filter(library => library?.type === 'movie') ?? [], [libraryData]);
   const playlists: PlaylistResource[] = useMemo(() => playlistData?.data ?? [], [playlistData]);
 
   const librariesMenu: MenuSection[] = useMemo(() => {
@@ -54,6 +73,7 @@ export function RootMenu() {
               <Button
                 size="1"
                 variant="ghost"
+                onClick={() => handleButtonClick('New Playlist', 'Music')}
               >New</Button>
             </Dialog.Trigger>
             <Dialog.Content>
@@ -69,6 +89,7 @@ export function RootMenu() {
               <Button
                 size="1"
                 variant="ghost"
+                onClick={() => handleButtonClick('Smart Playlist', 'Music')}
               >Smart</Button>
             </Dialog.Trigger>
             <Dialog.Content>
@@ -182,7 +203,11 @@ export function RootMenu() {
 
       <ScrollArea>
         <Box className={styles.menuContainer}>
-          <NavLink to="/" className={styles.homeLink}>
+          <NavLink 
+            to="/" 
+            className={styles.homeLink}
+            onClick={() => handleNavigation('/', 'Home')}
+          >
             <Flex align="center" gap="2">
               <Iconify icon="heroicons:home" width="24" height="24"/>
               <Text>Home</Text>
@@ -254,6 +279,7 @@ export function RootMenu() {
                             to={link.to}
                             className={linkClassName}
                             activeClassName={styles.activeLink}
+                            onClick={() => handleNavigation(link.to, link.label, 'playlist')}
                           >
                             {link.label}
                           </NavLink>
@@ -270,6 +296,7 @@ export function RootMenu() {
                       to={link.to}
                       className={linkClassName}
                       activeClassName={styles.activeLink}
+                      onClick={() => handleNavigation(link.to, link.label, section.label)}
                     >
                       {link.label}
                     </NavLink>
@@ -278,6 +305,7 @@ export function RootMenu() {
                       key={linkIndex}
                       href={link.href}
                       className={linkClassName}
+                      onClick={() => handleNavigation(link.href, link.label, section.label)}
                     >
                       {link.label}
                     </a>

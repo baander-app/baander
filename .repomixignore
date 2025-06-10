@@ -1,0 +1,11 @@
+# Add patterns to ignore here, one per line
+# Example:
+# *.log
+# tmp/
+vendor
+node_modules
+third_party
+stubs
+public
+examples
+packages

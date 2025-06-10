@@ -27,17 +27,12 @@ class ApmMiddleware
         $this->addRequestTags($request);
         $this->addCustomContext($request);
 
-        try {
-            $response = $next($request);
+        $response = $next($request);
 
-            $this->addResponseTags($response);
-            $this->addResponseContext($response);
+        $this->addResponseTags($response);
+        $this->addResponseContext($response);
 
-            return $response;
-        } catch (Throwable $exception) {
-            $this->handleException($exception, $request);
-            throw $exception;
-        }
+        return $response;
     }
 
     /**
@@ -55,9 +50,6 @@ class ApmMiddleware
                         'authenticated' => true,
                     ],
                 ]);
-
-                $this->apmManager->addCustomTag('user.id', (string)$user->id);
-                $this->apmManager->addCustomTag('user.authenticated', 'true');
             } else {
                 $this->apmManager->addCustomTag('user.authenticated', 'false');
             }
@@ -216,31 +208,6 @@ class ApmMiddleware
         } catch (Throwable $e) {
             $this->logger?->warning('Failed to add response context to APM', [
                 'exception' => $e->getMessage(),
-            ]);
-        }
-    }
-
-    /**
-     * Handle exceptions
-     */
-    private function handleException(Throwable $exception, Request $request): void
-    {
-        try {
-            $context = [
-                'exception_context' => [
-                    'request_url'    => $request->fullUrl(),
-                    'request_method' => $request->method(),
-                    'user_id'        => Auth::id(),
-                ],
-            ];
-
-            $this->apmManager->recordException($exception, $context);
-            $this->apmManager->addCustomTag('error.occurred', 'true');
-            $this->apmManager->addCustomTag('error.type', get_class($exception));
-        } catch (Throwable $e) {
-            $this->logger?->error('Failed to record exception in APM', [
-                'original_exception' => $exception->getMessage(),
-                'apm_exception'      => $e->getMessage(),
             ]);
         }
     }
