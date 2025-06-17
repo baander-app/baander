@@ -64,13 +64,6 @@ return [
             'replace_placeholders' => true,
         ],
 
-        'jobs_file' => [
-            'driver'               => 'single',
-            'path'                 => storage_path('logs/jobs.log'),
-            'level'                => env('LOG_LEVEL', 'debug'),
-            'replace_placeholders' => true,
-        ],
-
         'daily' => [
             'driver'               => 'daily',
             'path'                 => storage_path('logs/laravel.log'),
@@ -130,6 +123,21 @@ return [
             'level'                => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
         ],
+
+        'jobs' => [
+            'driver' => 'single',
+            'path'   => storage_path('logs/jobs.log'),
+            'level'  => env('LOG_LEVEL', 'debug'),
+            'replace_placeholders' => true,
+        ],
+
+        'music_jobs' => [
+            'driver' => 'single',
+            'path'   => storage_path('logs/music_jobs.log'),
+            'level'  => env('LOG_LEVEL', 'debug'),
+            'replace_placeholders' => true,
+        ]
+
         //
         //        'php_deprecations' => [
         //            'driver'               => 'single',

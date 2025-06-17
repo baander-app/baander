@@ -2,7 +2,7 @@
 // config/apm.php
 
 return [
-    'enabled' => env('APM_ENABLED', true),
+    'enabled' => env('ELASTIC_APM_ENABLED', true),
     'sampling_rate' => env('APM_SAMPLING_RATE', 1.0),
     'service_name' => env('APM_SERVICE_NAME', 'bander-app'),
     'service_version' => env('APM_SERVICE_VERSION', '1.0.0'),
@@ -66,7 +66,7 @@ return [
         'filesystem_downloads' => env('APM_MONITOR_FILESYSTEM_DOWNLOADS', true),
         'http_client' => env('APM_MONITOR_HTTP_CLIENT', true),
         'redis' => env('APM_MONITOR_REDIS', true),
-        'queue' => env('APM_MONITOR_QUEUE', true),
+        'queue' => env('APM_MONITOR_QUEUE', false),
         'always_sample_responses' => (bool)env('APM_ALWAYS_SAMPLE_RESPONSES', false),
     ],
 

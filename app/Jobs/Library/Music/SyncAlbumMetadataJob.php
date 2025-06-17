@@ -16,6 +16,8 @@ class SyncAlbumMetadataJob extends BaseJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public string $logChannel = 'music';
+
     public function __construct(
         private int $albumId,
         private bool $forceUpdate = false
@@ -27,7 +29,7 @@ class SyncAlbumMetadataJob extends BaseJob implements ShouldQueue
         $album = Album::find($this->albumId);
 
         if (!$album) {
-            Log::channel('stdout')->warning('Album not found for metadata sync', ['album_id' => $this->albumId]);
+            $this->logger()->warning('Album not found for metadata sync', ['album_id' => $this->albumId]);
             return;
         }
 
@@ -37,20 +39,20 @@ class SyncAlbumMetadataJob extends BaseJob implements ShouldQueue
             if ($results['quality_score'] >= 0.7) {
                 $this->updateAlbumMetadata($album, $results);
 
-                Log::channel('stdout')->info('Album metadata synced successfully', [
+                $this->logger()->info('Album metadata synced successfully', [
                     'album_id' => $album->id,
                     'source' => $results['source'],
                     'quality_score' => $results['quality_score']
                 ]);
             } else {
-                Log::channel('stdout')->warning('Album metadata sync rejected due to low quality', [
+                $this->logger()->warning('Album metadata sync rejected due to low quality', [
                     'album_id' => $album->id,
                     'quality_score' => $results['quality_score']
                 ]);
             }
 
         } catch (\Exception|\Error $e) {
-            Log::channel('stdout')->error('Album metadata sync job failed', [
+            $this->logger()->error('Album metadata sync job failed', [
                 'album_id' => $this->albumId,
                 'error' => $e->getMessage()
             ]);

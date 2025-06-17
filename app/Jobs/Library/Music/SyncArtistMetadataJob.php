@@ -2,18 +2,19 @@
 
 namespace App\Jobs\Library\Music;
 
+use App\Jobs\BaseJob;
 use App\Models\Artist;
 use App\Services\Metadata\MetadataSyncService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Queue\{InteractsWithQueue, SerializesModels};
 
-class SyncArtistMetadataJob implements ShouldQueue
+class SyncArtistMetadataJob extends BaseJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public string $logChannel = 'music';
 
     public function __construct(
         private int $artistId,
@@ -26,7 +27,7 @@ class SyncArtistMetadataJob implements ShouldQueue
         $artist = Artist::find($this->artistId);
 
         if (!$artist) {
-            Log::warning('Artist not found for metadata sync', ['artist_id' => $this->artistId]);
+            $this->logger()->warning('Artist not found for metadata sync', ['artist_id' => $this->artistId]);
             return;
         }
 
@@ -36,20 +37,20 @@ class SyncArtistMetadataJob implements ShouldQueue
             if ($results['quality_score'] >= 0.7) {
                 $this->updateArtistMetadata($artist, $results);
 
-                Log::info('Artist metadata synced successfully', [
+                $this->logger()->info('Artist metadata synced successfully', [
                     'artist_id' => $artist->id,
                     'source' => $results['source'],
                     'quality_score' => $results['quality_score']
                 ]);
             } else {
-                Log::warning('Artist metadata sync rejected due to low quality', [
+                $this->logger()->warning('Artist metadata sync rejected due to low quality', [
                     'artist_id' => $artist->id,
                     'quality_score' => $results['quality_score']
                 ]);
             }
 
         } catch (\Exception $e) {
-            Log::error('Artist metadata sync job failed', [
+            $this->logger()->error('Artist metadata sync job failed', [
                 'artist_id' => $this->artistId,
                 'error' => $e->getMessage()
             ]);
@@ -64,7 +65,7 @@ class SyncArtistMetadataJob implements ShouldQueue
         // Additional fields like bio, country, etc. could be added to the model later
 
         // Log successful sync for now - can be extended when more artist fields are added
-        Log::info('Artist metadata processed', [
+        $this->logger()->info('Artist metadata processed', [
             'artist_id' => $artist->id,
             'albums_found' => count($results['albums'] ?? []),
             'source' => $results['source']

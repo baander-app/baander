@@ -1,4 +1,4 @@
-import { ColumnDef, getCoreRowModel, getSortedRowModel, SortingState, useReactTable } from '@tanstack/react-table';
+import { ColumnDef, getCoreRowModel, getSortedRowModel, SortingState, useReactTable } from './types';
 import { useMemo, useState } from 'react';
 import { Iconify } from '@/ui/icons/iconify.tsx';
 import { useUserServiceGetApiUsers } from '@/api-client/queries';

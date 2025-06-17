@@ -43,9 +43,6 @@ class AlbumSearchService
                 $filter->setArtistName($album->artists->first()->name);
             }
 
-            if ($album->year) {
-                $filter->setDate($album->year);
-            }
 
             Log::debug('Searching MusicBrainz for album', [
                 'album_id' => $album->id,
@@ -129,6 +126,10 @@ class AlbumSearchService
 
             $bestMatch = $relevantResults->first();
             $detailedData = $this->discogsClient->lookup->release($bestMatch->id);
+
+            if (!$detailedData) {
+                return null;
+            }
 
             return [
                 'source' => 'discogs',

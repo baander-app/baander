@@ -384,6 +384,14 @@ class DefaultTerminatedHandler
             $manager = $event->app->make(OctaneApmManager::class);
         }
 
+        // Add this check to prevent termination errors
+        if ($manager->hasNoTransactionInstance()) {
+            $this->logger?->debug('No active transaction to terminate', [
+                'event_type' => class_basename($event),
+            ]);
+            return;
+        }
+
         try {
             $this->setTransactionResult($manager, $event);
             $this->setTransactionOutcome($manager, $event);

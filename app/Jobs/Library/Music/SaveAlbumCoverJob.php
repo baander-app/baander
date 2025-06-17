@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Log;
 
 class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
 {
+    public string $logChannel = 'music';
+
     private Album $album;
 
     /**
@@ -57,7 +59,7 @@ class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
             try {
                 $cover = $mediaMeta->getFrontCoverImage() ?: $images[0];
             } catch (\Exception $e) {
-                Log::warning('Failed to get front cover, using first available image', [
+                $this->logger()->warning('Failed to get front cover, using first available image', [
                     'error' => $e->getMessage(),
                     'album_id' => $this->album->id
                 ]);

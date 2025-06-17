@@ -2,6 +2,7 @@
 
 namespace App\Jobs\Library\Music;
 
+use App\Jobs\BaseJob;
 use App\Models\Song;
 use App\Services\Metadata\MetadataSyncService;
 use Illuminate\Bus\Queueable;
@@ -9,11 +10,12 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
 
-class SyncSongMetadataJob implements ShouldQueue
+class SyncSongMetadataJob extends BaseJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public string $logChannel = 'music';
 
     public function __construct(
         private int $songId,
@@ -26,7 +28,7 @@ class SyncSongMetadataJob implements ShouldQueue
         $song = Song::find($this->songId);
 
         if (!$song) {
-            Log::warning('Song not found for metadata sync', ['song_id' => $this->songId]);
+            $this->logger()->warning('Song not found for metadata sync', ['song_id' => $this->songId]);
             return;
         }
 
@@ -36,20 +38,20 @@ class SyncSongMetadataJob implements ShouldQueue
             if ($results['quality_score'] >= 0.6) {
                 $this->updateSongMetadata($song, $results);
 
-                Log::info('Song metadata synced successfully', [
+                $this->logger()->info('Song metadata synced successfully', [
                     'song_id' => $song->id,
                     'source' => $results['source'],
                     'quality_score' => $results['quality_score']
                 ]);
             } else {
-                Log::warning('Song metadata sync rejected due to low quality', [
+                $this->logger()->warning('Song metadata sync rejected due to low quality', [
                     'song_id' => $song->id,
                     'quality_score' => $results['quality_score']
                 ]);
             }
 
         } catch (\Exception $e) {
-            Log::error('Song metadata sync job failed', [
+            $this->logger()->error('Song metadata sync job failed', [
                 'song_id' => $this->songId,
                 'error' => $e->getMessage()
             ]);

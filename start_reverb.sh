@@ -1,1 +1,0 @@
-php artisan reverb:start --debug --host="0.0.0.0" --port=8080 --hostname="baander.test"

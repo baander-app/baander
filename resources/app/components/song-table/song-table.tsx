@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SongResource } from '@/api-client/requests';
 import { Iconify } from '@/ui/icons/iconify';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -10,8 +10,7 @@ import {
   getSortedRowModel,
   SortingState,
   useReactTable,
-} from '@tanstack/react-table';
-import { useVirtualizer } from '@tanstack/react-virtual';
+} from './types';
 import { SpeakerLoudIcon } from '@radix-ui/react-icons';
 import styles from './song-table.module.scss';
 
@@ -54,6 +53,7 @@ export function SongTable({
       {
         'header': 'Title',
         cell: (info) => <SongTitleCell song={info.row.original}/>,
+        size: 200,
       },
       {
         'header': 'Lyrics',
@@ -64,10 +64,12 @@ export function SongTable({
       {
         'header': 'Artist',
         accessorFn: (row) => row.artists?.map(x => x.name).join(', '),
+        size: 150,
       },
       {
         'header': 'Album',
         accessorFn: (row) => row.album?.title,
+        size: 150,
       },
       {
         'header': 'Duration',
@@ -100,36 +102,63 @@ export function SongTable({
 
   const { rows } = table.getRowModel();
 
-  const virtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 24,
-  });
+  // Custom virtualization implementation
+  const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 });
+  const [totalHeight, setTotalHeight] = useState(rows.length * 24);
+  const [visibleItems, setVisibleItems] = useState<Array<{ index: number, start: number, size: number }>>([]);
+  const rowHeight = 24; // Same as the estimateSize in the original implementation
 
-  // Handle infinite scrolling if needed
-  React.useEffect(() => {
-    if (!onFetchNextPage) return;
+  // Handle scroll events to update visible range
+  const handleScroll = useCallback(() => {
+    if (!parentRef.current) return;
 
-    const [lastItem] = [...virtualizer.getVirtualItems()].reverse();
+    const { scrollTop, clientHeight } = parentRef.current;
+    const buffer = 10; // Extra rows to render above and below viewport
 
-    if (!lastItem) {
-      return;
-    }
+    const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - buffer);
+    const endIndex = Math.min(rows.length - 1, Math.ceil((scrollTop + clientHeight) / rowHeight) + buffer);
 
+    setVisibleRange({ start: startIndex, end: endIndex });
+
+    // Check if we need to load more data (infinite scrolling)
     if (
-      lastItem.index >= songs.length - 1 &&
+      endIndex >= rows.length - 5 &&
       hasNextPage &&
-      !isFetchingNextPage
+      !isFetchingNextPage &&
+      onFetchNextPage
     ) {
       onFetchNextPage();
     }
-  }, [
-    hasNextPage,
-    onFetchNextPage,
-    songs.length,
-    isFetchingNextPage,
-    virtualizer.getVirtualItems(),
-  ]);
+  }, [rows.length, hasNextPage, isFetchingNextPage, onFetchNextPage]);
+
+  // Update visible items when visible range changes
+  useEffect(() => {
+    const items = [];
+    for (let i = visibleRange.start; i <= visibleRange.end; i++) {
+      if (i < rows.length) {
+        items.push({
+          index: i,
+          start: i * rowHeight,
+          size: rowHeight
+        });
+      }
+    }
+    setVisibleItems(items);
+    setTotalHeight(rows.length * rowHeight);
+  }, [visibleRange, rows.length]);
+
+  // Add scroll event listener
+  useEffect(() => {
+    const scrollElement = parentRef.current;
+    if (!scrollElement) return;
+
+    scrollElement.addEventListener('scroll', handleScroll);
+    handleScroll(); // Initial calculation
+
+    return () => {
+      scrollElement.removeEventListener('scroll', handleScroll);
+    };
+  }, [handleScroll]);
 
   return (
     <>
@@ -139,10 +168,10 @@ export function SongTable({
           {description && <p className={styles.description}>{description}</p>}
         </div>
       )}
-      
+
       <div ref={parentRef} className={`${styles.scrollList} ${className || ''}`}>
-        <div style={{ height: `${virtualizer.getTotalSize()}px` }}>
-          <table>
+        <div style={{ height: `${totalHeight}px`, position: 'relative', width: '100%' }}>
+          <table style={{ width: '100%', display: 'table', tableLayout: 'fixed' }}>
             <thead>
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
@@ -155,7 +184,8 @@ export function SongTable({
                         width: header.getSize(),
                         position: 'sticky',
                         top: 0,
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        zIndex: 20
                       }}
                     >
                       {header.isPlaceholder ? null : (
@@ -184,7 +214,7 @@ export function SongTable({
             ))}
             </thead>
             <tbody>
-            {virtualizer.getVirtualItems().map((virtualRow, index) => {
+            {visibleItems.map((virtualRow) => {
               const row = rows[virtualRow.index];
               return (
                 <tr
@@ -193,14 +223,25 @@ export function SongTable({
                   className={styles.listItem}
                   style={{
                     height: `${virtualRow.size}px`,
-                    transform: `translateY(${
-                      virtualRow.start - index * virtualRow.size
-                    }px)`,
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    transform: `translateY(${virtualRow.start}px)`,
+                    width: '100%',
+                    zIndex: 1
                   }}
                 >
                   {row.getVisibleCells().map((cell) => {
                     return (
-                      <td key={cell.id}>
+                      <td 
+                        key={cell.id}
+                        style={{
+                          width: cell.column.getSize(),
+                          display: 'table-cell',
+                          boxSizing: 'border-box'
+                        }}
+                      >
                         {flexRender(
                           cell.column.columnDef.cell,
                           cell.getContext(),

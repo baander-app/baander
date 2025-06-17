@@ -48,6 +48,11 @@ export type SmartPlaylistRule = {
   maxValue?: string; // Optional maxValue for 'between' operator
 };
 
+export type RuleGroup = {
+  operator: 'and' | 'or';
+  rules: SmartPlaylistRule[];
+};
+
 // Custom Autocomplete component for genre and artist fields
 type AutocompleteFieldProps = {
   placeholder: string;
@@ -120,7 +125,7 @@ function AutocompleteField({ placeholder, value, onChange, suggestions, loading 
 }
 
 export type SmartPlaylistFormData = {
-  ruleGroups: SmartPlaylistRule[][];
+  ruleGroups: RuleGroup[];
 };
 
 type SmartPlaylistRuleEditorProps = {
@@ -130,38 +135,91 @@ type SmartPlaylistRuleEditorProps = {
 };
 
 export function SmartPlaylistRuleEditor({ control, name, errors }: SmartPlaylistRuleEditorProps) {
-  // We'll only use the first group (index 0) since we're removing the groups concept
-  const groupName = name === 'ruleGroups' ? `${name}.0` : name;
-
-  // Initialize the first group if it doesn't exist
-  const { fields: ruleGroups, append: appendRuleGroup } = useFieldArray({
+  // Initialize rule groups if they don't exist
+  const { fields: ruleGroups, append: appendRuleGroup, remove: removeRuleGroup } = useFieldArray({
     control,
     name: 'ruleGroups',
   });
 
   if (ruleGroups.length === 0) {
-    // Add the first (and only) rule group with an initial rule
-    appendRuleGroup([{ field: 'genre', operator: 'is', value: '', maxValue: '' }]);
+    // Add the first rule group with an initial rule
+    appendRuleGroup({ 
+      operator: 'and', 
+      rules: [{ field: 'genre', operator: 'is', value: '', maxValue: '' }] 
+    });
   }
+
+  // Function to add a new rule group
+  const addRuleGroup = () => {
+    appendRuleGroup({ 
+      operator: 'and', 
+      rules: [{ field: 'genre', operator: 'is', value: '', maxValue: '' }] 
+    });
+  };
 
   return (
     <div className={styles.container}>
-      <div className={styles.ruleGroup}>
-        <h4 className={styles.ruleGroupTitle}>Match the following rules:</h4>
+      {ruleGroups.map((group, groupIndex) => (
+        <div key={group.id} className={styles.ruleGroup}>
+          {groupIndex > 0 && (
+            <Flex justify="center" mb="2">
+              <Controller
+                name={`ruleGroups.${groupIndex}.operator`}
+                control={control}
+                render={({ field }) => (
+                  <Select.Root
+                    value={field.value}
+                    onValueChange={(value) => field.onChange(value as 'and' | 'or')}
+                  >
+                    <Select.Trigger className={styles.logicalOperator}>
+                      {field.value === 'and' ? 'AND' : 'OR'}
+                    </Select.Trigger>
+                    <Select.Content>
+                      <Select.Item value="and">AND</Select.Item>
+                      <Select.Item value="or">OR</Select.Item>
+                    </Select.Content>
+                  </Select.Root>
+                )}
+              />
+            </Flex>
+          )}
 
-        <RuleEditor 
-          control={control}
-          name={groupName} 
-          errors={errors?.ruleGroups?.[0]} 
-        />
-      </div>
+          <Flex justify="space-between" align="center">
+            <h4 className={styles.ruleGroupTitle}>
+              {groupIndex === 0 ? 'Match the following rules:' : 'Also match:'}
+            </h4>
+            {ruleGroups.length > 1 && (
+              <Button 
+                color="red" 
+                variant="soft" 
+                size="1"
+                onClick={() => removeRuleGroup(groupIndex)}
+              >
+                <TrashIcon />
+              </Button>
+            )}
+          </Flex>
+
+          <RuleEditor 
+            control={control}
+            name={`ruleGroups.${groupIndex}.rules`} 
+            errors={errors?.ruleGroups?.[groupIndex]?.rules} 
+          />
+        </div>
+      ))}
+
+      <Flex justify="center" mt="4">
+        <Button variant="soft" onClick={addRuleGroup}>
+          <PlusIcon /> Add Rule Group
+        </Button>
+      </Flex>
     </div>
   );
 }
 
 type RuleEditorProps = {
   control: Control<SmartPlaylistFormData>;
-  name: `ruleGroups.${number}`;
+  name: `ruleGroups.${number}.rules`;
   errors?: any; // Using any temporarily to fix type issues
 };
 

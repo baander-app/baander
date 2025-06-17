@@ -12,6 +12,7 @@ use Illuminate\Support\LazyCollection;
 
 class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
 {
+    public string $logChannel = 'music';
 
     public function __construct(public Library $library)
     {
@@ -29,7 +30,9 @@ class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
         $this->library->updateLastScan();
         $path = $this->library->path;
 
-        $directories = LazyCollection::make(File::directories($path));
+        // Get all subdirectories and include the root directory
+        $directories = LazyCollection::make(File::directories($path))
+            ->concat([$path]);
 
         $totalDirectories = count($directories);
         $processedDirectories = 0;

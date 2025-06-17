@@ -13,9 +13,18 @@ class SmartPlaylistService
         $query = Song::query();
 
         foreach ($rules as $ruleGroup) {
-            $query->where(function (Builder  $q) use ($ruleGroup) {
-                foreach ($ruleGroup as $rule) {
-                    $this->applyRule($q, $rule);
+            $query->where(function (Builder $q) use ($ruleGroup) {
+                $operator = $ruleGroup['operator'] ?? 'and';
+                $groupRules = $ruleGroup['rules'] ?? [];
+
+                foreach ($groupRules as $index => $rule) {
+                    if ($index === 0 || strtolower($operator) === 'and') {
+                        $this->applyRule($q, $rule);
+                    } else {
+                        $q->orWhere(function (Builder $subQuery) use ($rule) {
+                            $this->applyRule($subQuery, $rule);
+                        });
+                    }
                 }
             });
         }

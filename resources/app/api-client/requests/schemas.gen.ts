@@ -184,22 +184,32 @@ export const $CreateSmartPlaylistRequest = {
         rules: {
             type: 'array',
             items: {
-                type: 'array',
-                items: {
-                    type: 'object',
-                    properties: {
-                        field: {
-                            type: 'string'
-                        },
-                        operator: {
-                            type: 'string'
-                        },
-                        value: {
-                            type: 'string'
-                        }
+                type: 'object',
+                properties: {
+                    operator: {
+                        type: 'string',
+                        enum: ['and', 'or']
                     },
-                    required: ['field', 'operator', 'value']
-                }
+                    rules: {
+                        type: 'array',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                field: {
+                                    type: 'string'
+                                },
+                                operator: {
+                                    type: 'string'
+                                },
+                                value: {
+                                    type: 'string'
+                                }
+                            },
+                            required: ['field', 'operator', 'value']
+                        }
+                    }
+                },
+                required: ['rules']
             }
         }
     },

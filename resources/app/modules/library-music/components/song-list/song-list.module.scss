@@ -7,8 +7,10 @@
   border-right: 1px solid #e0dddd;
   border-bottom: 1px solid #e0dddd;
   overflow-x: auto;
+  overflow-y: auto;
   max-width: 100%;
   height: calc(100vh - 260px);
+  position: relative;
 
   .title {
     margin-left: 3px;
@@ -18,6 +20,7 @@
     border-spacing: unset;
     table-layout: fixed;
     border-collapse: collapse;
+    width: 100%;
   }
 
 
@@ -27,7 +30,7 @@
     top: 0;
     z-index: 10;
     padding: 6px;
-    text-align: left;
+    text-align: center;
     font-weight: var(--font-weight-bold);
     font-size: 0.875rem;
     white-space: nowrap;
@@ -37,7 +40,7 @@
 
   td {
     padding: 6px;
-    text-align: left;
+    text-align: center;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -55,11 +58,18 @@
 .titleCell {
   display: flex;
   align-items: center;
+  justify-content: center;
 }
 
 .titleCellNowPlayingIcon {
   color: var(--accent-8);
   margin-right: 8px;
+}
+
+.titleCellTitle {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .scrollbar {

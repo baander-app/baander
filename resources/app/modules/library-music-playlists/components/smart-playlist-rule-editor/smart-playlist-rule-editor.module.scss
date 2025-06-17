@@ -80,3 +80,16 @@
 .dropDownTrigger {
   cursor: pointer;
 }
+
+.logicalOperator {
+  background-color: var(--gray-10);
+  color: white;
+  font-weight: bold;
+  min-width: 80px;
+  text-align: center;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--gray-11);
+  }
+}

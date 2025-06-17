@@ -1,1 +1,0 @@
-Add icons for clients https://github.com/Simbiat/DeviceDetectorIcons

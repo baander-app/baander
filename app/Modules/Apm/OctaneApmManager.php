@@ -229,14 +229,14 @@ class OctaneApmManager
     private function discardActiveSegments(): void
     {
         try {
-            // Discard current segments safely
+            // Only discard if there are active segments
             $currentTransaction = ElasticApm::getCurrentTransaction();
-            if (!$currentTransaction->hasEnded()) {
+            if ($currentTransaction && !$currentTransaction->hasEnded()) {
                 $this->discardSegment($currentTransaction);
             }
 
             $currentSegment = ElasticApm::getCurrentExecutionSegment();
-            if (!$currentSegment->hasEnded()) {
+            if ($currentSegment && !$currentSegment->hasEnded()) {
                 $this->discardSegment($currentSegment);
             }
 
@@ -245,7 +245,7 @@ class OctaneApmManager
             }
 
             foreach ($this->spans as $span) {
-                if (!$span->hasEnded()) {
+                if ($span && !$span->hasEnded()) {
                     $this->discardSegment($span);
                 }
             }
@@ -264,12 +264,15 @@ class OctaneApmManager
         }
 
         try {
-            $segment->discard();
+            // Add additional safety checks
+            if (method_exists($segment, 'discard')) {
+                $segment->discard();
+            }
         } catch (Throwable $e) {
+            // Log but don't throw - we want to continue cleanup
             $this->logError('Failed to discard segment', $e);
         }
     }
-
     /**
      * Log an error with context
      */

@@ -31,14 +31,18 @@ class RequestReceivedHandler
 
             $transaction = $manager->beginTransaction($transactionName, 'request', $requestContext);
 
+            // Add null check here
+            if (!$transaction) {
+                $this->logger?->debug('APM transaction not created - APM may be disabled or sampling skipped');
+                return;
+            }
+
             $transaction->context()->request()->setMethod($event->request->method());
             $transaction->context()->request()->url()->setFull($event->request->fullUrl());
 
-            if ($transaction) {
-                $this->addRequestTags($manager, $event);
-                $this->addSwooleContext($manager, $event);
-                $this->addRequestContext($manager, $event, $requestContext);
-            }
+            $this->addRequestTags($manager, $event);
+            $this->addSwooleContext($manager, $event);
+            $this->addRequestContext($manager, $event, $requestContext);
         } catch (Throwable $e) {
             $this->logger?->error('Failed to handle RequestReceived event', [
                 'exception' => $e->getMessage(),

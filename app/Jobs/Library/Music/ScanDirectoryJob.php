@@ -21,6 +21,8 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
     public const string GENRE_SEPARATOR = ';';
     private const int BATCH_SIZE = 50;
 
+    public string $logChannel = 'music';
+
     public function __construct(
         public string  $directory,
         public Library $library,
@@ -93,7 +95,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
                 $song->artists()->sync($this->getArtistIds($songData['artists']));
                 $song->genres()->sync($this->getGenreIds($songData['genres']));
             } catch (\Throwable $e) {
-                Log::error("Failed to save song: $song->title", [
+                $this->logger()->error("Failed to save song: $song->title", [
                     'exception' => $e,
                 ]);
             }
@@ -115,7 +117,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
                 $songs[] = $songData;
             }
         } catch (\Exception $e) {
-            Log::error("Failed to process file: {$file->getRealPath()}", [
+            $this->logger()->error("Failed to process file: {$file->getRealPath()}", [
                 'isReadable' => $file->isReadable(),
                 'isFile'     => $file->isFile(),
                 'exception'  => $e,
@@ -154,7 +156,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
 
             return null;
         } catch (\Exception $e) {
-            Log::error("Error processing metadata for file: $filePath", [
+            $this->logger()->error("Error processing metadata for file: $filePath", [
                 'exception' => $e,
             ]);
             return null;
@@ -190,7 +192,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
             try {
                 $album->saveOrFail();
             } catch (\Exception $e) {
-                Log::error("Failed to save album: $title", [
+                $this->logger()->error("Failed to save album: $title", [
                     'exception' => $e,
                 ]);
                 return null;

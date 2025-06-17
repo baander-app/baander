@@ -72,11 +72,14 @@ export type CreateSmartPlaylistRequest = {
     name: string;
     description?: string | null;
     is_public?: boolean;
-    rules: Array<Array<{
-        field: string;
-        operator: string;
-        value: string;
-    }>>;
+    rules: Array<{
+        operator?: 'and' | 'or';
+        rules: Array<{
+            field: string;
+            operator: string;
+            value: string;
+        }>;
+    }>;
 };
 
 export type CreateUserRequest = {
