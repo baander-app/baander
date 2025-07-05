@@ -102,12 +102,14 @@ export default defineConfig(config => {
   return {
     define: {
       __APP_ENV__: JSON.stringify(env.APP_ENV),
+      OTEL_EXPORTER_OTLP_ENDPOINT: env.OTEL_EXPORTER_OTLP_ENDPOINT,
+      OTEL_EXPORTER_OTLP_ENDPOINT_API_KEY: env.OTEL_EXPORTER_OTLP_ENDPOINT_API_KEY,
     },
     server: {
       port: 3000,
     },
     build: {
-      sourcemap: false,
+      sourcemap: true,
       target: ['chrome128', 'firefox128', 'safari16', 'esnext'],
       rollupOptions: {
         treeshake: true,

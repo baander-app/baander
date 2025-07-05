@@ -2,7 +2,6 @@
 
 namespace App\Exceptions;
 
-use App\Modules\Apm\Apm;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Throwable;
 
@@ -27,12 +26,5 @@ class Handler extends ExceptionHandler
         $this->reportable(function (Throwable $e) {
 
         });
-    }
-
-    public function report(Throwable $e)
-    {
-        parent::report($e);
-
-        Apm::recordException($e);
     }
 }

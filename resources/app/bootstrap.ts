@@ -21,10 +21,26 @@ dayjs.extend(duration);
 dayjs.extend(relativeTime);
 dayjs.extend(localizedFormat);
 
+import HyperDX from '@hyperdx/browser';
+import { ErrorBoundary } from 'react-error-boundary';
+
+HyperDX.init({
+  url: 'https://otel.juul.localdomain',
+  apiKey: '5be74f1d-4708-4f92-a19b-888ff10083f6',
+  service: 'baander-frontend',
+  tracePropagationTargets: [/baander.test\/api/i, /baander.test\/webauthn/i],
+  consoleCapture: true,
+  advancedNetworkCapture: true,
+  disableIntercom: true,
+});
+
+HyperDX.attachToReactErrorBoundary(ErrorBoundary)
+
 // Internal imports
 import { applyInterceptors } from '@/api-client-ext/interceptors';
 import { OpenAPI as OpenAPIConfig } from '@/api-client/requests';
 import { Token } from '@/services/auth/token.ts';
+
 
 // OpenAPI configuration
 OpenAPIConfig.BASE = `${import.meta.env.VITE_APP_URL}`;

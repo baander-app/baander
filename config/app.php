@@ -181,7 +181,6 @@ return [
          * Application Service Providers...
          */
         App\Providers\AppServiceProvider::class,
-        App\Modules\Apm\ElasticApmAgentServiceProvider::class,
         App\Providers\LogConfigurationServiceProvider::class,
         App\Providers\AuthServiceProvider::class,
         App\Providers\BroadcastServiceProvider::class,
@@ -205,7 +204,6 @@ return [
     */
 
     'aliases' => Facade::defaultAliases()->merge([
-        'Apm' => App\Modules\Apm\Apm::class,
     ])->toArray(),
 
 ];

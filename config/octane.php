@@ -155,12 +155,6 @@ return [
     */
 
     'tables' => [
-        'apm_queue_transactions:200' => [
-            'start_time' => 'float',
-            'job_name'   => 'string:255',
-            'queue_name' => 'string:255',
-            'connection' => 'string:255',
-        ],
         'metrics_state:1000' => [
             'timer_id' => 'int',
             'running' => 'int',

@@ -15,24 +15,10 @@ import styles from './app.module.scss';
 import { removeToast } from '@/store/notifications/notifications-slice.ts';
 import { Iconify } from './ui/icons/iconify';
 import { useEffect } from 'react';
-import { apm } from '@/services/apm.ts';
-import { useApmRouteTracking } from '@/hooks/use-apm-route-tracking';
-import { ApmErrorBoundary } from '@/components/apm/apm-error-boundary';
-import { withApmInstrumentation } from '@/components/apm/with-apm-instrumentation';
-
-// Create a wrapper component that uses the hook
-function AppWithRouteTracking() {
-  useApmRouteTracking();
-
-  return (
-    <ApmErrorBoundary>
-      <AppRoutes />
-    </ApmErrorBoundary>
-  );
-}
+import HyperDX from '@hyperdx/browser';
 
 // Instrument the main app component
-const InstrumentedApp = withApmInstrumentation(function App() {
+const App = () => {
   const { toasts } = useAppSelector(state => state.notifications);
   const { theme } = useAppSelector(state => state.ui);
   const { user } = useAppSelector(state => state.auth);
@@ -40,14 +26,9 @@ const InstrumentedApp = withApmInstrumentation(function App() {
 
   useEffect(() => {
     if (user) {
-      apm.setUserContext({
-        email: user.email,
-        username: user.name,
-      });
-    } else {
-      apm.setUserContext({
-        email: undefined,
-        username: undefined,
+      HyperDX.setGlobalAttributes({
+        userName: user.name,
+        userEmail: user.email,
       })
     }
   }, [user]);
@@ -66,7 +47,7 @@ const InstrumentedApp = withApmInstrumentation(function App() {
       >
         <MusicSourceProvider>
           <BrowserRouter>
-            <AppWithRouteTracking />
+            <AppRoutes/>
           </BrowserRouter>
 
           <ReactQueryDevtools/>
@@ -104,7 +85,7 @@ const InstrumentedApp = withApmInstrumentation(function App() {
         <Toast.Viewport className={styles.ToastViewport}/>
       </Theme>
     </HelmetProvider>
-  );
-}, 'App');
+  )
+}
 
-export default InstrumentedApp;
+export default App;

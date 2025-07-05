@@ -1,78 +1,93 @@
-FROM php:bookworm
+FROM php:8-zts
 
+# Copy FFmpeg binaries from static build
 COPY --from=martinjuul/ffmpeg-baander-static /usr/src/ffmpeg-build-script/workspace/bin/ffmpeg /bin/ffmpeg
 COPY --from=martinjuul/ffmpeg-baander-static /usr/src/ffmpeg-build-script/workspace/bin/ffprobe /bin/ffprobe
 COPY --from=martinjuul/ffmpeg-baander-static /usr/src/ffmpeg-build-script/workspace/bin/ffplay /bin/ffplay
 
-# set main params
+# Build arguments and environment variables
 ARG BUILD_ARGUMENT_ENV=dev
-ENV ENV=$BUILD_ARGUMENT_ENV
-ENV APP_HOME /var/www/html
 ARG HOST_UID=1000
 ARG HOST_GID=1000
-ENV USERNAME=www-data
 ARG INSIDE_DOCKER_CONTAINER=1
-ENV INSIDE_DOCKER_CONTAINER=$INSIDE_DOCKER_CONTAINER
 ARG XDEBUG_CONFIG=main
-ENV XDEBUG_CONFIG=$XDEBUG_CONFIG
-ARG XDEBUG_VERSION=3.4.3
-ENV XDEBUG_VERSION=$XDEBUG_VERSION
+ARG XDEBUG_VERSION=3.4.4
 
-# Check environment
+ENV ENV=$BUILD_ARGUMENT_ENV \
+    APP_HOME=/var/www/html \
+    USERNAME=www-data \
+    INSIDE_DOCKER_CONTAINER=$INSIDE_DOCKER_CONTAINER \
+    XDEBUG_CONFIG=$XDEBUG_CONFIG \
+    XDEBUG_VERSION=$XDEBUG_VERSION \
+    COMPOSER_ALLOW_SUPERUSER=1
+
+# Validate environment
 RUN set -xe && \
-    if [ "${BUILD_ARGUMENT_ENV}" = "default" ]; then echo "Set BUILD_ARGUMENT_ENV in docker build-args like --build-arg BUILD_ARGUMENT_ENV=dev" && exit 2; \
-    elif [ "${BUILD_ARGUMENT_ENV}" = "dev" ]; then echo "Building development environment."; \
-    else echo "Set correct BUILD_ARGUMENT_ENV in docker build-args like --build-arg BUILD_ARGUMENT_ENV=dev. Available choices are dev" && exit 2; \
+    if [ "${BUILD_ARGUMENT_ENV}" = "default" ]; then \
+        echo "Set BUILD_ARGUMENT_ENV in docker build-args like --build-arg BUILD_ARGUMENT_ENV=dev" && exit 2; \
+    elif [ "${BUILD_ARGUMENT_ENV}" = "dev" ]; then \
+        echo "Building development environment."; \
+    else \
+        echo "Set correct BUILD_ARGUMENT_ENV in docker build-args like --build-arg BUILD_ARGUMENT_ENV=dev. Available choices are dev" && exit 2; \
     fi
 
-# Install all the dependencies and enable PHP modules
-RUN set -xe \
-    && curl -sL https://deb.nodesource.com/setup_22.x  | bash - \
-    && DEBIAN_FRONTEND=noninteractive apt-get update -qq \
-    && DEBIAN_FRONTEND=noninteractive apt-get upgrade -yqq \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -yqq -o=Dpkg::Use-Pty=0 \
-      ca-certificates \
-      cron \
-      curl \
-      wget \
-      git \
-      nano \
-      nodejs \
-      procps \
-      sudo \
-      supervisor \
-      unzip \
-      iputils-ping \
-      libavif-dev \
-      libbz2-dev \
-      libc-ares-dev \
-      libcurl4-openssl-dev \
-      libfreetype6-dev \
-      libicu-dev \
-      libjpeg-dev \
-      libjpeg62-turbo-dev \
-      liblz4-dev \
-      libmagickwand-dev \
-      libpng-dev \
-      libpq-dev \
-      libreadline-dev \
-      libsqlite3-dev \
-      libssh2-1-dev \
-      libwebp-dev \
-      libxml2-dev \
-      libxpm-dev \
-      libzip-dev \
-      libzstd-dev \
-      libyaml-dev \
-      libuv1-dev \
-      zlib1g-dev
+# Install system dependencies
+RUN set -xe && \
+    curl -sL https://deb.nodesource.com/setup_24.x | bash - && \
+    DEBIAN_FRONTEND=noninteractive apt-get update -qq && \
+    DEBIAN_FRONTEND=noninteractive apt-get upgrade -yqq && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -yqq -o=Dpkg::Use-Pty=0 \
+        ca-certificates \
+        cron \
+        curl \
+        wget \
+        git \
+        nano \
+        nodejs \
+        procps \
+        sudo \
+        supervisor \
+        unzip \
+        iputils-ping \
+        libavif-dev \
+        libbz2-dev \
+        libc-ares-dev \
+        libcurl4-openssl-dev \
+        libfreetype6-dev \
+        libicu-dev \
+        libjpeg-dev \
+        libjpeg62-turbo-dev \
+        liblz4-dev \
+        libmagickwand-dev \
+        libpng-dev \
+        libpq-dev \
+        libreadline-dev \
+        libsqlite3-dev \
+        libssh2-1-dev \
+        libwebp-dev \
+        libxml2-dev \
+        libxpm-dev \
+        libzip-dev \
+        libzstd-dev \
+        libyaml-dev \
+        libuv1-dev \
+        libuv1-dev \
+        postgresql-client \
+        redis-tools \
+        jq \
+        tree \
+        zlib1g-dev && \
+    npm i -g yarn && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get clean
 
-RUN set -xe \
-    && docker-php-ext-configure gd --with-webp --with-jpeg --with-xpm --with-freetype \
-    && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
-    && docker-php-ext-configure intl \
-    && npm i -g yarn
+# Configure PHP extensions
+RUN set -xe && \
+    docker-php-ext-configure gd --with-webp --with-jpeg --with-xpm --with-freetype && \
+    docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql && \
+    docker-php-ext-configure intl
 
+# Install PHP extensions
 RUN set -xe && \
     docker-php-ext-install -j "$(nproc)" \
       exif \
@@ -149,77 +164,62 @@ RUN set -xe \
     && pecl bundle -d /usr/local/src/pecl swoole \
     && docker-php-ext-configure /usr/local/src/pecl/swoole --enable-sockets --enable-swoole-curl --enable-cares --enable-swoole-pgsql \
     && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/swoole \
-    # elastic apm
-    && wget https://github.com/elastic/apm-agent-php/releases/download/v1.15.0/apm-agent-php_1.15.0_amd64.deb \
-    && dpkg -i apm-agent-php_1.15.0_amd64.deb \
-    && rm apm-agent-php_1.15.0_amd64.deb \
+    # opentelemetry
+    && pecl bundle -d /usr/local/src/pecl opentelemetry \
+    && docker-php-ext-configure /usr/local/src/pecl/opentelemetry \
+    && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/opentelemetry \
     && rm -rf /usr/local/src/pecl \
     && rm -rf /tmp/* \
     && rm -rf /var/list/apt/* \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# create document root, fix permissions for www-data user and change owner to www-data
-RUN set -xe \
-    && mkdir -p ${APP_HOME}/public \
-    && mkdir -p /home/${USERNAME} && chown ${USERNAME}:${USERNAME} /home/${USERNAME} \
-    && usermod -o -u ${HOST_UID} ${USERNAME} -d /home/${USERNAME} \
-    && groupmod -o -g ${HOST_GID} ${USERNAME} \
-    && chown -R ${USERNAME}:${USERNAME} ${APP_HOME}
+# Install Xdebug
+RUN set -xe && \
+    pecl install xdebug-${XDEBUG_VERSION}
 
-# put php config for Laravel
-#COPY ./docker/$BUILD_ARGUMENT_ENV/php.ini /usr/local/etc/php/php.ini
+# Setup user permissions
+RUN set -xe && \
+    mkdir -p ${APP_HOME}/public && \
+    mkdir -p /home/${USERNAME} && \
+    chown ${USERNAME}:${USERNAME} /home/${USERNAME} && \
+    usermod -o -u ${HOST_UID} ${USERNAME} -d /home/${USERNAME} && \
+    groupmod -o -g ${HOST_GID} ${USERNAME} && \
+    chown -R ${USERNAME}:${USERNAME} ${APP_HOME}
 
+# Copy certificates and update CA store
 COPY ./docker/dev/ca.crt /usr/local/share/ca-certificates/ca-self.crt
+COPY ./docker/dev/juul.localdomain.crt /usr/local/share/ca-certificates/juul.localdomain.crt
+RUN update-ca-certificates
 
-RUN set -xe \
-    && update-ca-certificates
+# Copy and configure Xdebug
+COPY /docker/dev/xdebug-main.ini /docker/dev/xdebug.ini
+RUN mv /docker/dev/xdebug.ini /usr/local/etc/php/conf.d/
 
-# install Xdebug in case dev/test environment
-#COPY ./docker/general/do_we_need_xdebug.sh /tmp/
-#COPY ./docker/dev/xdebug-${XDEBUG_CONFIG}.ini /tmp/xdebug.ini
-#RUN chmod u+x /tmp/do_we_need_xdebug.sh && /tmp/do_we_need_xdebug.sh
-
-#COPY /docker/dev/xdebug-main.ini /docker/dev/xdebug.ini
-#
-#RUN set -xe \
-#    && pecl install xdebug-3.4.0 \
-#    && mv /docker/dev/xdebug.ini /usr/local/etc/php/conf.d/
-
-# install composer
+# Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 RUN chmod +x /usr/bin/composer
-ENV COMPOSER_ALLOW_SUPERUSER 1
 
-# add supervisor
+# Setup supervisor and cron
 RUN mkdir -p /var/log/supervisor
 COPY --chown=root:root ./docker/general/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-# add crontab
 COPY --chown=root:crontab ./docker/general/cron /var/spool/cron/crontabs/root
 RUN chmod 0600 /var/spool/cron/crontabs/root
 
-# set working directory
+# Set working directory and switch to app user
 WORKDIR ${APP_HOME}
 USER ${USERNAME}
 
-# Add necessary stuff to bash autocomplete
-RUN set -xe \
-    && echo 'alias artisan="php /var/www/html/artisan"' >> /home/${USERNAME}/.bashrc
+# Add bash aliases
+RUN echo 'alias artisan="php /var/www/html/artisan"' >> /home/${USERNAME}/.bashrc
 
-# copy source files and config file
+# Copy application files
 COPY --chown=${USERNAME}:${USERNAME} . ${APP_HOME}/
 COPY --chown=${USERNAME}:${USERNAME} .env ${APP_HOME}/.env
 COPY --chown=${USERNAME}:${USERNAME} start-swoole-server ${APP_HOME}/start-swoole-server
+RUN chmod +x ./start-swoole-server
 
-RUN set -xe \
-    && chmod +x ./start-swoole-server
-
-# install all PHP dependencies
-# TODO fix
-#RUN if [ "${BUILD_ARGUMENT_ENV}" = "dev" ] || [ "${BUILD_ARGUMENT_ENV}" = "test" ]; then COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interaction --no-progress; \
-#    else COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interaction --no-progress --no-dev; \
-#    fi
-RUN set -xe \
-    && COMPOSER_MEMORY_LIMIT=-1 composer install
+# Install Composer dependencies
+RUN COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interaction --no-progress
 
 CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
