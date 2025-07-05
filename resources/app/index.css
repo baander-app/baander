@@ -9,6 +9,17 @@
 /*@import "theme/light/gray.css";*/
 /*@import "theme/light/text.css";*/
 
+@font-face {
+    font-family: 'Bitstream Vera Sans Mono';
+    src: url('./assets/fonts/VeraMono-webfont.woff');
+    font-weight: normal;
+    font-style: normal;
+}
+
+.radix-themes {
+    --code-font-family: 'Bitstream Vera Sans Mono', monospace;
+}
+
 :root {
     --progress-width: 0;
     --buffered-width: 0;

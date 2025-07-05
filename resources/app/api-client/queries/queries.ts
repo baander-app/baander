@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { useMutation, UseMutationOptions, useQuery, UseQueryOptions } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, MovieService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, RetryService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
+import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, GenreService, ImageService, JobMetricsService, JobService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, MovieService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, RetryService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
 import { AuthenticateUsingPasskeyRequest, CreateLibraryRequest, CreatePlaylistRequest, CreateSmartPlaylistRequest, CreateUserRequest, ForgotPasswordRequest, LoginRequest, LogoutRequest, RegisterRequest, ResetPasswordRequest, RetryJobRequest, StorePasskeyRequest, UpdateGenreRequest, UpdateLibraryRequest, UpdatePlaylistRequest, UpdateSmartPlaylistRulesRequest, UpdateUserRequest } from "../requests/types.gen";
 import * as Common from "./common";
 /**
@@ -145,56 +145,6 @@ export const useFailedJobsServiceGetHorizonApiJobsFailedById = <TData = Common.F
   id: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseFailedJobsServiceGetHorizonApiJobsFailedByIdKeyFn({ id }, queryKey), queryFn: () => FailedJobsService.getHorizonApiJobsFailedById({ id }) as TData, ...options });
 /**
-* @returns LogFileResource Array of `LogFileResource`
-* @throws ApiError
-*/
-export const useFilesServiceGetSystemLogViewerApiFiles = <TData = Common.FilesServiceGetSystemLogViewerApiFilesDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseFilesServiceGetSystemLogViewerApiFilesKeyFn(queryKey), queryFn: () => FilesService.getSystemLogViewerApiFiles() as TData, ...options });
-/**
-* @param data The data for the request.
-* @param data.fileIdentifier
-* @returns unknown
-* @throws ApiError
-*/
-export const useFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadRequest = <TData = Common.FilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadRequestDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fileIdentifier }: {
-  fileIdentifier: string;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadRequestKeyFn({ fileIdentifier }, queryKey), queryFn: () => FilesService.getSystemLogViewerApiFilesByFileIdentifierDownloadRequest({ fileIdentifier }) as TData, ...options });
-/**
-* @param data The data for the request.
-* @param data.fileIdentifier
-* @returns string
-* @throws ApiError
-*/
-export const useFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownload = <TData = Common.FilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ fileIdentifier }: {
-  fileIdentifier: string;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadKeyFn({ fileIdentifier }, queryKey), queryFn: () => FilesService.getSystemLogViewerApiFilesByFileIdentifierDownload({ fileIdentifier }) as TData, ...options });
-/**
-* @param data The data for the request.
-* @param data.direction
-* @returns LogFolderResource Array of `LogFolderResource`
-* @throws ApiError
-*/
-export const useFoldersServiceGetSystemLogViewerApiFolders = <TData = Common.FoldersServiceGetSystemLogViewerApiFoldersDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ direction }: {
-  direction?: string;
-} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseFoldersServiceGetSystemLogViewerApiFoldersKeyFn({ direction }, queryKey), queryFn: () => FoldersService.getSystemLogViewerApiFolders({ direction }) as TData, ...options });
-/**
-* @param data The data for the request.
-* @param data.folderIdentifier
-* @returns unknown
-* @throws ApiError
-*/
-export const useFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequest = <TData = Common.FoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ folderIdentifier }: {
-  folderIdentifier: string;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestKeyFn({ folderIdentifier }, queryKey), queryFn: () => FoldersService.getSystemLogViewerApiFoldersByFolderIdentifierDownloadRequest({ folderIdentifier }) as TData, ...options });
-/**
-* @param data The data for the request.
-* @param data.folderIdentifier
-* @returns string
-* @throws ApiError
-*/
-export const useFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownload = <TData = Common.FoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ folderIdentifier }: {
-  folderIdentifier: string;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadKeyFn({ folderIdentifier }, queryKey), queryFn: () => FoldersService.getSystemLogViewerApiFoldersByFolderIdentifierDownload({ folderIdentifier }) as TData, ...options });
-/**
 * Get a collection of genres
 * @param data The data for the request.
 * @param data.fields
@@ -222,11 +172,6 @@ export const useGenreServiceGetApiGenres = <TData = Common.GenreServiceGetApiGen
 export const useGenreServiceGetApiGenresByGenre = <TData = Common.GenreServiceGetApiGenresByGenreDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ genre }: {
   genre: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseGenreServiceGetApiGenresByGenreKeyFn({ genre }, queryKey), queryFn: () => GenreService.getApiGenresByGenre({ genre }) as TData, ...options });
-/**
-* @returns LogViewerHostResource Array of `LogViewerHostResource`
-* @throws ApiError
-*/
-export const useHostsServiceGetSystemLogViewerApiHosts = <TData = Common.HostsServiceGetSystemLogViewerApiHostsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseHostsServiceGetSystemLogViewerApiHostsKeyFn(queryKey), queryFn: () => HostsService.getSystemLogViewerApiHosts() as TData, ...options });
 /**
 * Get an image asset
 * @param data The data for the request.
@@ -286,28 +231,125 @@ export const useLibraryServiceGetApiLibrariesBySlug = <TData = Common.LibrarySer
   slug: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLibraryServiceGetApiLibrariesBySlugKeyFn({ slug }, queryKey), queryFn: () => LibraryService.getApiLibrariesBySlug({ slug }) as TData, ...options });
 /**
+* Get a collection of log files
+* @returns LogFile
+* @throws ApiError
+*/
+export const useLogsServiceGetApiLogs = <TData = Common.LogsServiceGetApiLogsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLogsServiceGetApiLogsKeyFn(queryKey), queryFn: () => LogsService.getApiLogs() as TData, ...options });
+/**
+* Show a log file
 * @param data The data for the request.
-* @param data.file
-* @param data.query
-* @param data.direction
-* @param data.log
-* @param data.excludeLevels
-* @param data.excludeFileTypes
-* @param data.perPage
-* @param data.shorterStackTraces
+* @param data.logFile
 * @returns unknown
 * @throws ApiError
 */
-export const useLogsServiceGetSystemLogViewerApiLogs = <TData = Common.LogsServiceGetSystemLogViewerApiLogsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }: {
-  direction?: string;
-  excludeFileTypes?: string;
-  excludeLevels?: string;
-  file?: string;
-  log?: string;
-  perPage?: string;
-  query?: string;
-  shorterStackTraces?: boolean;
-} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLogsServiceGetSystemLogViewerApiLogsKeyFn({ direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }, queryKey), queryFn: () => LogsService.getSystemLogViewerApiLogs({ direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }) as TData, ...options });
+export const useLogsServiceGetApiLogsByLogFile = <TData = Common.LogsServiceGetApiLogsByLogFileDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ logFile }: {
+  logFile: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLogsServiceGetApiLogsByLogFileKeyFn({ logFile }, queryKey), queryFn: () => LogsService.getApiLogsByLogFile({ logFile }) as TData, ...options });
+/**
+* Get log file content
+* @param data The data for the request.
+* @param data.logFile
+* @param data.afterLine
+* @param data.maxLines
+* @returns unknown
+* @throws ApiError
+*/
+export const useLogsServiceGetApiLogsByLogFileContent = <TData = Common.LogsServiceGetApiLogsByLogFileContentDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ afterLine, logFile, maxLines }: {
+  afterLine?: number;
+  logFile: string;
+  maxLines?: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLogsServiceGetApiLogsByLogFileContentKeyFn({ afterLine, logFile, maxLines }, queryKey), queryFn: () => LogsService.getApiLogsByLogFileContent({ afterLine, logFile, maxLines }) as TData, ...options });
+/**
+* Count log file lines
+* @param data The data for the request.
+* @param data.logFile
+* @returns unknown
+* @throws ApiError
+*/
+export const useLogsServiceGetApiLogsByLogFileLines = <TData = Common.LogsServiceGetApiLogsByLogFileLinesDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ logFile }: {
+  logFile: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLogsServiceGetApiLogsByLogFileLinesKeyFn({ logFile }, queryKey), queryFn: () => LogsService.getApiLogsByLogFileLines({ logFile }) as TData, ...options });
+/**
+* Search log file content
+* @param data The data for the request.
+* @param data.logFile
+* @param data.pattern
+* @param data.caseSensitive
+* @param data.maxResults
+* @param data.caseSensitive
+* @param data.maxResults
+* @returns unknown
+* @throws ApiError
+*/
+export const useLogsServiceGetApiLogsByLogFileSearch = <TData = Common.LogsServiceGetApiLogsByLogFileSearchDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ caseSensitive, logFile, maxResults, pattern }: {
+  caseSensitive?: boolean;
+  logFile: string;
+  maxResults?: number;
+  pattern: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLogsServiceGetApiLogsByLogFileSearchKeyFn({ caseSensitive, logFile, maxResults, pattern }, queryKey), queryFn: () => LogsService.getApiLogsByLogFileSearch({ caseSensitive, logFile, maxResults, pattern }) as TData, ...options });
+/**
+* Get log file tail
+* @param data The data for the request.
+* @param data.logFile
+* @param data.lines
+* @returns unknown
+* @throws ApiError
+*/
+export const useLogsServiceGetApiLogsByLogFileTail = <TData = Common.LogsServiceGetApiLogsByLogFileTailDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ lines, logFile }: {
+  lines?: number;
+  logFile: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLogsServiceGetApiLogsByLogFileTailKeyFn({ lines, logFile }, queryKey), queryFn: () => LogsService.getApiLogsByLogFileTail({ lines, logFile }) as TData, ...options });
+/**
+* Get log file head
+* @param data The data for the request.
+* @param data.logFile
+* @param data.lines
+* @returns unknown
+* @throws ApiError
+*/
+export const useLogsServiceGetApiLogsByLogFileHead = <TData = Common.LogsServiceGetApiLogsByLogFileHeadDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ lines, logFile }: {
+  lines?: number;
+  logFile: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLogsServiceGetApiLogsByLogFileHeadKeyFn({ lines, logFile }, queryKey), queryFn: () => LogsService.getApiLogsByLogFileHead({ lines, logFile }) as TData, ...options });
+/**
+* Get log file statistics
+* @param data The data for the request.
+* @param data.logFile
+* @returns unknown
+* @throws ApiError
+*/
+export const useLogsServiceGetApiLogsByLogFileStats = <TData = Common.LogsServiceGetApiLogsByLogFileStatsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ logFile }: {
+  logFile: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLogsServiceGetApiLogsByLogFileStatsKeyFn({ logFile }, queryKey), queryFn: () => LogsService.getApiLogsByLogFileStats({ logFile }) as TData, ...options });
+/**
+* Download log file
+* @param data The data for the request.
+* @param data.logFile
+* @returns string
+* @throws ApiError
+*/
+export const useLogsServiceGetApiLogsByLogFileDownload = <TData = Common.LogsServiceGetApiLogsByLogFileDownloadDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ logFile }: {
+  logFile: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLogsServiceGetApiLogsByLogFileDownloadKeyFn({ logFile }, queryKey), queryFn: () => LogsService.getApiLogsByLogFileDownload({ logFile }) as TData, ...options });
+/**
+* Search across all log files
+* @param data The data for the request.
+* @param data.pattern
+* @param data.caseSensitive
+* @param data.maxResultsPerFile
+* @param data.caseSensitive
+* @param data.maxResultsPerFile
+* @param data.files
+* @returns unknown
+* @throws ApiError
+*/
+export const useLogsServiceGetApiLogsSearchAll = <TData = Common.LogsServiceGetApiLogsSearchAllDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ caseSensitive, files, maxResultsPerFile, pattern }: {
+  caseSensitive?: boolean;
+  files?: string[];
+  maxResultsPerFile?: number;
+  pattern: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLogsServiceGetApiLogsSearchAllKeyFn({ caseSensitive, files, maxResultsPerFile, pattern }, queryKey), queryFn: () => LogsService.getApiLogsSearchAll({ caseSensitive, files, maxResultsPerFile, pattern }) as TData, ...options });
 /**
 * Get all of the master supervisors and their underlying supervisors
 * @returns unknown
@@ -734,44 +776,6 @@ export const useBatchesServicePostHorizonApiBatchesRetryById = <TData = Common.B
   id: string;
 }, TContext>({ mutationFn: ({ id }) => BatchesService.postHorizonApiBatchesRetryById({ id }) as unknown as Promise<TData>, ...options });
 /**
-* @param data The data for the request.
-* @param data.fileIdentifier
-* @returns unknown
-* @throws ApiError
-*/
-export const useFilesServicePostSystemLogViewerApiFilesByFileIdentifierClearCache = <TData = Common.FilesServicePostSystemLogViewerApiFilesByFileIdentifierClearCacheMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  fileIdentifier: string;
-}, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  fileIdentifier: string;
-}, TContext>({ mutationFn: ({ fileIdentifier }) => FilesService.postSystemLogViewerApiFilesByFileIdentifierClearCache({ fileIdentifier }) as unknown as Promise<TData>, ...options });
-/**
-* @returns unknown
-* @throws ApiError
-*/
-export const useFilesServicePostSystemLogViewerApiClearCacheAll = <TData = Common.FilesServicePostSystemLogViewerApiClearCacheAllMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, void, TContext>, "mutationFn">) => useMutation<TData, TError, void, TContext>({ mutationFn: () => FilesService.postSystemLogViewerApiClearCacheAll() as unknown as Promise<TData>, ...options });
-/**
-* @param data The data for the request.
-* @param data.requestBody
-* @returns unknown
-* @throws ApiError
-*/
-export const useFilesServicePostSystemLogViewerApiDeleteMultipleFiles = <TData = Common.FilesServicePostSystemLogViewerApiDeleteMultipleFilesMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  requestBody?: { files?: string; };
-}, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  requestBody?: { files?: string; };
-}, TContext>({ mutationFn: ({ requestBody }) => FilesService.postSystemLogViewerApiDeleteMultipleFiles({ requestBody }) as unknown as Promise<TData>, ...options });
-/**
-* @param data The data for the request.
-* @param data.folderIdentifier
-* @returns unknown
-* @throws ApiError
-*/
-export const useFoldersServicePostSystemLogViewerApiFoldersByFolderIdentifierClearCache = <TData = Common.FoldersServicePostSystemLogViewerApiFoldersByFolderIdentifierClearCacheMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  folderIdentifier: string;
-}, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  folderIdentifier: string;
-}, TContext>({ mutationFn: ({ folderIdentifier }) => FoldersService.postSystemLogViewerApiFoldersByFolderIdentifierClearCache({ folderIdentifier }) as unknown as Promise<TData>, ...options });
-/**
 * Scan a library
 * @param data The data for the request.
 * @param data.slug
@@ -1075,28 +1079,6 @@ export const useUserServicePatchApiUsersByUser = <TData = Common.UserServicePatc
   requestBody?: UpdateUserRequest;
   user: number;
 }, TContext>({ mutationFn: ({ requestBody, user }) => UserService.patchApiUsersByUser({ requestBody, user }) as unknown as Promise<TData>, ...options });
-/**
-* @param data The data for the request.
-* @param data.fileIdentifier
-* @returns unknown
-* @throws ApiError
-*/
-export const useFilesServiceDeleteSystemLogViewerApiFilesByFileIdentifier = <TData = Common.FilesServiceDeleteSystemLogViewerApiFilesByFileIdentifierMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  fileIdentifier: string;
-}, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  fileIdentifier: string;
-}, TContext>({ mutationFn: ({ fileIdentifier }) => FilesService.deleteSystemLogViewerApiFilesByFileIdentifier({ fileIdentifier }) as unknown as Promise<TData>, ...options });
-/**
-* @param data The data for the request.
-* @param data.folderIdentifier
-* @returns unknown
-* @throws ApiError
-*/
-export const useFoldersServiceDeleteSystemLogViewerApiFoldersByFolderIdentifier = <TData = Common.FoldersServiceDeleteSystemLogViewerApiFoldersByFolderIdentifierMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  folderIdentifier: string;
-}, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  folderIdentifier: string;
-}, TContext>({ mutationFn: ({ folderIdentifier }) => FoldersService.deleteSystemLogViewerApiFoldersByFolderIdentifier({ folderIdentifier }) as unknown as Promise<TData>, ...options });
 /**
 * Delete a genre
 * @param data The data for the request.

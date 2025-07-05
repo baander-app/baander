@@ -44,6 +44,8 @@ services:
       - OTEL_SERVICE_NAME=baander-backend
       - OTEL_SERVICE_VERSION=1.0.0
       - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=otlp
       - OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.juul.localdomain
       - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
       - OTEL_EXPORTER_OTLP_HEADERS=Authorization=5be74f1d-4708-4f92-a19b-888ff10083f6

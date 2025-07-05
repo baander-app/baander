@@ -1,0 +1,38 @@
+/* Logs Module Styles */
+
+/* Base layout styles - these are still used for class names in the components */
+.logs-page {
+  /* Styles are now applied inline using Radix UI's style prop */
+}
+
+.logs-container {
+  /* Styles are now applied inline using Radix UI's style prop */
+}
+
+/* Sidebar and log file list have been replaced with a dropdown */
+
+.toolbar {
+  /* Styles are now applied inline using Radix UI's style prop */
+}
+
+.log-viewer-container {
+  /* Styles are now applied inline using Radix UI's style prop */
+}
+
+
+.log-viewer {
+  /* Styles are now applied inline using Radix UI's style prop */
+}
+
+.log-stats {
+  /* Styles are now applied inline using Radix UI's style prop */
+}
+
+.log-search {
+  /* Styles are now applied inline using Radix UI's style prop */
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  /* No sidebar-specific adjustments needed anymore */
+}

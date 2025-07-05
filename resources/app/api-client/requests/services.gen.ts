@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { GetApiLibrariesByLibraryAlbumsData, GetApiLibrariesByLibraryAlbumsResponse, GetApiLibrariesByLibraryAlbumsByAlbumData, GetApiLibrariesByLibraryAlbumsByAlbumResponse, GetApiLibrariesByLibraryArtistsData, GetApiLibrariesByLibraryArtistsResponse, GetApiLibrariesByLibraryArtistsByArtistData, GetApiLibrariesByLibraryArtistsByArtistResponse, PostApiAuthLoginData, PostApiAuthLoginResponse, PostApiAuthRefreshTokenResponse, PostApiAuthStreamTokenResponse, PostApiAuthRegisterData, PostApiAuthRegisterResponse, PostApiAuthForgotPasswordData, PostApiAuthForgotPasswordResponse, PostApiAuthResetPasswordData, PostApiAuthResetPasswordResponse, PostApiAuthVerifyByIdByHashData, PostApiAuthVerifyByIdByHashResponse, PostApiAuthLogoutData, PostApiAuthLogoutResponse, GetWebauthnPasskeyResponse, PostWebauthnPasskeyData, PostWebauthnPasskeyResponse, GetWebauthnPasskeyRegisterResponse, PostWebauthnPasskeyRegisterData, PostWebauthnPasskeyRegisterResponse, GetHorizonApiBatchesResponse, GetHorizonApiBatchesByIdData, GetHorizonApiBatchesByIdResponse, PostHorizonApiBatchesRetryByIdData, PostHorizonApiBatchesRetryByIdResponse, GetHorizonApiJobsCompletedData, GetHorizonApiJobsCompletedResponse, GetHorizonApiStatsResponse, GetHorizonApiJobsFailedData, GetHorizonApiJobsFailedResponse, GetHorizonApiJobsFailedByIdData, GetHorizonApiJobsFailedByIdResponse, GetSystemLogViewerApiFilesResponse, GetSystemLogViewerApiFilesByFileIdentifierDownloadRequestData, GetSystemLogViewerApiFilesByFileIdentifierDownloadRequestResponse, PostSystemLogViewerApiFilesByFileIdentifierClearCacheData, PostSystemLogViewerApiFilesByFileIdentifierClearCacheResponse, DeleteSystemLogViewerApiFilesByFileIdentifierData, DeleteSystemLogViewerApiFilesByFileIdentifierResponse, PostSystemLogViewerApiClearCacheAllResponse, PostSystemLogViewerApiDeleteMultipleFilesData, PostSystemLogViewerApiDeleteMultipleFilesResponse, GetSystemLogViewerApiFilesByFileIdentifierDownloadData, GetSystemLogViewerApiFilesByFileIdentifierDownloadResponse, GetSystemLogViewerApiFoldersData, GetSystemLogViewerApiFoldersResponse, GetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestData, GetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestResponse, PostSystemLogViewerApiFoldersByFolderIdentifierClearCacheData, PostSystemLogViewerApiFoldersByFolderIdentifierClearCacheResponse, DeleteSystemLogViewerApiFoldersByFolderIdentifierData, DeleteSystemLogViewerApiFoldersByFolderIdentifierResponse, GetSystemLogViewerApiFoldersByFolderIdentifierDownloadData, GetSystemLogViewerApiFoldersByFolderIdentifierDownloadResponse, GetApiGenresData, GetApiGenresResponse, GetApiGenresByGenreData, GetApiGenresByGenreResponse, PatchApiGenresByGenreData, PatchApiGenresByGenreResponse, DeleteApiGenresByGenreData, DeleteApiGenresByGenreResponse, GetSystemLogViewerApiHostsResponse, GetApiImagesByImageData, GetApiImagesByImageResponse, PostApiJobsScanLibraryBySlugData, PostApiJobsScanLibraryBySlugResponse, GetHorizonApiMetricsJobsResponse, GetHorizonApiMetricsJobsByIdData, GetHorizonApiMetricsJobsByIdResponse, GetHorizonApiJobsByIdData, GetHorizonApiJobsByIdResponse, GetApiLibrariesData, GetApiLibrariesResponse, PostApiLibrariesData, PostApiLibrariesResponse, GetApiLibrariesBySlugData, GetApiLibrariesBySlugResponse, PatchApiLibrariesBySlugData, PatchApiLibrariesBySlugResponse, DeleteApiLibrariesBySlugData, DeleteApiLibrariesBySlugResponse, GetSystemLogViewerApiLogsData, GetSystemLogViewerApiLogsResponse, GetHorizonApiMastersResponse, GetHorizonApiMonitoringResponse, PostHorizonApiMonitoringResponse, GetHorizonApiMonitoringByTagData, GetHorizonApiMonitoringByTagResponse, DeleteHorizonApiMonitoringByTagData, DeleteHorizonApiMonitoringByTagResponse, GetApiLibrariesByLibraryMoviesData, GetApiLibrariesByLibraryMoviesResponse, GetApiLibrariesByLibraryMoviesByMovieData, GetApiLibrariesByLibraryMoviesByMovieResponse, GetApiOpcacheStatusResponse, GetApiOpcacheConfigResponse, PostApiOpcacheClearResponse, PostApiOpcacheCompileData, PostApiOpcacheCompileResponse, GetHorizonApiJobsPendingData, GetHorizonApiJobsPendingResponse, GetApiPlaylistsResponse, PostApiPlaylistsData, PostApiPlaylistsResponse, GetApiPlaylistsByPlaylistData, GetApiPlaylistsByPlaylistResponse, PutApiPlaylistsByPlaylistData, PutApiPlaylistsByPlaylistResponse, DeleteApiPlaylistsByPlaylistData, DeleteApiPlaylistsByPlaylistResponse, PostApiPlaylistsByPlaylistSongsBySongData, PostApiPlaylistsByPlaylistSongsBySongResponse, DeleteApiPlaylistsByPlaylistSongsBySongData, DeleteApiPlaylistsByPlaylistSongsBySongResponse, PostApiPlaylistsByPlaylistReorderData, PostApiPlaylistsByPlaylistReorderResponse, PostApiPlaylistsByPlaylistCollaboratorsData, PostApiPlaylistsByPlaylistCollaboratorsResponse, DeleteApiPlaylistsByPlaylistCollaboratorsByUserData, DeleteApiPlaylistsByPlaylistCollaboratorsByUserResponse, PostApiPlaylistsByPlaylistCloneData, PostApiPlaylistsByPlaylistCloneResponse, GetApiPlaylistsByPlaylistStatisticsData, GetApiPlaylistsByPlaylistStatisticsResponse, PostApiPlaylistsByPlaylistStatisticsRecordViewData, PostApiPlaylistsByPlaylistStatisticsRecordViewResponse, PostApiPlaylistsByPlaylistStatisticsRecordPlayData, PostApiPlaylistsByPlaylistStatisticsRecordPlayResponse, PostApiPlaylistsByPlaylistStatisticsRecordShareData, PostApiPlaylistsByPlaylistStatisticsRecordShareResponse, PostApiPlaylistsByPlaylistStatisticsRecordFavoriteData, PostApiPlaylistsByPlaylistStatisticsRecordFavoriteResponse, PostApiPlaylistsSmartData, PostApiPlaylistsSmartResponse, PutApiPlaylistsByPlaylistSmartData, PutApiPlaylistsByPlaylistSmartResponse, PostApiPlaylistsByPlaylistSmartSyncData, PostApiPlaylistsByPlaylistSmartSyncResponse, GetApiQueueMetricsData, GetApiQueueMetricsResponse, GetApiQueueMetricsQueuesResponse, GetApiQueueMetricsMetricsData, GetApiQueueMetricsMetricsResponse, PostApiQueueMetricsRetryByIdData, PostApiQueueMetricsRetryByIdResponse, DeleteApiQueueMetricsByIdData, DeleteApiQueueMetricsByIdResponse, DeleteApiQueueMetricsPurgeResponse, GetHorizonApiMetricsQueuesResponse, GetHorizonApiMetricsQueuesByIdData, GetHorizonApiMetricsQueuesByIdResponse, PostHorizonApiJobsRetryByIdData, PostHorizonApiJobsRetryByIdResponse, GetApiSchemasMusicbrainzResponse, GetHorizonApiJobsSilencedData, GetHorizonApiJobsSilencedResponse, GetApiLibrariesByLibrarySongsData, GetApiLibrariesByLibrarySongsResponse, GetApiLibrariesByLibrarySongsByPublicIdData, GetApiLibrariesByLibrarySongsByPublicIdResponse, GetApiStreamSongBySongDirectData, GetApiStreamSongBySongDirectResponse, GetApiSystemInfoResponse, GetApiSystemInfoSysResponse, GetApiUsersData, GetApiUsersResponse, PostApiUsersData, PostApiUsersResponse, PatchApiUsersByUserData, PatchApiUsersByUserResponse, GetApiUsersByUserData, GetApiUsersByUserResponse, DeleteApiUsersByUserData, DeleteApiUsersByUserResponse, GetApiUsersMeResponse, GetApiUsersTokensByUserData, GetApiUsersTokensByUserResponse, DeleteApiUsersTokensByTokenData, DeleteApiUsersTokensByTokenResponse, GetHorizonApiWorkloadResponse } from './types.gen';
+import type { GetApiLibrariesByLibraryAlbumsData, GetApiLibrariesByLibraryAlbumsResponse, GetApiLibrariesByLibraryAlbumsByAlbumData, GetApiLibrariesByLibraryAlbumsByAlbumResponse, GetApiLibrariesByLibraryArtistsData, GetApiLibrariesByLibraryArtistsResponse, GetApiLibrariesByLibraryArtistsByArtistData, GetApiLibrariesByLibraryArtistsByArtistResponse, PostApiAuthLoginData, PostApiAuthLoginResponse, PostApiAuthRefreshTokenResponse, PostApiAuthStreamTokenResponse, PostApiAuthRegisterData, PostApiAuthRegisterResponse, PostApiAuthForgotPasswordData, PostApiAuthForgotPasswordResponse, PostApiAuthResetPasswordData, PostApiAuthResetPasswordResponse, PostApiAuthVerifyByIdByHashData, PostApiAuthVerifyByIdByHashResponse, PostApiAuthLogoutData, PostApiAuthLogoutResponse, GetWebauthnPasskeyResponse, PostWebauthnPasskeyData, PostWebauthnPasskeyResponse, GetWebauthnPasskeyRegisterResponse, PostWebauthnPasskeyRegisterData, PostWebauthnPasskeyRegisterResponse, GetHorizonApiBatchesResponse, GetHorizonApiBatchesByIdData, GetHorizonApiBatchesByIdResponse, PostHorizonApiBatchesRetryByIdData, PostHorizonApiBatchesRetryByIdResponse, GetHorizonApiJobsCompletedData, GetHorizonApiJobsCompletedResponse, GetHorizonApiStatsResponse, GetHorizonApiJobsFailedData, GetHorizonApiJobsFailedResponse, GetHorizonApiJobsFailedByIdData, GetHorizonApiJobsFailedByIdResponse, GetApiGenresData, GetApiGenresResponse, GetApiGenresByGenreData, GetApiGenresByGenreResponse, PatchApiGenresByGenreData, PatchApiGenresByGenreResponse, DeleteApiGenresByGenreData, DeleteApiGenresByGenreResponse, GetApiImagesByImageData, GetApiImagesByImageResponse, PostApiJobsScanLibraryBySlugData, PostApiJobsScanLibraryBySlugResponse, GetHorizonApiMetricsJobsResponse, GetHorizonApiMetricsJobsByIdData, GetHorizonApiMetricsJobsByIdResponse, GetHorizonApiJobsByIdData, GetHorizonApiJobsByIdResponse, GetApiLibrariesData, GetApiLibrariesResponse, PostApiLibrariesData, PostApiLibrariesResponse, GetApiLibrariesBySlugData, GetApiLibrariesBySlugResponse, PatchApiLibrariesBySlugData, PatchApiLibrariesBySlugResponse, DeleteApiLibrariesBySlugData, DeleteApiLibrariesBySlugResponse, GetApiLogsResponse, GetApiLogsByLogFileData, GetApiLogsByLogFileResponse, GetApiLogsByLogFileContentData, GetApiLogsByLogFileContentResponse, GetApiLogsByLogFileLinesData, GetApiLogsByLogFileLinesResponse, GetApiLogsByLogFileSearchData, GetApiLogsByLogFileSearchResponse, GetApiLogsByLogFileTailData, GetApiLogsByLogFileTailResponse, GetApiLogsByLogFileHeadData, GetApiLogsByLogFileHeadResponse, GetApiLogsByLogFileStatsData, GetApiLogsByLogFileStatsResponse, GetApiLogsByLogFileDownloadData, GetApiLogsByLogFileDownloadResponse, GetApiLogsSearchAllData, GetApiLogsSearchAllResponse, GetHorizonApiMastersResponse, GetHorizonApiMonitoringResponse, PostHorizonApiMonitoringResponse, GetHorizonApiMonitoringByTagData, GetHorizonApiMonitoringByTagResponse, DeleteHorizonApiMonitoringByTagData, DeleteHorizonApiMonitoringByTagResponse, GetApiLibrariesByLibraryMoviesData, GetApiLibrariesByLibraryMoviesResponse, GetApiLibrariesByLibraryMoviesByMovieData, GetApiLibrariesByLibraryMoviesByMovieResponse, GetApiOpcacheStatusResponse, GetApiOpcacheConfigResponse, PostApiOpcacheClearResponse, PostApiOpcacheCompileData, PostApiOpcacheCompileResponse, GetHorizonApiJobsPendingData, GetHorizonApiJobsPendingResponse, GetApiPlaylistsResponse, PostApiPlaylistsData, PostApiPlaylistsResponse, GetApiPlaylistsByPlaylistData, GetApiPlaylistsByPlaylistResponse, PutApiPlaylistsByPlaylistData, PutApiPlaylistsByPlaylistResponse, DeleteApiPlaylistsByPlaylistData, DeleteApiPlaylistsByPlaylistResponse, PostApiPlaylistsByPlaylistSongsBySongData, PostApiPlaylistsByPlaylistSongsBySongResponse, DeleteApiPlaylistsByPlaylistSongsBySongData, DeleteApiPlaylistsByPlaylistSongsBySongResponse, PostApiPlaylistsByPlaylistReorderData, PostApiPlaylistsByPlaylistReorderResponse, PostApiPlaylistsByPlaylistCollaboratorsData, PostApiPlaylistsByPlaylistCollaboratorsResponse, DeleteApiPlaylistsByPlaylistCollaboratorsByUserData, DeleteApiPlaylistsByPlaylistCollaboratorsByUserResponse, PostApiPlaylistsByPlaylistCloneData, PostApiPlaylistsByPlaylistCloneResponse, GetApiPlaylistsByPlaylistStatisticsData, GetApiPlaylistsByPlaylistStatisticsResponse, PostApiPlaylistsByPlaylistStatisticsRecordViewData, PostApiPlaylistsByPlaylistStatisticsRecordViewResponse, PostApiPlaylistsByPlaylistStatisticsRecordPlayData, PostApiPlaylistsByPlaylistStatisticsRecordPlayResponse, PostApiPlaylistsByPlaylistStatisticsRecordShareData, PostApiPlaylistsByPlaylistStatisticsRecordShareResponse, PostApiPlaylistsByPlaylistStatisticsRecordFavoriteData, PostApiPlaylistsByPlaylistStatisticsRecordFavoriteResponse, PostApiPlaylistsSmartData, PostApiPlaylistsSmartResponse, PutApiPlaylistsByPlaylistSmartData, PutApiPlaylistsByPlaylistSmartResponse, PostApiPlaylistsByPlaylistSmartSyncData, PostApiPlaylistsByPlaylistSmartSyncResponse, GetApiQueueMetricsData, GetApiQueueMetricsResponse, GetApiQueueMetricsQueuesResponse, GetApiQueueMetricsMetricsData, GetApiQueueMetricsMetricsResponse, PostApiQueueMetricsRetryByIdData, PostApiQueueMetricsRetryByIdResponse, DeleteApiQueueMetricsByIdData, DeleteApiQueueMetricsByIdResponse, DeleteApiQueueMetricsPurgeResponse, GetHorizonApiMetricsQueuesResponse, GetHorizonApiMetricsQueuesByIdData, GetHorizonApiMetricsQueuesByIdResponse, PostHorizonApiJobsRetryByIdData, PostHorizonApiJobsRetryByIdResponse, GetApiSchemasMusicbrainzResponse, GetHorizonApiJobsSilencedData, GetHorizonApiJobsSilencedResponse, GetApiLibrariesByLibrarySongsData, GetApiLibrariesByLibrarySongsResponse, GetApiLibrariesByLibrarySongsByPublicIdData, GetApiLibrariesByLibrarySongsByPublicIdResponse, GetApiStreamSongBySongDirectData, GetApiStreamSongBySongDirectResponse, GetApiSystemInfoResponse, GetApiSystemInfoSysResponse, GetApiUsersData, GetApiUsersResponse, PostApiUsersData, PostApiUsersResponse, PatchApiUsersByUserData, PatchApiUsersByUserResponse, GetApiUsersByUserData, GetApiUsersByUserResponse, DeleteApiUsersByUserData, DeleteApiUsersByUserResponse, GetApiUsersMeResponse, GetApiUsersTokensByUserData, GetApiUsersTokensByUserResponse, DeleteApiUsersTokensByTokenData, DeleteApiUsersTokensByTokenResponse, GetHorizonApiWorkloadResponse } from './types.gen';
 
 export class AlbumService {
     /**
@@ -540,213 +540,6 @@ export class FailedJobsService {
     
 }
 
-export class FilesService {
-    /**
-     * @returns LogFileResource Array of `LogFileResource`
-     * @throws ApiError
-     */
-    public static getSystemLogViewerApiFiles(): CancelablePromise<GetSystemLogViewerApiFilesResponse> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/system/log-viewer/api/files'
-        });
-    }
-    
-    /**
-     * @param data The data for the request.
-     * @param data.fileIdentifier
-     * @returns unknown
-     * @throws ApiError
-     */
-    public static getSystemLogViewerApiFilesByFileIdentifierDownloadRequest(data: GetSystemLogViewerApiFilesByFileIdentifierDownloadRequestData): CancelablePromise<GetSystemLogViewerApiFilesByFileIdentifierDownloadRequestResponse> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/system/log-viewer/api/files/{fileIdentifier}/download/request',
-            path: {
-                fileIdentifier: data.fileIdentifier
-            },
-            errors: {
-                403: 'Authorization error',
-                404: 'Not found'
-            }
-        });
-    }
-    
-    /**
-     * @param data The data for the request.
-     * @param data.fileIdentifier
-     * @returns unknown
-     * @throws ApiError
-     */
-    public static postSystemLogViewerApiFilesByFileIdentifierClearCache(data: PostSystemLogViewerApiFilesByFileIdentifierClearCacheData): CancelablePromise<PostSystemLogViewerApiFilesByFileIdentifierClearCacheResponse> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/system/log-viewer/api/files/{fileIdentifier}/clear-cache',
-            path: {
-                fileIdentifier: data.fileIdentifier
-            },
-            errors: {
-                404: 'Not found'
-            }
-        });
-    }
-    
-    /**
-     * @param data The data for the request.
-     * @param data.fileIdentifier
-     * @returns unknown
-     * @throws ApiError
-     */
-    public static deleteSystemLogViewerApiFilesByFileIdentifier(data: DeleteSystemLogViewerApiFilesByFileIdentifierData): CancelablePromise<DeleteSystemLogViewerApiFilesByFileIdentifierResponse> {
-        return __request(OpenAPI, {
-            method: 'DELETE',
-            url: '/system/log-viewer/api/files/{fileIdentifier}',
-            path: {
-                fileIdentifier: data.fileIdentifier
-            },
-            errors: {
-                403: 'Authorization error'
-            }
-        });
-    }
-    
-    /**
-     * @returns unknown
-     * @throws ApiError
-     */
-    public static postSystemLogViewerApiClearCacheAll(): CancelablePromise<PostSystemLogViewerApiClearCacheAllResponse> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/system/log-viewer/api/clear-cache-all'
-        });
-    }
-    
-    /**
-     * @param data The data for the request.
-     * @param data.requestBody
-     * @returns unknown
-     * @throws ApiError
-     */
-    public static postSystemLogViewerApiDeleteMultipleFiles(data: PostSystemLogViewerApiDeleteMultipleFilesData = {}): CancelablePromise<PostSystemLogViewerApiDeleteMultipleFilesResponse> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/system/log-viewer/api/delete-multiple-files',
-            body: data.requestBody,
-            mediaType: 'application/json'
-        });
-    }
-    
-    /**
-     * @param data The data for the request.
-     * @param data.fileIdentifier
-     * @returns string
-     * @throws ApiError
-     */
-    public static getSystemLogViewerApiFilesByFileIdentifierDownload(data: GetSystemLogViewerApiFilesByFileIdentifierDownloadData): CancelablePromise<GetSystemLogViewerApiFilesByFileIdentifierDownloadResponse> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/system/log-viewer/api/files/{fileIdentifier}/download',
-            path: {
-                fileIdentifier: data.fileIdentifier
-            }
-        });
-    }
-    
-}
-
-export class FoldersService {
-    /**
-     * @param data The data for the request.
-     * @param data.direction
-     * @returns LogFolderResource Array of `LogFolderResource`
-     * @throws ApiError
-     */
-    public static getSystemLogViewerApiFolders(data: GetSystemLogViewerApiFoldersData = {}): CancelablePromise<GetSystemLogViewerApiFoldersResponse> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/system/log-viewer/api/folders',
-            query: {
-                direction: data.direction
-            }
-        });
-    }
-    
-    /**
-     * @param data The data for the request.
-     * @param data.folderIdentifier
-     * @returns unknown
-     * @throws ApiError
-     */
-    public static getSystemLogViewerApiFoldersByFolderIdentifierDownloadRequest(data: GetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestData): CancelablePromise<GetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestResponse> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/system/log-viewer/api/folders/{folderIdentifier}/download/request',
-            path: {
-                folderIdentifier: data.folderIdentifier
-            },
-            errors: {
-                403: 'Authorization error',
-                404: 'Not found'
-            }
-        });
-    }
-    
-    /**
-     * @param data The data for the request.
-     * @param data.folderIdentifier
-     * @returns unknown
-     * @throws ApiError
-     */
-    public static postSystemLogViewerApiFoldersByFolderIdentifierClearCache(data: PostSystemLogViewerApiFoldersByFolderIdentifierClearCacheData): CancelablePromise<PostSystemLogViewerApiFoldersByFolderIdentifierClearCacheResponse> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/system/log-viewer/api/folders/{folderIdentifier}/clear-cache',
-            path: {
-                folderIdentifier: data.folderIdentifier
-            },
-            errors: {
-                404: 'Not found'
-            }
-        });
-    }
-    
-    /**
-     * @param data The data for the request.
-     * @param data.folderIdentifier
-     * @returns unknown
-     * @throws ApiError
-     */
-    public static deleteSystemLogViewerApiFoldersByFolderIdentifier(data: DeleteSystemLogViewerApiFoldersByFolderIdentifierData): CancelablePromise<DeleteSystemLogViewerApiFoldersByFolderIdentifierResponse> {
-        return __request(OpenAPI, {
-            method: 'DELETE',
-            url: '/system/log-viewer/api/folders/{folderIdentifier}',
-            path: {
-                folderIdentifier: data.folderIdentifier
-            },
-            errors: {
-                403: 'Authorization error'
-            }
-        });
-    }
-    
-    /**
-     * @param data The data for the request.
-     * @param data.folderIdentifier
-     * @returns string
-     * @throws ApiError
-     */
-    public static getSystemLogViewerApiFoldersByFolderIdentifierDownload(data: GetSystemLogViewerApiFoldersByFolderIdentifierDownloadData): CancelablePromise<GetSystemLogViewerApiFoldersByFolderIdentifierDownloadResponse> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/system/log-viewer/api/folders/{folderIdentifier}/download',
-            path: {
-                folderIdentifier: data.folderIdentifier
-            }
-        });
-    }
-    
-}
-
 export class GenreService {
     /**
      * Get a collection of genres
@@ -841,20 +634,6 @@ export class GenreService {
                 401: 'Unauthenticated',
                 404: 'Not found'
             }
-        });
-    }
-    
-}
-
-export class HostsService {
-    /**
-     * @returns LogViewerHostResource Array of `LogViewerHostResource`
-     * @throws ApiError
-     */
-    public static getSystemLogViewerApiHosts(): CancelablePromise<GetSystemLogViewerApiHostsResponse> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/system/log-viewer/api/hosts'
         });
     }
     
@@ -1071,31 +850,253 @@ export class LibraryService {
 
 export class LogsService {
     /**
+     * Get a collection of log files
+     * @returns LogFile
+     * @throws ApiError
+     */
+    public static getApiLogs(): CancelablePromise<GetApiLogsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/logs',
+            errors: {
+                401: 'Unauthenticated'
+            }
+        });
+    }
+    
+    /**
+     * Show a log file
      * @param data The data for the request.
-     * @param data.file
-     * @param data.query
-     * @param data.direction
-     * @param data.log
-     * @param data.excludeLevels
-     * @param data.excludeFileTypes
-     * @param data.perPage
-     * @param data.shorterStackTraces
+     * @param data.logFile
      * @returns unknown
      * @throws ApiError
      */
-    public static getSystemLogViewerApiLogs(data: GetSystemLogViewerApiLogsData = {}): CancelablePromise<GetSystemLogViewerApiLogsResponse> {
+    public static getApiLogsByLogFile(data: GetApiLogsByLogFileData): CancelablePromise<GetApiLogsByLogFileResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/system/log-viewer/api/logs',
+            url: '/api/logs/{logFile}',
+            path: {
+                logFile: data.logFile
+            },
+            errors: {
+                401: 'Unauthenticated',
+                404: '',
+                500: ''
+            }
+        });
+    }
+    
+    /**
+     * Get log file content
+     * @param data The data for the request.
+     * @param data.logFile
+     * @param data.afterLine
+     * @param data.maxLines
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static getApiLogsByLogFileContent(data: GetApiLogsByLogFileContentData): CancelablePromise<GetApiLogsByLogFileContentResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/logs/{logFile}/content',
+            path: {
+                logFile: data.logFile
+            },
             query: {
-                file: data.file,
-                query: data.query,
-                direction: data.direction,
-                log: data.log,
-                exclude_levels: data.excludeLevels,
-                exclude_file_types: data.excludeFileTypes,
-                per_page: data.perPage,
-                shorter_stack_traces: data.shorterStackTraces
+                after_line: data.afterLine,
+                max_lines: data.maxLines
+            },
+            errors: {
+                401: 'Unauthenticated',
+                404: '',
+                422: 'Validation error',
+                500: ''
+            }
+        });
+    }
+    
+    /**
+     * Count log file lines
+     * @param data The data for the request.
+     * @param data.logFile
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static getApiLogsByLogFileLines(data: GetApiLogsByLogFileLinesData): CancelablePromise<GetApiLogsByLogFileLinesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/logs/{logFile}/lines',
+            path: {
+                logFile: data.logFile
+            },
+            errors: {
+                401: 'Unauthenticated',
+                404: '',
+                500: ''
+            }
+        });
+    }
+    
+    /**
+     * Search log file content
+     * @param data The data for the request.
+     * @param data.logFile
+     * @param data.pattern
+     * @param data.caseSensitive
+     * @param data.maxResults
+     * @param data.caseSensitive
+     * @param data.maxResults
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static getApiLogsByLogFileSearch(data: GetApiLogsByLogFileSearchData): CancelablePromise<GetApiLogsByLogFileSearchResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/logs/{logFile}/search',
+            path: {
+                logFile: data.logFile
+            },
+            query: {
+                pattern: data.pattern,
+                caseSensitive: data.caseSensitive,
+                maxResults: data.maxResults,
+                case_sensitive: data.caseSensitive,
+                max_results: data.maxResults
+            },
+            errors: {
+                401: 'Unauthenticated',
+                404: '',
+                422: 'Validation error',
+                500: ''
+            }
+        });
+    }
+    
+    /**
+     * Get log file tail
+     * @param data The data for the request.
+     * @param data.logFile
+     * @param data.lines
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static getApiLogsByLogFileTail(data: GetApiLogsByLogFileTailData): CancelablePromise<GetApiLogsByLogFileTailResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/logs/{logFile}/tail',
+            path: {
+                logFile: data.logFile
+            },
+            query: {
+                lines: data.lines
+            },
+            errors: {
+                401: 'Unauthenticated',
+                404: '',
+                422: 'Validation error',
+                500: ''
+            }
+        });
+    }
+    
+    /**
+     * Get log file head
+     * @param data The data for the request.
+     * @param data.logFile
+     * @param data.lines
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static getApiLogsByLogFileHead(data: GetApiLogsByLogFileHeadData): CancelablePromise<GetApiLogsByLogFileHeadResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/logs/{logFile}/head',
+            path: {
+                logFile: data.logFile
+            },
+            query: {
+                lines: data.lines
+            },
+            errors: {
+                401: 'Unauthenticated',
+                404: '',
+                422: 'Validation error',
+                500: ''
+            }
+        });
+    }
+    
+    /**
+     * Get log file statistics
+     * @param data The data for the request.
+     * @param data.logFile
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static getApiLogsByLogFileStats(data: GetApiLogsByLogFileStatsData): CancelablePromise<GetApiLogsByLogFileStatsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/logs/{logFile}/stats',
+            path: {
+                logFile: data.logFile
+            },
+            errors: {
+                401: 'Unauthenticated',
+                404: '',
+                500: ''
+            }
+        });
+    }
+    
+    /**
+     * Download log file
+     * @param data The data for the request.
+     * @param data.logFile
+     * @returns string
+     * @throws ApiError
+     */
+    public static getApiLogsByLogFileDownload(data: GetApiLogsByLogFileDownloadData): CancelablePromise<GetApiLogsByLogFileDownloadResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/logs/{logFile}/download',
+            path: {
+                logFile: data.logFile
+            },
+            errors: {
+                401: 'Unauthenticated',
+                404: ''
+            }
+        });
+    }
+    
+    /**
+     * Search across all log files
+     * @param data The data for the request.
+     * @param data.pattern
+     * @param data.caseSensitive
+     * @param data.maxResultsPerFile
+     * @param data.caseSensitive
+     * @param data.maxResultsPerFile
+     * @param data.files
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static getApiLogsSearchAll(data: GetApiLogsSearchAllData): CancelablePromise<GetApiLogsSearchAllResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/logs/search/all',
+            query: {
+                pattern: data.pattern,
+                caseSensitive: data.caseSensitive,
+                maxResultsPerFile: data.maxResultsPerFile,
+                case_sensitive: data.caseSensitive,
+                max_results_per_file: data.maxResultsPerFile,
+                files: data.files
+            },
+            errors: {
+                401: 'Unauthenticated',
+                422: 'Validation error',
+                500: ''
             }
         });
     }

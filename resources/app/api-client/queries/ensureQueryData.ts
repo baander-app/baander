@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, MovieService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
+import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, GenreService, ImageService, JobMetricsService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, MovieService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
 import * as Common from "./common";
 /**
 * Get a collection of albums
@@ -144,56 +144,6 @@ export const ensureUseFailedJobsServiceGetHorizonApiJobsFailedByIdData = (queryC
   id: string;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseFailedJobsServiceGetHorizonApiJobsFailedByIdKeyFn({ id }), queryFn: () => FailedJobsService.getHorizonApiJobsFailedById({ id }) });
 /**
-* @returns LogFileResource Array of `LogFileResource`
-* @throws ApiError
-*/
-export const ensureUseFilesServiceGetSystemLogViewerApiFilesData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseFilesServiceGetSystemLogViewerApiFilesKeyFn(), queryFn: () => FilesService.getSystemLogViewerApiFiles() });
-/**
-* @param data The data for the request.
-* @param data.fileIdentifier
-* @returns unknown
-* @throws ApiError
-*/
-export const ensureUseFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadRequestData = (queryClient: QueryClient, { fileIdentifier }: {
-  fileIdentifier: string;
-}) => queryClient.ensureQueryData({ queryKey: Common.UseFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadRequestKeyFn({ fileIdentifier }), queryFn: () => FilesService.getSystemLogViewerApiFilesByFileIdentifierDownloadRequest({ fileIdentifier }) });
-/**
-* @param data The data for the request.
-* @param data.fileIdentifier
-* @returns string
-* @throws ApiError
-*/
-export const ensureUseFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadData = (queryClient: QueryClient, { fileIdentifier }: {
-  fileIdentifier: string;
-}) => queryClient.ensureQueryData({ queryKey: Common.UseFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadKeyFn({ fileIdentifier }), queryFn: () => FilesService.getSystemLogViewerApiFilesByFileIdentifierDownload({ fileIdentifier }) });
-/**
-* @param data The data for the request.
-* @param data.direction
-* @returns LogFolderResource Array of `LogFolderResource`
-* @throws ApiError
-*/
-export const ensureUseFoldersServiceGetSystemLogViewerApiFoldersData = (queryClient: QueryClient, { direction }: {
-  direction?: string;
-} = {}) => queryClient.ensureQueryData({ queryKey: Common.UseFoldersServiceGetSystemLogViewerApiFoldersKeyFn({ direction }), queryFn: () => FoldersService.getSystemLogViewerApiFolders({ direction }) });
-/**
-* @param data The data for the request.
-* @param data.folderIdentifier
-* @returns unknown
-* @throws ApiError
-*/
-export const ensureUseFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestData = (queryClient: QueryClient, { folderIdentifier }: {
-  folderIdentifier: string;
-}) => queryClient.ensureQueryData({ queryKey: Common.UseFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestKeyFn({ folderIdentifier }), queryFn: () => FoldersService.getSystemLogViewerApiFoldersByFolderIdentifierDownloadRequest({ folderIdentifier }) });
-/**
-* @param data The data for the request.
-* @param data.folderIdentifier
-* @returns string
-* @throws ApiError
-*/
-export const ensureUseFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadData = (queryClient: QueryClient, { folderIdentifier }: {
-  folderIdentifier: string;
-}) => queryClient.ensureQueryData({ queryKey: Common.UseFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadKeyFn({ folderIdentifier }), queryFn: () => FoldersService.getSystemLogViewerApiFoldersByFolderIdentifierDownload({ folderIdentifier }) });
-/**
 * Get a collection of genres
 * @param data The data for the request.
 * @param data.fields
@@ -221,11 +171,6 @@ export const ensureUseGenreServiceGetApiGenresData = (queryClient: QueryClient, 
 export const ensureUseGenreServiceGetApiGenresByGenreData = (queryClient: QueryClient, { genre }: {
   genre: string;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseGenreServiceGetApiGenresByGenreKeyFn({ genre }), queryFn: () => GenreService.getApiGenresByGenre({ genre }) });
-/**
-* @returns LogViewerHostResource Array of `LogViewerHostResource`
-* @throws ApiError
-*/
-export const ensureUseHostsServiceGetSystemLogViewerApiHostsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseHostsServiceGetSystemLogViewerApiHostsKeyFn(), queryFn: () => HostsService.getSystemLogViewerApiHosts() });
 /**
 * Get an image asset
 * @param data The data for the request.
@@ -285,28 +230,125 @@ export const ensureUseLibraryServiceGetApiLibrariesBySlugData = (queryClient: Qu
   slug: string;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseLibraryServiceGetApiLibrariesBySlugKeyFn({ slug }), queryFn: () => LibraryService.getApiLibrariesBySlug({ slug }) });
 /**
+* Get a collection of log files
+* @returns LogFile
+* @throws ApiError
+*/
+export const ensureUseLogsServiceGetApiLogsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseLogsServiceGetApiLogsKeyFn(), queryFn: () => LogsService.getApiLogs() });
+/**
+* Show a log file
 * @param data The data for the request.
-* @param data.file
-* @param data.query
-* @param data.direction
-* @param data.log
-* @param data.excludeLevels
-* @param data.excludeFileTypes
-* @param data.perPage
-* @param data.shorterStackTraces
+* @param data.logFile
 * @returns unknown
 * @throws ApiError
 */
-export const ensureUseLogsServiceGetSystemLogViewerApiLogsData = (queryClient: QueryClient, { direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }: {
-  direction?: string;
-  excludeFileTypes?: string;
-  excludeLevels?: string;
-  file?: string;
-  log?: string;
-  perPage?: string;
-  query?: string;
-  shorterStackTraces?: boolean;
-} = {}) => queryClient.ensureQueryData({ queryKey: Common.UseLogsServiceGetSystemLogViewerApiLogsKeyFn({ direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }), queryFn: () => LogsService.getSystemLogViewerApiLogs({ direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }) });
+export const ensureUseLogsServiceGetApiLogsByLogFileData = (queryClient: QueryClient, { logFile }: {
+  logFile: string;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseLogsServiceGetApiLogsByLogFileKeyFn({ logFile }), queryFn: () => LogsService.getApiLogsByLogFile({ logFile }) });
+/**
+* Get log file content
+* @param data The data for the request.
+* @param data.logFile
+* @param data.afterLine
+* @param data.maxLines
+* @returns unknown
+* @throws ApiError
+*/
+export const ensureUseLogsServiceGetApiLogsByLogFileContentData = (queryClient: QueryClient, { afterLine, logFile, maxLines }: {
+  afterLine?: number;
+  logFile: string;
+  maxLines?: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseLogsServiceGetApiLogsByLogFileContentKeyFn({ afterLine, logFile, maxLines }), queryFn: () => LogsService.getApiLogsByLogFileContent({ afterLine, logFile, maxLines }) });
+/**
+* Count log file lines
+* @param data The data for the request.
+* @param data.logFile
+* @returns unknown
+* @throws ApiError
+*/
+export const ensureUseLogsServiceGetApiLogsByLogFileLinesData = (queryClient: QueryClient, { logFile }: {
+  logFile: string;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseLogsServiceGetApiLogsByLogFileLinesKeyFn({ logFile }), queryFn: () => LogsService.getApiLogsByLogFileLines({ logFile }) });
+/**
+* Search log file content
+* @param data The data for the request.
+* @param data.logFile
+* @param data.pattern
+* @param data.caseSensitive
+* @param data.maxResults
+* @param data.caseSensitive
+* @param data.maxResults
+* @returns unknown
+* @throws ApiError
+*/
+export const ensureUseLogsServiceGetApiLogsByLogFileSearchData = (queryClient: QueryClient, { caseSensitive, logFile, maxResults, pattern }: {
+  caseSensitive?: boolean;
+  logFile: string;
+  maxResults?: number;
+  pattern: string;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseLogsServiceGetApiLogsByLogFileSearchKeyFn({ caseSensitive, logFile, maxResults, pattern }), queryFn: () => LogsService.getApiLogsByLogFileSearch({ caseSensitive, logFile, maxResults, pattern }) });
+/**
+* Get log file tail
+* @param data The data for the request.
+* @param data.logFile
+* @param data.lines
+* @returns unknown
+* @throws ApiError
+*/
+export const ensureUseLogsServiceGetApiLogsByLogFileTailData = (queryClient: QueryClient, { lines, logFile }: {
+  lines?: number;
+  logFile: string;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseLogsServiceGetApiLogsByLogFileTailKeyFn({ lines, logFile }), queryFn: () => LogsService.getApiLogsByLogFileTail({ lines, logFile }) });
+/**
+* Get log file head
+* @param data The data for the request.
+* @param data.logFile
+* @param data.lines
+* @returns unknown
+* @throws ApiError
+*/
+export const ensureUseLogsServiceGetApiLogsByLogFileHeadData = (queryClient: QueryClient, { lines, logFile }: {
+  lines?: number;
+  logFile: string;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseLogsServiceGetApiLogsByLogFileHeadKeyFn({ lines, logFile }), queryFn: () => LogsService.getApiLogsByLogFileHead({ lines, logFile }) });
+/**
+* Get log file statistics
+* @param data The data for the request.
+* @param data.logFile
+* @returns unknown
+* @throws ApiError
+*/
+export const ensureUseLogsServiceGetApiLogsByLogFileStatsData = (queryClient: QueryClient, { logFile }: {
+  logFile: string;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseLogsServiceGetApiLogsByLogFileStatsKeyFn({ logFile }), queryFn: () => LogsService.getApiLogsByLogFileStats({ logFile }) });
+/**
+* Download log file
+* @param data The data for the request.
+* @param data.logFile
+* @returns string
+* @throws ApiError
+*/
+export const ensureUseLogsServiceGetApiLogsByLogFileDownloadData = (queryClient: QueryClient, { logFile }: {
+  logFile: string;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseLogsServiceGetApiLogsByLogFileDownloadKeyFn({ logFile }), queryFn: () => LogsService.getApiLogsByLogFileDownload({ logFile }) });
+/**
+* Search across all log files
+* @param data The data for the request.
+* @param data.pattern
+* @param data.caseSensitive
+* @param data.maxResultsPerFile
+* @param data.caseSensitive
+* @param data.maxResultsPerFile
+* @param data.files
+* @returns unknown
+* @throws ApiError
+*/
+export const ensureUseLogsServiceGetApiLogsSearchAllData = (queryClient: QueryClient, { caseSensitive, files, maxResultsPerFile, pattern }: {
+  caseSensitive?: boolean;
+  files?: string[];
+  maxResultsPerFile?: number;
+  pattern: string;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseLogsServiceGetApiLogsSearchAllKeyFn({ caseSensitive, files, maxResultsPerFile, pattern }), queryFn: () => LogsService.getApiLogsSearchAll({ caseSensitive, files, maxResultsPerFile, pattern }) });
 /**
 * Get all of the master supervisors and their underlying supervisors
 * @returns unknown

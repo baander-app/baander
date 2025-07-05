@@ -9,7 +9,6 @@ use App\Models\{Album, Library, Song, TokenAbility};
 use App\Modules\{Pagination\JsonPaginator};
 use App\Modules\Http\Resources\Json\JsonAnonymousResourceCollection;
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 #[Middleware(['force.json'])]
 #[Prefix('/libraries/{library}/songs')]

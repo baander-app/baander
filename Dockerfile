@@ -162,7 +162,7 @@ RUN set -xe \
     && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/uv \
     # swoole
     && pecl bundle -d /usr/local/src/pecl swoole \
-    && docker-php-ext-configure /usr/local/src/pecl/swoole --enable-sockets --enable-swoole-curl --enable-cares --enable-swoole-pgsql \
+    && docker-php-ext-configure /usr/local/src/pecl/swoole --enable-swoole-thread --enable-sockets --enable-swoole-curl --enable-cares --enable-swoole-pgsql \
     && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/swoole \
     # opentelemetry
     && pecl bundle -d /usr/local/src/pecl opentelemetry \

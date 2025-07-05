@@ -55,6 +55,14 @@ export type AuthenticateUsingPasskeyRequest = {
     start_authentication_response: string;
 };
 
+export type ContentChunk = {
+    content?: string;
+    startLine?: number;
+    endLine?: number;
+    totalLines?: number;
+    hasMore?: boolean;
+};
+
 export type CreateLibraryRequest = {
     name: string;
     path: string;
@@ -88,6 +96,15 @@ export type CreateUserRequest = {
     password: string;
 };
 
+export type FileInfo = {
+    size?: number;
+    sizeMb?: number;
+    lines?: number;
+    avgLineLength?: number;
+    optimalThreads?: number;
+    path?: string;
+};
+
 export type ForgotPasswordRequest = {
     email: string;
     url?: string;
@@ -116,14 +133,6 @@ export type ImageResource = {
     url: string;
 };
 
-export type LevelCountResource = {
-    level: string;
-    level_name: string;
-    level_class: string;
-    count: string;
-    selected: string;
-};
-
 export type LibraryResource = {
     name: string;
     slug: string;
@@ -137,67 +146,12 @@ export type LibraryResource = {
 
 export type LibraryType = 'music' | 'podcast' | 'audiobook' | 'movie' | 'tv_show';
 
-export type LogFileResource = {
-    type: {
-        value: string;
-        name: string;
-    };
-    identifier: string;
-    sub_folder: string;
-    sub_folder_identifier: string;
-    path: string;
-    name: string;
-    size: string;
-    size_in_mb: string;
-    size_formatted: string;
-    download_url: string;
-    earliest_timestamp: string;
-    latest_timestamp: string;
-    can_download: string;
-    can_delete: string;
-    loading: boolean;
-    /**
-     * helper for frontend
-     */
-    selected_for_deletion: boolean;
-};
-
-export type LogFolderResource = {
-    identifier: string;
-    path: string;
-    clean_path: string;
-    is_root: string;
-    earliest_timestamp: string;
-    latest_timestamp: string;
-    download_url: string;
-    files: Array<LogFileResource>;
-    can_download: string;
-    can_delete: string;
-    loading: boolean;
-};
-
-export type LogResource = {
-    index: string;
-    file_identifier: string;
-    file_position: string;
-    level: string;
-    level_name: string;
-    level_class: string;
-    datetime: string;
-    time: string;
-    message: string;
-    context: string;
-    extra: string;
-    url: string;
-};
-
-export type LogViewerHostResource = {
-    identifier: string;
-    name: string;
-    host: string;
-    headers: string;
-    auth: string;
-    is_remote: string;
+export type LogFile = {
+    id?: string;
+    fileName?: string;
+    path?: string;
+    createdAt?: string;
+    updatedAt?: string;
 };
 
 export type LoginRequest = {
@@ -315,6 +269,15 @@ export type ResetPasswordRequest = {
 
 export type RetryJobRequest = {
     id?: number;
+};
+
+export type SearchResults = {
+    results?: Array<unknown>;
+    pattern?: string;
+    caseSensitive?: boolean;
+    totalMatches?: number;
+    searchTimeMs?: number;
+    hasMoreResults?: boolean;
 };
 
 export type SongResource = {
@@ -645,88 +608,6 @@ export type GetHorizonApiJobsFailedByIdData = {
 
 export type GetHorizonApiJobsFailedByIdResponse = unknown;
 
-export type GetSystemLogViewerApiFilesResponse = Array<LogFileResource>;
-
-export type GetSystemLogViewerApiFilesByFileIdentifierDownloadRequestData = {
-    fileIdentifier: string;
-};
-
-export type GetSystemLogViewerApiFilesByFileIdentifierDownloadRequestResponse = {
-    url: string;
-};
-
-export type PostSystemLogViewerApiFilesByFileIdentifierClearCacheData = {
-    fileIdentifier: string;
-};
-
-export type PostSystemLogViewerApiFilesByFileIdentifierClearCacheResponse = {
-    success: boolean;
-};
-
-export type DeleteSystemLogViewerApiFilesByFileIdentifierData = {
-    fileIdentifier: string;
-};
-
-export type DeleteSystemLogViewerApiFilesByFileIdentifierResponse = {
-    success: boolean;
-};
-
-export type PostSystemLogViewerApiClearCacheAllResponse = {
-    success: boolean;
-};
-
-export type PostSystemLogViewerApiDeleteMultipleFilesData = {
-    requestBody?: {
-        files?: string;
-    };
-};
-
-export type PostSystemLogViewerApiDeleteMultipleFilesResponse = {
-    success: boolean;
-};
-
-export type GetSystemLogViewerApiFilesByFileIdentifierDownloadData = {
-    fileIdentifier: string;
-};
-
-export type GetSystemLogViewerApiFilesByFileIdentifierDownloadResponse = string;
-
-export type GetSystemLogViewerApiFoldersData = {
-    direction?: string;
-};
-
-export type GetSystemLogViewerApiFoldersResponse = Array<LogFolderResource>;
-
-export type GetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestData = {
-    folderIdentifier: string;
-};
-
-export type GetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestResponse = {
-    url: string;
-};
-
-export type PostSystemLogViewerApiFoldersByFolderIdentifierClearCacheData = {
-    folderIdentifier: string;
-};
-
-export type PostSystemLogViewerApiFoldersByFolderIdentifierClearCacheResponse = {
-    success: boolean;
-};
-
-export type DeleteSystemLogViewerApiFoldersByFolderIdentifierData = {
-    folderIdentifier: string;
-};
-
-export type DeleteSystemLogViewerApiFoldersByFolderIdentifierResponse = {
-    success: boolean;
-};
-
-export type GetSystemLogViewerApiFoldersByFolderIdentifierDownloadData = {
-    folderIdentifier: string;
-};
-
-export type GetSystemLogViewerApiFoldersByFolderIdentifierDownloadResponse = string;
-
 export type GetApiGenresData = {
     fields?: string;
     librarySlug?: string;
@@ -798,8 +679,6 @@ export type DeleteApiGenresByGenreData = {
 };
 
 export type DeleteApiGenresByGenreResponse = void;
-
-export type GetSystemLogViewerApiHostsResponse = Array<LogViewerHostResource>;
 
 export type GetApiImagesByImageData = {
     /**
@@ -900,45 +779,123 @@ export type DeleteApiLibrariesBySlugData = {
 
 export type DeleteApiLibrariesBySlugResponse = void;
 
-export type GetSystemLogViewerApiLogsData = {
-    direction?: string;
-    excludeFileTypes?: string;
-    excludeLevels?: string;
-    file?: string;
-    log?: string;
-    perPage?: string;
-    query?: string;
-    shorterStackTraces?: boolean;
+export type GetApiLogsResponse = Array<LogFile>;
+
+export type GetApiLogsByLogFileData = {
+    logFile: string;
 };
 
-export type GetSystemLogViewerApiLogsResponse = {
-    file: LogFileResource | null;
-    levelCounts: Array<LevelCountResource>;
-    logs: Array<LogResource>;
-    columns: string | null;
-    pagination: {
-        current_page: string;
-        first_page_url: string;
-        from: string;
-        last_page: string;
-        last_page_url: string;
-        links: string;
-        links_short: string;
-        next_page_url: string;
-        path: string;
-        per_page: string;
-        prev_page_url: string;
-        to: string;
-        total: string;
-    } | null;
-    expandAutomatically: string;
-    cacheRecentlyCleared: string;
-    hasMoreResults: string;
-    percentScanned: string;
-    performance: {
-        memoryUsage: string;
-        requestTime: string;
-        version: string;
+export type GetApiLogsByLogFileResponse = {
+    data: {
+        file: LogFile | null;
+        info: FileInfo;
+    };
+};
+
+export type GetApiLogsByLogFileContentData = {
+    afterLine?: number;
+    logFile: string;
+    maxLines?: number;
+};
+
+export type GetApiLogsByLogFileContentResponse = {
+    data: ContentChunk;
+};
+
+export type GetApiLogsByLogFileLinesData = {
+    logFile: string;
+};
+
+export type GetApiLogsByLogFileLinesResponse = {
+    data: {
+        file: string;
+        totalLines: number;
+    };
+};
+
+export type GetApiLogsByLogFileSearchData = {
+    caseSensitive?: boolean;
+    caseSensitive?: boolean;
+    logFile: string;
+    maxResults?: number;
+    maxResults?: number;
+    pattern: string;
+};
+
+export type GetApiLogsByLogFileSearchResponse = {
+    data: SearchResults;
+};
+
+export type GetApiLogsByLogFileTailData = {
+    lines?: number;
+    logFile: string;
+};
+
+export type GetApiLogsByLogFileTailResponse = {
+    data: {
+        content: ContentChunk;
+        totalLines: number;
+        showingLines: string;
+    };
+};
+
+export type GetApiLogsByLogFileHeadData = {
+    lines?: number;
+    logFile: string;
+};
+
+export type GetApiLogsByLogFileHeadResponse = {
+    data: {
+        content: ContentChunk;
+        showingLines: string;
+    };
+};
+
+export type GetApiLogsByLogFileStatsData = {
+    logFile: string;
+};
+
+export type GetApiLogsByLogFileStatsResponse = {
+    data: {
+        fileInfo: FileInfo;
+        logLevels: {
+            error: string;
+            warning: string;
+            info: string;
+            debug: string;
+        };
+        performance: {
+            isLargeFile: boolean;
+            shouldUseThreading: boolean;
+            optimalThreads: number;
+        };
+    };
+};
+
+export type GetApiLogsByLogFileDownloadData = {
+    logFile: string;
+};
+
+export type GetApiLogsByLogFileDownloadResponse = string;
+
+export type GetApiLogsSearchAllData = {
+    caseSensitive?: boolean;
+    caseSensitive?: boolean;
+    files?: Array<(string)>;
+    maxResultsPerFile?: number;
+    maxResultsPerFile?: number;
+    pattern: string;
+};
+
+export type GetApiLogsSearchAllResponse = {
+    data: {
+        pattern: string;
+        caseSensitive: string;
+        totalFilesSearched: string;
+        filesWithMatches: string;
+        totalMatches: 0;
+        searchTimeMs: string;
+        results: Array<(string)>;
     };
 };
 
@@ -2261,194 +2218,6 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/system/log-viewer/api/files': {
-        get: {
-            res: {
-                /**
-                 * Array of `LogFileResource`
-                 */
-                200: Array<LogFileResource>;
-            };
-        };
-    };
-    '/system/log-viewer/api/files/{fileIdentifier}/download/request': {
-        get: {
-            req: GetSystemLogViewerApiFilesByFileIdentifierDownloadRequestData;
-            res: {
-                200: {
-                    url: string;
-                };
-                /**
-                 * Authorization error
-                 */
-                403: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
-                 * Not found
-                 */
-                404: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-            };
-        };
-    };
-    '/system/log-viewer/api/files/{fileIdentifier}/clear-cache': {
-        post: {
-            req: PostSystemLogViewerApiFilesByFileIdentifierClearCacheData;
-            res: {
-                200: {
-                    success: boolean;
-                };
-                /**
-                 * Not found
-                 */
-                404: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-            };
-        };
-    };
-    '/system/log-viewer/api/files/{fileIdentifier}': {
-        delete: {
-            req: DeleteSystemLogViewerApiFilesByFileIdentifierData;
-            res: {
-                200: {
-                    success: boolean;
-                };
-                /**
-                 * Authorization error
-                 */
-                403: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-            };
-        };
-    };
-    '/system/log-viewer/api/clear-cache-all': {
-        post: {
-            res: {
-                200: {
-                    success: boolean;
-                };
-            };
-        };
-    };
-    '/system/log-viewer/api/delete-multiple-files': {
-        post: {
-            req: PostSystemLogViewerApiDeleteMultipleFilesData;
-            res: {
-                200: {
-                    success: boolean;
-                };
-            };
-        };
-    };
-    '/system/log-viewer/api/files/{fileIdentifier}/download': {
-        get: {
-            req: GetSystemLogViewerApiFilesByFileIdentifierDownloadData;
-            res: {
-                200: string;
-            };
-        };
-    };
-    '/system/log-viewer/api/folders': {
-        get: {
-            req: GetSystemLogViewerApiFoldersData;
-            res: {
-                /**
-                 * Array of `LogFolderResource`
-                 */
-                200: Array<LogFolderResource>;
-            };
-        };
-    };
-    '/system/log-viewer/api/folders/{folderIdentifier}/download/request': {
-        get: {
-            req: GetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestData;
-            res: {
-                200: {
-                    url: string;
-                };
-                /**
-                 * Authorization error
-                 */
-                403: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-                /**
-                 * Not found
-                 */
-                404: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-            };
-        };
-    };
-    '/system/log-viewer/api/folders/{folderIdentifier}/clear-cache': {
-        post: {
-            req: PostSystemLogViewerApiFoldersByFolderIdentifierClearCacheData;
-            res: {
-                200: {
-                    success: boolean;
-                };
-                /**
-                 * Not found
-                 */
-                404: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-            };
-        };
-    };
-    '/system/log-viewer/api/folders/{folderIdentifier}': {
-        delete: {
-            req: DeleteSystemLogViewerApiFoldersByFolderIdentifierData;
-            res: {
-                200: {
-                    success: boolean;
-                };
-                /**
-                 * Authorization error
-                 */
-                403: {
-                    /**
-                     * Error overview.
-                     */
-                    message: string;
-                };
-            };
-        };
-    };
-    '/system/log-viewer/api/folders/{folderIdentifier}/download': {
-        get: {
-            req: GetSystemLogViewerApiFoldersByFolderIdentifierDownloadData;
-            res: {
-                200: string;
-            };
-        };
-    };
     '/api/genres': {
         get: {
             req: GetApiGenresData;
@@ -2613,16 +2382,6 @@ export type $OpenApiTs = {
                      */
                     message: string;
                 };
-            };
-        };
-    };
-    '/system/log-viewer/api/hosts': {
-        get: {
-            res: {
-                /**
-                 * Array of `LogViewerHostResource`
-                 */
-                200: Array<LogViewerHostResource>;
             };
         };
     };
@@ -2869,39 +2628,346 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/system/log-viewer/api/logs': {
+    '/api/logs': {
         get: {
-            req: GetSystemLogViewerApiLogsData;
+            res: {
+                200: Array<LogFile>;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/logs/{logFile}': {
+        get: {
+            req: GetApiLogsByLogFileData;
             res: {
                 200: {
-                    file: LogFileResource | null;
-                    levelCounts: Array<LevelCountResource>;
-                    logs: Array<LogResource>;
-                    columns: string | null;
-                    pagination: {
-                        current_page: string;
-                        first_page_url: string;
-                        from: string;
-                        last_page: string;
-                        last_page_url: string;
-                        links: string;
-                        links_short: string;
-                        next_page_url: string;
-                        path: string;
-                        per_page: string;
-                        prev_page_url: string;
-                        to: string;
-                        total: string;
-                    } | null;
-                    expandAutomatically: string;
-                    cacheRecentlyCleared: string;
-                    hasMoreResults: string;
-                    percentScanned: string;
-                    performance: {
-                        memoryUsage: string;
-                        requestTime: string;
-                        version: string;
+                    data: {
+                        file: LogFile | null;
+                        info: FileInfo;
                     };
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                404: {
+                    error: 'Log file not found';
+                };
+                500: {
+                    error: string;
+                };
+            };
+        };
+    };
+    '/api/logs/{logFile}/content': {
+        get: {
+            req: GetApiLogsByLogFileContentData;
+            res: {
+                200: {
+                    data: ContentChunk;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                404: {
+                    error: 'Log file not found';
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+                500: {
+                    error: string;
+                };
+            };
+        };
+    };
+    '/api/logs/{logFile}/lines': {
+        get: {
+            req: GetApiLogsByLogFileLinesData;
+            res: {
+                200: {
+                    data: {
+                        file: string;
+                        totalLines: number;
+                    };
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                404: {
+                    error: 'Log file not found';
+                };
+                500: {
+                    error: string;
+                };
+            };
+        };
+    };
+    '/api/logs/{logFile}/search': {
+        get: {
+            req: GetApiLogsByLogFileSearchData;
+            res: {
+                200: {
+                    data: SearchResults;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                404: {
+                    error: 'Log file not found';
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+                500: {
+                    error: string;
+                };
+            };
+        };
+    };
+    '/api/logs/{logFile}/tail': {
+        get: {
+            req: GetApiLogsByLogFileTailData;
+            res: {
+                200: {
+                    data: {
+                        content: ContentChunk;
+                        totalLines: number;
+                        showingLines: string;
+                    };
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                404: {
+                    error: 'Log file not found';
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+                500: {
+                    error: string;
+                };
+            };
+        };
+    };
+    '/api/logs/{logFile}/head': {
+        get: {
+            req: GetApiLogsByLogFileHeadData;
+            res: {
+                200: {
+                    data: {
+                        content: ContentChunk;
+                        showingLines: string;
+                    };
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                404: {
+                    error: 'Log file not found';
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+                500: {
+                    error: string;
+                };
+            };
+        };
+    };
+    '/api/logs/{logFile}/stats': {
+        get: {
+            req: GetApiLogsByLogFileStatsData;
+            res: {
+                200: {
+                    data: {
+                        fileInfo: FileInfo;
+                        logLevels: {
+                            error: string;
+                            warning: string;
+                            info: string;
+                            debug: string;
+                        };
+                        performance: {
+                            isLargeFile: boolean;
+                            shouldUseThreading: boolean;
+                            optimalThreads: number;
+                        };
+                    };
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                404: {
+                    error: 'Log file not found';
+                };
+                500: {
+                    error: string;
+                };
+            };
+        };
+    };
+    '/api/logs/{logFile}/download': {
+        get: {
+            req: GetApiLogsByLogFileDownloadData;
+            res: {
+                200: string;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                404: {
+    error: 'Log file does not exist on disk';
+} | {
+    error: 'Log file not found';
+};
+            };
+        };
+    };
+    '/api/logs/search/all': {
+        get: {
+            req: GetApiLogsSearchAllData;
+            res: {
+                200: {
+                    data: {
+                        pattern: string;
+                        caseSensitive: string;
+                        totalFilesSearched: string;
+                        filesWithMatches: string;
+                        totalMatches: 0;
+                        searchTimeMs: string;
+                        results: Array<(string)>;
+                    };
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
+                };
+                500: {
+                    error: string;
                 };
             };
         };

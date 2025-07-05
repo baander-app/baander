@@ -3,6 +3,8 @@
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Processor\PsrLogMessageProcessor;
+use OpenTelemetry\Contrib\Logs\Monolog\Handler as OpenTelemetryHandler;
+
 
 return [
 
@@ -53,7 +55,7 @@ return [
     'channels' => [
         'stack' => [
             'driver'            => 'stack',
-            'channels'          => ['single'],
+            'channels'          => ['single', 'otel'],
             'ignore_exceptions' => false,
         ],
 
@@ -62,6 +64,13 @@ return [
             'path'                 => storage_path('logs/laravel.log'),
             'level'                => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
+        ],
+
+        'otel' => [
+            'driver'     => 'monolog',
+            'level'      => env('LOG_LEVEL', 'debug'),
+            'handler'    => OpenTelemetryHandler::class,
+            'processors' => [PsrLogMessageProcessor::class],
         ],
 
         'daily' => [

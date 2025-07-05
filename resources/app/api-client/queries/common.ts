@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, FilesService, FoldersService, GenreService, HostsService, ImageService, JobMetricsService, JobService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, MovieService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, RetryService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
+import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, GenreService, ImageService, JobMetricsService, JobService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, MovieService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, RetryService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
 export type AlbumServiceGetApiLibrariesByLibraryAlbumsDefaultResponse = Awaited<ReturnType<typeof AlbumService.getApiLibrariesByLibraryAlbums>>;
 export type AlbumServiceGetApiLibrariesByLibraryAlbumsQueryResult<TData = AlbumServiceGetApiLibrariesByLibraryAlbumsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAlbumServiceGetApiLibrariesByLibraryAlbumsKey = "AlbumServiceGetApiLibrariesByLibraryAlbums";
@@ -86,40 +86,6 @@ export const useFailedJobsServiceGetHorizonApiJobsFailedByIdKey = "FailedJobsSer
 export const UseFailedJobsServiceGetHorizonApiJobsFailedByIdKeyFn = ({ id }: {
   id: string;
 }, queryKey?: Array<unknown>) => [useFailedJobsServiceGetHorizonApiJobsFailedByIdKey, ...(queryKey ?? [{ id }])];
-export type FilesServiceGetSystemLogViewerApiFilesDefaultResponse = Awaited<ReturnType<typeof FilesService.getSystemLogViewerApiFiles>>;
-export type FilesServiceGetSystemLogViewerApiFilesQueryResult<TData = FilesServiceGetSystemLogViewerApiFilesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useFilesServiceGetSystemLogViewerApiFilesKey = "FilesServiceGetSystemLogViewerApiFiles";
-export const UseFilesServiceGetSystemLogViewerApiFilesKeyFn = (queryKey?: Array<unknown>) => [useFilesServiceGetSystemLogViewerApiFilesKey, ...(queryKey ?? [])];
-export type FilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadRequestDefaultResponse = Awaited<ReturnType<typeof FilesService.getSystemLogViewerApiFilesByFileIdentifierDownloadRequest>>;
-export type FilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadRequestQueryResult<TData = FilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadRequestDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadRequestKey = "FilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadRequest";
-export const UseFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadRequestKeyFn = ({ fileIdentifier }: {
-  fileIdentifier: string;
-}, queryKey?: Array<unknown>) => [useFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadRequestKey, ...(queryKey ?? [{ fileIdentifier }])];
-export type FilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadDefaultResponse = Awaited<ReturnType<typeof FilesService.getSystemLogViewerApiFilesByFileIdentifierDownload>>;
-export type FilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadQueryResult<TData = FilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadKey = "FilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownload";
-export const UseFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadKeyFn = ({ fileIdentifier }: {
-  fileIdentifier: string;
-}, queryKey?: Array<unknown>) => [useFilesServiceGetSystemLogViewerApiFilesByFileIdentifierDownloadKey, ...(queryKey ?? [{ fileIdentifier }])];
-export type FoldersServiceGetSystemLogViewerApiFoldersDefaultResponse = Awaited<ReturnType<typeof FoldersService.getSystemLogViewerApiFolders>>;
-export type FoldersServiceGetSystemLogViewerApiFoldersQueryResult<TData = FoldersServiceGetSystemLogViewerApiFoldersDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useFoldersServiceGetSystemLogViewerApiFoldersKey = "FoldersServiceGetSystemLogViewerApiFolders";
-export const UseFoldersServiceGetSystemLogViewerApiFoldersKeyFn = ({ direction }: {
-  direction?: string;
-} = {}, queryKey?: Array<unknown>) => [useFoldersServiceGetSystemLogViewerApiFoldersKey, ...(queryKey ?? [{ direction }])];
-export type FoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestDefaultResponse = Awaited<ReturnType<typeof FoldersService.getSystemLogViewerApiFoldersByFolderIdentifierDownloadRequest>>;
-export type FoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestQueryResult<TData = FoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestKey = "FoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequest";
-export const UseFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestKeyFn = ({ folderIdentifier }: {
-  folderIdentifier: string;
-}, queryKey?: Array<unknown>) => [useFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadRequestKey, ...(queryKey ?? [{ folderIdentifier }])];
-export type FoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadDefaultResponse = Awaited<ReturnType<typeof FoldersService.getSystemLogViewerApiFoldersByFolderIdentifierDownload>>;
-export type FoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadQueryResult<TData = FoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadKey = "FoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownload";
-export const UseFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadKeyFn = ({ folderIdentifier }: {
-  folderIdentifier: string;
-}, queryKey?: Array<unknown>) => [useFoldersServiceGetSystemLogViewerApiFoldersByFolderIdentifierDownloadKey, ...(queryKey ?? [{ folderIdentifier }])];
 export type GenreServiceGetApiGenresDefaultResponse = Awaited<ReturnType<typeof GenreService.getApiGenres>>;
 export type GenreServiceGetApiGenresQueryResult<TData = GenreServiceGetApiGenresDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useGenreServiceGetApiGenresKey = "GenreServiceGetApiGenres";
@@ -136,10 +102,6 @@ export const useGenreServiceGetApiGenresByGenreKey = "GenreServiceGetApiGenresBy
 export const UseGenreServiceGetApiGenresByGenreKeyFn = ({ genre }: {
   genre: string;
 }, queryKey?: Array<unknown>) => [useGenreServiceGetApiGenresByGenreKey, ...(queryKey ?? [{ genre }])];
-export type HostsServiceGetSystemLogViewerApiHostsDefaultResponse = Awaited<ReturnType<typeof HostsService.getSystemLogViewerApiHosts>>;
-export type HostsServiceGetSystemLogViewerApiHostsQueryResult<TData = HostsServiceGetSystemLogViewerApiHostsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useHostsServiceGetSystemLogViewerApiHostsKey = "HostsServiceGetSystemLogViewerApiHosts";
-export const UseHostsServiceGetSystemLogViewerApiHostsKeyFn = (queryKey?: Array<unknown>) => [useHostsServiceGetSystemLogViewerApiHostsKey, ...(queryKey ?? [])];
 export type ImageServiceGetApiImagesByImageDefaultResponse = Awaited<ReturnType<typeof ImageService.getApiImagesByImage>>;
 export type ImageServiceGetApiImagesByImageQueryResult<TData = ImageServiceGetApiImagesByImageDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useImageServiceGetApiImagesByImageKey = "ImageServiceGetApiImagesByImage";
@@ -175,19 +137,74 @@ export const useLibraryServiceGetApiLibrariesBySlugKey = "LibraryServiceGetApiLi
 export const UseLibraryServiceGetApiLibrariesBySlugKeyFn = ({ slug }: {
   slug: string;
 }, queryKey?: Array<unknown>) => [useLibraryServiceGetApiLibrariesBySlugKey, ...(queryKey ?? [{ slug }])];
-export type LogsServiceGetSystemLogViewerApiLogsDefaultResponse = Awaited<ReturnType<typeof LogsService.getSystemLogViewerApiLogs>>;
-export type LogsServiceGetSystemLogViewerApiLogsQueryResult<TData = LogsServiceGetSystemLogViewerApiLogsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useLogsServiceGetSystemLogViewerApiLogsKey = "LogsServiceGetSystemLogViewerApiLogs";
-export const UseLogsServiceGetSystemLogViewerApiLogsKeyFn = ({ direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }: {
-  direction?: string;
-  excludeFileTypes?: string;
-  excludeLevels?: string;
-  file?: string;
-  log?: string;
-  perPage?: string;
-  query?: string;
-  shorterStackTraces?: boolean;
-} = {}, queryKey?: Array<unknown>) => [useLogsServiceGetSystemLogViewerApiLogsKey, ...(queryKey ?? [{ direction, excludeFileTypes, excludeLevels, file, log, perPage, query, shorterStackTraces }])];
+export type LogsServiceGetApiLogsDefaultResponse = Awaited<ReturnType<typeof LogsService.getApiLogs>>;
+export type LogsServiceGetApiLogsQueryResult<TData = LogsServiceGetApiLogsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useLogsServiceGetApiLogsKey = "LogsServiceGetApiLogs";
+export const UseLogsServiceGetApiLogsKeyFn = (queryKey?: Array<unknown>) => [useLogsServiceGetApiLogsKey, ...(queryKey ?? [])];
+export type LogsServiceGetApiLogsByLogFileDefaultResponse = Awaited<ReturnType<typeof LogsService.getApiLogsByLogFile>>;
+export type LogsServiceGetApiLogsByLogFileQueryResult<TData = LogsServiceGetApiLogsByLogFileDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useLogsServiceGetApiLogsByLogFileKey = "LogsServiceGetApiLogsByLogFile";
+export const UseLogsServiceGetApiLogsByLogFileKeyFn = ({ logFile }: {
+  logFile: string;
+}, queryKey?: Array<unknown>) => [useLogsServiceGetApiLogsByLogFileKey, ...(queryKey ?? [{ logFile }])];
+export type LogsServiceGetApiLogsByLogFileContentDefaultResponse = Awaited<ReturnType<typeof LogsService.getApiLogsByLogFileContent>>;
+export type LogsServiceGetApiLogsByLogFileContentQueryResult<TData = LogsServiceGetApiLogsByLogFileContentDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useLogsServiceGetApiLogsByLogFileContentKey = "LogsServiceGetApiLogsByLogFileContent";
+export const UseLogsServiceGetApiLogsByLogFileContentKeyFn = ({ afterLine, logFile, maxLines }: {
+  afterLine?: number;
+  logFile: string;
+  maxLines?: number;
+}, queryKey?: Array<unknown>) => [useLogsServiceGetApiLogsByLogFileContentKey, ...(queryKey ?? [{ afterLine, logFile, maxLines }])];
+export type LogsServiceGetApiLogsByLogFileLinesDefaultResponse = Awaited<ReturnType<typeof LogsService.getApiLogsByLogFileLines>>;
+export type LogsServiceGetApiLogsByLogFileLinesQueryResult<TData = LogsServiceGetApiLogsByLogFileLinesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useLogsServiceGetApiLogsByLogFileLinesKey = "LogsServiceGetApiLogsByLogFileLines";
+export const UseLogsServiceGetApiLogsByLogFileLinesKeyFn = ({ logFile }: {
+  logFile: string;
+}, queryKey?: Array<unknown>) => [useLogsServiceGetApiLogsByLogFileLinesKey, ...(queryKey ?? [{ logFile }])];
+export type LogsServiceGetApiLogsByLogFileSearchDefaultResponse = Awaited<ReturnType<typeof LogsService.getApiLogsByLogFileSearch>>;
+export type LogsServiceGetApiLogsByLogFileSearchQueryResult<TData = LogsServiceGetApiLogsByLogFileSearchDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useLogsServiceGetApiLogsByLogFileSearchKey = "LogsServiceGetApiLogsByLogFileSearch";
+export const UseLogsServiceGetApiLogsByLogFileSearchKeyFn = ({ caseSensitive, logFile, maxResults, pattern }: {
+  caseSensitive?: boolean;
+  logFile: string;
+  maxResults?: number;
+  pattern: string;
+}, queryKey?: Array<unknown>) => [useLogsServiceGetApiLogsByLogFileSearchKey, ...(queryKey ?? [{ caseSensitive, logFile, maxResults, pattern }])];
+export type LogsServiceGetApiLogsByLogFileTailDefaultResponse = Awaited<ReturnType<typeof LogsService.getApiLogsByLogFileTail>>;
+export type LogsServiceGetApiLogsByLogFileTailQueryResult<TData = LogsServiceGetApiLogsByLogFileTailDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useLogsServiceGetApiLogsByLogFileTailKey = "LogsServiceGetApiLogsByLogFileTail";
+export const UseLogsServiceGetApiLogsByLogFileTailKeyFn = ({ lines, logFile }: {
+  lines?: number;
+  logFile: string;
+}, queryKey?: Array<unknown>) => [useLogsServiceGetApiLogsByLogFileTailKey, ...(queryKey ?? [{ lines, logFile }])];
+export type LogsServiceGetApiLogsByLogFileHeadDefaultResponse = Awaited<ReturnType<typeof LogsService.getApiLogsByLogFileHead>>;
+export type LogsServiceGetApiLogsByLogFileHeadQueryResult<TData = LogsServiceGetApiLogsByLogFileHeadDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useLogsServiceGetApiLogsByLogFileHeadKey = "LogsServiceGetApiLogsByLogFileHead";
+export const UseLogsServiceGetApiLogsByLogFileHeadKeyFn = ({ lines, logFile }: {
+  lines?: number;
+  logFile: string;
+}, queryKey?: Array<unknown>) => [useLogsServiceGetApiLogsByLogFileHeadKey, ...(queryKey ?? [{ lines, logFile }])];
+export type LogsServiceGetApiLogsByLogFileStatsDefaultResponse = Awaited<ReturnType<typeof LogsService.getApiLogsByLogFileStats>>;
+export type LogsServiceGetApiLogsByLogFileStatsQueryResult<TData = LogsServiceGetApiLogsByLogFileStatsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useLogsServiceGetApiLogsByLogFileStatsKey = "LogsServiceGetApiLogsByLogFileStats";
+export const UseLogsServiceGetApiLogsByLogFileStatsKeyFn = ({ logFile }: {
+  logFile: string;
+}, queryKey?: Array<unknown>) => [useLogsServiceGetApiLogsByLogFileStatsKey, ...(queryKey ?? [{ logFile }])];
+export type LogsServiceGetApiLogsByLogFileDownloadDefaultResponse = Awaited<ReturnType<typeof LogsService.getApiLogsByLogFileDownload>>;
+export type LogsServiceGetApiLogsByLogFileDownloadQueryResult<TData = LogsServiceGetApiLogsByLogFileDownloadDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useLogsServiceGetApiLogsByLogFileDownloadKey = "LogsServiceGetApiLogsByLogFileDownload";
+export const UseLogsServiceGetApiLogsByLogFileDownloadKeyFn = ({ logFile }: {
+  logFile: string;
+}, queryKey?: Array<unknown>) => [useLogsServiceGetApiLogsByLogFileDownloadKey, ...(queryKey ?? [{ logFile }])];
+export type LogsServiceGetApiLogsSearchAllDefaultResponse = Awaited<ReturnType<typeof LogsService.getApiLogsSearchAll>>;
+export type LogsServiceGetApiLogsSearchAllQueryResult<TData = LogsServiceGetApiLogsSearchAllDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useLogsServiceGetApiLogsSearchAllKey = "LogsServiceGetApiLogsSearchAll";
+export const UseLogsServiceGetApiLogsSearchAllKeyFn = ({ caseSensitive, files, maxResultsPerFile, pattern }: {
+  caseSensitive?: boolean;
+  files?: string[];
+  maxResultsPerFile?: number;
+  pattern: string;
+}, queryKey?: Array<unknown>) => [useLogsServiceGetApiLogsSearchAllKey, ...(queryKey ?? [{ caseSensitive, files, maxResultsPerFile, pattern }])];
 export type MasterSupervisorServiceGetHorizonApiMastersDefaultResponse = Awaited<ReturnType<typeof MasterSupervisorService.getHorizonApiMasters>>;
 export type MasterSupervisorServiceGetHorizonApiMastersQueryResult<TData = MasterSupervisorServiceGetHorizonApiMastersDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useMasterSupervisorServiceGetHorizonApiMastersKey = "MasterSupervisorServiceGetHorizonApiMasters";
@@ -367,10 +384,6 @@ export type AuthServicePostWebauthnPasskeyRegisterMutationResult = Awaited<Retur
 export type PasskeyServicePostWebauthnPasskeyMutationResult = Awaited<ReturnType<typeof PasskeyService.postWebauthnPasskey>>;
 export type PasskeyServicePostWebauthnPasskeyRegisterMutationResult = Awaited<ReturnType<typeof PasskeyService.postWebauthnPasskeyRegister>>;
 export type BatchesServicePostHorizonApiBatchesRetryByIdMutationResult = Awaited<ReturnType<typeof BatchesService.postHorizonApiBatchesRetryById>>;
-export type FilesServicePostSystemLogViewerApiFilesByFileIdentifierClearCacheMutationResult = Awaited<ReturnType<typeof FilesService.postSystemLogViewerApiFilesByFileIdentifierClearCache>>;
-export type FilesServicePostSystemLogViewerApiClearCacheAllMutationResult = Awaited<ReturnType<typeof FilesService.postSystemLogViewerApiClearCacheAll>>;
-export type FilesServicePostSystemLogViewerApiDeleteMultipleFilesMutationResult = Awaited<ReturnType<typeof FilesService.postSystemLogViewerApiDeleteMultipleFiles>>;
-export type FoldersServicePostSystemLogViewerApiFoldersByFolderIdentifierClearCacheMutationResult = Awaited<ReturnType<typeof FoldersService.postSystemLogViewerApiFoldersByFolderIdentifierClearCache>>;
 export type JobServicePostApiJobsScanLibraryBySlugMutationResult = Awaited<ReturnType<typeof JobService.postApiJobsScanLibraryBySlug>>;
 export type LibraryServicePostApiLibrariesMutationResult = Awaited<ReturnType<typeof LibraryService.postApiLibraries>>;
 export type MonitoringServicePostHorizonApiMonitoringMutationResult = Awaited<ReturnType<typeof MonitoringService.postHorizonApiMonitoring>>;
@@ -395,8 +408,6 @@ export type PlaylistServicePutApiPlaylistsByPlaylistSmartMutationResult = Awaite
 export type GenreServicePatchApiGenresByGenreMutationResult = Awaited<ReturnType<typeof GenreService.patchApiGenresByGenre>>;
 export type LibraryServicePatchApiLibrariesBySlugMutationResult = Awaited<ReturnType<typeof LibraryService.patchApiLibrariesBySlug>>;
 export type UserServicePatchApiUsersByUserMutationResult = Awaited<ReturnType<typeof UserService.patchApiUsersByUser>>;
-export type FilesServiceDeleteSystemLogViewerApiFilesByFileIdentifierMutationResult = Awaited<ReturnType<typeof FilesService.deleteSystemLogViewerApiFilesByFileIdentifier>>;
-export type FoldersServiceDeleteSystemLogViewerApiFoldersByFolderIdentifierMutationResult = Awaited<ReturnType<typeof FoldersService.deleteSystemLogViewerApiFoldersByFolderIdentifier>>;
 export type GenreServiceDeleteApiGenresByGenreMutationResult = Awaited<ReturnType<typeof GenreService.deleteApiGenresByGenre>>;
 export type LibraryServiceDeleteApiLibrariesBySlugMutationResult = Awaited<ReturnType<typeof LibraryService.deleteApiLibrariesBySlug>>;
 export type MonitoringServiceDeleteHorizonApiMonitoringByTagMutationResult = Awaited<ReturnType<typeof MonitoringService.deleteHorizonApiMonitoringByTag>>;

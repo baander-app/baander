@@ -1,0 +1,11 @@
+--- /dev/null
++++ ../src/NullLogger.php
+@@ -19,7 +19,7 @@
+      *
+      * @throws \Psr\Log\InvalidArgumentException
+      */
+-    public function log($level, string|\Stringable $message, array $context = []): void
++    public function log($level, $message, array $context = []): void
+     {
+         // noop
+     }

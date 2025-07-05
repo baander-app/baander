@@ -1,0 +1,81 @@
+--- /dev/null
++++ ../src/LoggerTrait.php
+@@ -15,7 +15,7 @@
+     /**
+      * System is unusable.
+      */
+-    public function emergency(string|\Stringable $message, array $context = []): void
++    public function emergency($message, array $context = []): void
+     {
+         $this->log(LogLevel::EMERGENCY, $message, $context);
+     }
+@@ -26,7 +26,7 @@
+      * Example: Entire website down, database unavailable, etc. This should
+      * trigger the SMS alerts and wake you up.
+      */
+-    public function alert(string|\Stringable $message, array $context = []): void
++    public function alert($message, array $context = []): void
+     {
+         $this->log(LogLevel::ALERT, $message, $context);
+     }
+@@ -36,7 +36,7 @@
+      *
+      * Example: Application component unavailable, unexpected exception.
+      */
+-    public function critical(string|\Stringable $message, array $context = []): void
++    public function critical($message, array $context = []): void
+     {
+         $this->log(LogLevel::CRITICAL, $message, $context);
+     }
+@@ -45,7 +45,7 @@
+      * Runtime errors that do not require immediate action but should typically
+      * be logged and monitored.
+      */
+-    public function error(string|\Stringable $message, array $context = []): void
++    public function error($message, array $context = []): void
+     {
+         $this->log(LogLevel::ERROR, $message, $context);
+     }
+@@ -56,7 +56,7 @@
+      * Example: Use of deprecated APIs, poor use of an API, undesirable things
+      * that are not necessarily wrong.
+      */
+-    public function warning(string|\Stringable $message, array $context = []): void
++    public function warning($message, array $context = []): void
+     {
+         $this->log(LogLevel::WARNING, $message, $context);
+     }
+@@ -64,7 +64,7 @@
+     /**
+      * Normal but significant events.
+      */
+-    public function notice(string|\Stringable $message, array $context = []): void
++    public function notice($message, array $context = []): void
+     {
+         $this->log(LogLevel::NOTICE, $message, $context);
+     }
+@@ -74,7 +74,7 @@
+      *
+      * Example: User logs in, SQL logs.
+      */
+-    public function info(string|\Stringable $message, array $context = []): void
++    public function info($message, array $context = []): void
+     {
+         $this->log(LogLevel::INFO, $message, $context);
+     }
+@@ -82,7 +82,7 @@
+     /**
+      * Detailed debug information.
+      */
+-    public function debug(string|\Stringable $message, array $context = []): void
++    public function debug($message, array $context = []): void
+     {
+         $this->log(LogLevel::DEBUG, $message, $context);
+     }
+@@ -94,5 +94,5 @@
+      *
+      * @throws \Psr\Log\InvalidArgumentException
+      */
+-    abstract public function log($level, string|\Stringable $message, array $context = []): void;
++    abstract public function log($level, $message, array $context = []): void;
+ }

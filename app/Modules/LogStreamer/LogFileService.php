@@ -2,27 +2,40 @@
 
 namespace App\Modules\LogStreamer;
 
+use App\Modules\LogStreamer\Models\LogFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Finder\SplFileInfo;
 
 class LogFileService
 {
-    public function getFiles(): Collection
-    {
-        return collect(File::allFiles(storage_path('logs')))
-            ->filter(fn(SplFileInfo $log) => $log->getExtension() === 'log');
-    }
-
     public function getSortedFiles()
     {
         return $this->getFiles()
-            ->map(function (SplFileInfo $log) {
-                return [
-                    'fileName' => $log->getRelativePathname(),
-                ];
-            })
-            ->sortByDesc('label')
+            ->sortByDesc(fn(LogFile $log) => $log->createdAt)
             ->values();
+    }
+
+    /**
+     * @return Collection<LogFile>
+     */
+    public function getFiles(): Collection
+    {
+        return collect(File::allFiles(storage_path('logs')))
+            ->map(function (SplFileInfo $log) {
+                return new LogFile(
+                    id: hash('sha256', $log->getRealPath()),
+                    fileName: $log->getRelativePathname(),
+                    path: $log->getRealPath(),
+                    createdAt: Carbon::createFromTimestamp($log->getCTime()),
+                    updatedAt: Carbon::createFromTimestamp($log->getMTime()),
+                );
+            });
+    }
+
+    public function getFileById(string $id): ?LogFile
+    {
+        return $this->getFiles()->firstWhere(fn(LogFile $log) => $log->id === $id);
     }
 }
