@@ -1,9 +1,7 @@
 .scrollList {
   border-right: 1px solid #e0dddd;
   overflow-x: auto;
-  overflow-y: auto;
   max-width: 100%;
-  position: relative;
 
   table {
     border-spacing: unset;
@@ -18,17 +16,18 @@
     top: 0;
     z-index: 10;
     padding: 6px;
-    text-align: center;
+    text-align: left;
     font-weight: var(--font-weight-bold);
     font-size: 0.875rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    cursor: pointer;
   }
 
   td {
     padding: 6px;
-    text-align: center;
+    text-align: left;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -37,6 +36,42 @@
   tbody tr:hover {
     background-color: var(--accent-2);
   }
+}
+
+.tableContainer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.fixedHeader {
+  position: relative;
+  z-index: 100;
+  background-color: var(--red-1);
+
+  table {
+    width: 100%;
+    table-layout: fixed;
+  }
+}
+
+.scrollableContent {
+  height: 400px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.virtualizedContainer {
+  position: relative;
+}
+
+.virtualizedRow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: table;
+  table-layout: fixed;
 }
 
 .header {
@@ -60,7 +95,6 @@
 .titleCell {
   display: flex;
   align-items: center;
-  justify-content: center;
 }
 
 .titleCellNowPlayingIcon {

@@ -30,3 +30,5 @@ bundle-visualization.html
 /api.json
 /*.pem
 repomix-output.xml
+/scramble_export.js
+/scramble:export.js

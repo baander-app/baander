@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { RefObject, useCallback, useEffect, useRef, useState } from 'react';
 import { SongResource } from '@/api-client/requests';
 import { Iconify } from '@/ui/icons/iconify';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -8,9 +8,13 @@ import {
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
+  Header,
+  Row,
   SortingState,
+  Table,
   useReactTable,
-} from './types';
+} from '@tanstack/react-table';
+import { useVirtualizer, VirtualItem, Virtualizer } from '@tanstack/react-virtual';
 import { SpeakerLoudIcon } from '@radix-ui/react-icons';
 import styles from './song-table.module.scss';
 
@@ -18,81 +22,111 @@ export interface SongTableProps {
   songs: SongResource[];
   title?: string | null;
   description?: string | null;
-  onFetchNextPage?: () => void;
-  hasNextPage?: boolean;
-  isFetchingNextPage?: boolean;
+  onScrollToBottom?: () => void;
+  estimatedTotalCount?: number;
   className?: string;
 }
 
+interface TableHeaderProps {
+  title?: string | null;
+  description?: string | null;
+}
+
+interface StickyHeaderProps {
+  table: Table<SongResource>;
+}
+
+interface HeaderCellProps {
+  header: Header<SongResource, unknown>;
+}
+
+interface VirtualizedRowsProps {
+  visibleRows: VirtualizedRowData[];
+  onSongClick: (id: string) => void;
+}
+
+interface SongTitleCellProps {
+  song: SongResource;
+}
+
+interface VirtualizedRowData {
+  virtualRow: VirtualItem;
+  row: Row<SongResource>;
+}
+
+interface UseVirtualizedTableProps {
+  table: Table<SongResource>;
+  parentRef: RefObject<HTMLDivElement | null>;
+  estimatedTotalCount?: number;
+  onScrollToBottom?: () => void;
+  lastScrollTime: RefObject<number>;
+  hasTriggered: RefObject<boolean>;
+}
+
+interface UseVirtualizedTableReturn {
+  virtualizer: Virtualizer<HTMLDivElement, Element>;
+  visibleRows: VirtualizedRowData[];
+}
+
+const COLUMN_DEFINITIONS: ColumnDef<SongResource>[] = [
+  {
+    header: 'Title',
+    cell: (info) => <SongTitleCell song={info.row.original}/>,
+  },
+  {
+    header: 'Lyrics',
+    accessorKey: 'lyricsExist',
+    cell: (info) => info.getValue() ? <Iconify icon="arcticons:quicklyric"/> : null,
+    size: 60,
+  },
+  {
+    header: 'Artist',
+    accessorFn: (row) => row.artists?.map(x => x.name).join(', '),
+  },
+  {
+    header: 'Album',
+    accessorFn: (row) => row.album?.title,
+  },
+  {
+    header: 'Duration',
+    accessorKey: 'durationHuman',
+    size: 80,
+  },
+  {
+    header: 'Track',
+    accessorKey: 'track',
+    size: 60,
+  },
+];
+
 export function SongTable({
-  songs,
-  title,
-  description,
-  onFetchNextPage,
-  hasNextPage,
-  isFetchingNextPage,
-  className,
-}: SongTableProps) {
+                            songs,
+                            title,
+                            description,
+                            onScrollToBottom,
+                            estimatedTotalCount,
+                            className,
+                          }: SongTableProps) {
   const dispatch = useAppDispatch();
   const [sorting, setSorting] = useState<SortingState>([]);
-
-  const onSongClick = useCallback((publicId: string) => {
-    if (songs) {
-      const newQueue = [...songs];
-      const index = newQueue.findIndex(x => x.public_id === publicId);
-      newQueue.splice(0, 0, newQueue.splice(index, 1)[0]);
-      dispatch(setQueueAndSong({
-        queue: newQueue,
-        playPublicId: newQueue[0].public_id,
-      }));
-    }
-  }, [dispatch, songs]);
-
-  const columns = useMemo<Array<ColumnDef<SongResource>>>(
-    () => [
-      {
-        'header': 'Title',
-        cell: (info) => <SongTitleCell song={info.row.original}/>,
-        size: 200,
-      },
-      {
-        'header': 'Lyrics',
-        'accessorKey': 'lyricsExist',
-        cell: (info) => info.getValue() ? <Iconify icon="arcticons:quicklyric"/> : null,
-        size: 10,
-      },
-      {
-        'header': 'Artist',
-        accessorFn: (row) => row.artists?.map(x => x.name).join(', '),
-        size: 150,
-      },
-      {
-        'header': 'Album',
-        accessorFn: (row) => row.album?.title,
-        size: 150,
-      },
-      {
-        'header': 'Duration',
-        'accessorKey': 'durationHuman',
-        size: 10,
-      },
-      {
-        'header': 'Track',
-        'accessorKey': 'track',
-        size: 10,
-      },
-    ],
-    [],
-  );
-
   const parentRef = useRef<HTMLDivElement>(null);
+  const lastScrollTimeRef = useRef(0);
+  const hasTriggeredRef = useRef(false);
+
+  const handleSongClick = useCallback((publicId: string) => {
+    const newQueue = [...songs];
+    const index = newQueue.findIndex(x => x.public_id === publicId);
+    newQueue.splice(0, 0, newQueue.splice(index, 1)[0]);
+    dispatch(setQueueAndSong({
+      queue: newQueue,
+      playPublicId: newQueue[0].public_id,
+    }));
+  }, [dispatch, songs]);
 
   const table = useReactTable({
     data: songs,
-    columns,
-    state: {
-      sorting,
-    },
+    columns: COLUMN_DEFINITIONS,
+    state: { sorting },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -100,177 +134,188 @@ export function SongTable({
     debugColumns: false,
   });
 
-  const { rows } = table.getRowModel();
-
-  // Custom virtualization implementation
-  const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 });
-  const [totalHeight, setTotalHeight] = useState(rows.length * 24);
-  const [visibleItems, setVisibleItems] = useState<Array<{ index: number, start: number, size: number }>>([]);
-  const rowHeight = 24; // Same as the estimateSize in the original implementation
-
-  // Handle scroll events to update visible range
-  const handleScroll = useCallback(() => {
-    if (!parentRef.current) return;
-
-    const { scrollTop, clientHeight } = parentRef.current;
-    const buffer = 10; // Extra rows to render above and below viewport
-
-    const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - buffer);
-    const endIndex = Math.min(rows.length - 1, Math.ceil((scrollTop + clientHeight) / rowHeight) + buffer);
-
-    setVisibleRange({ start: startIndex, end: endIndex });
-
-    // Check if we need to load more data (infinite scrolling)
-    if (
-      endIndex >= rows.length - 5 &&
-      hasNextPage &&
-      !isFetchingNextPage &&
-      onFetchNextPage
-    ) {
-      onFetchNextPage();
-    }
-  }, [rows.length, hasNextPage, isFetchingNextPage, onFetchNextPage]);
-
-  // Update visible items when visible range changes
-  useEffect(() => {
-    const items = [];
-    for (let i = visibleRange.start; i <= visibleRange.end; i++) {
-      if (i < rows.length) {
-        items.push({
-          index: i,
-          start: i * rowHeight,
-          size: rowHeight
-        });
-      }
-    }
-    setVisibleItems(items);
-    setTotalHeight(rows.length * rowHeight);
-  }, [visibleRange, rows.length]);
-
-  // Add scroll event listener
-  useEffect(() => {
-    const scrollElement = parentRef.current;
-    if (!scrollElement) return;
-
-    scrollElement.addEventListener('scroll', handleScroll);
-    handleScroll(); // Initial calculation
-
-    return () => {
-      scrollElement.removeEventListener('scroll', handleScroll);
-    };
-  }, [handleScroll]);
+  const { virtualizer, visibleRows } = useVirtualizedTable({
+    table,
+    parentRef,
+    estimatedTotalCount,
+    onScrollToBottom,
+    lastScrollTime: lastScrollTimeRef,
+    hasTriggered: hasTriggeredRef,
+  });
 
   return (
-    <>
-      {(title || description) && (
-        <div className={styles.header}>
-          {title && <h2 className={styles.title}>{title}</h2>}
-          {description && <p className={styles.description}>{description}</p>}
-        </div>
-      )}
+    <div className={`${styles.scrollList} ${className || ''}`}>
+      <TableHeader title={title} description={description}/>
 
-      <div ref={parentRef} className={`${styles.scrollList} ${className || ''}`}>
-        <div style={{ height: `${totalHeight}px`, position: 'relative', width: '100%' }}>
-          <table style={{ width: '100%', display: 'table', tableLayout: 'fixed' }}>
-            <thead>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <th
-                      key={header.id}
-                      colSpan={header.colSpan}
-                      style={{
-                        width: header.getSize(),
-                        position: 'sticky',
-                        top: 0,
-                        cursor: 'pointer',
-                        zIndex: 20
-                      }}
-                    >
-                      {header.isPlaceholder ? null : (
-                        <div
-                          {...{
-                            className: header.column.getCanSort()
-                                       ? 'cursor-pointer select-none'
-                                       : '',
-                            onClick: header.column.getToggleSortingHandler(),
-                          }}
-                        >
-                          {flexRender(
-                            header.column.columnDef.header,
-                            header.getContext(),
-                          )}
-                          {{
-                            asc: ' 🔼',
-                            desc: ' 🔽',
-                          }[header.column.getIsSorted() as string] ?? null}
-                        </div>
-                      )}
-                    </th>
-                  );
-                })}
-              </tr>
-            ))}
-            </thead>
-            <tbody>
-            {visibleItems.map((virtualRow) => {
-              const row = rows[virtualRow.index];
-              return (
-                <tr
-                  key={row.id}
-                  onClick={() => onSongClick(row.original.public_id)}
-                  className={styles.listItem}
-                  style={{
-                    height: `${virtualRow.size}px`,
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    transform: `translateY(${virtualRow.start}px)`,
-                    width: '100%',
-                    zIndex: 1
-                  }}
-                >
-                  {row.getVisibleCells().map((cell) => {
-                    return (
-                      <td 
-                        key={cell.id}
-                        style={{
-                          width: cell.column.getSize(),
-                          display: 'table-cell',
-                          boxSizing: 'border-box'
-                        }}
-                      >
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext(),
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
-            </tbody>
-          </table>
+      <div className={styles.tableContainer}>
+        <StickyHeader table={table}/>
+
+        <div ref={parentRef} className={styles.scrollableContent}>
+          <div className={styles.virtualizedContainer} style={{ height: `${virtualizer.getTotalSize()}px` }}>
+            <VirtualizedRows
+              visibleRows={visibleRows}
+              onSongClick={handleSongClick}
+            />
+          </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
-interface SongTitleCellProps {
-  song: SongResource;
+function TableHeader({ title, description }: TableHeaderProps) {
+  if (!title && !description) return null;
+
+  return (
+    <div className={styles.header}>
+      {title && <h2 className={styles.title}>{title}</h2>}
+      {description && <p className={styles.description}>{description}</p>}
+    </div>
+  );
+}
+
+function StickyHeader({ table }: StickyHeaderProps) {
+  return (
+    <div className={styles.fixedHeader}>
+      <table>
+        <thead>
+        {table.getHeaderGroups().map((headerGroup) => (
+          <tr key={headerGroup.id}>
+            {headerGroup.headers.map((header) => (
+              <HeaderCell key={header.id} header={header}/>
+            ))}
+          </tr>
+        ))}
+        </thead>
+      </table>
+    </div>
+  );
+}
+
+function HeaderCell({ header }: HeaderCellProps) {
+  return (
+    <th style={{ width: header.getSize() }}>
+      {header.isPlaceholder ? null : (
+        <div
+          className={header.column.getCanSort() ? 'cursor-pointer select-none' : ''}
+          onClick={header.column.getToggleSortingHandler()}
+        >
+          {flexRender(header.column.columnDef.header, header.getContext())}
+          {getSortIcon(header.column.getIsSorted())}
+        </div>
+      )}
+    </th>
+  );
+}
+
+function VirtualizedRows({ visibleRows, onSongClick }: VirtualizedRowsProps) {
+  return (
+    <table>
+      <tbody>
+      {visibleRows.map(({ virtualRow, row }) => (
+        <tr
+          key={row.id}
+          onClick={() => onSongClick(row.original.public_id)}
+          className={`${styles.listItem} ${styles.virtualizedRow}`}
+          style={{
+            height: `${virtualRow.size}px`,
+            transform: `translateY(${virtualRow.start}px)`,
+          }}
+        >
+          {row.getVisibleCells().map((cell) => (
+            <td key={cell.id} style={{ width: cell.column.getSize() }}>
+              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+            </td>
+          ))}
+        </tr>
+      ))}
+      </tbody>
+    </table>
+  );
 }
 
 function SongTitleCell({ song }: SongTitleCellProps) {
   const { currentSongPublicId } = useAppSelector(state => state.musicPlayer);
+  const isCurrentSong = currentSongPublicId === song.public_id;
 
   return (
     <div className={styles.titleCell}>
-      {currentSongPublicId === song.public_id && <SpeakerLoudIcon className={styles.titleCellNowPlayingIcon}/>}
+      {isCurrentSong && <SpeakerLoudIcon className={styles.titleCellNowPlayingIcon}/>}
       <div className={styles.titleCellTitle}>{song.title}</div>
     </div>
   );
+}
+
+function useVirtualizedTable({
+                               table,
+                               parentRef,
+                               estimatedTotalCount,
+                               onScrollToBottom,
+                               lastScrollTime,
+                               hasTriggered,
+                             }: UseVirtualizedTableProps): UseVirtualizedTableReturn {
+  const { rows } = table.getRowModel();
+  const actualRowCount = rows.length;
+  const virtualizerCount = estimatedTotalCount && estimatedTotalCount > actualRowCount ? estimatedTotalCount : actualRowCount;
+
+  const virtualizer = useVirtualizer({
+    count: virtualizerCount,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 40,
+    overscan: 5,
+  });
+
+  useEffect(() => {
+    if (rows.length > 0) {
+      virtualizer.scrollToIndex(0, { align: 'start' });
+    }
+  }, [rows.length, virtualizer]);
+
+  useEffect(() => {
+    hasTriggered.current = false;
+  }, [rows.length, hasTriggered]);
+
+  useEffect(() => {
+    if (!onScrollToBottom) return;
+
+    const scrollElement = parentRef.current;
+    if (!scrollElement) return;
+
+    const handleScroll = () => {
+      const now = Date.now();
+      if (now - lastScrollTime.current < 200) return;
+      lastScrollTime.current = now;
+
+      const virtualItems = virtualizer.getVirtualItems();
+      if (virtualItems.length === 0) return;
+
+      const lastVirtualItem = virtualItems[virtualItems.length - 1];
+      const triggerThreshold = Math.max(5, Math.min(10, Math.floor(actualRowCount * 0.1)));
+      const isNearEnd = lastVirtualItem.index >= actualRowCount - triggerThreshold;
+
+      if (isNearEnd && !hasTriggered.current) {
+        hasTriggered.current = true;
+        onScrollToBottom();
+      }
+    };
+
+    scrollElement.addEventListener('scroll', handleScroll, { passive: true });
+    return () => scrollElement.removeEventListener('scroll', handleScroll);
+  }, [onScrollToBottom, virtualizer, actualRowCount, lastScrollTime, hasTriggered]);
+
+  const virtualItems = virtualizer.getVirtualItems();
+  const visibleRows = virtualItems
+    .filter(virtualRow => virtualRow.index < actualRowCount)
+    .map(virtualRow => ({
+      virtualRow,
+      row: rows[virtualRow.index],
+    }));
+
+  return { virtualizer, visibleRows };
+}
+
+function getSortIcon(sortDirection: string | false) {
+  const icons = { asc: ' 🔼', desc: ' 🔽' };
+
+  return icons[sortDirection as keyof typeof icons] ?? null;
 }
