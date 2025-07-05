@@ -22,6 +22,8 @@ trait CastsDtoToSchema
             throw new \Exception("$className is not a valid Data object");
         }
 
+        dump($className);
+
         return Schema::createFromParameters($this->parametersFromDto($className));
     }
 
@@ -32,7 +34,7 @@ trait CastsDtoToSchema
      */
     public function parametersFromDto(string $className): array
     {
-        return (new RulesToParameters($this->rulesFromDto($className), [], $this->openApiTransformer))->handle();
+        return new RulesToParameters($this->rulesFromDto($className), [], $this->openApiTransformer)->handle();
     }
 
     /**
@@ -56,7 +58,7 @@ trait CastsDtoToSchema
             throw new \Exception("$className is not a valid Data object");
         }
 
-        $dataObject = (new ReflectionClass($className))->newInstanceWithoutConstructor();
+        $dataObject = new ReflectionClass($className)->newInstanceWithoutConstructor();
 
         return $dataObject->getValidationRules([]);
     }
@@ -98,7 +100,7 @@ trait CastsDtoToSchema
             return [];
         }
 
-        $useVariables = (new ReflectionClosure($closure))->getUseVariables();
+        $useVariables = new ReflectionClosure($closure)->getUseVariables();
 
         if (!(($prop = ($useVariables['dataProperty'] ?? null)) instanceof DataProperty)) {
             return [];

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -64,7 +64,7 @@
     </script>
     <style>
         #mosaic-provider-react-aria-0-1 > div > div > div > div.sl-flex > div.sl-flex.sl-flex-grow-0.sl-flex-shrink-0.sl-justify-self-end.sl-resize-x {
-            background-color: #17282e;
+            /*background-color: #17282e;*/
         }
     </style>
 </head>

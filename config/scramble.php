@@ -96,5 +96,6 @@ DESCRIPTION
         \App\Modules\OpenApi\JsonPaginatorExtension::class,
         \App\Modules\OpenApi\LaravelDataRequestExtension::class,
         \App\Modules\OpenApi\LaravelDataToSchema::class,
+        \App\Modules\OpenApi\LaravelDataCollectionExtension::class,
     ],
 ];
