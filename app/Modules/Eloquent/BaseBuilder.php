@@ -2,7 +2,7 @@
 
 namespace App\Modules\Eloquent;
 
-use App\Modules\Pagination\JsonPaginator;
+use App\Modules\Http\Pagination\JsonPaginator;
 use Illuminate\Container\Container;
 use Illuminate\Database\Eloquent\Builder;
 

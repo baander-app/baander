@@ -9,12 +9,15 @@ interface SmartPlaylistForm {
   name: string;
   description: string;
   is_public: boolean;
-  ruleGroups: Array<Array<{
-    field: string;
-    operator: string;
-    value: string;
-    maxValue?: string;
-  }>>;
+  rules: Array<{
+    operator?: 'and' | 'or';
+    rules: Array<{
+      field: string;
+      operator: string;
+      value: string;
+      maxValue?: string;
+    }>;
+  }>;
 }
 
 
@@ -30,39 +33,61 @@ export function CreateSmartPlaylist() {
       name: '',
       description: '',
       is_public: false,
-      ruleGroups: [[{ field: 'genre', operator: 'is', value: '', maxValue: '' }]],
+      rules: [{
+        operator: 'and',
+        rules: [{ field: 'genre', operator: 'is', value: '', maxValue: '' }]
+      }],
     },
   });
 
-  // Watch the ruleGroups field to validate it has at least one rule
-  const ruleGroups = watch('ruleGroups.0');
+  // Watch the rules field to validate it has at least one rule
+  const rules = watch('rules.0.rules');
 
   const [error, setError] = useState<string | null>(null);
+  const [isSubmittingManual, setIsSubmittingManual] = useState<boolean>(false);
 
   const onSubmit = async (data: SmartPlaylistForm) => {
+    console.log('Form submitted with data:', data);
     try {
       setError(null);
+      setIsSubmittingManual(true); // Set manual submitting state to true
 
       // Validate that at least one rule is defined
-      if (data.ruleGroups.length === 0 || data.ruleGroups[0].length === 0) {
+      if (data.rules.length === 0 || data.rules[0].rules.length === 0) {
         setError('At least one rule is required');
+        console.log('Validation failed: At least one rule is required');
+        setIsSubmittingManual(false); // Reset manual submitting state
         return;
       }
 
-      // Transform the data to match the API's expected format
-      // Since we only have one group now, we'll just use that
+      console.log('About to make API call with data:', data);
+
+      // Remove maxValue from rules before sending to API
       const apiData = {
         ...data,
-        rules: [data.ruleGroups[0]] // The API expects 'rules' as an array with a single group
+        rules: data.rules.map(group => ({
+          operator: group.operator,
+          rules: group.rules.map(rule => ({
+            field: rule.field,
+            operator: rule.operator,
+            value: rule.value
+          }))
+        }))
       };
 
+      console.log('Sending API data:', apiData);
+
+      // Make the API call with the transformed data
       await PlaylistService.postApiPlaylistsSmart({
         requestBody: apiData,
       });
 
+      console.log('API call successful');
+
       // Handle success - redirect or show success message
       window.location.href = '/library/playlists';
     } catch (err: any) {
+      console.error('Error in API call:', err);
       if (err.status === 422 && err.body?.errors) {
         // Handle validation errors
         const validationErrors = err.body.errors;
@@ -71,12 +96,25 @@ export function CreateSmartPlaylist() {
       } else {
         setError(err.body?.message || 'Failed to create smart playlist');
       }
+      // Reset manual submitting state
+      setIsSubmittingManual(false);
     }
   };
 
   return (
     <div className={styles.container}>
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form 
+        onSubmit={(e) => {
+          console.log('Form onSubmit event triggered');
+          try {
+            handleSubmit(onSubmit)(e);
+          } catch (error) {
+            console.error('Error in form submission:', error);
+            // Prevent default form submission if there's an error
+            e.preventDefault();
+          }
+        }}
+      >
         <Flex direction="column" gap="4">
           {error && (
             <Text color="red" size="2" className={styles.error}>
@@ -147,15 +185,15 @@ export function CreateSmartPlaylist() {
               </Text>
               <SmartPlaylistRuleEditor 
                 control={control} 
-                name="ruleGroups" 
-                errors={errors.ruleGroups}
+                name="rules" 
+                errors={errors.rules}
               />
-              {errors.ruleGroups && (
+              {errors.rules && (
                 <Text color="red" size="1" className={styles.error}>
-                  {errors.ruleGroups.message}
+                  {errors.rules.message}
                 </Text>
               )}
-              {(!ruleGroups || ruleGroups.length === 0) && (
+              {(!rules || rules.length === 0) && (
                 <Text color="red" size="1" className={styles.error}>
                   At least one rule is required
                 </Text>
@@ -164,9 +202,36 @@ export function CreateSmartPlaylist() {
           </Flex>
 
           <Flex justify="end" mt="4" className={styles.submitButton}>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Creating...' : 'Create Smart Playlist'}
-            </Button>
+            {/* Using a regular HTML button instead of Radix UI Button */}
+            <button 
+              type="submit"
+              className={styles.submitButtonHtml}
+              onClick={(e) => {
+                console.log('Submit button clicked');
+
+                // As a fallback, manually trigger form submission if the regular process fails
+                if (!isSubmitting && !isSubmittingManual) {
+                  e.preventDefault(); // Prevent default form submission
+                  console.log('Manually triggering form submission');
+
+                  // Get the current form values
+                  const formValues = {
+                    name: watch('name'),
+                    description: watch('description'),
+                    is_public: watch('is_public'),
+                    rules: watch('rules')
+                  };
+
+                  console.log('Manual submission with values:', formValues);
+
+                  // Call onSubmit directly
+                  onSubmit(formValues);
+                }
+              }}
+              disabled={isSubmitting || isSubmittingManual}
+            >
+              {isSubmitting || isSubmittingManual ? 'Creating...' : 'Create Smart Playlist'}
+            </button>
           </Flex>
         </Flex>
       </form>

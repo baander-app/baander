@@ -1,9 +1,11 @@
+
 import React, { ReactEventHandler, RefObject, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { noop } from '@/utils/noop.ts';
 import { useMusicSource } from '@/providers/music-source-provider';
 import { SongResource } from '@/api-client/requests';
 import { useAppDispatch } from '@/store/hooks.ts';
 import { createNotification } from '@/store/notifications/notifications-slice.ts';
+import { globalAudioProcessor } from '@/services/global-audio-processor-service.ts';
 
 interface AudioPlayerContextType {
   audioRef: RefObject<HTMLAudioElement>;
@@ -52,6 +54,7 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
   } = useMusicSource();
 
   const audioRef = useRef<HTMLAudioElement>(new Audio());
+  const [processorConnected, setProcessorConnected] = useState(false);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -62,6 +65,24 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
   const [volume, setVolume] = useState(1);
   const [currentVolume, setCurrentVolume] = useState(100);
   const [song, setSong] = useState<SongResource | null>(null);
+
+  // Initialize global audio processor only once when audio element is created
+  useEffect(() => {
+    if (audioRef.current && !processorConnected) {
+      console.log('Initializing global audio processor...');
+      globalAudioProcessor.initialize();
+      globalAudioProcessor.connectAudioElement(audioRef.current)
+        .then(() => {
+          console.log('Audio processor connected successfully');
+          setProcessorConnected(true);
+        })
+        .catch((error) => {
+          console.warn('Failed to connect audio processor:', error);
+          // Still mark as connected to prevent retries
+          setProcessorConnected(true);
+        });
+    }
+  }, [processorConnected]);
 
   const togglePlayPause = () => {
     if (isPlaying) {
@@ -164,6 +185,7 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
     const currentAudioRef = audioRef.current;
     return () => {
       currentAudioRef.pause();
+      // Note: Don't destroy the global processor here as it should persist
     };
   }, []);
 
@@ -187,26 +209,33 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
       return;
     }
 
-    if (!audioRef.current) {
-      audioRef.current = new Audio(authenticatedSource);
-    } else if (authenticatedSource) {
+    // Don't create a new audio element if we already have one
+    if (audioRef.current.src !== authenticatedSource) {
+      console.log('Setting new audio source:', authenticatedSource);
       audioRef.current.pause();
       audioRef.current.src = authenticatedSource;
+
+      // Reset the processor connection attempt flag when source changes
+      // This allows the processor to attempt connection again if needed
+      if (!processorConnected) {
+        globalAudioProcessor.reset();
+      }
     }
 
     audioRef.current.volume = volume / 100;
-
     audioRef.current.preload = 'auto';
+
     // @ts-ignore
     audioRef.current.ondurationchange = (e) => setDuration(e.currentTarget.duration);
     // @ts-ignore
     audioRef.current.ontimeupdate = (e) => handleTimeUpdate(e);
     // @ts-ignore
     audioRef.current.onprogress = (e) => handleBufferProgress(e);
+
     audioRef.current.play().then(() => {
       setIsPlaying(true);
     });
-  }, [authenticatedSource]);
+  }, [authenticatedSource, volume, processorConnected]);
 
   return (
     <AudioPlayerContext.Provider

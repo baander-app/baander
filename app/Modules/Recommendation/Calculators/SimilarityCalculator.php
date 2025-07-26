@@ -107,7 +107,7 @@ class SimilarityCalculator implements CalculatorInterface
      * @param mixed $sourceData
      * @return \Illuminate\Database\Eloquent\Collection
      */
-    private function normalizeSourceData($sourceData): Collection
+    private function normalizeSourceData($sourceData)
     {
         if ($sourceData instanceof Model) {
             return collect([$sourceData]);

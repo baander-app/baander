@@ -68,3 +68,16 @@ export function LyricsButton({ onClick, isActive, ...props }: LyricsButtonProps)
     {...props}
   />;
 }
+
+interface EqButtonProps extends PlayerControlProps {
+  isActive?: boolean;
+}
+
+export function EqButton({ onClick, isActive, ...props }: EqButtonProps) {
+  return <BaseControl
+    title={`${isActive ? 'Hide' : 'Show'} visualizer`}
+    iconName={isActive ? 'ph:equalizer' : 'ph:waveform-slash'}
+    onClick={onClick}
+    {...props}
+  />;
+}

@@ -6,12 +6,12 @@ use App\Extensions\StrExt;
 use App\Jobs\BaseJob;
 use App\Models\{Album, Artist, Genre, Library, Song};
 use App\Modules\Lyrics\Lrc;
-use App\Modules\MediaMeta\MediaMeta;
+use App\Modules\Metadata\MediaMeta\MediaMeta;
 use App\Modules\Translation\LocaleString;
 use Arr;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
-use Illuminate\Support\Facades\{DB, File, Log};
+use Illuminate\Support\Facades\{DB, File};
 use Illuminate\Support\LazyCollection;
 use SplFileInfo;
 

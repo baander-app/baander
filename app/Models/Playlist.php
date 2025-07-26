@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
+use App\Modules\MediaLibrary\SmartPlaylistService;
 use App\Modules\Nanoid\Concerns\HasNanoPublicId;
-use App\Services\SmartPlaylistService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 

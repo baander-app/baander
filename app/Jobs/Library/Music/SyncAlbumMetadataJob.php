@@ -4,13 +4,12 @@ namespace App\Jobs\Library\Music;
 
 use App\Jobs\BaseJob;
 use App\Models\Album;
-use App\Services\Metadata\MetadataSyncService;
+use App\Modules\Metadata\MetadataSyncService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
 
 class SyncAlbumMetadataJob extends BaseJob implements ShouldQueue
 {

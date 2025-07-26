@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, GenreService, ImageService, JobMetricsService, JobService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, MovieService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, RetryService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
+import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, GenreService, ImageService, JobMetricsService, JobService, JobsService, LastFmService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, MovieService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, RetryService, SchemaService, SilencedJobsService, SongService, SpotifyService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
 export type AlbumServiceGetApiLibrariesByLibraryAlbumsDefaultResponse = Awaited<ReturnType<typeof AlbumService.getApiLibrariesByLibraryAlbums>>;
 export type AlbumServiceGetApiLibrariesByLibraryAlbumsQueryResult<TData = AlbumServiceGetApiLibrariesByLibraryAlbumsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAlbumServiceGetApiLibrariesByLibraryAlbumsKey = "AlbumServiceGetApiLibrariesByLibraryAlbums";
@@ -124,6 +124,22 @@ export const useJobsServiceGetHorizonApiJobsByIdKey = "JobsServiceGetHorizonApiJ
 export const UseJobsServiceGetHorizonApiJobsByIdKeyFn = ({ id }: {
   id: string;
 }, queryKey?: Array<unknown>) => [useJobsServiceGetHorizonApiJobsByIdKey, ...(queryKey ?? [{ id }])];
+export type LastFmServiceGetApiServicesLastfmAuthorizeDefaultResponse = Awaited<ReturnType<typeof LastFmService.getApiServicesLastfmAuthorize>>;
+export type LastFmServiceGetApiServicesLastfmAuthorizeQueryResult<TData = LastFmServiceGetApiServicesLastfmAuthorizeDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useLastFmServiceGetApiServicesLastfmAuthorizeKey = "LastFmServiceGetApiServicesLastfmAuthorize";
+export const UseLastFmServiceGetApiServicesLastfmAuthorizeKeyFn = (queryKey?: Array<unknown>) => [useLastFmServiceGetApiServicesLastfmAuthorizeKey, ...(queryKey ?? [])];
+export type LastFmServiceGetApiServicesLastfmCallbackDefaultResponse = Awaited<ReturnType<typeof LastFmService.getApiServicesLastfmCallback>>;
+export type LastFmServiceGetApiServicesLastfmCallbackQueryResult<TData = LastFmServiceGetApiServicesLastfmCallbackDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useLastFmServiceGetApiServicesLastfmCallbackKey = "LastFmServiceGetApiServicesLastfmCallback";
+export const UseLastFmServiceGetApiServicesLastfmCallbackKeyFn = ({ nonce, state, token }: {
+  nonce?: string;
+  state?: string;
+  token?: string;
+} = {}, queryKey?: Array<unknown>) => [useLastFmServiceGetApiServicesLastfmCallbackKey, ...(queryKey ?? [{ nonce, state, token }])];
+export type LastFmServiceGetApiServicesLastfmStatusDefaultResponse = Awaited<ReturnType<typeof LastFmService.getApiServicesLastfmStatus>>;
+export type LastFmServiceGetApiServicesLastfmStatusQueryResult<TData = LastFmServiceGetApiServicesLastfmStatusDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useLastFmServiceGetApiServicesLastfmStatusKey = "LastFmServiceGetApiServicesLastfmStatus";
+export const UseLastFmServiceGetApiServicesLastfmStatusKeyFn = (queryKey?: Array<unknown>) => [useLastFmServiceGetApiServicesLastfmStatusKey, ...(queryKey ?? [])];
 export type LibraryServiceGetApiLibrariesDefaultResponse = Awaited<ReturnType<typeof LibraryService.getApiLibraries>>;
 export type LibraryServiceGetApiLibrariesQueryResult<TData = LibraryServiceGetApiLibrariesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useLibraryServiceGetApiLibrariesKey = "LibraryServiceGetApiLibraries";
@@ -324,6 +340,47 @@ export const UseSongServiceGetApiLibrariesByLibrarySongsByPublicIdKeyFn = ({ lib
   publicId: string;
   relations?: string;
 }, queryKey?: Array<unknown>) => [useSongServiceGetApiLibrariesByLibrarySongsByPublicIdKey, ...(queryKey ?? [{ library, publicId, relations }])];
+export type SpotifyServiceGetApiServicesSpotifyAuthorizeDefaultResponse = Awaited<ReturnType<typeof SpotifyService.getApiServicesSpotifyAuthorize>>;
+export type SpotifyServiceGetApiServicesSpotifyAuthorizeQueryResult<TData = SpotifyServiceGetApiServicesSpotifyAuthorizeDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSpotifyServiceGetApiServicesSpotifyAuthorizeKey = "SpotifyServiceGetApiServicesSpotifyAuthorize";
+export const UseSpotifyServiceGetApiServicesSpotifyAuthorizeKeyFn = (queryKey?: Array<unknown>) => [useSpotifyServiceGetApiServicesSpotifyAuthorizeKey, ...(queryKey ?? [])];
+export type SpotifyServiceGetApiServicesSpotifyCallbackDefaultResponse = Awaited<ReturnType<typeof SpotifyService.getApiServicesSpotifyCallback>>;
+export type SpotifyServiceGetApiServicesSpotifyCallbackQueryResult<TData = SpotifyServiceGetApiServicesSpotifyCallbackDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSpotifyServiceGetApiServicesSpotifyCallbackKey = "SpotifyServiceGetApiServicesSpotifyCallback";
+export const UseSpotifyServiceGetApiServicesSpotifyCallbackKeyFn = ({ code, error, state }: {
+  code?: string;
+  error?: string;
+  state?: string;
+} = {}, queryKey?: Array<unknown>) => [useSpotifyServiceGetApiServicesSpotifyCallbackKey, ...(queryKey ?? [{ code, error, state }])];
+export type SpotifyServiceGetApiServicesSpotifyStatusDefaultResponse = Awaited<ReturnType<typeof SpotifyService.getApiServicesSpotifyStatus>>;
+export type SpotifyServiceGetApiServicesSpotifyStatusQueryResult<TData = SpotifyServiceGetApiServicesSpotifyStatusDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSpotifyServiceGetApiServicesSpotifyStatusKey = "SpotifyServiceGetApiServicesSpotifyStatus";
+export const UseSpotifyServiceGetApiServicesSpotifyStatusKeyFn = (queryKey?: Array<unknown>) => [useSpotifyServiceGetApiServicesSpotifyStatusKey, ...(queryKey ?? [])];
+export type SpotifyServiceGetApiServicesSpotifyUserProfileDefaultResponse = Awaited<ReturnType<typeof SpotifyService.getApiServicesSpotifyUserProfile>>;
+export type SpotifyServiceGetApiServicesSpotifyUserProfileQueryResult<TData = SpotifyServiceGetApiServicesSpotifyUserProfileDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSpotifyServiceGetApiServicesSpotifyUserProfileKey = "SpotifyServiceGetApiServicesSpotifyUserProfile";
+export const UseSpotifyServiceGetApiServicesSpotifyUserProfileKeyFn = (queryKey?: Array<unknown>) => [useSpotifyServiceGetApiServicesSpotifyUserProfileKey, ...(queryKey ?? [])];
+export type SpotifyServiceGetApiServicesSpotifyUserPlaylistsDefaultResponse = Awaited<ReturnType<typeof SpotifyService.getApiServicesSpotifyUserPlaylists>>;
+export type SpotifyServiceGetApiServicesSpotifyUserPlaylistsQueryResult<TData = SpotifyServiceGetApiServicesSpotifyUserPlaylistsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSpotifyServiceGetApiServicesSpotifyUserPlaylistsKey = "SpotifyServiceGetApiServicesSpotifyUserPlaylists";
+export const UseSpotifyServiceGetApiServicesSpotifyUserPlaylistsKeyFn = ({ limit, offset }: {
+  limit?: string;
+  offset?: string;
+} = {}, queryKey?: Array<unknown>) => [useSpotifyServiceGetApiServicesSpotifyUserPlaylistsKey, ...(queryKey ?? [{ limit, offset }])];
+export type SpotifyServiceGetApiServicesSpotifySearchDefaultResponse = Awaited<ReturnType<typeof SpotifyService.getApiServicesSpotifySearch>>;
+export type SpotifyServiceGetApiServicesSpotifySearchQueryResult<TData = SpotifyServiceGetApiServicesSpotifySearchDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSpotifyServiceGetApiServicesSpotifySearchKey = "SpotifyServiceGetApiServicesSpotifySearch";
+export const UseSpotifyServiceGetApiServicesSpotifySearchKeyFn = ({ limit, market, offset, q, type }: {
+  limit?: string;
+  market?: string;
+  offset?: string;
+  q?: string;
+  type?: string;
+} = {}, queryKey?: Array<unknown>) => [useSpotifyServiceGetApiServicesSpotifySearchKey, ...(queryKey ?? [{ limit, market, offset, q, type }])];
+export type SpotifyServiceGetApiServicesSpotifyGenresSeedsDefaultResponse = Awaited<ReturnType<typeof SpotifyService.getApiServicesSpotifyGenresSeeds>>;
+export type SpotifyServiceGetApiServicesSpotifyGenresSeedsQueryResult<TData = SpotifyServiceGetApiServicesSpotifyGenresSeedsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSpotifyServiceGetApiServicesSpotifyGenresSeedsKey = "SpotifyServiceGetApiServicesSpotifyGenresSeeds";
+export const UseSpotifyServiceGetApiServicesSpotifyGenresSeedsKeyFn = (queryKey?: Array<unknown>) => [useSpotifyServiceGetApiServicesSpotifyGenresSeedsKey, ...(queryKey ?? [])];
 export type StreamServiceGetApiStreamSongBySongDirectDefaultResponse = Awaited<ReturnType<typeof StreamService.getApiStreamSongBySongDirect>>;
 export type StreamServiceGetApiStreamSongBySongDirectQueryResult<TData = StreamServiceGetApiStreamSongBySongDirectDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useStreamServiceGetApiStreamSongBySongDirectKey = "StreamServiceGetApiStreamSongBySongDirect";
@@ -385,6 +442,7 @@ export type PasskeyServicePostWebauthnPasskeyMutationResult = Awaited<ReturnType
 export type PasskeyServicePostWebauthnPasskeyRegisterMutationResult = Awaited<ReturnType<typeof PasskeyService.postWebauthnPasskeyRegister>>;
 export type BatchesServicePostHorizonApiBatchesRetryByIdMutationResult = Awaited<ReturnType<typeof BatchesService.postHorizonApiBatchesRetryById>>;
 export type JobServicePostApiJobsScanLibraryBySlugMutationResult = Awaited<ReturnType<typeof JobService.postApiJobsScanLibraryBySlug>>;
+export type LastFmServicePostApiServicesLastfmDisconnectMutationResult = Awaited<ReturnType<typeof LastFmService.postApiServicesLastfmDisconnect>>;
 export type LibraryServicePostApiLibrariesMutationResult = Awaited<ReturnType<typeof LibraryService.postApiLibraries>>;
 export type MonitoringServicePostHorizonApiMonitoringMutationResult = Awaited<ReturnType<typeof MonitoringService.postHorizonApiMonitoring>>;
 export type OpCacheServicePostApiOpcacheClearMutationResult = Awaited<ReturnType<typeof OpCacheService.postApiOpcacheClear>>;
@@ -402,7 +460,9 @@ export type PlaylistServicePostApiPlaylistsSmartMutationResult = Awaited<ReturnT
 export type PlaylistServicePostApiPlaylistsByPlaylistSmartSyncMutationResult = Awaited<ReturnType<typeof PlaylistService.postApiPlaylistsByPlaylistSmartSync>>;
 export type QueueServicePostApiQueueMetricsRetryByIdMutationResult = Awaited<ReturnType<typeof QueueService.postApiQueueMetricsRetryById>>;
 export type RetryServicePostHorizonApiJobsRetryByIdMutationResult = Awaited<ReturnType<typeof RetryService.postHorizonApiJobsRetryById>>;
+export type SpotifyServicePostApiServicesSpotifyDisconnectMutationResult = Awaited<ReturnType<typeof SpotifyService.postApiServicesSpotifyDisconnect>>;
 export type UserServicePostApiUsersMutationResult = Awaited<ReturnType<typeof UserService.postApiUsers>>;
+export type AlbumServicePutApiLibrariesByLibraryAlbumsByAlbumMutationResult = Awaited<ReturnType<typeof AlbumService.putApiLibrariesByLibraryAlbumsByAlbum>>;
 export type PlaylistServicePutApiPlaylistsByPlaylistMutationResult = Awaited<ReturnType<typeof PlaylistService.putApiPlaylistsByPlaylist>>;
 export type PlaylistServicePutApiPlaylistsByPlaylistSmartMutationResult = Awaited<ReturnType<typeof PlaylistService.putApiPlaylistsByPlaylistSmart>>;
 export type GenreServicePatchApiGenresByGenreMutationResult = Awaited<ReturnType<typeof GenreService.patchApiGenresByGenre>>;

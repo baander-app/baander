@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Modules\QueueMonitor\MonitorStatus;
+use App\Modules\Queue\QueueMonitor\MonitorStatus;
 use Carbon\CarbonInterval;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;

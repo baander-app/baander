@@ -3,7 +3,7 @@ import { BarsMode } from '@/modules/equalizer/types.ts';
 import styles from './vfd-display.module.scss';
 import { VfdSpectrumAnalyzer } from '@/modules/equalizer/components/vfd-spectrum.tsx';
 import { VfdChannelAnalyzer } from '@/modules/equalizer/components/vfd-channel-analyzer.tsx';
-import { PlaybackSource } from '@/modules/equalizer/models/playback-source.ts';
+import { PlaybackSource } from '@/models/playback-source.ts';
 
 export interface VfdDisplayProps {
   [key: string]: any;

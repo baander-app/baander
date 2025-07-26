@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { GetApiLibrariesByLibraryAlbumsData, GetApiLibrariesByLibraryAlbumsResponse, GetApiLibrariesByLibraryAlbumsByAlbumData, GetApiLibrariesByLibraryAlbumsByAlbumResponse, GetApiLibrariesByLibraryArtistsData, GetApiLibrariesByLibraryArtistsResponse, GetApiLibrariesByLibraryArtistsByArtistData, GetApiLibrariesByLibraryArtistsByArtistResponse, PostApiAuthLoginData, PostApiAuthLoginResponse, PostApiAuthRefreshTokenResponse, PostApiAuthStreamTokenResponse, PostApiAuthRegisterData, PostApiAuthRegisterResponse, PostApiAuthForgotPasswordData, PostApiAuthForgotPasswordResponse, PostApiAuthResetPasswordData, PostApiAuthResetPasswordResponse, PostApiAuthVerifyByIdByHashData, PostApiAuthVerifyByIdByHashResponse, PostApiAuthLogoutData, PostApiAuthLogoutResponse, GetWebauthnPasskeyResponse, PostWebauthnPasskeyData, PostWebauthnPasskeyResponse, GetWebauthnPasskeyRegisterResponse, PostWebauthnPasskeyRegisterData, PostWebauthnPasskeyRegisterResponse, GetHorizonApiBatchesResponse, GetHorizonApiBatchesByIdData, GetHorizonApiBatchesByIdResponse, PostHorizonApiBatchesRetryByIdData, PostHorizonApiBatchesRetryByIdResponse, GetHorizonApiJobsCompletedData, GetHorizonApiJobsCompletedResponse, GetHorizonApiStatsResponse, GetHorizonApiJobsFailedData, GetHorizonApiJobsFailedResponse, GetHorizonApiJobsFailedByIdData, GetHorizonApiJobsFailedByIdResponse, GetApiGenresData, GetApiGenresResponse, GetApiGenresByGenreData, GetApiGenresByGenreResponse, PatchApiGenresByGenreData, PatchApiGenresByGenreResponse, DeleteApiGenresByGenreData, DeleteApiGenresByGenreResponse, GetApiImagesByImageData, GetApiImagesByImageResponse, PostApiJobsScanLibraryBySlugData, PostApiJobsScanLibraryBySlugResponse, GetHorizonApiMetricsJobsResponse, GetHorizonApiMetricsJobsByIdData, GetHorizonApiMetricsJobsByIdResponse, GetHorizonApiJobsByIdData, GetHorizonApiJobsByIdResponse, GetApiLibrariesData, GetApiLibrariesResponse, PostApiLibrariesData, PostApiLibrariesResponse, GetApiLibrariesBySlugData, GetApiLibrariesBySlugResponse, PatchApiLibrariesBySlugData, PatchApiLibrariesBySlugResponse, DeleteApiLibrariesBySlugData, DeleteApiLibrariesBySlugResponse, GetApiLogsResponse, GetApiLogsByLogFileData, GetApiLogsByLogFileResponse, GetApiLogsByLogFileContentData, GetApiLogsByLogFileContentResponse, GetApiLogsByLogFileLinesData, GetApiLogsByLogFileLinesResponse, GetApiLogsByLogFileSearchData, GetApiLogsByLogFileSearchResponse, GetApiLogsByLogFileTailData, GetApiLogsByLogFileTailResponse, GetApiLogsByLogFileHeadData, GetApiLogsByLogFileHeadResponse, GetApiLogsByLogFileStatsData, GetApiLogsByLogFileStatsResponse, GetApiLogsByLogFileDownloadData, GetApiLogsByLogFileDownloadResponse, GetApiLogsSearchAllData, GetApiLogsSearchAllResponse, GetHorizonApiMastersResponse, GetHorizonApiMonitoringResponse, PostHorizonApiMonitoringResponse, GetHorizonApiMonitoringByTagData, GetHorizonApiMonitoringByTagResponse, DeleteHorizonApiMonitoringByTagData, DeleteHorizonApiMonitoringByTagResponse, GetApiLibrariesByLibraryMoviesData, GetApiLibrariesByLibraryMoviesResponse, GetApiLibrariesByLibraryMoviesByMovieData, GetApiLibrariesByLibraryMoviesByMovieResponse, GetApiOpcacheStatusResponse, GetApiOpcacheConfigResponse, PostApiOpcacheClearResponse, PostApiOpcacheCompileData, PostApiOpcacheCompileResponse, GetHorizonApiJobsPendingData, GetHorizonApiJobsPendingResponse, GetApiPlaylistsResponse, PostApiPlaylistsData, PostApiPlaylistsResponse, GetApiPlaylistsByPlaylistData, GetApiPlaylistsByPlaylistResponse, PutApiPlaylistsByPlaylistData, PutApiPlaylistsByPlaylistResponse, DeleteApiPlaylistsByPlaylistData, DeleteApiPlaylistsByPlaylistResponse, PostApiPlaylistsByPlaylistSongsBySongData, PostApiPlaylistsByPlaylistSongsBySongResponse, DeleteApiPlaylistsByPlaylistSongsBySongData, DeleteApiPlaylistsByPlaylistSongsBySongResponse, PostApiPlaylistsByPlaylistReorderData, PostApiPlaylistsByPlaylistReorderResponse, PostApiPlaylistsByPlaylistCollaboratorsData, PostApiPlaylistsByPlaylistCollaboratorsResponse, DeleteApiPlaylistsByPlaylistCollaboratorsByUserData, DeleteApiPlaylistsByPlaylistCollaboratorsByUserResponse, PostApiPlaylistsByPlaylistCloneData, PostApiPlaylistsByPlaylistCloneResponse, GetApiPlaylistsByPlaylistStatisticsData, GetApiPlaylistsByPlaylistStatisticsResponse, PostApiPlaylistsByPlaylistStatisticsRecordViewData, PostApiPlaylistsByPlaylistStatisticsRecordViewResponse, PostApiPlaylistsByPlaylistStatisticsRecordPlayData, PostApiPlaylistsByPlaylistStatisticsRecordPlayResponse, PostApiPlaylistsByPlaylistStatisticsRecordShareData, PostApiPlaylistsByPlaylistStatisticsRecordShareResponse, PostApiPlaylistsByPlaylistStatisticsRecordFavoriteData, PostApiPlaylistsByPlaylistStatisticsRecordFavoriteResponse, PostApiPlaylistsSmartData, PostApiPlaylistsSmartResponse, PutApiPlaylistsByPlaylistSmartData, PutApiPlaylistsByPlaylistSmartResponse, PostApiPlaylistsByPlaylistSmartSyncData, PostApiPlaylistsByPlaylistSmartSyncResponse, GetApiQueueMetricsData, GetApiQueueMetricsResponse, GetApiQueueMetricsQueuesResponse, GetApiQueueMetricsMetricsData, GetApiQueueMetricsMetricsResponse, PostApiQueueMetricsRetryByIdData, PostApiQueueMetricsRetryByIdResponse, DeleteApiQueueMetricsByIdData, DeleteApiQueueMetricsByIdResponse, DeleteApiQueueMetricsPurgeResponse, GetHorizonApiMetricsQueuesResponse, GetHorizonApiMetricsQueuesByIdData, GetHorizonApiMetricsQueuesByIdResponse, PostHorizonApiJobsRetryByIdData, PostHorizonApiJobsRetryByIdResponse, GetApiSchemasMusicbrainzResponse, GetHorizonApiJobsSilencedData, GetHorizonApiJobsSilencedResponse, GetApiLibrariesByLibrarySongsData, GetApiLibrariesByLibrarySongsResponse, GetApiLibrariesByLibrarySongsByPublicIdData, GetApiLibrariesByLibrarySongsByPublicIdResponse, GetApiStreamSongBySongDirectData, GetApiStreamSongBySongDirectResponse, GetApiSystemInfoResponse, GetApiSystemInfoSysResponse, GetApiUsersData, GetApiUsersResponse, PostApiUsersData, PostApiUsersResponse, PatchApiUsersByUserData, PatchApiUsersByUserResponse, GetApiUsersByUserData, GetApiUsersByUserResponse, DeleteApiUsersByUserData, DeleteApiUsersByUserResponse, GetApiUsersMeResponse, GetApiUsersTokensByUserData, GetApiUsersTokensByUserResponse, DeleteApiUsersTokensByTokenData, DeleteApiUsersTokensByTokenResponse, GetHorizonApiWorkloadResponse } from './types.gen';
+import type { GetApiLibrariesByLibraryAlbumsData, GetApiLibrariesByLibraryAlbumsResponse, GetApiLibrariesByLibraryAlbumsByAlbumData, GetApiLibrariesByLibraryAlbumsByAlbumResponse, PutApiLibrariesByLibraryAlbumsByAlbumData, PutApiLibrariesByLibraryAlbumsByAlbumResponse, GetApiLibrariesByLibraryArtistsData, GetApiLibrariesByLibraryArtistsResponse, GetApiLibrariesByLibraryArtistsByArtistData, GetApiLibrariesByLibraryArtistsByArtistResponse, PostApiAuthLoginData, PostApiAuthLoginResponse, PostApiAuthRefreshTokenResponse, PostApiAuthStreamTokenResponse, PostApiAuthRegisterData, PostApiAuthRegisterResponse, PostApiAuthForgotPasswordData, PostApiAuthForgotPasswordResponse, PostApiAuthResetPasswordData, PostApiAuthResetPasswordResponse, PostApiAuthVerifyByIdByHashData, PostApiAuthVerifyByIdByHashResponse, PostApiAuthLogoutData, PostApiAuthLogoutResponse, GetWebauthnPasskeyResponse, PostWebauthnPasskeyData, PostWebauthnPasskeyResponse, GetWebauthnPasskeyRegisterResponse, PostWebauthnPasskeyRegisterData, PostWebauthnPasskeyRegisterResponse, GetHorizonApiBatchesResponse, GetHorizonApiBatchesByIdData, GetHorizonApiBatchesByIdResponse, PostHorizonApiBatchesRetryByIdData, PostHorizonApiBatchesRetryByIdResponse, GetHorizonApiJobsCompletedData, GetHorizonApiJobsCompletedResponse, GetHorizonApiStatsResponse, GetHorizonApiJobsFailedData, GetHorizonApiJobsFailedResponse, GetHorizonApiJobsFailedByIdData, GetHorizonApiJobsFailedByIdResponse, GetApiGenresData, GetApiGenresResponse, GetApiGenresByGenreData, GetApiGenresByGenreResponse, PatchApiGenresByGenreData, PatchApiGenresByGenreResponse, DeleteApiGenresByGenreData, DeleteApiGenresByGenreResponse, GetApiImagesByImageData, GetApiImagesByImageResponse, PostApiJobsScanLibraryBySlugData, PostApiJobsScanLibraryBySlugResponse, GetHorizonApiMetricsJobsResponse, GetHorizonApiMetricsJobsByIdData, GetHorizonApiMetricsJobsByIdResponse, GetHorizonApiJobsByIdData, GetHorizonApiJobsByIdResponse, GetApiServicesLastfmAuthorizeResponse, GetApiServicesLastfmCallbackData, GetApiServicesLastfmCallbackResponse, PostApiServicesLastfmDisconnectResponse, GetApiServicesLastfmStatusResponse, GetApiLibrariesData, GetApiLibrariesResponse, PostApiLibrariesData, PostApiLibrariesResponse, GetApiLibrariesBySlugData, GetApiLibrariesBySlugResponse, PatchApiLibrariesBySlugData, PatchApiLibrariesBySlugResponse, DeleteApiLibrariesBySlugData, DeleteApiLibrariesBySlugResponse, GetApiLogsResponse, GetApiLogsByLogFileData, GetApiLogsByLogFileResponse, GetApiLogsByLogFileContentData, GetApiLogsByLogFileContentResponse, GetApiLogsByLogFileLinesData, GetApiLogsByLogFileLinesResponse, GetApiLogsByLogFileSearchData, GetApiLogsByLogFileSearchResponse, GetApiLogsByLogFileTailData, GetApiLogsByLogFileTailResponse, GetApiLogsByLogFileHeadData, GetApiLogsByLogFileHeadResponse, GetApiLogsByLogFileStatsData, GetApiLogsByLogFileStatsResponse, GetApiLogsByLogFileDownloadData, GetApiLogsByLogFileDownloadResponse, GetApiLogsSearchAllData, GetApiLogsSearchAllResponse, GetHorizonApiMastersResponse, GetHorizonApiMonitoringResponse, PostHorizonApiMonitoringResponse, GetHorizonApiMonitoringByTagData, GetHorizonApiMonitoringByTagResponse, DeleteHorizonApiMonitoringByTagData, DeleteHorizonApiMonitoringByTagResponse, GetApiLibrariesByLibraryMoviesData, GetApiLibrariesByLibraryMoviesResponse, GetApiLibrariesByLibraryMoviesByMovieData, GetApiLibrariesByLibraryMoviesByMovieResponse, GetApiOpcacheStatusResponse, GetApiOpcacheConfigResponse, PostApiOpcacheClearResponse, PostApiOpcacheCompileData, PostApiOpcacheCompileResponse, GetHorizonApiJobsPendingData, GetHorizonApiJobsPendingResponse, GetApiPlaylistsResponse, PostApiPlaylistsData, PostApiPlaylistsResponse, GetApiPlaylistsByPlaylistData, GetApiPlaylistsByPlaylistResponse, PutApiPlaylistsByPlaylistData, PutApiPlaylistsByPlaylistResponse, DeleteApiPlaylistsByPlaylistData, DeleteApiPlaylistsByPlaylistResponse, PostApiPlaylistsByPlaylistSongsBySongData, PostApiPlaylistsByPlaylistSongsBySongResponse, DeleteApiPlaylistsByPlaylistSongsBySongData, DeleteApiPlaylistsByPlaylistSongsBySongResponse, PostApiPlaylistsByPlaylistReorderData, PostApiPlaylistsByPlaylistReorderResponse, PostApiPlaylistsByPlaylistCollaboratorsData, PostApiPlaylistsByPlaylistCollaboratorsResponse, DeleteApiPlaylistsByPlaylistCollaboratorsByUserData, DeleteApiPlaylistsByPlaylistCollaboratorsByUserResponse, PostApiPlaylistsByPlaylistCloneData, PostApiPlaylistsByPlaylistCloneResponse, GetApiPlaylistsByPlaylistStatisticsData, GetApiPlaylistsByPlaylistStatisticsResponse, PostApiPlaylistsByPlaylistStatisticsRecordViewData, PostApiPlaylistsByPlaylistStatisticsRecordViewResponse, PostApiPlaylistsByPlaylistStatisticsRecordPlayData, PostApiPlaylistsByPlaylistStatisticsRecordPlayResponse, PostApiPlaylistsByPlaylistStatisticsRecordShareData, PostApiPlaylistsByPlaylistStatisticsRecordShareResponse, PostApiPlaylistsByPlaylistStatisticsRecordFavoriteData, PostApiPlaylistsByPlaylistStatisticsRecordFavoriteResponse, PostApiPlaylistsSmartData, PostApiPlaylistsSmartResponse, PutApiPlaylistsByPlaylistSmartData, PutApiPlaylistsByPlaylistSmartResponse, PostApiPlaylistsByPlaylistSmartSyncData, PostApiPlaylistsByPlaylistSmartSyncResponse, GetApiQueueMetricsData, GetApiQueueMetricsResponse, GetApiQueueMetricsQueuesResponse, GetApiQueueMetricsMetricsData, GetApiQueueMetricsMetricsResponse, PostApiQueueMetricsRetryByIdData, PostApiQueueMetricsRetryByIdResponse, DeleteApiQueueMetricsByIdData, DeleteApiQueueMetricsByIdResponse, DeleteApiQueueMetricsPurgeResponse, GetHorizonApiMetricsQueuesResponse, GetHorizonApiMetricsQueuesByIdData, GetHorizonApiMetricsQueuesByIdResponse, PostHorizonApiJobsRetryByIdData, PostHorizonApiJobsRetryByIdResponse, GetApiSchemasMusicbrainzResponse, GetHorizonApiJobsSilencedData, GetHorizonApiJobsSilencedResponse, GetApiLibrariesByLibrarySongsData, GetApiLibrariesByLibrarySongsResponse, GetApiLibrariesByLibrarySongsByPublicIdData, GetApiLibrariesByLibrarySongsByPublicIdResponse, GetApiServicesSpotifyAuthorizeResponse, GetApiServicesSpotifyCallbackData, GetApiServicesSpotifyCallbackResponse, PostApiServicesSpotifyDisconnectResponse, GetApiServicesSpotifyStatusResponse, GetApiServicesSpotifyUserProfileResponse, GetApiServicesSpotifyUserPlaylistsData, GetApiServicesSpotifyUserPlaylistsResponse, GetApiServicesSpotifySearchData, GetApiServicesSpotifySearchResponse, GetApiServicesSpotifyGenresSeedsResponse, GetApiStreamSongBySongDirectData, GetApiStreamSongBySongDirectResponse, GetApiSystemInfoResponse, GetApiSystemInfoSysResponse, GetApiUsersData, GetApiUsersResponse, PostApiUsersData, PostApiUsersResponse, PatchApiUsersByUserData, PatchApiUsersByUserResponse, GetApiUsersByUserData, GetApiUsersByUserResponse, DeleteApiUsersByUserData, DeleteApiUsersByUserResponse, GetApiUsersMeResponse, GetApiUsersTokensByUserData, GetApiUsersTokensByUserResponse, DeleteApiUsersTokensByTokenData, DeleteApiUsersTokensByTokenResponse, GetHorizonApiWorkloadResponse } from './types.gen';
 
 export class AlbumService {
     /**
@@ -59,6 +59,32 @@ export class AlbumService {
             errors: {
                 401: 'Unauthenticated',
                 404: 'Not found'
+            }
+        });
+    }
+    
+    /**
+     * @param data The data for the request.
+     * @param data.library The library slug
+     * @param data.album The album slug
+     * @param data.requestBody
+     * @returns AlbumResource `AlbumResource`
+     * @throws ApiError
+     */
+    public static putApiLibrariesByLibraryAlbumsByAlbum(data: PutApiLibrariesByLibraryAlbumsByAlbumData): CancelablePromise<PutApiLibrariesByLibraryAlbumsByAlbumResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/api/libraries/{library}/albums/{album}',
+            path: {
+                library: data.library,
+                album: data.album
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthenticated',
+                404: 'Not found',
+                422: 'Validation error'
             }
         });
     }
@@ -731,6 +757,76 @@ export class JobsService {
             url: '/-/horizon/api/jobs/{id}',
             path: {
                 id: data.id
+            }
+        });
+    }
+    
+}
+
+export class LastFmService {
+    /**
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static getApiServicesLastfmAuthorize(): CancelablePromise<GetApiServicesLastfmAuthorizeResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/services/lastfm/authorize',
+            errors: {
+                401: 'Unauthenticated',
+                500: ''
+            }
+        });
+    }
+    
+    /**
+     * @param data The data for the request.
+     * @param data.token
+     * @param data.state This is the new token from Last.fm
+     * @param data.nonce
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static getApiServicesLastfmCallback(data: GetApiServicesLastfmCallbackData = {}): CancelablePromise<GetApiServicesLastfmCallbackResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/services/lastfm/callback',
+            query: {
+                token: data.token,
+                state: data.state,
+                nonce: data.nonce
+            },
+            errors: {
+                400: '',
+                500: ''
+            }
+        });
+    }
+    
+    /**
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static postApiServicesLastfmDisconnect(): CancelablePromise<PostApiServicesLastfmDisconnectResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/services/lastfm/disconnect',
+            errors: {
+                401: 'Unauthenticated'
+            }
+        });
+    }
+    
+    /**
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static getApiServicesLastfmStatus(): CancelablePromise<GetApiServicesLastfmStatusResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/services/lastfm/status',
+            errors: {
+                401: 'Unauthenticated'
             }
         });
     }
@@ -2033,6 +2129,157 @@ export class SongService {
                 401: 'Unauthenticated',
                 404: 'Not found',
                 422: 'Validation error'
+            }
+        });
+    }
+    
+}
+
+export class SpotifyService {
+    /**
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static getApiServicesSpotifyAuthorize(): CancelablePromise<GetApiServicesSpotifyAuthorizeResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/services/spotify/authorize',
+            errors: {
+                401: 'Unauthenticated',
+                500: ''
+            }
+        });
+    }
+    
+    /**
+     * @param data The data for the request.
+     * @param data.code
+     * @param data.state
+     * @param data.error
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static getApiServicesSpotifyCallback(data: GetApiServicesSpotifyCallbackData = {}): CancelablePromise<GetApiServicesSpotifyCallbackResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/services/spotify/callback',
+            query: {
+                code: data.code,
+                state: data.state,
+                error: data.error
+            },
+            errors: {
+                400: '',
+                500: ''
+            }
+        });
+    }
+    
+    /**
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static postApiServicesSpotifyDisconnect(): CancelablePromise<PostApiServicesSpotifyDisconnectResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/services/spotify/disconnect',
+            errors: {
+                401: 'Unauthenticated'
+            }
+        });
+    }
+    
+    /**
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static getApiServicesSpotifyStatus(): CancelablePromise<GetApiServicesSpotifyStatusResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/services/spotify/status',
+            errors: {
+                401: 'Unauthenticated'
+            }
+        });
+    }
+    
+    /**
+     * @returns string
+     * @throws ApiError
+     */
+    public static getApiServicesSpotifyUserProfile(): CancelablePromise<GetApiServicesSpotifyUserProfileResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/services/spotify/user/profile',
+            errors: {
+                401: 'Unauthenticated',
+                500: ''
+            }
+        });
+    }
+    
+    /**
+     * @param data The data for the request.
+     * @param data.limit
+     * @param data.offset
+     * @returns string
+     * @throws ApiError
+     */
+    public static getApiServicesSpotifyUserPlaylists(data: GetApiServicesSpotifyUserPlaylistsData = {}): CancelablePromise<GetApiServicesSpotifyUserPlaylistsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/services/spotify/user/playlists',
+            query: {
+                limit: data.limit,
+                offset: data.offset
+            },
+            errors: {
+                401: 'Unauthenticated',
+                500: ''
+            }
+        });
+    }
+    
+    /**
+     * @param data The data for the request.
+     * @param data.q
+     * @param data.type
+     * @param data.limit
+     * @param data.offset
+     * @param data.market
+     * @returns string
+     * @throws ApiError
+     */
+    public static getApiServicesSpotifySearch(data: GetApiServicesSpotifySearchData = {}): CancelablePromise<GetApiServicesSpotifySearchResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/services/spotify/search',
+            query: {
+                q: data.q,
+                type: data.type,
+                limit: data.limit,
+                offset: data.offset,
+                market: data.market
+            },
+            errors: {
+                400: '',
+                401: 'Unauthenticated',
+                500: ''
+            }
+        });
+    }
+    
+    /**
+     * @returns string
+     * @throws ApiError
+     */
+    public static getApiServicesSpotifyGenresSeeds(): CancelablePromise<GetApiServicesSpotifyGenresSeedsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/services/spotify/genres/seeds',
+            errors: {
+                401: 'Unauthenticated',
+                500: ''
             }
         });
     }

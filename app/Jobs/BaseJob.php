@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Modules\QueueMonitor\Concerns\IsMonitored;
+use App\Modules\Queue\QueueMonitor\Concerns\IsMonitored;
 use Illuminate\Bus\Queueable;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;

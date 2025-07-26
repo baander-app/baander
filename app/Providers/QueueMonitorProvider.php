@@ -2,7 +2,7 @@
 
 namespace App\Providers;
 
-use App\Services\QueueMonitorService;
+use App\Modules\Queue\QueueMonitor\QueueMonitorService;
 use Illuminate\Queue\Events\{JobExceptionOccurred, JobFailed, JobProcessed, JobProcessing, JobQueued};
 use Illuminate\Queue\QueueManager;
 use Illuminate\Support\Facades\Event;

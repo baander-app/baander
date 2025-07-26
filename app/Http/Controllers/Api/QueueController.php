@@ -8,11 +8,11 @@ use App\Http\Requests\QueueMonitor\RetryJobRequest;
 use App\Http\Resources\QueueMonitor\QueueMonitorResource;
 use App\Models\QueueMonitor;
 use App\Models\TokenAbility;
-use App\Modules\{Pagination\JsonPaginator};
+use App\Modules\{Http\Pagination\JsonPaginator};
 use App\Modules\Eloquent\BaseBuilder;
 use App\Modules\Http\Resources\Json\JsonAnonymousResourceCollection;
-use App\Modules\QueueMonitor\MonitorStatus;
-use App\Services\QueueMetrics\QueueMetricsService;
+use App\Modules\Queue\QueueMetrics\QueueMetricsService;
+use App\Modules\Queue\QueueMonitor\MonitorStatus;
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Post, Prefix};
 
 #[Prefix('/queue-metrics')]

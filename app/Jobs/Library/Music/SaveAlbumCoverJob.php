@@ -4,10 +4,10 @@ namespace App\Jobs\Library\Music;
 
 use App\Jobs\BaseJob;
 use App\Models\Album;
+use App\Modules\Metadata\MediaMeta\Frame\Apic;
+use App\Modules\Metadata\MediaMeta\MediaMeta;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
-use App\Modules\MediaMeta\Frame\Apic;
-use App\Modules\MediaMeta\MediaMeta;
 use Illuminate\Support\Facades\Log;
 
 class SaveAlbumCoverJob extends BaseJob implements ShouldQueue

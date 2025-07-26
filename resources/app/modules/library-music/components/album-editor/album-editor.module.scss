@@ -1,0 +1,28 @@
+.form {
+  width: 100%;
+  max-width: 600px;
+  padding: 12px;
+}
+
+.selectedBadge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+}
+
+.removeButton {
+  padding: 0;
+  margin: 0;
+  height: 16px;
+  width: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+}

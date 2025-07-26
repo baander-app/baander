@@ -71,13 +71,23 @@ class Song extends BaseModel implements DirectStreamableFile, Recommendable
     public static function getRecommendationConfig(): array
     {
         return [
-            'same_genre' => [
-                'algorithm'       => 'db_relation',
+            'similar_genre'         => [
+                'algorithm'       => 'music_genre',
                 'data_table'      => 'genre_song',
                 'data_field'      => 'song_id',
                 'data_field_type' => self::class,
                 'group_field'     => 'genre_id',
                 'count'           => 10,
+            ],
+            'user_listening_habits' => [
+                'algorithm'           => 'user_listening_habits',
+                'user_activity_table' => 'user_media_activities',
+                'media_field'         => 'user_media_activityable_id',
+                'media_type_field'    => 'user_media_activityable_type',
+                'media_type'          => self::class,
+                'play_count_field'    => 'play_count',
+                'love_field'          => 'love',
+                'count'               => 10,
             ],
         ];
     }
@@ -96,7 +106,7 @@ class Song extends BaseModel implements DirectStreamableFile, Recommendable
 
     public function userMediaActivies()
     {
-        return $this->morphToMany(UserMediaActivity::class, 'userMediaActivityable');
+        return $this->morphToMany(UserMediaActivity::class, 'user_media_activityable');
     }
 
     public function genres()

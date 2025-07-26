@@ -1,5 +1,7 @@
 <?php
 
+$otel = require_once __DIR__ . '/otel_provider.php';
+
 /*
 |--------------------------------------------------------------------------
 | Create The Application
@@ -14,6 +16,7 @@
 $app = new Illuminate\Foundation\Application(
     $_ENV['APP_BASE_PATH'] ?? dirname(__DIR__)
 );
+
 
 /*
 |--------------------------------------------------------------------------

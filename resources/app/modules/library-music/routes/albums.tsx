@@ -5,21 +5,50 @@ import { AlbumDetail } from '@/modules/library-music/components/album-detail/alb
 import { CoverGrid } from '@/modules/library-music/components/cover-grid';
 import { Album } from '@/modules/library-music/components/album';
 import { useAlbumServiceGetApiLibrariesByLibraryAlbums } from '@/api-client/queries';
-import { Box, ContextMenu, Flex, Skeleton } from '@radix-ui/themes';
+import { Box, ContextMenu, Dialog, Flex, Skeleton } from '@radix-ui/themes';
 import { usePathParam } from '@/hooks/use-path-param.ts';
 import { LibraryParams } from '@/modules/library-music/routes/_routes.tsx';
 import { AlbumResource } from '@/api-client/requests';
 import { motion } from 'motion/react';
+import { useDisclosure } from '@/hooks/use-disclosure.ts';
+import { AlbumEditor } from '@/modules/library-music/components/album-editor/album-editor.tsx';
 
-// @ts-expect-error
+
 function AlbumContextMenu({ album }: { album: AlbumResource }) {
+  const [showEditor, editorHandlers] = useDisclosure(false);
+
   return (
-    <ContextMenu.Content>
-      <ContextMenu.Item>Play</ContextMenu.Item>
-      <ContextMenu.Item>Edit</ContextMenu.Item>
-      <ContextMenu.Separator/>
-      <ContextMenu.Item color="red">Delete</ContextMenu.Item>
-    </ContextMenu.Content>
+    <>
+      <ContextMenu.Content>
+        <ContextMenu.Item>Play</ContextMenu.Item>
+        <ContextMenu.Item onClick={() => editorHandlers.toggle()}>Edit</ContextMenu.Item>
+        <ContextMenu.Separator/>
+        <ContextMenu.Item color="red">Delete</ContextMenu.Item>
+      </ContextMenu.Content>
+
+
+      <Dialog.Root open={showEditor} onOpenChange={editorHandlers.toggle}>
+        <Dialog.Content style={{
+          backgroundColor: 'var(--color-background)',
+          border: '1px solid var(--gray-6)',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+          padding: '60px',
+          maxWidth: '650px',
+          width: '100%',
+        }}>
+          <Dialog.Title>Edit Album</Dialog.Title>
+          <Dialog.Description>
+            Make changes to the album information.
+          </Dialog.Description>
+
+          <AlbumEditor album={album} onSubmit={() => {
+            editorHandlers.close();
+          }} librarySlug="muzak" />
+        </Dialog.Content>
+      </Dialog.Root>
+
+    </>
   );
 }
 
@@ -59,11 +88,22 @@ export default function Albums() {
         </CoverGrid>
       </Box>
 
-      <Box display="block" minHeight="300px" minWidth="300px" className={styles.sidebar} mt="2" mr="2">
+
+      <Box
+        display="block"
+        position="sticky"
+        right="8px"
+        top="8px"
+        minHeight="300px"
+        minWidth="300px"
+        className={styles.sidebar}
+        style={{ alignSelf: 'flex-start' }} // Add this for flex containers
+      >
         {showAlbumDetail && (
           <motion.div
+            key={showAlbumDetail}
             layout
-            initial={{ opacity: 0, scale: 0.5 }}
+            initial={{ opacity: 0, scale: 0.3 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{
               duration: 0.3,
@@ -73,6 +113,7 @@ export default function Albums() {
             <AlbumDetail albumSlug={showAlbumDetail}/>
           </motion.div>
         )}
+
       </Box>
     </Flex>
   );

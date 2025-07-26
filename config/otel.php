@@ -1,120 +1,40 @@
 <?php
 
 return [
+    'instrumentation' => [
+        'enabled' => env('OTEL_INSTRUMENTATION_ENABLED', true),
 
-    /**
-     * Enable or disable OpenTelemetry tracing
-     * When disabled, no watchers will be registered and no tracing will occur
-     */
-    'enabled'           => env('OTEL_ENABLED', true),
-
-    /**
-     * The name of the tracer that will be used to create spans.
-     * This is useful for identifying the source of the spans.
-     */
-    'tracer_name'       => env('OTEL_TRACER_NAME', 'overtrue.laravel-open-telemetry'),
-
-    /**
-     * Middleware Configuration
-     */
-    'middleware'        => [
-        /**
-         * Trace ID Middleware Configuration
-         * Used to add X-Trace-Id to response headers
-         */
-        'trace_id' => [
-            'enabled'     => env('OTEL_TRACE_ID_MIDDLEWARE_ENABLED', true),
-            'global'      => env('OTEL_TRACE_ID_MIDDLEWARE_GLOBAL', true),
-            'header_name' => env('OTEL_TRACE_ID_HEADER_NAME', 'X-Trace-Id'),
+        'events' => [
+            'auth'       => env('OTEL_TRACE_AUTH_EVENTS', true),
+            'mail'       => env('OTEL_TRACE_MAIL_EVENTS', true),
+            'queue'      => env('OTEL_TRACE_QUEUE_EVENTS', true),
+            'database'   => env('OTEL_TRACE_DATABASE_EVENTS', true),
+            'routing'    => env('OTEL_TRACE_ROUTING_EVENTS', true),
+            'cache'      => env('OTEL_TRACE_CACHE_EVENTS', true),
+            'filesystem' => env('OTEL_TRACE_FILESYSTEM_EVENTS', true),
+            'security'   => env('OTEL_TRACE_SECURITY_EVENTS', true),
+            'custom'     => env('OTEL_TRACE_CUSTOM_EVENTS', true),
         ],
     ],
 
-    /**
-     * HTTP Client Configuration
-     */
-    'http_client'       => [
-        /**
-         * Global Request Middleware Configuration
-         * Automatically adds OpenTelemetry propagation headers to all HTTP requests
-         */
-        'propagation_middleware' => [
-            'enabled' => env('OTEL_HTTP_CLIENT_PROPAGATION_ENABLED', true),
-        ],
+    'database' => [
+        'trace_all_queries'    => env('OTEL_TRACE_ALL_QUERIES', false),
+        'slow_query_threshold' => env('OTEL_SLOW_QUERY_THRESHOLD', 100), // milliseconds
     ],
 
-    /**
-     * Watchers Configuration
-     *
-     * Available Watcher classes:
-     * - \Overtrue\LaravelOpenTelemetry\Watchers\CacheWatcher::class
-     * - \Overtrue\LaravelOpenTelemetry\Watchers\QueryWatcher::class
-     * - \Overtrue\LaravelOpenTelemetry\Watchers\HttpClientWatcher::class
-     * - \Overtrue\LaravelOpenTelemetry\Watchers\ExceptionWatcher::class
-     * - \Overtrue\LaravelOpenTelemetry\Watchers\AuthenticateWatcher::class
-     * - \Overtrue\LaravelOpenTelemetry\Watchers\EventWatcher::class
-     * - \Overtrue\LaravelOpenTelemetry\Watchers\QueueWatcher::class
-     * - \Overtrue\LaravelOpenTelemetry\Watchers\RedisWatcher::class
-     */
-    'watchers'          => [
-        \Overtrue\LaravelOpenTelemetry\Watchers\CacheWatcher::class,
-        \Overtrue\LaravelOpenTelemetry\Watchers\QueryWatcher::class,
-        \Overtrue\LaravelOpenTelemetry\Watchers\HttpClientWatcher::class, // 已添加智能重复检测，可以同时使用
-        \Overtrue\LaravelOpenTelemetry\Watchers\ExceptionWatcher::class,
-        \Overtrue\LaravelOpenTelemetry\Watchers\AuthenticateWatcher::class,
-        \Overtrue\LaravelOpenTelemetry\Watchers\EventWatcher::class,
-        \Overtrue\LaravelOpenTelemetry\Watchers\QueueWatcher::class,
-        \Overtrue\LaravelOpenTelemetry\Watchers\RedisWatcher::class,
+    'ignored_paths' => [
+        '/health',
+        '/metrics',
+        '/favicon.ico',
+        '/robots.txt',
+        '/_debugbar',
+        '/telescope',
+        '/horizon',
     ],
 
-    /**
-     * Allow to trace requests with specific headers. You can use `*` as wildcard.
-     */
-    'allowed_headers'   => explode(',', env('OTEL_ALLOWED_HEADERS', implode(',', [
-        'referer',
-        'x-*',
-        'accept',
-        'request-id',
-    ]))),
-
-    /**
-     * Sensitive headers will be marked as *** from the span attributes. You can use `*` as wildcard.
-     */
-    'sensitive_headers' => explode(',', env('OTEL_SENSITIVE_HEADERS', implode(',', [
-        'cookie',
-        'authorization',
-        'x-api-key',
-    ]))),
-
-    /**
-     * Ignore paths will not be traced. You can use `*` as wildcard.
-     */
-    'ignore_paths'      => explode(',', env('OTEL_IGNORE_PATHS', implode(',', [
-        '.well-known/*',    // Well-known URIs (RFC 8615)
-        '_debugbar*',       // Laravel Debugbar
-        '_profiler/*',      // Symfony profiler (if used)
-        'admin/health',     // Admin health check
-        'android-chrome-*',
-        'api/health',       // API health check
-        'api/ping',         // API ping
-        'apple-touch-icon.png',
-        'baander-logo.svg',
-        'browserconfig.xml',
-        'favicon.ico',      // Browser favicon requests
-        'health*',          // Health check endpoints
-        'horizon*',         // Laravel Horizon dashboard
-        'internal/*',       // Internal endpoints
-        'manifest.json',
-        'metrics',          // Metrics endpoint
-        'monitoring/*',     // Monitoring endpoints
-        'mstile-*',
-        'ping',             // Simple ping endpoint
-        'robots.txt',       // SEO robots file
-        'safari-pinned-tab.svg',
-        'sitemap.xml',      // SEO sitemap
-        'status',           // Status endpoint
-        'storage/*',
-        'telescope*',       // Laravel Telescope dashboard
-        'up',
-        'vendor/*',
-    ]))),
+    'security' => [
+        'track_failed_logins'       => env('OTEL_TRACK_FAILED_LOGINS', true),
+        'track_rate_limits'         => env('OTEL_TRACK_RATE_LIMITS', true),
+        'track_unauthorized_access' => env('OTEL_TRACK_UNAUTHORIZED_ACCESS', true),
+    ],
 ];

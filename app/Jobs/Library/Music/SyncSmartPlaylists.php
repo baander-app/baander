@@ -4,11 +4,11 @@ namespace App\Jobs\Library\Music;
 
 use App\Jobs\BaseJob;
 use App\Models\Playlist;
-use App\Services\SmartPlaylistService;
+use App\Modules\MediaLibrary\SmartPlaylistService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\{InteractsWithQueue, SerializesModels, Middleware\WithoutOverlapping};
+use Illuminate\Queue\{InteractsWithQueue, Middleware\WithoutOverlapping, SerializesModels};
 
 class SyncSmartPlaylists extends BaseJob implements ShouldQueue
 {

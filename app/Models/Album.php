@@ -9,10 +9,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Overtrue\LaravelVersionable\Versionable;
 use Spatie\Sluggable\{HasSlug, SlugOptions};
+use Spatie\Image\Enums\Fit;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class Album extends BaseModel
+class Album extends BaseModel implements HasMedia
 {
-    use HasFactory, HasLibraryAccess, HasSlug, Versionable;
+    use HasFactory, HasLibraryAccess, HasSlug, Versionable, InteractsWithMedia;
 
     public static array $filterFields = [
         'title',
@@ -56,6 +60,12 @@ class Album extends BaseModel
         return SlugOptions::create()
             ->generateSlugsFrom(['title', 'year'])
             ->saveSlugsTo('slug');
+    }
+
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaCollection('cover')
+            ->withResponsiveImages();
     }
 
     public function getRouteKeyName(): string

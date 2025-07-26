@@ -1,6 +1,6 @@
 <?php
 
-use App\Modules\QueueMonitor\MonitorStatus;
+use App\Modules\Queue\QueueMonitor\MonitorStatus;
 use Illuminate\Database\Migrations\Migration;
 use Tpetry\PostgresqlEnhanced\Schema\Blueprint;
 use Tpetry\PostgresqlEnhanced\Support\Facades\Schema;

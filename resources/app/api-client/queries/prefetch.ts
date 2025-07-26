@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, GenreService, ImageService, JobMetricsService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, MovieService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
+import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, GenreService, ImageService, JobMetricsService, JobsService, LastFmService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, MovieService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, SchemaService, SilencedJobsService, SongService, SpotifyService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
 import * as Common from "./common";
 /**
 * Get a collection of albums
@@ -207,6 +207,29 @@ export const prefetchUseJobMetricsServiceGetHorizonApiMetricsJobsById = (queryCl
 export const prefetchUseJobsServiceGetHorizonApiJobsById = (queryClient: QueryClient, { id }: {
   id: string;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseJobsServiceGetHorizonApiJobsByIdKeyFn({ id }), queryFn: () => JobsService.getHorizonApiJobsById({ id }) });
+/**
+* @returns unknown
+* @throws ApiError
+*/
+export const prefetchUseLastFmServiceGetApiServicesLastfmAuthorize = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseLastFmServiceGetApiServicesLastfmAuthorizeKeyFn(), queryFn: () => LastFmService.getApiServicesLastfmAuthorize() });
+/**
+* @param data The data for the request.
+* @param data.token
+* @param data.state This is the new token from Last.fm
+* @param data.nonce
+* @returns unknown
+* @throws ApiError
+*/
+export const prefetchUseLastFmServiceGetApiServicesLastfmCallback = (queryClient: QueryClient, { nonce, state, token }: {
+  nonce?: string;
+  state?: string;
+  token?: string;
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseLastFmServiceGetApiServicesLastfmCallbackKeyFn({ nonce, state, token }), queryFn: () => LastFmService.getApiServicesLastfmCallback({ nonce, state, token }) });
+/**
+* @returns unknown
+* @throws ApiError
+*/
+export const prefetchUseLastFmServiceGetApiServicesLastfmStatus = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseLastFmServiceGetApiServicesLastfmStatusKeyFn(), queryFn: () => LastFmService.getApiServicesLastfmStatus() });
 /**
 * Get a collection of media libraries
 * @param data The data for the request.
@@ -546,6 +569,67 @@ export const prefetchUseSongServiceGetApiLibrariesByLibrarySongsByPublicId = (qu
   publicId: string;
   relations?: string;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseSongServiceGetApiLibrariesByLibrarySongsByPublicIdKeyFn({ library, publicId, relations }), queryFn: () => SongService.getApiLibrariesByLibrarySongsByPublicId({ library, publicId, relations }) });
+/**
+* @returns unknown
+* @throws ApiError
+*/
+export const prefetchUseSpotifyServiceGetApiServicesSpotifyAuthorize = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSpotifyServiceGetApiServicesSpotifyAuthorizeKeyFn(), queryFn: () => SpotifyService.getApiServicesSpotifyAuthorize() });
+/**
+* @param data The data for the request.
+* @param data.code
+* @param data.state
+* @param data.error
+* @returns unknown
+* @throws ApiError
+*/
+export const prefetchUseSpotifyServiceGetApiServicesSpotifyCallback = (queryClient: QueryClient, { code, error, state }: {
+  code?: string;
+  error?: string;
+  state?: string;
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseSpotifyServiceGetApiServicesSpotifyCallbackKeyFn({ code, error, state }), queryFn: () => SpotifyService.getApiServicesSpotifyCallback({ code, error, state }) });
+/**
+* @returns unknown
+* @throws ApiError
+*/
+export const prefetchUseSpotifyServiceGetApiServicesSpotifyStatus = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSpotifyServiceGetApiServicesSpotifyStatusKeyFn(), queryFn: () => SpotifyService.getApiServicesSpotifyStatus() });
+/**
+* @returns string
+* @throws ApiError
+*/
+export const prefetchUseSpotifyServiceGetApiServicesSpotifyUserProfile = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSpotifyServiceGetApiServicesSpotifyUserProfileKeyFn(), queryFn: () => SpotifyService.getApiServicesSpotifyUserProfile() });
+/**
+* @param data The data for the request.
+* @param data.limit
+* @param data.offset
+* @returns string
+* @throws ApiError
+*/
+export const prefetchUseSpotifyServiceGetApiServicesSpotifyUserPlaylists = (queryClient: QueryClient, { limit, offset }: {
+  limit?: string;
+  offset?: string;
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseSpotifyServiceGetApiServicesSpotifyUserPlaylistsKeyFn({ limit, offset }), queryFn: () => SpotifyService.getApiServicesSpotifyUserPlaylists({ limit, offset }) });
+/**
+* @param data The data for the request.
+* @param data.q
+* @param data.type
+* @param data.limit
+* @param data.offset
+* @param data.market
+* @returns string
+* @throws ApiError
+*/
+export const prefetchUseSpotifyServiceGetApiServicesSpotifySearch = (queryClient: QueryClient, { limit, market, offset, q, type }: {
+  limit?: string;
+  market?: string;
+  offset?: string;
+  q?: string;
+  type?: string;
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseSpotifyServiceGetApiServicesSpotifySearchKeyFn({ limit, market, offset, q, type }), queryFn: () => SpotifyService.getApiServicesSpotifySearch({ limit, market, offset, q, type }) });
+/**
+* @returns string
+* @throws ApiError
+*/
+export const prefetchUseSpotifyServiceGetApiServicesSpotifyGenresSeeds = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSpotifyServiceGetApiServicesSpotifyGenresSeedsKeyFn(), queryFn: () => SpotifyService.getApiServicesSpotifyGenresSeeds() });
 /**
 * Direct stream the song.
 * Requires token with "access-stream"

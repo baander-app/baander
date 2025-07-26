@@ -55,10 +55,10 @@ trait HasRecommendation
      * @param string $recommendationName
      * @return int Number of recommendations generated
      */
-    public static function generateRecommendations(string $recommendationName): int
+    public static function generateRecommendations(string $recommendationName, array $options = []): int
     {
         return App::make(RecommendationService::class)
-            ->generateRecommendations(static::class, $recommendationName);
+            ->generateRecommendations(static::class, $recommendationName, $options);
     }
 
     /**

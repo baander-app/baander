@@ -17,12 +17,6 @@ export function SongList() {
   } = useSongServiceGetApiLibrariesByLibrarySongsInfinite({
     library: libraryParam,
     relations: 'album,artists,album.cover,songs.genres',
-  }, undefined, {
-    // Disable automatic fetching behaviors
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    staleTime: Infinity,
-    enabled: true,
   });
 
   const allSongs = songData ? songData.pages.flatMap((page) => page.data) : [];

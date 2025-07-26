@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { VirtualLogViewer } from './virtual-log-viewer.tsx';
 import { JsonLogLine } from './json-log-line.tsx';
@@ -47,6 +48,7 @@ interface PaginatedLogState {
   hasMoreAfter: boolean;
 }
 
+// Simple Log Display Component (only for very small datasets with no infinite scroll potential)
 const SimpleLogDisplay: React.FC<{
   lines: LogLine[];
   height: number;
@@ -126,7 +128,7 @@ const SimpleLogDisplay: React.FC<{
   );
 };
 
-// Search Results Component - also updated to use JsonLogLine
+// Search Results Component
 const SearchResults: React.FC<{
   results: SearchResult[];
   totalMatches: number;
@@ -239,6 +241,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     }
   );
 
+  // Tail endpoint - ONLY for tail mode
   const {
     data: tailData,
     isLoading: isLoadingTail,
@@ -255,6 +258,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     }
   );
 
+  // Head endpoint - ONLY for head mode
   const {
     data: headData,
     isLoading: isLoadingHead,
@@ -271,6 +275,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     }
   );
 
+  // Search endpoint - ONLY for search mode
   const {
     data: searchData,
     isLoading: isLoadingSearch,
@@ -289,6 +294,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     }
   );
 
+  // Process log data helper
   const processLogData = useCallback((data: any): LogLine[] => {
     if (!data) return [];
 
@@ -324,6 +330,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     return [];
   }, []);
 
+  // Process and update state when data changes
   useEffect(() => {
     const totalLines = linesData?.data?.totalLines || 0;
     let processedLines: LogLine[] = [];
@@ -365,32 +372,34 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     }
   }, [contentData, tailData, headData, linesData, viewMode, processLogData]);
 
-  useEffect(() => {
-    const handleResize = () => {
-      // Trigger a re-render to recalculate viewerHeight
-      setPaginatedState(prev => ({ ...prev }));
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
+  // Load more content - now works for all view modes
   const loadMoreContent = useCallback(async (direction: 'before' | 'after') => {
-    if (isLoadingMore || !logFileId || viewMode !== 'content') return;
+    if (isLoadingMore || !logFileId) return;
 
+    console.log(`🚀 Loading more ${direction} for ${viewMode} mode`);
     setIsLoadingMore(true);
+
     try {
-      const chunkSize = 2000;
-      let afterLine: number;
+      if (viewMode === 'content') {
+        // Content mode uses the content endpoint
+        const chunkSize = 2000;
+        let afterLine: number;
 
-      if (direction === 'after') {
-        afterLine = paginatedState.currentEndLine;
+        if (direction === 'after') {
+          afterLine = paginatedState.currentEndLine;
+        } else {
+          afterLine = Math.max(0, paginatedState.currentStartLine - chunkSize);
+        }
+
+        setCurrentAfterLine(afterLine);
       } else {
-        afterLine = Math.max(0, paginatedState.currentStartLine - chunkSize);
+        // For head/tail modes, we need to refetch with different parameters
+        // This would require extending the API or using the content endpoint
+        console.log(`TODO: Implement infinite scroll for ${viewMode} mode`);
+
+        // For now, we can switch to content mode for infinite scrolling
+        // or implement specific logic for head/tail infinite scroll
       }
-
-      setCurrentAfterLine(afterLine);
-
     } catch (error) {
       console.error('Failed to load more content:', error);
     } finally {
@@ -398,6 +407,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     }
   }, [logFileId, paginatedState, isLoadingMore, viewMode]);
 
+  // Jump to specific line using content endpoint
   const jumpToLine = useCallback((targetLine: number) => {
     if (!logFileId || isLoadingMore || viewMode !== 'content') return;
 
@@ -406,6 +416,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     setCurrentAfterLine(startLine);
   }, [logFileId, isLoadingMore, viewMode]);
 
+  // Determine current loading state
   const isLoading = useMemo(() => {
     switch (viewMode) {
       case 'content': return isLoadingContent;
@@ -416,6 +427,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     }
   }, [viewMode, isLoadingContent, isLoadingTail, isLoadingHead, isLoadingSearch]);
 
+  // Determine current error
   const error = useMemo(() => {
     switch (viewMode) {
       case 'content': return contentError;
@@ -433,6 +445,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     return windowHeight - baseOffset - navigationHeight;
   }, [viewMode]);
 
+  // Render loading state
   if (isLoadingLines || (isLoading && paginatedState.lines.length === 0)) {
     return (
       <Flex justify="center" align="center" style={{ height: `${viewerHeight}px` }}>
@@ -441,10 +454,12 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     );
   }
 
+  // Render error state
   if (error) {
     return <ErrorDisplay error={error} />;
   }
 
+  // Render search results
   if (viewMode === 'search') {
     if (!searchData?.data?.results || searchData.data.results.length === 0) {
       return (
@@ -472,17 +487,35 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     );
   }
 
-  const useVirtualScrolling = viewMode === 'content' && paginatedState.lines.length > 100;
+  // Determine if we should use virtual scrolling
+  // Use virtual scrolling when:
+  // 1. There are more than 20 lines, OR
+  // 2. There's potential for infinite scrolling (hasMoreBefore or hasMoreAfter)
+  const shouldUseVirtualScrolling =
+    paginatedState.lines.length > 20 ||
+    paginatedState.hasMoreBefore ||
+    paginatedState.hasMoreAfter;
+
+  console.log('Rendering decision:', {
+    viewMode,
+    linesCount: paginatedState.lines.length,
+    hasMoreBefore: paginatedState.hasMoreBefore,
+    hasMoreAfter: paginatedState.hasMoreAfter,
+    shouldUseVirtualScrolling
+  });
 
   return (
     <Box>
-      {useVirtualScrolling ? (
+      {shouldUseVirtualScrolling ? (
         <VirtualLogViewer
           logLines={paginatedState.lines}
           height={viewerHeight}
           onLoadMore={loadMoreContent}
           totalLines={paginatedState.totalLines}
           currentStartLine={paginatedState.currentStartLine}
+          hasMoreBefore={paginatedState.hasMoreBefore}
+          hasMoreAfter={paginatedState.hasMoreAfter}
+          isLoading={isLoadingMore}
         />
       ) : (
          <SimpleLogDisplay

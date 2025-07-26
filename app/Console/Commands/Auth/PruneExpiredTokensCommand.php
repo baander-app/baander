@@ -3,7 +3,7 @@
 namespace App\Console\Commands\Auth;
 
 use App\Actions\Tokens\PruneExpiredTokens;
-use App\Services\AuthTokenService;
+use App\Modules\Auth\AccessTokenService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Arr;
 
@@ -28,7 +28,7 @@ class PruneExpiredTokensCommand extends Command
      */
     public function handle()
     {
-        $authTokenManager = app(AuthTokenService::class);
+        $authTokenManager = app(AccessTokenService::class);
         $result = (new PruneExpiredTokens($authTokenManager))->run();
 
         $count = Arr::get($result, 'removed', 0);

@@ -2,12 +2,12 @@
 
 namespace App\Actions\Tokens;
 
-use App\Services\AuthTokenService;
+use App\Modules\Auth\AccessTokenService;
 use JetBrains\PhpStorm\ArrayShape;
 
 class PruneExpiredTokens
 {
-    public function __construct(private readonly AuthTokenService $authTokenManager)
+    public function __construct(private readonly AccessTokenService $authTokenManager)
     {
     }
 

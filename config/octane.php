@@ -35,13 +35,30 @@ return [
     |
     */
 
-    'server' => env('OCTANE_SERVER', 'swoole'),
+    'server'              => env('OCTANE_SERVER', 'swoole'),
+    'termination_timeout' => 30, // Give more time for cleanup
+
 
     'swoole' => [
         'command'          => '/var/www/html/start-swoole-server',
         'show_fatal_error' => env('OCTANE_SHOW_FATAL_ERROR', true),
         'options'          => [
-            'log_file' => storage_path('logs/swoole_http.log'),
+            'log_file'            => storage_path('logs/swoole_http.log'),
+            'log_level'           => 0,
+            'worker_num'          => 5,
+            'task_worker_num'     => 4,  // Increase task workers for telemetry
+            'task_ipc_mode'       => 1,
+            'task_max_request'    => 500,
+            'task_tmpdir'         => storage_path('app/swoole'),
+            'max_request'         => 500,
+            'reload_async'        => true,
+            'max_wait_time'       => 60,
+            'open_tcp_nodelay'    => true,
+            'pid_file'            => storage_path('logs/swoole_http.pid'),
+            'open_cpu_affinity'   => true,
+            'cpu_affinity_ignore' => [0, 1],
+            'open_http2_protocol' => true,
+
         ],
     ],
 
@@ -82,16 +99,16 @@ return [
         ],
 
         RequestHandled::class => [
-            //
         ],
 
         RequestTerminated::class => [
             // FlushUploadedFiles::class,
+            \App\Octane\Listeners\TelemetryFlushListener::class,
         ],
 
         TaskReceived::class => [
             ...Octane::prepareApplicationForNextOperation(),
-            //
+            \App\Octane\TelemetryTaskHandler::class,
         ],
 
         TaskTerminated::class => [
@@ -121,6 +138,7 @@ return [
 
         WorkerStopping::class => [
             CloseMonologHandlers::class,
+            \App\Octane\Listeners\TelemetryShutdownListener::class,
         ],
     ],
 
@@ -155,25 +173,25 @@ return [
     */
 
     'tables' => [
-        'metrics_state:1000' => [
+        'metrics_state:1000'        => [
             'timer_id' => 'int',
-            'running' => 'int',
+            'running'  => 'int',
         ],
         'job_resource_monitor:5000' => [
-            'samples' => 'int',
-            'cpu_avg' => 'float',
-            'memory_avg' => 'float',
-            'cpu_peak' => 'float',
-            'memory_peak' => 'float',
-            'cpu_min' => 'float',
-            'memory_min' => 'float',
-            'started_at' => 'int',
+            'samples'      => 'int',
+            'cpu_avg'      => 'float',
+            'memory_avg'   => 'float',
+            'cpu_peak'     => 'float',
+            'memory_peak'  => 'float',
+            'cpu_min'      => 'float',
+            'memory_min'   => 'float',
+            'started_at'   => 'int',
             'last_updated' => 'int',
-            'last_cpu' => 'float',
-            'last_memory' => 'float',
-            'memory_mb' => 'float',
-            'status' => 'string:20',
-            'finished_at' => 'int',
+            'last_cpu'     => 'float',
+            'last_memory'  => 'float',
+            'memory_mb'    => 'float',
+            'status'       => 'string:20',
+            'finished_at'  => 'int',
         ],
 
     ],

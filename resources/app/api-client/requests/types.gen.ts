@@ -24,6 +24,14 @@ export type AlbumResource = {
     }>;
 };
 
+export type AlbumUpdateRequest = {
+    title: string;
+    year?: number;
+    mbid?: string;
+    discogs_id?: number;
+    genres?: Array<(number)>;
+};
+
 export type AlbumWithoutSongsResource = {
     title: string;
     slug: string;
@@ -111,6 +119,7 @@ export type ForgotPasswordRequest = {
 };
 
 export type GenreResource = {
+    id: number;
     name: string;
     slug: string;
     createdAt: string | null;
@@ -407,6 +416,20 @@ export type GetApiLibrariesByLibraryAlbumsByAlbumData = {
 };
 
 export type GetApiLibrariesByLibraryAlbumsByAlbumResponse = AlbumResource;
+
+export type PutApiLibrariesByLibraryAlbumsByAlbumData = {
+    /**
+     * The album slug
+     */
+    album: string;
+    /**
+     * The library slug
+     */
+    library: string;
+    requestBody: AlbumUpdateRequest;
+};
+
+export type PutApiLibrariesByLibraryAlbumsByAlbumResponse = AlbumResource;
 
 export type GetApiLibrariesByLibraryArtistsData = {
     fields?: string;
@@ -712,6 +735,38 @@ export type GetHorizonApiJobsByIdData = {
 };
 
 export type GetHorizonApiJobsByIdResponse = Array<unknown>;
+
+export type GetApiServicesLastfmAuthorizeResponse = {
+    authUrl: string;
+};
+
+export type GetApiServicesLastfmCallbackData = {
+    nonce?: string;
+    /**
+     * This is the new token from Last.fm
+     */
+    state?: string;
+    token?: string;
+};
+
+export type GetApiServicesLastfmCallbackResponse = {
+    success: boolean;
+};
+
+export type PostApiServicesLastfmDisconnectResponse = {
+    success: boolean;
+};
+
+export type GetApiServicesLastfmStatusResponse = {
+    connected: boolean;
+    username: string;
+    data: string;
+} | {
+    connected: boolean;
+    expired: boolean;
+} | {
+    connected: boolean;
+};
 
 export type GetApiLibrariesData = {
     limit?: number;
@@ -1470,6 +1525,63 @@ export type GetApiLibrariesByLibrarySongsByPublicIdData = {
 
 export type GetApiLibrariesByLibrarySongsByPublicIdResponse = SongResource;
 
+export type GetApiServicesSpotifyAuthorizeResponse = {
+    authUrl: string;
+};
+
+export type GetApiServicesSpotifyCallbackData = {
+    code?: string;
+    error?: string;
+    state?: string;
+};
+
+export type GetApiServicesSpotifyCallbackResponse = {
+    success: boolean;
+};
+
+export type PostApiServicesSpotifyDisconnectResponse = {
+    success: boolean;
+};
+
+export type GetApiServicesSpotifyStatusResponse = {
+    connected: boolean;
+    username: string;
+    data: {
+        spotify_user_id: string;
+        email: string;
+        country: string;
+        followers: string;
+        product: string;
+        images: string;
+    };
+} | {
+    connected: boolean;
+    expired: boolean;
+} | {
+    connected: boolean;
+};
+
+export type GetApiServicesSpotifyUserProfileResponse = string;
+
+export type GetApiServicesSpotifyUserPlaylistsData = {
+    limit?: string;
+    offset?: string;
+};
+
+export type GetApiServicesSpotifyUserPlaylistsResponse = string;
+
+export type GetApiServicesSpotifySearchData = {
+    limit?: string;
+    market?: string;
+    offset?: string;
+    q?: string;
+    type?: string;
+};
+
+export type GetApiServicesSpotifySearchResponse = string;
+
+export type GetApiServicesSpotifyGenresSeedsResponse = string;
+
 export type GetApiStreamSongBySongDirectData = {
     /**
      * The song public id
@@ -1733,6 +1845,48 @@ export type $OpenApiTs = {
                      * Error overview.
                      */
                     message: string;
+                };
+            };
+        };
+        put: {
+            req: PutApiLibrariesByLibraryAlbumsByAlbumData;
+            res: {
+                /**
+                 * `AlbumResource`
+                 */
+                200: AlbumResource;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Not found
+                 */
+                404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                /**
+                 * Validation error
+                 */
+                422: {
+                    /**
+                     * Errors overview.
+                     */
+                    message: string;
+                    /**
+                     * A detailed description of each field that failed validation.
+                     */
+                    errors: {
+                        [key: string]: Array<(string)>;
+                    };
                 };
             };
         };
@@ -2443,6 +2597,94 @@ export type $OpenApiTs = {
             req: GetHorizonApiJobsByIdData;
             res: {
                 200: Array<unknown>;
+            };
+        };
+    };
+    '/api/services/lastfm/authorize': {
+        get: {
+            res: {
+                200: {
+                    authUrl: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                500: {
+                    error: 'Failed to get Last.fm token';
+                };
+            };
+        };
+    };
+    '/api/services/lastfm/callback': {
+        get: {
+            req: GetApiServicesLastfmCallbackData;
+            res: {
+                200: {
+                    success: boolean;
+                };
+                400: {
+    error: 'IP address mismatch';
+} | {
+    error: 'User agent mismatch';
+} | {
+    error: 'Invalid nonce';
+} | {
+    error: 'Invalid, expired, or already used authorization state';
+} | {
+    error: 'Missing required parameters';
+};
+                500: {
+                    error: 'Failed to get Last.fm session';
+                };
+            };
+        };
+    };
+    '/api/services/lastfm/disconnect': {
+        post: {
+            res: {
+                200: {
+                    success: boolean;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/services/lastfm/status': {
+        get: {
+            res: {
+                200: {
+    connected: boolean;
+    username: string;
+    data: string;
+} | {
+    connected: boolean;
+    expired: boolean;
+} | {
+    connected: boolean;
+};
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
             };
         };
     };
@@ -4433,6 +4675,184 @@ export type $OpenApiTs = {
                     errors: {
                         [key: string]: Array<(string)>;
                     };
+                };
+            };
+        };
+    };
+    '/api/services/spotify/authorize': {
+        get: {
+            res: {
+                200: {
+                    authUrl: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                500: {
+                    error: 'Spotify client ID not configured';
+                };
+            };
+        };
+    };
+    '/api/services/spotify/callback': {
+        get: {
+            req: GetApiServicesSpotifyCallbackData;
+            res: {
+                200: {
+                    success: boolean;
+                };
+                400: {
+    error: 'IP address mismatch';
+} | {
+    error: 'User agent mismatch';
+} | {
+    error: 'Invalid, expired, or already used authorization state';
+} | {
+    error: 'Missing required parameters';
+} | {
+    error: string;
+};
+                500: {
+    error: 'Failed to connect to Spotify';
+} | {
+    error: 'Failed to get access token';
+};
+            };
+        };
+    };
+    '/api/services/spotify/disconnect': {
+        post: {
+            res: {
+                200: {
+                    success: boolean;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/services/spotify/status': {
+        get: {
+            res: {
+                200: {
+    connected: boolean;
+    username: string;
+    data: {
+        spotify_user_id: string;
+        email: string;
+        country: string;
+        followers: string;
+        product: string;
+        images: string;
+    };
+} | {
+    connected: boolean;
+    expired: boolean;
+} | {
+    connected: boolean;
+};
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/services/spotify/user/profile': {
+        get: {
+            res: {
+                200: string;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                500: {
+                    error: 'Failed to get user profile';
+                };
+            };
+        };
+    };
+    '/api/services/spotify/user/playlists': {
+        get: {
+            req: GetApiServicesSpotifyUserPlaylistsData;
+            res: {
+                200: string;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                500: {
+                    error: 'Failed to get playlists';
+                };
+            };
+        };
+    };
+    '/api/services/spotify/search': {
+        get: {
+            req: GetApiServicesSpotifySearchData;
+            res: {
+                200: string;
+                400: {
+                    error: 'Query parameter is required';
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                500: {
+                    error: 'Search failed';
+                };
+            };
+        };
+    };
+    '/api/services/spotify/genres/seeds': {
+        get: {
+            res: {
+                200: string;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+                500: {
+                    error: 'Failed to get genre seeds';
                 };
             };
         };

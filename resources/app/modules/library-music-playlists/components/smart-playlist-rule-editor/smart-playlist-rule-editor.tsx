@@ -125,20 +125,20 @@ function AutocompleteField({ placeholder, value, onChange, suggestions, loading 
 }
 
 export type SmartPlaylistFormData = {
-  ruleGroups: RuleGroup[];
+  rules: RuleGroup[];
 };
 
 type SmartPlaylistRuleEditorProps = {
-  control: Control<SmartPlaylistFormData>;
-  name: 'ruleGroups' | `ruleGroups.${number}`;
-  errors?: FieldErrors<SmartPlaylistFormData>;
+  control: Control<any>;
+  name: 'rules' | `rules.${number}`;
+  errors?: FieldErrors<any>;
 };
 
 export function SmartPlaylistRuleEditor({ control, name, errors }: SmartPlaylistRuleEditorProps) {
   // Initialize rule groups if they don't exist
   const { fields: ruleGroups, append: appendRuleGroup, remove: removeRuleGroup } = useFieldArray({
     control,
-    name: 'ruleGroups',
+    name,
   });
 
   if (ruleGroups.length === 0) {
@@ -164,7 +164,7 @@ export function SmartPlaylistRuleEditor({ control, name, errors }: SmartPlaylist
           {groupIndex > 0 && (
             <Flex justify="center" mb="2">
               <Controller
-                name={`ruleGroups.${groupIndex}.operator`}
+                name={`${name}.${groupIndex}.operator`}
                 control={control}
                 render={({ field }) => (
                   <Select.Root
@@ -184,7 +184,7 @@ export function SmartPlaylistRuleEditor({ control, name, errors }: SmartPlaylist
             </Flex>
           )}
 
-          <Flex justify="space-between" align="center">
+          <Flex justify="between" align="center">
             <h4 className={styles.ruleGroupTitle}>
               {groupIndex === 0 ? 'Match the following rules:' : 'Also match:'}
             </h4>
@@ -202,8 +202,8 @@ export function SmartPlaylistRuleEditor({ control, name, errors }: SmartPlaylist
 
           <RuleEditor 
             control={control}
-            name={`ruleGroups.${groupIndex}.rules`} 
-            errors={errors?.ruleGroups?.[groupIndex]?.rules} 
+            name={`${name}.${groupIndex}.rules`} 
+            errors={errors?.rules?.[groupIndex]?.rules} 
           />
         </div>
       ))}
@@ -219,7 +219,7 @@ export function SmartPlaylistRuleEditor({ control, name, errors }: SmartPlaylist
 
 type RuleEditorProps = {
   control: Control<SmartPlaylistFormData>;
-  name: `ruleGroups.${number}.rules`;
+  name: string; // Using string to allow for dynamic paths
   errors?: any; // Using any temporarily to fix type issues
 };
 

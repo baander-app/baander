@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { SongResource } from '@/api-client/requests';
-import { PlaybackSource } from '@/modules/equalizer/models/playback-source.ts';
+import { PlaybackSource } from '@/models/playback-source.ts';
 
 interface MusicPlayerSlice {
   queue: SongResource[];
@@ -17,12 +17,18 @@ interface MusicPlayerSlice {
   volume: {
     level: number;
     isMuted: boolean;
+    normalization: {
+      enabled: boolean;
+      targetLufs: number; // Target loudness in LUFS
+      currentGain: number; // Current normalization gain in dB
+    };
   };
   analysis: {
     leftChannel: number;
     rightChannel: number;
     frequencies: number[];
     bufferSize: number;
+    lufs: number; // Integrated loudness measurement
   };
   lyrics: {
     offsetMs: number;
@@ -44,12 +50,18 @@ const initialState: MusicPlayerSlice = {
   volume: {
     level: 100,
     isMuted: false,
+    normalization: {
+      enabled: false,
+      targetLufs: -14.0, // Standard streaming platform target
+      currentGain: 0,
+    },
   },
   analysis: {
     leftChannel: 0,
     rightChannel: 0,
     frequencies: [],
     bufferSize: 0,
+    lufs: 0,
   },
   lyrics: {
     offsetMs: -150,
@@ -138,6 +150,18 @@ export const musicPlayerSlice = createSlice({
     setLyricsOffset: (state, action: PayloadAction<{ ms: number }>) => {
       state.lyrics.offsetMs = action.payload.ms;
     },
+    setVolumeNormalization: (state, action: PayloadAction<boolean>) => {
+      state.volume.normalization.enabled = action.payload;
+    },
+    setTargetLufs: (state, action: PayloadAction<number>) => {
+      state.volume.normalization.targetLufs = action.payload;
+    },
+    setNormalizationGain: (state, action: PayloadAction<number>) => {
+      state.volume.normalization.currentGain = action.payload;
+    },
+    setLufs: (state, action: PayloadAction<number>) => {
+      state.analysis.lufs = action.payload;
+    },
   },
   selectors: {
     selectSong: (sliceState) =>
@@ -167,6 +191,10 @@ export const {
   setFrequencies,
   setBufferSize,
   setLyricsOffset,
+  setVolumeNormalization,
+  setTargetLufs,
+  setNormalizationGain,
+  setLufs,
 } = musicPlayerSlice.actions;
 
 export const {

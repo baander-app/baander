@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Modules\DeviceDetector\Device;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
@@ -201,30 +200,13 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
     ])]
     public static function prepareDeviceFromRequest(Request $request): array
     {
-        $deviceDetector = Device::detectRequest($request);
-
-        $osName = $deviceDetector->getOs('name');
-        if ($osName === 'UNK') {
-            $osName = null;
-        }
-        $osVersion = $deviceDetector->getOs('version');
-        if ($osVersion === 'UNK') {
-            $osVersion = null;
-        }
-
-        if ($osName === 'Windows' && $osVersion === '10') {
-            $osVersion = '>=10';
-        }
-
-        $deviceName = $deviceDetector->getDeviceName();
-
         return [
             'user_agent'              => $request->userAgent(),
-            'client_type'             => $deviceDetector->getClient('type'),
-            'client_name'             => $deviceDetector->getClient('name'),
-            'client_version'          => $deviceDetector->getClient('version'),
-            'device_operating_system' => $osName || $osVersion ? implode('|', [$osName, $osVersion]) : null,
-            'device_name'             => $deviceName ?: null,
+            'client_type'             => '',
+            'client_name'             => '',
+            'client_version'          => '',
+            'device_operating_system' =>  null,
+            'device_name'             =>   null,
         ];
     }
 

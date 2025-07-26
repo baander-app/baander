@@ -10,7 +10,15 @@ return [
     'tastedive' => [
         'api_key' => env('TASTE_DIVE_API_KEY'),
     ],
-    'discogs' => [
+    'discogs'   => [
         'api_key' => env('DISCOGS_API_KEY'),
-    ]
+    ],
+    'lastfm'    => [
+        'key'    => env('LASTFM_API_KEY'),
+        'secret' => env('LASTFM_SECRET'),
+    ],
+    'spotify'   => [
+        'client_id' => env('SPOTIFY_CLIENT_ID'),
+        'secret'    => env('SPOTIFY_SECRET'),
+    ],
 ];

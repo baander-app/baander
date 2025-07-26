@@ -40,19 +40,23 @@ services:
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     environment:
-      - OTEL_PHP_AUTOLOAD_ENABLED=true
+      - OTEL_PHP_AUTOLOAD_ENABLED=false
+      - OTEL_ENABLED=true
+      - OTEL_EXPORTER_OTLP_INSECURE=true
+      - OTEL_EXPORTER_OTLP_TIMEOUT=30
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.juul.localdomain
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://otel.juul.localdomain/v1/traces
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_EXPORTER_OTLP_TIMEOUT=30
+      - OTEL_PROPAGATORS=tracecontext,baggage
       - OTEL_SERVICE_NAME=baander-backend
       - OTEL_SERVICE_VERSION=1.0.0
-      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_LOGS_PROCESSOR=batch
       - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_TRACES_PROCESSOR=batch
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_PROCESSOR=batch
       - OTEL_METRICS_EXPORTER=otlp
-      - OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.juul.localdomain
-      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
-      - OTEL_EXPORTER_OTLP_HEADERS=Authorization=5be74f1d-4708-4f92-a19b-888ff10083f6
-      - OTEL_PROPAGATORS=tracecontext,baggage
-      - OTEL_TRACE_ID_MIDDLEWARE_ENABLED=true
-      - OTEL_TRACE_ID_MIDDLEWARE_GLOBAL=true
-      - OTEL_HTTP_CLIENT_PROPAGATION_ENABLED=true
     volumes:
       - /mnt/c/baander-library:/storage/baander-library
       - ./:/var/www/html:cached

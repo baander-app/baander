@@ -15,7 +15,6 @@ import styles from './app.module.scss';
 import { removeToast } from '@/store/notifications/notifications-slice.ts';
 import { Iconify } from './ui/icons/iconify';
 import { useEffect } from 'react';
-import HyperDX from '@hyperdx/browser';
 
 // Instrument the main app component
 const App = () => {
@@ -26,10 +25,6 @@ const App = () => {
 
   useEffect(() => {
     if (user) {
-      HyperDX.setGlobalAttributes({
-        userName: user.name,
-        userEmail: user.email,
-      })
     }
   }, [user]);
 
@@ -52,7 +47,7 @@ const App = () => {
 
           <ReactQueryDevtools/>
 
-          <Toast.Root></Toast.Root>
+          {/*<Toast.Root style={{ pointerEvents: 'none' }} />*/}
         </MusicSourceProvider>
 
         {toasts.map((toast) => (

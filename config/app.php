@@ -172,7 +172,6 @@ return [
         /*
          * Package Service Providers...
          */
-        App\Modules\DeviceDetector\DeviceDetectorServiceProvider::class,
         App\Modules\Nanoid\NanoIdServiceProvider::class,
         App\Modules\BlurHash\BlurHashServiceProvider::class,
         App\Providers\FortifyServiceProvider::class,
@@ -181,12 +180,15 @@ return [
          * Application Service Providers...
          */
         App\Providers\AppServiceProvider::class,
-        App\Providers\LogConfigurationServiceProvider::class,
+        App\Modules\OpenTelemetry\OpenTelemetryServiceProvider::class,
+        App\Modules\OpenTelemetry\Instrumentation\LaravelInstrumentation::class,
         App\Providers\AuthServiceProvider::class,
         App\Providers\BroadcastServiceProvider::class,
         App\Providers\EventServiceProvider::class,
         App\Providers\QueueMonitorProvider::class,
         App\Providers\HorizonServiceProvider::class,
+        App\Providers\IntegrationsServiceProvider::class,
+        App\Providers\MetadataServiceProvider::class,
         App\Providers\RouteServiceProvider::class,
         App\Providers\ScrambleServiceProvider::class,
         App\Providers\RecommendationServiceProvider::class,
@@ -206,4 +208,5 @@ return [
     'aliases' => Facade::defaultAliases()->merge([
     ])->toArray(),
 
+    'otel_enabled' => env('OTEL_ENABLED', true),
 ];

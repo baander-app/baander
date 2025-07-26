@@ -2,7 +2,7 @@
 
 namespace App\Jobs\Auth;
 
-use App\Services\AuthTokenService;
+use App\Modules\Auth\AccessTokenService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -30,7 +30,7 @@ class RevokeTokenJob implements ShouldQueue
      */
     public function handle(): void
     {
-        $service = app(AuthTokenService::class);
+        $service = app(AccessTokenService::class);
 
         if (!$service->revokeToken($this->token)) {
             $this->fail('Unable to revoke token.');

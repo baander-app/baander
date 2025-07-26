@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use App\Auth\Role;
-use App\Modules\Webauthn\Concerns\HasPasskeys;
+use App\Modules\Auth\Webauthn\Concerns\HasPasskeys;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -94,6 +94,72 @@ class User extends Authenticatable implements HasPasskeys
     {
         return $this->hasRole(Role::Admin->value);
     }
+
+    public function thirdPartyCredentials(): HasMany
+    {
+        return $this->hasMany(ThirdPartyCredential::class);
+    }
+
+    public function getThirdPartyCredential(string $provider): ?ThirdPartyCredential
+    {
+        return $this->thirdPartyCredentials()
+            ->forProvider($provider)
+            ->valid()
+            ->first();
+    }
+
+    public function hasValidCredential(string $provider): bool
+    {
+        return $this->getThirdPartyCredential($provider) !== null;
+    }
+
+    // Provider-specific helpers
+    public function getLastFmCredential(): ?ThirdPartyCredential
+    {
+        return $this->getThirdPartyCredential('lastfm');
+    }
+
+    public function getSpotifyCredential(): ?ThirdPartyCredential
+    {
+        return $this->getThirdPartyCredential('spotify');
+    }
+
+    public function getDiscogsCredential(): ?ThirdPartyCredential
+    {
+        return $this->getThirdPartyCredential('discogs');
+    }
+
+    public function getMusicBrainzCredential(): ?ThirdPartyCredential
+    {
+        return $this->getThirdPartyCredential('musicbrainz');
+    }
+
+    // Helper methods for common operations
+    public function getConnectedProviders(): array
+    {
+        return $this->thirdPartyCredentials()
+            ->valid()
+            ->pluck('provider')
+            ->toArray();
+    }
+
+    public function isConnectedTo(string $provider): bool
+    {
+        return in_array($provider, $this->getConnectedProviders());
+    }
+
+    public function getProviderUsername(string $provider): ?string
+    {
+        $credential = $this->getThirdPartyCredential($provider);
+        return $credential?->getProviderUsername();
+    }
+
+    public function getProviderMeta(string $provider, string $key, $default = null)
+    {
+        $credential = $this->getThirdPartyCredential($provider);
+        return $credential?->getMeta($key, $default);
+    }
+
 
     public function accessibleLibraries()
     {

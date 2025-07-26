@@ -3,6 +3,7 @@
 namespace App\Console\Commands\Recommendations;
 
 use App\Models\Song;
+use App\Models\User;
 use Illuminate\Console\Command;
 
 class SynchronizeRecommendationsCommand extends Command
@@ -26,6 +27,6 @@ class SynchronizeRecommendationsCommand extends Command
      */
     public function handle()
     {
-        Song::generateRecommendations('same_genre');
+        Song::generateRecommendations('similar_genre', ['user_id' => User::first()->id]);
     }
 }

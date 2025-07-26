@@ -93,9 +93,9 @@ DESCRIPTION
     ],
 
     'extensions' => [
-        \App\Modules\OpenApi\JsonPaginatorExtension::class,
-        \App\Modules\OpenApi\LaravelDataRequestExtension::class,
-        \App\Modules\OpenApi\LaravelDataToSchema::class,
-        \App\Modules\OpenApi\LaravelDataCollectionExtension::class,
+        \App\Modules\Http\OpenApi\JsonPaginatorExtension::class,
+        \App\Modules\Http\OpenApi\LaravelDataRequestExtension::class,
+        \App\Modules\Http\OpenApi\LaravelDataToSchema::class,
+        \App\Modules\Http\OpenApi\LaravelDataCollectionExtension::class,
     ],
 ];

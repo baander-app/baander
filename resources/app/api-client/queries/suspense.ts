@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryOptions, useSuspenseQuery } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, GenreService, ImageService, JobMetricsService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, MovieService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
+import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, GenreService, ImageService, JobMetricsService, JobsService, LastFmService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, MovieService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, SchemaService, SilencedJobsService, SongService, SpotifyService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
 import * as Common from "./common";
 /**
 * Get a collection of albums
@@ -207,6 +207,29 @@ export const useJobMetricsServiceGetHorizonApiMetricsJobsByIdSuspense = <TData =
 export const useJobsServiceGetHorizonApiJobsByIdSuspense = <TData = Common.JobsServiceGetHorizonApiJobsByIdDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ id }: {
   id: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseJobsServiceGetHorizonApiJobsByIdKeyFn({ id }, queryKey), queryFn: () => JobsService.getHorizonApiJobsById({ id }) as TData, ...options });
+/**
+* @returns unknown
+* @throws ApiError
+*/
+export const useLastFmServiceGetApiServicesLastfmAuthorizeSuspense = <TData = Common.LastFmServiceGetApiServicesLastfmAuthorizeDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseLastFmServiceGetApiServicesLastfmAuthorizeKeyFn(queryKey), queryFn: () => LastFmService.getApiServicesLastfmAuthorize() as TData, ...options });
+/**
+* @param data The data for the request.
+* @param data.token
+* @param data.state This is the new token from Last.fm
+* @param data.nonce
+* @returns unknown
+* @throws ApiError
+*/
+export const useLastFmServiceGetApiServicesLastfmCallbackSuspense = <TData = Common.LastFmServiceGetApiServicesLastfmCallbackDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ nonce, state, token }: {
+  nonce?: string;
+  state?: string;
+  token?: string;
+} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseLastFmServiceGetApiServicesLastfmCallbackKeyFn({ nonce, state, token }, queryKey), queryFn: () => LastFmService.getApiServicesLastfmCallback({ nonce, state, token }) as TData, ...options });
+/**
+* @returns unknown
+* @throws ApiError
+*/
+export const useLastFmServiceGetApiServicesLastfmStatusSuspense = <TData = Common.LastFmServiceGetApiServicesLastfmStatusDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseLastFmServiceGetApiServicesLastfmStatusKeyFn(queryKey), queryFn: () => LastFmService.getApiServicesLastfmStatus() as TData, ...options });
 /**
 * Get a collection of media libraries
 * @param data The data for the request.
@@ -546,6 +569,67 @@ export const useSongServiceGetApiLibrariesByLibrarySongsByPublicIdSuspense = <TD
   publicId: string;
   relations?: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseSongServiceGetApiLibrariesByLibrarySongsByPublicIdKeyFn({ library, publicId, relations }, queryKey), queryFn: () => SongService.getApiLibrariesByLibrarySongsByPublicId({ library, publicId, relations }) as TData, ...options });
+/**
+* @returns unknown
+* @throws ApiError
+*/
+export const useSpotifyServiceGetApiServicesSpotifyAuthorizeSuspense = <TData = Common.SpotifyServiceGetApiServicesSpotifyAuthorizeDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseSpotifyServiceGetApiServicesSpotifyAuthorizeKeyFn(queryKey), queryFn: () => SpotifyService.getApiServicesSpotifyAuthorize() as TData, ...options });
+/**
+* @param data The data for the request.
+* @param data.code
+* @param data.state
+* @param data.error
+* @returns unknown
+* @throws ApiError
+*/
+export const useSpotifyServiceGetApiServicesSpotifyCallbackSuspense = <TData = Common.SpotifyServiceGetApiServicesSpotifyCallbackDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ code, error, state }: {
+  code?: string;
+  error?: string;
+  state?: string;
+} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseSpotifyServiceGetApiServicesSpotifyCallbackKeyFn({ code, error, state }, queryKey), queryFn: () => SpotifyService.getApiServicesSpotifyCallback({ code, error, state }) as TData, ...options });
+/**
+* @returns unknown
+* @throws ApiError
+*/
+export const useSpotifyServiceGetApiServicesSpotifyStatusSuspense = <TData = Common.SpotifyServiceGetApiServicesSpotifyStatusDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseSpotifyServiceGetApiServicesSpotifyStatusKeyFn(queryKey), queryFn: () => SpotifyService.getApiServicesSpotifyStatus() as TData, ...options });
+/**
+* @returns string
+* @throws ApiError
+*/
+export const useSpotifyServiceGetApiServicesSpotifyUserProfileSuspense = <TData = Common.SpotifyServiceGetApiServicesSpotifyUserProfileDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseSpotifyServiceGetApiServicesSpotifyUserProfileKeyFn(queryKey), queryFn: () => SpotifyService.getApiServicesSpotifyUserProfile() as TData, ...options });
+/**
+* @param data The data for the request.
+* @param data.limit
+* @param data.offset
+* @returns string
+* @throws ApiError
+*/
+export const useSpotifyServiceGetApiServicesSpotifyUserPlaylistsSuspense = <TData = Common.SpotifyServiceGetApiServicesSpotifyUserPlaylistsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, offset }: {
+  limit?: string;
+  offset?: string;
+} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseSpotifyServiceGetApiServicesSpotifyUserPlaylistsKeyFn({ limit, offset }, queryKey), queryFn: () => SpotifyService.getApiServicesSpotifyUserPlaylists({ limit, offset }) as TData, ...options });
+/**
+* @param data The data for the request.
+* @param data.q
+* @param data.type
+* @param data.limit
+* @param data.offset
+* @param data.market
+* @returns string
+* @throws ApiError
+*/
+export const useSpotifyServiceGetApiServicesSpotifySearchSuspense = <TData = Common.SpotifyServiceGetApiServicesSpotifySearchDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, market, offset, q, type }: {
+  limit?: string;
+  market?: string;
+  offset?: string;
+  q?: string;
+  type?: string;
+} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseSpotifyServiceGetApiServicesSpotifySearchKeyFn({ limit, market, offset, q, type }, queryKey), queryFn: () => SpotifyService.getApiServicesSpotifySearch({ limit, market, offset, q, type }) as TData, ...options });
+/**
+* @returns string
+* @throws ApiError
+*/
+export const useSpotifyServiceGetApiServicesSpotifyGenresSeedsSuspense = <TData = Common.SpotifyServiceGetApiServicesSpotifyGenresSeedsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseSpotifyServiceGetApiServicesSpotifyGenresSeedsKeyFn(queryKey), queryFn: () => SpotifyService.getApiServicesSpotifyGenresSeeds() as TData, ...options });
 /**
 * Direct stream the song.
 * Requires token with "access-stream"

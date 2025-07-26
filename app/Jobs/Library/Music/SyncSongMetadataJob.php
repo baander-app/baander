@@ -4,7 +4,7 @@ namespace App\Jobs\Library\Music;
 
 use App\Jobs\BaseJob;
 use App\Models\Song;
-use App\Services\Metadata\MetadataSyncService;
+use App\Modules\Metadata\MetadataSyncService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;

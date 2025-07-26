@@ -1,8 +1,8 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { useMutation, UseMutationOptions, useQuery, UseQueryOptions } from "@tanstack/react-query";
-import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, GenreService, ImageService, JobMetricsService, JobService, JobsService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, MovieService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, RetryService, SchemaService, SilencedJobsService, SongService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
-import { AuthenticateUsingPasskeyRequest, CreateLibraryRequest, CreatePlaylistRequest, CreateSmartPlaylistRequest, CreateUserRequest, ForgotPasswordRequest, LoginRequest, LogoutRequest, RegisterRequest, ResetPasswordRequest, RetryJobRequest, StorePasskeyRequest, UpdateGenreRequest, UpdateLibraryRequest, UpdatePlaylistRequest, UpdateSmartPlaylistRulesRequest, UpdateUserRequest } from "../requests/types.gen";
+import { AlbumService, ArtistService, AuthService, BatchesService, CompletedJobsService, DashboardStatsService, FailedJobsService, GenreService, ImageService, JobMetricsService, JobService, JobsService, LastFmService, LibraryService, LogsService, MasterSupervisorService, MonitoringService, MovieService, OpCacheService, PasskeyService, PendingJobsService, PlaylistService, QueueMetricsService, QueueService, RetryService, SchemaService, SilencedJobsService, SongService, SpotifyService, StreamService, SystemInfoService, UserService, UserTokenService, WorkloadService } from "../requests/services.gen";
+import { AlbumUpdateRequest, AuthenticateUsingPasskeyRequest, CreateLibraryRequest, CreatePlaylistRequest, CreateSmartPlaylistRequest, CreateUserRequest, ForgotPasswordRequest, LoginRequest, LogoutRequest, RegisterRequest, ResetPasswordRequest, RetryJobRequest, StorePasskeyRequest, UpdateGenreRequest, UpdateLibraryRequest, UpdatePlaylistRequest, UpdateSmartPlaylistRulesRequest, UpdateUserRequest } from "../requests/types.gen";
 import * as Common from "./common";
 /**
 * Get a collection of albums
@@ -208,6 +208,29 @@ export const useJobMetricsServiceGetHorizonApiMetricsJobsById = <TData = Common.
 export const useJobsServiceGetHorizonApiJobsById = <TData = Common.JobsServiceGetHorizonApiJobsByIdDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ id }: {
   id: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseJobsServiceGetHorizonApiJobsByIdKeyFn({ id }, queryKey), queryFn: () => JobsService.getHorizonApiJobsById({ id }) as TData, ...options });
+/**
+* @returns unknown
+* @throws ApiError
+*/
+export const useLastFmServiceGetApiServicesLastfmAuthorize = <TData = Common.LastFmServiceGetApiServicesLastfmAuthorizeDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLastFmServiceGetApiServicesLastfmAuthorizeKeyFn(queryKey), queryFn: () => LastFmService.getApiServicesLastfmAuthorize() as TData, ...options });
+/**
+* @param data The data for the request.
+* @param data.token
+* @param data.state This is the new token from Last.fm
+* @param data.nonce
+* @returns unknown
+* @throws ApiError
+*/
+export const useLastFmServiceGetApiServicesLastfmCallback = <TData = Common.LastFmServiceGetApiServicesLastfmCallbackDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ nonce, state, token }: {
+  nonce?: string;
+  state?: string;
+  token?: string;
+} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLastFmServiceGetApiServicesLastfmCallbackKeyFn({ nonce, state, token }, queryKey), queryFn: () => LastFmService.getApiServicesLastfmCallback({ nonce, state, token }) as TData, ...options });
+/**
+* @returns unknown
+* @throws ApiError
+*/
+export const useLastFmServiceGetApiServicesLastfmStatus = <TData = Common.LastFmServiceGetApiServicesLastfmStatusDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLastFmServiceGetApiServicesLastfmStatusKeyFn(queryKey), queryFn: () => LastFmService.getApiServicesLastfmStatus() as TData, ...options });
 /**
 * Get a collection of media libraries
 * @param data The data for the request.
@@ -548,6 +571,67 @@ export const useSongServiceGetApiLibrariesByLibrarySongsByPublicId = <TData = Co
   relations?: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSongServiceGetApiLibrariesByLibrarySongsByPublicIdKeyFn({ library, publicId, relations }, queryKey), queryFn: () => SongService.getApiLibrariesByLibrarySongsByPublicId({ library, publicId, relations }) as TData, ...options });
 /**
+* @returns unknown
+* @throws ApiError
+*/
+export const useSpotifyServiceGetApiServicesSpotifyAuthorize = <TData = Common.SpotifyServiceGetApiServicesSpotifyAuthorizeDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSpotifyServiceGetApiServicesSpotifyAuthorizeKeyFn(queryKey), queryFn: () => SpotifyService.getApiServicesSpotifyAuthorize() as TData, ...options });
+/**
+* @param data The data for the request.
+* @param data.code
+* @param data.state
+* @param data.error
+* @returns unknown
+* @throws ApiError
+*/
+export const useSpotifyServiceGetApiServicesSpotifyCallback = <TData = Common.SpotifyServiceGetApiServicesSpotifyCallbackDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ code, error, state }: {
+  code?: string;
+  error?: string;
+  state?: string;
+} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSpotifyServiceGetApiServicesSpotifyCallbackKeyFn({ code, error, state }, queryKey), queryFn: () => SpotifyService.getApiServicesSpotifyCallback({ code, error, state }) as TData, ...options });
+/**
+* @returns unknown
+* @throws ApiError
+*/
+export const useSpotifyServiceGetApiServicesSpotifyStatus = <TData = Common.SpotifyServiceGetApiServicesSpotifyStatusDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSpotifyServiceGetApiServicesSpotifyStatusKeyFn(queryKey), queryFn: () => SpotifyService.getApiServicesSpotifyStatus() as TData, ...options });
+/**
+* @returns string
+* @throws ApiError
+*/
+export const useSpotifyServiceGetApiServicesSpotifyUserProfile = <TData = Common.SpotifyServiceGetApiServicesSpotifyUserProfileDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSpotifyServiceGetApiServicesSpotifyUserProfileKeyFn(queryKey), queryFn: () => SpotifyService.getApiServicesSpotifyUserProfile() as TData, ...options });
+/**
+* @param data The data for the request.
+* @param data.limit
+* @param data.offset
+* @returns string
+* @throws ApiError
+*/
+export const useSpotifyServiceGetApiServicesSpotifyUserPlaylists = <TData = Common.SpotifyServiceGetApiServicesSpotifyUserPlaylistsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, offset }: {
+  limit?: string;
+  offset?: string;
+} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSpotifyServiceGetApiServicesSpotifyUserPlaylistsKeyFn({ limit, offset }, queryKey), queryFn: () => SpotifyService.getApiServicesSpotifyUserPlaylists({ limit, offset }) as TData, ...options });
+/**
+* @param data The data for the request.
+* @param data.q
+* @param data.type
+* @param data.limit
+* @param data.offset
+* @param data.market
+* @returns string
+* @throws ApiError
+*/
+export const useSpotifyServiceGetApiServicesSpotifySearch = <TData = Common.SpotifyServiceGetApiServicesSpotifySearchDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, market, offset, q, type }: {
+  limit?: string;
+  market?: string;
+  offset?: string;
+  q?: string;
+  type?: string;
+} = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSpotifyServiceGetApiServicesSpotifySearchKeyFn({ limit, market, offset, q, type }, queryKey), queryFn: () => SpotifyService.getApiServicesSpotifySearch({ limit, market, offset, q, type }) as TData, ...options });
+/**
+* @returns string
+* @throws ApiError
+*/
+export const useSpotifyServiceGetApiServicesSpotifyGenresSeeds = <TData = Common.SpotifyServiceGetApiServicesSpotifyGenresSeedsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSpotifyServiceGetApiServicesSpotifyGenresSeedsKeyFn(queryKey), queryFn: () => SpotifyService.getApiServicesSpotifyGenresSeeds() as TData, ...options });
+/**
 * Direct stream the song.
 * Requires token with "access-stream"
 * @param data The data for the request.
@@ -788,6 +872,11 @@ export const useJobServicePostApiJobsScanLibraryBySlug = <TData = Common.JobServ
   slug: string;
 }, TContext>({ mutationFn: ({ slug }) => JobService.postApiJobsScanLibraryBySlug({ slug }) as unknown as Promise<TData>, ...options });
 /**
+* @returns unknown
+* @throws ApiError
+*/
+export const useLastFmServicePostApiServicesLastfmDisconnect = <TData = Common.LastFmServicePostApiServicesLastfmDisconnectMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, void, TContext>, "mutationFn">) => useMutation<TData, TError, void, TContext>({ mutationFn: () => LastFmService.postApiServicesLastfmDisconnect() as unknown as Promise<TData>, ...options });
+/**
 * Create a library
 * @param data The data for the request.
 * @param data.requestBody
@@ -992,6 +1081,11 @@ export const useRetryServicePostHorizonApiJobsRetryById = <TData = Common.RetryS
   id: string;
 }, TContext>({ mutationFn: ({ id }) => RetryService.postHorizonApiJobsRetryById({ id }) as unknown as Promise<TData>, ...options });
 /**
+* @returns unknown
+* @throws ApiError
+*/
+export const useSpotifyServicePostApiServicesSpotifyDisconnect = <TData = Common.SpotifyServicePostApiServicesSpotifyDisconnectMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, void, TContext>, "mutationFn">) => useMutation<TData, TError, void, TContext>({ mutationFn: () => SpotifyService.postApiServicesSpotifyDisconnect() as unknown as Promise<TData>, ...options });
+/**
 * Create user
 * This is endpoint allows administrators to create users
 * @param data The data for the request.
@@ -1004,6 +1098,23 @@ export const useUserServicePostApiUsers = <TData = Common.UserServicePostApiUser
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   requestBody: CreateUserRequest;
 }, TContext>({ mutationFn: ({ requestBody }) => UserService.postApiUsers({ requestBody }) as unknown as Promise<TData>, ...options });
+/**
+* @param data The data for the request.
+* @param data.library The library slug
+* @param data.album The album slug
+* @param data.requestBody
+* @returns AlbumResource `AlbumResource`
+* @throws ApiError
+*/
+export const useAlbumServicePutApiLibrariesByLibraryAlbumsByAlbum = <TData = Common.AlbumServicePutApiLibrariesByLibraryAlbumsByAlbumMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  album: string;
+  library: string;
+  requestBody: AlbumUpdateRequest;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  album: string;
+  library: string;
+  requestBody: AlbumUpdateRequest;
+}, TContext>({ mutationFn: ({ album, library, requestBody }) => AlbumService.putApiLibrariesByLibraryAlbumsByAlbum({ album, library, requestBody }) as unknown as Promise<TData>, ...options });
 /**
 * Update a playlist
 * @param data The data for the request.

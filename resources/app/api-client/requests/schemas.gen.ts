@@ -58,6 +58,40 @@ export const $AlbumResource = {
     title: 'AlbumResource'
 } as const;
 
+export const $AlbumUpdateRequest = {
+    type: 'object',
+    properties: {
+        title: {
+            type: 'string',
+            minLength: 1,
+            maxLength: 255
+        },
+        year: {
+            type: 'number',
+            minimum: 0,
+            maximum: 9999
+        },
+        mbid: {
+            type: 'string',
+            minLength: 1,
+            maxLength: 255
+        },
+        discogs_id: {
+            type: 'number',
+            minimum: 0,
+            maximum: 999999999999
+        },
+        genres: {
+            type: 'array',
+            items: {
+                type: 'integer'
+            }
+        }
+    },
+    required: ['title'],
+    title: 'AlbumUpdateRequest'
+} as const;
+
 export const $AlbumWithoutSongsResource = {
     type: 'object',
     properties: {
@@ -304,6 +338,9 @@ export const $ForgotPasswordRequest = {
 export const $GenreResource = {
     type: 'object',
     properties: {
+        id: {
+            type: 'integer'
+        },
         name: {
             type: 'string'
         },
@@ -326,7 +363,7 @@ export const $GenreResource = {
             }
         }
     },
-    required: ['name', 'slug', 'createdAt', 'updatedAt'],
+    required: ['id', 'name', 'slug', 'createdAt', 'updatedAt'],
     title: 'GenreResource'
 } as const;
 

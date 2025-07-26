@@ -55,27 +55,45 @@ return [
     'channels' => [
         'stack' => [
             'driver'            => 'stack',
-            'channels'          => ['single', 'otel'],
+            'channels'          => ['daily', 'otel'],
             'ignore_exceptions' => false,
         ],
 
-        'single' => [
+        'otel' => [
+            'driver' => 'custom',
+            'via' => function () {
+                $logger = new \Monolog\Logger('otel');
+
+                $handler = new OpenTelemetryHandler(
+                    \OpenTelemetry\API\Globals::loggerProvider(),
+                    \Monolog\Level::Debug,
+                    true
+                );
+
+                $logger->pushHandler($handler);
+                $logger->pushProcessor(new PsrLogMessageProcessor());
+
+                return $logger;
+            },
+        ],
+
+        'otel_debug' => [
             'driver'               => 'single',
-            'path'                 => storage_path('logs/laravel.log'),
+            'path'                 => storage_path('logs/otel.log'),
             'level'                => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
         ],
 
-        'otel' => [
-            'driver'     => 'monolog',
-            'level'      => env('LOG_LEVEL', 'debug'),
-            'handler'    => OpenTelemetryHandler::class,
-            'processors' => [PsrLogMessageProcessor::class],
+        'single' => [
+            'driver'               => 'single',
+            'path'                 => storage_path('logs/baander.log'),
+            'level'                => env('LOG_LEVEL', 'debug'),
+            'replace_placeholders' => true,
         ],
 
         'daily' => [
             'driver'               => 'daily',
-            'path'                 => storage_path('logs/laravel.log'),
+            'path'                 => storage_path('logs/baander.log'),
             'level'                => env('LOG_LEVEL', 'debug'),
             'days'                 => 14,
             'replace_placeholders' => true,
@@ -134,18 +152,18 @@ return [
         ],
 
         'jobs' => [
-            'driver' => 'single',
-            'path'   => storage_path('logs/jobs.log'),
-            'level'  => env('LOG_LEVEL', 'debug'),
+            'driver'               => 'single',
+            'path'                 => storage_path('logs/jobs.log'),
+            'level'                => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
         ],
 
         'music_jobs' => [
-            'driver' => 'single',
-            'path'   => storage_path('logs/music_jobs.log'),
-            'level'  => env('LOG_LEVEL', 'debug'),
+            'driver'               => 'single',
+            'path'                 => storage_path('logs/music_jobs.log'),
+            'level'                => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
-        ]
+        ],
 
         //
         //        'php_deprecations' => [

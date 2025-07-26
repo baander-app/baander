@@ -258,6 +258,9 @@ function useVirtualizedTable({
   const actualRowCount = rows.length;
   const virtualizerCount = estimatedTotalCount && estimatedTotalCount > actualRowCount ? estimatedTotalCount : actualRowCount;
 
+  // Track previous row count to detect if this is new data or appended data
+  const previousRowCount = useRef(0);
+
   const virtualizer = useVirtualizer({
     count: virtualizerCount,
     getScrollElement: () => parentRef.current,
@@ -266,9 +269,12 @@ function useVirtualizedTable({
   });
 
   useEffect(() => {
-    if (rows.length > 0) {
+    // Only scroll to top if we went from 0 rows to some rows (initial load)
+    // or if the row count decreased (new dataset)
+    if (rows.length > 0 && (previousRowCount.current === 0 || rows.length < previousRowCount.current)) {
       virtualizer.scrollToIndex(0, { align: 'start' });
     }
+    previousRowCount.current = rows.length;
   }, [rows.length, virtualizer]);
 
   useEffect(() => {

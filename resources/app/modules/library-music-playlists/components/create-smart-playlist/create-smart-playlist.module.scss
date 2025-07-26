@@ -29,3 +29,24 @@
 .submitButton {
   margin-top: 1rem;
 }
+
+.submitButtonHtml {
+  background-color: var(--accent-9);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.submitButtonHtml:hover {
+  background-color: var(--accent-10);
+}
+
+.submitButtonHtml:disabled {
+  background-color: var(--accent-6);
+  cursor: not-allowed;
+}

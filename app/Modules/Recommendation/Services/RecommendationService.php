@@ -230,7 +230,7 @@ class RecommendationService
         // Calculate recommendations
         try {
             $recommendations = $calculator->calculate($models, $config);
-            return $this->saveRecommendations($modelClass, $name, $recommendations, $config);
+            return $this->saveRecommendations($modelClass, $name, $recommendations, $config, $options);
         } catch (\Throwable $e) {
             $this->logger->error("Error generating recommendations: " . $e->getMessage());
             return 0;
@@ -250,11 +250,13 @@ class RecommendationService
         string $modelClass,
         string $name,
         array $recommendations,
-        array $config
+        array $config,
+        array $options
     ): int {
         $targetType = $config['data_field_type'] ?? $modelClass;
         $insertedCount = 0;
         $batchSize = $config['batch_size'] ?? 1000;
+        $userId = $options['user_id'] ?? null;
 
         // Use a transaction for better performance and data integrity
         DB::transaction(function () use (
@@ -263,7 +265,8 @@ class RecommendationService
             $recommendations,
             $targetType,
             &$insertedCount,
-            $batchSize
+            $batchSize,
+            $userId
         ) {
             // Delete existing recommendations
             Recommendation::where('source_type', $modelClass)
@@ -282,7 +285,7 @@ class RecommendationService
                 arsort($targets);
 
                 foreach ($targets as $targetId => $score) {
-                    $recommendationsToInsert[] = [
+                    $row = [
                         'source_type' => $modelClass,
                         'source_id' => $sourceId,
                         'target_type' => $targetType,
@@ -293,6 +296,10 @@ class RecommendationService
                         'created_at' => $now,
                         'updated_at' => $now,
                     ];
+
+                    $row['user_id'] = $userId;
+
+                    $recommendationsToInsert[] = $row;
 
                     $insertedCount++;
                     $position++; // Increment position for next item

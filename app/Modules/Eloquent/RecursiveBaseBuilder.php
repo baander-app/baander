@@ -2,9 +2,9 @@
 
 namespace App\Modules\Eloquent;
 
-use App\Modules\Pagination\JsonPaginator;
-use Staudenmeir\LaravelAdjacencyList\Eloquent\Builder as AdjacencyListBuilder;
+use App\Modules\Http\Pagination\JsonPaginator;
 use Illuminate\Container\Container;
+use Staudenmeir\LaravelAdjacencyList\Eloquent\Builder as AdjacencyListBuilder;
 
 class RecursiveBaseBuilder extends AdjacencyListBuilder
 {
