@@ -2,6 +2,7 @@
 # Example:
 # *.log
 # tmp/
+.junie
 vendor
 node_modules
 third_party
@@ -9,3 +10,4 @@ stubs
 public
 examples
 packages
+resources

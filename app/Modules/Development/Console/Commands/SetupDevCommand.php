@@ -1,13 +1,15 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Modules\Development\Console\Commands;
 
+use App\Modules\Development\Console\DevelopmentCommand;
+use App\Modules\Development\Console\RequiresLocalEnvironment;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\UsersSeed;
 use File;
-use Illuminate\Console\Command;
+use Symfony\Component\Console\Command\Command;
 
-class SetupDevCommand extends Command
+class SetupDevCommand extends DevelopmentCommand
 {
     /**
      * The name and signature of the console command.
@@ -26,10 +28,13 @@ class SetupDevCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle()
+    #[RequiresLocalEnvironment]
+    protected function executeCommand(): int
     {
         $this->envFile();
         $this->database();
+
+        return Command::SUCCESS;
     }
 
     private function envFile()
