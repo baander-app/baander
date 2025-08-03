@@ -12,7 +12,7 @@ import { AlbumEditor } from '@/modules/library-music/components/album-editor/alb
 import { AlbumResource } from '@/libs/api-client/gen/models';
 import { useAlbumsIndex } from '@/libs/api-client/gen/endpoints/album/album.ts';
 
-function AlbumContextMenu({ album }: { album: AlbumResource }) {
+function AlbumContextMenu({ album, librarySlug }: { album: AlbumResource, librarySlug: string }) {
   const [showEditor, editorHandlers] = useDisclosure(false);
 
   return (
@@ -40,9 +40,13 @@ function AlbumContextMenu({ album }: { album: AlbumResource }) {
             Make changes to the album information.
           </Dialog.Description>
 
-          <AlbumEditor album={album} onSubmit={() => {
-            editorHandlers.close();
-          }} librarySlug="muzak"/>
+          <AlbumEditor
+            album={album}
+            onSubmit={() => {
+              editorHandlers.close();
+            }}
+            librarySlug={librarySlug}
+          />
         </Dialog.Content>
       </Dialog.Root>
 
@@ -76,7 +80,7 @@ export default function Albums() {
                       />
                     </ContextMenu.Trigger>
 
-                    <AlbumContextMenu album={album}/>
+                    <AlbumContextMenu album={album} librarySlug={libraryParam}/>
                   </ContextMenu.Root>
                 </div>
               ))}
