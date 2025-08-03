@@ -1,11 +1,10 @@
-
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { NewAccessTokenResource } from '@/libs/api-client/gen/models';
 import { Token } from '@/services/auth/token.ts';
 import { login as loginService, logout as logoutService } from '@/services/auth/auth.service.ts';
 import { tokenBindingService } from '@/services/auth/token-binding.service';
-import { isTokenExpired } from '@/services/auth/token.ts';
-import { refreshStreamToken } from '@/services/auth/stream-token.ts';
+import { refreshToken } from '@/services/auth/refresh-token.service.ts';
+import { eventBridge } from '@/services/event-bridge/bridge';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -23,120 +22,149 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [streamToken, setStreamToken] = useState<NewAccessTokenResource>();
-  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isRefreshingRef = useRef<boolean>(false);
 
   const isAuthenticated = !!Token.get() && !isLoading;
 
+  // Initialize auth state from storage
   useEffect(() => {
-    // Initialize auth state on mount
-    const initializeAuth = () => {
-      try {
-        const token = Token.get();
-        const storedSessionId = tokenBindingService.getSessionId();
-        const storedStreamToken = Token.getStreamToken();
-
-        if (token && storedSessionId) {
-          setSessionId(storedSessionId);
-        }
-
-        if (storedStreamToken) {
-          setStreamToken(storedStreamToken);
-        }
-      } catch (error) {
-        console.warn('Failed to initialize auth:', error);
-        Token.clear();
-        tokenBindingService.clear();
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initializeAuth();
+    initializeAuthState();
   }, []);
 
-  // Stream token refresh logic
+  // Listen to auth events for state synchronization
+  useEffect(() => {
+    const unsubscribeLogin = eventBridge.on('auth:login', (data) => {
+      setSessionId(data.sessionId || null);
+    });
+
+    const unsubscribeLogout = eventBridge.on('auth:logout', () => {
+      setSessionId(null);
+      setStreamToken(undefined);
+      clearRefreshInterval();
+    });
+
+    return () => {
+      unsubscribeLogin();
+      unsubscribeLogout();
+    };
+  }, []);
+
+  // Setup stream token refresh when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      startStreamTokenRefresh();
+    } else {
+      clearRefreshInterval();
+    }
+
+    return clearRefreshInterval;
+  }, [isAuthenticated]);
+
+  const initializeAuthState = useCallback(() => {
+    try {
+      const authToken = Token.get();
+      const storedSessionId = tokenBindingService.getSessionId();
+      const storedStreamToken = Token.getStreamToken();
+
+      if (authToken && storedSessionId) {
+        setSessionId(storedSessionId);
+      }
+
+      if (storedStreamToken && !Token.isExpired(storedStreamToken.expiresAt)) {
+        setStreamToken(storedStreamToken);
+      }
+    } catch (error) {
+      console.warn('Failed to initialize auth state:', error);
+      clearAuthState();
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const startStreamTokenRefresh = useCallback(() => {
+    // Initial refresh
+    refreshStreamTokenIfNeeded();
+
+    // Set up interval for periodic refresh
+    refreshIntervalRef.current = setInterval(refreshStreamTokenIfNeeded, 30_000);
+  }, []);
+
   const refreshStreamTokenIfNeeded = useCallback(async () => {
     if (!isAuthenticated || isRefreshingRef.current) {
       return;
     }
 
-    if (!streamToken?.token || isTokenExpired(streamToken.expiresAt)) {
+    const currentStreamToken = Token.getStreamToken();
+    const needsRefresh = !currentStreamToken || Token.isExpired(currentStreamToken.expiresAt);
+
+    if (needsRefresh) {
       isRefreshingRef.current = true;
       try {
-        const newStreamToken = await refreshStreamToken();
+        await refreshToken('stream');
+        const newStreamToken = Token.getStreamToken();
         setStreamToken(newStreamToken);
-        Token.setStreamToken(newStreamToken);
       } catch (error) {
         console.error('Failed to refresh stream token:', error);
-        // Don't clear auth on stream token failure
+        // Don't clear main auth on stream token failure
       } finally {
         isRefreshingRef.current = false;
       }
     }
-  }, [isAuthenticated, streamToken?.token, streamToken?.expiresAt]);
+  }, [isAuthenticated]);
 
-  // Setup stream token refresh interval
-  useEffect(() => {
-    if (!isAuthenticated) {
-      return;
+  const clearRefreshInterval = useCallback(() => {
+    if (refreshIntervalRef.current) {
+      clearInterval(refreshIntervalRef.current);
+      refreshIntervalRef.current = null;
     }
+    isRefreshingRef.current = false;
+  }, []);
 
-    refreshStreamTokenIfNeeded();
-
-    refreshTimeoutRef.current = setInterval(refreshStreamTokenIfNeeded, 30_000);
-
-    return () => {
-      if (refreshTimeoutRef.current) {
-        clearInterval(refreshTimeoutRef.current);
-        refreshTimeoutRef.current = null;
-      }
-    };
-  }, [isAuthenticated, refreshStreamTokenIfNeeded]);
+  const clearAuthState = useCallback(() => {
+    Token.clear();
+    tokenBindingService.clear();
+    setSessionId(null);
+    setStreamToken(undefined);
+    clearRefreshInterval();
+  }, []);
 
   const authenticateStreamUrl = useCallback((url: string) => {
-    if (isAuthenticated && streamToken?.token) {
-      return `${url}?_token=${streamToken.token}`;
+    if (!isAuthenticated || !streamToken?.token) {
+      console.warn('Stream token not available for URL authentication');
+      return url;
     }
-    console.warn('Stream token not available for URL authentication');
-    return url;
+
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}_token=${streamToken.token}`;
   }, [isAuthenticated, streamToken?.token]);
 
-  const login = async (credentials: { email: string; password: string }) => {
+  const login = useCallback(async (credentials: { email: string; password: string }) => {
     try {
       setIsLoading(true);
-      const response = await loginService(credentials);
-
-      if (response.sessionId) {
-        setSessionId(response.sessionId);
-      }
+      await loginService(credentials);
+      // State will be updated via event bridge listener
     } catch (error) {
-      setSessionId(null);
+      clearAuthState();
       throw error;
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       setIsLoading(true);
       await logoutService();
+      // State will be cleared via event bridge listener
     } catch (error) {
       console.warn('Logout failed:', error);
+      // Clear state anyway
+      clearAuthState();
     } finally {
-      // Clear stream token refresh interval
-      if (refreshTimeoutRef.current) {
-        clearInterval(refreshTimeoutRef.current);
-        refreshTimeoutRef.current = null;
-      }
-      isRefreshingRef.current = false;
-
-      setSessionId(null);
-      setStreamToken(undefined);
       setIsLoading(false);
     }
-  };
+  }, []);
 
   const contextValue: AuthContextType = {
     isAuthenticated,

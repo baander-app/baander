@@ -1,4 +1,3 @@
-// services/auth/auth.service.ts
 import { authLogin, authLogout, authTokensRevokeAll } from '@/libs/api-client/gen/endpoints/auth/auth.ts';
 import { Token } from '@/services/auth/token.ts';
 import { tokenBindingService } from '@/services/auth/token-binding.service.ts';
@@ -12,16 +11,19 @@ export async function login(credentials: { email: string; password: string }) {
 
     const { accessToken, refreshToken, sessionId } = response;
 
+    // Store session ID for request headers
     if (sessionId) {
       tokenBindingService.setSessionId(sessionId);
     }
 
+    // Store tokens
     Token.set({
-      accessToken: accessToken,
-      refreshToken: refreshToken,
+      accessToken,
+      refreshToken,
       sessionId,
     });
 
+    // Notify other parts of the app
     eventBridge.emit('auth:login', {
       tokens: { accessToken, refreshToken },
       sessionId,
@@ -29,8 +31,8 @@ export async function login(credentials: { email: string; password: string }) {
 
     return response;
   } catch (error) {
-    tokenBindingService.clear();
-    Token.clear();
+    // Clean up on login failure
+    clearAuthData();
     throw error;
   }
 }
@@ -41,14 +43,16 @@ export async function logout() {
   } catch (error) {
     console.warn('Logout API call failed:', error);
   } finally {
-    Token.clear();
-    tokenBindingService.clear();
-
-    // Emit logout event for external systems
+    clearAuthData();
     eventBridge.emit('auth:logout', undefined);
   }
 }
 
 export function revokeAllTokensExceptCurrent() {
   return authTokensRevokeAll();
+}
+
+function clearAuthData() {
+  Token.clear();
+  tokenBindingService.clear();
 }

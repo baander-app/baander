@@ -1,84 +1,67 @@
-
 import { Token } from '@/services/auth/token.ts';
 import { NotificationFacade } from '@/modules/notifications/notification-facade.ts';
 import { authRefreshToken, authStreamToken } from '@/libs/api-client/gen/endpoints/auth/auth.ts';
 import { tokenBindingService } from '@/services/auth/token-binding.service.ts';
 import { HeaderExt } from '@/models/header-ext.ts';
 
-export async function refreshToken(type: 'access' | 'stream') {
+type TokenType = 'access' | 'stream';
+
+export async function refreshToken(type: TokenType) {
   const authTokens = Token.get();
 
   if (!authTokens?.refreshToken) {
     throw new Error('Refresh token not found');
   }
 
-  if (type === 'access') {
-    try {
-      // Get session ID for token binding
-      const sessionId = tokenBindingService.getSessionId();
+  const sessionId = tokenBindingService.getSessionId();
+  const headers = {
+    'Authorization': `Bearer ${authTokens.refreshToken.token}`,
+    ...(sessionId && { [HeaderExt.X_BAANDER_SESSION_ID]: sessionId }),
+  };
 
-      // Call the API with refresh token authorization and session header
-      const response = await authRefreshToken({
-        headers: {
-          'Authorization': `Bearer ${authTokens.refreshToken.token}`,
-          ...(sessionId && { [HeaderExt.X_BAANDER_SESSION_ID]: sessionId }),
-        },
-        _skipAuth: false, // We need the refresh token auth, not access token
-      });
-
-      // Update token storage
-      Token.set({
-        accessToken: response.accessToken,
-        refreshToken: authTokens.refreshToken, // Keep existing refresh token
-        sessionId: authTokens.sessionId,
-      });
-
-      // Note: We can't call useAuth hooks here since this is not a component
-      // The auth provider should listen to token changes or we need a different approach
-
-    } catch (e) {
-      NotificationFacade.create({
-        type: 'error',
-        title: 'Authentication error',
-        message: 'Failed to refresh access token',
-        toast: true,
-      });
-
-      // Clear tokens if refresh fails
-      Token.clear();
-      tokenBindingService.clear();
-
-      throw e;
+  try {
+    if (type === 'access') {
+      await refreshAccessToken(authTokens, headers);
+    } else {
+      await refreshStreamToken(headers);
     }
-    return;
+  } catch (error) {
+    handleRefreshError(type, error);
+    throw error;
   }
+}
 
-  if (type === 'stream') {
-    try {
-      // Get session ID for token binding
-      const sessionId = tokenBindingService.getSessionId();
+async function refreshAccessToken(authTokens: any, headers: Record<string, string>) {
+  const response = await authRefreshToken({
+    headers,
+    _skipAuth: false,
+  });
 
-      // Call the API with refresh token authorization and session header
-      const response = await authStreamToken({
-        headers: {
-          'Authorization': `Bearer ${authTokens.refreshToken.token}`,
-          ...(sessionId && { [HeaderExt.X_BAANDER_SESSION_ID]: sessionId }),
-        },
-        _skipAuth: false, // We need the refresh token auth, not access token
-      });
+  Token.set({
+    accessToken: response.accessToken,
+    refreshToken: authTokens.refreshToken, // Keep existing refresh token
+    sessionId: authTokens.sessionId,
+  });
+}
 
-      // Update stream token storage
-      Token.setStreamToken(response.streamToken);
+async function refreshStreamToken(headers: Record<string, string>) {
+  const response = await authStreamToken({
+    headers,
+    _skipAuth: false,
+  });
 
-    } catch (e) {
-      NotificationFacade.create({
-        type: 'error',
-        title: 'Authentication error',
-        message: 'Failed to refresh stream token',
-      });
+  Token.setStreamToken(response.streamToken);
+}
 
-      throw e;
-    }
-    return;
-  }
+function handleRefreshError(type: TokenType, error: any) {
+  NotificationFacade.create({
+    type: 'error',
+    title: 'Authentication error',
+    message: `Failed to refresh ${type} token\n\n${error.message}`,
+    toast: true,
+  });
+
+  // Clear tokens if refresh fails
+  Token.clear();
+  tokenBindingService.clear();
 }

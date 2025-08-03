@@ -1,45 +1,46 @@
+
 import { AuthLogin200, NewAccessTokenResource } from '@/libs/api-client/gen/models';
 
 const LOCAL_STORAGE_KEY = 'baander_token';
 const LOCAL_STORAGE_KEY_STREAM = 'baander_stream_token';
 
 export const Token = {
-  get() {
-    const token = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!token) {
+  get(): AuthLogin200 | undefined {
+    try {
+      const token = localStorage.getItem(LOCAL_STORAGE_KEY);
+      return token ? JSON.parse(token) : undefined;
+    } catch {
+      // Clear corrupted data
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
       return undefined;
     }
-
-    return JSON.parse(token) as AuthLogin200;
   },
-  getStreamToken() {
-    const token = localStorage.getItem(LOCAL_STORAGE_KEY_STREAM);
-    if (!token) {
+
+  getStreamToken(): NewAccessTokenResource | undefined {
+    try {
+      const token = localStorage.getItem(LOCAL_STORAGE_KEY_STREAM);
+      return token ? JSON.parse(token) : undefined;
+    } catch {
+      // Clear corrupted data
+      localStorage.removeItem(LOCAL_STORAGE_KEY_STREAM);
       return undefined;
     }
-
-    return JSON.parse(token) as NewAccessTokenResource;
   },
-  set(token: AuthLogin200) {
+
+  set(token: AuthLogin200): void {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(token));
   },
-  setStreamToken(token: NewAccessTokenResource) {
+
+  setStreamToken(token: NewAccessTokenResource): void {
     localStorage.setItem(LOCAL_STORAGE_KEY_STREAM, JSON.stringify(token));
   },
-  clear() {
+
+  clear(): void {
     localStorage.removeItem(LOCAL_STORAGE_KEY);
     localStorage.removeItem(LOCAL_STORAGE_KEY_STREAM);
   },
+
+  isExpired(expiresAt: string): boolean {
+    return new Date() >= new Date(expiresAt);
+  },
 };
-
-export function isTokenExpired(expiresAt: string): boolean {
-  // Convert expiresAt to a Date object
-  const tokenExpiryDate = new Date(expiresAt);
-
-  // Get current date
-  const now = new Date();
-
-  // If the current date is equal to or later than the expiry date,
-  // it means that the token is expired or about to expire
-  return now >= tokenExpiryDate;
-}
