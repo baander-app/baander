@@ -46,6 +46,20 @@ class GlobalAudioProcessorService {
     }
   }
 
+  public async resumeContextIfNeeded(): Promise<void> {
+    if (!this.processor) {
+      console.warn('Audio processor not initialized');
+      return;
+    }
+
+    try {
+      await this.processor.resumeContextIfNeeded();
+    } catch (error) {
+      console.warn('Failed to resume audio context through global processor:', error);
+      throw error;
+    }
+  }
+
   public getProcessor(): AudioProcessor | null {
     return this.processor;
   }

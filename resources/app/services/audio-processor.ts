@@ -16,6 +16,7 @@ export class AudioProcessor {
   private filters: BiquadFilterNode[] = [];
   private spatialNode: ConvolverNode | null = null;
   private audioWorkletNode: AudioWorkletNode | null = null;
+  private contextResumed = false;
 
   // Volume normalization
   private lufsBuffer: number[] = [];
@@ -262,6 +263,19 @@ export class AudioProcessor {
     }
   }
 
+  async resumeContextIfNeeded(): Promise<void> {
+    if (this.audioContext.state === 'suspended' && !this.contextResumed) {
+      try {
+        await this.audioContext.resume();
+        this.contextResumed = true;
+        console.log('AudioContext resumed successfully');
+      } catch (error) {
+        console.warn('Failed to resume AudioContext:', error);
+        throw error;
+      }
+    }
+  }
+
   async connectAudioElement(audioElement: HTMLAudioElement) {
     try {
       if (this.isConnected && this.audioElement !== audioElement) {
@@ -275,29 +289,21 @@ export class AudioProcessor {
 
       this.audioElement = audioElement;
 
-      if (this.audioContext.state === 'suspended') {
-        await this.audioContext.resume();
-      }
-
-      if (this.audioContext.state !== 'running') {
-        await new Promise(resolve => {
-          const checkState = () => {
-            if (this.audioContext.state === 'running') {
-              resolve(void 0);
-            } else {
-              setTimeout(checkState, 10);
-            }
-          };
-          checkState();
-        });
-      }
+      // Don't automatically resume - let the audio player handle this
+      // when user actually tries to play audio
 
       this.sourceNode = this.audioContext.createMediaElementSource(audioElement);
       this.sourceNode.connect(this.analyzerNode);
 
       this.isConnected = true;
       this.passiveMode = false;
-      await this.initializeWorkletIfNeeded();
+
+      // Initialize worklet without requiring running context
+      try {
+        await this.initializeWorkletIfNeeded();
+      } catch (error) {
+        console.warn('Could not initialize worklet immediately:', error);
+      }
 
     } catch (error) {
       console.error('Failed to connect audio element:', error);
@@ -310,6 +316,7 @@ export class AudioProcessor {
       }
     }
   }
+
 
   disconnect() {
     if (this.sourceNode) {

@@ -55,6 +55,8 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
   const audioRef = useRef<HTMLAudioElement>(new Audio());
   const [processorConnected, setProcessorConnected] = useState(false);
 
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [isReady, setIsReady] = useState(false);
@@ -64,6 +66,27 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
   const [volume, setVolume] = useState(1);
   const [currentVolume, setCurrentVolume] = useState(100);
   const [song, setSong] = useState<SongResource | null>(null);
+
+  useEffect(() => {
+    const handleUserInteraction = () => {
+      setHasUserInteracted(true);
+      // Remove listeners after first interaction
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('keydown', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
+    };
+
+    document.addEventListener('click', handleUserInteraction);
+    document.addEventListener('keydown', handleUserInteraction);
+    document.addEventListener('touchstart', handleUserInteraction);
+
+    return () => {
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('keydown', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
+    };
+  }, []);
+
 
   // Initialize global audio processor only once when audio element is created
   useEffect(() => {
@@ -83,13 +106,38 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
     }
   }, [processorConnected]);
 
-  const togglePlayPause = () => {
+  const playWithContextResume = useCallback(async () => {
+    if (!audioRef.current || !isReady) {
+      return;
+    }
+
+    try {
+      // Try to resume the audio processor context if needed
+      if (processorConnected && globalAudioProcessor) {
+        await globalAudioProcessor.resumeContextIfNeeded?.();
+      }
+
+      await audioRef.current.play();
+      setIsPlaying(true);
+    } catch (error) {
+      console.warn('Play failed:', error);
+      dispatch(createNotification({
+        type: 'warning',
+        title: 'Playback requires interaction',
+        message: 'Please click the play button to start playback',
+        toast: true,
+      }));
+    }
+  }, [isReady, dispatch, processorConnected]);
+
+  const togglePlayPause = useCallback(() => {
     if (isPlaying) {
       setIsPlaying(false);
     } else if (isReady) {
-      setIsPlaying(true);
+      playWithContextResume();
     }
-  };
+  }, [isPlaying, isReady, playWithContextResume]);
+
 
   const toggleMuteUnmute = () => {
     if (isMuted) {
@@ -190,7 +238,7 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
 
   useEffect(() => {
     if (isPlaying && isReady) {
-      audioRef.current.play().catch((e) => {
+      playWithContextResume().catch((e) => {
         dispatch(createNotification({
           type: 'error',
           title: 'Audio player error',
@@ -231,10 +279,17 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
     // @ts-ignore
     audioRef.current.onprogress = (e) => handleBufferProgress(e);
 
-    audioRef.current.play().then(() => {
-      setIsPlaying(true);
-    });
-  }, [authenticatedSource, volume, processorConnected]);
+    // Only autoplay if user has interacted
+
+    if (hasUserInteracted) {
+      audioRef.current.play().then(() => {
+        setIsPlaying(true);
+      }).catch((error) => {
+        console.warn('Autoplay failed:', error);
+      });
+    }
+
+  }, [authenticatedSource, volume, processorConnected, hasUserInteracted]);
 
   return (
     <AudioPlayerContext.Provider
