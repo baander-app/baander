@@ -1,10 +1,3 @@
-import { InternalAxiosRequestConfig } from 'axios';
-
-export interface AuthRequest extends InternalAxiosRequestConfig {
-  _didRetry?: boolean;
-  _skipAuth?: boolean;
-}
-
 export class TokenBindingService {
   private sessionId: string | null = null;
   private fingerprint: string | null = null;
@@ -165,29 +158,4 @@ export class TokenBindingService {
 }
 
 // Singleton instance
-const tokenBindingService = new TokenBindingService();
-
-// Notification system for security alerts
-interface NotificationOptions {
-  type: 'error' | 'warning' | 'info';
-  title: string;
-  message: string;
-  duration?: number;
-}
-
-function showNotification(options: NotificationOptions): void {
-  // This should integrate with your existing notification system
-  // For now, we'll use console and optionally browser notifications
-  console.warn(`${options.title}: ${options.message}`);
-
-  // Browser notification (if permitted)
-  if ('Notification' in window && Notification.permission === 'granted') {
-    new Notification(options.title, {
-      body: options.message,
-      icon: '/favicon.ico',
-    });
-  }
-}
-
-
-export { tokenBindingService };
+export const tokenBindingService = new TokenBindingService();

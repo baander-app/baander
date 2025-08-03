@@ -5,6 +5,7 @@ import { equalizerSlice } from '@/store/audio/equalizer.ts';
 import { musicPlayerSlice } from '@/store/music/music-player-slice.ts';
 import { notificationsSlice } from '@/store/notifications/notifications-slice.ts';
 import { uiSlice } from '@/store/users/ui-slice.ts';
+import { eventBridgeMiddleware } from '@/store/middleware/event-bridge.middleware.ts';
 
 const rootReducer = combineSlices(
   equalizerSlice,
@@ -27,7 +28,7 @@ export const makeStore = () => {
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({
         serializableCheck: false,
-      }),
+      }).concat(eventBridgeMiddleware)
   });
 
   return store;

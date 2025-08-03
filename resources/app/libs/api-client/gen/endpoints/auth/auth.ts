@@ -59,6 +59,7 @@ import type {
   AuthStreamToken200,
   AuthTokensRevoke200,
   AuthTokensRevoke400,
+  AuthTokensRevokeAll200,
   AuthenticateUsingPasskeyRequest,
   AuthenticationExceptionResponse,
   ForgotPasswordRequest,
@@ -955,6 +956,88 @@ export function useAuthTokensSuspenseInfinite<
   return query;
 }
 
+/**
+ * @summary Revoke all tokens except current
+ */
+export const authTokensRevokeAll = (
+  options?: SecondParameter<typeof customInstance>
+) => {
+  return customInstance<AuthTokensRevokeAll200>(
+    { url: `/api/auth/tokens`, method: "DELETE" },
+    options
+  );
+};
+
+export const getAuthTokensRevokeAllMutationOptions = <
+  TError = ErrorType<AuthenticationExceptionResponse>,
+  TContext = unknown
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof authTokensRevokeAll>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof authTokensRevokeAll>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["authTokensRevokeAll"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof authTokensRevokeAll>>,
+    void
+  > = () => {
+    return authTokensRevokeAll(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AuthTokensRevokeAllMutationResult = NonNullable<
+  Awaited<ReturnType<typeof authTokensRevokeAll>>
+>;
+
+export type AuthTokensRevokeAllMutationError =
+  ErrorType<AuthenticationExceptionResponse>;
+
+/**
+ * @summary Revoke all tokens except current
+ */
+export const useAuthTokensRevokeAll = <
+  TError = ErrorType<AuthenticationExceptionResponse>,
+  TContext = unknown
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof authTokensRevokeAll>>,
+      TError,
+      void,
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof authTokensRevokeAll>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationOptions = getAuthTokensRevokeAllMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
 /**
  * @summary Revoke a specific token
  */

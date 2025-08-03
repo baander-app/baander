@@ -25,8 +25,10 @@ export function InlinePlayer() {
   } = useMusicSource();
 
   const canQuery = Boolean(sourceSong?.public_id);
-  const { data: song } = useSongsShow('music', sourceSong?.public_id!, {
-
+  const { data: song } = useSongsShow('music', sourceSong?.public_id!, undefined, {
+    query: {
+      enabled: canQuery,
+    }
   });
 
   const { setSong } = useAudioPlayer();

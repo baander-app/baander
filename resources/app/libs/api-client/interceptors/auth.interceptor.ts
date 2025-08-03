@@ -1,3 +1,4 @@
+
 import { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { Token } from '@/services/auth/token.ts';
 import { refreshToken } from '@/services/auth/refresh-token.service.ts';
@@ -12,8 +13,8 @@ interface AuthRequest extends InternalAxiosRequestConfig {
 interface TokenBindingError {
   message: string;
   code: 'TOKEN_BINDING_FAILED';
-  reason: 'fingerprint_mismatch' | 'session_mismatch' | 'max_ip_changes_exceeded' | string;
-  action?: 'reauth' | 'logout';
+  reason: 'fingerprint_mismatch' | 'session_mismatch' | 'max_ip_changes_exceeded' | 'concurrent_ip_usage' | 'rapid_ip_changes' | 'suspicious_geo_jump' | string;
+  action?: 'reauth' | 'logout' | 'revoke_all_tokens';
 }
 
 // Simple notification system that doesn't depend on Redux
@@ -28,7 +29,7 @@ function showNotification(type: 'error' | 'warning' | 'info', title: string, mes
     });
   }
 
-  // You can also emit a custom event here for your notification system to catch
+  // Emit a custom event for your notification system to catch
   window.dispatchEvent(new CustomEvent('auth-notification', {
     detail: { type, title, message }
   }));
@@ -51,17 +52,23 @@ export function authInterceptor(instance: AxiosInstance) {
         return Promise.reject(new Error('Environment validation failed'));
       }
 
-      // Add authorization header with Bearer token
-      const authToken = Token.get();
-      if (authToken?.accessToken?.token) {
-        config.headers = config.headers || {};
-        config.headers.Authorization = `Bearer ${authToken.accessToken.token}`;
+      // Initialize headers if not present
+      config.headers = config.headers || {};
+
+      // Check if this request already has an Authorization header (like refresh token requests)
+      const hasAuthHeader = config.headers.Authorization;
+
+      // Add authorization header with Bearer token only if not already present
+      if (!hasAuthHeader) {
+        const authToken = Token.get();
+        if (authToken?.accessToken?.token) {
+          config.headers.Authorization = `Bearer ${authToken.accessToken.token}`;
+        }
       }
 
-      // Add session ID header for token binding validation
+      // Add session ID header for token binding validation (always add if available and not present)
       const sessionId = tokenBindingService.getSessionId();
-      if (sessionId) {
-        config.headers = config.headers || {};
+      if (sessionId && !config.headers[HeaderExt.X_BAANDER_SESSION_ID]) {
         config.headers[HeaderExt.X_BAANDER_SESSION_ID] = sessionId;
       }
 
@@ -111,8 +118,13 @@ export function authInterceptor(instance: AxiosInstance) {
     const { type, title, message } = getTokenBindingNotification(errorData.reason);
     showNotification(type, title, message);
 
-    // Redirect to login page
-    redirectToLogin();
+    // Redirect to login page for critical security issues
+    if (errorData.action === 'revoke_all_tokens' || errorData.reason === 'concurrent_ip_usage') {
+      redirectToLogin();
+    } else {
+      // For less critical issues, just redirect normally
+      setTimeout(() => redirectToLogin(), 2000); // Give user time to read notification
+    }
 
     return Promise.reject(new Error(`Token binding failed: ${errorData.reason}`));
   }
@@ -125,7 +137,18 @@ export function authInterceptor(instance: AxiosInstance) {
 
     // Ensure we have a bearer token
     if (!authHeader?.startsWith('Bearer ')) {
+      console.warn('No valid authorization header found');
       return Promise.reject(new Error('No valid authorization header'));
+    }
+
+    // Don't retry refresh token requests to avoid infinite loops
+    const isRefreshRequest = originalRequest.url?.includes('/refreshToken') || originalRequest.url?.includes('/streamToken');
+    if (isRefreshRequest) {
+      console.warn('Refresh token request failed, clearing tokens');
+      Token.clear();
+      tokenBindingService.clear();
+      redirectToLogin();
+      return Promise.reject(new Error('Refresh token expired'));
     }
 
     // Determine token type (access or stream)
@@ -141,13 +164,15 @@ export function authInterceptor(instance: AxiosInstance) {
     originalRequest._didRetry = true;
 
     try {
+      console.log(`Attempting to refresh ${tokenType} token...`);
+
       // Attempt to refresh the token
       await refreshToken(tokenType);
 
       // Update request with new token
       updateRequestWithNewToken(originalRequest, tokenType);
 
-      // Re-add session ID
+      // Re-add session ID (might have changed)
       const sessionId = tokenBindingService.getSessionId();
       if (sessionId) {
         originalRequest.headers = originalRequest.headers || {};
@@ -180,11 +205,29 @@ export function authInterceptor(instance: AxiosInstance) {
    */
   function getTokenBindingNotification(reason: string) {
     switch (reason) {
+      case 'concurrent_ip_usage':
+        return {
+          type: 'error' as const,
+          title: 'SECURITY ALERT',
+          message: 'Your account is being used from multiple locations. All sessions have been terminated for security.',
+        };
       case 'max_ip_changes_exceeded':
         return {
           type: 'error' as const,
           title: 'Security Alert',
           message: 'Too many location changes detected. Please log in again for security.',
+        };
+      case 'rapid_ip_changes':
+        return {
+          type: 'warning' as const,
+          title: 'Suspicious Activity',
+          message: 'Rapid location changes detected. Please log in again.',
+        };
+      case 'suspicious_geo_jump':
+        return {
+          type: 'warning' as const,
+          title: 'Unusual Location',
+          message: 'Impossible travel detected between locations. Please log in again.',
         };
       case 'fingerprint_mismatch':
         return {
@@ -249,7 +292,10 @@ export function authInterceptor(instance: AxiosInstance) {
    */
   function redirectToLogin() {
     if (typeof window !== 'undefined') {
-      window.location.href = '/login';
+      // Clear any existing timers to prevent multiple redirects
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 100);
     }
   }
 

@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Api\Auth\Concerns\HandlesUserTokens;
-use App\Modules\Auth\GeoLocationService;
-use App\Modules\Auth\TokenBindingService;
 use App\Http\Requests\Auth\{ForgotPasswordRequest, LoginRequest, LogoutRequest, RegisterRequest, ResetPasswordRequest};
 use App\Http\Resources\Auth\NewAccessTokenResource;
 use App\Http\Resources\User\UserResource;
 use App\Jobs\Auth\RevokeTokenJob;
 use App\Models\{PersonalAccessToken, TokenAbility, User};
+use App\Modules\Auth\GeoLocationService;
+use App\Modules\Auth\TokenBindingService;
 use App\Notifications\ForgotPasswordNotification;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -185,6 +185,18 @@ class AuthController
         $token->delete();
 
         return response()->json(['message' => 'Token revoked successfully']);
+    }
+
+    /**
+     * Revoke all tokens except current
+     */
+    #[Delete('tokens', 'auth.tokens.revokeAll', ['auth:sanctum'])]
+    public function revokeAllTokensExceptCurrent(Request $request)
+    {
+        $user = $request->user();
+        $user->tokens()->where('id', '!=', $user->currentAccessToken()->id)->delete();
+
+        return response()->json(['message' => 'All tokens except current revoked successfully']);
     }
 
     /**
