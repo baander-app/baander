@@ -1,7 +1,5 @@
 import { Cover } from '@/modules/library-music/components/artwork/cover';
-import { useAlbumServiceGetApiLibrariesByLibraryAlbumsByAlbum } from '@/api-client/queries';
-import { SongResource } from '@/api-client/requests';
-import { Text, Card, Flex, Box, ScrollArea, Skeleton } from '@radix-ui/themes';
+import { Box, Card, Flex, ScrollArea, Skeleton, Text } from '@radix-ui/themes';
 import { AlertLoadingError } from '@/ui/alerts/alert-loading-error.tsx';
 import { useAppDispatch } from '@/store/hooks.ts';
 import { setQueueAndSong } from '@/store/music/music-player-slice.ts';
@@ -12,6 +10,8 @@ import { usePathParam } from '@/hooks/use-path-param.ts';
 import { LibraryParams } from '@/modules/library-music/routes/_routes.tsx';
 import { generateBlurhashBackgroundImage } from '@/libs/blurhash/generate-bg-image.ts';
 import { useCallback } from 'react';
+import { useAlbumsShow } from '@/libs/api-client/gen/endpoints/album/album.ts';
+import { SongResource } from '@/libs/api-client/gen/models';
 
 interface AlbumDetailProps extends React.HTMLAttributes<HTMLDivElement> {
   albumSlug: string;
@@ -19,10 +19,7 @@ interface AlbumDetailProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export function AlbumDetail({ albumSlug, ...rest }: AlbumDetailProps) {
   const { library } = usePathParam<LibraryParams>();
-  const { data, isLoadingError, refetch } = useAlbumServiceGetApiLibrariesByLibraryAlbumsByAlbum({
-    album: albumSlug,
-    library: library,
-  });
+  const { data, isLoadingError, refetch } = useAlbumsShow(library, albumSlug);
 
   const genres = data?.genres?.map((genre) => genre.name).join(', ');
   const blurhash = data?.cover && generateBlurhashBackgroundImage(data.cover.blurhash, 128, 128);
@@ -55,7 +52,7 @@ export function AlbumDetail({ albumSlug, ...rest }: AlbumDetailProps) {
                 <Flex p="sm" align="start" direction="column" justify="center">
                   <Text size="6" weight="bold">{data?.title}</Text>
                   {data?.artists && (
-                    <Text >{data.artists.map(x => x.name).join(', ')}</Text>
+                    <Text>{data.artists.map(x => x.name).join(', ')}</Text>
                   )}
 
                   <Text>{genres} - {data?.year}</Text>
@@ -115,13 +112,13 @@ function AlbumSongs({ songs }: AlbumSongProps) {
   return (
     <>
       <ScrollArea>
-        <table >
+        <table>
           <thead>
-            <tr>
-              <th>Track</th>
-              <th>Title</th>
-              <th>Duration</th>
-            </tr>
+          <tr>
+            <th>Track</th>
+            <th>Title</th>
+            <th>Duration</th>
+          </tr>
           </thead>
           <tbody>{rows}</tbody>
         </table>
@@ -136,7 +133,7 @@ function AlbumDetailSkeleton() {
     <Card>
       <Flex>
         <Box p="sm">
-          <Skeleton height="180px" width="180px" />
+          <Skeleton height="180px" width="180px"/>
         </Box>
 
         <Box p="sm" width="100%">

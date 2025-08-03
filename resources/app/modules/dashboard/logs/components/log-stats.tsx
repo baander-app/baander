@@ -1,20 +1,9 @@
 import React, { useState } from 'react';
-import { useLogsServiceGetApiLogsByLogFileStats } from '@/api-client/queries';
 import { LoadingSpinner } from '@/modules/common/LoadingSpinner.tsx';
 import { ErrorDisplay } from '@/modules/common/ErrorDisplay.tsx';
-import { 
-  Box, 
-  Flex, 
-  Grid, 
-  Text, 
-  Heading, 
-  Card, 
-  Button, 
-  Table,
-  Progress,
-  IconButton,
-} from '@radix-ui/themes';
-import { DownloadIcon, ChevronDownIcon, ChevronUpIcon } from '@radix-ui/react-icons';
+import { Box, Button, Card, Flex, Grid, Heading, IconButton, Progress, Table, Text } from '@radix-ui/themes';
+import { ChevronDownIcon, ChevronUpIcon, DownloadIcon } from '@radix-ui/react-icons';
+import { useLogsStats } from '@/libs/api-client/gen/endpoints/logs/logs.ts';
 
 interface LogStatsProps {
   logFileId: string;
@@ -31,16 +20,17 @@ export const LogStats: React.FC<LogStatsProps> = ({ logFileId }) => {
     data: statsData,
     isLoading,
     error,
-  } = useLogsServiceGetApiLogsByLogFileStats(
-    { logFile: logFileId },
-    undefined,
-    { enabled: !!logFileId }
+  } = useLogsStats(
+    logFileId,
+    {
+      query: { enabled: !!logFileId },
+    },
   );
 
   if (isLoading) {
     return (
       <Box p="4" style={{ backgroundColor: 'var(--gray-2)', borderTop: '1px solid var(--gray-4)' }}>
-        <LoadingSpinner size="small" />
+        <LoadingSpinner size="small"/>
       </Box>
     );
   }
@@ -48,7 +38,7 @@ export const LogStats: React.FC<LogStatsProps> = ({ logFileId }) => {
   if (error) {
     return (
       <Box p="4" style={{ backgroundColor: 'var(--gray-2)', borderTop: '1px solid var(--gray-4)' }}>
-        <ErrorDisplay error={error} title="Failed to load log statistics" />
+        <ErrorDisplay error={error} title="Failed to load log statistics"/>
       </Box>
     );
   }
@@ -61,14 +51,15 @@ export const LogStats: React.FC<LogStatsProps> = ({ logFileId }) => {
 
   return (
     <Box className="log-stats" style={{ backgroundColor: 'var(--gray-2)', borderTop: '1px solid var(--gray-4)' }}>
-      <Flex justify="between" align="center" p="2" style={{ borderBottom: isCollapsed ? 'none' : '1px solid var(--gray-4)' }}>
+      <Flex justify="between" align="center" p="2"
+            style={{ borderBottom: isCollapsed ? 'none' : '1px solid var(--gray-4)' }}>
         <Flex align="center" gap="2">
-          <IconButton 
-            variant="ghost" 
+          <IconButton
+            variant="ghost"
             onClick={toggleCollapsed}
-            aria-label={isCollapsed ? "Expand stats" : "Collapse stats"}
+            aria-label={isCollapsed ? 'Expand stats' : 'Collapse stats'}
           >
-            {isCollapsed ? <ChevronDownIcon /> : <ChevronUpIcon />}
+            {isCollapsed ? <ChevronDownIcon/> : <ChevronUpIcon/>}
           </IconButton>
           <Text weight="medium">Log Statistics</Text>
           {isCollapsed && (
@@ -79,7 +70,7 @@ export const LogStats: React.FC<LogStatsProps> = ({ logFileId }) => {
         </Flex>
         <Button asChild size="1" color="blue">
           <a href={`/api/logs/${logFileId}/download`} download>
-            <DownloadIcon />
+            <DownloadIcon/>
             Download
           </a>
         </Button>
@@ -113,10 +104,10 @@ export const LogStats: React.FC<LogStatsProps> = ({ logFileId }) => {
             <Card>
               <Heading size="3" mb="2">Log Levels</Heading>
               <Box>
-                <LogLevelBar label="Error" count={logLevels.error} color="red" />
-                <LogLevelBar label="Warning" count={logLevels.warning} color="yellow" />
-                <LogLevelBar label="Info" count={logLevels.info} color="blue" />
-                <LogLevelBar label="Debug" count={logLevels.debug} color="gray" />
+                <LogLevelBar label="Error" count={logLevels.error} color="red"/>
+                <LogLevelBar label="Warning" count={logLevels.warning} color="yellow"/>
+                <LogLevelBar label="Info" count={logLevels.info} color="blue"/>
+                <LogLevelBar label="Debug" count={logLevels.debug} color="gray"/>
               </Box>
             </Card>
 
@@ -131,7 +122,8 @@ export const LogStats: React.FC<LogStatsProps> = ({ logFileId }) => {
                   </Table.Row>
                   <Table.Row>
                     <Table.Cell><Text color="gray" size="2">Threading:</Text></Table.Cell>
-                    <Table.Cell><Text size="2">{performance.shouldUseThreading ? 'Recommended' : 'Not needed'}</Text></Table.Cell>
+                    <Table.Cell><Text
+                      size="2">{performance.shouldUseThreading ? 'Recommended' : 'Not needed'}</Text></Table.Cell>
                   </Table.Row>
                   <Table.Row>
                     <Table.Cell><Text color="gray" size="2">Optimal Threads:</Text></Table.Cell>
@@ -164,7 +156,7 @@ const LogLevelBar: React.FC<LogLevelBarProps> = ({ label, count, color }) => {
         <Text color="gray" size="2">{label}</Text>
         <Text color="gray" size="2">{count}</Text>
       </Flex>
-      <Progress value={percentage} color={color} size="1" />
+      <Progress value={percentage} color={color} size="1"/>
     </Box>
   );
 };

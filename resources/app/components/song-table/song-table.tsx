@@ -1,5 +1,4 @@
 import { RefObject, useCallback, useEffect, useRef, useState } from 'react';
-import { SongResource } from '@/api-client/requests';
 import { Iconify } from '@/ui/icons/iconify';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setQueueAndSong } from '@/store/music/music-player-slice';
@@ -17,6 +16,7 @@ import {
 import { useVirtualizer, VirtualItem, Virtualizer } from '@tanstack/react-virtual';
 import { SpeakerLoudIcon } from '@radix-ui/react-icons';
 import styles from './song-table.module.scss';
+import { SongResource } from '@/libs/api-client/gen/models';
 
 export interface SongTableProps {
   songs: SongResource[];

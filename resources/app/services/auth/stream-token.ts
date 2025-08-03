@@ -1,4 +1,4 @@
-import { NewAccessTokenResource } from '@/api-client/requests';
+import { NewAccessTokenResource } from '@/libs/api-client/gen/models';
 import { isTokenExpired, Token } from '@/services/auth/token.ts';
 
 export function refreshStreamToken() {

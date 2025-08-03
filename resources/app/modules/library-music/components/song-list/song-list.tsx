@@ -1,9 +1,9 @@
 import { usePathParam } from '@/hooks/use-path-param';
 import { LibraryParams } from '@/modules/library-music/routes/_routes';
-import { useSongServiceGetApiLibrariesByLibrarySongsInfinite } from '@/api-client/queries/infiniteQueries';
 import { SongTable } from '@/components/song-table/song-table';
 import { useCallback, useRef, useMemo } from 'react';
 import styles from './song-list.module.scss';
+import { useSongsIndexInfinite } from '@/libs/api-client/gen/endpoints/song/song.ts';
 
 export function SongList() {
   const { library: libraryParam } = usePathParam<LibraryParams>();
@@ -14,8 +14,7 @@ export function SongList() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useSongServiceGetApiLibrariesByLibrarySongsInfinite({
-    library: libraryParam,
+  } = useSongsIndexInfinite(libraryParam,{
     relations: 'album,artists,album.cover,songs.genres',
   });
 

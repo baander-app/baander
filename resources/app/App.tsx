@@ -1,9 +1,4 @@
-
 import { BrowserRouter } from 'react-router-dom';
-
-import '@fontsource-variable/inter';
-import '@fontsource-variable/source-code-pro';
-
 import { AppRoutes } from '@/routes';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { MusicSourceProvider } from '@/providers/music-source-provider';
@@ -14,19 +9,12 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks.ts';
 import styles from './app.module.scss';
 import { removeToast } from '@/store/notifications/notifications-slice.ts';
 import { Iconify } from './ui/icons/iconify';
-import { useEffect } from 'react';
 
 // Instrument the main app component
 const App = () => {
   const { toasts } = useAppSelector(state => state.notifications);
   const { theme } = useAppSelector(state => state.ui);
-  const { user } = useAppSelector(state => state.auth);
   const dispatch = useAppDispatch();
-
-  useEffect(() => {
-    if (user) {
-    }
-  }, [user]);
 
   const dispatchRemoveToast = (id: string) => {
     dispatch(removeToast({ id }));

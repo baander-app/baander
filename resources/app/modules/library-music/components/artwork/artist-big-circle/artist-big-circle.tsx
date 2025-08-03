@@ -1,7 +1,7 @@
 import { Text } from '@radix-ui/themes';
 
 import styles from './artist-big-circle.module.scss';
-import { ArtistResource } from '@/api-client/requests';
+import { ArtistResource } from '@/libs/api-client/gen/models';
 
 interface ArtistBigCircleProps {
   artist: ArtistResource;

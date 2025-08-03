@@ -1,11 +1,10 @@
-
 import React, { ReactEventHandler, RefObject, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { noop } from '@/utils/noop.ts';
 import { useMusicSource } from '@/providers/music-source-provider';
-import { SongResource } from '@/api-client/requests';
 import { useAppDispatch } from '@/store/hooks.ts';
 import { createNotification } from '@/store/notifications/notifications-slice.ts';
 import { globalAudioProcessor } from '@/services/global-audio-processor-service.ts';
+import { SongResource } from '@/libs/api-client/gen/models';
 
 interface AudioPlayerContextType {
   audioRef: RefObject<HTMLAudioElement>;

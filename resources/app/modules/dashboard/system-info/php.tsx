@@ -1,7 +1,7 @@
-import { useSystemInfoServiceGetApiSystemInfo } from '@/api-client/queries';
 import { Card, Container, Grid, Text, Heading } from '@radix-ui/themes';
 
 import styles from './php.module.scss';
+import { useSystemInfoPhp } from '@/libs/api-client/gen/endpoints/system-info/system-info.ts';
 
 function Section(section: { section: string, values: { key: string, value: string|number|boolean|null }[] }) {
   return (
@@ -18,7 +18,7 @@ function Section(section: { section: string, values: { key: string, value: strin
 }
 
 export function Php() {
-  const { data } = useSystemInfoServiceGetApiSystemInfo();
+  const { data } = useSystemInfoPhp();
 
   return (
     <Container>

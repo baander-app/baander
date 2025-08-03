@@ -1,17 +1,14 @@
 import { Box, Button, Container, Flex, Heading, Text } from '@radix-ui/themes';
-import { useAppDispatch, useAppSelector } from '@/store/hooks.ts';
+import { useAppDispatch } from '@/store/hooks.ts';
 import { useCallback } from 'react';
-import { selectAccessToken, selectRefreshToken, selectStreamToken } from '@/store/users/auth-slice.ts';
 import { useTestMode } from '@/providers/test-mode-provider.tsx';
 import { CreateNotification } from '@/modules/notifications/models.ts';
 import { createNotification } from '@/store/notifications/notifications-slice.ts';
+import { useAuth } from '@/providers/auth-provider.tsx';
 
 export function DevPanel() {
+  const { accessToken, refreshToken, streamToken } = useAuth();
   const dispatch = useAppDispatch();
-
-  const accessToken = useAppSelector(selectAccessToken);
-  const refreshToken = useAppSelector(selectRefreshToken);
-  const streamToken = useAppSelector(selectStreamToken);
   const { isTestMode, toggleTestMode } = useTestMode();
 
   const copyAccessToken = useCallback(() => {
@@ -51,13 +48,13 @@ export function DevPanel() {
       {
         type: 'error',
         message: 'Test error notification',
-      }
-    ]
+      },
+    ];
 
     notifications.forEach((notification) => {
       dispatch(createNotification(notification));
-    })
-  }
+    });
+  };
 
   return (
     <Container>

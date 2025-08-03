@@ -15,6 +15,7 @@ import { createIDBPersister, queryClient } from '@/common/react-query.ts';
 import { RadixProvider } from '@/providers/radix-provider.tsx';
 import { Reset } from '@radix-ui/themes';
 import { TestModeProvider } from '@/providers/test-mode-provider.tsx';
+import { AuthProvider } from '@/providers/auth-provider.tsx';
 // @ts-ignore
 globalThis.Ziggy = Ziggy;
 
@@ -23,20 +24,22 @@ const reactQueryPersister = createIDBPersister();
 ReactDOM.createRoot(document.getElementById('baanderapproot') as HTMLElement).render(
   <React.StrictMode>
     <TestModeProvider>
-      <PersistQueryClientProvider
-        client={queryClient}
-        persistOptions={{ buster: 'baander', persister: reactQueryPersister }}
-      >
-        <Provider store={store}>
-          <DateFormatterProvider>
-            <RadixProvider>
-              <Reset>
-                <App/>
-              </Reset>
-            </RadixProvider>
-          </DateFormatterProvider>
-        </Provider>
-      </PersistQueryClientProvider>
+      <AuthProvider>
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{ buster: 'baander', persister: reactQueryPersister }}
+        >
+          <Provider store={store}>
+            <DateFormatterProvider>
+              <RadixProvider>
+                <Reset>
+                  <App/>
+                </Reset>
+              </RadixProvider>
+            </DateFormatterProvider>
+          </Provider>
+        </PersistQueryClientProvider>
+      </AuthProvider>
     </TestModeProvider>
   </React.StrictMode>,
 );

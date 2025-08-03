@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Button, Container, Dialog, Flex, Inset, Text } from '@radix-ui/themes';
-import { useUserTokenServiceGetApiUsersTokensByUser } from '@/api-client/queries';
 import { useDateFormatter } from '@/providers/dayjs-provider.tsx';
-import { PersonalAccessTokenViewResource } from '@/api-client/requests';
 import { TokenDetail } from '@/modules/user-settings/features/tokens/token-detail.tsx';
+import { useUserTokenGetUserTokens } from '@/libs/api-client/gen/endpoints/user-token/user-token.ts';
+import { PersonalAccessTokenViewResource } from '@/libs/api-client/gen/models';
 
 export function Sessions() {
-  const { data, isLoading } = useUserTokenServiceGetApiUsersTokensByUser({ user: '1', perPage: 100 });
+  const { data, isLoading } = useUserTokenGetUserTokens('1');
   const { formatDate } = useDateFormatter();
   const [openSession, setOpenSession] = useState<PersonalAccessTokenViewResource | undefined>();
 

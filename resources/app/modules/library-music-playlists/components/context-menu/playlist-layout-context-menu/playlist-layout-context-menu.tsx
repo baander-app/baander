@@ -1,12 +1,12 @@
 import { ContextMenu } from '@radix-ui/themes';
-import { usePlaylistServiceDeleteApiPlaylistsByPlaylist } from '@/api-client/queries';
+import { usePlaylistDestroy } from '@/libs/api-client/gen/endpoints/playlist/playlist.ts';
 
 export interface PlaylistLayoutContextMenuProps {
   id: string;
 }
 
 export function PlaylistLayoutContextMenu({id}: PlaylistLayoutContextMenuProps) {
-  const deleteMutation = usePlaylistServiceDeleteApiPlaylistsByPlaylist({
+  const deleteMutation = usePlaylistDestroy({
 
   });
 

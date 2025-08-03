@@ -1,4 +1,4 @@
-import { PersonalAccessTokenViewResource } from '@/api-client/requests';
+import { PersonalAccessTokenViewResource } from '@/libs/api-client/gen/models';
 import { Code, Badge, Card, DataList } from '@radix-ui/themes';
 import { useDateFormatter } from '@/providers/dayjs-provider.tsx';
 import { DateTime } from '@/ui/dates/date-time.tsx';

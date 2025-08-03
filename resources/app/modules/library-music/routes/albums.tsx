@@ -1,18 +1,16 @@
 import { useState } from 'react';
-
 import styles from './albums.module.scss';
 import { AlbumDetail } from '@/modules/library-music/components/album-detail/album-detail.tsx';
 import { CoverGrid } from '@/modules/library-music/components/cover-grid';
 import { Album } from '@/modules/library-music/components/album';
-import { useAlbumServiceGetApiLibrariesByLibraryAlbums } from '@/api-client/queries';
 import { Box, ContextMenu, Dialog, Flex, Skeleton } from '@radix-ui/themes';
 import { usePathParam } from '@/hooks/use-path-param.ts';
 import { LibraryParams } from '@/modules/library-music/routes/_routes.tsx';
-import { AlbumResource } from '@/api-client/requests';
 import { motion } from 'motion/react';
 import { useDisclosure } from '@/hooks/use-disclosure.ts';
 import { AlbumEditor } from '@/modules/library-music/components/album-editor/album-editor.tsx';
-
+import { AlbumResource } from '@/libs/api-client/gen/models';
+import { useAlbumsIndex } from '@/libs/api-client/gen/endpoints/album/album.ts';
 
 function AlbumContextMenu({ album }: { album: AlbumResource }) {
   const [showEditor, editorHandlers] = useDisclosure(false);
@@ -44,7 +42,7 @@ function AlbumContextMenu({ album }: { album: AlbumResource }) {
 
           <AlbumEditor album={album} onSubmit={() => {
             editorHandlers.close();
-          }} librarySlug="muzak" />
+          }} librarySlug="muzak"/>
         </Dialog.Content>
       </Dialog.Root>
 
@@ -55,8 +53,7 @@ function AlbumContextMenu({ album }: { album: AlbumResource }) {
 export default function Albums() {
   const { library: libraryParam } = usePathParam<LibraryParams>();
   const [showAlbumDetail, setShowAlbumDetail] = useState<string | null>(null);
-  const { data, isLoading } = useAlbumServiceGetApiLibrariesByLibraryAlbums({
-    library: libraryParam,
+  const { data, isLoading } = useAlbumsIndex(libraryParam, {
     relations: 'artists,cover',
   });
 

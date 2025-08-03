@@ -1,19 +1,20 @@
 import React, { useState } from 'react';
-import { useQueueServiceGetApiQueueMetricsInfinite } from '@/api-client/queries/infiniteQueries.ts';
 import { TableVirtuoso } from 'react-virtuoso';
 import { Button, Dialog, Flex, Text } from '@radix-ui/themes';
-import { QueueMonitorResource } from '@/api-client/requests';
 import { JobStatus } from '@/modules/dashboard/queue-monitor/components/job-status.tsx';
 import dayjs from 'dayjs';
 
 import styles from './jobs-list.module.scss';
 import { JobDetails } from '@/modules/dashboard/queue-monitor/components/job-details.tsx';
+import { useQueueMetricsShowInfinite } from '@/libs/api-client/gen/endpoints/queue/queue.ts';
+import { QueueMonitorResource } from '@/libs/api-client/gen/models';
 
 export interface JobsList extends React.ComponentPropsWithoutRef<'div'> {
 
 }
-export function JobsList({...rest}: JobsList) {
-  const { data: jobsData, fetchNextPage, hasNextPage } = useQueueServiceGetApiQueueMetricsInfinite();
+
+export function JobsList({ ...rest }: JobsList) {
+  const { data: jobsData, fetchNextPage, hasNextPage } = useQueueMetricsShowInfinite();
   const [openJob, setOpenJob] = useState<QueueMonitorResource>();
 
   const getDuration = (start: string | null, end: string | null) => {
@@ -89,10 +90,10 @@ export function JobsList({...rest}: JobsList) {
         />
 
         <Dialog.Content>
-          <Dialog.Title>{ openJob?.name ?? 'Job' }</Dialog.Title>
+          <Dialog.Title>{openJob?.name ?? 'Job'}</Dialog.Title>
           <Dialog.Description>See the details about the job</Dialog.Description>
 
-          {openJob && <JobDetails job={openJob} />}
+          {openJob && <JobDetails job={openJob}/>}
 
           <Flex gap="3" mt="4" justify="end">
             <Dialog.Close>
@@ -118,4 +119,4 @@ const Scroller = React.forwardRef<HTMLDivElement, ScrollerProps>(({ style, ...pr
 });
 const TableComponents = {
   Scroller,
-}
+};

@@ -4,13 +4,11 @@ import { ArtistBigCircle } from '@/modules/library-music/components/artwork/arti
 import { Container } from '@radix-ui/themes';
 import { usePathParam } from '@/hooks/use-path-param.ts';
 import { LibraryParams } from '@/modules/library-music/routes/_routes.tsx';
-import { useArtistServiceGetApiLibrariesByLibraryArtists } from '@/api-client/queries';
+import { useArtistsIndex } from '@/libs/api-client/gen/endpoints/artist/artist.ts';
 
 export default function Artists() {
   const { library: libraryParam } = usePathParam<LibraryParams>();
-  const {data: artistsData} = useArtistServiceGetApiLibrariesByLibraryArtists({
-    library: libraryParam,
-  })
+  const {data: artistsData} = useArtistsIndex(libraryParam)
 
   return (
     <Container className={styles.artistsLayout}>

@@ -21,21 +21,5 @@ dayjs.extend(duration);
 dayjs.extend(relativeTime);
 dayjs.extend(localizedFormat);
 
-// Internal imports
-import { applyInterceptors } from '@/api-client-ext/interceptors';
-import { OpenAPI as OpenAPIConfig } from '@/api-client/requests';
-import { Token } from '@/services/auth/token.ts';
-
-
-// OpenAPI configuration
-OpenAPIConfig.BASE = `${import.meta.env.VITE_APP_URL}`;
-OpenAPIConfig.CREDENTIALS = 'same-origin';
-OpenAPIConfig.HEADERS = {
-  'accept': 'application/json',
-  'X-CSRF-TOKEN': document.head.querySelector('meta[name="csrf-token"]')!.getAttribute('content') as string,
-  'X-Requested-With': 'XMLHttpRequest',
-};
-OpenAPIConfig.TOKEN = Token.get()?.accessToken.token;
-
-// Apply request interceptors
-applyInterceptors();
+import '@fontsource-variable/inter';
+import '@fontsource-variable/source-code-pro';

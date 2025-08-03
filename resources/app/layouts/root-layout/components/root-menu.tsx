@@ -4,13 +4,14 @@ import { lazyImport } from '@/utils/lazy-import';
 import { Iconify } from '@/ui/icons/iconify';
 import styles from './root-menu.module.scss';
 import { ReactNode, useMemo } from 'react';
-import { useLibraryServiceGetApiLibraries, usePlaylistServiceGetApiPlaylists } from '@/api-client/queries';
 import { CreatePlaylist } from '@/modules/library-music-playlists/components/create-playlist/create-playlist.tsx';
 import { CreateSmartPlaylist } from '@/modules/library-music-playlists/components/create-smart-playlist/create-smart-playlist.tsx';
-import { LibraryResource, PlaylistResource } from '@/api-client/requests/types.gen';
 import {
   PlaylistLayoutContextMenu
 } from '@/modules/library-music-playlists/components/context-menu/playlist-layout-context-menu/playlist-layout-context-menu.tsx';
+import { useLibrariesIndex } from '@/libs/api-client/gen/endpoints/library/library.ts';
+import { usePlaylistIndex } from '@/libs/api-client/gen/endpoints/playlist/playlist.ts';
+import { LibraryResource, PlaylistResource } from '@/libs/api-client/gen/models';
 
 const { Brand } = lazyImport(() => import('@/ui/brand/Brand'), 'Brand');
 
@@ -33,8 +34,8 @@ interface MenuSection {
 }
 
 export function RootMenu() {
-  const { data: libraryData } = useLibraryServiceGetApiLibraries();
-  const { data: playlistData } = usePlaylistServiceGetApiPlaylists(['playlists']);
+  const { data: libraryData } = useLibrariesIndex();
+  const { data: playlistData } = usePlaylistIndex();
 
   const musicLibraries: LibraryResource[] = useMemo(() => libraryData?.data?.filter(library => library?.type === 'music') ?? [], [libraryData]);
   const movieLibraries: LibraryResource[] = useMemo(() => libraryData?.data?.filter(library => library?.type === 'movie') ?? [], [libraryData]);

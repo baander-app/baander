@@ -1,9 +1,9 @@
-import { useQueueServiceGetApiQueueMetricsMetrics } from '@/api-client/queries';
 import { Flex } from '@radix-ui/themes';
 import { MetricCard } from '@/modules/dashboard/queue-monitor/components/metric-card.tsx';
+import { useQueueMetricsMetrics } from '@/libs/api-client/gen/endpoints/queue/queue.ts';
 
 export function Metrics() {
-  const { data } = useQueueServiceGetApiQueueMetricsMetrics();
+  const { data } = useQueueMetricsMetrics();
 
   return (
     <Flex gap="3" mt="4" justify="center">

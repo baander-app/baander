@@ -6,12 +6,12 @@ import { DashboardLayout } from '@/layouts/dashboard-layout/dashboard-layout.tsx
 import { DashboardRoutes } from '@/modules/dashboard/routes.tsx';
 import { AudioPlayerContextProvider } from '@/modules/library-music-player/providers/audio-player-provider.tsx';
 import { UserSettingsRoutes } from '@/modules/user-settings/routes.tsx';
-import { useLibraryServiceGetApiLibrariesBySlug } from '@/api-client/queries';
 import { usePathParam } from '@/hooks/use-path-param.ts';
 import { LibraryMoviesRoutes } from '@/modules/library-movies/routes/_routes.tsx';
 import { LibraryType } from '@/models/library-type.ts';
 import { Overview } from '@/modules/overview/overview.tsx';
 import { LibraryMusicPlaylistsRoutes } from '@/modules/library-music-playlists/_routes.tsx';
+import { useLibraryShow } from '@/libs/api-client/gen/endpoints/library/library.ts';
 
 const App = () => {
   return (
@@ -38,10 +38,10 @@ const DashboardApp = () => {
 const LibraryRoutes = () => {
   const { library } = usePathParam<{ library: string }>();
 
-  const { data: libraryData, failureReason, isLoading } = useLibraryServiceGetApiLibrariesBySlug({ slug: library });
+  const { data: libraryData, failureReason, isLoading } = useLibraryShow(library);
 
   if (isLoading) return <div>Loading...</div>;
-  if (failureReason) return <div>Error: {failureReason as string}</div>;
+  if (failureReason) return <div>Error: {failureReason.message}</div>;
 
   switch (libraryData?.type) {
     case LibraryType.Music:

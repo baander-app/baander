@@ -1,20 +1,18 @@
 import { ScrollList, ScrollListItem } from '@/modules/library-music/components/scroll-list';
 import { Flex } from '@radix-ui/themes';
-import {
-  useAlbumServiceGetApiLibrariesByLibraryAlbums,
-  useArtistServiceGetApiLibrariesByLibraryArtists,
-  useGenreServiceGetApiGenres,
-} from '@/api-client/queries';
 import { useEffect, useState } from 'react';
 import { SongList } from '@/modules/library-music/components/song-list/song-list.tsx';
-import { GenreResource } from '@/api-client/requests';
 import { usePathParam } from '@/hooks/use-path-param.ts';
 import { LibraryParams } from '@/modules/library-music/routes/_routes.tsx';
+import { useGenresIndex } from '@/libs/api-client/gen/endpoints/genre/genre.ts';
+import { GenreResource } from '@/libs/api-client/gen/models';
+import { useAlbumsIndex } from '@/libs/api-client/gen/endpoints/album/album.ts';
+import { useArtistsIndex } from '@/libs/api-client/gen/endpoints/artist/artist.ts';
 
 export default function Songs() {
   const { library } = usePathParam<LibraryParams>();
 
-  const { data: genreData } = useGenreServiceGetApiGenres({ librarySlug: library });
+  const { data: genreData } = useGenresIndex();
   const [genres, setGenres] = useState<ScrollListItem[]>([]);
   const [selectedGenres, setSelectedGenres] = useState<ScrollListItem | undefined>();
 
@@ -29,8 +27,7 @@ export default function Songs() {
     }
   }, [genreData]);
 
-  const { data: albumData } = useAlbumServiceGetApiLibrariesByLibraryAlbums({
-    library,
+  const { data: albumData } = useAlbumsIndex(library, {
     genres: selectedGenres?.key ?? undefined,
   });
   const [albums, setAlbums] = useState<ScrollListItem[]>([]);
@@ -45,7 +42,7 @@ export default function Songs() {
     }
   }, [albumData]);
 
-  const { data: artistData } = useArtistServiceGetApiLibrariesByLibraryArtists({ library });
+  const { data: artistData } = useArtistsIndex(library);
   const [artists, setArtists] = useState<ScrollListItem[]>([]);
 
   useEffect(() => {

@@ -1,16 +1,15 @@
 import { Flex, Heading, Section } from '@radix-ui/themes';
-import { useAlbumServiceGetApiLibrariesByLibraryAlbums } from '@/api-client/queries';
 import { Carousel } from '@/ui/carousel/carousel.tsx';
 import { ReactNode, useEffect, useState } from 'react';
 import { Album } from '@/modules/library-music/components/album';
+import { useAlbumsIndex } from '@/libs/api-client/gen/endpoints/album/album.ts';
 
 export interface OverviewProps {
   title: string;
 }
 
 export function Overview({title}: OverviewProps) {
-  const { data } = useAlbumServiceGetApiLibrariesByLibraryAlbums({
-    library: 'music',
+  const { data } = useAlbumsIndex('music', {
     relations: 'cover,artists',
   });
   const [albums, setAlbums] = useState<ReactNode[]>([]);

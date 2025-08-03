@@ -1,27 +1,30 @@
 import { Box, Button, Container, Heading } from '@radix-ui/themes';
 import { ReactNode, useEffect, useState } from 'react';
-import { JobService } from '@/api-client/requests';
-import { useLibraryServiceGetApiLibraries } from '@/api-client/queries';
 import { useAppDispatch } from '@/store/hooks.ts';
 import { createNotification } from '@/store/notifications/notifications-slice.ts';
+import { useLibrariesIndex } from '@/libs/api-client/gen/endpoints/library/library.ts';
+import { useJobLibraryScan } from '@/libs/api-client/gen/endpoints/job/job.ts';
 
 export function LibrariesList() {
-  const {data} = useLibraryServiceGetApiLibraries();
+  const { data } = useLibrariesIndex();
   const [rows, setRows] = useState<ReactNode[]>([]);
   const dispatch = useAppDispatch();
 
+  const mutation = useJobLibraryScan({
+    mutation: {
+      onSuccess: (data) => {
+        dispatch(createNotification({
+          type: 'info',
+          title: 'Library scan',
+          message: data.message,
+          toast: true,
+        }));
+      },
+    },
+  });
+
   const startScanJob = (slug: string) => {
-    JobService.postApiJobsScanLibraryBySlug({slug})
-      .then(res => {
-        if (typeof res !== 'string') {
-          dispatch(createNotification({
-            type: 'info',
-            title: 'Library scan',
-            message: res.message,
-            toast: true,
-          }));
-        }
-      });
+    mutation.mutate({ slug });
   };
 
   useEffect(() => {
@@ -51,21 +54,21 @@ export function LibrariesList() {
     <Container mt="3">
       <Heading>Libraries - list</Heading>
 
-     <Box mt="4">
-       <table>
-         <thead>
-         <tr>
-           <th>Name</th>
-           <th>Path</th>
-           <th>Last scan</th>
-           <th>Created</th>
-           <th>Updated</th>
-           <th>Actions</th>
-         </tr>
-         </thead>
-         <tbody>{rows}</tbody>
-       </table>
-     </Box>
+      <Box mt="4">
+        <table>
+          <thead>
+          <tr>
+            <th>Name</th>
+            <th>Path</th>
+            <th>Last scan</th>
+            <th>Created</th>
+            <th>Updated</th>
+            <th>Actions</th>
+          </tr>
+          </thead>
+          <tbody>{rows}</tbody>
+        </table>
+      </Box>
     </Container>
   );
 }

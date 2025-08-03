@@ -1,12 +1,9 @@
-
-import { useForm, SubmitHandler } from 'react-hook-form';
+import { SubmitHandler, useForm } from 'react-hook-form';
 import { DevTool } from '@hookform/devtools';
-import { TextField, Button, Box, Flex, Text } from '@radix-ui/themes';
+import { Box, Button, Flex, Text, TextField } from '@radix-ui/themes';
 import { Label } from 'radix-ui';
 import styles from './create-account-form.module.scss';
-import { useAppDispatch } from '@/store/hooks';
-import { createUser } from '@/store/users/auth-slice.ts';
-
+import { authRegister } from '@/libs/api-client/gen/endpoints/auth/auth.ts';
 
 interface AccountForm {
   name: string;
@@ -23,7 +20,6 @@ export function CreateAccountForm() {
     control,
     setError,
   } = useForm<AccountForm>();
-  const dispatch = useAppDispatch();
 
   const onSubmit: SubmitHandler<AccountForm> = (data) => {
     if (data.password !== data.password_confirmation) {
@@ -34,7 +30,7 @@ export function CreateAccountForm() {
       return;
     }
 
-    dispatch(createUser(data));
+    authRegister(data);
   };
 
   return (
@@ -98,7 +94,7 @@ export function CreateAccountForm() {
         </Flex>
       </form>
 
-      <DevTool control={control} />
+      <DevTool control={control}/>
     </>
   );
 }

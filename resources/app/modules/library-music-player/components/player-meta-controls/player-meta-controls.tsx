@@ -5,15 +5,14 @@ import {
 } from '@/modules/library-music-player/components/player-buttons/player-buttons.tsx';
 import { Waveform } from '@/ui/waveform/waveform.tsx';
 import styles from './player-meta-controls.module.scss';
-import { SongResource } from '@/api-client/requests';
 import { VolumeSlider } from '@/modules/library-music-player/components/volume-slider/volume-slider.tsx';
 import { useLyrics } from '@/ui/lyrics-viewer/providers/lyrics-provider.tsx';
 import { LyricsViewer } from '@/ui/lyrics-viewer/lyrics-viewer.tsx';
 import { useEffect } from 'react';
 import { useDisclosure } from '@/hooks/use-disclosure';
-import { Box, Button } from '@radix-ui/themes';
-import { Iconify } from '@/ui/icons/iconify.tsx';
+import { Box } from '@radix-ui/themes';
 import { Equalizer } from '@/modules/sony-eq/equalizer.tsx';
+import { SongResource } from '@/libs/api-client/gen/models';
 
 export interface PlayerMetaControlsProps {
   song?: SongResource;

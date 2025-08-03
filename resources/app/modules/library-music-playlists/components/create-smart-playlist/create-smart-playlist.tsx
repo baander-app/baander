@@ -1,9 +1,9 @@
-import { Button, Flex, Switch, Text, TextField } from '@radix-ui/themes';
+import { Flex, Switch, Text, TextField } from '@radix-ui/themes';
 import { useForm, Controller } from 'react-hook-form';
 import { useState } from 'react';
-import { PlaylistService } from '../../../../api-client/requests/services.gen';
 import { SmartPlaylistRuleEditor } from '../smart-playlist-rule-editor/smart-playlist-rule-editor';
 import styles from './create-smart-playlist.module.scss';
+import { usePlaylistSmartCreate } from '@/libs/api-client/gen/endpoints/playlist/playlist.ts';
 
 interface SmartPlaylistForm {
   name: string;
@@ -44,19 +44,36 @@ export function CreateSmartPlaylist() {
   const rules = watch('rules.0.rules');
 
   const [error, setError] = useState<string | null>(null);
-  const [isSubmittingManual, setIsSubmittingManual] = useState<boolean>(false);
+
+  const mutation = usePlaylistSmartCreate({
+    mutation: {
+      onSuccess: () => {
+        console.log('Smart playlist created successfully');
+        window.location.href = '/library/playlists';
+      },
+      onError: (err: any) => {
+        console.error('Error creating smart playlist:', err);
+        if (err.status === 422 && err.body?.errors) {
+          // Handle validation errors
+          const validationErrors = err.body.errors;
+          const errorMessages = Object.values(validationErrors).flat();
+          setError(errorMessages.join(', '));
+        } else {
+          setError(err.body?.message || 'Failed to create smart playlist');
+        }
+      }
+    }
+  });
 
   const onSubmit = async (data: SmartPlaylistForm) => {
     console.log('Form submitted with data:', data);
     try {
       setError(null);
-      setIsSubmittingManual(true); // Set manual submitting state to true
 
       // Validate that at least one rule is defined
       if (data.rules.length === 0 || data.rules[0].rules.length === 0) {
         setError('At least one rule is required');
         console.log('Validation failed: At least one rule is required');
-        setIsSubmittingManual(false); // Reset manual submitting state
         return;
       }
 
@@ -77,33 +94,18 @@ export function CreateSmartPlaylist() {
 
       console.log('Sending API data:', apiData);
 
-      // Make the API call with the transformed data
-      await PlaylistService.postApiPlaylistsSmart({
-        requestBody: apiData,
-      });
+      // Use the mutation instead of the old API call
+      mutation.mutate({ data: apiData });
 
-      console.log('API call successful');
-
-      // Handle success - redirect or show success message
-      window.location.href = '/library/playlists';
     } catch (err: any) {
-      console.error('Error in API call:', err);
-      if (err.status === 422 && err.body?.errors) {
-        // Handle validation errors
-        const validationErrors = err.body.errors;
-        const errorMessages = Object.values(validationErrors).flat();
-        setError(errorMessages.join(', '));
-      } else {
-        setError(err.body?.message || 'Failed to create smart playlist');
-      }
-      // Reset manual submitting state
-      setIsSubmittingManual(false);
+      console.error('Error in form submission:', err);
+      setError('An unexpected error occurred');
     }
   };
 
   return (
     <div className={styles.container}>
-      <form 
+      <form
         onSubmit={(e) => {
           console.log('Form onSubmit event triggered');
           try {
@@ -132,7 +134,7 @@ export function CreateSmartPlaylist() {
                   data-1p-ignore
                   placeholder="Playlist name"
                   className={styles.input}
-                  {...register('name', { 
+                  {...register('name', {
                     required: 'Name is required',
                     maxLength: { value: 255, message: 'Name must be at most 255 characters' }
                   })}
@@ -183,9 +185,9 @@ export function CreateSmartPlaylist() {
               <Text as="div" size="2" mb="1" weight="bold" className={styles.title}>
                 Rules
               </Text>
-              <SmartPlaylistRuleEditor 
-                control={control} 
-                name="rules" 
+              <SmartPlaylistRuleEditor
+                control={control}
+                name="rules"
                 errors={errors.rules}
               />
               {errors.rules && (
@@ -202,35 +204,12 @@ export function CreateSmartPlaylist() {
           </Flex>
 
           <Flex justify="end" mt="4" className={styles.submitButton}>
-            {/* Using a regular HTML button instead of Radix UI Button */}
-            <button 
+            <button
               type="submit"
               className={styles.submitButtonHtml}
-              onClick={(e) => {
-                console.log('Submit button clicked');
-
-                // As a fallback, manually trigger form submission if the regular process fails
-                if (!isSubmitting && !isSubmittingManual) {
-                  e.preventDefault(); // Prevent default form submission
-                  console.log('Manually triggering form submission');
-
-                  // Get the current form values
-                  const formValues = {
-                    name: watch('name'),
-                    description: watch('description'),
-                    is_public: watch('is_public'),
-                    rules: watch('rules')
-                  };
-
-                  console.log('Manual submission with values:', formValues);
-
-                  // Call onSubmit directly
-                  onSubmit(formValues);
-                }
-              }}
-              disabled={isSubmitting || isSubmittingManual}
+              disabled={isSubmitting || mutation.isPending}
             >
-              {isSubmitting || isSubmittingManual ? 'Creating...' : 'Create Smart Playlist'}
+              {isSubmitting || mutation.isPending ? 'Creating...' : 'Create Smart Playlist'}
             </button>
           </Flex>
         </Flex>

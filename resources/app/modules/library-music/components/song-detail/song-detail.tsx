@@ -1,4 +1,3 @@
-import { useSongServiceGetApiLibrariesByLibrarySongsByPublicId } from '@/api-client/queries';
 import {
   Box,
   Callout,
@@ -10,13 +9,14 @@ import {
 } from '@radix-ui/themes';
 import { DateTime } from '@/ui/dates/date-time.tsx';
 import { useEffect, useState } from 'react';
+import { useSongsShow } from '@/libs/api-client/gen/endpoints/song/song.ts';
 
 export interface SongDetailProps {
   publicId: string;
 }
 
 export function SongDetail({ publicId }: SongDetailProps) {
-  const { data, error, isLoading } = useSongServiceGetApiLibrariesByLibrarySongsByPublicId({ library: 'music', publicId });
+  const { data, error, isLoading } = useSongsShow('music', publicId);
 
   const [title, setTitle] = useState('');
   const [year, setYear] = useState<number | ''>('');

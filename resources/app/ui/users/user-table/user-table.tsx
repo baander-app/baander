@@ -1,11 +1,11 @@
 import { ColumnDef, getCoreRowModel, getSortedRowModel, SortingState, useReactTable } from './types';
 import { useMemo, useState } from 'react';
 import { Iconify } from '@/ui/icons/iconify.tsx';
-import { useUserServiceGetApiUsers } from '@/api-client/queries';
-import { UserResource } from '@/api-client/requests';
 import { Tooltip } from 'radix-ui';
 import { Button, Flex, Text } from '@radix-ui/themes';
 import  { Table } from '@radix-ui/themes';
+import { UserResource } from '@/libs/api-client/gen/models';
+import { useUsersIndex } from '@/libs/api-client/gen/endpoints/user/user.ts';
 
 export function UserTable() {
   const columns = useMemo<ColumnDef<UserResource>[]>(
@@ -40,7 +40,7 @@ export function UserTable() {
     pageSize: 30,
   });
 
-  const { data, isLoading, refetch } = useUserServiceGetApiUsers({
+  const { data, isLoading, refetch } = useUsersIndex({
     sorting: JSON.stringify(sorting),
     page: pagination.pageIndex,
     limit: pagination.pageSize,

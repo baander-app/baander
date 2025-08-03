@@ -207,7 +207,7 @@ export const Equalizer: React.FC<EqualizerProps> = ({
     const audioProcessor = globalAudioProcessor.getProcessor();
 
     if (audioProcessor) {
-      audioProcessor.setEnabled(eqState.isEnabled);
+      audioProcessor.setEnabled();
       audioProcessor.updateEQBands(eqState.bands.map(band => band.gain));
       audioProcessor.setVolume(volume / 100);
       audioProcessor.setMuted(isMuted);

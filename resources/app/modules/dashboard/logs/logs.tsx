@@ -1,7 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  useLogsServiceGetApiLogs
-} from '@/api-client/queries';
 import { LogViewer } from './components/log-viewer.tsx';
 import { LogSearch } from './components/log-search.tsx';
 import { LogStats } from './components/log-stats.tsx';
@@ -13,6 +10,7 @@ import {
   Container,
 } from '@radix-ui/themes';
 import './logs.css';
+import { useLogsIndex } from '@/libs/api-client/gen/endpoints/logs/logs.ts';
 
 export const LogsPage: React.FC = () => {
   const [selectedLogFile, setSelectedLogFile] = useState<string | null>(null);
@@ -25,7 +23,7 @@ export const LogsPage: React.FC = () => {
     data: logFiles, 
     isLoading: isLoadingLogFiles, 
     error: logFilesError 
-  } = useLogsServiceGetApiLogs();
+  } = useLogsIndex();
 
   // Select first log file by default if none selected
   useEffect(() => {

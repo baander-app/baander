@@ -30,7 +30,7 @@ class OpCacheController extends Controller
      *  file_cache_only: bool,
      *  cache_full: bool,
      *  restart_pending: bool,
-     *  restart_in_progress,
+     *  restart_in_progress: bool,
      *  memory_usage: array{
      *    used_memory: int,
      *    free_memory: int,

@@ -1,8 +1,8 @@
 import React, { RefObject, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { noop } from '@/utils/noop.ts';
-import { useStreamToken } from '@/hooks/use-stream-token.ts';
 import { useAppDispatch, useAppSelector } from '@/store/hooks.ts';
 import { playNextSong, selectSong } from '@/store/music/music-player-slice.ts';
+import { useAuth } from '@/providers/auth-provider.tsx';
 
 interface MusicSourceContextType {
   authenticatedSource: string | undefined;
@@ -19,7 +19,7 @@ MusicSourceContext.displayName = 'MusicSourceContext';
 
 export function MusicSourceProvider({ children }: { children: React.ReactNode }) {
   const dispatch = useAppDispatch();
-  const { streamToken } = useStreamToken();
+  const { streamToken } = useAuth();
 
   const currentSong = useAppSelector(selectSong);
   const [audioRef, setAudioRef] = useState<RefObject<HTMLAudioElement | null>>();

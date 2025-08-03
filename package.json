@@ -3,11 +3,12 @@
     "version": "1.0.0",
     "private": true,
     "license": "Apache-2.0",
+    "type": "module",
     "scripts": {
         "clean": "rimraf public/build",
         "build": "yarn clean && tsc && vite build",
         "dev": "yarn clean && vite",
-        "generate-api-client": "openapi-rq -i ./api.json -c axios --initialPageParam=1 --nextPageParam=nextPage -o resources/app/api-client"
+        "generate-api-client": "npx orval --config orval.config.cjs"
     },
     "dependencies": {
         "@fontsource-variable/inter": "^5.1.1",
@@ -38,7 +39,7 @@
         "@reduxjs/toolkit": "^2.5.1",
         "@simplewebauthn/browser": "^10.0.0",
         "@tabler/icons-react": "^3.29.0",
-        "@tanstack/react-query": "^5.65.1",
+        "@tanstack/react-query": "^5.84.1",
         "@tanstack/react-query-devtools": "^5.65.1",
         "@tanstack/react-query-persist-client": "^5.65.1",
         "@tanstack/react-table": "^8.20.6",
@@ -82,7 +83,6 @@
         "ziggy-js": "^2.5.0"
     },
     "devDependencies": {
-        "@7nohe/openapi-react-query-codegen": "^1.6.2",
         "@hookform/devtools": "^4.4.0",
         "@iconify/react": "^5.2.0",
         "@types/node": "^22.12.0",
@@ -93,6 +93,7 @@
         "babel-plugin-react-compiler": "^19.0.0-beta-27714ef-20250124",
         "chokidar": "^4.0.3",
         "laravel-vite-plugin": "^1.2.0",
+        "orval": "^7.11.2",
         "postcss": "^8.5.1",
         "postcss-simple-vars": "^7.0.1",
         "resolve-url-loader": "^5.0.0",

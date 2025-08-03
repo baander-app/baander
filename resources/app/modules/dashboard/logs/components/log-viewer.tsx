@@ -1,26 +1,19 @@
-
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { VirtualLogViewer } from './virtual-log-viewer.tsx';
 import { JsonLogLine } from './json-log-line.tsx';
 import { LineJumpNavigation } from './line-jump-navigation.tsx';
-import {
-  useLogsServiceGetApiLogsByLogFileContent,
-  useLogsServiceGetApiLogsByLogFileSearch,
-  useLogsServiceGetApiLogsByLogFileTail,
-  useLogsServiceGetApiLogsByLogFileHead,
-  useLogsServiceGetApiLogsByLogFileLines
-} from '@/api-client/queries';
 import { LoadingSpinner } from '@/modules/common/LoadingSpinner.tsx';
 import { ErrorDisplay } from '@/modules/common/ErrorDisplay.tsx';
-import {
-  Box,
-  Flex,
-  Text,
-  ScrollArea,
-  Em
-} from '@radix-ui/themes';
+import { Box, Em, Flex, ScrollArea, Text } from '@radix-ui/themes';
 import { MagnifyingGlassIcon } from '@radix-ui/react-icons';
 import { useDebounce } from 'ahooks';
+import {
+  useLogsContent,
+  useLogsHead,
+  useLogsSearch,
+  useLogsShow,
+  useLogsTail,
+} from '@/libs/api-client/gen/endpoints/logs/logs.ts';
 
 interface LogViewerProps {
   logFileId: string;
@@ -59,32 +52,32 @@ const SimpleLogDisplay: React.FC<{
       return {
         color: '#ff6b6b',
         backgroundColor: '#ff6b6b08',
-        borderLeft: '3px solid #ff6b6b20'
+        borderLeft: '3px solid #ff6b6b20',
       };
     }
     if (upperContent.includes('WARN')) {
       return {
         color: '#ffa726',
         backgroundColor: '#ffa72608',
-        borderLeft: '3px solid #ffa72620'
+        borderLeft: '3px solid #ffa72620',
       };
     }
     if (upperContent.includes('INFO')) {
       return {
         color: '#42a5f5',
         backgroundColor: '#42a5f508',
-        borderLeft: '3px solid #42a5f520'
+        borderLeft: '3px solid #42a5f520',
       };
     }
     if (upperContent.includes('DEBUG')) {
       return {
         color: '#9e9e9e',
-        borderLeft: '3px solid transparent'
+        borderLeft: '3px solid transparent',
       };
     }
     return {
       color: '#e0e0e0',
-      borderLeft: '3px solid transparent'
+      borderLeft: '3px solid transparent',
     };
   };
 
@@ -145,7 +138,7 @@ const SearchResults: React.FC<{
       }}
     >
       <Flex align="center" gap="3">
-        <MagnifyingGlassIcon width="16" height="16" style={{ color: '#64748b' }} />
+        <MagnifyingGlassIcon width="16" height="16" style={{ color: '#64748b' }}/>
         <Text style={{ color: '#e2e8f0', fontSize: '14px', fontWeight: '500' }}>
           Found <span style={{ color: '#3b82f6', fontWeight: '600' }}>{totalMatches}</span> matches for
           <Em style={{ color: '#fbbf24', fontWeight: '500', marginLeft: '4px' }}>"{searchQuery}"</Em>
@@ -169,7 +162,7 @@ const SearchResults: React.FC<{
             content={result.content}
             logStyle={{
               color: '#fbbf24',
-              backgroundColor: 'transparent'
+              backgroundColor: 'transparent',
             }}
           />
         </Box>
@@ -190,11 +183,11 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     currentEndLine: 0,
     totalLines: 0,
     hasMoreBefore: false,
-    hasMoreAfter: false
+    hasMoreAfter: false,
   });
 
   const debouncedSearchQuery = useDebounce(searchQuery, {
-    wait: 300
+    wait: 300,
   });
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [currentAfterLine, setCurrentAfterLine] = useState(0);
@@ -207,7 +200,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
       currentEndLine: 0,
       totalLines: 0,
       hasMoreBefore: false,
-      hasMoreAfter: false
+      hasMoreAfter: false,
     });
     setCurrentAfterLine(0);
     setIsLoadingMore(false);
@@ -217,10 +210,10 @@ export const LogViewer: React.FC<LogViewerProps> = ({
   const {
     data: linesData,
     isLoading: isLoadingLines,
-  } = useLogsServiceGetApiLogsByLogFileLines(
-    { logFile: logFileId },
-    undefined,
-    { enabled: !!logFileId }
+  } = useLogsShow(logFileId,
+    {
+      query: { enabled: !!logFileId },
+    },
   );
 
   // Content endpoint with pagination - ONLY for content mode
@@ -228,17 +221,17 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     data: contentData,
     isLoading: isLoadingContent,
     error: contentError,
-  } = useLogsServiceGetApiLogsByLogFileContent(
+  } = useLogsContent(logFileId,
     {
-      logFile: logFileId,
-      maxLines: Math.min(linesCount, 5000),
-      afterLine: currentAfterLine
+      max_lines: Math.min(linesCount, 5000),
+      after_line: currentAfterLine,
     },
-    undefined,
     {
-      enabled: viewMode === 'content' && !!logFileId,
-      refetchOnWindowFocus: false,
-    }
+      query: {
+        enabled: viewMode === 'content' && !!logFileId,
+        refetchOnWindowFocus: false,
+      },
+    },
   );
 
   // Tail endpoint - ONLY for tail mode
@@ -246,16 +239,16 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     data: tailData,
     isLoading: isLoadingTail,
     error: tailError,
-  } = useLogsServiceGetApiLogsByLogFileTail(
+  } = useLogsTail(logFileId,
     {
-      logFile: logFileId,
-      lines: Math.min(linesCount, 1000)
+      lines: Math.min(linesCount, 1000),
     },
-    undefined,
     {
-      enabled: viewMode === 'tail' && !!logFileId,
-      refetchOnWindowFocus: false,
-    }
+      query: {
+        enabled: viewMode === 'tail' && !!logFileId,
+        refetchOnWindowFocus: false,
+      }
+    },
   );
 
   // Head endpoint - ONLY for head mode
@@ -263,16 +256,17 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     data: headData,
     isLoading: isLoadingHead,
     error: headError,
-  } = useLogsServiceGetApiLogsByLogFileHead(
+  } = useLogsHead(
+    logFileId,
     {
-      logFile: logFileId,
-      lines: Math.min(linesCount, 1000)
+      lines: Math.min(linesCount, 1000),
     },
-    undefined,
     {
-      enabled: viewMode === 'head' && !!logFileId,
-      refetchOnWindowFocus: false,
-    }
+      query: {
+        enabled: viewMode === 'head' && !!logFileId,
+        refetchOnWindowFocus: false,
+      }
+    },
   );
 
   // Search endpoint - ONLY for search mode
@@ -280,18 +274,18 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     data: searchData,
     isLoading: isLoadingSearch,
     error: searchError,
-  } = useLogsServiceGetApiLogsByLogFileSearch(
+  } = useLogsSearch(logFileId,
     {
-      logFile: logFileId,
       pattern: debouncedSearchQuery,
       maxResults: 1000,
-      caseSensitive: false
+      caseSensitive: false,
     },
-    undefined,
     {
-      enabled: viewMode === 'search' && !!logFileId && debouncedSearchQuery.length > 2,
-      refetchOnWindowFocus: false,
-    }
+      query: {
+        enabled: viewMode === 'search' && !!logFileId,
+        refetchOnWindowFocus: false,
+      }
+    },
   );
 
   // Process log data helper
@@ -305,7 +299,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
         .filter(line => line.trim() !== '')
         .map((content, index) => ({
           line: startLine + index,
-          content: content.trim()
+          content: content.trim(),
         }));
     }
 
@@ -315,7 +309,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
         .filter(line => line.trim() !== '')
         .map((content, index) => ({
           line: index + 1,
-          content: content.trim()
+          content: content.trim(),
         }));
     }
 
@@ -323,7 +317,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     if (Array.isArray(data)) {
       return data.map((line, index) => ({
         line: line.line || index + 1,
-        content: line.content || String(line)
+        content: line.content || String(line),
       }));
     }
 
@@ -332,7 +326,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
 
   // Process and update state when data changes
   useEffect(() => {
-    const totalLines = linesData?.data?.totalLines || 0;
+    const totalLines = linesData?.data?.lines || 0;
     let processedLines: LogLine[] = [];
     let startLine = 1;
     let endLine = 0;
@@ -367,7 +361,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
         currentEndLine: endLine,
         totalLines,
         hasMoreBefore,
-        hasMoreAfter
+        hasMoreAfter,
       });
     }
   }, [contentData, tailData, headData, linesData, viewMode, processLogData]);
@@ -419,22 +413,32 @@ export const LogViewer: React.FC<LogViewerProps> = ({
   // Determine current loading state
   const isLoading = useMemo(() => {
     switch (viewMode) {
-      case 'content': return isLoadingContent;
-      case 'tail': return isLoadingTail;
-      case 'head': return isLoadingHead;
-      case 'search': return isLoadingSearch;
-      default: return false;
+      case 'content':
+        return isLoadingContent;
+      case 'tail':
+        return isLoadingTail;
+      case 'head':
+        return isLoadingHead;
+      case 'search':
+        return isLoadingSearch;
+      default:
+        return false;
     }
   }, [viewMode, isLoadingContent, isLoadingTail, isLoadingHead, isLoadingSearch]);
 
   // Determine current error
   const error = useMemo(() => {
     switch (viewMode) {
-      case 'content': return contentError;
-      case 'tail': return tailError;
-      case 'head': return headError;
-      case 'search': return searchError;
-      default: return null;
+      case 'content':
+        return contentError;
+      case 'tail':
+        return tailError;
+      case 'head':
+        return headError;
+      case 'search':
+        return searchError;
+      default:
+        return null;
     }
   }, [viewMode, contentError, tailError, headError, searchError]);
 
@@ -449,14 +453,14 @@ export const LogViewer: React.FC<LogViewerProps> = ({
   if (isLoadingLines || (isLoading && paginatedState.lines.length === 0)) {
     return (
       <Flex justify="center" align="center" style={{ height: `${viewerHeight}px` }}>
-        <LoadingSpinner />
+        <LoadingSpinner/>
       </Flex>
     );
   }
 
   // Render error state
   if (error) {
-    return <ErrorDisplay error={error} />;
+    return <ErrorDisplay error={error}/>;
   }
 
   // Render search results
@@ -465,7 +469,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
       return (
         <Flex direction="column" justify="center" align="center" style={{ height: `${viewerHeight}px` }}>
           <Box style={{ marginBottom: '16px', opacity: 0.6 }}>
-            <MagnifyingGlassIcon width="48" height="48" style={{ color: '#6b7280' }} />
+            <MagnifyingGlassIcon width="48" height="48" style={{ color: '#6b7280' }}/>
           </Box>
           <Text style={{ color: '#6b7280', fontSize: '14px' }}>
             No search results found for "<Em style={{ color: '#9ca3af' }}>{debouncedSearchQuery}</Em>"
@@ -501,7 +505,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     linesCount: paginatedState.lines.length,
     hasMoreBefore: paginatedState.hasMoreBefore,
     hasMoreAfter: paginatedState.hasMoreAfter,
-    shouldUseVirtualScrolling
+    shouldUseVirtualScrolling,
   });
 
   return (

@@ -1,28 +1,25 @@
 import { Token } from '@/services/auth/token.ts';
-import { AuthService, OpenAPI } from '@/api-client/requests';
-import { setAccessToken, setStreamToken } from '@/store/users/auth-slice.ts';
 import { store } from '@/store';
 import { NotificationFacade } from '@/modules/notifications/notification-facade.ts';
+import { authRefreshToken, authStreamToken } from '@/libs/api-client/gen/endpoints/auth/auth.ts';
+import { useAuth } from '@/providers/auth-provider.tsx';
 
 export async function refreshToken(type: 'access' | 'stream') {
-  const refreshToken = store.getState().auth?.refreshToken;
+  const { refreshToken, setRefreshToken, setAccessToken, setStreamToken } = useAuth();
 
   if (refreshToken) {
-    OpenAPI.TOKEN = refreshToken.token;
   } else {
     throw new Error('Refresh token not found');
   }
 
   if (type === 'access') {
     try {
-      const accessToken = await AuthService.postApiAuthRefreshToken();
+      const accessToken = await authRefreshToken();
       Token.set({
         accessToken: accessToken.accessToken,
         refreshToken: refreshToken,
       });
       store.dispatch(setAccessToken(accessToken.accessToken));
-
-      OpenAPI.TOKEN = accessToken.accessToken.token;
     } catch (e) {
       NotificationFacade.create({
         type: 'error',
@@ -39,7 +36,7 @@ export async function refreshToken(type: 'access' | 'stream') {
 
   if (type === 'stream') {
     try {
-      const streamToken = await AuthService.postApiAuthStreamToken();
+      const streamToken = await authStreamToken();
 
       Token.setStreamToken(streamToken.streamToken);
       store.dispatch(setStreamToken(streamToken.streamToken));

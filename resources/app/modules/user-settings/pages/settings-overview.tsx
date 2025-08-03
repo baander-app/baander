@@ -2,7 +2,6 @@ import { SettingsPageLayout } from '@/modules/user-settings/layouts/settings-pag
 import { Box, Button } from '@radix-ui/themes';
 import { DevPanel } from '@/modules/user-settings/features/dev-panel.tsx';
 import { useAppDispatch, useAppSelector } from '@/store/hooks.ts';
-import { logoutUser } from '@/store/users/auth-slice.ts';
 import { setTheme } from '@/store/users/ui-slice.ts';
 
 export function SettingsOverview() {

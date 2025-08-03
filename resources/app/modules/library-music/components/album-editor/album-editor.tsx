@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Button, TextField, Flex, Box, Text, Select, Badge } from '@radix-ui/themes';
+import { useState, useEffect } from 'react';
+import { Button, TextField, Flex, Box, Select, Badge } from '@radix-ui/themes';
 import { useForm, Controller } from 'react-hook-form';
-import { useGenreServiceGetApiGenres } from '@/api-client/queries';
 import styles from './album-editor.module.scss';
 import { Form } from 'radix-ui';
+import { useGenresIndex } from '@/libs/api-client/gen/endpoints/genre/genre.ts';
 
 interface AlbumEditorProps {
   album?: {
@@ -111,7 +111,7 @@ export function AlbumEditor({ album, librarySlug, onSubmit, onCancel }: AlbumEdi
   });
 
   // Fetch genres
-  const { data: genresData, isLoading: genresLoading } = useGenreServiceGetApiGenres({
+  const { data: genresData } = useGenresIndex({
     librarySlug: librarySlug || '',
     limit: 100,
   });

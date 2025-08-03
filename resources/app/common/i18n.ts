@@ -3,6 +3,7 @@ import { initReactI18next } from 'react-i18next';
 
 import LanguageDetector from 'i18next-browser-languagedetector';
 
+
 i18n
   .use(LanguageDetector)
   .use(initReactI18next)
@@ -11,6 +12,7 @@ i18n
     interpolation: {
       escapeValue: false, // not needed for react as it escapes by default
     },
+    // @ts-ignore
     resources: LARAVEL_TRANSLATIONS
   });
 

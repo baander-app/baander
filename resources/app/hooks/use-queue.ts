@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setQueue, setCurrentSongIndex } from '@/store/music/music-player-slice';
-import { SongResource } from '@/api-client/requests';
+import { SongResource } from '@/libs/api-client/gen/models';
 
 export function useQueue() {
   const dispatch = useAppDispatch();

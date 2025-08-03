@@ -3,7 +3,6 @@ import { Flex } from '@radix-ui/themes';
 import { useMusicSource } from '@/providers/music-source-provider.tsx';
 import { PlayerStateInput } from '@/services/libraries/player-state.ts';
 import { useAudioPlayer } from '@/modules/library-music-player/providers/audio-player-provider.tsx';
-import { useSongServiceGetApiLibrariesByLibrarySongsByPublicId } from '@/api-client/queries';
 import { PlayerControls } from '@/modules/library-music-player/components/player-controls/player-controls.tsx';
 import PlayerFacePlate from '@/modules/library-music-player/components/player-face-plate/player-face-plate.tsx';
 import {
@@ -12,6 +11,7 @@ import {
 import { LyricsProvider } from '@/ui/lyrics-viewer/providers/lyrics-provider.tsx';
 import { selectSong } from '@/store/music/music-player-slice.ts';
 import { useAppSelector } from '@/store/hooks.ts';
+import { useSongsShow } from '@/libs/api-client/gen/endpoints/song/song.ts';
 
 export function InlinePlayer() {
   const sourceSong = useAppSelector(selectSong);
@@ -25,11 +25,9 @@ export function InlinePlayer() {
   } = useMusicSource();
 
   const canQuery = Boolean(sourceSong?.public_id);
-  const { data: song } = useSongServiceGetApiLibrariesByLibrarySongsByPublicId({
-    library: 'music',
-    publicId: sourceSong?.public_id!,
-    relations: 'album,album.cover,artists',
-  }, undefined, { enabled: canQuery });
+  const { data: song } = useSongsShow('music', sourceSong?.public_id!, {
+
+  });
 
   const { setSong } = useAudioPlayer();
 
@@ -92,7 +90,7 @@ export function InlinePlayer() {
   return (
     <>
       <LyricsProvider>
-        <Flex justify="center" flexGrow="1" style={{flexGrow: 1}}>
+        <Flex justify="center" flexGrow="1" style={{ flexGrow: 1 }}>
           <PlayerControls
             isPlaying={isPlaying}
             togglePlayPause={() => togglePlayPause()}

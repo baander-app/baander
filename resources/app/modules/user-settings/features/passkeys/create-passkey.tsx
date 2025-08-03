@@ -1,9 +1,9 @@
 import { useWebauthn } from '@/hooks/use-webauthn.ts';
 import { Button, Flex, TextField } from '@radix-ui/themes';
-import { AuthService } from '@/api-client/requests';
 import { useForm } from 'react-hook-form';
 import { Iconify } from '@/ui/icons/iconify.tsx';
 import { useEffect } from 'react';
+import { authPasskeyRegister, authPasskeyRegisterOption } from '@/libs/api-client/gen/endpoints/auth/auth.ts';
 
 type FormValues = {
   name: string,
@@ -21,15 +21,13 @@ export function CreatePasskey() {
   }, []);
 
   const onSubmit = async (values: FormValues) => {
-    const options = await AuthService.getWebauthnPasskeyRegister();
+    const options = await authPasskeyRegisterOption();
     // @ts-ignore
     const registration = await startRegistration(options);
 
-    AuthService.postWebauthnPasskeyRegister({
-      requestBody: {
-        name: values.name,
-        passkey: JSON.stringify(registration),
-      },
+    authPasskeyRegister({
+      name: values.name,
+      passkey: JSON.stringify(registration),
     }).then((res) => {
       console.log(res);
     });
