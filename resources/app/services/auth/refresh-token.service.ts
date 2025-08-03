@@ -1,11 +1,10 @@
 import { Token } from '@/services/auth/token.ts';
-import { store } from '@/store';
 import { NotificationFacade } from '@/modules/notifications/notification-facade.ts';
 import { authRefreshToken, authStreamToken } from '@/libs/api-client/gen/endpoints/auth/auth.ts';
 import { useAuth } from '@/providers/auth-provider.tsx';
 
 export async function refreshToken(type: 'access' | 'stream') {
-  const { refreshToken, setRefreshToken, setAccessToken, setStreamToken } = useAuth();
+  const { refreshToken, setAccessToken, setStreamToken } = useAuth();
 
   if (refreshToken) {
   } else {
@@ -19,7 +18,7 @@ export async function refreshToken(type: 'access' | 'stream') {
         accessToken: accessToken.accessToken,
         refreshToken: refreshToken,
       });
-      store.dispatch(setAccessToken(accessToken.accessToken));
+      setAccessToken(accessToken.accessToken);
     } catch (e) {
       NotificationFacade.create({
         type: 'error',
@@ -39,7 +38,7 @@ export async function refreshToken(type: 'access' | 'stream') {
       const streamToken = await authStreamToken();
 
       Token.setStreamToken(streamToken.streamToken);
-      store.dispatch(setStreamToken(streamToken.streamToken));
+      setStreamToken(streamToken.streamToken);
     } catch (e) {
       NotificationFacade.create({
         type: 'error',

@@ -57,7 +57,7 @@ return [
             'reload_async'        => true,
             'max_wait_time'       => 60,
             'open_tcp_nodelay'    => true,
-            'pid_file'            => storage_path('logs/swoole_http.pid'),
+            'pid_file'            => storage_path('app/swoole_http.pid'),
             'open_cpu_affinity'   => true,
             'cpu_affinity_ignore' => [0, 1],
             'open_http2_protocol' => true,
@@ -106,7 +106,7 @@ return [
         ],
 
         RequestTerminated::class => [
-            // FlushUploadedFiles::class,
+            FlushUploadedFiles::class,
             \App\Octane\Listeners\TelemetryFlushListener::class,
         ],
 

@@ -15,6 +15,7 @@ import type { UserResourceCreatedAt } from "./userResourceCreatedAt";
 import type { UserResourceUpdatedAt } from "./userResourceUpdatedAt";
 
 export interface UserResource {
+  publicId: string;
   name: string;
   email: string;
   isAdmin: boolean;

@@ -713,7 +713,7 @@ export const getHorizonMonitoringTagPaginateQueryKey = (
 export const getHorizonMonitoringTagPaginateInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof horizonMonitoringTagPaginate>>,
-    HorizonMonitoringTagPaginateParams["limit"]
+    HorizonMonitoringTagPaginateParams["page"]
   >,
   TError = ErrorType<unknown>
 >(
@@ -726,7 +726,7 @@ export const getHorizonMonitoringTagPaginateInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        HorizonMonitoringTagPaginateParams["limit"]
+        HorizonMonitoringTagPaginateParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -741,11 +741,11 @@ export const getHorizonMonitoringTagPaginateInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof horizonMonitoringTagPaginate>>,
     QueryKey,
-    HorizonMonitoringTagPaginateParams["limit"]
+    HorizonMonitoringTagPaginateParams["page"]
   > = ({ signal, pageParam }) =>
     horizonMonitoringTagPaginate(
       tag,
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -760,7 +760,7 @@ export const getHorizonMonitoringTagPaginateInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    HorizonMonitoringTagPaginateParams["limit"]
+    HorizonMonitoringTagPaginateParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -772,7 +772,7 @@ export type HorizonMonitoringTagPaginateInfiniteQueryError = ErrorType<unknown>;
 export function useHorizonMonitoringTagPaginateInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof horizonMonitoringTagPaginate>>,
-    HorizonMonitoringTagPaginateParams["limit"]
+    HorizonMonitoringTagPaginateParams["page"]
   >,
   TError = ErrorType<unknown>
 >(
@@ -785,7 +785,7 @@ export function useHorizonMonitoringTagPaginateInfinite<
         TError,
         TData,
         QueryKey,
-        HorizonMonitoringTagPaginateParams["limit"]
+        HorizonMonitoringTagPaginateParams["page"]
       >
     > &
       Pick<
@@ -806,7 +806,7 @@ export function useHorizonMonitoringTagPaginateInfinite<
 export function useHorizonMonitoringTagPaginateInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof horizonMonitoringTagPaginate>>,
-    HorizonMonitoringTagPaginateParams["limit"]
+    HorizonMonitoringTagPaginateParams["page"]
   >,
   TError = ErrorType<unknown>
 >(
@@ -819,7 +819,7 @@ export function useHorizonMonitoringTagPaginateInfinite<
         TError,
         TData,
         QueryKey,
-        HorizonMonitoringTagPaginateParams["limit"]
+        HorizonMonitoringTagPaginateParams["page"]
       >
     > &
       Pick<
@@ -840,7 +840,7 @@ export function useHorizonMonitoringTagPaginateInfinite<
 export function useHorizonMonitoringTagPaginateInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof horizonMonitoringTagPaginate>>,
-    HorizonMonitoringTagPaginateParams["limit"]
+    HorizonMonitoringTagPaginateParams["page"]
   >,
   TError = ErrorType<unknown>
 >(
@@ -853,7 +853,7 @@ export function useHorizonMonitoringTagPaginateInfinite<
         TError,
         TData,
         QueryKey,
-        HorizonMonitoringTagPaginateParams["limit"]
+        HorizonMonitoringTagPaginateParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -869,7 +869,7 @@ export function useHorizonMonitoringTagPaginateInfinite<
 export function useHorizonMonitoringTagPaginateInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof horizonMonitoringTagPaginate>>,
-    HorizonMonitoringTagPaginateParams["limit"]
+    HorizonMonitoringTagPaginateParams["page"]
   >,
   TError = ErrorType<unknown>
 >(
@@ -882,7 +882,7 @@ export function useHorizonMonitoringTagPaginateInfinite<
         TError,
         TData,
         QueryKey,
-        HorizonMonitoringTagPaginateParams["limit"]
+        HorizonMonitoringTagPaginateParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1215,7 +1215,7 @@ export function useHorizonMonitoringTagPaginateSuspense<
 export const getHorizonMonitoringTagPaginateSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof horizonMonitoringTagPaginate>>,
-    HorizonMonitoringTagPaginateParams["limit"]
+    HorizonMonitoringTagPaginateParams["page"]
   >,
   TError = ErrorType<unknown>
 >(
@@ -1228,7 +1228,7 @@ export const getHorizonMonitoringTagPaginateSuspenseInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        HorizonMonitoringTagPaginateParams["limit"]
+        HorizonMonitoringTagPaginateParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1243,11 +1243,11 @@ export const getHorizonMonitoringTagPaginateSuspenseInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof horizonMonitoringTagPaginate>>,
     QueryKey,
-    HorizonMonitoringTagPaginateParams["limit"]
+    HorizonMonitoringTagPaginateParams["page"]
   > = ({ signal, pageParam }) =>
     horizonMonitoringTagPaginate(
       tag,
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -1261,7 +1261,7 @@ export const getHorizonMonitoringTagPaginateSuspenseInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    HorizonMonitoringTagPaginateParams["limit"]
+    HorizonMonitoringTagPaginateParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -1273,7 +1273,7 @@ export type HorizonMonitoringTagPaginateSuspenseInfiniteQueryError =
 export function useHorizonMonitoringTagPaginateSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof horizonMonitoringTagPaginate>>,
-    HorizonMonitoringTagPaginateParams["limit"]
+    HorizonMonitoringTagPaginateParams["page"]
   >,
   TError = ErrorType<unknown>
 >(
@@ -1286,7 +1286,7 @@ export function useHorizonMonitoringTagPaginateSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        HorizonMonitoringTagPaginateParams["limit"]
+        HorizonMonitoringTagPaginateParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1298,7 +1298,7 @@ export function useHorizonMonitoringTagPaginateSuspenseInfinite<
 export function useHorizonMonitoringTagPaginateSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof horizonMonitoringTagPaginate>>,
-    HorizonMonitoringTagPaginateParams["limit"]
+    HorizonMonitoringTagPaginateParams["page"]
   >,
   TError = ErrorType<unknown>
 >(
@@ -1311,7 +1311,7 @@ export function useHorizonMonitoringTagPaginateSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        HorizonMonitoringTagPaginateParams["limit"]
+        HorizonMonitoringTagPaginateParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1323,7 +1323,7 @@ export function useHorizonMonitoringTagPaginateSuspenseInfinite<
 export function useHorizonMonitoringTagPaginateSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof horizonMonitoringTagPaginate>>,
-    HorizonMonitoringTagPaginateParams["limit"]
+    HorizonMonitoringTagPaginateParams["page"]
   >,
   TError = ErrorType<unknown>
 >(
@@ -1336,7 +1336,7 @@ export function useHorizonMonitoringTagPaginateSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        HorizonMonitoringTagPaginateParams["limit"]
+        HorizonMonitoringTagPaginateParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1352,7 +1352,7 @@ export function useHorizonMonitoringTagPaginateSuspenseInfinite<
 export function useHorizonMonitoringTagPaginateSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof horizonMonitoringTagPaginate>>,
-    HorizonMonitoringTagPaginateParams["limit"]
+    HorizonMonitoringTagPaginateParams["page"]
   >,
   TError = ErrorType<unknown>
 >(
@@ -1365,7 +1365,7 @@ export function useHorizonMonitoringTagPaginateSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        HorizonMonitoringTagPaginateParams["limit"]
+        HorizonMonitoringTagPaginateParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;

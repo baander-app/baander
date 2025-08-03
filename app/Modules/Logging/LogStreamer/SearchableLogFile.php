@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Modules\LogStreamer;
+namespace App\Modules\Logging\LogStreamer;
 
-use App\Modules\LogStreamer\Models\ContentChunk;
-use App\Modules\LogStreamer\Models\FileInfo;
-use App\Modules\LogStreamer\Models\SearchResult;
-use App\Modules\LogStreamer\Models\SearchResults;
+use App\Modules\Logging\LogStreamer\Models\ContentChunk;
+use App\Modules\Logging\LogStreamer\Models\FileInfo;
+use App\Modules\Logging\LogStreamer\Models\SearchResult;
+use App\Modules\Logging\LogStreamer\Models\SearchResults;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Swoole\Thread;

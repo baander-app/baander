@@ -78,7 +78,7 @@ export const getLibrariesIndexQueryKey = (params?: LibrariesIndexParams) => {
 export const getLibrariesIndexInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof librariesIndex>>,
-    LibrariesIndexParams["limit"]
+    LibrariesIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -92,7 +92,7 @@ export const getLibrariesIndexInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        LibrariesIndexParams["limit"]
+        LibrariesIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -105,10 +105,10 @@ export const getLibrariesIndexInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof librariesIndex>>,
     QueryKey,
-    LibrariesIndexParams["limit"]
+    LibrariesIndexParams["page"]
   > = ({ signal, pageParam }) =>
     librariesIndex(
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -118,7 +118,7 @@ export const getLibrariesIndexInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    LibrariesIndexParams["limit"]
+    LibrariesIndexParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -132,7 +132,7 @@ export type LibrariesIndexInfiniteQueryError = ErrorType<
 export function useLibrariesIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof librariesIndex>>,
-    LibrariesIndexParams["limit"]
+    LibrariesIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -146,7 +146,7 @@ export function useLibrariesIndexInfinite<
         TError,
         TData,
         QueryKey,
-        LibrariesIndexParams["limit"]
+        LibrariesIndexParams["page"]
       >
     > &
       Pick<
@@ -167,7 +167,7 @@ export function useLibrariesIndexInfinite<
 export function useLibrariesIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof librariesIndex>>,
-    LibrariesIndexParams["limit"]
+    LibrariesIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -181,7 +181,7 @@ export function useLibrariesIndexInfinite<
         TError,
         TData,
         QueryKey,
-        LibrariesIndexParams["limit"]
+        LibrariesIndexParams["page"]
       >
     > &
       Pick<
@@ -202,7 +202,7 @@ export function useLibrariesIndexInfinite<
 export function useLibrariesIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof librariesIndex>>,
-    LibrariesIndexParams["limit"]
+    LibrariesIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -216,7 +216,7 @@ export function useLibrariesIndexInfinite<
         TError,
         TData,
         QueryKey,
-        LibrariesIndexParams["limit"]
+        LibrariesIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -232,7 +232,7 @@ export function useLibrariesIndexInfinite<
 export function useLibrariesIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof librariesIndex>>,
-    LibrariesIndexParams["limit"]
+    LibrariesIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -246,7 +246,7 @@ export function useLibrariesIndexInfinite<
         TError,
         TData,
         QueryKey,
-        LibrariesIndexParams["limit"]
+        LibrariesIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -550,7 +550,7 @@ export function useLibrariesIndexSuspense<
 export const getLibrariesIndexSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof librariesIndex>>,
-    LibrariesIndexParams["limit"]
+    LibrariesIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -564,7 +564,7 @@ export const getLibrariesIndexSuspenseInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        LibrariesIndexParams["limit"]
+        LibrariesIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -577,10 +577,10 @@ export const getLibrariesIndexSuspenseInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof librariesIndex>>,
     QueryKey,
-    LibrariesIndexParams["limit"]
+    LibrariesIndexParams["page"]
   > = ({ signal, pageParam }) =>
     librariesIndex(
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -594,7 +594,7 @@ export const getLibrariesIndexSuspenseInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    LibrariesIndexParams["limit"]
+    LibrariesIndexParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -608,7 +608,7 @@ export type LibrariesIndexSuspenseInfiniteQueryError = ErrorType<
 export function useLibrariesIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof librariesIndex>>,
-    LibrariesIndexParams["limit"]
+    LibrariesIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -622,7 +622,7 @@ export function useLibrariesIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LibrariesIndexParams["limit"]
+        LibrariesIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -634,7 +634,7 @@ export function useLibrariesIndexSuspenseInfinite<
 export function useLibrariesIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof librariesIndex>>,
-    LibrariesIndexParams["limit"]
+    LibrariesIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -648,7 +648,7 @@ export function useLibrariesIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LibrariesIndexParams["limit"]
+        LibrariesIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -660,7 +660,7 @@ export function useLibrariesIndexSuspenseInfinite<
 export function useLibrariesIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof librariesIndex>>,
-    LibrariesIndexParams["limit"]
+    LibrariesIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -674,7 +674,7 @@ export function useLibrariesIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LibrariesIndexParams["limit"]
+        LibrariesIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -690,7 +690,7 @@ export function useLibrariesIndexSuspenseInfinite<
 export function useLibrariesIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof librariesIndex>>,
-    LibrariesIndexParams["limit"]
+    LibrariesIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -704,7 +704,7 @@ export function useLibrariesIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LibrariesIndexParams["limit"]
+        LibrariesIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;

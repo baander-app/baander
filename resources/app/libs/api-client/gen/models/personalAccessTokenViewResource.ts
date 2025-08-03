@@ -12,29 +12,32 @@ The media information is organized and easily searchable, ensuring users can alw
  * OpenAPI spec version: 0.0.1
  */
 import type { PersonalAccessTokenViewResourceAbilities } from "./personalAccessTokenViewResourceAbilities";
-import type { PersonalAccessTokenViewResourceUserAgent } from "./personalAccessTokenViewResourceUserAgent";
-import type { PersonalAccessTokenViewResourceClientName } from "./personalAccessTokenViewResourceClientName";
-import type { PersonalAccessTokenViewResourceClientVersion } from "./personalAccessTokenViewResourceClientVersion";
-import type { PersonalAccessTokenViewResourceClientType } from "./personalAccessTokenViewResourceClientType";
-import type { PersonalAccessTokenViewResourceDeviceOperatingSystem } from "./personalAccessTokenViewResourceDeviceOperatingSystem";
-import type { PersonalAccessTokenViewResourceDeviceName } from "./personalAccessTokenViewResourceDeviceName";
-import type { PersonalAccessTokenViewResourceLastUsedAt } from "./personalAccessTokenViewResourceLastUsedAt";
-import type { PersonalAccessTokenViewResourceExpiresAt } from "./personalAccessTokenViewResourceExpiresAt";
 import type { PersonalAccessTokenViewResourceCreatedAt } from "./personalAccessTokenViewResourceCreatedAt";
+import type { PersonalAccessTokenViewResourceDeviceName } from "./personalAccessTokenViewResourceDeviceName";
+import type { PersonalAccessTokenViewResourceDeviceOperatingSystem } from "./personalAccessTokenViewResourceDeviceOperatingSystem";
+import type { PersonalAccessTokenViewResourceExpiresAt } from "./personalAccessTokenViewResourceExpiresAt";
+import type { PersonalAccessTokenViewResourceLastUsedAt } from "./personalAccessTokenViewResourceLastUsedAt";
 import type { PersonalAccessTokenViewResourceUpdatedAt } from "./personalAccessTokenViewResourceUpdatedAt";
+import type { PersonalAccessTokenViewResourceUserAgent } from "./personalAccessTokenViewResourceUserAgent";
+import type { PersonalAccessTokenViewResourceIpAddress } from "./personalAccessTokenViewResourceIpAddress";
+import type { PersonalAccessTokenViewResourceIpHistory } from "./personalAccessTokenViewResourceIpHistory";
+import type { PersonalAccessTokenViewResourceCountryCode } from "./personalAccessTokenViewResourceCountryCode";
+import type { PersonalAccessTokenViewResourceCity } from "./personalAccessTokenViewResourceCity";
 
 export interface PersonalAccessTokenViewResource {
   id: number;
   name: string;
   abilities: PersonalAccessTokenViewResourceAbilities;
-  userAgent: PersonalAccessTokenViewResourceUserAgent;
-  clientName: PersonalAccessTokenViewResourceClientName;
-  clientVersion: PersonalAccessTokenViewResourceClientVersion;
-  clientType: PersonalAccessTokenViewResourceClientType;
-  deviceOperatingSystem: PersonalAccessTokenViewResourceDeviceOperatingSystem;
-  deviceName: PersonalAccessTokenViewResourceDeviceName;
-  lastUsedAt: PersonalAccessTokenViewResourceLastUsedAt;
-  expiresAt: PersonalAccessTokenViewResourceExpiresAt;
   createdAt: PersonalAccessTokenViewResourceCreatedAt;
+  deviceName: PersonalAccessTokenViewResourceDeviceName;
+  deviceOperatingSystem: PersonalAccessTokenViewResourceDeviceOperatingSystem;
+  expiresAt: PersonalAccessTokenViewResourceExpiresAt;
+  lastUsedAt: PersonalAccessTokenViewResourceLastUsedAt;
   updatedAt: PersonalAccessTokenViewResourceUpdatedAt;
+  userAgent: PersonalAccessTokenViewResourceUserAgent;
+  ipAddress: PersonalAccessTokenViewResourceIpAddress;
+  ipHistory: PersonalAccessTokenViewResourceIpHistory;
+  countryCode: PersonalAccessTokenViewResourceCountryCode;
+  city: PersonalAccessTokenViewResourceCity;
+  ipChangeCount: number;
 }

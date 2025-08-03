@@ -22,9 +22,15 @@ return new class extends Migration
             $table->text('user_agent')->nullable();
             $table->text('device_operating_system')->nullable();
             $table->text('device_name')->nullable();
-            $table->text('client_name')->nullable();
-            $table->text('client_version')->nullable();
-            $table->text('client_type')->nullable();
+            $table->text('client_fingerprint')->nullable();
+            $table->text('session_id')->nullable();
+            $table->ipAddress('ip_address')->nullable();
+            $table->jsonb('ip_history')->nullable();
+            $table->integer('ip_change_count')->default(0);
+            $table->text('country_code', 2)->nullable();
+            $table->text('city')->nullable();
+            $table->timestampTz('last_geo_notification_at')->nullable();
+
             $table->timestampsTz();
         });
     }

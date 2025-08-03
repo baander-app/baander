@@ -724,7 +724,7 @@ export const getPlaylistShowQueryKey = (
 export const getPlaylistShowInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof playlistShow>>,
-    PlaylistShowParams["limit"]
+    PlaylistShowParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -742,7 +742,7 @@ export const getPlaylistShowInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        PlaylistShowParams["limit"]
+        PlaylistShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -756,11 +756,11 @@ export const getPlaylistShowInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof playlistShow>>,
     QueryKey,
-    PlaylistShowParams["limit"]
+    PlaylistShowParams["page"]
   > = ({ signal, pageParam }) =>
     playlistShow(
       playlist,
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -775,7 +775,7 @@ export const getPlaylistShowInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    PlaylistShowParams["limit"]
+    PlaylistShowParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -792,7 +792,7 @@ export type PlaylistShowInfiniteQueryError = ErrorType<
 export function usePlaylistShowInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof playlistShow>>,
-    PlaylistShowParams["limit"]
+    PlaylistShowParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -810,7 +810,7 @@ export function usePlaylistShowInfinite<
         TError,
         TData,
         QueryKey,
-        PlaylistShowParams["limit"]
+        PlaylistShowParams["page"]
       >
     > &
       Pick<
@@ -831,7 +831,7 @@ export function usePlaylistShowInfinite<
 export function usePlaylistShowInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof playlistShow>>,
-    PlaylistShowParams["limit"]
+    PlaylistShowParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -849,7 +849,7 @@ export function usePlaylistShowInfinite<
         TError,
         TData,
         QueryKey,
-        PlaylistShowParams["limit"]
+        PlaylistShowParams["page"]
       >
     > &
       Pick<
@@ -870,7 +870,7 @@ export function usePlaylistShowInfinite<
 export function usePlaylistShowInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof playlistShow>>,
-    PlaylistShowParams["limit"]
+    PlaylistShowParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -888,7 +888,7 @@ export function usePlaylistShowInfinite<
         TError,
         TData,
         QueryKey,
-        PlaylistShowParams["limit"]
+        PlaylistShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -904,7 +904,7 @@ export function usePlaylistShowInfinite<
 export function usePlaylistShowInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof playlistShow>>,
-    PlaylistShowParams["limit"]
+    PlaylistShowParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -922,7 +922,7 @@ export function usePlaylistShowInfinite<
         TError,
         TData,
         QueryKey,
-        PlaylistShowParams["limit"]
+        PlaylistShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1287,7 +1287,7 @@ export function usePlaylistShowSuspense<
 export const getPlaylistShowSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof playlistShow>>,
-    PlaylistShowParams["limit"]
+    PlaylistShowParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1305,7 +1305,7 @@ export const getPlaylistShowSuspenseInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        PlaylistShowParams["limit"]
+        PlaylistShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1319,11 +1319,11 @@ export const getPlaylistShowSuspenseInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof playlistShow>>,
     QueryKey,
-    PlaylistShowParams["limit"]
+    PlaylistShowParams["page"]
   > = ({ signal, pageParam }) =>
     playlistShow(
       playlist,
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -1337,7 +1337,7 @@ export const getPlaylistShowSuspenseInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    PlaylistShowParams["limit"]
+    PlaylistShowParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -1354,7 +1354,7 @@ export type PlaylistShowSuspenseInfiniteQueryError = ErrorType<
 export function usePlaylistShowSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof playlistShow>>,
-    PlaylistShowParams["limit"]
+    PlaylistShowParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1372,7 +1372,7 @@ export function usePlaylistShowSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        PlaylistShowParams["limit"]
+        PlaylistShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1384,7 +1384,7 @@ export function usePlaylistShowSuspenseInfinite<
 export function usePlaylistShowSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof playlistShow>>,
-    PlaylistShowParams["limit"]
+    PlaylistShowParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1402,7 +1402,7 @@ export function usePlaylistShowSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        PlaylistShowParams["limit"]
+        PlaylistShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1414,7 +1414,7 @@ export function usePlaylistShowSuspenseInfinite<
 export function usePlaylistShowSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof playlistShow>>,
-    PlaylistShowParams["limit"]
+    PlaylistShowParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1432,7 +1432,7 @@ export function usePlaylistShowSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        PlaylistShowParams["limit"]
+        PlaylistShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1448,7 +1448,7 @@ export function usePlaylistShowSuspenseInfinite<
 export function usePlaylistShowSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof playlistShow>>,
-    PlaylistShowParams["limit"]
+    PlaylistShowParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1466,7 +1466,7 @@ export function usePlaylistShowSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        PlaylistShowParams["limit"]
+        PlaylistShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -2109,7 +2109,7 @@ export const usePlaylistCollaboratorsStore = <
  */
 export const playlistCollaboratorsDestroy = (
   playlist: string,
-  user: number,
+  user: string,
   options?: SecondParameter<typeof customInstance>
 ) => {
   return customInstance<PlaylistCollaboratorsDestroy200>(
@@ -2132,14 +2132,14 @@ export const getPlaylistCollaboratorsDestroyMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof playlistCollaboratorsDestroy>>,
     TError,
-    { playlist: string; user: number },
+    { playlist: string; user: string },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof playlistCollaboratorsDestroy>>,
   TError,
-  { playlist: string; user: number },
+  { playlist: string; user: string },
   TContext
 > => {
   const mutationKey = ["playlistCollaboratorsDestroy"];
@@ -2153,7 +2153,7 @@ export const getPlaylistCollaboratorsDestroyMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof playlistCollaboratorsDestroy>>,
-    { playlist: string; user: number }
+    { playlist: string; user: string }
   > = (props) => {
     const { playlist, user } = props ?? {};
 
@@ -2188,7 +2188,7 @@ export const usePlaylistCollaboratorsDestroy = <
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof playlistCollaboratorsDestroy>>,
       TError,
-      { playlist: string; user: number },
+      { playlist: string; user: string },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -2197,7 +2197,7 @@ export const usePlaylistCollaboratorsDestroy = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof playlistCollaboratorsDestroy>>,
   TError,
-  { playlist: string; user: number },
+  { playlist: string; user: string },
   TContext
 > => {
   const mutationOptions =

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\LogStreamer\Models;
+namespace App\Modules\Logging\LogStreamer\Models;
 
 use Illuminate\Support\Carbon;
 use Spatie\LaravelData\Data;

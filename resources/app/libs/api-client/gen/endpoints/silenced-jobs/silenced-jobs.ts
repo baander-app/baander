@@ -70,7 +70,7 @@ export const getHorizonSilencedJobsIndexQueryKey = (
 export const getHorizonSilencedJobsIndexInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof horizonSilencedJobsIndex>>,
-    HorizonSilencedJobsIndexParams["limit"]
+    HorizonSilencedJobsIndexParams["page"]
   >,
   TError = ErrorType<unknown>
 >(
@@ -82,7 +82,7 @@ export const getHorizonSilencedJobsIndexInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        HorizonSilencedJobsIndexParams["limit"]
+        HorizonSilencedJobsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -96,10 +96,10 @@ export const getHorizonSilencedJobsIndexInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof horizonSilencedJobsIndex>>,
     QueryKey,
-    HorizonSilencedJobsIndexParams["limit"]
+    HorizonSilencedJobsIndexParams["page"]
   > = ({ signal, pageParam }) =>
     horizonSilencedJobsIndex(
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -109,7 +109,7 @@ export const getHorizonSilencedJobsIndexInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    HorizonSilencedJobsIndexParams["limit"]
+    HorizonSilencedJobsIndexParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -121,7 +121,7 @@ export type HorizonSilencedJobsIndexInfiniteQueryError = ErrorType<unknown>;
 export function useHorizonSilencedJobsIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof horizonSilencedJobsIndex>>,
-    HorizonSilencedJobsIndexParams["limit"]
+    HorizonSilencedJobsIndexParams["page"]
   >,
   TError = ErrorType<unknown>
 >(
@@ -133,7 +133,7 @@ export function useHorizonSilencedJobsIndexInfinite<
         TError,
         TData,
         QueryKey,
-        HorizonSilencedJobsIndexParams["limit"]
+        HorizonSilencedJobsIndexParams["page"]
       >
     > &
       Pick<
@@ -154,7 +154,7 @@ export function useHorizonSilencedJobsIndexInfinite<
 export function useHorizonSilencedJobsIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof horizonSilencedJobsIndex>>,
-    HorizonSilencedJobsIndexParams["limit"]
+    HorizonSilencedJobsIndexParams["page"]
   >,
   TError = ErrorType<unknown>
 >(
@@ -166,7 +166,7 @@ export function useHorizonSilencedJobsIndexInfinite<
         TError,
         TData,
         QueryKey,
-        HorizonSilencedJobsIndexParams["limit"]
+        HorizonSilencedJobsIndexParams["page"]
       >
     > &
       Pick<
@@ -187,7 +187,7 @@ export function useHorizonSilencedJobsIndexInfinite<
 export function useHorizonSilencedJobsIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof horizonSilencedJobsIndex>>,
-    HorizonSilencedJobsIndexParams["limit"]
+    HorizonSilencedJobsIndexParams["page"]
   >,
   TError = ErrorType<unknown>
 >(
@@ -199,7 +199,7 @@ export function useHorizonSilencedJobsIndexInfinite<
         TError,
         TData,
         QueryKey,
-        HorizonSilencedJobsIndexParams["limit"]
+        HorizonSilencedJobsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -215,7 +215,7 @@ export function useHorizonSilencedJobsIndexInfinite<
 export function useHorizonSilencedJobsIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof horizonSilencedJobsIndex>>,
-    HorizonSilencedJobsIndexParams["limit"]
+    HorizonSilencedJobsIndexParams["page"]
   >,
   TError = ErrorType<unknown>
 >(
@@ -227,7 +227,7 @@ export function useHorizonSilencedJobsIndexInfinite<
         TError,
         TData,
         QueryKey,
-        HorizonSilencedJobsIndexParams["limit"]
+        HorizonSilencedJobsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -535,7 +535,7 @@ export function useHorizonSilencedJobsIndexSuspense<
 export const getHorizonSilencedJobsIndexSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof horizonSilencedJobsIndex>>,
-    HorizonSilencedJobsIndexParams["limit"]
+    HorizonSilencedJobsIndexParams["page"]
   >,
   TError = ErrorType<unknown>
 >(
@@ -547,7 +547,7 @@ export const getHorizonSilencedJobsIndexSuspenseInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        HorizonSilencedJobsIndexParams["limit"]
+        HorizonSilencedJobsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -561,10 +561,10 @@ export const getHorizonSilencedJobsIndexSuspenseInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof horizonSilencedJobsIndex>>,
     QueryKey,
-    HorizonSilencedJobsIndexParams["limit"]
+    HorizonSilencedJobsIndexParams["page"]
   > = ({ signal, pageParam }) =>
     horizonSilencedJobsIndex(
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -578,7 +578,7 @@ export const getHorizonSilencedJobsIndexSuspenseInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    HorizonSilencedJobsIndexParams["limit"]
+    HorizonSilencedJobsIndexParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -591,7 +591,7 @@ export type HorizonSilencedJobsIndexSuspenseInfiniteQueryError =
 export function useHorizonSilencedJobsIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof horizonSilencedJobsIndex>>,
-    HorizonSilencedJobsIndexParams["limit"]
+    HorizonSilencedJobsIndexParams["page"]
   >,
   TError = ErrorType<unknown>
 >(
@@ -603,7 +603,7 @@ export function useHorizonSilencedJobsIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        HorizonSilencedJobsIndexParams["limit"]
+        HorizonSilencedJobsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -615,7 +615,7 @@ export function useHorizonSilencedJobsIndexSuspenseInfinite<
 export function useHorizonSilencedJobsIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof horizonSilencedJobsIndex>>,
-    HorizonSilencedJobsIndexParams["limit"]
+    HorizonSilencedJobsIndexParams["page"]
   >,
   TError = ErrorType<unknown>
 >(
@@ -627,7 +627,7 @@ export function useHorizonSilencedJobsIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        HorizonSilencedJobsIndexParams["limit"]
+        HorizonSilencedJobsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -639,7 +639,7 @@ export function useHorizonSilencedJobsIndexSuspenseInfinite<
 export function useHorizonSilencedJobsIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof horizonSilencedJobsIndex>>,
-    HorizonSilencedJobsIndexParams["limit"]
+    HorizonSilencedJobsIndexParams["page"]
   >,
   TError = ErrorType<unknown>
 >(
@@ -651,7 +651,7 @@ export function useHorizonSilencedJobsIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        HorizonSilencedJobsIndexParams["limit"]
+        HorizonSilencedJobsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -667,7 +667,7 @@ export function useHorizonSilencedJobsIndexSuspenseInfinite<
 export function useHorizonSilencedJobsIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof horizonSilencedJobsIndex>>,
-    HorizonSilencedJobsIndexParams["limit"]
+    HorizonSilencedJobsIndexParams["page"]
   >,
   TError = ErrorType<unknown>
 >(
@@ -679,7 +679,7 @@ export function useHorizonSilencedJobsIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        HorizonSilencedJobsIndexParams["limit"]
+        HorizonSilencedJobsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;

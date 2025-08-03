@@ -618,7 +618,7 @@ export const getSpotifyCallbackQueryKey = (params?: SpotifyCallbackParams) => {
 export const getSpotifyCallbackInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifyCallback>>,
-    SpotifyCallbackParams["limit"]
+    SpotifyCallbackParams["page"]
   >,
   TError = ErrorType<SpotifyCallback400 | SpotifyCallback500>
 >(
@@ -630,7 +630,7 @@ export const getSpotifyCallbackInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        SpotifyCallbackParams["limit"]
+        SpotifyCallbackParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -643,10 +643,10 @@ export const getSpotifyCallbackInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof spotifyCallback>>,
     QueryKey,
-    SpotifyCallbackParams["limit"]
+    SpotifyCallbackParams["page"]
   > = ({ signal, pageParam }) =>
     spotifyCallback(
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -656,7 +656,7 @@ export const getSpotifyCallbackInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    SpotifyCallbackParams["limit"]
+    SpotifyCallbackParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -670,7 +670,7 @@ export type SpotifyCallbackInfiniteQueryError = ErrorType<
 export function useSpotifyCallbackInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifyCallback>>,
-    SpotifyCallbackParams["limit"]
+    SpotifyCallbackParams["page"]
   >,
   TError = ErrorType<SpotifyCallback400 | SpotifyCallback500>
 >(
@@ -682,7 +682,7 @@ export function useSpotifyCallbackInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifyCallbackParams["limit"]
+        SpotifyCallbackParams["page"]
       >
     > &
       Pick<
@@ -703,7 +703,7 @@ export function useSpotifyCallbackInfinite<
 export function useSpotifyCallbackInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifyCallback>>,
-    SpotifyCallbackParams["limit"]
+    SpotifyCallbackParams["page"]
   >,
   TError = ErrorType<SpotifyCallback400 | SpotifyCallback500>
 >(
@@ -715,7 +715,7 @@ export function useSpotifyCallbackInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifyCallbackParams["limit"]
+        SpotifyCallbackParams["page"]
       >
     > &
       Pick<
@@ -736,7 +736,7 @@ export function useSpotifyCallbackInfinite<
 export function useSpotifyCallbackInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifyCallback>>,
-    SpotifyCallbackParams["limit"]
+    SpotifyCallbackParams["page"]
   >,
   TError = ErrorType<SpotifyCallback400 | SpotifyCallback500>
 >(
@@ -748,7 +748,7 @@ export function useSpotifyCallbackInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifyCallbackParams["limit"]
+        SpotifyCallbackParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -761,7 +761,7 @@ export function useSpotifyCallbackInfinite<
 export function useSpotifyCallbackInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifyCallback>>,
-    SpotifyCallbackParams["limit"]
+    SpotifyCallbackParams["page"]
   >,
   TError = ErrorType<SpotifyCallback400 | SpotifyCallback500>
 >(
@@ -773,7 +773,7 @@ export function useSpotifyCallbackInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifyCallbackParams["limit"]
+        SpotifyCallbackParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1071,7 +1071,7 @@ export function useSpotifyCallbackSuspense<
 export const getSpotifyCallbackSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifyCallback>>,
-    SpotifyCallbackParams["limit"]
+    SpotifyCallbackParams["page"]
   >,
   TError = ErrorType<SpotifyCallback400 | SpotifyCallback500>
 >(
@@ -1083,7 +1083,7 @@ export const getSpotifyCallbackSuspenseInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        SpotifyCallbackParams["limit"]
+        SpotifyCallbackParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1096,10 +1096,10 @@ export const getSpotifyCallbackSuspenseInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof spotifyCallback>>,
     QueryKey,
-    SpotifyCallbackParams["limit"]
+    SpotifyCallbackParams["page"]
   > = ({ signal, pageParam }) =>
     spotifyCallback(
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -1113,7 +1113,7 @@ export const getSpotifyCallbackSuspenseInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    SpotifyCallbackParams["limit"]
+    SpotifyCallbackParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -1127,7 +1127,7 @@ export type SpotifyCallbackSuspenseInfiniteQueryError = ErrorType<
 export function useSpotifyCallbackSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifyCallback>>,
-    SpotifyCallbackParams["limit"]
+    SpotifyCallbackParams["page"]
   >,
   TError = ErrorType<SpotifyCallback400 | SpotifyCallback500>
 >(
@@ -1139,7 +1139,7 @@ export function useSpotifyCallbackSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifyCallbackParams["limit"]
+        SpotifyCallbackParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1151,7 +1151,7 @@ export function useSpotifyCallbackSuspenseInfinite<
 export function useSpotifyCallbackSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifyCallback>>,
-    SpotifyCallbackParams["limit"]
+    SpotifyCallbackParams["page"]
   >,
   TError = ErrorType<SpotifyCallback400 | SpotifyCallback500>
 >(
@@ -1163,7 +1163,7 @@ export function useSpotifyCallbackSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifyCallbackParams["limit"]
+        SpotifyCallbackParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1175,7 +1175,7 @@ export function useSpotifyCallbackSuspenseInfinite<
 export function useSpotifyCallbackSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifyCallback>>,
-    SpotifyCallbackParams["limit"]
+    SpotifyCallbackParams["page"]
   >,
   TError = ErrorType<SpotifyCallback400 | SpotifyCallback500>
 >(
@@ -1187,7 +1187,7 @@ export function useSpotifyCallbackSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifyCallbackParams["limit"]
+        SpotifyCallbackParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1200,7 +1200,7 @@ export function useSpotifyCallbackSuspenseInfinite<
 export function useSpotifyCallbackSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifyCallback>>,
-    SpotifyCallbackParams["limit"]
+    SpotifyCallbackParams["page"]
   >,
   TError = ErrorType<SpotifyCallback400 | SpotifyCallback500>
 >(
@@ -1212,7 +1212,7 @@ export function useSpotifyCallbackSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifyCallbackParams["limit"]
+        SpotifyCallbackParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -2392,7 +2392,7 @@ export const getSpotifyUserPlaylistsQueryKey = (
 export const getSpotifyUserPlaylistsInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifyUserPlaylists>>,
-    SpotifyUserPlaylistsParams["limit"]
+    SpotifyUserPlaylistsParams["page"]
   >,
   TError = ErrorType<AuthenticationExceptionResponse | SpotifyUserPlaylists500>
 >(
@@ -2404,7 +2404,7 @@ export const getSpotifyUserPlaylistsInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        SpotifyUserPlaylistsParams["limit"]
+        SpotifyUserPlaylistsParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -2418,10 +2418,10 @@ export const getSpotifyUserPlaylistsInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof spotifyUserPlaylists>>,
     QueryKey,
-    SpotifyUserPlaylistsParams["limit"]
+    SpotifyUserPlaylistsParams["page"]
   > = ({ signal, pageParam }) =>
     spotifyUserPlaylists(
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -2431,7 +2431,7 @@ export const getSpotifyUserPlaylistsInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    SpotifyUserPlaylistsParams["limit"]
+    SpotifyUserPlaylistsParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -2445,7 +2445,7 @@ export type SpotifyUserPlaylistsInfiniteQueryError = ErrorType<
 export function useSpotifyUserPlaylistsInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifyUserPlaylists>>,
-    SpotifyUserPlaylistsParams["limit"]
+    SpotifyUserPlaylistsParams["page"]
   >,
   TError = ErrorType<AuthenticationExceptionResponse | SpotifyUserPlaylists500>
 >(
@@ -2457,7 +2457,7 @@ export function useSpotifyUserPlaylistsInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifyUserPlaylistsParams["limit"]
+        SpotifyUserPlaylistsParams["page"]
       >
     > &
       Pick<
@@ -2478,7 +2478,7 @@ export function useSpotifyUserPlaylistsInfinite<
 export function useSpotifyUserPlaylistsInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifyUserPlaylists>>,
-    SpotifyUserPlaylistsParams["limit"]
+    SpotifyUserPlaylistsParams["page"]
   >,
   TError = ErrorType<AuthenticationExceptionResponse | SpotifyUserPlaylists500>
 >(
@@ -2490,7 +2490,7 @@ export function useSpotifyUserPlaylistsInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifyUserPlaylistsParams["limit"]
+        SpotifyUserPlaylistsParams["page"]
       >
     > &
       Pick<
@@ -2511,7 +2511,7 @@ export function useSpotifyUserPlaylistsInfinite<
 export function useSpotifyUserPlaylistsInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifyUserPlaylists>>,
-    SpotifyUserPlaylistsParams["limit"]
+    SpotifyUserPlaylistsParams["page"]
   >,
   TError = ErrorType<AuthenticationExceptionResponse | SpotifyUserPlaylists500>
 >(
@@ -2523,7 +2523,7 @@ export function useSpotifyUserPlaylistsInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifyUserPlaylistsParams["limit"]
+        SpotifyUserPlaylistsParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -2536,7 +2536,7 @@ export function useSpotifyUserPlaylistsInfinite<
 export function useSpotifyUserPlaylistsInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifyUserPlaylists>>,
-    SpotifyUserPlaylistsParams["limit"]
+    SpotifyUserPlaylistsParams["page"]
   >,
   TError = ErrorType<AuthenticationExceptionResponse | SpotifyUserPlaylists500>
 >(
@@ -2548,7 +2548,7 @@ export function useSpotifyUserPlaylistsInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifyUserPlaylistsParams["limit"]
+        SpotifyUserPlaylistsParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -2854,7 +2854,7 @@ export function useSpotifyUserPlaylistsSuspense<
 export const getSpotifyUserPlaylistsSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifyUserPlaylists>>,
-    SpotifyUserPlaylistsParams["limit"]
+    SpotifyUserPlaylistsParams["page"]
   >,
   TError = ErrorType<AuthenticationExceptionResponse | SpotifyUserPlaylists500>
 >(
@@ -2866,7 +2866,7 @@ export const getSpotifyUserPlaylistsSuspenseInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        SpotifyUserPlaylistsParams["limit"]
+        SpotifyUserPlaylistsParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -2880,10 +2880,10 @@ export const getSpotifyUserPlaylistsSuspenseInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof spotifyUserPlaylists>>,
     QueryKey,
-    SpotifyUserPlaylistsParams["limit"]
+    SpotifyUserPlaylistsParams["page"]
   > = ({ signal, pageParam }) =>
     spotifyUserPlaylists(
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -2897,7 +2897,7 @@ export const getSpotifyUserPlaylistsSuspenseInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    SpotifyUserPlaylistsParams["limit"]
+    SpotifyUserPlaylistsParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -2911,7 +2911,7 @@ export type SpotifyUserPlaylistsSuspenseInfiniteQueryError = ErrorType<
 export function useSpotifyUserPlaylistsSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifyUserPlaylists>>,
-    SpotifyUserPlaylistsParams["limit"]
+    SpotifyUserPlaylistsParams["page"]
   >,
   TError = ErrorType<AuthenticationExceptionResponse | SpotifyUserPlaylists500>
 >(
@@ -2923,7 +2923,7 @@ export function useSpotifyUserPlaylistsSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifyUserPlaylistsParams["limit"]
+        SpotifyUserPlaylistsParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -2935,7 +2935,7 @@ export function useSpotifyUserPlaylistsSuspenseInfinite<
 export function useSpotifyUserPlaylistsSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifyUserPlaylists>>,
-    SpotifyUserPlaylistsParams["limit"]
+    SpotifyUserPlaylistsParams["page"]
   >,
   TError = ErrorType<AuthenticationExceptionResponse | SpotifyUserPlaylists500>
 >(
@@ -2947,7 +2947,7 @@ export function useSpotifyUserPlaylistsSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifyUserPlaylistsParams["limit"]
+        SpotifyUserPlaylistsParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -2959,7 +2959,7 @@ export function useSpotifyUserPlaylistsSuspenseInfinite<
 export function useSpotifyUserPlaylistsSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifyUserPlaylists>>,
-    SpotifyUserPlaylistsParams["limit"]
+    SpotifyUserPlaylistsParams["page"]
   >,
   TError = ErrorType<AuthenticationExceptionResponse | SpotifyUserPlaylists500>
 >(
@@ -2971,7 +2971,7 @@ export function useSpotifyUserPlaylistsSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifyUserPlaylistsParams["limit"]
+        SpotifyUserPlaylistsParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -2984,7 +2984,7 @@ export function useSpotifyUserPlaylistsSuspenseInfinite<
 export function useSpotifyUserPlaylistsSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifyUserPlaylists>>,
-    SpotifyUserPlaylistsParams["limit"]
+    SpotifyUserPlaylistsParams["page"]
   >,
   TError = ErrorType<AuthenticationExceptionResponse | SpotifyUserPlaylists500>
 >(
@@ -2996,7 +2996,7 @@ export function useSpotifyUserPlaylistsSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifyUserPlaylistsParams["limit"]
+        SpotifyUserPlaylistsParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -3040,7 +3040,7 @@ export const getSpotifySearchQueryKey = (params?: SpotifySearchParams) => {
 export const getSpotifySearchInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifySearch>>,
-    SpotifySearchParams["limit"]
+    SpotifySearchParams["page"]
   >,
   TError = ErrorType<
     SpotifySearch400 | AuthenticationExceptionResponse | SpotifySearch500
@@ -3054,7 +3054,7 @@ export const getSpotifySearchInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        SpotifySearchParams["limit"]
+        SpotifySearchParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -3067,10 +3067,10 @@ export const getSpotifySearchInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof spotifySearch>>,
     QueryKey,
-    SpotifySearchParams["limit"]
+    SpotifySearchParams["page"]
   > = ({ signal, pageParam }) =>
     spotifySearch(
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -3080,7 +3080,7 @@ export const getSpotifySearchInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    SpotifySearchParams["limit"]
+    SpotifySearchParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -3094,7 +3094,7 @@ export type SpotifySearchInfiniteQueryError = ErrorType<
 export function useSpotifySearchInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifySearch>>,
-    SpotifySearchParams["limit"]
+    SpotifySearchParams["page"]
   >,
   TError = ErrorType<
     SpotifySearch400 | AuthenticationExceptionResponse | SpotifySearch500
@@ -3108,7 +3108,7 @@ export function useSpotifySearchInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifySearchParams["limit"]
+        SpotifySearchParams["page"]
       >
     > &
       Pick<
@@ -3129,7 +3129,7 @@ export function useSpotifySearchInfinite<
 export function useSpotifySearchInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifySearch>>,
-    SpotifySearchParams["limit"]
+    SpotifySearchParams["page"]
   >,
   TError = ErrorType<
     SpotifySearch400 | AuthenticationExceptionResponse | SpotifySearch500
@@ -3143,7 +3143,7 @@ export function useSpotifySearchInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifySearchParams["limit"]
+        SpotifySearchParams["page"]
       >
     > &
       Pick<
@@ -3164,7 +3164,7 @@ export function useSpotifySearchInfinite<
 export function useSpotifySearchInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifySearch>>,
-    SpotifySearchParams["limit"]
+    SpotifySearchParams["page"]
   >,
   TError = ErrorType<
     SpotifySearch400 | AuthenticationExceptionResponse | SpotifySearch500
@@ -3178,7 +3178,7 @@ export function useSpotifySearchInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifySearchParams["limit"]
+        SpotifySearchParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -3191,7 +3191,7 @@ export function useSpotifySearchInfinite<
 export function useSpotifySearchInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifySearch>>,
-    SpotifySearchParams["limit"]
+    SpotifySearchParams["page"]
   >,
   TError = ErrorType<
     SpotifySearch400 | AuthenticationExceptionResponse | SpotifySearch500
@@ -3205,7 +3205,7 @@ export function useSpotifySearchInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifySearchParams["limit"]
+        SpotifySearchParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -3503,7 +3503,7 @@ export function useSpotifySearchSuspense<
 export const getSpotifySearchSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifySearch>>,
-    SpotifySearchParams["limit"]
+    SpotifySearchParams["page"]
   >,
   TError = ErrorType<
     SpotifySearch400 | AuthenticationExceptionResponse | SpotifySearch500
@@ -3517,7 +3517,7 @@ export const getSpotifySearchSuspenseInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        SpotifySearchParams["limit"]
+        SpotifySearchParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -3530,10 +3530,10 @@ export const getSpotifySearchSuspenseInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof spotifySearch>>,
     QueryKey,
-    SpotifySearchParams["limit"]
+    SpotifySearchParams["page"]
   > = ({ signal, pageParam }) =>
     spotifySearch(
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -3547,7 +3547,7 @@ export const getSpotifySearchSuspenseInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    SpotifySearchParams["limit"]
+    SpotifySearchParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -3561,7 +3561,7 @@ export type SpotifySearchSuspenseInfiniteQueryError = ErrorType<
 export function useSpotifySearchSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifySearch>>,
-    SpotifySearchParams["limit"]
+    SpotifySearchParams["page"]
   >,
   TError = ErrorType<
     SpotifySearch400 | AuthenticationExceptionResponse | SpotifySearch500
@@ -3575,7 +3575,7 @@ export function useSpotifySearchSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifySearchParams["limit"]
+        SpotifySearchParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -3587,7 +3587,7 @@ export function useSpotifySearchSuspenseInfinite<
 export function useSpotifySearchSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifySearch>>,
-    SpotifySearchParams["limit"]
+    SpotifySearchParams["page"]
   >,
   TError = ErrorType<
     SpotifySearch400 | AuthenticationExceptionResponse | SpotifySearch500
@@ -3601,7 +3601,7 @@ export function useSpotifySearchSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifySearchParams["limit"]
+        SpotifySearchParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -3613,7 +3613,7 @@ export function useSpotifySearchSuspenseInfinite<
 export function useSpotifySearchSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifySearch>>,
-    SpotifySearchParams["limit"]
+    SpotifySearchParams["page"]
   >,
   TError = ErrorType<
     SpotifySearch400 | AuthenticationExceptionResponse | SpotifySearch500
@@ -3627,7 +3627,7 @@ export function useSpotifySearchSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifySearchParams["limit"]
+        SpotifySearchParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -3640,7 +3640,7 @@ export function useSpotifySearchSuspenseInfinite<
 export function useSpotifySearchSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof spotifySearch>>,
-    SpotifySearchParams["limit"]
+    SpotifySearchParams["page"]
   >,
   TError = ErrorType<
     SpotifySearch400 | AuthenticationExceptionResponse | SpotifySearch500
@@ -3654,7 +3654,7 @@ export function useSpotifySearchSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        SpotifySearchParams["limit"]
+        SpotifySearchParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;

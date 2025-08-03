@@ -9,6 +9,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks.ts';
 import styles from './app.module.scss';
 import { removeToast } from '@/store/notifications/notifications-slice.ts';
 import { Iconify } from './ui/icons/iconify';
+import { useEffect } from 'react';
 
 // Instrument the main app component
 const App = () => {
@@ -19,6 +20,10 @@ const App = () => {
   const dispatchRemoveToast = (id: string) => {
     dispatch(removeToast({ id }));
   };
+
+  useEffect(() => {
+    Notification.requestPermission();
+  }, []);
 
   return (
     <HelmetProvider>
@@ -68,7 +73,7 @@ const App = () => {
         <Toast.Viewport className={styles.ToastViewport}/>
       </Theme>
     </HelmetProvider>
-  )
-}
+  );
+};
 
 export default App;

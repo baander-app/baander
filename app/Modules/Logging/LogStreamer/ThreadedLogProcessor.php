@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Modules\LogStreamer;
+namespace App\Modules\Logging\LogStreamer;
 
-use App\Modules\LogStreamer\Models\ContentChunk;
-use App\Modules\LogStreamer\Models\SearchResults;
+use App\Modules\Logging\LogStreamer\Models\ContentChunk;
+use App\Modules\Logging\LogStreamer\Models\SearchResults;
 use RuntimeException;
 use Swoole\Thread;
 use Swoole\Thread\Queue;

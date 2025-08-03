@@ -79,7 +79,7 @@ export const getUserTokenGetUserTokensQueryKey = (
 export const getUserTokenGetUserTokensInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof userTokenGetUserTokens>>,
-    UserTokenGetUserTokensParams["limit"]
+    UserTokenGetUserTokensParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -94,7 +94,7 @@ export const getUserTokenGetUserTokensInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        UserTokenGetUserTokensParams["limit"]
+        UserTokenGetUserTokensParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -108,11 +108,11 @@ export const getUserTokenGetUserTokensInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof userTokenGetUserTokens>>,
     QueryKey,
-    UserTokenGetUserTokensParams["limit"]
+    UserTokenGetUserTokensParams["page"]
   > = ({ signal, pageParam }) =>
     userTokenGetUserTokens(
       user,
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -127,7 +127,7 @@ export const getUserTokenGetUserTokensInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    UserTokenGetUserTokensParams["limit"]
+    UserTokenGetUserTokensParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -141,7 +141,7 @@ export type UserTokenGetUserTokensInfiniteQueryError = ErrorType<
 export function useUserTokenGetUserTokensInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof userTokenGetUserTokens>>,
-    UserTokenGetUserTokensParams["limit"]
+    UserTokenGetUserTokensParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -156,7 +156,7 @@ export function useUserTokenGetUserTokensInfinite<
         TError,
         TData,
         QueryKey,
-        UserTokenGetUserTokensParams["limit"]
+        UserTokenGetUserTokensParams["page"]
       >
     > &
       Pick<
@@ -177,7 +177,7 @@ export function useUserTokenGetUserTokensInfinite<
 export function useUserTokenGetUserTokensInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof userTokenGetUserTokens>>,
-    UserTokenGetUserTokensParams["limit"]
+    UserTokenGetUserTokensParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -192,7 +192,7 @@ export function useUserTokenGetUserTokensInfinite<
         TError,
         TData,
         QueryKey,
-        UserTokenGetUserTokensParams["limit"]
+        UserTokenGetUserTokensParams["page"]
       >
     > &
       Pick<
@@ -213,7 +213,7 @@ export function useUserTokenGetUserTokensInfinite<
 export function useUserTokenGetUserTokensInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof userTokenGetUserTokens>>,
-    UserTokenGetUserTokensParams["limit"]
+    UserTokenGetUserTokensParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -228,7 +228,7 @@ export function useUserTokenGetUserTokensInfinite<
         TError,
         TData,
         QueryKey,
-        UserTokenGetUserTokensParams["limit"]
+        UserTokenGetUserTokensParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -244,7 +244,7 @@ export function useUserTokenGetUserTokensInfinite<
 export function useUserTokenGetUserTokensInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof userTokenGetUserTokens>>,
-    UserTokenGetUserTokensParams["limit"]
+    UserTokenGetUserTokensParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -259,7 +259,7 @@ export function useUserTokenGetUserTokensInfinite<
         TError,
         TData,
         QueryKey,
-        UserTokenGetUserTokensParams["limit"]
+        UserTokenGetUserTokensParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -614,7 +614,7 @@ export function useUserTokenGetUserTokensSuspense<
 export const getUserTokenGetUserTokensSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof userTokenGetUserTokens>>,
-    UserTokenGetUserTokensParams["limit"]
+    UserTokenGetUserTokensParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -629,7 +629,7 @@ export const getUserTokenGetUserTokensSuspenseInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        UserTokenGetUserTokensParams["limit"]
+        UserTokenGetUserTokensParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -643,11 +643,11 @@ export const getUserTokenGetUserTokensSuspenseInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof userTokenGetUserTokens>>,
     QueryKey,
-    UserTokenGetUserTokensParams["limit"]
+    UserTokenGetUserTokensParams["page"]
   > = ({ signal, pageParam }) =>
     userTokenGetUserTokens(
       user,
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -661,7 +661,7 @@ export const getUserTokenGetUserTokensSuspenseInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    UserTokenGetUserTokensParams["limit"]
+    UserTokenGetUserTokensParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -675,7 +675,7 @@ export type UserTokenGetUserTokensSuspenseInfiniteQueryError = ErrorType<
 export function useUserTokenGetUserTokensSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof userTokenGetUserTokens>>,
-    UserTokenGetUserTokensParams["limit"]
+    UserTokenGetUserTokensParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -690,7 +690,7 @@ export function useUserTokenGetUserTokensSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        UserTokenGetUserTokensParams["limit"]
+        UserTokenGetUserTokensParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -702,7 +702,7 @@ export function useUserTokenGetUserTokensSuspenseInfinite<
 export function useUserTokenGetUserTokensSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof userTokenGetUserTokens>>,
-    UserTokenGetUserTokensParams["limit"]
+    UserTokenGetUserTokensParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -717,7 +717,7 @@ export function useUserTokenGetUserTokensSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        UserTokenGetUserTokensParams["limit"]
+        UserTokenGetUserTokensParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -729,7 +729,7 @@ export function useUserTokenGetUserTokensSuspenseInfinite<
 export function useUserTokenGetUserTokensSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof userTokenGetUserTokens>>,
-    UserTokenGetUserTokensParams["limit"]
+    UserTokenGetUserTokensParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -744,7 +744,7 @@ export function useUserTokenGetUserTokensSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        UserTokenGetUserTokensParams["limit"]
+        UserTokenGetUserTokensParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -760,7 +760,7 @@ export function useUserTokenGetUserTokensSuspenseInfinite<
 export function useUserTokenGetUserTokensSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof userTokenGetUserTokens>>,
-    UserTokenGetUserTokensParams["limit"]
+    UserTokenGetUserTokensParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -775,7 +775,7 @@ export function useUserTokenGetUserTokensSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        UserTokenGetUserTokensParams["limit"]
+        UserTokenGetUserTokensParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Auth\Role;
 use App\Modules\Auth\Webauthn\Concerns\HasPasskeys;
+use App\Modules\Nanoid\Concerns\HasNanoPublicId;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -19,6 +20,7 @@ class User extends Authenticatable implements HasPasskeys
 {
     use HasFactory,
         HasApiTokens,
+        HasNanoPublicId,
         HasRoles,
         Notifiable,
         TwoFactorAuthenticatable;
@@ -55,6 +57,11 @@ class User extends Authenticatable implements HasPasskeys
         'email_verified_at' => 'datetime',
         'password'          => 'hashed',
     ];
+
+    public function getRouteKeyName(): string
+    {
+        return 'public_id';
+    }
 
     /**
      * Create a new personal access token for the user.

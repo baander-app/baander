@@ -4,30 +4,32 @@ import { useCallback } from 'react';
 import { useTestMode } from '@/providers/test-mode-provider.tsx';
 import { CreateNotification } from '@/modules/notifications/models.ts';
 import { createNotification } from '@/store/notifications/notifications-slice.ts';
-import { useAuth } from '@/providers/auth-provider.tsx';
+import { Token } from '@/services/auth/token.ts';
 
 export function DevPanel() {
-  const { accessToken, refreshToken, streamToken } = useAuth();
   const dispatch = useAppDispatch();
   const { isTestMode, toggleTestMode } = useTestMode();
 
   const copyAccessToken = useCallback(() => {
-    if (accessToken && accessToken.token) {
-      navigator.clipboard.writeText(accessToken.token);
+    const token = Token.get();
+    if (token) {
+      navigator.clipboard.writeText(token.accessToken.token);
     }
-  }, [accessToken]);
+  }, []);
 
   const copyRefreshToken = useCallback(() => {
-    if (refreshToken && refreshToken.token) {
-      navigator.clipboard.writeText(refreshToken.token);
+    const token = Token.get();
+    if (token) {
+      navigator.clipboard.writeText(token.refreshToken.token);
     }
-  }, [refreshToken]);
+  }, []);
 
   const copyStreamToken = useCallback(() => {
-    if (streamToken && streamToken.token) {
-      navigator.clipboard.writeText(streamToken.token);
+    const token = Token.getStreamToken();
+    if (token) {
+      navigator.clipboard.writeText(token.token);
     }
-  }, [streamToken]);
+  }, []);
 
   const addTestNotification = () => {
     const notifications: CreateNotification[] = [

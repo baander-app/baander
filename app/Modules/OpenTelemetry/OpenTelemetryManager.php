@@ -333,6 +333,24 @@ class OpenTelemetryManager
         }
     }
 
+    public function shutdown(): void
+    {
+        Log::channel('otel_debug')->info('OpenTelemetryManager: Shutting down');
+
+        try {
+            Globals::tracerProvider()->shutdown();
+            Globals::meterProvider()->shutdown();
+            Globals::loggerProvider()->shutdown();
+
+            Log::channel('otel_debug')->info('OpenTelemetryManager: Shutdown completed successfully');
+        } catch (\Exception $e) {
+            Log::channel('otel_debug')->error('OpenTelemetryManager: Shutdown failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+        }
+    }
+
     /**
      * Get the tracer instance
      */

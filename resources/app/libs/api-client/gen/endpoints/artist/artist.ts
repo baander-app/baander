@@ -79,7 +79,7 @@ export const getArtistsIndexQueryKey = (
 export const getArtistsIndexInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof artistsIndex>>,
-    ArtistsIndexParams["limit"]
+    ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -94,7 +94,7 @@ export const getArtistsIndexInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        ArtistsIndexParams["limit"]
+        ArtistsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -108,11 +108,11 @@ export const getArtistsIndexInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof artistsIndex>>,
     QueryKey,
-    ArtistsIndexParams["limit"]
+    ArtistsIndexParams["page"]
   > = ({ signal, pageParam }) =>
     artistsIndex(
       library,
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -127,7 +127,7 @@ export const getArtistsIndexInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    ArtistsIndexParams["limit"]
+    ArtistsIndexParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -141,7 +141,7 @@ export type ArtistsIndexInfiniteQueryError = ErrorType<
 export function useArtistsIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof artistsIndex>>,
-    ArtistsIndexParams["limit"]
+    ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -156,7 +156,7 @@ export function useArtistsIndexInfinite<
         TError,
         TData,
         QueryKey,
-        ArtistsIndexParams["limit"]
+        ArtistsIndexParams["page"]
       >
     > &
       Pick<
@@ -177,7 +177,7 @@ export function useArtistsIndexInfinite<
 export function useArtistsIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof artistsIndex>>,
-    ArtistsIndexParams["limit"]
+    ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -192,7 +192,7 @@ export function useArtistsIndexInfinite<
         TError,
         TData,
         QueryKey,
-        ArtistsIndexParams["limit"]
+        ArtistsIndexParams["page"]
       >
     > &
       Pick<
@@ -213,7 +213,7 @@ export function useArtistsIndexInfinite<
 export function useArtistsIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof artistsIndex>>,
-    ArtistsIndexParams["limit"]
+    ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -228,7 +228,7 @@ export function useArtistsIndexInfinite<
         TError,
         TData,
         QueryKey,
-        ArtistsIndexParams["limit"]
+        ArtistsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -244,7 +244,7 @@ export function useArtistsIndexInfinite<
 export function useArtistsIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof artistsIndex>>,
-    ArtistsIndexParams["limit"]
+    ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -259,7 +259,7 @@ export function useArtistsIndexInfinite<
         TError,
         TData,
         QueryKey,
-        ArtistsIndexParams["limit"]
+        ArtistsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -588,7 +588,7 @@ export function useArtistsIndexSuspense<
 export const getArtistsIndexSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof artistsIndex>>,
-    ArtistsIndexParams["limit"]
+    ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -603,7 +603,7 @@ export const getArtistsIndexSuspenseInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        ArtistsIndexParams["limit"]
+        ArtistsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -617,11 +617,11 @@ export const getArtistsIndexSuspenseInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof artistsIndex>>,
     QueryKey,
-    ArtistsIndexParams["limit"]
+    ArtistsIndexParams["page"]
   > = ({ signal, pageParam }) =>
     artistsIndex(
       library,
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -635,7 +635,7 @@ export const getArtistsIndexSuspenseInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    ArtistsIndexParams["limit"]
+    ArtistsIndexParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -649,7 +649,7 @@ export type ArtistsIndexSuspenseInfiniteQueryError = ErrorType<
 export function useArtistsIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof artistsIndex>>,
-    ArtistsIndexParams["limit"]
+    ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -664,7 +664,7 @@ export function useArtistsIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        ArtistsIndexParams["limit"]
+        ArtistsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -676,7 +676,7 @@ export function useArtistsIndexSuspenseInfinite<
 export function useArtistsIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof artistsIndex>>,
-    ArtistsIndexParams["limit"]
+    ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -691,7 +691,7 @@ export function useArtistsIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        ArtistsIndexParams["limit"]
+        ArtistsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -703,7 +703,7 @@ export function useArtistsIndexSuspenseInfinite<
 export function useArtistsIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof artistsIndex>>,
-    ArtistsIndexParams["limit"]
+    ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -718,7 +718,7 @@ export function useArtistsIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        ArtistsIndexParams["limit"]
+        ArtistsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -734,7 +734,7 @@ export function useArtistsIndexSuspenseInfinite<
 export function useArtistsIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof artistsIndex>>,
-    ArtistsIndexParams["limit"]
+    ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -749,7 +749,7 @@ export function useArtistsIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        ArtistsIndexParams["limit"]
+        ArtistsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;

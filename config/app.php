@@ -174,6 +174,7 @@ return [
          */
         App\Modules\Nanoid\NanoIdServiceProvider::class,
         App\Modules\BlurHash\BlurHashServiceProvider::class,
+        \App\Modules\Logging\LoggerServiceProvider::class,
         \App\Modules\Recommendation\RecommendationServiceProvider::class,
         App\Providers\FortifyServiceProvider::class,
 

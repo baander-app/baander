@@ -21,6 +21,7 @@ class UserResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
+            'publicId'  => $this->public_id,
             'name'      => $this->name,
             'email'     => $this->email,
             'isAdmin'   => (bool)$this->isAdmin(),

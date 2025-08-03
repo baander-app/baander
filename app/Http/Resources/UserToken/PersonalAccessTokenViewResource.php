@@ -28,16 +28,21 @@ class PersonalAccessTokenViewResource extends JsonResource
              * @var array<string>|null
              */
             'abilities'             => $this->abilities,
-            'userAgent'             => $this->user_agent,
-            'clientName'            => $this->client_name,
-            'clientVersion'         => $this->client_version,
-            'clientType'            => $this->client_type,
-            'deviceOperatingSystem' => $this->device_operating_system,
-            'deviceName'            => $this->device_name,
-            'lastUsedAt'            => $this->last_used_at,
-            'expiresAt'             => $this->expires_at,
             'createdAt'             => $this->created_at,
+            'deviceName'            => $this->device_name,
+            'deviceOperatingSystem' => $this->device_operating_system,
+            'expiresAt'             => $this->expires_at,
+            'lastUsedAt'            => $this->last_used_at,
             'updatedAt'             => $this->updated_at,
+            'userAgent'             => $this->user_agent,
+            'ipAddress'             => $this->ip_address,
+            /**
+             * @var array<string>|null
+             */
+            'ipHistory'             => $this->ip_history,
+            'countryCode'           => $this->country_code,
+            'city'                  => $this->city,
+            'ipChangeCount'         => $this->ip_change_count,
         ];
     }
 }

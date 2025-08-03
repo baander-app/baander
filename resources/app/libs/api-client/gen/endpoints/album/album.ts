@@ -84,7 +84,7 @@ export const getAlbumsIndexQueryKey = (
 export const getAlbumsIndexInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof albumsIndex>>,
-    AlbumsIndexParams["limit"]
+    AlbumsIndexParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -101,7 +101,7 @@ export const getAlbumsIndexInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        AlbumsIndexParams["limit"]
+        AlbumsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -115,11 +115,11 @@ export const getAlbumsIndexInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof albumsIndex>>,
     QueryKey,
-    AlbumsIndexParams["limit"]
+    AlbumsIndexParams["page"]
   > = ({ signal, pageParam }) =>
     albumsIndex(
       library,
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -134,7 +134,7 @@ export const getAlbumsIndexInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    AlbumsIndexParams["limit"]
+    AlbumsIndexParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -150,7 +150,7 @@ export type AlbumsIndexInfiniteQueryError = ErrorType<
 export function useAlbumsIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof albumsIndex>>,
-    AlbumsIndexParams["limit"]
+    AlbumsIndexParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -167,7 +167,7 @@ export function useAlbumsIndexInfinite<
         TError,
         TData,
         QueryKey,
-        AlbumsIndexParams["limit"]
+        AlbumsIndexParams["page"]
       >
     > &
       Pick<
@@ -188,7 +188,7 @@ export function useAlbumsIndexInfinite<
 export function useAlbumsIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof albumsIndex>>,
-    AlbumsIndexParams["limit"]
+    AlbumsIndexParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -205,7 +205,7 @@ export function useAlbumsIndexInfinite<
         TError,
         TData,
         QueryKey,
-        AlbumsIndexParams["limit"]
+        AlbumsIndexParams["page"]
       >
     > &
       Pick<
@@ -226,7 +226,7 @@ export function useAlbumsIndexInfinite<
 export function useAlbumsIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof albumsIndex>>,
-    AlbumsIndexParams["limit"]
+    AlbumsIndexParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -243,7 +243,7 @@ export function useAlbumsIndexInfinite<
         TError,
         TData,
         QueryKey,
-        AlbumsIndexParams["limit"]
+        AlbumsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -259,7 +259,7 @@ export function useAlbumsIndexInfinite<
 export function useAlbumsIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof albumsIndex>>,
-    AlbumsIndexParams["limit"]
+    AlbumsIndexParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -276,7 +276,7 @@ export function useAlbumsIndexInfinite<
         TError,
         TData,
         QueryKey,
-        AlbumsIndexParams["limit"]
+        AlbumsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -629,7 +629,7 @@ export function useAlbumsIndexSuspense<
 export const getAlbumsIndexSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof albumsIndex>>,
-    AlbumsIndexParams["limit"]
+    AlbumsIndexParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -646,7 +646,7 @@ export const getAlbumsIndexSuspenseInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        AlbumsIndexParams["limit"]
+        AlbumsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -660,11 +660,11 @@ export const getAlbumsIndexSuspenseInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof albumsIndex>>,
     QueryKey,
-    AlbumsIndexParams["limit"]
+    AlbumsIndexParams["page"]
   > = ({ signal, pageParam }) =>
     albumsIndex(
       library,
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -678,7 +678,7 @@ export const getAlbumsIndexSuspenseInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    AlbumsIndexParams["limit"]
+    AlbumsIndexParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -694,7 +694,7 @@ export type AlbumsIndexSuspenseInfiniteQueryError = ErrorType<
 export function useAlbumsIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof albumsIndex>>,
-    AlbumsIndexParams["limit"]
+    AlbumsIndexParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -711,7 +711,7 @@ export function useAlbumsIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        AlbumsIndexParams["limit"]
+        AlbumsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -723,7 +723,7 @@ export function useAlbumsIndexSuspenseInfinite<
 export function useAlbumsIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof albumsIndex>>,
-    AlbumsIndexParams["limit"]
+    AlbumsIndexParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -740,7 +740,7 @@ export function useAlbumsIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        AlbumsIndexParams["limit"]
+        AlbumsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -752,7 +752,7 @@ export function useAlbumsIndexSuspenseInfinite<
 export function useAlbumsIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof albumsIndex>>,
-    AlbumsIndexParams["limit"]
+    AlbumsIndexParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -769,7 +769,7 @@ export function useAlbumsIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        AlbumsIndexParams["limit"]
+        AlbumsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -785,7 +785,7 @@ export function useAlbumsIndexSuspenseInfinite<
 export function useAlbumsIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof albumsIndex>>,
-    AlbumsIndexParams["limit"]
+    AlbumsIndexParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -802,7 +802,7 @@ export function useAlbumsIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        AlbumsIndexParams["limit"]
+        AlbumsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;

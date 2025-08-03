@@ -80,6 +80,14 @@ return [
             'replace_placeholders' => true,
         ],
 
+        'security' => [
+            'driver'               => 'daily',
+            'path'                 => storage_path('logs/security.log'),
+            'level'                => env('LOG_LEVEL', 'debug'),
+            'days'                 => 14,
+            'replace_placeholders' => true,
+        ],
+
         'daily' => [
             'driver'               => 'daily',
             'path'                 => storage_path('logs/baander.log'),

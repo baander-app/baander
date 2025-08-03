@@ -1239,7 +1239,7 @@ export const getLogsContentQueryKey = (
 export const getLogsContentInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsContent>>,
-    LogsContentParams["limit"]
+    LogsContentParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1257,7 +1257,7 @@ export const getLogsContentInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        LogsContentParams["limit"]
+        LogsContentParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1271,11 +1271,11 @@ export const getLogsContentInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof logsContent>>,
     QueryKey,
-    LogsContentParams["limit"]
+    LogsContentParams["page"]
   > = ({ signal, pageParam }) =>
     logsContent(
       logFile,
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -1290,7 +1290,7 @@ export const getLogsContentInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    LogsContentParams["limit"]
+    LogsContentParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -1307,7 +1307,7 @@ export type LogsContentInfiniteQueryError = ErrorType<
 export function useLogsContentInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsContent>>,
-    LogsContentParams["limit"]
+    LogsContentParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1325,7 +1325,7 @@ export function useLogsContentInfinite<
         TError,
         TData,
         QueryKey,
-        LogsContentParams["limit"]
+        LogsContentParams["page"]
       >
     > &
       Pick<
@@ -1346,7 +1346,7 @@ export function useLogsContentInfinite<
 export function useLogsContentInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsContent>>,
-    LogsContentParams["limit"]
+    LogsContentParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1364,7 +1364,7 @@ export function useLogsContentInfinite<
         TError,
         TData,
         QueryKey,
-        LogsContentParams["limit"]
+        LogsContentParams["page"]
       >
     > &
       Pick<
@@ -1385,7 +1385,7 @@ export function useLogsContentInfinite<
 export function useLogsContentInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsContent>>,
-    LogsContentParams["limit"]
+    LogsContentParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1403,7 +1403,7 @@ export function useLogsContentInfinite<
         TError,
         TData,
         QueryKey,
-        LogsContentParams["limit"]
+        LogsContentParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1419,7 +1419,7 @@ export function useLogsContentInfinite<
 export function useLogsContentInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsContent>>,
-    LogsContentParams["limit"]
+    LogsContentParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1437,7 +1437,7 @@ export function useLogsContentInfinite<
         TError,
         TData,
         QueryKey,
-        LogsContentParams["limit"]
+        LogsContentParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1802,7 +1802,7 @@ export function useLogsContentSuspense<
 export const getLogsContentSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsContent>>,
-    LogsContentParams["limit"]
+    LogsContentParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1820,7 +1820,7 @@ export const getLogsContentSuspenseInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        LogsContentParams["limit"]
+        LogsContentParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1834,11 +1834,11 @@ export const getLogsContentSuspenseInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof logsContent>>,
     QueryKey,
-    LogsContentParams["limit"]
+    LogsContentParams["page"]
   > = ({ signal, pageParam }) =>
     logsContent(
       logFile,
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -1852,7 +1852,7 @@ export const getLogsContentSuspenseInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    LogsContentParams["limit"]
+    LogsContentParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -1869,7 +1869,7 @@ export type LogsContentSuspenseInfiniteQueryError = ErrorType<
 export function useLogsContentSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsContent>>,
-    LogsContentParams["limit"]
+    LogsContentParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1887,7 +1887,7 @@ export function useLogsContentSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LogsContentParams["limit"]
+        LogsContentParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1899,7 +1899,7 @@ export function useLogsContentSuspenseInfinite<
 export function useLogsContentSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsContent>>,
-    LogsContentParams["limit"]
+    LogsContentParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1917,7 +1917,7 @@ export function useLogsContentSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LogsContentParams["limit"]
+        LogsContentParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1929,7 +1929,7 @@ export function useLogsContentSuspenseInfinite<
 export function useLogsContentSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsContent>>,
-    LogsContentParams["limit"]
+    LogsContentParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1947,7 +1947,7 @@ export function useLogsContentSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LogsContentParams["limit"]
+        LogsContentParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1963,7 +1963,7 @@ export function useLogsContentSuspenseInfinite<
 export function useLogsContentSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsContent>>,
-    LogsContentParams["limit"]
+    LogsContentParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1981,7 +1981,7 @@ export function useLogsContentSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LogsContentParams["limit"]
+        LogsContentParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -2644,7 +2644,7 @@ export const getLogsSearchQueryKey = (
 export const getLogsSearchInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsSearch>>,
-    LogsSearchParams["limit"]
+    LogsSearchParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -2662,7 +2662,7 @@ export const getLogsSearchInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        LogsSearchParams["limit"]
+        LogsSearchParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -2676,11 +2676,11 @@ export const getLogsSearchInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof logsSearch>>,
     QueryKey,
-    LogsSearchParams["limit"]
+    LogsSearchParams["page"]
   > = ({ signal, pageParam }) =>
     logsSearch(
       logFile,
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -2695,7 +2695,7 @@ export const getLogsSearchInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    LogsSearchParams["limit"]
+    LogsSearchParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -2712,7 +2712,7 @@ export type LogsSearchInfiniteQueryError = ErrorType<
 export function useLogsSearchInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsSearch>>,
-    LogsSearchParams["limit"]
+    LogsSearchParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -2730,7 +2730,7 @@ export function useLogsSearchInfinite<
         TError,
         TData,
         QueryKey,
-        LogsSearchParams["limit"]
+        LogsSearchParams["page"]
       >
     > &
       Pick<
@@ -2751,7 +2751,7 @@ export function useLogsSearchInfinite<
 export function useLogsSearchInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsSearch>>,
-    LogsSearchParams["limit"]
+    LogsSearchParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -2769,7 +2769,7 @@ export function useLogsSearchInfinite<
         TError,
         TData,
         QueryKey,
-        LogsSearchParams["limit"]
+        LogsSearchParams["page"]
       >
     > &
       Pick<
@@ -2790,7 +2790,7 @@ export function useLogsSearchInfinite<
 export function useLogsSearchInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsSearch>>,
-    LogsSearchParams["limit"]
+    LogsSearchParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -2808,7 +2808,7 @@ export function useLogsSearchInfinite<
         TError,
         TData,
         QueryKey,
-        LogsSearchParams["limit"]
+        LogsSearchParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -2824,7 +2824,7 @@ export function useLogsSearchInfinite<
 export function useLogsSearchInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsSearch>>,
-    LogsSearchParams["limit"]
+    LogsSearchParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -2842,7 +2842,7 @@ export function useLogsSearchInfinite<
         TError,
         TData,
         QueryKey,
-        LogsSearchParams["limit"]
+        LogsSearchParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -3207,7 +3207,7 @@ export function useLogsSearchSuspense<
 export const getLogsSearchSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsSearch>>,
-    LogsSearchParams["limit"]
+    LogsSearchParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -3225,7 +3225,7 @@ export const getLogsSearchSuspenseInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        LogsSearchParams["limit"]
+        LogsSearchParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -3239,11 +3239,11 @@ export const getLogsSearchSuspenseInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof logsSearch>>,
     QueryKey,
-    LogsSearchParams["limit"]
+    LogsSearchParams["page"]
   > = ({ signal, pageParam }) =>
     logsSearch(
       logFile,
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -3257,7 +3257,7 @@ export const getLogsSearchSuspenseInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    LogsSearchParams["limit"]
+    LogsSearchParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -3274,7 +3274,7 @@ export type LogsSearchSuspenseInfiniteQueryError = ErrorType<
 export function useLogsSearchSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsSearch>>,
-    LogsSearchParams["limit"]
+    LogsSearchParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -3292,7 +3292,7 @@ export function useLogsSearchSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LogsSearchParams["limit"]
+        LogsSearchParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -3304,7 +3304,7 @@ export function useLogsSearchSuspenseInfinite<
 export function useLogsSearchSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsSearch>>,
-    LogsSearchParams["limit"]
+    LogsSearchParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -3322,7 +3322,7 @@ export function useLogsSearchSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LogsSearchParams["limit"]
+        LogsSearchParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -3334,7 +3334,7 @@ export function useLogsSearchSuspenseInfinite<
 export function useLogsSearchSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsSearch>>,
-    LogsSearchParams["limit"]
+    LogsSearchParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -3352,7 +3352,7 @@ export function useLogsSearchSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LogsSearchParams["limit"]
+        LogsSearchParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -3368,7 +3368,7 @@ export function useLogsSearchSuspenseInfinite<
 export function useLogsSearchSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsSearch>>,
-    LogsSearchParams["limit"]
+    LogsSearchParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -3386,7 +3386,7 @@ export function useLogsSearchSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LogsSearchParams["limit"]
+        LogsSearchParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -3438,7 +3438,7 @@ export const getLogsTailQueryKey = (
 export const getLogsTailInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsTail>>,
-    LogsTailParams["limit"]
+    LogsTailParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -3456,7 +3456,7 @@ export const getLogsTailInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        LogsTailParams["limit"]
+        LogsTailParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -3470,11 +3470,11 @@ export const getLogsTailInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof logsTail>>,
     QueryKey,
-    LogsTailParams["limit"]
+    LogsTailParams["page"]
   > = ({ signal, pageParam }) =>
     logsTail(
       logFile,
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -3489,7 +3489,7 @@ export const getLogsTailInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    LogsTailParams["limit"]
+    LogsTailParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -3506,7 +3506,7 @@ export type LogsTailInfiniteQueryError = ErrorType<
 export function useLogsTailInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsTail>>,
-    LogsTailParams["limit"]
+    LogsTailParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -3524,7 +3524,7 @@ export function useLogsTailInfinite<
         TError,
         TData,
         QueryKey,
-        LogsTailParams["limit"]
+        LogsTailParams["page"]
       >
     > &
       Pick<
@@ -3545,7 +3545,7 @@ export function useLogsTailInfinite<
 export function useLogsTailInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsTail>>,
-    LogsTailParams["limit"]
+    LogsTailParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -3563,7 +3563,7 @@ export function useLogsTailInfinite<
         TError,
         TData,
         QueryKey,
-        LogsTailParams["limit"]
+        LogsTailParams["page"]
       >
     > &
       Pick<
@@ -3584,7 +3584,7 @@ export function useLogsTailInfinite<
 export function useLogsTailInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsTail>>,
-    LogsTailParams["limit"]
+    LogsTailParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -3602,7 +3602,7 @@ export function useLogsTailInfinite<
         TError,
         TData,
         QueryKey,
-        LogsTailParams["limit"]
+        LogsTailParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -3618,7 +3618,7 @@ export function useLogsTailInfinite<
 export function useLogsTailInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsTail>>,
-    LogsTailParams["limit"]
+    LogsTailParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -3636,7 +3636,7 @@ export function useLogsTailInfinite<
         TError,
         TData,
         QueryKey,
-        LogsTailParams["limit"]
+        LogsTailParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -3999,7 +3999,7 @@ export function useLogsTailSuspense<
 export const getLogsTailSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsTail>>,
-    LogsTailParams["limit"]
+    LogsTailParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -4017,7 +4017,7 @@ export const getLogsTailSuspenseInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        LogsTailParams["limit"]
+        LogsTailParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -4031,11 +4031,11 @@ export const getLogsTailSuspenseInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof logsTail>>,
     QueryKey,
-    LogsTailParams["limit"]
+    LogsTailParams["page"]
   > = ({ signal, pageParam }) =>
     logsTail(
       logFile,
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -4049,7 +4049,7 @@ export const getLogsTailSuspenseInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    LogsTailParams["limit"]
+    LogsTailParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -4066,7 +4066,7 @@ export type LogsTailSuspenseInfiniteQueryError = ErrorType<
 export function useLogsTailSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsTail>>,
-    LogsTailParams["limit"]
+    LogsTailParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -4084,7 +4084,7 @@ export function useLogsTailSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LogsTailParams["limit"]
+        LogsTailParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -4096,7 +4096,7 @@ export function useLogsTailSuspenseInfinite<
 export function useLogsTailSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsTail>>,
-    LogsTailParams["limit"]
+    LogsTailParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -4114,7 +4114,7 @@ export function useLogsTailSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LogsTailParams["limit"]
+        LogsTailParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -4126,7 +4126,7 @@ export function useLogsTailSuspenseInfinite<
 export function useLogsTailSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsTail>>,
-    LogsTailParams["limit"]
+    LogsTailParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -4144,7 +4144,7 @@ export function useLogsTailSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LogsTailParams["limit"]
+        LogsTailParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -4160,7 +4160,7 @@ export function useLogsTailSuspenseInfinite<
 export function useLogsTailSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsTail>>,
-    LogsTailParams["limit"]
+    LogsTailParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -4178,7 +4178,7 @@ export function useLogsTailSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LogsTailParams["limit"]
+        LogsTailParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -4230,7 +4230,7 @@ export const getLogsHeadQueryKey = (
 export const getLogsHeadInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsHead>>,
-    LogsHeadParams["limit"]
+    LogsHeadParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -4248,7 +4248,7 @@ export const getLogsHeadInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        LogsHeadParams["limit"]
+        LogsHeadParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -4262,11 +4262,11 @@ export const getLogsHeadInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof logsHead>>,
     QueryKey,
-    LogsHeadParams["limit"]
+    LogsHeadParams["page"]
   > = ({ signal, pageParam }) =>
     logsHead(
       logFile,
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -4281,7 +4281,7 @@ export const getLogsHeadInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    LogsHeadParams["limit"]
+    LogsHeadParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -4298,7 +4298,7 @@ export type LogsHeadInfiniteQueryError = ErrorType<
 export function useLogsHeadInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsHead>>,
-    LogsHeadParams["limit"]
+    LogsHeadParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -4316,7 +4316,7 @@ export function useLogsHeadInfinite<
         TError,
         TData,
         QueryKey,
-        LogsHeadParams["limit"]
+        LogsHeadParams["page"]
       >
     > &
       Pick<
@@ -4337,7 +4337,7 @@ export function useLogsHeadInfinite<
 export function useLogsHeadInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsHead>>,
-    LogsHeadParams["limit"]
+    LogsHeadParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -4355,7 +4355,7 @@ export function useLogsHeadInfinite<
         TError,
         TData,
         QueryKey,
-        LogsHeadParams["limit"]
+        LogsHeadParams["page"]
       >
     > &
       Pick<
@@ -4376,7 +4376,7 @@ export function useLogsHeadInfinite<
 export function useLogsHeadInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsHead>>,
-    LogsHeadParams["limit"]
+    LogsHeadParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -4394,7 +4394,7 @@ export function useLogsHeadInfinite<
         TError,
         TData,
         QueryKey,
-        LogsHeadParams["limit"]
+        LogsHeadParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -4410,7 +4410,7 @@ export function useLogsHeadInfinite<
 export function useLogsHeadInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsHead>>,
-    LogsHeadParams["limit"]
+    LogsHeadParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -4428,7 +4428,7 @@ export function useLogsHeadInfinite<
         TError,
         TData,
         QueryKey,
-        LogsHeadParams["limit"]
+        LogsHeadParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -4791,7 +4791,7 @@ export function useLogsHeadSuspense<
 export const getLogsHeadSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsHead>>,
-    LogsHeadParams["limit"]
+    LogsHeadParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -4809,7 +4809,7 @@ export const getLogsHeadSuspenseInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        LogsHeadParams["limit"]
+        LogsHeadParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -4823,11 +4823,11 @@ export const getLogsHeadSuspenseInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof logsHead>>,
     QueryKey,
-    LogsHeadParams["limit"]
+    LogsHeadParams["page"]
   > = ({ signal, pageParam }) =>
     logsHead(
       logFile,
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -4841,7 +4841,7 @@ export const getLogsHeadSuspenseInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    LogsHeadParams["limit"]
+    LogsHeadParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -4858,7 +4858,7 @@ export type LogsHeadSuspenseInfiniteQueryError = ErrorType<
 export function useLogsHeadSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsHead>>,
-    LogsHeadParams["limit"]
+    LogsHeadParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -4876,7 +4876,7 @@ export function useLogsHeadSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LogsHeadParams["limit"]
+        LogsHeadParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -4888,7 +4888,7 @@ export function useLogsHeadSuspenseInfinite<
 export function useLogsHeadSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsHead>>,
-    LogsHeadParams["limit"]
+    LogsHeadParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -4906,7 +4906,7 @@ export function useLogsHeadSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LogsHeadParams["limit"]
+        LogsHeadParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -4918,7 +4918,7 @@ export function useLogsHeadSuspenseInfinite<
 export function useLogsHeadSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsHead>>,
-    LogsHeadParams["limit"]
+    LogsHeadParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -4936,7 +4936,7 @@ export function useLogsHeadSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LogsHeadParams["limit"]
+        LogsHeadParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -4952,7 +4952,7 @@ export function useLogsHeadSuspenseInfinite<
 export function useLogsHeadSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsHead>>,
-    LogsHeadParams["limit"]
+    LogsHeadParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -4970,7 +4970,7 @@ export function useLogsHeadSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LogsHeadParams["limit"]
+        LogsHeadParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -6202,7 +6202,7 @@ export const getLogsSearchAllQueryKey = (params?: LogsSearchAllParams) => {
 export const getLogsSearchAllInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsSearchAll>>,
-    LogsSearchAllParams["limit"]
+    LogsSearchAllParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -6218,7 +6218,7 @@ export const getLogsSearchAllInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        LogsSearchAllParams["limit"]
+        LogsSearchAllParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -6231,10 +6231,10 @@ export const getLogsSearchAllInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof logsSearchAll>>,
     QueryKey,
-    LogsSearchAllParams["limit"]
+    LogsSearchAllParams["page"]
   > = ({ signal, pageParam }) =>
     logsSearchAll(
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -6244,7 +6244,7 @@ export const getLogsSearchAllInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    LogsSearchAllParams["limit"]
+    LogsSearchAllParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -6260,7 +6260,7 @@ export type LogsSearchAllInfiniteQueryError = ErrorType<
 export function useLogsSearchAllInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsSearchAll>>,
-    LogsSearchAllParams["limit"]
+    LogsSearchAllParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -6276,7 +6276,7 @@ export function useLogsSearchAllInfinite<
         TError,
         TData,
         QueryKey,
-        LogsSearchAllParams["limit"]
+        LogsSearchAllParams["page"]
       >
     > &
       Pick<
@@ -6297,7 +6297,7 @@ export function useLogsSearchAllInfinite<
 export function useLogsSearchAllInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsSearchAll>>,
-    LogsSearchAllParams["limit"]
+    LogsSearchAllParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -6313,7 +6313,7 @@ export function useLogsSearchAllInfinite<
         TError,
         TData,
         QueryKey,
-        LogsSearchAllParams["limit"]
+        LogsSearchAllParams["page"]
       >
     > &
       Pick<
@@ -6334,7 +6334,7 @@ export function useLogsSearchAllInfinite<
 export function useLogsSearchAllInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsSearchAll>>,
-    LogsSearchAllParams["limit"]
+    LogsSearchAllParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -6350,7 +6350,7 @@ export function useLogsSearchAllInfinite<
         TError,
         TData,
         QueryKey,
-        LogsSearchAllParams["limit"]
+        LogsSearchAllParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -6366,7 +6366,7 @@ export function useLogsSearchAllInfinite<
 export function useLogsSearchAllInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsSearchAll>>,
-    LogsSearchAllParams["limit"]
+    LogsSearchAllParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -6382,7 +6382,7 @@ export function useLogsSearchAllInfinite<
         TError,
         TData,
         QueryKey,
-        LogsSearchAllParams["limit"]
+        LogsSearchAllParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -6710,7 +6710,7 @@ export function useLogsSearchAllSuspense<
 export const getLogsSearchAllSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsSearchAll>>,
-    LogsSearchAllParams["limit"]
+    LogsSearchAllParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -6726,7 +6726,7 @@ export const getLogsSearchAllSuspenseInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        LogsSearchAllParams["limit"]
+        LogsSearchAllParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -6739,10 +6739,10 @@ export const getLogsSearchAllSuspenseInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof logsSearchAll>>,
     QueryKey,
-    LogsSearchAllParams["limit"]
+    LogsSearchAllParams["page"]
   > = ({ signal, pageParam }) =>
     logsSearchAll(
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -6756,7 +6756,7 @@ export const getLogsSearchAllSuspenseInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    LogsSearchAllParams["limit"]
+    LogsSearchAllParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -6772,7 +6772,7 @@ export type LogsSearchAllSuspenseInfiniteQueryError = ErrorType<
 export function useLogsSearchAllSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsSearchAll>>,
-    LogsSearchAllParams["limit"]
+    LogsSearchAllParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -6788,7 +6788,7 @@ export function useLogsSearchAllSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LogsSearchAllParams["limit"]
+        LogsSearchAllParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -6800,7 +6800,7 @@ export function useLogsSearchAllSuspenseInfinite<
 export function useLogsSearchAllSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsSearchAll>>,
-    LogsSearchAllParams["limit"]
+    LogsSearchAllParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -6816,7 +6816,7 @@ export function useLogsSearchAllSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LogsSearchAllParams["limit"]
+        LogsSearchAllParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -6828,7 +6828,7 @@ export function useLogsSearchAllSuspenseInfinite<
 export function useLogsSearchAllSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsSearchAll>>,
-    LogsSearchAllParams["limit"]
+    LogsSearchAllParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -6844,7 +6844,7 @@ export function useLogsSearchAllSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LogsSearchAllParams["limit"]
+        LogsSearchAllParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -6860,7 +6860,7 @@ export function useLogsSearchAllSuspenseInfinite<
 export function useLogsSearchAllSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof logsSearchAll>>,
-    LogsSearchAllParams["limit"]
+    LogsSearchAllParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -6876,7 +6876,7 @@ export function useLogsSearchAllSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LogsSearchAllParams["limit"]
+        LogsSearchAllParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;

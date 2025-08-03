@@ -4,6 +4,7 @@ import { SongTable } from '@/components/song-table/song-table';
 import { useCallback, useRef, useMemo } from 'react';
 import styles from './song-list.module.scss';
 import { useSongsIndexInfinite } from '@/libs/api-client/gen/endpoints/song/song.ts';
+import { addPagination } from '@/hooks/use-paginated-infinite-query.ts';
 
 export function SongList() {
   const { library: libraryParam } = usePathParam<LibraryParams>();
@@ -14,9 +15,13 @@ export function SongList() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useSongsIndexInfinite(libraryParam,{
+  } = useSongsIndexInfinite(
+    libraryParam,
+    {
     relations: 'album,artists,album.cover,songs.genres',
-  });
+  },
+    addPagination()
+  );
 
   const allSongs = songData ? songData.pages.flatMap((page) => page.data) : [];
 
@@ -25,7 +30,6 @@ export function SongList() {
     if (!songData?.pages?.length) return 0;
 
     const firstPage = songData.pages[0];
-    const itemsPerPage = firstPage?.data?.length || 20; // fallback to 20
 
     // Try to get total from the API response metadata
     const total = (firstPage as any)?.total || (firstPage as any)?.meta?.total;

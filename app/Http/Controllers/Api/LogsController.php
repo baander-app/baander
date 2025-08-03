@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\TokenAbility;
-use App\Modules\LogStreamer\{LogFileService, Models\LogFile, SearchableLogFile, ThreadedLogProcessor};
+use App\Modules\Logging\LogStreamer\{Models\LogFile};
+use App\Modules\Logging\LogStreamer\LogFileService;
+use App\Modules\Logging\LogStreamer\SearchableLogFile;
+use App\Modules\Logging\LogStreamer\ThreadedLogProcessor;
 use Illuminate\Http\{JsonResponse, Request, Response};
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
 

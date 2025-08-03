@@ -78,7 +78,7 @@ export const getUsersIndexQueryKey = (params?: UsersIndexParams) => {
 export const getUsersIndexInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof usersIndex>>,
-    UsersIndexParams["limit"]
+    UsersIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -92,7 +92,7 @@ export const getUsersIndexInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        UsersIndexParams["limit"]
+        UsersIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -105,10 +105,10 @@ export const getUsersIndexInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof usersIndex>>,
     QueryKey,
-    UsersIndexParams["limit"]
+    UsersIndexParams["page"]
   > = ({ signal, pageParam }) =>
     usersIndex(
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -118,7 +118,7 @@ export const getUsersIndexInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    UsersIndexParams["limit"]
+    UsersIndexParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -132,7 +132,7 @@ export type UsersIndexInfiniteQueryError = ErrorType<
 export function useUsersIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof usersIndex>>,
-    UsersIndexParams["limit"]
+    UsersIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -146,7 +146,7 @@ export function useUsersIndexInfinite<
         TError,
         TData,
         QueryKey,
-        UsersIndexParams["limit"]
+        UsersIndexParams["page"]
       >
     > &
       Pick<
@@ -167,7 +167,7 @@ export function useUsersIndexInfinite<
 export function useUsersIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof usersIndex>>,
-    UsersIndexParams["limit"]
+    UsersIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -181,7 +181,7 @@ export function useUsersIndexInfinite<
         TError,
         TData,
         QueryKey,
-        UsersIndexParams["limit"]
+        UsersIndexParams["page"]
       >
     > &
       Pick<
@@ -202,7 +202,7 @@ export function useUsersIndexInfinite<
 export function useUsersIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof usersIndex>>,
-    UsersIndexParams["limit"]
+    UsersIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -216,7 +216,7 @@ export function useUsersIndexInfinite<
         TError,
         TData,
         QueryKey,
-        UsersIndexParams["limit"]
+        UsersIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -232,7 +232,7 @@ export function useUsersIndexInfinite<
 export function useUsersIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof usersIndex>>,
-    UsersIndexParams["limit"]
+    UsersIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -246,7 +246,7 @@ export function useUsersIndexInfinite<
         TError,
         TData,
         QueryKey,
-        UsersIndexParams["limit"]
+        UsersIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -550,7 +550,7 @@ export function useUsersIndexSuspense<
 export const getUsersIndexSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof usersIndex>>,
-    UsersIndexParams["limit"]
+    UsersIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -564,7 +564,7 @@ export const getUsersIndexSuspenseInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        UsersIndexParams["limit"]
+        UsersIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -577,10 +577,10 @@ export const getUsersIndexSuspenseInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof usersIndex>>,
     QueryKey,
-    UsersIndexParams["limit"]
+    UsersIndexParams["page"]
   > = ({ signal, pageParam }) =>
     usersIndex(
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -594,7 +594,7 @@ export const getUsersIndexSuspenseInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    UsersIndexParams["limit"]
+    UsersIndexParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -608,7 +608,7 @@ export type UsersIndexSuspenseInfiniteQueryError = ErrorType<
 export function useUsersIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof usersIndex>>,
-    UsersIndexParams["limit"]
+    UsersIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -622,7 +622,7 @@ export function useUsersIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        UsersIndexParams["limit"]
+        UsersIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -634,7 +634,7 @@ export function useUsersIndexSuspenseInfinite<
 export function useUsersIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof usersIndex>>,
-    UsersIndexParams["limit"]
+    UsersIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -648,7 +648,7 @@ export function useUsersIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        UsersIndexParams["limit"]
+        UsersIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -660,7 +660,7 @@ export function useUsersIndexSuspenseInfinite<
 export function useUsersIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof usersIndex>>,
-    UsersIndexParams["limit"]
+    UsersIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -674,7 +674,7 @@ export function useUsersIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        UsersIndexParams["limit"]
+        UsersIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -690,7 +690,7 @@ export function useUsersIndexSuspenseInfinite<
 export function useUsersIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof usersIndex>>,
-    UsersIndexParams["limit"]
+    UsersIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -704,7 +704,7 @@ export function useUsersIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        UsersIndexParams["limit"]
+        UsersIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -832,7 +832,7 @@ export const useUsersStore = <
  * @summary Update a user
  */
 export const usersUpdate = (
-  user: number,
+  user: string,
   updateUserRequest: BodyType<UpdateUserRequest>,
   options?: SecondParameter<typeof customInstance>
 ) => {
@@ -858,14 +858,14 @@ export const getUsersUpdateMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof usersUpdate>>,
     TError,
-    { user: number; data: BodyType<UpdateUserRequest> },
+    { user: string; data: BodyType<UpdateUserRequest> },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof usersUpdate>>,
   TError,
-  { user: number; data: BodyType<UpdateUserRequest> },
+  { user: string; data: BodyType<UpdateUserRequest> },
   TContext
 > => {
   const mutationKey = ["usersUpdate"];
@@ -879,7 +879,7 @@ export const getUsersUpdateMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof usersUpdate>>,
-    { user: number; data: BodyType<UpdateUserRequest> }
+    { user: string; data: BodyType<UpdateUserRequest> }
   > = (props) => {
     const { user, data } = props ?? {};
 
@@ -914,7 +914,7 @@ export const useUsersUpdate = <
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof usersUpdate>>,
       TError,
-      { user: number; data: BodyType<UpdateUserRequest> },
+      { user: string; data: BodyType<UpdateUserRequest> },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -923,7 +923,7 @@ export const useUsersUpdate = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof usersUpdate>>,
   TError,
-  { user: number; data: BodyType<UpdateUserRequest> },
+  { user: string; data: BodyType<UpdateUserRequest> },
   TContext
 > => {
   const mutationOptions = getUsersUpdateMutationOptions(options);
@@ -934,7 +934,7 @@ export const useUsersUpdate = <
  * @summary Get small user detail info
  */
 export const usersShow = (
-  user: number,
+  user: string,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
@@ -944,7 +944,7 @@ export const usersShow = (
   );
 };
 
-export const getUsersShowQueryKey = (user?: number) => {
+export const getUsersShowQueryKey = (user?: string) => {
   return [`/api/users/${user}`] as const;
 };
 
@@ -954,7 +954,7 @@ export const getUsersShowInfiniteQueryOptions = <
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  user: number,
+  user: string,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -999,7 +999,7 @@ export function useUsersShowInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  user: number,
+  user: string,
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
@@ -1028,7 +1028,7 @@ export function useUsersShowInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  user: number,
+  user: string,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -1057,7 +1057,7 @@ export function useUsersShowInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  user: number,
+  user: string,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -1082,7 +1082,7 @@ export function useUsersShowInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  user: number,
+  user: string,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -1117,7 +1117,7 @@ export const getUsersShowQueryOptions = <
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  user: number,
+  user: string,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof usersShow>>, TError, TData>
@@ -1156,7 +1156,7 @@ export function useUsersShow<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  user: number,
+  user: string,
   options: {
     query: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof usersShow>>, TError, TData>
@@ -1181,7 +1181,7 @@ export function useUsersShow<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  user: number,
+  user: string,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof usersShow>>, TError, TData>
@@ -1206,7 +1206,7 @@ export function useUsersShow<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  user: number,
+  user: string,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof usersShow>>, TError, TData>
@@ -1227,7 +1227,7 @@ export function useUsersShow<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  user: number,
+  user: string,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof usersShow>>, TError, TData>
@@ -1256,7 +1256,7 @@ export const getUsersShowSuspenseQueryOptions = <
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  user: number,
+  user: string,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
@@ -1296,7 +1296,7 @@ export function useUsersShowSuspense<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  user: number,
+  user: string,
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
@@ -1317,7 +1317,7 @@ export function useUsersShowSuspense<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  user: number,
+  user: string,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
@@ -1338,7 +1338,7 @@ export function useUsersShowSuspense<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  user: number,
+  user: string,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
@@ -1363,7 +1363,7 @@ export function useUsersShowSuspense<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  user: number,
+  user: string,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
@@ -1398,7 +1398,7 @@ export const getUsersShowSuspenseInfiniteQueryOptions = <
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  user: number,
+  user: string,
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
@@ -1442,7 +1442,7 @@ export function useUsersShowSuspenseInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  user: number,
+  user: string,
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
@@ -1463,7 +1463,7 @@ export function useUsersShowSuspenseInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  user: number,
+  user: string,
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
@@ -1484,7 +1484,7 @@ export function useUsersShowSuspenseInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  user: number,
+  user: string,
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
@@ -1509,7 +1509,7 @@ export function useUsersShowSuspenseInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  user: number,
+  user: string,
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<

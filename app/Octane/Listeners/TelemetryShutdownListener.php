@@ -16,6 +16,6 @@ class TelemetryShutdownListener
     {
         // Flush and shutdown telemetry synchronously when worker stops
         $this->telemetry->forceFlush();
-//        $this->telemetry->shutdown();
+        $this->telemetry->shutdown();
     }
 }

@@ -22,7 +22,7 @@ export default defineConfig({
           useSuspenseQuery: true,
           useSuspenseInfiniteQuery: true,
           useInfinite: true,
-          useInfiniteQueryParam: 'limit',
+          useInfiniteQueryParam: 'page',
         },
       },
     },

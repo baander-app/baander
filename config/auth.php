@@ -44,7 +44,7 @@ return [
         'api' => [
             'driver'   => 'sanctum',
             'provider' => 'users',
-            'hash' => false,
+            'hash'     => false,
         ],
     ],
 
@@ -67,8 +67,8 @@ return [
 
     'providers' => [
         'users' => [
-            'driver' => 'eloquent',
-            'model' => App\Models\User::class,
+            'driver'            => 'eloquent',
+            'model'             => App\Models\User::class,
             'password_fallback' => true,
         ],
 
@@ -147,4 +147,13 @@ return [
     'user_identifier_field_name' => 'email',
 
     'email_verification_link_expires_in_minutes' => 60,
+
+    'token_binding' => [
+        'max_ip_changes' => 10,
+        'geo_change_cooldown_seconds' => 3600, // 1 hour
+        'concurrent_ip_window_seconds' => 300, // 5 minutes
+        'max_concurrent_ips' => 1, // Only allow 1 concurrent IP (strict)
+        'min_ip_change_interval_minutes' => 5, // Minimum 5 minutes between IP changes
+        'suspicious_geo_jump_hours' => 2, // Country changes within 2 hours are suspicious
+    ],
 ];

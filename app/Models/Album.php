@@ -105,8 +105,12 @@ class Album extends BaseModel implements HasMedia
         return $this->hasMany(Song::class)->orderByNullsLast('track');
     }
 
-    protected function scopeWhereGenreNames(BaseBuilder $q, array $names)
+    protected function scopeWhereGenreNames(BaseBuilder $q, array|string $names)
     {
+        if (is_string($names)) {
+            $names = explode(',', $names);
+        }
+
         return $q->whereHas('songs', function ($q) use ($names) {
             $q->whereHas('genres', function ($q) use ($names) {
                 $q->whereIn('name', $names);

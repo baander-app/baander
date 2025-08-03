@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Modules\LogStreamer;
+namespace App\Modules\Logging\LogStreamer;
 
-use App\Modules\LogStreamer\Models\LogFile;
+use App\Modules\Logging\LogStreamer\Models\LogFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;

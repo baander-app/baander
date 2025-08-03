@@ -57,6 +57,8 @@ import type {
   AuthResetPassword200,
   AuthResetPassword400,
   AuthStreamToken200,
+  AuthTokensRevoke200,
+  AuthTokensRevoke400,
   AuthenticateUsingPasskeyRequest,
   AuthenticationExceptionResponse,
   ForgotPasswordRequest,
@@ -423,6 +425,619 @@ export const useAuthRegister = <
   TContext
 > => {
   const mutationOptions = getAuthRegisterMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+/**
+ * Returns information about all active tokens including IP history
+ * @summary Get user's active tokens/sessions
+ */
+export const authTokens = (
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal
+) => {
+  return customInstance<string>(
+    { url: `/api/auth/tokens`, method: "GET", signal },
+    options
+  );
+};
+
+export const getAuthTokensQueryKey = () => {
+  return [`/api/auth/tokens`] as const;
+};
+
+export const getAuthTokensInfiniteQueryOptions = <
+  TData = InfiniteData<Awaited<ReturnType<typeof authTokens>>>,
+  TError = ErrorType<AuthenticationExceptionResponse>
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof authTokens>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getAuthTokensQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof authTokens>>> = ({
+    signal,
+  }) => authTokens(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof authTokens>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AuthTokensInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof authTokens>>
+>;
+export type AuthTokensInfiniteQueryError =
+  ErrorType<AuthenticationExceptionResponse>;
+
+export function useAuthTokensInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof authTokens>>>,
+  TError = ErrorType<AuthenticationExceptionResponse>
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof authTokens>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof authTokens>>,
+          TError,
+          Awaited<ReturnType<typeof authTokens>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAuthTokensInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof authTokens>>>,
+  TError = ErrorType<AuthenticationExceptionResponse>
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof authTokens>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof authTokens>>,
+          TError,
+          Awaited<ReturnType<typeof authTokens>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAuthTokensInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof authTokens>>>,
+  TError = ErrorType<AuthenticationExceptionResponse>
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof authTokens>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get user's active tokens/sessions
+ */
+
+export function useAuthTokensInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof authTokens>>>,
+  TError = ErrorType<AuthenticationExceptionResponse>
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof authTokens>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAuthTokensInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAuthTokensQueryOptions = <
+  TData = Awaited<ReturnType<typeof authTokens>>,
+  TError = ErrorType<AuthenticationExceptionResponse>
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof authTokens>>, TError, TData>
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getAuthTokensQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof authTokens>>> = ({
+    signal,
+  }) => authTokens(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof authTokens>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AuthTokensQueryResult = NonNullable<
+  Awaited<ReturnType<typeof authTokens>>
+>;
+export type AuthTokensQueryError = ErrorType<AuthenticationExceptionResponse>;
+
+export function useAuthTokens<
+  TData = Awaited<ReturnType<typeof authTokens>>,
+  TError = ErrorType<AuthenticationExceptionResponse>
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof authTokens>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof authTokens>>,
+          TError,
+          Awaited<ReturnType<typeof authTokens>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAuthTokens<
+  TData = Awaited<ReturnType<typeof authTokens>>,
+  TError = ErrorType<AuthenticationExceptionResponse>
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof authTokens>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof authTokens>>,
+          TError,
+          Awaited<ReturnType<typeof authTokens>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAuthTokens<
+  TData = Awaited<ReturnType<typeof authTokens>>,
+  TError = ErrorType<AuthenticationExceptionResponse>
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof authTokens>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get user's active tokens/sessions
+ */
+
+export function useAuthTokens<
+  TData = Awaited<ReturnType<typeof authTokens>>,
+  TError = ErrorType<AuthenticationExceptionResponse>
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof authTokens>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAuthTokensQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAuthTokensSuspenseQueryOptions = <
+  TData = Awaited<ReturnType<typeof authTokens>>,
+  TError = ErrorType<AuthenticationExceptionResponse>
+>(options?: {
+  query?: Partial<
+    UseSuspenseQueryOptions<
+      Awaited<ReturnType<typeof authTokens>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getAuthTokensQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof authTokens>>> = ({
+    signal,
+  }) => authTokens(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
+    Awaited<ReturnType<typeof authTokens>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AuthTokensSuspenseQueryResult = NonNullable<
+  Awaited<ReturnType<typeof authTokens>>
+>;
+export type AuthTokensSuspenseQueryError =
+  ErrorType<AuthenticationExceptionResponse>;
+
+export function useAuthTokensSuspense<
+  TData = Awaited<ReturnType<typeof authTokens>>,
+  TError = ErrorType<AuthenticationExceptionResponse>
+>(
+  options: {
+    query: Partial<
+      UseSuspenseQueryOptions<
+        Awaited<ReturnType<typeof authTokens>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseSuspenseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAuthTokensSuspense<
+  TData = Awaited<ReturnType<typeof authTokens>>,
+  TError = ErrorType<AuthenticationExceptionResponse>
+>(
+  options?: {
+    query?: Partial<
+      UseSuspenseQueryOptions<
+        Awaited<ReturnType<typeof authTokens>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseSuspenseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAuthTokensSuspense<
+  TData = Awaited<ReturnType<typeof authTokens>>,
+  TError = ErrorType<AuthenticationExceptionResponse>
+>(
+  options?: {
+    query?: Partial<
+      UseSuspenseQueryOptions<
+        Awaited<ReturnType<typeof authTokens>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseSuspenseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get user's active tokens/sessions
+ */
+
+export function useAuthTokensSuspense<
+  TData = Awaited<ReturnType<typeof authTokens>>,
+  TError = ErrorType<AuthenticationExceptionResponse>
+>(
+  options?: {
+    query?: Partial<
+      UseSuspenseQueryOptions<
+        Awaited<ReturnType<typeof authTokens>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseSuspenseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAuthTokensSuspenseQueryOptions(options);
+
+  const query = useSuspenseQuery(
+    queryOptions,
+    queryClient
+  ) as UseSuspenseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAuthTokensSuspenseInfiniteQueryOptions = <
+  TData = InfiniteData<Awaited<ReturnType<typeof authTokens>>>,
+  TError = ErrorType<AuthenticationExceptionResponse>
+>(options?: {
+  query?: Partial<
+    UseSuspenseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof authTokens>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getAuthTokensQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof authTokens>>> = ({
+    signal,
+  }) => authTokens(requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    ...queryOptions,
+  } as UseSuspenseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof authTokens>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AuthTokensSuspenseInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof authTokens>>
+>;
+export type AuthTokensSuspenseInfiniteQueryError =
+  ErrorType<AuthenticationExceptionResponse>;
+
+export function useAuthTokensSuspenseInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof authTokens>>>,
+  TError = ErrorType<AuthenticationExceptionResponse>
+>(
+  options: {
+    query: Partial<
+      UseSuspenseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof authTokens>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseSuspenseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAuthTokensSuspenseInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof authTokens>>>,
+  TError = ErrorType<AuthenticationExceptionResponse>
+>(
+  options?: {
+    query?: Partial<
+      UseSuspenseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof authTokens>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseSuspenseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAuthTokensSuspenseInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof authTokens>>>,
+  TError = ErrorType<AuthenticationExceptionResponse>
+>(
+  options?: {
+    query?: Partial<
+      UseSuspenseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof authTokens>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseSuspenseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get user's active tokens/sessions
+ */
+
+export function useAuthTokensSuspenseInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof authTokens>>>,
+  TError = ErrorType<AuthenticationExceptionResponse>
+>(
+  options?: {
+    query?: Partial<
+      UseSuspenseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof authTokens>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseSuspenseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAuthTokensSuspenseInfiniteQueryOptions(options);
+
+  const query = useSuspenseInfiniteQuery(
+    queryOptions,
+    queryClient
+  ) as UseSuspenseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * @summary Revoke a specific token
+ */
+export const authTokensRevoke = (
+  tokenId: string,
+  options?: SecondParameter<typeof customInstance>
+) => {
+  return customInstance<AuthTokensRevoke200>(
+    { url: `/api/auth/tokens/${tokenId}`, method: "DELETE" },
+    options
+  );
+};
+
+export const getAuthTokensRevokeMutationOptions = <
+  TError = ErrorType<AuthTokensRevoke400 | AuthenticationExceptionResponse>,
+  TContext = unknown
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof authTokensRevoke>>,
+    TError,
+    { tokenId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof authTokensRevoke>>,
+  TError,
+  { tokenId: string },
+  TContext
+> => {
+  const mutationKey = ["authTokensRevoke"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof authTokensRevoke>>,
+    { tokenId: string }
+  > = (props) => {
+    const { tokenId } = props ?? {};
+
+    return authTokensRevoke(tokenId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AuthTokensRevokeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof authTokensRevoke>>
+>;
+
+export type AuthTokensRevokeMutationError = ErrorType<
+  AuthTokensRevoke400 | AuthenticationExceptionResponse
+>;
+
+/**
+ * @summary Revoke a specific token
+ */
+export const useAuthTokensRevoke = <
+  TError = ErrorType<AuthTokensRevoke400 | AuthenticationExceptionResponse>,
+  TContext = unknown
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof authTokensRevoke>>,
+      TError,
+      { tokenId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof authTokensRevoke>>,
+  TError,
+  { tokenId: string },
+  TContext
+> => {
+  const mutationOptions = getAuthTokensRevokeMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

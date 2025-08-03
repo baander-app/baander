@@ -611,7 +611,7 @@ export const getLastfmCallbackQueryKey = (params?: LastfmCallbackParams) => {
 export const getLastfmCallbackInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof lastfmCallback>>,
-    LastfmCallbackParams["limit"]
+    LastfmCallbackParams["page"]
   >,
   TError = ErrorType<LastfmCallback400 | LastfmCallback500>
 >(
@@ -623,7 +623,7 @@ export const getLastfmCallbackInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        LastfmCallbackParams["limit"]
+        LastfmCallbackParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -636,10 +636,10 @@ export const getLastfmCallbackInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof lastfmCallback>>,
     QueryKey,
-    LastfmCallbackParams["limit"]
+    LastfmCallbackParams["page"]
   > = ({ signal, pageParam }) =>
     lastfmCallback(
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -649,7 +649,7 @@ export const getLastfmCallbackInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    LastfmCallbackParams["limit"]
+    LastfmCallbackParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -663,7 +663,7 @@ export type LastfmCallbackInfiniteQueryError = ErrorType<
 export function useLastfmCallbackInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof lastfmCallback>>,
-    LastfmCallbackParams["limit"]
+    LastfmCallbackParams["page"]
   >,
   TError = ErrorType<LastfmCallback400 | LastfmCallback500>
 >(
@@ -675,7 +675,7 @@ export function useLastfmCallbackInfinite<
         TError,
         TData,
         QueryKey,
-        LastfmCallbackParams["limit"]
+        LastfmCallbackParams["page"]
       >
     > &
       Pick<
@@ -696,7 +696,7 @@ export function useLastfmCallbackInfinite<
 export function useLastfmCallbackInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof lastfmCallback>>,
-    LastfmCallbackParams["limit"]
+    LastfmCallbackParams["page"]
   >,
   TError = ErrorType<LastfmCallback400 | LastfmCallback500>
 >(
@@ -708,7 +708,7 @@ export function useLastfmCallbackInfinite<
         TError,
         TData,
         QueryKey,
-        LastfmCallbackParams["limit"]
+        LastfmCallbackParams["page"]
       >
     > &
       Pick<
@@ -729,7 +729,7 @@ export function useLastfmCallbackInfinite<
 export function useLastfmCallbackInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof lastfmCallback>>,
-    LastfmCallbackParams["limit"]
+    LastfmCallbackParams["page"]
   >,
   TError = ErrorType<LastfmCallback400 | LastfmCallback500>
 >(
@@ -741,7 +741,7 @@ export function useLastfmCallbackInfinite<
         TError,
         TData,
         QueryKey,
-        LastfmCallbackParams["limit"]
+        LastfmCallbackParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -754,7 +754,7 @@ export function useLastfmCallbackInfinite<
 export function useLastfmCallbackInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof lastfmCallback>>,
-    LastfmCallbackParams["limit"]
+    LastfmCallbackParams["page"]
   >,
   TError = ErrorType<LastfmCallback400 | LastfmCallback500>
 >(
@@ -766,7 +766,7 @@ export function useLastfmCallbackInfinite<
         TError,
         TData,
         QueryKey,
-        LastfmCallbackParams["limit"]
+        LastfmCallbackParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1044,7 +1044,7 @@ export function useLastfmCallbackSuspense<
 export const getLastfmCallbackSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof lastfmCallback>>,
-    LastfmCallbackParams["limit"]
+    LastfmCallbackParams["page"]
   >,
   TError = ErrorType<LastfmCallback400 | LastfmCallback500>
 >(
@@ -1056,7 +1056,7 @@ export const getLastfmCallbackSuspenseInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        LastfmCallbackParams["limit"]
+        LastfmCallbackParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1069,10 +1069,10 @@ export const getLastfmCallbackSuspenseInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof lastfmCallback>>,
     QueryKey,
-    LastfmCallbackParams["limit"]
+    LastfmCallbackParams["page"]
   > = ({ signal, pageParam }) =>
     lastfmCallback(
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -1086,7 +1086,7 @@ export const getLastfmCallbackSuspenseInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    LastfmCallbackParams["limit"]
+    LastfmCallbackParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -1100,7 +1100,7 @@ export type LastfmCallbackSuspenseInfiniteQueryError = ErrorType<
 export function useLastfmCallbackSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof lastfmCallback>>,
-    LastfmCallbackParams["limit"]
+    LastfmCallbackParams["page"]
   >,
   TError = ErrorType<LastfmCallback400 | LastfmCallback500>
 >(
@@ -1112,7 +1112,7 @@ export function useLastfmCallbackSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LastfmCallbackParams["limit"]
+        LastfmCallbackParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1124,7 +1124,7 @@ export function useLastfmCallbackSuspenseInfinite<
 export function useLastfmCallbackSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof lastfmCallback>>,
-    LastfmCallbackParams["limit"]
+    LastfmCallbackParams["page"]
   >,
   TError = ErrorType<LastfmCallback400 | LastfmCallback500>
 >(
@@ -1136,7 +1136,7 @@ export function useLastfmCallbackSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LastfmCallbackParams["limit"]
+        LastfmCallbackParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1148,7 +1148,7 @@ export function useLastfmCallbackSuspenseInfinite<
 export function useLastfmCallbackSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof lastfmCallback>>,
-    LastfmCallbackParams["limit"]
+    LastfmCallbackParams["page"]
   >,
   TError = ErrorType<LastfmCallback400 | LastfmCallback500>
 >(
@@ -1160,7 +1160,7 @@ export function useLastfmCallbackSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LastfmCallbackParams["limit"]
+        LastfmCallbackParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1173,7 +1173,7 @@ export function useLastfmCallbackSuspenseInfinite<
 export function useLastfmCallbackSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof lastfmCallback>>,
-    LastfmCallbackParams["limit"]
+    LastfmCallbackParams["page"]
   >,
   TError = ErrorType<LastfmCallback400 | LastfmCallback500>
 >(
@@ -1185,7 +1185,7 @@ export function useLastfmCallbackSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        LastfmCallbackParams["limit"]
+        LastfmCallbackParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;

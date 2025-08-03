@@ -77,7 +77,7 @@ export const getGenresIndexQueryKey = (params?: GenresIndexParams) => {
 export const getGenresIndexInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof genresIndex>>,
-    GenresIndexParams["limit"]
+    GenresIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -91,7 +91,7 @@ export const getGenresIndexInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        GenresIndexParams["limit"]
+        GenresIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -104,10 +104,10 @@ export const getGenresIndexInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof genresIndex>>,
     QueryKey,
-    GenresIndexParams["limit"]
+    GenresIndexParams["page"]
   > = ({ signal, pageParam }) =>
     genresIndex(
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -117,7 +117,7 @@ export const getGenresIndexInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    GenresIndexParams["limit"]
+    GenresIndexParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -131,7 +131,7 @@ export type GenresIndexInfiniteQueryError = ErrorType<
 export function useGenresIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof genresIndex>>,
-    GenresIndexParams["limit"]
+    GenresIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -145,7 +145,7 @@ export function useGenresIndexInfinite<
         TError,
         TData,
         QueryKey,
-        GenresIndexParams["limit"]
+        GenresIndexParams["page"]
       >
     > &
       Pick<
@@ -166,7 +166,7 @@ export function useGenresIndexInfinite<
 export function useGenresIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof genresIndex>>,
-    GenresIndexParams["limit"]
+    GenresIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -180,7 +180,7 @@ export function useGenresIndexInfinite<
         TError,
         TData,
         QueryKey,
-        GenresIndexParams["limit"]
+        GenresIndexParams["page"]
       >
     > &
       Pick<
@@ -201,7 +201,7 @@ export function useGenresIndexInfinite<
 export function useGenresIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof genresIndex>>,
-    GenresIndexParams["limit"]
+    GenresIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -215,7 +215,7 @@ export function useGenresIndexInfinite<
         TError,
         TData,
         QueryKey,
-        GenresIndexParams["limit"]
+        GenresIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -231,7 +231,7 @@ export function useGenresIndexInfinite<
 export function useGenresIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof genresIndex>>,
-    GenresIndexParams["limit"]
+    GenresIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -245,7 +245,7 @@ export function useGenresIndexInfinite<
         TError,
         TData,
         QueryKey,
-        GenresIndexParams["limit"]
+        GenresIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -549,7 +549,7 @@ export function useGenresIndexSuspense<
 export const getGenresIndexSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof genresIndex>>,
-    GenresIndexParams["limit"]
+    GenresIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -563,7 +563,7 @@ export const getGenresIndexSuspenseInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        GenresIndexParams["limit"]
+        GenresIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -576,10 +576,10 @@ export const getGenresIndexSuspenseInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof genresIndex>>,
     QueryKey,
-    GenresIndexParams["limit"]
+    GenresIndexParams["page"]
   > = ({ signal, pageParam }) =>
     genresIndex(
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -593,7 +593,7 @@ export const getGenresIndexSuspenseInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    GenresIndexParams["limit"]
+    GenresIndexParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -607,7 +607,7 @@ export type GenresIndexSuspenseInfiniteQueryError = ErrorType<
 export function useGenresIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof genresIndex>>,
-    GenresIndexParams["limit"]
+    GenresIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -621,7 +621,7 @@ export function useGenresIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        GenresIndexParams["limit"]
+        GenresIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -633,7 +633,7 @@ export function useGenresIndexSuspenseInfinite<
 export function useGenresIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof genresIndex>>,
-    GenresIndexParams["limit"]
+    GenresIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -647,7 +647,7 @@ export function useGenresIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        GenresIndexParams["limit"]
+        GenresIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -659,7 +659,7 @@ export function useGenresIndexSuspenseInfinite<
 export function useGenresIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof genresIndex>>,
-    GenresIndexParams["limit"]
+    GenresIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -673,7 +673,7 @@ export function useGenresIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        GenresIndexParams["limit"]
+        GenresIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -689,7 +689,7 @@ export function useGenresIndexSuspenseInfinite<
 export function useGenresIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof genresIndex>>,
-    GenresIndexParams["limit"]
+    GenresIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -703,7 +703,7 @@ export function useGenresIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        GenresIndexParams["limit"]
+        GenresIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;

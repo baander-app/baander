@@ -81,7 +81,7 @@ export const getSongsIndexQueryKey = (
 export const getSongsIndexInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof songsIndex>>,
-    SongsIndexParams["limit"]
+    SongsIndexParams["page"]
   >,
   TError = ErrorType<
     | SongsIndex400
@@ -99,7 +99,7 @@ export const getSongsIndexInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        SongsIndexParams["limit"]
+        SongsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -113,11 +113,11 @@ export const getSongsIndexInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof songsIndex>>,
     QueryKey,
-    SongsIndexParams["limit"]
+    SongsIndexParams["page"]
   > = ({ signal, pageParam }) =>
     songsIndex(
       library,
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -132,7 +132,7 @@ export const getSongsIndexInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    SongsIndexParams["limit"]
+    SongsIndexParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -149,7 +149,7 @@ export type SongsIndexInfiniteQueryError = ErrorType<
 export function useSongsIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof songsIndex>>,
-    SongsIndexParams["limit"]
+    SongsIndexParams["page"]
   >,
   TError = ErrorType<
     | SongsIndex400
@@ -167,7 +167,7 @@ export function useSongsIndexInfinite<
         TError,
         TData,
         QueryKey,
-        SongsIndexParams["limit"]
+        SongsIndexParams["page"]
       >
     > &
       Pick<
@@ -188,7 +188,7 @@ export function useSongsIndexInfinite<
 export function useSongsIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof songsIndex>>,
-    SongsIndexParams["limit"]
+    SongsIndexParams["page"]
   >,
   TError = ErrorType<
     | SongsIndex400
@@ -206,7 +206,7 @@ export function useSongsIndexInfinite<
         TError,
         TData,
         QueryKey,
-        SongsIndexParams["limit"]
+        SongsIndexParams["page"]
       >
     > &
       Pick<
@@ -227,7 +227,7 @@ export function useSongsIndexInfinite<
 export function useSongsIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof songsIndex>>,
-    SongsIndexParams["limit"]
+    SongsIndexParams["page"]
   >,
   TError = ErrorType<
     | SongsIndex400
@@ -245,7 +245,7 @@ export function useSongsIndexInfinite<
         TError,
         TData,
         QueryKey,
-        SongsIndexParams["limit"]
+        SongsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -261,7 +261,7 @@ export function useSongsIndexInfinite<
 export function useSongsIndexInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof songsIndex>>,
-    SongsIndexParams["limit"]
+    SongsIndexParams["page"]
   >,
   TError = ErrorType<
     | SongsIndex400
@@ -279,7 +279,7 @@ export function useSongsIndexInfinite<
         TError,
         TData,
         QueryKey,
-        SongsIndexParams["limit"]
+        SongsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -644,7 +644,7 @@ export function useSongsIndexSuspense<
 export const getSongsIndexSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof songsIndex>>,
-    SongsIndexParams["limit"]
+    SongsIndexParams["page"]
   >,
   TError = ErrorType<
     | SongsIndex400
@@ -662,7 +662,7 @@ export const getSongsIndexSuspenseInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        SongsIndexParams["limit"]
+        SongsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -676,11 +676,11 @@ export const getSongsIndexSuspenseInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof songsIndex>>,
     QueryKey,
-    SongsIndexParams["limit"]
+    SongsIndexParams["page"]
   > = ({ signal, pageParam }) =>
     songsIndex(
       library,
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -694,7 +694,7 @@ export const getSongsIndexSuspenseInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    SongsIndexParams["limit"]
+    SongsIndexParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -711,7 +711,7 @@ export type SongsIndexSuspenseInfiniteQueryError = ErrorType<
 export function useSongsIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof songsIndex>>,
-    SongsIndexParams["limit"]
+    SongsIndexParams["page"]
   >,
   TError = ErrorType<
     | SongsIndex400
@@ -729,7 +729,7 @@ export function useSongsIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        SongsIndexParams["limit"]
+        SongsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -741,7 +741,7 @@ export function useSongsIndexSuspenseInfinite<
 export function useSongsIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof songsIndex>>,
-    SongsIndexParams["limit"]
+    SongsIndexParams["page"]
   >,
   TError = ErrorType<
     | SongsIndex400
@@ -759,7 +759,7 @@ export function useSongsIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        SongsIndexParams["limit"]
+        SongsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -771,7 +771,7 @@ export function useSongsIndexSuspenseInfinite<
 export function useSongsIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof songsIndex>>,
-    SongsIndexParams["limit"]
+    SongsIndexParams["page"]
   >,
   TError = ErrorType<
     | SongsIndex400
@@ -789,7 +789,7 @@ export function useSongsIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        SongsIndexParams["limit"]
+        SongsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -805,7 +805,7 @@ export function useSongsIndexSuspenseInfinite<
 export function useSongsIndexSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof songsIndex>>,
-    SongsIndexParams["limit"]
+    SongsIndexParams["page"]
   >,
   TError = ErrorType<
     | SongsIndex400
@@ -823,7 +823,7 @@ export function useSongsIndexSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        SongsIndexParams["limit"]
+        SongsIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -885,7 +885,7 @@ export const getSongsShowQueryKey = (
 export const getSongsShowInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof songsShow>>,
-    SongsShowParams["limit"]
+    SongsShowParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -903,7 +903,7 @@ export const getSongsShowInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        SongsShowParams["limit"]
+        SongsShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -917,12 +917,12 @@ export const getSongsShowInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof songsShow>>,
     QueryKey,
-    SongsShowParams["limit"]
+    SongsShowParams["page"]
   > = ({ signal, pageParam }) =>
     songsShow(
       library,
       publicId,
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -937,7 +937,7 @@ export const getSongsShowInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    SongsShowParams["limit"]
+    SongsShowParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -953,7 +953,7 @@ export type SongsShowInfiniteQueryError = ErrorType<
 export function useSongsShowInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof songsShow>>,
-    SongsShowParams["limit"]
+    SongsShowParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -971,7 +971,7 @@ export function useSongsShowInfinite<
         TError,
         TData,
         QueryKey,
-        SongsShowParams["limit"]
+        SongsShowParams["page"]
       >
     > &
       Pick<
@@ -992,7 +992,7 @@ export function useSongsShowInfinite<
 export function useSongsShowInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof songsShow>>,
-    SongsShowParams["limit"]
+    SongsShowParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1010,7 +1010,7 @@ export function useSongsShowInfinite<
         TError,
         TData,
         QueryKey,
-        SongsShowParams["limit"]
+        SongsShowParams["page"]
       >
     > &
       Pick<
@@ -1031,7 +1031,7 @@ export function useSongsShowInfinite<
 export function useSongsShowInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof songsShow>>,
-    SongsShowParams["limit"]
+    SongsShowParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1049,7 +1049,7 @@ export function useSongsShowInfinite<
         TError,
         TData,
         QueryKey,
-        SongsShowParams["limit"]
+        SongsShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1065,7 +1065,7 @@ export function useSongsShowInfinite<
 export function useSongsShowInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof songsShow>>,
-    SongsShowParams["limit"]
+    SongsShowParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1083,7 +1083,7 @@ export function useSongsShowInfinite<
         TError,
         TData,
         QueryKey,
-        SongsShowParams["limit"]
+        SongsShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1451,7 +1451,7 @@ export function useSongsShowSuspense<
 export const getSongsShowSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof songsShow>>,
-    SongsShowParams["limit"]
+    SongsShowParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1469,7 +1469,7 @@ export const getSongsShowSuspenseInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        SongsShowParams["limit"]
+        SongsShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1483,12 +1483,12 @@ export const getSongsShowSuspenseInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof songsShow>>,
     QueryKey,
-    SongsShowParams["limit"]
+    SongsShowParams["page"]
   > = ({ signal, pageParam }) =>
     songsShow(
       library,
       publicId,
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -1502,7 +1502,7 @@ export const getSongsShowSuspenseInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    SongsShowParams["limit"]
+    SongsShowParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -1518,7 +1518,7 @@ export type SongsShowSuspenseInfiniteQueryError = ErrorType<
 export function useSongsShowSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof songsShow>>,
-    SongsShowParams["limit"]
+    SongsShowParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1536,7 +1536,7 @@ export function useSongsShowSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        SongsShowParams["limit"]
+        SongsShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1548,7 +1548,7 @@ export function useSongsShowSuspenseInfinite<
 export function useSongsShowSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof songsShow>>,
-    SongsShowParams["limit"]
+    SongsShowParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1566,7 +1566,7 @@ export function useSongsShowSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        SongsShowParams["limit"]
+        SongsShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1578,7 +1578,7 @@ export function useSongsShowSuspenseInfinite<
 export function useSongsShowSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof songsShow>>,
-    SongsShowParams["limit"]
+    SongsShowParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1596,7 +1596,7 @@ export function useSongsShowSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        SongsShowParams["limit"]
+        SongsShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1612,7 +1612,7 @@ export function useSongsShowSuspenseInfinite<
 export function useSongsShowSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof songsShow>>,
-    SongsShowParams["limit"]
+    SongsShowParams["page"]
   >,
   TError = ErrorType<
     | AuthenticationExceptionResponse
@@ -1630,7 +1630,7 @@ export function useSongsShowSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        SongsShowParams["limit"]
+        SongsShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;

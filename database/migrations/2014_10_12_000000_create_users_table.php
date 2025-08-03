@@ -13,12 +13,15 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
+            $table->text('public_id');
             $table->caseInsensitiveText('name');
             $table->text('email')->unique();
             $table->timestampTz('email_verified_at')->nullable();
             $table->text('password');
             $table->text('remember_token')->nullable();
             $table->timestampsTz();
+
+            $table->unique('public_id', 'idx_users_public_id');
         });
     }
 

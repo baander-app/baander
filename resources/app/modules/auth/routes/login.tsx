@@ -4,23 +4,10 @@ import styles from './login.module.scss';
 import { VinylSpinAnimation } from '@/ui/animations/vinyl-spin-animation/vinyl-spin-animation.tsx';
 import { Form } from 'radix-ui';
 import { Link } from 'react-router-dom';
-import { useAuthLogin } from '@/libs/api-client/gen/endpoints/auth/auth.ts';
 import { useAuth } from '@/providers/auth-provider.tsx';
 
 export default function Login() {
-  const auth = useAuth();
-
-  const mutation = useAuthLogin({
-    mutation: {
-      onSuccess: (data) => {
-        auth.setAccessToken(data.accessToken);
-        auth.setRefreshToken(data.refreshToken);
-      },
-    },
-    request: {
-      _skipAuth: true, // Skip auth header for login request
-    },
-  });
+  const {login} = useAuth();
 
   const onSubmit = async (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -31,10 +18,11 @@ export default function Login() {
     // @ts-expect-error
     const password = formData.password.value;
 
-    mutation.mutate({
-      data: {
-        email, password
-      }
+    login({
+      email,
+      password
+    }).then(res => {
+      console.log('res', res);
     })
   };
 

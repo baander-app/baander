@@ -82,7 +82,7 @@ export const getQueueMetricsShowQueryKey = (
 export const getQueueMetricsShowInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof queueMetricsShow>>,
-    QueueMetricsShowParams["limit"]
+    QueueMetricsShowParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -96,7 +96,7 @@ export const getQueueMetricsShowInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        QueueMetricsShowParams["limit"]
+        QueueMetricsShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -110,10 +110,10 @@ export const getQueueMetricsShowInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof queueMetricsShow>>,
     QueryKey,
-    QueueMetricsShowParams["limit"]
+    QueueMetricsShowParams["page"]
   > = ({ signal, pageParam }) =>
     queueMetricsShow(
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -123,7 +123,7 @@ export const getQueueMetricsShowInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    QueueMetricsShowParams["limit"]
+    QueueMetricsShowParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -137,7 +137,7 @@ export type QueueMetricsShowInfiniteQueryError = ErrorType<
 export function useQueueMetricsShowInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof queueMetricsShow>>,
-    QueueMetricsShowParams["limit"]
+    QueueMetricsShowParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -151,7 +151,7 @@ export function useQueueMetricsShowInfinite<
         TError,
         TData,
         QueryKey,
-        QueueMetricsShowParams["limit"]
+        QueueMetricsShowParams["page"]
       >
     > &
       Pick<
@@ -172,7 +172,7 @@ export function useQueueMetricsShowInfinite<
 export function useQueueMetricsShowInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof queueMetricsShow>>,
-    QueueMetricsShowParams["limit"]
+    QueueMetricsShowParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -186,7 +186,7 @@ export function useQueueMetricsShowInfinite<
         TError,
         TData,
         QueryKey,
-        QueueMetricsShowParams["limit"]
+        QueueMetricsShowParams["page"]
       >
     > &
       Pick<
@@ -207,7 +207,7 @@ export function useQueueMetricsShowInfinite<
 export function useQueueMetricsShowInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof queueMetricsShow>>,
-    QueueMetricsShowParams["limit"]
+    QueueMetricsShowParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -221,7 +221,7 @@ export function useQueueMetricsShowInfinite<
         TError,
         TData,
         QueryKey,
-        QueueMetricsShowParams["limit"]
+        QueueMetricsShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -237,7 +237,7 @@ export function useQueueMetricsShowInfinite<
 export function useQueueMetricsShowInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof queueMetricsShow>>,
-    QueueMetricsShowParams["limit"]
+    QueueMetricsShowParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -251,7 +251,7 @@ export function useQueueMetricsShowInfinite<
         TError,
         TData,
         QueryKey,
-        QueueMetricsShowParams["limit"]
+        QueueMetricsShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -577,7 +577,7 @@ export function useQueueMetricsShowSuspense<
 export const getQueueMetricsShowSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof queueMetricsShow>>,
-    QueueMetricsShowParams["limit"]
+    QueueMetricsShowParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -591,7 +591,7 @@ export const getQueueMetricsShowSuspenseInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        QueueMetricsShowParams["limit"]
+        QueueMetricsShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -605,10 +605,10 @@ export const getQueueMetricsShowSuspenseInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof queueMetricsShow>>,
     QueryKey,
-    QueueMetricsShowParams["limit"]
+    QueueMetricsShowParams["page"]
   > = ({ signal, pageParam }) =>
     queueMetricsShow(
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -622,7 +622,7 @@ export const getQueueMetricsShowSuspenseInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    QueueMetricsShowParams["limit"]
+    QueueMetricsShowParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -636,7 +636,7 @@ export type QueueMetricsShowSuspenseInfiniteQueryError = ErrorType<
 export function useQueueMetricsShowSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof queueMetricsShow>>,
-    QueueMetricsShowParams["limit"]
+    QueueMetricsShowParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -650,7 +650,7 @@ export function useQueueMetricsShowSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        QueueMetricsShowParams["limit"]
+        QueueMetricsShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -662,7 +662,7 @@ export function useQueueMetricsShowSuspenseInfinite<
 export function useQueueMetricsShowSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof queueMetricsShow>>,
-    QueueMetricsShowParams["limit"]
+    QueueMetricsShowParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -676,7 +676,7 @@ export function useQueueMetricsShowSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        QueueMetricsShowParams["limit"]
+        QueueMetricsShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -688,7 +688,7 @@ export function useQueueMetricsShowSuspenseInfinite<
 export function useQueueMetricsShowSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof queueMetricsShow>>,
-    QueueMetricsShowParams["limit"]
+    QueueMetricsShowParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -702,7 +702,7 @@ export function useQueueMetricsShowSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        QueueMetricsShowParams["limit"]
+        QueueMetricsShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -718,7 +718,7 @@ export function useQueueMetricsShowSuspenseInfinite<
 export function useQueueMetricsShowSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof queueMetricsShow>>,
-    QueueMetricsShowParams["limit"]
+    QueueMetricsShowParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -732,7 +732,7 @@ export function useQueueMetricsShowSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        QueueMetricsShowParams["limit"]
+        QueueMetricsShowParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1329,7 +1329,7 @@ export const getQueueMetricsMetricsQueryKey = (
 export const getQueueMetricsMetricsInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof queueMetricsMetrics>>,
-    QueueMetricsMetricsParams["limit"]
+    QueueMetricsMetricsParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -1343,7 +1343,7 @@ export const getQueueMetricsMetricsInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        QueueMetricsMetricsParams["limit"]
+        QueueMetricsMetricsParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1357,10 +1357,10 @@ export const getQueueMetricsMetricsInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof queueMetricsMetrics>>,
     QueryKey,
-    QueueMetricsMetricsParams["limit"]
+    QueueMetricsMetricsParams["page"]
   > = ({ signal, pageParam }) =>
     queueMetricsMetrics(
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -1370,7 +1370,7 @@ export const getQueueMetricsMetricsInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    QueueMetricsMetricsParams["limit"]
+    QueueMetricsMetricsParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -1384,7 +1384,7 @@ export type QueueMetricsMetricsInfiniteQueryError = ErrorType<
 export function useQueueMetricsMetricsInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof queueMetricsMetrics>>,
-    QueueMetricsMetricsParams["limit"]
+    QueueMetricsMetricsParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -1398,7 +1398,7 @@ export function useQueueMetricsMetricsInfinite<
         TError,
         TData,
         QueryKey,
-        QueueMetricsMetricsParams["limit"]
+        QueueMetricsMetricsParams["page"]
       >
     > &
       Pick<
@@ -1419,7 +1419,7 @@ export function useQueueMetricsMetricsInfinite<
 export function useQueueMetricsMetricsInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof queueMetricsMetrics>>,
-    QueueMetricsMetricsParams["limit"]
+    QueueMetricsMetricsParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -1433,7 +1433,7 @@ export function useQueueMetricsMetricsInfinite<
         TError,
         TData,
         QueryKey,
-        QueueMetricsMetricsParams["limit"]
+        QueueMetricsMetricsParams["page"]
       >
     > &
       Pick<
@@ -1454,7 +1454,7 @@ export function useQueueMetricsMetricsInfinite<
 export function useQueueMetricsMetricsInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof queueMetricsMetrics>>,
-    QueueMetricsMetricsParams["limit"]
+    QueueMetricsMetricsParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -1468,7 +1468,7 @@ export function useQueueMetricsMetricsInfinite<
         TError,
         TData,
         QueryKey,
-        QueueMetricsMetricsParams["limit"]
+        QueueMetricsMetricsParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1484,7 +1484,7 @@ export function useQueueMetricsMetricsInfinite<
 export function useQueueMetricsMetricsInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof queueMetricsMetrics>>,
-    QueueMetricsMetricsParams["limit"]
+    QueueMetricsMetricsParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -1498,7 +1498,7 @@ export function useQueueMetricsMetricsInfinite<
         TError,
         TData,
         QueryKey,
-        QueueMetricsMetricsParams["limit"]
+        QueueMetricsMetricsParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1830,7 +1830,7 @@ export function useQueueMetricsMetricsSuspense<
 export const getQueueMetricsMetricsSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof queueMetricsMetrics>>,
-    QueueMetricsMetricsParams["limit"]
+    QueueMetricsMetricsParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -1844,7 +1844,7 @@ export const getQueueMetricsMetricsSuspenseInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        QueueMetricsMetricsParams["limit"]
+        QueueMetricsMetricsParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1858,10 +1858,10 @@ export const getQueueMetricsMetricsSuspenseInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof queueMetricsMetrics>>,
     QueryKey,
-    QueueMetricsMetricsParams["limit"]
+    QueueMetricsMetricsParams["page"]
   > = ({ signal, pageParam }) =>
     queueMetricsMetrics(
-      { ...params, limit: pageParam || params?.["limit"] },
+      { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal
     );
@@ -1875,7 +1875,7 @@ export const getQueueMetricsMetricsSuspenseInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    QueueMetricsMetricsParams["limit"]
+    QueueMetricsMetricsParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -1889,7 +1889,7 @@ export type QueueMetricsMetricsSuspenseInfiniteQueryError = ErrorType<
 export function useQueueMetricsMetricsSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof queueMetricsMetrics>>,
-    QueueMetricsMetricsParams["limit"]
+    QueueMetricsMetricsParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -1903,7 +1903,7 @@ export function useQueueMetricsMetricsSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        QueueMetricsMetricsParams["limit"]
+        QueueMetricsMetricsParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1915,7 +1915,7 @@ export function useQueueMetricsMetricsSuspenseInfinite<
 export function useQueueMetricsMetricsSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof queueMetricsMetrics>>,
-    QueueMetricsMetricsParams["limit"]
+    QueueMetricsMetricsParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -1929,7 +1929,7 @@ export function useQueueMetricsMetricsSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        QueueMetricsMetricsParams["limit"]
+        QueueMetricsMetricsParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1941,7 +1941,7 @@ export function useQueueMetricsMetricsSuspenseInfinite<
 export function useQueueMetricsMetricsSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof queueMetricsMetrics>>,
-    QueueMetricsMetricsParams["limit"]
+    QueueMetricsMetricsParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -1955,7 +1955,7 @@ export function useQueueMetricsMetricsSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        QueueMetricsMetricsParams["limit"]
+        QueueMetricsMetricsParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1971,7 +1971,7 @@ export function useQueueMetricsMetricsSuspenseInfinite<
 export function useQueueMetricsMetricsSuspenseInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof queueMetricsMetrics>>,
-    QueueMetricsMetricsParams["limit"]
+    QueueMetricsMetricsParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -1985,7 +1985,7 @@ export function useQueueMetricsMetricsSuspenseInfinite<
         TError,
         TData,
         QueryKey,
-        QueueMetricsMetricsParams["limit"]
+        QueueMetricsMetricsParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;

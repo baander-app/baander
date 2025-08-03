@@ -16,4 +16,5 @@ import type { NewAccessTokenResource } from "./newAccessTokenResource";
 export type AuthLogin200 = {
   accessToken: NewAccessTokenResource;
   refreshToken: NewAccessTokenResource;
+  sessionId: string;
 };

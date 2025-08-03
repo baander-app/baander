@@ -9,8 +9,8 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
 use JetBrains\PhpStorm\ArrayShape;
-use Laravel\Sanctum\PersonalAccessToken as SanctumPersonalAccessToken;
 use Laravel\Sanctum\NewAccessToken;
+use Laravel\Sanctum\PersonalAccessToken as SanctumPersonalAccessToken;
 
 class PersonalAccessToken extends SanctumPersonalAccessToken
 {
@@ -20,11 +20,16 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
         'abilities',
         'expires_at',
         'user_agent',
-        'client_name',
-        'client_version',
-        'client_type',
         'device_operating_system',
         'device_name',
+        'client_fingerprint',
+        'session_id',
+        'ip_address',
+        'ip_history',
+        'ip_change_count',
+        'country_code',
+        'city',
+        'last_geo_notification_at',
     ];
 
     /**
@@ -53,9 +58,9 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
     /**
      * Create a new personal access token for the user.
      *
-     * @param  mixed  $tokenable
-     * @param  string  $name
-     * @param  array  $abilities
+     * @param mixed $tokenable
+     * @param string $name
+     * @param array $abilities
      * @param \DateTimeInterface|null $expiresAt
      * @return \Laravel\Sanctum\NewAccessToken
      */
@@ -64,15 +69,15 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
         $plainTextToken = Str::random(40);
 
         $token = $tokenable->tokens()->create([
-            'name' => $name,
-            'token' => hash('sha256', $plainTextToken),
-            'abilities' => $abilities,
+            'name'       => $name,
+            'token'      => hash('sha256', $plainTextToken),
+            'abilities'  => $abilities,
             'expires_at' => $expiresAt,
         ]);
 
         // Token will be cached via the created event
 
-        return new NewAccessToken($token, $tokenable->getKey().'|'.$plainTextToken);
+        return new NewAccessToken($token, $tokenable->getKey() . '|' . $plainTextToken);
     }
 
     /**
@@ -115,7 +120,7 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
         $cacheStore = $cacheConfig['store'];
 
         // Get the TTL value as integer or null
-        $ttl = is_numeric($cacheConfig['ttl']) ? (int) $cacheConfig['ttl'] : null;
+        $ttl = is_numeric($cacheConfig['ttl']) ? (int)$cacheConfig['ttl'] : null;
 
         return Cache::store($cacheStore)->remember(
             $cacheKey,
@@ -126,7 +131,7 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
                 }
 
                 return null;
-            }
+            },
         );
     }
 
@@ -167,12 +172,12 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
         $cacheKey = $cacheConfig['prefix'] . $token->id;
 
         // Ensure TTL is a proper integer or null
-        $ttl = is_numeric($cacheConfig['ttl']) ? (int) $cacheConfig['ttl'] : null;
+        $ttl = is_numeric($cacheConfig['ttl']) ? (int)$cacheConfig['ttl'] : null;
 
         Cache::store($cacheConfig['store'])->put(
             $cacheKey,
             $token,
-            $ttl ? now()->addMinutes($ttl) : null
+            $ttl ? now()->addMinutes($ttl) : null,
         );
     }
 
@@ -192,9 +197,6 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
 
     #[ArrayShape([
         'user_agent'              => "null|string",
-        'client_type'             => "array|null|string",
-        'client_name'             => "array|null|string",
-        'client_version'          => "array|null|string",
         'device_operating_system' => "null|string",
         'device_name'             => "null|string",
     ])]
@@ -202,11 +204,8 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
     {
         return [
             'user_agent'              => $request->userAgent(),
-            'client_type'             => '',
-            'client_name'             => '',
-            'client_version'          => '',
-            'device_operating_system' =>  null,
-            'device_name'             =>   null,
+            'device_operating_system' => null,
+            'device_name'             => null,
         ];
     }
 
@@ -224,7 +223,7 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
     protected function expiresAt(): Attribute
     {
         return Attribute::make(
-            get: fn ($value) => $value ? new \Carbon\Carbon($value) : null,
+            get: fn($value) => $value ? new \Carbon\Carbon($value) : null,
         );
     }
 }
