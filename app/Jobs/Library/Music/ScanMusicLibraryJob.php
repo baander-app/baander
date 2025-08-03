@@ -20,7 +20,8 @@ class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
 
     public function middleware(): array
     {
-        return [new WithoutOverlapping($this->library->id)->dontRelease()];
+        // Release after 30 minutes if now complete
+        return [new WithoutOverlapping($this->library->id)->releaseAfter(900)];
     }
 
     public function handle(): void
@@ -50,4 +51,13 @@ class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
         $this->queueData(['processedDirectories' => $processedDirectories]);
         LibraryScanCompleted::dispatch($this->library);
     }
+
+    public function failed(\Throwable $exception): void
+    {
+        \Log::error('ScanMusicLibraryJob permanently failed', [
+            'library_id' => $this->library->id,
+            'error' => $exception->getMessage()
+        ]);
+    }
+
 }

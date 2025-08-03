@@ -1,9 +1,8 @@
 <?php
 
+use App\Modules\OpenTelemetry\MonologHandler as OpenTelemetryMonolog;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
-use Monolog\Processor\PsrLogMessageProcessor;
-use OpenTelemetry\Contrib\Logs\Monolog\Handler as OpenTelemetryHandler;
 
 
 return [
@@ -61,20 +60,10 @@ return [
 
         'otel' => [
             'driver' => 'custom',
-            'via' => function () {
-                $logger = new \Monolog\Logger('otel');
-
-                $handler = new OpenTelemetryHandler(
-                    \OpenTelemetry\API\Globals::loggerProvider(),
-                    \Monolog\Level::Debug,
-                    true
-                );
-
-                $logger->pushHandler($handler);
-                $logger->pushProcessor(new PsrLogMessageProcessor());
-
-                return $logger;
-            },
+            'via'    => OpenTelemetryMonolog::class,
+            'name'   => 'otel',
+            'level'  => \Psr\Log\LogLevel::DEBUG,
+            'bubble' => true,
         ],
 
         'otel_debug' => [

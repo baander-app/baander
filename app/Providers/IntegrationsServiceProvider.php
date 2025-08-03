@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Baander;
 use App\Http\Integrations\CoverArtArchive\CoverArtArchiveClient;
 use App\Http\Integrations\LastFm\LastFmClient;
 use App\Http\Integrations\MusicBrainz\MusicBrainzClient;
@@ -9,7 +10,11 @@ use App\Modules\Auth\LastFmCredentialService;
 use App\Modules\Auth\ThirdPartyCredentialService;
 use App\Services\GuzzleService;
 use GuzzleHttp\Client;
+use Illuminate\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
+use MusicBrainz\HttpAdapter\GuzzleHttpAdapter;
+use MusicBrainz\MusicBrainz;
+use Psr\Log\LoggerInterface;
 
 class IntegrationsServiceProvider extends ServiceProvider
 {
@@ -20,6 +25,16 @@ class IntegrationsServiceProvider extends ServiceProvider
     {
         $this->app->scoped(CoverArtArchiveClient::class, function () {
             return new CoverArtArchiveClient(app(GuzzleService::class));
+        });
+
+        $this->app->scoped(MusicBrainz::class, function (Application $app) {
+            $guzzle = new GuzzleHttpAdapter(new Client());
+            $musicBrainz = new MusicBrainz($guzzle, $app->get(LoggerInterface::class)->channel('buggregator'));
+
+            $musicBrainz->config()
+                ->setUserAgent('Baander server/' . Baander::VERSION);
+
+            return $musicBrainz;
         });
 
         $this->app->scoped(MusicBrainzClient::class, function () {

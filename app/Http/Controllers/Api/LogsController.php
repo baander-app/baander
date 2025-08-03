@@ -168,8 +168,8 @@ class LogsController extends Controller
         try {
             $searchableFile = new SearchableLogFile($file->path);
             $pattern = $request->string('pattern');
-            $caseSensitive = $request->boolean('case_sensitive', true);
-            $maxResults = $request->integer('max_results', 100);
+            $caseSensitive = $request->boolean('caseSensitive', true);
+            $maxResults = $request->integer('maxResults', 100);
 
             $results = $searchableFile->search($pattern, $caseSensitive, $maxResults);
 
@@ -365,8 +365,8 @@ class LogsController extends Controller
 
         try {
             $pattern = $request->string('pattern');
-            $caseSensitive = $request->boolean('case_sensitive', true);
-            $maxResultsPerFile = $request->integer('max_results_per_file', 10);
+            $caseSensitive = $request->boolean('caseSensitive', true);
+            $maxResultsPerFile = $request->integer('maxResultsPerFile', 10);
             $requestedFiles = $request->input('files', []);
 
             $files = $this->logFileService->getFiles();

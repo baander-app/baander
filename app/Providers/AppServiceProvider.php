@@ -2,7 +2,6 @@
 
 namespace App\Providers;
 
-use App\Baander;
 use App\Http\Integrations\Transcoder\TranscoderClient;
 use App\Repositories\Cache\CacheRepositoryInterface;
 use App\Repositories\Cache\LaravelCacheRepository;
@@ -14,9 +13,6 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\ImageManager;
-use MusicBrainz\HttpAdapter\GuzzleHttpAdapter;
-use MusicBrainz\MusicBrainz;
-use Psr\Log\LoggerInterface;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -35,16 +31,6 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->scoped(ImageManager::class, function () {
             return new ImageManager(new Driver());
-        });
-
-        $this->app->scoped(MusicBrainz::class, function (Application $app) {
-            $guzzle = new GuzzleHttpAdapter(new Client());
-            $musicBrainz = new MusicBrainz($guzzle, $app->get(LoggerInterface::class)->channel('buggregator'));
-
-            $musicBrainz->config()
-                ->setUserAgent('Baander server/' . Baander::VERSION);
-
-            return $musicBrainz;
         });
 
         $this->app->scoped(TranscoderClient::class, function (Application $app) {

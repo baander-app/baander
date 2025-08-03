@@ -710,14 +710,73 @@ export type GetApiImagesByImageData = {
     image: string;
 };
 
-export type GetApiImagesByImageResponse = string;
+export type GetApiImagesByImageResponse = (Blob | File);
+
+export type GetApiJobsLocksResponse = Array<{
+    key: string;
+    ttl: number;
+    age_hours: number | string;
+    exists: boolean;
+}>;
+
+export type GetApiJobsLocksByJobClassLockByJobIdData = {
+    jobClass: string;
+    jobId: string;
+};
+
+export type GetApiJobsLocksByJobClassLockByJobIdResponse = {
+    key: string;
+    ttl: number;
+    age_hours: number | string;
+    exists: boolean;
+};
+
+export type DeleteApiJobsLocksByJobClassLockByJobIdData = {
+    jobClass: string;
+    jobId: string;
+};
+
+export type DeleteApiJobsLocksByJobClassLockByJobIdResponse = {
+    success: boolean;
+    message: 'Job lock cleared.' | 'Job lock not found.';
+};
+
+export type PostApiJobsCleanupData = {
+    requestBody?: {
+        dryRun?: boolean;
+    };
+};
+
+export type PostApiJobsCleanupResponse = {
+    stuck_locks: {
+        count: string;
+        locks: Array<(string)>;
+    };
+    old_failed_jobs: {
+        count: string;
+        jobs: Array<unknown>;
+    };
+    dry_run: string;
+};
+
+export type PostApiJobsFailedData = {
+    requestBody?: {
+        hoursOld?: number;
+        dryRun?: boolean;
+    };
+};
+
+export type PostApiJobsFailedResponse = {
+    success: boolean;
+    message: 'All failed jobs cleared.';
+};
 
 export type PostApiJobsScanLibraryBySlugData = {
     slug: string;
 };
 
 export type PostApiJobsScanLibraryBySlugResponse = {
-    message: 'Job started successfully';
+    message: string;
 };
 
 export type GetHorizonApiMetricsJobsResponse = Array<unknown>;
@@ -870,9 +929,7 @@ export type GetApiLogsByLogFileLinesResponse = {
 
 export type GetApiLogsByLogFileSearchData = {
     caseSensitive?: boolean;
-    caseSensitive?: boolean;
     logFile: string;
-    maxResults?: number;
     maxResults?: number;
     pattern: string;
 };
@@ -935,9 +992,7 @@ export type GetApiLogsByLogFileDownloadResponse = string;
 
 export type GetApiLogsSearchAllData = {
     caseSensitive?: boolean;
-    caseSensitive?: boolean;
-    files?: Array<(string)>;
-    maxResultsPerFile?: number;
+    filesArray?: Array<(string)>;
     maxResultsPerFile?: number;
     pattern: string;
 };
@@ -1561,14 +1616,14 @@ export type GetApiServicesSpotifyStatusResponse = {
     connected: boolean;
 };
 
-export type GetApiServicesSpotifyUserProfileResponse = string;
+export type GetApiServicesSpotifyUserProfileResponse = Array<unknown>;
 
 export type GetApiServicesSpotifyUserPlaylistsData = {
     limit?: string;
     offset?: string;
 };
 
-export type GetApiServicesSpotifyUserPlaylistsResponse = string;
+export type GetApiServicesSpotifyUserPlaylistsResponse = Array<unknown>;
 
 export type GetApiServicesSpotifySearchData = {
     limit?: string;
@@ -1578,9 +1633,9 @@ export type GetApiServicesSpotifySearchData = {
     type?: string;
 };
 
-export type GetApiServicesSpotifySearchResponse = string;
+export type GetApiServicesSpotifySearchResponse = Array<unknown>;
 
-export type GetApiServicesSpotifyGenresSeedsResponse = string;
+export type GetApiServicesSpotifyGenresSeedsResponse = Array<unknown>;
 
 export type GetApiStreamSongBySongDirectData = {
     /**
@@ -1589,9 +1644,7 @@ export type GetApiStreamSongBySongDirectData = {
     song: string;
 };
 
-export type GetApiStreamSongBySongDirectResponse = {
-    [key: string]: unknown;
-};
+export type GetApiStreamSongBySongDirectResponse = (Blob | File);
 
 export type GetApiSystemInfoResponse = Array<{
     section: string;
@@ -2543,11 +2596,119 @@ export type $OpenApiTs = {
         get: {
             req: GetApiImagesByImageData;
             res: {
-                200: string;
+                200: (Blob | File);
                 /**
                  * Not found
                  */
                 404: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/jobs/locks': {
+        get: {
+            res: {
+                200: Array<{
+                    key: string;
+                    ttl: number;
+                    age_hours: number | string;
+                    exists: boolean;
+                }>;
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/jobs/locks/{jobClass}/lock/{jobId}': {
+        get: {
+            req: GetApiJobsLocksByJobClassLockByJobIdData;
+            res: {
+                200: {
+                    key: string;
+                    ttl: number;
+                    age_hours: number | string;
+                    exists: boolean;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+        delete: {
+            req: DeleteApiJobsLocksByJobClassLockByJobIdData;
+            res: {
+                200: {
+                    success: boolean;
+                    message: 'Job lock cleared.' | 'Job lock not found.';
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/jobs/cleanup': {
+        post: {
+            req: PostApiJobsCleanupData;
+            res: {
+                200: {
+                    stuck_locks: {
+                        count: string;
+                        locks: Array<(string)>;
+                    };
+                    old_failed_jobs: {
+                        count: string;
+                        jobs: Array<unknown>;
+                    };
+                    dry_run: string;
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
+                    /**
+                     * Error overview.
+                     */
+                    message: string;
+                };
+            };
+        };
+    };
+    '/api/jobs/failed': {
+        post: {
+            req: PostApiJobsFailedData;
+            res: {
+                200: {
+                    success: boolean;
+                    message: 'All failed jobs cleared.';
+                };
+                /**
+                 * Unauthenticated
+                 */
+                401: {
                     /**
                      * Error overview.
                      */
@@ -2561,7 +2722,7 @@ export type $OpenApiTs = {
             req: PostApiJobsScanLibraryBySlugData;
             res: {
                 200: {
-                    message: 'Job started successfully';
+                    message: string;
                 };
                 /**
                  * Unauthenticated
@@ -2628,6 +2789,9 @@ export type $OpenApiTs = {
                 200: {
                     success: boolean;
                 };
+                /**
+                 * State is already removed by Cache::pull(), so no cleanup needed
+                 */
                 400: {
     error: 'IP address mismatch';
 } | {
@@ -4779,7 +4943,7 @@ export type $OpenApiTs = {
     '/api/services/spotify/user/profile': {
         get: {
             res: {
-                200: string;
+                200: Array<unknown>;
                 /**
                  * Unauthenticated
                  */
@@ -4799,7 +4963,7 @@ export type $OpenApiTs = {
         get: {
             req: GetApiServicesSpotifyUserPlaylistsData;
             res: {
-                200: string;
+                200: Array<unknown>;
                 /**
                  * Unauthenticated
                  */
@@ -4819,7 +4983,7 @@ export type $OpenApiTs = {
         get: {
             req: GetApiServicesSpotifySearchData;
             res: {
-                200: string;
+                200: Array<unknown>;
                 400: {
                     error: 'Query parameter is required';
                 };
@@ -4841,7 +5005,7 @@ export type $OpenApiTs = {
     '/api/services/spotify/genres/seeds': {
         get: {
             res: {
-                200: string;
+                200: Array<unknown>;
                 /**
                  * Unauthenticated
                  */
@@ -4861,9 +5025,7 @@ export type $OpenApiTs = {
         get: {
             req: GetApiStreamSongBySongDirectData;
             res: {
-                200: {
-                    [key: string]: unknown;
-                };
+                200: (Blob | File);
                 /**
                  * Unauthenticated
                  */

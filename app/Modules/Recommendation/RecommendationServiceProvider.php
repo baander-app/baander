@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Providers;
+namespace App\Modules\Recommendation;
 
 use App\Modules\Recommendation\Calculators\ContentBasedCalculator;
 use App\Modules\Recommendation\Calculators\DatabaseRelationCalculator;

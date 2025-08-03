@@ -43,7 +43,7 @@ class LastFmCredentialService
      * Check if user has valid Last.fm credentials by validating with API
      * This method should be called from LastFmClient to avoid circular dependency
      */
-    public function hasValidCredentials(User $user, callable $validator = null): bool
+    public function hasValidCredentials(User $user, ?callable $validator = null): bool
     {
         $credential = $this->getCredentials($user);
 

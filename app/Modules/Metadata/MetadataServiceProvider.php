@@ -1,8 +1,7 @@
 <?php
 
-namespace App\Providers;
+namespace App\Modules\Metadata;
 
-use App\Modules\Metadata\MetadataJobDispatcher;
 use Illuminate\Support\ServiceProvider;
 
 class MetadataServiceProvider extends ServiceProvider

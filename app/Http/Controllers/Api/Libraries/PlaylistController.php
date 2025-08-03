@@ -292,7 +292,7 @@ class PlaylistController extends Controller
      * @param Playlist $playlist
      * @return \Illuminate\Http\JsonResponse
      */
-    #[Post('{playlist}/statistics/record/view', 'api.playlist.statistics.record.view', [
+    #[Post('{playlist}/statistics/record/view', 'api.playlist.statistics.record-view', [
         'auth:sanctum',
         'ability:' . TokenAbility::ACCESS_API->value,
     ])]
@@ -311,7 +311,7 @@ class PlaylistController extends Controller
      * @param Playlist $playlist
      * @return \Illuminate\Http\JsonResponse
      */
-    #[Post('{playlist}/statistics/record/play', 'api.playlist.statistics.record.view', [
+    #[Post('{playlist}/statistics/record/play', 'api.playlist.statistics.record-play', [
         'auth:sanctum',
         'ability:' . TokenAbility::ACCESS_API->value,
     ])]
@@ -330,7 +330,7 @@ class PlaylistController extends Controller
      * @param Playlist $playlist
      * @return \Illuminate\Http\JsonResponse
      */
-    #[Post('{playlist}/statistics/record/share', 'api.playlist.statistics.record.view', [
+    #[Post('{playlist}/statistics/record/share', 'api.playlist.statistics.record-share', [
         'auth:sanctum',
         'ability:' . TokenAbility::ACCESS_API->value,
     ])]
@@ -349,7 +349,7 @@ class PlaylistController extends Controller
      * @param Playlist $playlist
      * @return \Illuminate\Http\JsonResponse
      */
-    #[Post('{playlist}/statistics/record/favorite', 'api.playlist.statistics.record.view', [
+    #[Post('{playlist}/statistics/record/favorite', 'api.playlist.statistics.record-favorite', [
         'auth:sanctum',
         'ability:' . TokenAbility::ACCESS_API->value,
     ])]
@@ -369,7 +369,7 @@ class PlaylistController extends Controller
      * @return PlaylistResource
      * @throws \Throwable
      */
-    #[Post('/smart', 'api.playlist.smart', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
+    #[Post('/smart', 'api.playlist.smart-create', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
     public function createSmartPlaylist(CreateSmartPlaylistRequest $request)
     {
 //        $this->authorize('create', Playlist::class);
@@ -396,7 +396,7 @@ class PlaylistController extends Controller
      * @param Playlist $playlist
      * @return PlaylistResource
      */
-    #[Put('{playlist}/smart', 'api.playlist.smart', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
+    #[Put('{playlist}/smart', 'api.playlist.smart-update', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
     public function updateSmartRules(UpdateSmartPlaylistRulesRequest $request, Playlist $playlist)
     {
         $this->authorize('update', $playlist);
@@ -417,7 +417,7 @@ class PlaylistController extends Controller
      * @param Playlist $playlist
      * @return \Illuminate\Http\JsonResponse
      */
-    #[Post('{playlist}/smart/sync', 'api.playlist.smart', ['auth:sanctum',
+    #[Post('{playlist}/smart/sync', 'api.playlist.smart-sync', ['auth:sanctum',
                                                            'ability:' . TokenAbility::ACCESS_API->value])]
     public function syncSmartPlaylist(Playlist $playlist)
     {

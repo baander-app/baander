@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\PersonalAccessToken;
+use App\Models\User;
 use App\Modules\Auth\Webauthn\CounterChecker;
 use App\Modules\Auth\Webauthn\WebauthnService;
 use Illuminate\Support\Facades\Gate;
@@ -43,9 +44,13 @@ class AuthServiceProvider extends ServiceProvider
     {
         Passport::withCookieEncryption();
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+        $this->bootGates();
+    }
 
-        Gate::define('viewApiDoc', function ($user) {
-            return $user->isAdmin();
+    private function bootGates()
+    {
+        Gate::define('viewApiDocs', function (User $user) {
+            return (bool)$user;
         });
 
         Gate::define('viewDashboard', function ($user) {

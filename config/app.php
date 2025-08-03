@@ -174,24 +174,22 @@ return [
          */
         App\Modules\Nanoid\NanoIdServiceProvider::class,
         App\Modules\BlurHash\BlurHashServiceProvider::class,
+        \App\Modules\Recommendation\RecommendationServiceProvider::class,
         App\Providers\FortifyServiceProvider::class,
 
         /*
          * Application Service Providers...
          */
         App\Providers\AppServiceProvider::class,
-        App\Modules\OpenTelemetry\OpenTelemetryServiceProvider::class,
-        App\Modules\OpenTelemetry\Instrumentation\LaravelInstrumentation::class,
         App\Providers\AuthServiceProvider::class,
         App\Providers\BroadcastServiceProvider::class,
         App\Providers\EventServiceProvider::class,
-        App\Providers\QueueMonitorProvider::class,
+        \App\Modules\Queue\QueueMonitorProvider::class,
         App\Providers\HorizonServiceProvider::class,
         App\Providers\IntegrationsServiceProvider::class,
-        App\Providers\MetadataServiceProvider::class,
+        \App\Modules\Metadata\MetadataServiceProvider::class,
         App\Providers\RouteServiceProvider::class,
         App\Providers\ScrambleServiceProvider::class,
-        App\Providers\RecommendationServiceProvider::class,
     ])->toArray(),
 
     /*

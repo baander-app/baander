@@ -46,7 +46,7 @@ class GenreHandler extends BaseHandler
         int $limit = 20,
         int $offset = 0,
         ?string $market = null,
-        string $year = null
+        ?string $year = null
     ): array {
         $query = "genre:\"{$genre}\"";
 
@@ -76,7 +76,7 @@ class GenreHandler extends BaseHandler
         int $limit = 20,
         int $offset = 0,
         ?string $market = null,
-        string $year = null
+        ?string $year = null
     ): array {
         $query = "genre:\"{$genre}\"";
 

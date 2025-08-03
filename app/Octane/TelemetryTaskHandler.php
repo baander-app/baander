@@ -43,7 +43,7 @@ class TelemetryTaskHandler
 
                 case 'telemetry_shutdown':
                     Log::channel('otel_debug')->info('TelemetryTaskHandler: Executing shutdown');
-                    $this->telemetry->shutdown();
+//                    $this->telemetry->shutdown();
                     break;
 
                 default:

@@ -16,6 +16,12 @@ class Kernel extends ConsoleKernel
         $schedule->command('horizon:snapshot')->everyFiveMinutes()->onOneServer();
         $schedule->command('sanctum:tokens clean')->daily();
         $schedule->command('sanctum:tokens cache')->weekly();
+        // Clear stuck job locks every hour
+        $schedule->command('jobs:clear-stuck')->hourly();
+
+        // Clean up old failed jobs weekly
+        $schedule->command('queue:flush')->weekly();
+
         $schedule->job(new ProbeQueueChecker())->everyMinute();
     }
 

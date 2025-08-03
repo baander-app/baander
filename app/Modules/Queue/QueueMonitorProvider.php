@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Providers;
+namespace App\Modules\Queue;
 
 use App\Modules\Queue\QueueMonitor\QueueMonitorService;
 use Illuminate\Queue\Events\{JobExceptionOccurred, JobFailed, JobProcessed, JobProcessing, JobQueued};

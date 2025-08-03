@@ -29,7 +29,6 @@ return [
     */
 
     'connections' => [
-
         'sync' => [
             'driver' => 'sync',
         ],
@@ -42,18 +41,13 @@ return [
             'after_commit' => false,
         ],
 
-        'redis' => [
-            'driver' => 'redis',
-            'connection' => 'default',
-            'queue' => env('REDIS_QUEUE', 'default'),
-            'retry_after' => 90,
-            'block_for' => null,
+        'redis'  => [
+            'driver'       => 'redis',
+            'connection'   => 'default',
+            'queue'        => env('REDIS_QUEUE', 'default'),
+            'retry_after'  => 90,
+            'block_for'    => null,
             'after_commit' => false,
-        ],
-
-        // Development connection using Octane task workers
-        'octane' => [
-            'driver' => 'sync', // Uses Octane's task workers when available
         ],
     ],
 
@@ -69,7 +63,7 @@ return [
     */
 
     'batching' => [
-        'database' => env('DB_CONNECTION', 'mysql'),
+        'database' => env('DB_CONNECTION', 'pgsql'),
         'table'    => 'job_batches',
     ],
 
