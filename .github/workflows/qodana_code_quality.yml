@@ -24,8 +24,8 @@ jobs:
         with:
           pr-mode: false
           push-fixes: commit
-          commit-message: "🤖 Auto-fix code quality issues"
-          args: "--apply-fixes"
+          commit-message: "Auto-fix code quality issues"
+          args: "--apply-fixes --cleanup"
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN_1066393617 }}
           QODANA_ENDPOINT: 'https://qodana.cloud'
