@@ -29,3 +29,4 @@ jobs:
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN_1066393617 }}
           QODANA_ENDPOINT: 'https://qodana.cloud'
+          QODANA_SKIP_COMPOSER: 'true'

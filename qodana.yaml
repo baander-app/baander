@@ -7,9 +7,9 @@ profile:
 php:
   version: "8.4"
 
-bootstrap: |+
-  set -eu
-  composer require --dev barryvdh/laravel-ide-helper
+# Skip composer operations to avoid extension issues
+bootstrap: |
+  export QODANA_SKIP_COMPOSER=true
 
 exclude:
   - name: All
