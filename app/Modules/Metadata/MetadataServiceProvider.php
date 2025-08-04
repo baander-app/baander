@@ -11,7 +11,7 @@ class MetadataServiceProvider extends ServiceProvider
         $this->app->singleton(MetadataJobDispatcher::class, function ($app) {
             return new MetadataJobDispatcher(
                 defaultBatchSize: config('metadata.sync.batch_size', 10),
-                defaultQueue: config('metadata.sync.queue', 'default')
+                defaultQueue: config('metadata.sync.queue', 'default'),
             );
         });
     }

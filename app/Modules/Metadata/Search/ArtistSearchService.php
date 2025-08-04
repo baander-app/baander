@@ -15,10 +15,12 @@ class ArtistSearchService
 {
     public function __construct(
         private readonly MusicBrainzClient $musicBrainzClient,
-        private readonly DiscogsClient $discogsClient,
-        private readonly MatchingStrategy $matchingStrategy,
-        private readonly QualityValidator $qualityValidator
-    ) {}
+        private readonly DiscogsClient     $discogsClient,
+        private readonly MatchingStrategy  $matchingStrategy,
+        private readonly QualityValidator  $qualityValidator,
+    )
+    {
+    }
 
     /**
      * Search all sources for artist metadata
@@ -27,7 +29,7 @@ class ArtistSearchService
     {
         return [
             'musicbrainz' => $this->searchMusicBrainz($artist),
-            'discogs' => $this->searchDiscogs($artist),
+            'discogs'     => $this->searchDiscogs($artist),
         ];
     }
 
@@ -42,7 +44,7 @@ class ArtistSearchService
 
             Log::debug('Searching MusicBrainz for artist', [
                 'artist_id' => $artist->id,
-                'name' => $artist->name
+                'name'      => $artist->name,
             ]);
 
             $searchResults = $this->musicBrainzClient->search->artist($filter);
@@ -64,19 +66,50 @@ class ArtistSearchService
             $detailedData = $this->musicBrainzClient->lookup->artist($bestMatch->id);
 
             return [
-                'source' => 'musicbrainz',
-                'data' => $detailedData->toArray(),
-                'quality_score' => $this->qualityValidator->scoreArtistMatch($detailedData->toArray(), $artist),
-                'search_results_count' => $searchResults->count()
+                'source'               => 'musicbrainz',
+                'data'                 => $detailedData->toArray(),
+                'quality_score'        => $this->qualityValidator->scoreArtistMatch($detailedData->toArray(), $artist),
+                'search_results_count' => $searchResults->count(),
             ];
 
         } catch (\Exception $e) {
             Log::warning('MusicBrainz artist search failed', [
                 'artist_id' => $artist->id,
-                'error' => $e->getMessage()
+                'error'     => $e->getMessage(),
             ]);
             return null;
         }
+    }
+
+    private function isRelevantMatch($artistModel, Artist $artist): bool
+    {
+        if (empty($artistModel->name)) {
+            return false;
+        }
+
+        $similarity = similar_text(
+            mb_strtolower($artistModel->name),
+            mb_strtolower($artist->name),
+        );
+
+        return $similarity > 70;
+    }
+
+    private function calculateRelevanceScore($artistModel, Artist $artist): float
+    {
+        $baseScore = similar_text(mb_strtolower($artistModel->name), mb_strtolower($artist->name));
+
+        // Bonus for exact matches
+        if (mb_strtolower($artistModel->name) === mb_strtolower($artist->name)) {
+            $baseScore += 50;
+        }
+
+        // Bonus for disambiguation matches (like "Artist (band)")
+        if (str_contains(mb_strtolower($artistModel->name), mb_strtolower($artist->name))) {
+            $baseScore += 20;
+        }
+
+        return $baseScore;
     }
 
     /**
@@ -90,7 +123,7 @@ class ArtistSearchService
 
             Log::debug('Searching Discogs for artist', [
                 'artist_id' => $artist->id,
-                'name' => $artist->name
+                'name'      => $artist->name,
             ]);
 
             $searchResults = $this->discogsClient->search->artist($filter);
@@ -112,24 +145,51 @@ class ArtistSearchService
             $detailedData = $this->discogsClient->lookup->artist($bestMatch->id);
 
             return [
-                'source' => 'discogs',
-                'data' => $detailedData->toArray(),
-                'quality_score' => $this->qualityValidator->scoreArtistMatch($detailedData->toArray(), $artist),
+                'source'               => 'discogs',
+                'data'                 => $detailedData->toArray(),
+                'quality_score'        => $this->qualityValidator->scoreArtistMatch($detailedData->toArray(), $artist),
                 'search_results_count' => $searchResults->count(),
-                'pagination' => $this->discogsClient->search->getPagination()
+                'pagination'           => $this->discogsClient->search->getPagination(),
             ];
 
         } catch (\Exception $e) {
             Log::warning('Discogs artist search failed', [
                 'artist_id' => $artist->id,
-                'error' => $e->getMessage()
+                'error'     => $e->getMessage(),
             ]);
             return null;
         }
     }
 
+    private function isRelevantDiscogsMatch($artistModel, Artist $artist): bool
+    {
+        if (empty($artistModel->title)) {
+            return false;
+        }
+
+        $similarity = similar_text(
+            mb_strtolower($artistModel->title),
+            mb_strtolower($artist->name),
+        );
+
+        return $similarity > 70;
+    }
+
+    private function calculateDiscogsRelevanceScore($artistModel, Artist $artist): float
+    {
+        $baseScore = similar_text(mb_strtolower($artistModel->title), mb_strtolower($artist->name));
+
+        // Bonus for exact matches
+        if (mb_strtolower($artistModel->title) === mb_strtolower($artist->name)) {
+            $baseScore += 50;
+        }
+
+        return $baseScore;
+    }
+
     /**
      * Search for artist with fuzzy matching
+     * Now made public to be used by external services
      */
     public function searchFuzzy(Artist $artist): array
     {
@@ -151,7 +211,23 @@ class ArtistSearchService
             } catch (\Exception $e) {
                 Log::debug('Fuzzy search variation failed', [
                     'variation' => $variation,
-                    'error' => $e->getMessage()
+                    'error'     => $e->getMessage(),
+                ]);
+            }
+
+            // Try Discogs
+            $discogsFilter = new DiscogsArtistFilter();
+            $discogsFilter->setTitle($variation);
+
+            try {
+                $discogsResults = $this->discogsClient->search->artist($discogsFilter);
+                if (!$discogsResults->isEmpty()) {
+                    $results['discogs_' . $variation] = $discogsResults->take(3);
+                }
+            } catch (\Exception $e) {
+                Log::debug('Discogs fuzzy search variation failed', [
+                    'variation' => $variation,
+                    'error'     => $e->getMessage(),
                 ]);
             }
         }
@@ -161,6 +237,7 @@ class ArtistSearchService
 
     /**
      * Generate artist name variations for fuzzy matching
+     * Enhanced with more variation types
      */
     private function generateArtistNameVariations(string $name): array
     {
@@ -183,64 +260,21 @@ class ArtistSearchService
             $variations[] = $normalized;
         }
 
+        // Replace & with "and" and vice versa
+        if (str_contains($name, '&')) {
+            $variations[] = str_replace('&', 'and', $name);
+        }
+        if (str_contains($name, 'and')) {
+            $variations[] = str_replace('and', '&', $name);
+        }
+
+        // Remove disambiguation info like "Artist (band)", "Artist (US)", etc.
+        $withoutDisambiguation = preg_replace('/\s*\([^)]*\)/', '', $name);
+        if ($withoutDisambiguation !== $name) {
+            $variations[] = trim($withoutDisambiguation);
+        }
+
         // Remove duplicates and return
         return array_unique($variations);
-    }
-
-    private function isRelevantMatch($artistModel, Artist $artist): bool
-    {
-        if (empty($artistModel->name)) {
-            return false;
-        }
-
-        $similarity = similar_text(
-            strtolower($artistModel->name),
-            strtolower($artist->name)
-        );
-
-        return $similarity > 70;
-    }
-
-    private function isRelevantDiscogsMatch($artistModel, Artist $artist): bool
-    {
-        if (empty($artistModel->title)) {
-            return false;
-        }
-
-        $similarity = similar_text(
-            strtolower($artistModel->title),
-            strtolower($artist->name)
-        );
-
-        return $similarity > 70;
-    }
-
-    private function calculateRelevanceScore($artistModel, Artist $artist): float
-    {
-        $baseScore = similar_text(strtolower($artistModel->name), strtolower($artist->name));
-
-        // Bonus for exact matches
-        if (strtolower($artistModel->name) === strtolower($artist->name)) {
-            $baseScore += 50;
-        }
-
-        // Bonus for disambiguation matches (like "Artist (band)")
-        if (str_contains(strtolower($artistModel->name), strtolower($artist->name))) {
-            $baseScore += 20;
-        }
-
-        return $baseScore;
-    }
-
-    private function calculateDiscogsRelevanceScore($artistModel, Artist $artist): float
-    {
-        $baseScore = similar_text(strtolower($artistModel->title), strtolower($artist->name));
-
-        // Bonus for exact matches
-        if (strtolower($artistModel->title) === strtolower($artist->name)) {
-            $baseScore += 50;
-        }
-
-        return $baseScore;
     }
 }

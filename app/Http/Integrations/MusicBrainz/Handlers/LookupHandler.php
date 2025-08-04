@@ -27,7 +27,10 @@ class LookupHandler extends Handler
 
     public function release(string $mbid): ?Release
     {
-        $response = $this->fetchEndpoint('release/' . $mbid);
+        $response = $this->fetchEndpoint('release/' . $mbid, [
+            'inc' => 'artists+recordings+release-groups+media+artist-credits+discids+isrcs',
+            'fmt' => 'json',
+        ]);
         return $response ? Release::fromApiData($response) : null;
     }
 

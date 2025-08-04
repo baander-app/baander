@@ -29,7 +29,7 @@ class IntegrationsServiceProvider extends ServiceProvider
 
         $this->app->scoped(MusicBrainz::class, function (Application $app) {
             $guzzle = new GuzzleHttpAdapter(new Client());
-            $musicBrainz = new MusicBrainz($guzzle, $app->get(LoggerInterface::class)->channel('buggregator'));
+            $musicBrainz = new MusicBrainz($guzzle, $app->get(LoggerInterface::class)->channel('otel'));
 
             $musicBrainz->config()
                 ->setUserAgent('Baander server/' . Baander::VERSION);

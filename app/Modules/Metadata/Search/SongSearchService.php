@@ -15,20 +15,11 @@ class SongSearchService
 {
     public function __construct(
         private readonly MusicBrainzClient $musicBrainzClient,
-        private readonly DiscogsClient $discogsClient,
-        private readonly MatchingStrategy $matchingStrategy,
-        private readonly QualityValidator $qualityValidator
-    ) {}
-
-    /**
-     * Search all sources for song metadata
-     */
-    public function searchAllSources(Song $song): array
+        private readonly DiscogsClient     $discogsClient,
+        private readonly MatchingStrategy  $matchingStrategy,
+        private readonly QualityValidator  $qualityValidator,
+    )
     {
-        return [
-            'musicbrainz' => $this->searchMusicBrainz($song),
-            'discogs' => $this->searchDiscogs($song),
-        ];
     }
 
     /**
@@ -45,17 +36,28 @@ class SongSearchService
 
         if ($songData) {
             return [
-                'song' => $songData,
-                'artists' => $this->extractSongArtists($songData, $albumMetadata['source']),
-                'genres' => $this->extractSongGenres($songData, $albumMetadata['source']),
-                'lyrics' => null,
+                'song'          => $songData,
+                'artists'       => $this->extractSongArtists($songData, $albumMetadata['source']),
+                'genres'        => $this->extractSongGenres($songData, $albumMetadata['source']),
+                'lyrics'        => null,
                 'quality_score' => $this->qualityValidator->scoreSongMatch($songData, $song),
-                'source' => $albumMetadata['source'] . '_album_context',
+                'source'        => $albumMetadata['source'] . '_album_context',
             ];
         }
 
         // Fallback to individual search
         return $this->searchAllSources($song);
+    }
+
+    /**
+     * Search all sources for song metadata
+     */
+    public function searchAllSources(Song $song): array
+    {
+        return [
+            'musicbrainz' => $this->searchMusicBrainz($song),
+            'discogs'     => $this->searchDiscogs($song),
+        ];
     }
 
     /**
@@ -77,8 +79,8 @@ class SongSearchService
 
             Log::debug('Searching MusicBrainz for song', [
                 'song_id' => $song->id,
-                'title' => $song->title,
-                'artist' => $song->artists->first()->name ?? null
+                'title'   => $song->title,
+                'artist'  => $song->artists->first()->name ?? null,
             ]);
 
             $searchResults = $this->musicBrainzClient->search->recording($filter);
@@ -100,18 +102,54 @@ class SongSearchService
             $detailedData = $this->musicBrainzClient->lookup->recording($bestMatch->id);
 
             return [
-                'source' => 'musicbrainz',
-                'data' => $detailedData->toArray(),
-                'quality_score' => $this->qualityValidator->scoreSongMatch($detailedData->toArray(), $song)
+                'source'        => 'musicbrainz',
+                'data'          => $detailedData->toArray(),
+                'quality_score' => $this->qualityValidator->scoreSongMatch($detailedData->toArray(), $song),
             ];
 
         } catch (\Exception $e) {
             Log::warning('MusicBrainz song search failed', [
                 'song_id' => $song->id,
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage(),
             ]);
             return null;
         }
+    }
+
+    private function isRelevantMatch($recording, Song $song): bool
+    {
+        if (empty($recording->title)) {
+            return false;
+        }
+
+        $similarity = similar_text(
+            mb_strtolower($recording->title),
+            mb_strtolower($song->title),
+        );
+
+        return $similarity > 70;
+    }
+
+    private function calculateRelevanceScore($recording, Song $song): float
+    {
+        $score = similar_text(mb_strtolower($recording->title), mb_strtolower($song->title));
+
+        // Bonus for artist match
+        if (isset($recording->artist_credit) && $song->artists->isNotEmpty()) {
+            $recordingArtist = $recording->artist_credit[0]['artist']['name'] ?? '';
+            $songArtist = $song->artists->first()->name;
+            $score += similar_text(mb_strtolower($recordingArtist), mb_strtolower($songArtist)) * 0.3;
+        }
+
+        // Bonus for length match (if available)
+        if (isset($recording->length) && $song->length) {
+            $lengthDiff = abs($recording->length - $song->length);
+            if ($lengthDiff < 5000) { // within 5 seconds
+                $score += 20;
+            }
+        }
+
+        return $score;
     }
 
     /**
@@ -132,9 +170,9 @@ class SongSearchService
             }
 
             Log::debug('Searching Discogs for song via album', [
-                'song_id' => $song->id,
-                'song_title' => $song->title,
-                'album_title' => $song->album->title
+                'song_id'     => $song->id,
+                'song_title'  => $song->title,
+                'album_title' => $song->album->title,
             ]);
 
             $searchResults = $this->discogsClient->search->release($filter);
@@ -153,7 +191,7 @@ class SongSearchService
                     if ($detailedData === null) {
                         Log::debug('Discogs lookup failed for release', [
                             'release_id' => $release->id,
-                            'title' => $release->title ?? 'unknown'
+                            'title'      => $release->title ?? 'unknown',
                         ]);
                         continue;
                     }
@@ -162,16 +200,16 @@ class SongSearchService
 
                     if ($trackData) {
                         return [
-                            'source' => 'discogs',
-                            'data' => $trackData,
-                            'release_data' => $detailedData->toArray(),
-                            'quality_score' => $this->qualityValidator->scoreSongMatch($trackData, $song)
+                            'source'        => 'discogs',
+                            'data'          => $trackData,
+                            'release_data'  => $detailedData->toArray(),
+                            'quality_score' => $this->qualityValidator->scoreSongMatch($trackData, $song),
                         ];
                     }
                 } catch (\Exception $e) {
                     Log::debug('Exception during Discogs lookup', [
                         'release_id' => $release->id,
-                        'error' => $e->getMessage()
+                        'error'      => $e->getMessage(),
                     ]);
                     continue; // Try next release
                 }
@@ -182,10 +220,33 @@ class SongSearchService
         } catch (\Exception $e) {
             Log::warning('Discogs song search failed', [
                 'song_id' => $song->id,
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage(),
             ]);
             return null;
         }
+    }
+
+    private function findTrackInDiscogs(array $releaseData, Song $song): ?array
+    {
+        if (!isset($releaseData['tracklist'])) {
+            return null;
+        }
+
+        foreach ($releaseData['tracklist'] as $track) {
+            $similarity = $this->matchingStrategy->calculateSongSimilarity($track, $song);
+
+            if ($similarity >= 0.8) {
+                // Enhance track data with release context
+                $track['release_artists'] = $releaseData['artists'] ?? [];
+                $track['release_genres'] = array_merge(
+                    $releaseData['genres'] ?? [],
+                    $releaseData['styles'] ?? [],
+                );
+                return $track;
+            }
+        }
+
+        return null;
     }
 
     private function findSongInAlbumMetadata(Song $song, array $albumMetadata): ?array
@@ -232,29 +293,6 @@ class SongSearchService
         return null;
     }
 
-    private function findTrackInDiscogs(array $releaseData, Song $song): ?array
-    {
-        if (!isset($releaseData['tracklist'])) {
-            return null;
-        }
-
-        foreach ($releaseData['tracklist'] as $track) {
-            $similarity = $this->matchingStrategy->calculateSongSimilarity($track, $song);
-
-            if ($similarity >= 0.8) {
-                // Enhance track data with release context
-                $track['release_artists'] = $releaseData['artists'] ?? [];
-                $track['release_genres'] = array_merge(
-                    $releaseData['genres'] ?? [],
-                    $releaseData['styles'] ?? []
-                );
-                return $track;
-            }
-        }
-
-        return null;
-    }
-
     private function extractSongArtists($songData, string $source): array
     {
         $artists = [];
@@ -265,8 +303,8 @@ class SongSearchService
                     foreach ($songData['artist-credit'] as $credit) {
                         if (isset($credit['artist'])) {
                             $artists[] = [
-                                'name' => $credit['artist']['name'],
-                                'external_id' => $credit['artist']['id'],
+                                'name'            => $credit['artist']['name'],
+                                'external_id'     => $credit['artist']['id'],
                                 'external_source' => 'musicbrainz',
                             ];
                         }
@@ -278,8 +316,8 @@ class SongSearchService
                 if (isset($songData['release_artists'])) {
                     foreach ($songData['release_artists'] as $artist) {
                         $artists[] = [
-                            'name' => $artist['name'] ?? $artist,
-                            'external_id' => $artist['id'] ?? null,
+                            'name'            => $artist['name'] ?? $artist,
+                            'external_id'     => $artist['id'] ?? null,
                             'external_source' => 'discogs',
                         ];
                     }
@@ -318,39 +356,78 @@ class SongSearchService
         return array_unique($genres);
     }
 
-    private function isRelevantMatch($recording, Song $song): bool
+    /**
+     * Search for song with fuzzy matching
+     */
+    public function searchFuzzy(Song $song): array
     {
-        if (empty($recording->title)) {
-            return false;
-        }
+        $results = [];
 
-        $similarity = similar_text(
-            strtolower($recording->title),
-            strtolower($song->title)
-        );
+        // Try variations of the song title
+        $variations = $this->generateSongTitleVariations($song->title);
 
-        return $similarity > 70;
-    }
+        foreach ($variations as $variation) {
+            // Try MusicBrainz
+            $filter = new RecordingFilter();
+            $filter->setTitle($variation);
 
-    private function calculateRelevanceScore($recording, Song $song): float
-    {
-        $score = similar_text(strtolower($recording->title), strtolower($song->title));
+            if ($song->artists->isNotEmpty()) {
+                $filter->setArtistName($song->artists->first()->name);
+            }
 
-        // Bonus for artist match
-        if (isset($recording->artist_credit) && $song->artists->isNotEmpty()) {
-            $recordingArtist = $recording->artist_credit[0]['artist']['name'] ?? '';
-            $songArtist = $song->artists->first()->name;
-            $score += similar_text(strtolower($recordingArtist), strtolower($songArtist)) * 0.3;
-        }
-
-        // Bonus for length match (if available)
-        if (isset($recording->length) && $song->length) {
-            $lengthDiff = abs($recording->length - $song->length);
-            if ($lengthDiff < 5000) { // within 5 seconds
-                $score += 20;
+            try {
+                $searchResults = $this->musicBrainzClient->search->recording($filter);
+                if (!$searchResults->isEmpty()) {
+                    $results['musicbrainz_' . $variation] = $searchResults->take(3);
+                }
+            } catch (\Exception $e) {
+                Log::debug('Song fuzzy search variation failed', [
+                    'variation' => $variation,
+                    'error'     => $e->getMessage(),
+                ]);
             }
         }
 
-        return $score;
+        return $results;
+    }
+
+    /**
+     * Generate song title variations for fuzzy matching
+     */
+    private function generateSongTitleVariations(string $title): array
+    {
+        $variations = [$title];
+
+        // Remove common prefixes/suffixes
+        $cleanTitle = preg_replace('/^(the\s+|a\s+|an\s+)/i', '', $title);
+        if ($cleanTitle !== $title) {
+            $variations[] = $cleanTitle;
+        }
+
+        // Add "The" prefix if not present
+        if (!preg_match('/^the\s+/i', $title)) {
+            $variations[] = 'The ' . $title;
+        }
+
+        // Replace special characters
+        $normalized = preg_replace('/[^\w\s]/', '', $title);
+        if ($normalized !== $title) {
+            $variations[] = $normalized;
+        }
+
+        // Remove version info like "(Radio Edit)", "(Live)", "(Remix)", etc.
+        $withoutVersion = preg_replace('/\s*\([^)]*(?:edit|live|remix|version|mix|acoustic)[^)]*\)/i', '', $title);
+        if ($withoutVersion !== $title) {
+            $variations[] = trim($withoutVersion);
+        }
+
+        // Remove featuring info
+        $withoutFeat = preg_replace('/\s*\(?(?:feat\.?|featuring|ft\.?)\s+[^)]*\)?/i', '', $title);
+        if ($withoutFeat !== $title) {
+            $variations[] = trim($withoutFeat);
+        }
+
+        // Remove duplicates and return
+        return array_unique($variations);
     }
 }

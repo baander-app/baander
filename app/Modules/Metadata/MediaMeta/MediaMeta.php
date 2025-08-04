@@ -37,29 +37,23 @@ class MediaMeta
     public const IMAGE_ILLUSTRATION = 18;
     public const IMAGE_BAND_LOGO = 19;
     public const IMAGE_PUBLISHER_LOGO = 20;
-
+    private const string LOG_TAG = 'MediaMeta ';
     /**
      * @var string The path to the audio file
      */
     protected string $filePath;
-
     /**
      * @var Id3v1|null The ID3v1 tag reader
      */
     protected ?Id3v1 $id3v1 = null;
-
     /**
      * @var Id3v2|null The ID3v2 tag reader
      */
     protected ?Id3v2 $id3v2 = null;
-
     /**
      * @var int The preferred text encoding for ID3v2 tags
      */
     protected int $encoding = Encoding::UTF8;
-
-    private const string LOG_TAG = 'MediaMeta ';
-
     private ?FFMpeg $ffmpeg = null;
     private StreamCollection|null $streamCollection = null;
 
@@ -102,36 +96,6 @@ class MediaMeta
     }
 
     /**
-     * Get the ID3v1 tag reader.
-     *
-     * @return Id3v1 The ID3v1 tag reader, or null if the file doesn't have ID3v1 tags
-     * @throws Exception
-     */
-    public function getID3v1(): Id3v1
-    {
-        $this->id3v1 = new Id3v1($this->filePath);
-
-        return $this->id3v1;
-    }
-
-    /**
-     * Get the ID3v2 tag reader.
-     *
-     * @return Id3v2 The ID3v2 tag reader, or null if the file doesn't have ID3v2 tags
-     * @throws Exception
-     */
-    public function getID3v2(): Id3v2
-    {
-        $options = [
-            'encoding' => $this->encoding,
-        ];
-
-        $this->id3v2 = new Id3v2($this->filePath, $options);
-
-        return $this->id3v2;
-    }
-
-    /**
      * Get the title of the audio file.
      *
      * @return string|null The title, or null if not available
@@ -166,6 +130,36 @@ class MediaMeta
         }
 
         return null;
+    }
+
+    /**
+     * Get the ID3v2 tag reader.
+     *
+     * @return Id3v2 The ID3v2 tag reader, or null if the file doesn't have ID3v2 tags
+     * @throws Exception
+     */
+    public function getID3v2(): Id3v2
+    {
+        $options = [
+            'encoding' => $this->encoding,
+        ];
+
+        $this->id3v2 = new Id3v2($this->filePath, $options);
+
+        return $this->id3v2;
+    }
+
+    /**
+     * Get the ID3v1 tag reader.
+     *
+     * @return Id3v1 The ID3v1 tag reader, or null if the file doesn't have ID3v1 tags
+     * @throws Exception
+     */
+    public function getID3v1(): Id3v1
+    {
+        $this->id3v1 = new Id3v1($this->filePath);
+
+        return $this->id3v1;
     }
 
     /**
@@ -270,6 +264,26 @@ class MediaMeta
     }
 
     /**
+     * Get the artists of the audio file as an array.
+     *
+     * @return array<string> The artists, or an empty array if not available
+     */
+    public function getArtists(): array
+    {
+        $frame = $this->getArtistFrame();
+        if ($frame) {
+            return $frame->getArtists();
+        }
+
+        $artist = $this->getArtist();
+        if ($artist) {
+            return [$artist];
+        }
+
+        return [];
+    }
+
+    /**
      * Get the artist frame of the audio file.
      *
      * @return \App\Modules\Metadata\MediaMeta\Frame\TPE1|null The artist frame, or null if not available
@@ -288,26 +302,6 @@ class MediaMeta
         }
 
         return null;
-    }
-
-    /**
-     * Get the artists of the audio file as an array.
-     *
-     * @return array<string> The artists, or an empty array if not available
-     */
-    public function getArtists(): array
-    {
-        $frame = $this->getArtistFrame();
-        if ($frame) {
-            return $frame->getArtists();
-        }
-
-        $artist = $this->getArtist();
-        if ($artist) {
-            return [$artist];
-        }
-
-        return [];
     }
 
     /**
@@ -574,6 +568,49 @@ class MediaMeta
     }
 
     /**
+     * Get the front cover image from the audio file.
+     *
+     * @return Apic|null The front cover image, or null if not available
+     */
+    public function getFrontCoverImage(): ?Apic
+    {
+        return $this->getImageByType(self::IMAGE_COVER_FRONT);
+    }
+
+    /**
+     * Get the first APIC frame (image) of a specific type from the audio file.
+     *
+     * @param int $imageType The image type (use the IMAGE_* constants)
+     * @return Apic|null The first APIC frame of the specified type, or null if not available
+     */
+    public function getImageByType(int $imageType): ?Apic
+    {
+        $images = $this->getImagesByType($imageType);
+
+        return count($images) > 0 ? $images[0] : null;
+    }
+
+    /**
+     * Get APIC frames (images) of a specific type from the audio file.
+     *
+     * @param int $imageType The image type (use the IMAGE_* constants)
+     * @return array<Apic> An array of APIC frames of the specified type, or an empty array if none are available
+     */
+    public function getImagesByType(int $imageType): array
+    {
+        $images = [];
+        $allImages = $this->getImages();
+
+        foreach ($allImages as $image) {
+            if ($image->getImageType() === $imageType) {
+                $images[] = $image;
+            }
+        }
+
+        return $images;
+    }
+
+    /**
      * Get all APIC frames (images) from the audio file.
      *
      * @return array<Apic> An array of APIC frames, or an empty array if none are available
@@ -600,36 +637,15 @@ class MediaMeta
     }
 
     /**
-     * Get APIC frames (images) of a specific type from the audio file.
+     * Get the image type of the first APIC frame.
      *
-     * @param int $imageType The image type (use the IMAGE_* constants)
-     * @return array<Apic> An array of APIC frames of the specified type, or an empty array if none are available
+     * @return int|null The image type, or null if not available
      */
-    public function getImagesByType(int $imageType): array
+    public function getImageType(): ?int
     {
-        $images = [];
-        $allImages = $this->getImages();
+        $image = $this->getImage();
 
-        foreach ($allImages as $image) {
-            if ($image->getImageType() === $imageType) {
-                $images[] = $image;
-            }
-        }
-
-        return $images;
-    }
-
-    /**
-     * Get the first APIC frame (image) of a specific type from the audio file.
-     *
-     * @param int $imageType The image type (use the IMAGE_* constants)
-     * @return Apic|null The first APIC frame of the specified type, or null if not available
-     */
-    public function getImageByType(int $imageType): ?Apic
-    {
-        $images = $this->getImagesByType($imageType);
-
-        return count($images) > 0 ? $images[0] : null;
+        return $image?->getImageType();
     }
 
     /**
@@ -641,16 +657,6 @@ class MediaMeta
     {
         $images = $this->getImages();
         return count($images) > 0 ? $images[0] : null;
-    }
-
-    /**
-     * Get the front cover image from the audio file.
-     *
-     * @return Apic|null The front cover image, or null if not available
-     */
-    public function getFrontCoverImage(): ?Apic
-    {
-        return $this->getImageByType(self::IMAGE_COVER_FRONT);
     }
 
     /**
@@ -674,15 +680,13 @@ class MediaMeta
     }
 
     /**
-     * Get the image data from the first APIC frame.
+     * Get the front cover image data from the audio file.
      *
-     * @return string|null The image data, or null if not available
+     * @return string|null The front cover image data, or null if not available
      */
-    public function getImageData(): ?string
+    public function getFrontCoverImageData(): ?string
     {
-        $image = $this->getImage();
-
-        return $image?->getImageData();
+        return $this->getImageDataByType(self::IMAGE_COVER_FRONT);
     }
 
     /**
@@ -699,13 +703,15 @@ class MediaMeta
     }
 
     /**
-     * Get the front cover image data from the audio file.
+     * Get the image data from the first APIC frame.
      *
-     * @return string|null The front cover image data, or null if not available
+     * @return string|null The image data, or null if not available
      */
-    public function getFrontCoverImageData(): ?string
+    public function getImageData(): ?string
     {
-        return $this->getImageDataByType(self::IMAGE_COVER_FRONT);
+        $image = $this->getImage();
+
+        return $image?->getImageData();
     }
 
     /**
@@ -719,6 +725,11 @@ class MediaMeta
         return $image?->getMimeType();
     }
 
+    public function getMimeType(): string
+    {
+        return new \finfo(FILEINFO_MIME_TYPE)->file($this->filePath);
+    }
+
     /**
      * Get the MIME type of a specific type of APIC frame.
      *
@@ -730,18 +741,6 @@ class MediaMeta
         $image = $this->getImageByType($imageType);
 
         return $image?->getMimeType();
-    }
-
-    /**
-     * Get the image type of the first APIC frame.
-     *
-     * @return int|null The image type, or null if not available
-     */
-    public function getImageType(): ?int
-    {
-        $image = $this->getImage();
-
-        return $image?->getImageType();
     }
 
     /**
@@ -772,11 +771,6 @@ class MediaMeta
     public function isAudioFile(): bool
     {
         return Str::startsWith($this->getMimeType(), 'audio/');
-    }
-
-    public function getMimeType(): string
-    {
-        return new \finfo(FILEINFO_MIME_TYPE)->file($this->filePath);
     }
 
     public function probeLength()

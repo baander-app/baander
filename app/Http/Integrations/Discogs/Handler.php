@@ -2,18 +2,31 @@
 
 namespace App\Http\Integrations\Discogs;
 
-use App\Baander;
 use GuzzleHttp\Client;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
+use App\Baander;
 
 abstract class Handler
 {
+    private const RATE_LIMIT_CACHE_KEY = 'discogs_rate_limit';
+    private const DEFAULT_RETRY_AFTER = 60; // seconds
+
     public function __construct(protected readonly Client $client, protected readonly string $baseUrl)
     {}
 
     protected function fetchEndpoint(string $endpoint, array $params = []): ?array
     {
+        // Check if we're currently rate limited
+        if (Cache::has(self::RATE_LIMIT_CACHE_KEY)) {
+            Log::warning('Discogs API request skipped due to rate limiting', [
+                'endpoint' => $endpoint,
+                'rate_limit_expires' => Cache::get(self::RATE_LIMIT_CACHE_KEY . '_expires')
+            ]);
+            return null;
+        }
+
         if (config('services.discogs.api_key')) {
             $params['token'] = config('services.discogs.api_key');
         }
@@ -31,6 +44,14 @@ abstract class Handler
 
             $statusCode = $response->getStatusCode();
             $body = $response->getBody()->getContents();
+            $rateLimitRemaining = $response->getHeader('X-Discogs-Ratelimit-Remaining')[0] ?? 'unknown';
+
+            // Handle rate limiting
+            if ($statusCode === 429) {
+                $retryAfter = $response->getHeader('Retry-After')[0] ?? self::DEFAULT_RETRY_AFTER;
+                $this->handleRateLimit($endpoint, (int)$retryAfter, $rateLimitRemaining);
+                return null;
+            }
 
             // Only log detailed info for non-200 responses to reduce noise
             if ($statusCode !== 200) {
@@ -38,7 +59,15 @@ abstract class Handler
                     'endpoint' => $endpoint,
                     'status_code' => $statusCode,
                     'response_body' => substr($body, 0, 200), // Limit body length
-                    'rate_limit_remaining' => $response->getHeader('X-Discogs-Ratelimit-Remaining')[0] ?? 'unknown',
+                    'rate_limit_remaining' => $rateLimitRemaining,
+                ]);
+            }
+
+            // Log rate limit info when getting low
+            if (is_numeric($rateLimitRemaining) && (int)$rateLimitRemaining < 10) {
+                Log::warning('Discogs rate limit getting low', [
+                    'endpoint' => $endpoint,
+                    'rate_limit_remaining' => $rateLimitRemaining
                 ]);
             }
 
@@ -59,9 +88,17 @@ abstract class Handler
         }
     }
 
-
     protected function fetchEndpointAsync(string $endpoint, array $params = []): PromiseInterface
     {
+        // Check if we're currently rate limited
+        if (Cache::has(self::RATE_LIMIT_CACHE_KEY)) {
+            Log::warning('Discogs API async request skipped due to rate limiting', [
+                'endpoint' => $endpoint,
+                'rate_limit_expires' => Cache::get(self::RATE_LIMIT_CACHE_KEY . '_expires')
+            ]);
+            return \GuzzleHttp\Promise\Create::promiseFor(null);
+        }
+
         if (config('services.discogs.api_key')) {
             $params['token'] = config('services.discogs.api_key');
         }
@@ -76,16 +113,34 @@ abstract class Handler
             'http_errors' => false, // Don't throw exceptions for 4xx/5xx
         ])->then(function ($response) use ($endpoint) {
             $statusCode = $response->getStatusCode();
+            $body = $response->getBody()->getContents();
+            $rateLimitRemaining = $response->getHeader('X-Discogs-Ratelimit-Remaining')[0] ?? 'unknown';
+
+            // Handle rate limiting
+            if ($statusCode === 429) {
+                $retryAfter = $response->getHeader('Retry-After')[0] ?? self::DEFAULT_RETRY_AFTER;
+                $this->handleRateLimit($endpoint, (int)$retryAfter, $rateLimitRemaining);
+                return null;
+            }
 
             if ($statusCode === 200) {
-                return json_decode($response->getBody()->getContents(), true);
+                // Log rate limit info when getting low
+                if (is_numeric($rateLimitRemaining) && (int)$rateLimitRemaining < 10) {
+                    Log::warning('Discogs rate limit getting low (async)', [
+                        'endpoint' => $endpoint,
+                        'rate_limit_remaining' => $rateLimitRemaining
+                    ]);
+                }
+
+                return json_decode($body, true);
             }
 
             // Log non-200 responses
             Log::warning('Discogs API async non-200 response', [
                 'endpoint' => $endpoint,
                 'status_code' => $statusCode,
-                'response_body' => $response->getBody()->getContents()
+                'response_body' => substr($body, 0, 200),
+                'rate_limit_remaining' => $rateLimitRemaining,
             ]);
 
             return null;
@@ -97,5 +152,39 @@ abstract class Handler
             ]);
             return null;
         });
+    }
+
+    private function handleRateLimit(string $endpoint, int $retryAfter, string $rateLimitRemaining): void
+    {
+        $expiresAt = now()->addSeconds($retryAfter);
+
+        Cache::put(self::RATE_LIMIT_CACHE_KEY, true, $expiresAt);
+        Cache::put(self::RATE_LIMIT_CACHE_KEY . '_expires', $expiresAt->toISOString(), $expiresAt);
+
+        Log::warning('Discogs rate limit hit, caching rate limit status', [
+            'endpoint' => $endpoint,
+            'retry_after' => $retryAfter,
+            'rate_limit_remaining' => $rateLimitRemaining,
+            'rate_limit_expires' => $expiresAt->toISOString()
+        ]);
+    }
+
+    /**
+     * Check if we can make a Discogs request (not rate limited)
+     */
+    public function canMakeRequest(): bool
+    {
+        return !Cache::has(self::RATE_LIMIT_CACHE_KEY);
+    }
+
+    /**
+     * Get rate limit status information
+     */
+    public function getRateLimitStatus(): array
+    {
+        return [
+            'is_rate_limited' => Cache::has(self::RATE_LIMIT_CACHE_KEY),
+            'expires_at' => Cache::get(self::RATE_LIMIT_CACHE_KEY . '_expires'),
+        ];
     }
 }

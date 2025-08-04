@@ -35,7 +35,8 @@ class SyncAlbumMetadataJob extends BaseJob implements ShouldQueue
         try {
             $results = $metadataSyncService->syncAlbum($album);
 
-            if ($results['quality_score'] >= 0.7) {
+            // Lower the threshold from 0.7 to 0.5 and add more context
+            if ($results['quality_score'] >= 0.5) {
                 $this->updateAlbumMetadata($album, $results);
 
                 $this->logger()->info('Album metadata synced successfully', [
@@ -44,16 +45,23 @@ class SyncAlbumMetadataJob extends BaseJob implements ShouldQueue
                     'quality_score' => $results['quality_score']
                 ]);
             } else {
+                // Also log what the album data looks like for debugging
                 $this->logger()->warning('Album metadata sync rejected due to low quality', [
                     'album_id' => $album->id,
-                    'quality_score' => $results['quality_score']
+                    'quality_score' => $results['quality_score'],
+                    'source' => $results['source'],
+                    'album_title' => $album->title,
+                    'album_artists' => $album->artists->pluck('name')->toArray(),
+                    'has_year' => !empty($album->year),
+                    'songs_count' => $album->songs()->count()
                 ]);
             }
 
         } catch (\Exception|\Error $e) {
             $this->logger()->error('Album metadata sync job failed', [
                 'album_id' => $this->albumId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
 
             throw $e;

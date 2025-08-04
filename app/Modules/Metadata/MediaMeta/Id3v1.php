@@ -12,58 +12,154 @@ use Exception;
  */
 class Id3v1
 {
-    /** @var string */
-    private string $title = '';
-
-    /** @var string */
-    private string $artist = '';
-
-    /** @var string */
-    private string $album = '';
-
-    /** @var string */
-    private string $year = '';
-
-    /** @var string */
-    private string $comment = '';
-
-    /** @var integer */
-    private int $track = 0;
-
-    /** @var integer */
-    private int $genre = 255;
-
     /**
      * The genre list.
      *
      * @var array
      */
     public static array $genres = [
-        'Blues', 'Classic Rock', 'Country', 'Dance', 'Disco', 'Funk', 'Grunge',
-        'Hip-Hop', 'Jazz', 'Metal', 'New Age', 'Oldies', 'Other', 'Pop', 'R&B',
-        'Rap', 'Reggae', 'Rock', 'Techno', 'Industrial', 'Alternative', 'Ska',
-        'Death Metal', 'Pranks', 'Soundtrack', 'Euro-Techno', 'Ambient',
-        'Trip-Hop', 'Vocal', 'Jazz+Funk', 'Fusion', 'Trance', 'Classical',
-        'Instrumental', 'Acid', 'House', 'Game', 'Sound Clip', 'Gospel',
-        'Noise', 'AlternRock', 'Bass', 'Soul', 'Punk', 'Space', 'Meditative',
-        'Instrumental Pop', 'Instrumental Rock', 'Ethnic', 'Gothic',
-        'Darkwave', 'Techno-Industrial', 'Electronic', 'Pop-Folk', 'Eurodance',
-        'Dream', 'Southern Rock', 'Comedy', 'Cult', 'Gangsta', 'Top 40',
-        'Christian Rap', 'Pop/Funk', 'Jungle', 'Native American', 'Cabaret',
-        'New Wave', 'Psychadelic', 'Rave', 'Showtunes', 'Trailer', 'Lo-Fi',
-        'Tribal', 'Acid Punk', 'Acid Jazz', 'Polka', 'Retro', 'Musical',
-        'Rock & Roll', 'Hard Rock', 'Folk', 'Folk-Rock', 'National Folk',
-        'Swing', 'Fast Fusion', 'Bebob', 'Latin', 'Revival', 'Celtic',
-        'Bluegrass', 'Avantgarde', 'Gothic Rock', 'Progressive Rock',
-        'Psychedelic Rock', 'Symphonic Rock', 'Slow Rock', 'Big Band',
-        'Chorus', 'Easy Listening', 'Acoustic', 'Humour', 'Speech', 'Chanson',
-        'Opera', 'Chamber Music', 'Sonata', 'Symphony', 'Booty Bass', 'Primus',
-        'Porn Groove', 'Satire', 'Slow Jam', 'Club', 'Tango', 'Samba',
-        'Folklore', 'Ballad', 'Power Ballad', 'Rhythmic Soul', 'Freestyle',
-        'Duet', 'Punk Rock', 'Drum Solo', 'A capella', 'Euro-House',
-        'Dance Hall', 255 => 'Unknown',
+        'Blues',
+        'Classic Rock',
+        'Country',
+        'Dance',
+        'Disco',
+        'Funk',
+        'Grunge',
+        'Hip-Hop',
+        'Jazz',
+        'Metal',
+        'New Age',
+        'Oldies',
+        'Other',
+        'Pop',
+        'R&B',
+        'Rap',
+        'Reggae',
+        'Rock',
+        'Techno',
+        'Industrial',
+        'Alternative',
+        'Ska',
+        'Death Metal',
+        'Pranks',
+        'Soundtrack',
+        'Euro-Techno',
+        'Ambient',
+        'Trip-Hop',
+        'Vocal',
+        'Jazz+Funk',
+        'Fusion',
+        'Trance',
+        'Classical',
+        'Instrumental',
+        'Acid',
+        'House',
+        'Game',
+        'Sound Clip',
+        'Gospel',
+        'Noise',
+        'AlternRock',
+        'Bass',
+        'Soul',
+        'Punk',
+        'Space',
+        'Meditative',
+        'Instrumental Pop',
+        'Instrumental Rock',
+        'Ethnic',
+        'Gothic',
+        'Darkwave',
+        'Techno-Industrial',
+        'Electronic',
+        'Pop-Folk',
+        'Eurodance',
+        'Dream',
+        'Southern Rock',
+        'Comedy',
+        'Cult',
+        'Gangsta',
+        'Top 40',
+        'Christian Rap',
+        'Pop/Funk',
+        'Jungle',
+        'Native American',
+        'Cabaret',
+        'New Wave',
+        'Psychadelic',
+        'Rave',
+        'Showtunes',
+        'Trailer',
+        'Lo-Fi',
+        'Tribal',
+        'Acid Punk',
+        'Acid Jazz',
+        'Polka',
+        'Retro',
+        'Musical',
+        'Rock & Roll',
+        'Hard Rock',
+        'Folk',
+        'Folk-Rock',
+        'National Folk',
+        'Swing',
+        'Fast Fusion',
+        'Bebob',
+        'Latin',
+        'Revival',
+        'Celtic',
+        'Bluegrass',
+        'Avantgarde',
+        'Gothic Rock',
+        'Progressive Rock',
+        'Psychedelic Rock',
+        'Symphonic Rock',
+        'Slow Rock',
+        'Big Band',
+        'Chorus',
+        'Easy Listening',
+        'Acoustic',
+        'Humour',
+        'Speech',
+        'Chanson',
+        'Opera',
+        'Chamber Music',
+        'Sonata',
+        'Symphony',
+        'Booty Bass',
+        'Primus',
+        'Porn Groove',
+        'Satire',
+        'Slow Jam',
+        'Club',
+        'Tango',
+        'Samba',
+        'Folklore',
+        'Ballad',
+        'Power Ballad',
+        'Rhythmic Soul',
+        'Freestyle',
+        'Duet',
+        'Punk Rock',
+        'Drum Solo',
+        'A capella',
+        'Euro-House',
+        'Dance Hall',
+        255 => 'Unknown',
     ];
-
+    /** @var string */
+    private string $title = '';
+    /** @var string */
+    private string $artist = '';
+    /** @var string */
+    private string $album = '';
+    /** @var string */
+    private string $year = '';
+    /** @var string */
+    private string $comment = '';
+    /** @var integer */
+    private int $track = 0;
+    /** @var integer */
+    private int $genre = 255;
     private string $filePath;
 
     /**
@@ -133,76 +229,6 @@ class Id3v1
     }
 
     /**
-     * Returns the artist.
-     *
-     * @return string
-     */
-    public function getArtist(): string
-    {
-        return $this->artist;
-    }
-
-    /**
-     * Returns the album.
-     *
-     * @return string
-     */
-    public function getAlbum(): string
-    {
-        return $this->album;
-    }
-
-    /**
-     * Returns the year.
-     *
-     * @return string
-     */
-    public function getYear(): string
-    {
-        return $this->year;
-    }
-
-    /**
-     * Returns the comment.
-     *
-     * @return string
-     */
-    public function getComment(): string
-    {
-        return $this->comment;
-    }
-
-    /**
-     * Returns the track number.
-     *
-     * @return integer
-     */
-    public function getTrack(): int
-    {
-        return $this->track;
-    }
-
-    /**
-     * Returns the genre.
-     *
-     * @return string
-     */
-    public function getGenre(): string
-    {
-        return self::$genres[$this->genre] ?? 'Unknown';
-    }
-
-    /**
-     * Returns the genre ID.
-     *
-     * @return integer
-     */
-    public function getGenreId(): int
-    {
-        return $this->genre;
-    }
-
-    /**
      * Sets the title.
      *
      * @param string $title The title
@@ -212,6 +238,16 @@ class Id3v1
     {
         $this->title = substr($title, 0, 30);
         return $this;
+    }
+
+    /**
+     * Returns the artist.
+     *
+     * @return string
+     */
+    public function getArtist(): string
+    {
+        return $this->artist;
     }
 
     /**
@@ -227,6 +263,16 @@ class Id3v1
     }
 
     /**
+     * Returns the album.
+     *
+     * @return string
+     */
+    public function getAlbum(): string
+    {
+        return $this->album;
+    }
+
+    /**
      * Sets the album.
      *
      * @param string $album The album
@@ -236,6 +282,16 @@ class Id3v1
     {
         $this->album = substr($album, 0, 30);
         return $this;
+    }
+
+    /**
+     * Returns the year.
+     *
+     * @return string
+     */
+    public function getYear(): string
+    {
+        return $this->year;
     }
 
     /**
@@ -251,6 +307,16 @@ class Id3v1
     }
 
     /**
+     * Returns the comment.
+     *
+     * @return string
+     */
+    public function getComment(): string
+    {
+        return $this->comment;
+    }
+
+    /**
      * Sets the comment.
      *
      * @param string $comment The comment
@@ -260,6 +326,16 @@ class Id3v1
     {
         $this->comment = substr($comment, 0, 28);
         return $this;
+    }
+
+    /**
+     * Returns the track number.
+     *
+     * @return integer
+     */
+    public function getTrack(): int
+    {
+        return $this->track;
     }
 
     /**
@@ -275,15 +351,13 @@ class Id3v1
     }
 
     /**
-     * Sets the genre ID.
+     * Returns the genre.
      *
-     * @param integer $genreId The genre ID
-     * @return self
+     * @return string
      */
-    public function setGenreId(int $genreId): self
+    public function getGenre(): string
     {
-        $this->genre = min(255, max(0, $genreId));
-        return $this;
+        return self::$genres[$this->genre] ?? 'Unknown';
     }
 
     /**
@@ -298,6 +372,28 @@ class Id3v1
         if ($genreId !== false) {
             $this->genre = $genreId;
         }
+        return $this;
+    }
+
+    /**
+     * Returns the genre ID.
+     *
+     * @return integer
+     */
+    public function getGenreId(): int
+    {
+        return $this->genre;
+    }
+
+    /**
+     * Sets the genre ID.
+     *
+     * @param integer $genreId The genre ID
+     * @return self
+     */
+    public function setGenreId(int $genreId): self
+    {
+        $this->genre = min(255, max(0, $genreId));
         return $this;
     }
 

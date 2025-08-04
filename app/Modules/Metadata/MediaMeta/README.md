@@ -1,6 +1,7 @@
 # MediaMeta
 
-MediaMeta provides a unified interface for reading ID3 tags from audio files. It supports both ID3v1 and ID3v2 formats and can extract image data from APIC tags.
+MediaMeta provides a unified interface for reading ID3 tags from audio files. It supports both ID3v1 and ID3v2 formats
+and can extract image data from APIC tags.
 
 ## Features
 

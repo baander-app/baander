@@ -234,17 +234,6 @@ class Id3v2
     }
 
     /**
-     * Returns all frames with the given identifier.
-     *
-     * @param string $identifier The frame identifier
-     * @return array The frames
-     */
-    public function getFramesByIdentifier(string $identifier): array
-    {
-        return $this->frames[$identifier] ?? [];
-    }
-
-    /**
      * Returns the APIC frame (APIC).
      *
      *
@@ -258,6 +247,17 @@ class Id3v2
         }
 
         return $frames[0];
+    }
+
+    /**
+     * Returns all frames with the given identifier.
+     *
+     * @param string $identifier The frame identifier
+     * @return array The frames
+     */
+    public function getFramesByIdentifier(string $identifier): array
+    {
+        return $this->frames[$identifier] ?? [];
     }
 
     /**
@@ -428,16 +428,6 @@ class Id3v2
     }
 
     /**
-     * Returns the comment frames (COMM).
-     *
-     * @return array<COMM> The comment frames
-     */
-    public function getCOMMFrames(): array
-    {
-        return $this->getFramesByIdentifier('COMM');
-    }
-
-    /**
      * Returns the first comment frame (COMM).
      *
      * @return COMM|null The comment frame, or null if not available
@@ -450,6 +440,16 @@ class Id3v2
         }
 
         return $frames[0];
+    }
+
+    /**
+     * Returns the comment frames (COMM).
+     *
+     * @return array<COMM> The comment frames
+     */
+    public function getCOMMFrames(): array
+    {
+        return $this->getFramesByIdentifier('COMM');
     }
 
     /**
@@ -876,16 +876,6 @@ class Id3v2
     }
 
     /**
-     * Returns the unsynchronized lyric/text transcription frames (USLT).
-     *
-     * @return array<USLT> The unsynchronized lyric/text transcription frames
-     */
-    public function getUSLTFrames(): array
-    {
-        return $this->getFramesByIdentifier('USLT');
-    }
-
-    /**
      * Returns the first unsynchronized lyric/text transcription frame (USLT).
      *
      * @return USLT|null The unsynchronized lyric/text transcription frame, or null if not available
@@ -901,6 +891,16 @@ class Id3v2
     }
 
     /**
+     * Returns the unsynchronized lyric/text transcription frames (USLT).
+     *
+     * @return array<USLT> The unsynchronized lyric/text transcription frames
+     */
+    public function getUSLTFrames(): array
+    {
+        return $this->getFramesByIdentifier('USLT');
+    }
+
+    /**
      * Returns an unsynchronized lyric/text transcription frame with the given description.
      *
      * @param string $description The description
@@ -911,16 +911,6 @@ class Id3v2
         $frames = $this->getUSLTFrames();
 
         return array_find($frames, fn($frame) => $frame->getDescription() === $description);
-    }
-
-    /**
-     * Returns the synchronized lyric/text frames (SYLT).
-     *
-     * @return array<SYLT> The synchronized lyric/text frames
-     */
-    public function getSYLTFrames(): array
-    {
-        return $this->getFramesByIdentifier('SYLT');
     }
 
     /**
@@ -939,6 +929,16 @@ class Id3v2
     }
 
     /**
+     * Returns the synchronized lyric/text frames (SYLT).
+     *
+     * @return array<SYLT> The synchronized lyric/text frames
+     */
+    public function getSYLTFrames(): array
+    {
+        return $this->getFramesByIdentifier('SYLT');
+    }
+
+    /**
      * Returns a synchronized lyric/text frame with the given description.
      *
      * @param string $description The description
@@ -949,16 +949,6 @@ class Id3v2
         $frames = $this->getSYLTFrames();
 
         return array_find($frames, fn($frame) => $frame->getDescription() === $description);
-    }
-
-    /**
-     * Returns the popularimeter frames (POPM).
-     *
-     * @return array<POPM> The popularimeter frames
-     */
-    public function getPOPMFrames(): array
-    {
-        return $this->getFramesByIdentifier('POPM');
     }
 
     /**
@@ -974,6 +964,16 @@ class Id3v2
         }
 
         return $frames[0];
+    }
+
+    /**
+     * Returns the popularimeter frames (POPM).
+     *
+     * @return array<POPM> The popularimeter frames
+     */
+    public function getPOPMFrames(): array
+    {
+        return $this->getFramesByIdentifier('POPM');
     }
 
     /**
@@ -1020,16 +1020,6 @@ class Id3v2
     }
 
     /**
-     * Returns the linked information frames (LINK).
-     *
-     * @return array<LINK> The linked information frames
-     */
-    public function getLINKFrames(): array
-    {
-        return $this->getFramesByIdentifier('LINK');
-    }
-
-    /**
      * Returns the first linked information frame (LINK).
      *
      * @return LINK|null The linked information frame, or null if not available
@@ -1042,6 +1032,16 @@ class Id3v2
         }
 
         return $frames[0];
+    }
+
+    /**
+     * Returns the linked information frames (LINK).
+     *
+     * @return array<LINK> The linked information frames
+     */
+    public function getLINKFrames(): array
+    {
+        return $this->getFramesByIdentifier('LINK');
     }
 
     /**

@@ -9,19 +9,84 @@ use Illuminate\Support\Collection;
 class MetadataJobDispatcher
 {
     public function __construct(
-        private readonly int $defaultBatchSize = 10,
-        private readonly string $defaultQueue = 'default'
-    ) {}
+        private readonly int    $defaultBatchSize = 10,
+        private readonly string $defaultQueue = 'default',
+    )
+    {
+    }
+
+    public function syncMixed(
+        array     $albumIds = [],
+        array     $songIds = [],
+        array     $artistIds = [],
+        ?int      $libraryId = null,
+        bool      $forceUpdate = false,
+        ?int      $batchSize = null,
+        ?string   $queueName = null,
+        bool      $includeSongs = false,
+        bool      $includeArtists = false,
+        ?callable $progressCallback = null,
+    ): int
+    {
+        $totalJobs = 0;
+
+        if (!empty($albumIds)) {
+            $totalJobs += $this->syncAlbums(
+                $albumIds,
+                $forceUpdate,
+                $batchSize,
+                $queueName,
+                $includeSongs,
+                $includeArtists,
+                $progressCallback,
+            );
+        }
+
+        if (!empty($songIds)) {
+            $totalJobs += $this->syncSongs(
+                $songIds,
+                $forceUpdate,
+                $batchSize,
+                $queueName,
+                $progressCallback,
+            );
+        }
+
+        if (!empty($artistIds)) {
+            $totalJobs += $this->syncArtists(
+                $artistIds,
+                $forceUpdate,
+                $batchSize,
+                $queueName,
+                $progressCallback,
+            );
+        }
+
+        if ($libraryId && empty($albumIds) && empty($songIds) && empty($artistIds)) {
+            $totalJobs += $this->syncLibrary(
+                $libraryId,
+                $forceUpdate,
+                $batchSize,
+                $queueName,
+                $includeSongs,
+                $includeArtists,
+                $progressCallback,
+            );
+        }
+
+        return $totalJobs;
+    }
 
     public function syncAlbums(
-        array $albumIds,
-        bool $forceUpdate = false,
-        ?int $batchSize = null,
-        ?string $queueName = null,
-        bool $includeSongs = false,
-        bool $includeArtists = false,
-        ?callable $progressCallback = null
-    ): int {
+        array     $albumIds,
+        bool      $forceUpdate = false,
+        ?int      $batchSize = null,
+        ?string   $queueName = null,
+        bool      $includeSongs = false,
+        bool      $includeArtists = false,
+        ?callable $progressCallback = null,
+    ): int
+    {
         $batchSize = $batchSize ?? $this->defaultBatchSize;
         $queueName = $queueName ?? $this->defaultQueue;
 
@@ -43,7 +108,7 @@ class MetadataJobDispatcher
             $includeSongs,
             $includeArtists,
             $progressCallback,
-            $totalAlbums
+            $totalAlbums,
         ) {
             foreach ($albums as $album) {
                 SyncAlbumMetadataJob::dispatch($album->id, $forceUpdate)
@@ -77,12 +142,13 @@ class MetadataJobDispatcher
     }
 
     public function syncSongs(
-        array $songIds,
-        bool $forceUpdate = false,
-        ?int $batchSize = null,
-        ?string $queueName = null,
-        ?callable $progressCallback = null
-    ): int {
+        array     $songIds,
+        bool      $forceUpdate = false,
+        ?int      $batchSize = null,
+        ?string   $queueName = null,
+        ?callable $progressCallback = null,
+    ): int
+    {
         $batchSize = $batchSize ?? $this->defaultBatchSize;
         $queueName = $queueName ?? $this->defaultQueue;
 
@@ -102,7 +168,7 @@ class MetadataJobDispatcher
             &$jobCount,
             &$processed,
             $progressCallback,
-            $totalSongs
+            $totalSongs,
         ) {
             foreach ($songs as $song) {
                 SyncSongMetadataJob::dispatch($song->id, $forceUpdate)
@@ -120,12 +186,13 @@ class MetadataJobDispatcher
     }
 
     public function syncArtists(
-        array $artistIds,
-        bool $forceUpdate = false,
-        ?int $batchSize = null,
-        ?string $queueName = null,
-        ?callable $progressCallback = null
-    ): int {
+        array     $artistIds,
+        bool      $forceUpdate = false,
+        ?int      $batchSize = null,
+        ?string   $queueName = null,
+        ?callable $progressCallback = null,
+    ): int
+    {
         $batchSize = $batchSize ?? $this->defaultBatchSize;
         $queueName = $queueName ?? $this->defaultQueue;
 
@@ -145,7 +212,7 @@ class MetadataJobDispatcher
             &$jobCount,
             &$processed,
             $progressCallback,
-            $totalArtists
+            $totalArtists,
         ) {
             foreach ($artists as $artist) {
                 SyncArtistMetadataJob::dispatch($artist->id, $forceUpdate)
@@ -163,14 +230,15 @@ class MetadataJobDispatcher
     }
 
     public function syncLibrary(
-        int $libraryId,
-        bool $forceUpdate = false,
-        ?int $batchSize = null,
-        ?string $queueName = null,
-        bool $includeSongs = false,
-        bool $includeArtists = false,
-        ?callable $progressCallback = null
-    ): int {
+        int       $libraryId,
+        bool      $forceUpdate = false,
+        ?int      $batchSize = null,
+        ?string   $queueName = null,
+        bool      $includeSongs = false,
+        bool      $includeArtists = false,
+        ?callable $progressCallback = null,
+    ): int
+    {
         $batchSize = $batchSize ?? $this->defaultBatchSize;
         $queueName = $queueName ?? $this->defaultQueue;
 
@@ -190,7 +258,7 @@ class MetadataJobDispatcher
                 $includeSongs,
                 $includeArtists,
                 $progressCallback,
-                $totalAlbums
+                $totalAlbums,
             ) {
                 foreach ($albums as $album) {
                     SyncAlbumMetadataJob::dispatch($album->id, $forceUpdate)
@@ -239,7 +307,7 @@ class MetadataJobDispatcher
                     &$totalJobs,
                     &$processed,
                     $progressCallback,
-                    $totalOrphanedSongs
+                    $totalOrphanedSongs,
                 ) {
                     foreach ($songs as $song) {
                         SyncSongMetadataJob::dispatch($song->id, $forceUpdate)
@@ -272,7 +340,7 @@ class MetadataJobDispatcher
                     &$totalJobs,
                     &$processed,
                     $progressCallback,
-                    $totalArtists
+                    $totalArtists,
                 ) {
                     foreach ($artists as $artist) {
                         SyncArtistMetadataJob::dispatch($artist->id, $forceUpdate)
@@ -291,75 +359,14 @@ class MetadataJobDispatcher
         return $totalJobs;
     }
 
-    public function syncMixed(
-        array $albumIds = [],
-        array $songIds = [],
-        array $artistIds = [],
-        ?int $libraryId = null,
-        bool $forceUpdate = false,
-        ?int $batchSize = null,
-        ?string $queueName = null,
-        bool $includeSongs = false,
-        bool $includeArtists = false,
-        ?callable $progressCallback = null
-    ): int {
-        $totalJobs = 0;
-
-        if (!empty($albumIds)) {
-            $totalJobs += $this->syncAlbums(
-                $albumIds,
-                $forceUpdate,
-                $batchSize,
-                $queueName,
-                $includeSongs,
-                $includeArtists,
-                $progressCallback
-            );
-        }
-
-        if (!empty($songIds)) {
-            $totalJobs += $this->syncSongs(
-                $songIds,
-                $forceUpdate,
-                $batchSize,
-                $queueName,
-                $progressCallback
-            );
-        }
-
-        if (!empty($artistIds)) {
-            $totalJobs += $this->syncArtists(
-                $artistIds,
-                $forceUpdate,
-                $batchSize,
-                $queueName,
-                $progressCallback
-            );
-        }
-
-        if ($libraryId && empty($albumIds) && empty($songIds) && empty($artistIds)) {
-            $totalJobs += $this->syncLibrary(
-                $libraryId,
-                $forceUpdate,
-                $batchSize,
-                $queueName,
-                $includeSongs,
-                $includeArtists,
-                $progressCallback
-            );
-        }
-
-        return $totalJobs;
-    }
-
     public function getLibraryStats(int $libraryId): array
     {
         return [
-            'albums' => Album::where('library_id', $libraryId)->count(),
-            'songs' => Song::whereHas('album', function ($query) use ($libraryId) {
+            'albums'         => Album::where('library_id', $libraryId)->count(),
+            'songs'          => Song::whereHas('album', function ($query) use ($libraryId) {
                 $query->where('library_id', $libraryId);
             })->count(),
-            'artists' => Artist::whereHas('albums', function ($query) use ($libraryId) {
+            'artists'        => Artist::whereHas('albums', function ($query) use ($libraryId) {
                 $query->where('library_id', $libraryId);
             })->count(),
             'orphaned_songs' => Song::whereHas('album', function ($query) use ($libraryId) {
@@ -371,8 +378,8 @@ class MetadataJobDispatcher
     public function validateIds(array $albumIds = [], array $songIds = [], array $artistIds = []): array
     {
         $results = [
-            'albums' => ['valid' => [], 'invalid' => []],
-            'songs' => ['valid' => [], 'invalid' => []],
+            'albums'  => ['valid' => [], 'invalid' => []],
+            'songs'   => ['valid' => [], 'invalid' => []],
             'artists' => ['valid' => [], 'invalid' => []],
         ];
 
