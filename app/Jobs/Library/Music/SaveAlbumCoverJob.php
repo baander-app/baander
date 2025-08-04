@@ -13,16 +13,15 @@ use Illuminate\Support\Str;
 
 class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
 {
-    public string $logChannel = 'music';
-
-    private Album $album;
 
     /**
      * Create a new job instance.
      */
-    public function __construct(Album $album)
+    public function __construct(
+        private Album $album,
+        private readonly bool $force = false
+    )
     {
-        $this->album = $album;
     }
 
     /**
@@ -41,6 +40,12 @@ class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
     public function handle(): void
     {
         $this->queueProgress(0);
+
+        // Early exit if cover already exists (saves processing time)
+        if ($this->album->cover()->exists() && !$this->force) {
+            $this->queueProgress(100);
+            return;
+        }
 
         try {
             $song = $this->album->songs()->firstOrFail();
@@ -71,6 +76,10 @@ class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
             $this->queueProgress(75);
 
             $this->album->cover()->create($imageData);
+
+            // Mark as recently processed to prevent unnecessary future jobs
+            cache()->put("album_cover_processed_{$this->album->id}", true, now()->addMinutes(10));
+
             $this->queueProgress(100);
         } catch (\Exception $e) {
             Log::error('Failed to save album cover', [
@@ -80,7 +89,8 @@ class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
             ]);
             throw $e;
         } finally {
-            // Clean up resources
+            // Clear the queued flag since job is complete
+            cache()->forget("album_cover_queued_{$this->album->id}");
             unset($this->album);
         }
     }
