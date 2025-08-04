@@ -9,6 +9,7 @@ use App\Modules\Metadata\MediaMeta\MediaMeta;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
 {
@@ -31,7 +32,7 @@ class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
      */
     public function middleware(): array
     {
-        return [new WithoutOverlapping("album_cover_{$this->album->id}")->dontRelease()];
+        return [new WithoutOverlapping("album_cover_{$this->album->id}")];
     }
 
     /**
@@ -87,7 +88,7 @@ class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
     private function createImage(Apic $artwork): array
     {
         $extension = $this->detectFileExtension($artwork->getImageData());
-        $fileName = $this->album->title . '_' . Apic::$types[$artwork->getImageType()];
+        $fileName = Str::replace(['/', '\\'], '', Str::ascii($this->album->title)) . '_' . Apic::$types[$artwork->getImageType()];
         $destination = config('image.storage.covers') . DIRECTORY_SEPARATOR . $fileName . '.' . $extension;
 
         \File::put($destination, $artwork->getImageData());

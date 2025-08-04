@@ -21,8 +21,6 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
     public const string GENRE_SEPARATOR = ';';
     private const int BATCH_SIZE = 50;
 
-    public string $logChannel = 'music';
-
     public function __construct(
         public string  $directory,
         public Library $library,
@@ -38,7 +36,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
     public function middleware(): array
     {
         $sha = hash('sha256', $this->directory);
-        return [new WithoutOverlapping("scan_music_directory_$sha")->dontRelease()];
+        return [new WithoutOverlapping("scan_music_directory_$sha")];
     }
 
     /**
@@ -180,7 +178,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
     {
         $title = $albumTitle;
         $album = Album::whereTitle($title)->whereLibraryId($this->library->id)->first();
-        $fallback = $this->isSongInBaseDirectory($directoryName) ? LocaleString::delimitString('library.album.fallback') : $directoryName;
+        $fallback = $this->isSongInBaseDirectory($directoryName) ? LocaleString::delimitString('library.album.unknown') : $directoryName;
 
         if (!$album) {
             $album = new Album([
@@ -211,7 +209,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         }
 
         return [
-            'title'         => $mediaMeta->getTitle() ?? $file->getBasename(),
+            'title'         => $mediaMeta->getTitle() ?? $file->getBasename() ?? LocaleString::delimitString('library.song.unknown'),
             'track'         => $mediaMeta->getTrackNumber(),
             'length'        => $mediaMeta->probeLength(),
             'lyrics'        => $lyric ? StrExt::convertToUtf8($lyric) : null,

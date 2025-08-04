@@ -18,7 +18,7 @@ class SyncSmartPlaylists extends BaseJob implements ShouldQueue
 
     public function middleware(): array
     {
-        return [new WithoutOverlapping('sync_smart_playlists')->dontRelease()];
+        return [new WithoutOverlapping('sync_smart_playlists')];
     }
 
     /**
