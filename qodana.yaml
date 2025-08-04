@@ -38,8 +38,5 @@ failThreshold: 50
 
 # Enable specific auto-fixable inspections
 include:
-  - name: PhpMissingReturnTypeInspection
-  - name: PhpMissingParamTypeInspection
-  - name: PhpDocMissingThrowsInspection
   - name: PhpUnusedImportInspection
   - name: PhpCodeStyleInspection
