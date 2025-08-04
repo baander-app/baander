@@ -17,8 +17,10 @@ class SyncAlbumMetadataJob extends BaseJob implements ShouldQueue
 
     public function __construct(
         private readonly int  $albumId,
-        private readonly bool $forceUpdate = false
-    ) {}
+        private readonly bool $forceUpdate = false,
+    )
+    {
+    }
 
     public function handle(): void
     {
@@ -33,33 +35,34 @@ class SyncAlbumMetadataJob extends BaseJob implements ShouldQueue
         try {
             $results = $metadataSyncService->syncAlbum($album);
 
-            // Lower the threshold from 0.7 to 0.5 and add more context
             if ($results['quality_score'] >= 0.5) {
                 $this->updateAlbumMetadata($album, $results);
 
                 $this->logger()->info('Album metadata synced successfully', [
-                    'album_id' => $album->id,
-                    'source' => $results['source'],
-                    'quality_score' => $results['quality_score']
+                    'album_id'      => $album->id,
+                    'mbid'          => $album->mbid,
+                    'discogs_id'    => $album->discogs_id,
+                    'source'        => $results['source'],
+                    'quality_score' => $results['quality_score'],
                 ]);
             } else {
                 // Also log what the album data looks like for debugging
                 $this->logger()->warning('Album metadata sync rejected due to low quality', [
-                    'album_id' => $album->id,
+                    'album_id'      => $album->id,
                     'quality_score' => $results['quality_score'],
-                    'source' => $results['source'],
-                    'album_title' => $album->title,
+                    'source'        => $results['source'],
+                    'album_title'   => $album->title,
                     'album_artists' => $album->artists->pluck('name')->toArray(),
-                    'has_year' => !empty($album->year),
-                    'songs_count' => $album->songs()->count()
+                    'has_year'      => !empty($album->year),
+                    'songs_count'   => $album->songs()->count(),
                 ]);
             }
 
         } catch (\Exception|\Error $e) {
             $this->logger()->error('Album metadata sync job failed', [
                 'album_id' => $this->albumId,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'error'    => $e->getMessage(),
+                'trace'    => $e->getTraceAsString(),
             ]);
 
             throw $e;
@@ -69,8 +72,7 @@ class SyncAlbumMetadataJob extends BaseJob implements ShouldQueue
 
     private function updateAlbumMetadata(Album $album, array $results): void
     {
-        // Update album if data is present and force update is enabled or current data is missing
-        if ($results['album'] && ($this->forceUpdate || !$album->year)) {
+        if ($results['album']) {
             $updateData = [];
 
             // Update year if available
@@ -87,16 +89,20 @@ class SyncAlbumMetadataJob extends BaseJob implements ShouldQueue
                 }
             }
 
-            // Update MusicBrainz ID if available
+            // Update MusicBrainz ID if available and album doesn't have it
             if (isset($results['album']['mbid']) && $results['album']['mbid']) {
-                if ($this->forceUpdate || !$album->mbid) {
+                if (!$album->mbid) {
+                    $updateData['mbid'] = $results['album']['mbid'];
+                } elseif ($this->forceUpdate) {
                     $updateData['mbid'] = $results['album']['mbid'];
                 }
             }
 
-            // Update Discogs ID if available
+            // Update Discogs ID if available and album doesn't have it
             if (isset($results['album']['discogs_id']) && $results['album']['discogs_id']) {
-                if ($this->forceUpdate || !$album->discogs_id) {
+                if (!$album->discogs_id) {
+                    $updateData['discogs_id'] = $results['album']['discogs_id'];
+                } elseif ($this->forceUpdate) {
                     $updateData['discogs_id'] = $results['album']['discogs_id'];
                 }
             }

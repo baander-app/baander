@@ -18,8 +18,6 @@ abstract class BaseJob
         SerializesModels,
         IsMonitored;
 
-    public string $logChannel = 'jobs';
-
     protected function logger(): LoggerInterface
     {
         return Log::channel('stdout');

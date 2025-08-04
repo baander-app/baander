@@ -22,8 +22,8 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
     private const int BATCH_SIZE = 50;
 
     public function __construct(
-        public string  $directory,
-        public Library $library,
+        private string  $directory,
+        private Library $library,
     )
     {
     }

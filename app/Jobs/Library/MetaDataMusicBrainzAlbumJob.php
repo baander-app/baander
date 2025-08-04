@@ -25,7 +25,7 @@ class MetaDataMusicBrainzAlbumJob extends BaseJob implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct(public Album $album)
+    public function __construct(private Album $album)
     {
         //
     }
@@ -61,7 +61,7 @@ class MetaDataMusicBrainzAlbumJob extends BaseJob implements ShouldQueue
         }
 
         $artists = $this->processCredits($release->getArtistCredits());
-        $this->album->artist()->sync($artists);
+        $this->album->artists()->sync($artists);
 
 
         $this->album->update();

@@ -12,14 +12,14 @@ use Illuminate\Support\LazyCollection;
 
 class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
 {
-    public function __construct(public Library $library)
+    public function __construct(private Library $library)
     {
     }
 
     public function middleware(): array
     {
         // Release after 30 minutes if now complete
-        return [new WithoutOverlapping($this->library->id)->releaseAfter(900)];
+        return [new WithoutOverlapping($this->library->id)];
     }
 
     public function handle(): void

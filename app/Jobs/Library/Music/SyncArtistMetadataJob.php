@@ -75,16 +75,21 @@ class SyncArtistMetadataJob extends BaseJob implements ShouldQueue
             $highConfidence = $results['quality_score'] >= 0.8;
 
             if (isset($results['artist']['mbid']) && $results['artist']['mbid']) {
-                if ($this->forceUpdate || !$artist->mbid || $highConfidence) {
+                if (!$artist->mbid) {
                     $updateData['mbid'] = $results['artist']['mbid'];
                     $identifiersUpdated = true;
+                } elseif ($this->forceUpdate || $highConfidence) {
+                    $updateData['mbid'] = $results['artist']['mbid'];
                 }
             }
 
             if (isset($results['artist']['discogs_id']) && $results['artist']['discogs_id']) {
-                if ($this->forceUpdate || !$artist->discogs_id || $highConfidence) {
+                // Always update if artist doesn't have discogs_id, or if force update, or if high confidence
+                if (!$artist->mbid) {
                     $updateData['discogs_id'] = $results['artist']['discogs_id'];
                     $identifiersUpdated = true;
+                } elseif ($this->forceUpdate || $highConfidence) {
+                    $updateData['discogs_id'] = $results['artist']['discogs_id'];
                 }
             }
 
@@ -158,10 +163,9 @@ class SyncArtistMetadataJob extends BaseJob implements ShouldQueue
             }
         }
 
-
-//        if (!empty($results['aliases'])) {
-//            $this->updateArtistAliases($artist, $results['aliases']);
-//        }
+        //        if (!empty($results['aliases'])) {
+        //            $this->updateArtistAliases($artist, $results['aliases']);
+        //        }
     }
 
     private function updateArtistAliases(Artist $artist, array $aliases): void

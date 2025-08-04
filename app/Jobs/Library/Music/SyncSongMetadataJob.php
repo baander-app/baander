@@ -16,9 +16,11 @@ class SyncSongMetadataJob extends BaseJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public function __construct(
-        private readonly int $songId,
-        private readonly bool $forceUpdate = false
-    ) {}
+        private readonly int  $songId,
+        private readonly bool $forceUpdate = false,
+    )
+    {
+    }
 
     public function handle(): void
     {
@@ -37,21 +39,23 @@ class SyncSongMetadataJob extends BaseJob implements ShouldQueue
                 $this->updateSongMetadata($song, $results);
 
                 $this->logger()->info('Song metadata synced successfully', [
-                    'song_id' => $song->id,
-                    'source' => $results['source'],
-                    'quality_score' => $results['quality_score']
+                    'song_id'       => $song->id,
+                    'mbid'          => $song->mbid,
+                    'discogs_id'    => $song->discogs_id,
+                    'source'        => $results['source'],
+                    'quality_score' => $results['quality_score'],
                 ]);
             } else {
                 $this->logger()->warning('Song metadata sync rejected due to low quality', [
-                    'song_id' => $song->id,
-                    'quality_score' => $results['quality_score']
+                    'song_id'       => $song->id,
+                    'quality_score' => $results['quality_score'],
                 ]);
             }
 
         } catch (\Exception $e) {
             $this->logger()->error('Song metadata sync job failed', [
                 'song_id' => $this->songId,
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage(),
             ]);
 
             throw $e;
@@ -66,6 +70,24 @@ class SyncSongMetadataJob extends BaseJob implements ShouldQueue
         if ($results['song']) {
             if (($this->forceUpdate || !$song->length) && isset($results['song']['length'])) {
                 $updateData['length'] = $results['song']['length'];
+            }
+
+            // Update MusicBrainz ID if available and song doesn't have it
+            if (isset($results['song']['mbid']) && $results['song']['mbid']) {
+                if (!$song->mbid) {
+                    $updateData['mbid'] = $results['song']['mbid'];
+                } elseif ($this->forceUpdate) {
+                    $updateData['mbid'] = $results['song']['mbid'];
+                }
+            }
+
+            // Update Discogs ID if available and song doesn't have it
+            if (isset($results['song']['discogs_id']) && $results['song']['discogs_id']) {
+                if (!$song->discogs_id) {
+                    $updateData['discogs_id'] = $results['song']['discogs_id'];
+                } elseif ($this->forceUpdate) {
+                    $updateData['discogs_id'] = $results['song']['discogs_id'];
+                }
             }
         }
 
