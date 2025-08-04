@@ -67,6 +67,7 @@
       "ext-exif": "*"
     },
     "require-dev": {
+        "barryvdh/laravel-ide-helper": "^3.6",
         "cweagans/composer-patches": "^1.7",
         "doctrine/dbal": "^4.2.2",
         "fakerphp/faker": "^v1.24.1",

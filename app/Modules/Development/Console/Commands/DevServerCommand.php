@@ -2,7 +2,8 @@
 
 namespace App\Modules\Development\Console\Commands;
 
-use FilesystemIterator;
+use App\Modules\Filesystem\FileWatcher;
+use App\Modules\Filesystem\Exceptions\InotifyException;
 use Illuminate\Console\Command;
 use Symfony\Component\Process\Process;
 
@@ -13,6 +14,7 @@ class DevServerCommand extends Command
 
     private array $processes = [];
     private bool $running = true;
+    private ?FileWatcher $fileWatcher = null;
 
     // Constants for better performance and maintainability
     private const string PHP_PATH = '/usr/local/bin/php';
@@ -26,8 +28,6 @@ class DevServerCommand extends Command
         '/var/www/html/database',
     ];
 
-    private const int WATCH_MASK = IN_MODIFY | IN_CREATE | IN_DELETE | IN_MOVE;
-
     private const array COLORS = [
         'octane'    => "\033[34m",     // Blue
         'queue'     => "\033[32m",      // Green
@@ -37,22 +37,18 @@ class DevServerCommand extends Command
 
     private const string RESET = "\033[0m";
 
-    /**
-     * @var false|resource
-     */
-    private $inotifyResource;
-    private array $watchDescriptors = [];
-
     public function handle(): int
     {
         if ($this->option('stop')) {
             return $this->stopServer();
         }
 
-        // Check if inotify extension is available
-        if (!extension_loaded('inotify')) {
-            $this->error('inotify extension not available. Using fallback method.');
-            return $this->handleWithoutInotify();
+        // Initialize file watcher
+        $this->fileWatcher = new FileWatcher();
+
+        if (!$this->fileWatcher->isAvailable()) {
+            $this->error('File watching not available. Using fallback method.');
+            return $this->handleWithoutFileWatching();
         }
 
         // Register signal handlers for graceful shutdown
@@ -117,60 +113,50 @@ class DevServerCommand extends Command
 
     private function initializeFileWatcher(): void
     {
-        $this->inotifyResource = inotify_init();
-        stream_set_blocking($this->inotifyResource, false);
+        try {
+            $this->fileWatcher->start();
 
-        foreach (self::WATCH_PATHS as $path) {
-            if (is_dir($path)) {
-                $this->addWatchRecursive($path);
-            }
-        }
-
-        $this->info('[File Watcher] Watching ' . count($this->watchDescriptors) . ' directories for changes');
-    }
-
-    private function addWatchRecursive(string $path): void
-    {
-        $wd = inotify_add_watch($this->inotifyResource, $path, self::WATCH_MASK);
-
-        if ($wd) {
-            $this->watchDescriptors[$wd] = $path;
-        }
-
-        // Use more efficient directory iteration
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::SELF_FIRST,
-        );
-
-        foreach ($iterator as $file) {
-            if ($file->isDir()) {
-                $wd = inotify_add_watch($this->inotifyResource, $file->getPathname(), self::WATCH_MASK);
-
-                if ($wd) {
-                    $this->watchDescriptors[$wd] = $file->getPathname();
+            $totalWatches = 0;
+            foreach (self::WATCH_PATHS as $path) {
+                if (is_dir($path)) {
+                    $watchCount = $this->fileWatcher->watch($path, ['IN_MODIFY', 'IN_CREATE', 'IN_DELETE'], true);
+                    $totalWatches += $watchCount;
                 }
             }
+
+            // Add callback for PHP file changes
+            $this->fileWatcher->onEvent(function (string $path, array $event) {
+                $filename = $event['name'] ?? '';
+                if (str_ends_with($filename, '.php')) {
+                    $this->info("[File Watcher] PHP file changed: $path/$filename");
+                    $this->scheduleQueueRestart();
+                }
+            });
+
+            $this->info("[File Watcher] Watching $totalWatches directories for changes");
+        } catch (InotifyException $e) {
+            $this->error("Failed to initialize file watcher: " . $e->getMessage());
         }
+    }
+
+    private bool $queueRestartScheduled = false;
+
+    private function scheduleQueueRestart(): void
+    {
+        $this->queueRestartScheduled = true;
     }
 
     private function checkForFileChanges(): bool
     {
-        $events = inotify_read($this->inotifyResource);
-
-        if (!$events) {
+        if (!$this->fileWatcher) {
             return false;
         }
 
-        foreach ($events as $event) {
-            $filename = $event['name'] ?? '';
+        $eventCount = $this->fileWatcher->poll();
 
-            // Quick extension check without pathinfo
-            if (str_ends_with($filename, '.php')) {
-                $path = $this->watchDescriptors[$event['wd']] ?? 'unknown';
-                $this->info("[File Watcher] PHP file changed: $path/$filename");
-                return true;
-            }
+        if ($this->queueRestartScheduled) {
+            $this->queueRestartScheduled = false;
+            return true;
         }
 
         return false;
@@ -334,91 +320,67 @@ SHELL;
 
         // Display regular output with original colors intact
         if (!empty($output)) {
-            $lines = explode("\n", rtrim($output, "\n"));
-            foreach ($lines as $line) {
-                if (!empty(trim($line))) {
-                    $this->outputOriginalLine($name, $line);
-                }
-            }
+            $this->displayColoredOutput($name, $output, false);
         }
 
-        // Display error output with original colors intact
+        // Display error output
         if (!empty($errorOutput)) {
-            $lines = explode("\n", rtrim($errorOutput, "\n"));
-            foreach ($lines as $line) {
-                if (!empty(trim($line))) {
-                    $this->outputOriginalLine($name, $line);
-                }
-            }
+            $this->displayColoredOutput($name, $errorOutput, true);
         }
     }
 
-    private function outputOriginalLine(string $name, string $line): void
+    private function displayColoredOutput(string $name, string $output, bool $isError = false): void
     {
-        $timestamp = now()->format('H:i:s');
         $color = self::COLORS[$name] ?? self::COLORS['default'];
+        $prefix = $isError ? "[ERROR-$name]" : "[$name]";
 
-        // Single write operation for better performance
-        $this->output->write("$color[$timestamp] [$name]" . self::RESET . " $line\n");
-    }
-
-    private function gracefullyRestartQueueProcess(): void
-    {
-        if (isset($this->processes['queue'])) {
-            // Gracefully terminate the queue process
-            $this->processes['queue']->signal(SIGTERM);
-
-            // Wait up to 10 seconds for a graceful shutdown
-            $timeout = 10;
-            while ($this->processes['queue']->isRunning() && $timeout > 0) {
-                usleep(500000); // 0.5 seconds
-                $timeout--;
+        $lines = explode("\n", trim($output));
+        foreach ($lines as $line) {
+            if (!empty($line)) {
+                echo $color . $prefix . ' ' . $line . self::RESET . "\n";
             }
-
-            // Force kill if still running
-            if ($this->processes['queue']->isRunning()) {
-                $this->processes['queue']->signal(SIGKILL);
-            }
-
-            // Start new queue process
-            $this->processes['queue'] = $this->createQueueProcess();
-            $this->processes['queue']->start();
-            $this->info('[Queue] Worker restarted successfully');
         }
     }
 
     private function restartProcess(string $name): void
     {
-        if (!isset($this->processes[$name])) {
-            return;
+        if (isset($this->processes[$name])) {
+            $this->processes[$name]->stop();
         }
 
-        // Stop the existing process
-        if ($this->processes[$name]->isRunning()) {
-            $this->processes[$name]->signal(SIGTERM);
-
-            // Wait for a graceful shutdown
-            $timeout = 5;
-            while ($this->processes[$name]->isRunning() && $timeout > 0) {
-                usleep(500000);
-                $timeout--;
-            }
-
-            if ($this->processes[$name]->isRunning()) {
-                $this->processes[$name]->signal(SIGKILL);
-            }
+        switch ($name) {
+            case 'octane':
+                $this->processes[$name] = $this->createOctaneProcess();
+                break;
+            case 'queue':
+                $this->processes[$name] = $this->createQueueProcess();
+                break;
+            case 'scheduler':
+                $this->processes[$name] = $this->createSchedulerProcess();
+                break;
         }
-
-        // Create and start a new process
-        $this->processes[$name] = match ($name) {
-            'octane' => $this->createOctaneProcess(),
-            'queue' => $this->createQueueProcess(),
-            'scheduler' => $this->createSchedulerProcess(),
-            default => throw new \InvalidArgumentException("Unknown process: $name")
-        };
 
         $this->processes[$name]->start();
-        $this->info("[$name] Process restarted successfully");
+        $this->info("[$name] Process restarted");
+    }
+
+    private function gracefullyRestartQueueProcess(): void
+    {
+        if (isset($this->processes['queue'])) {
+            // Send SIGTERM for graceful shutdown
+            $this->processes['queue']->signal(SIGTERM);
+
+            // Wait a bit for graceful shutdown
+            sleep(2);
+
+            if ($this->processes['queue']->isRunning()) {
+                // Force kill if still running
+                $this->processes['queue']->stop();
+            }
+
+            // Restart the process
+            $this->restartProcess('queue');
+        }
     }
 
     private function stopAllProcesses(): void
@@ -430,94 +392,49 @@ SHELL;
                 $this->info("Stopping $name...");
                 $process->signal(SIGTERM);
 
-                // Wait for a graceful shutdown
-                $timeout = 10;
-                while ($process->isRunning() && $timeout > 0) {
-                    usleep(500000);
-                    $timeout--;
-                }
+                // Wait for graceful shutdown
+                sleep(1);
 
-                // Force kill if needed
                 if ($process->isRunning()) {
-                    $process->signal(SIGKILL);
-                    $this->warn("$name was force killed");
-                } else {
-                    $this->info("$name stopped gracefully");
+                    $process->stop();
                 }
             }
         }
 
         // Clean up file watcher
-        if ($this->inotifyResource) {
-            foreach ($this->watchDescriptors as $wd => $path) {
-                inotify_rm_watch($this->inotifyResource, $wd);
-            }
-            fclose($this->inotifyResource);
-        }
+        $this->fileWatcher?->stop();
 
-        // Clean up a scheduler script
-        $schedulerScript = storage_path('app/scheduler.sh');
-        if (file_exists($schedulerScript)) {
-            unlink($schedulerScript);
-        }
-
-        $this->info('All processes stopped successfully');
+        $this->info('All processes stopped.');
     }
 
     private function stopServer(): int
     {
         $this->info('Stopping development server...');
 
-        // Kill any running processes by looking for our specific commands
-        $processes = [
-            'octane:start' => 'Octane server',
-            'queue:work'   => 'Queue worker',
-            'schedule:run' => 'Scheduler',
-        ];
+        // Kill processes by name
+        $processes = ['octane:start', 'queue:work', 'schedule:run'];
 
-        foreach ($processes as $command => $description) {
-            $pids = shell_exec("pgrep -f '$command' 2>/dev/null");
-            if ($pids) {
-                $pidArray = array_filter(explode("\n", trim($pids)));
-                foreach ($pidArray as $pid) {
-                    if (is_numeric($pid)) {
-                        posix_kill((int)$pid, SIGTERM);
-                        $this->info("Stopped $description (PID: $pid)");
-                    }
-                }
+        foreach ($processes as $processName) {
+            $command = ['pkill', '-f', $processName];
+            $process = new Process($command);
+            $process->run();
+
+            if ($process->isSuccessful()) {
+                $this->info("Stopped processes matching: $processName");
             }
         }
 
-        // Clean up scheduler script
-        $schedulerScript = storage_path('app/scheduler.sh');
-        if (file_exists($schedulerScript)) {
-            unlink($schedulerScript);
-        }
-
-        $this->info('Development server stopped');
         return 0;
     }
 
-    private function handleWithoutInotify(): int
+    private function handleWithoutFileWatching(): int
     {
         $this->info('Starting development server without file watching...');
-        $this->info('Press Ctrl+C to stop all processes');
-        $this->line('');
-
-        // Register signal handlers for graceful shutdown
-        if (function_exists('pcntl_signal')) {
-            pcntl_signal(SIGTERM, [$this, 'pcntlSignalHandler']);
-            pcntl_signal(SIGINT, [$this, 'pcntlSignalHandler']);
-            pcntl_async_signals(true);
-        }
-
         $this->startAllProcesses();
 
-        // Simple monitoring without file watching
         while ($this->running) {
             $this->monitorProcesses();
-
-            usleep(500000); // 0.5 seconds (longer interval without file watching)
+            sleep(1);
         }
 
         $this->stopAllProcesses();
