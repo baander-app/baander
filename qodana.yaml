@@ -1,4 +1,3 @@
-
 version: "1.0"
 linter: jetbrains/qodana-php:2025.1
 
@@ -7,6 +6,10 @@ profile:
 
 php:
   version: "8.4"
+
+bootstrap: |+
+  set -eu
+  composer require --dev barryvdh/laravel-ide-helper
 
 exclude:
   - name: All
