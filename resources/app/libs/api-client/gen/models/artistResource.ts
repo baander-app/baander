@@ -16,8 +16,8 @@ import type { ArtistResourceUpdatedAt } from "./artistResourceUpdatedAt";
 import type { ImageResource } from "./imageResource";
 
 export interface ArtistResource {
+  publicId: string;
   name: string;
-  slug: string;
   createdAt: ArtistResourceCreatedAt;
   updatedAt: ArtistResourceUpdatedAt;
   /** Portrait relation */

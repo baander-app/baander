@@ -23,8 +23,8 @@ class ArtistResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
+            'publicId'  => $this->public_id,
             'name'      => $this->name,
-            'slug'      => $this->slug,
             'createdAt' => $this->created_at,
             'updatedAt' => $this->updated_at,
             /**

@@ -197,7 +197,6 @@ return [
             'status'       => 'string:20',
             'finished_at'  => 'int',
         ],
-
     ],
 
     /*

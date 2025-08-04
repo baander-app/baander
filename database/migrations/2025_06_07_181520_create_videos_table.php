@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('videos', function (Blueprint $table) {
             $table->id();
+            $table->text('public_id')->unique('idx_videos_public_id');
 
             $table->text('path');
             $table->text('hash')->unique();

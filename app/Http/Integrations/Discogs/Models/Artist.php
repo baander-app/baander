@@ -18,7 +18,7 @@ class Artist extends Model
         public ?array $urls = null,
         public ?array $members = null,
         public ?string $data_quality = null,
-        public ?string $namevariations = null,
+        public ?array $namevariations = null,
         public ?array $aliases = null,
         public ?int $releases_count = null
     ) {

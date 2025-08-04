@@ -26,7 +26,6 @@ class ArtistIndexRequest extends FormRequest
              * @query
              * Comma seperated string of fields you want to select. If nothing is defined `select *` is default.
              * - title
-             * - slug
              */
             'fields'    => 'string',
             /**

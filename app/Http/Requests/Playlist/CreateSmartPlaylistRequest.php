@@ -22,16 +22,16 @@ class CreateSmartPlaylistRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name'                    => 'required|string|max:255',
-            'description'             => 'nullable|string',
-            'is_public'               => 'sometimes|boolean',
-            'rules'                   => 'required|array',
-            'rules.*'                 => 'array',
-            'rules.*.operator'        => 'sometimes|string|in:and,or',
-            'rules.*.rules'           => 'required|array',
-            'rules.*.rules.*.field'   => 'required|string',
+            'name'                     => 'required|string|max:255',
+            'description'              => 'nullable|string',
+            'isPublic'                 => 'sometimes|boolean',
+            'rules'                    => 'required|array',
+            'rules.*'                  => 'array',
+            'rules.*.operator'         => 'sometimes|string|in:and,or',
+            'rules.*.rules'            => 'required|array',
+            'rules.*.rules.*.field'    => 'required|string',
             'rules.*.rules.*.operator' => 'required|string',
-            'rules.*.rules.*.value'   => 'required',
+            'rules.*.rules.*.value'    => 'required',
         ];
     }
 }

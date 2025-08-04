@@ -45,7 +45,6 @@ import type {
   AuthForgotPassword200,
   AuthLogin200,
   AuthLogin401,
-  AuthLogoutBody,
   AuthPasskeyLogin200,
   AuthPasskeyLogin401,
   AuthPasskeyOptions200,
@@ -64,6 +63,7 @@ import type {
   AuthenticationExceptionResponse,
   ForgotPasswordRequest,
   LoginRequest,
+  LogoutRequest,
   ModelNotFoundExceptionResponse,
   RegisterRequest,
   ResetPasswordRequest,
@@ -1401,7 +1401,7 @@ export const useAuthVerifyEmail = <
  * @summary Logout
  */
 export const authLogout = (
-  authLogoutBody: BodyType<AuthLogoutBody>,
+  logoutRequest: BodyType<LogoutRequest>,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
@@ -1410,7 +1410,7 @@ export const authLogout = (
       url: `/api/auth/logout`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      data: authLogoutBody,
+      data: logoutRequest,
       signal,
     },
     options
@@ -1426,14 +1426,14 @@ export const getAuthLogoutMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof authLogout>>,
     TError,
-    { data: BodyType<AuthLogoutBody> },
+    { data: BodyType<LogoutRequest> },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof authLogout>>,
   TError,
-  { data: BodyType<AuthLogoutBody> },
+  { data: BodyType<LogoutRequest> },
   TContext
 > => {
   const mutationKey = ["authLogout"];
@@ -1447,7 +1447,7 @@ export const getAuthLogoutMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof authLogout>>,
-    { data: BodyType<AuthLogoutBody> }
+    { data: BodyType<LogoutRequest> }
   > = (props) => {
     const { data } = props ?? {};
 
@@ -1460,7 +1460,7 @@ export const getAuthLogoutMutationOptions = <
 export type AuthLogoutMutationResult = NonNullable<
   Awaited<ReturnType<typeof authLogout>>
 >;
-export type AuthLogoutMutationBody = BodyType<AuthLogoutBody>;
+export type AuthLogoutMutationBody = BodyType<LogoutRequest>;
 export type AuthLogoutMutationError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
@@ -1478,7 +1478,7 @@ export const useAuthLogout = <
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof authLogout>>,
       TError,
-      { data: BodyType<AuthLogoutBody> },
+      { data: BodyType<LogoutRequest> },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1487,7 +1487,7 @@ export const useAuthLogout = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof authLogout>>,
   TError,
-  { data: BodyType<AuthLogoutBody> },
+  { data: BodyType<LogoutRequest> },
   TContext
 > => {
   const mutationOptions = getAuthLogoutMutationOptions(options);

@@ -13,13 +13,13 @@ The media information is organized and easily searchable, ensuring users can alw
  */
 
 export interface ImageResource {
-  public_id: string;
+  publicId: string;
   path: string;
   extension: string;
   size: number;
-  mime_type: string;
+  mimeType: string;
   width: number;
   height: number;
-  blurhash: string;
+  blurash: string;
   url: string;
 }

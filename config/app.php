@@ -179,6 +179,7 @@ return [
         \App\Modules\OpenTelemetry\OpenTelemetryServiceProvider::class,
         \App\Modules\OpenTelemetry\Instrumentation\LaravelInstrumentation::class,
         App\Providers\FortifyServiceProvider::class,
+        App\Modules\TextSimilarity\TextSimilarityServiceProvider::class,
 
         /*
          * Application Service Providers...

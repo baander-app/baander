@@ -24,9 +24,11 @@ class AlbumResource extends AlbumWithoutSongsResource
     public function toArray(Request $request): array
     {
         return [
+            'publicId'  => $this->public_id,
             'title'     => $this->title,
-            'slug'      => $this->slug,
             'year'      => $this->year,
+            'mbid'      => $this->mbid,
+            'discogsId' => $this->discogs_id,
             'createdAt' => $this->created_at,
             'updatedAt' => $this->updated_at,
             /**
@@ -48,8 +50,7 @@ class AlbumResource extends AlbumWithoutSongsResource
              * }[]
              */
             'genres'    => $this->whenLoaded('songs', function () {
-                return $this->songs->flatMap(fn($song) => $song->genres)->unique('id')->values()->map(fn($genre)
-                    => [
+                return $this->songs->flatMap(fn($song) => $song->genres)->unique('id')->values()->map(fn($genre) => [
                     'slug' => $genre->slug,
                     'name' => $genre->name,
                 ]);

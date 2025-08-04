@@ -12,6 +12,8 @@ The media information is organized and easily searchable, ensuring users can alw
  * OpenAPI spec version: 0.0.1
  */
 import type { AlbumResourceYear } from "./albumResourceYear";
+import type { AlbumResourceMbid } from "./albumResourceMbid";
+import type { AlbumResourceDiscogsId } from "./albumResourceDiscogsId";
 import type { AlbumResourceCreatedAt } from "./albumResourceCreatedAt";
 import type { AlbumResourceUpdatedAt } from "./albumResourceUpdatedAt";
 import type { ImageResource } from "./imageResource";
@@ -20,9 +22,11 @@ import type { SongResource } from "./songResource";
 import type { AlbumResourceGenresItem } from "./albumResourceGenresItem";
 
 export interface AlbumResource {
+  publicId: string;
   title: string;
-  slug: string;
   year: AlbumResourceYear;
+  mbid: AlbumResourceMbid;
+  discogsId: AlbumResourceDiscogsId;
   createdAt: AlbumResourceCreatedAt;
   updatedAt: AlbumResourceUpdatedAt;
   /** Cover relation */

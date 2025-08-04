@@ -22,6 +22,7 @@ abstract class Handler
 
     protected function fetchEndpoint(string $endpoint, array $params = []): ?array
     {
+        $params += ['fmt' => 'json'];
         $lock = Cache::lock(self::RATE_LIMIT_LOCK_KEY, self::LOCK_TIMEOUT);
 
         try {
@@ -39,6 +40,7 @@ abstract class Handler
             Cache::put(self::RATE_LIMIT_CACHE_KEY, microtime(true), 60);
 
             $headers = [
+                'Accept' => 'application/json',
                 'User-Agent' => Baander::getPeerName(),
             ];
 

@@ -79,7 +79,7 @@ class User extends Authenticatable implements HasPasskeys
 
         $attributes = [
             'name'            => $name,
-            'token'           => hash('sha256', $plainTextToken),
+            'token'           => hash('xxh3', $plainTextToken),
             'broadcast_token' => $broadcastToken,
             'abilities'       => $abilities,
             'expires_at'      => $expiresAt,

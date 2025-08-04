@@ -12,6 +12,7 @@ return new class extends Migration {
     {
         Schema::create('albums', function (Blueprint $table) {
             $table->id();
+            $table->text('public_id')->unique('idx_albums_public_id');
 
             $table->foreignId('library_id')
                 ->references('id')
@@ -20,7 +21,6 @@ return new class extends Migration {
                 ->cascadeOnUpdate();
 
             $table->caseInsensitiveText('title');
-            $table->text('slug')->unique();
 
             $table->integer('year')->nullable()->comment('The year the album was released');
 

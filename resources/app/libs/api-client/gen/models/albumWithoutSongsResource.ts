@@ -18,8 +18,8 @@ import type { ImageResource } from "./imageResource";
 import type { ArtistResource } from "./artistResource";
 
 export interface AlbumWithoutSongsResource {
+  publicId: string;
   title: string;
-  slug: string;
   year: AlbumWithoutSongsResourceYear;
   createdAt: AlbumWithoutSongsResourceCreatedAt;
   updatedAt: AlbumWithoutSongsResourceUpdatedAt;

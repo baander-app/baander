@@ -2,14 +2,12 @@
 
 namespace App\Models;
 
-use App\Models\BaseModel;
+use App\Modules\Nanoid\Concerns\HasNanoPublicId;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Spatie\Sluggable\HasSlug;
-use Spatie\Sluggable\SlugOptions;
 
 class Movie extends BaseModel
 {
-    use HasFactory, HasSlug;
+    use HasFactory, HasNanoPublicId;
 
     protected $fillable = [
         'title',
@@ -17,19 +15,9 @@ class Movie extends BaseModel
         'summary',
     ];
 
-    /**
-     * Get the options for generating the slug.
-     */
-    public function getSlugOptions(): SlugOptions
-    {
-        return SlugOptions::create()
-            ->generateSlugsFrom(['title', 'year'])
-            ->saveSlugsTo('slug');
-    }
-
     public function getRouteKeyName(): string
     {
-        return 'slug';
+        return 'public_id';
     }
 
     public function library()

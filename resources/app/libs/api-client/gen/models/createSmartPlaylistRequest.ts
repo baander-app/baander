@@ -18,6 +18,6 @@ export interface CreateSmartPlaylistRequest {
   /** @maxLength 255 */
   name: string;
   description?: CreateSmartPlaylistRequestDescription;
-  is_public?: boolean;
+  isPublic?: boolean;
   rules: CreateSmartPlaylistRequestRulesItem[];
 }

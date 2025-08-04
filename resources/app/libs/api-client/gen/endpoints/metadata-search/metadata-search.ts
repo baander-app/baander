@@ -50,13 +50,11 @@ import type { ErrorType } from "../../../axios-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
+ * Looks up album in all providers
  * @summary Search for album
-
-
-Looks up album in all providers
  */
 export const metadataSearchAlbum = (
-  album: string,
+  album: number,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
@@ -66,7 +64,7 @@ export const metadataSearchAlbum = (
   );
 };
 
-export const getMetadataSearchAlbumQueryKey = (album?: string) => {
+export const getMetadataSearchAlbumQueryKey = (album?: number) => {
   return [`/api/metadata/search/album/${album}`] as const;
 };
 
@@ -76,7 +74,7 @@ export const getMetadataSearchAlbumInfiniteQueryOptions = <
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -122,7 +120,7 @@ export function useMetadataSearchAlbumInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
@@ -151,7 +149,7 @@ export function useMetadataSearchAlbumInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -180,7 +178,7 @@ export function useMetadataSearchAlbumInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -197,9 +195,6 @@ export function useMetadataSearchAlbumInfinite<
 };
 /**
  * @summary Search for album
-
-
-Looks up album in all providers
  */
 
 export function useMetadataSearchAlbumInfinite<
@@ -208,7 +203,7 @@ export function useMetadataSearchAlbumInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -246,7 +241,7 @@ export const getMetadataSearchAlbumQueryOptions = <
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -292,7 +287,7 @@ export function useMetadataSearchAlbum<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -321,7 +316,7 @@ export function useMetadataSearchAlbum<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -350,7 +345,7 @@ export function useMetadataSearchAlbum<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -367,9 +362,6 @@ export function useMetadataSearchAlbum<
 };
 /**
  * @summary Search for album
-
-
-Looks up album in all providers
  */
 
 export function useMetadataSearchAlbum<
@@ -378,7 +370,7 @@ export function useMetadataSearchAlbum<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -411,7 +403,7 @@ export const getMetadataSearchAlbumSuspenseQueryOptions = <
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
@@ -452,7 +444,7 @@ export function useMetadataSearchAlbumSuspense<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
@@ -473,7 +465,7 @@ export function useMetadataSearchAlbumSuspense<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
@@ -494,7 +486,7 @@ export function useMetadataSearchAlbumSuspense<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
@@ -511,9 +503,6 @@ export function useMetadataSearchAlbumSuspense<
 };
 /**
  * @summary Search for album
-
-
-Looks up album in all providers
  */
 
 export function useMetadataSearchAlbumSuspense<
@@ -522,7 +511,7 @@ export function useMetadataSearchAlbumSuspense<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
@@ -560,7 +549,7 @@ export const getMetadataSearchAlbumSuspenseInfiniteQueryOptions = <
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
@@ -605,7 +594,7 @@ export function useMetadataSearchAlbumSuspenseInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
@@ -626,7 +615,7 @@ export function useMetadataSearchAlbumSuspenseInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
@@ -647,7 +636,7 @@ export function useMetadataSearchAlbumSuspenseInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
@@ -664,9 +653,6 @@ export function useMetadataSearchAlbumSuspenseInfinite<
 };
 /**
  * @summary Search for album
-
-
-Looks up album in all providers
  */
 
 export function useMetadataSearchAlbumSuspenseInfinite<
@@ -675,7 +661,7 @@ export function useMetadataSearchAlbumSuspenseInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
@@ -708,12 +694,11 @@ export function useMetadataSearchAlbumSuspenseInfinite<
 }
 
 /**
+ * Generates title variations based on the album name and then searches in all providers
  * @summary Search for album (fuzzy)
-
-Generates title variations based on the album name and then searches in all providers
  */
 export const metadataSearchFuzzyAlbum = (
-  album: string,
+  album: number,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
@@ -723,7 +708,7 @@ export const metadataSearchFuzzyAlbum = (
   );
 };
 
-export const getMetadataSearchFuzzyAlbumQueryKey = (album?: string) => {
+export const getMetadataSearchFuzzyAlbumQueryKey = (album?: number) => {
   return [`/api/metadata/search/album/${album}/fuzzy`] as const;
 };
 
@@ -733,7 +718,7 @@ export const getMetadataSearchFuzzyAlbumInfiniteQueryOptions = <
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -779,7 +764,7 @@ export function useMetadataSearchFuzzyAlbumInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
@@ -808,7 +793,7 @@ export function useMetadataSearchFuzzyAlbumInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -837,7 +822,7 @@ export function useMetadataSearchFuzzyAlbumInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -854,8 +839,6 @@ export function useMetadataSearchFuzzyAlbumInfinite<
 };
 /**
  * @summary Search for album (fuzzy)
-
-Generates title variations based on the album name and then searches in all providers
  */
 
 export function useMetadataSearchFuzzyAlbumInfinite<
@@ -864,7 +847,7 @@ export function useMetadataSearchFuzzyAlbumInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -902,7 +885,7 @@ export const getMetadataSearchFuzzyAlbumQueryOptions = <
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -948,7 +931,7 @@ export function useMetadataSearchFuzzyAlbum<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -977,7 +960,7 @@ export function useMetadataSearchFuzzyAlbum<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -1006,7 +989,7 @@ export function useMetadataSearchFuzzyAlbum<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -1023,8 +1006,6 @@ export function useMetadataSearchFuzzyAlbum<
 };
 /**
  * @summary Search for album (fuzzy)
-
-Generates title variations based on the album name and then searches in all providers
  */
 
 export function useMetadataSearchFuzzyAlbum<
@@ -1033,7 +1014,7 @@ export function useMetadataSearchFuzzyAlbum<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -1066,7 +1047,7 @@ export const getMetadataSearchFuzzyAlbumSuspenseQueryOptions = <
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
@@ -1107,7 +1088,7 @@ export function useMetadataSearchFuzzyAlbumSuspense<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
@@ -1128,7 +1109,7 @@ export function useMetadataSearchFuzzyAlbumSuspense<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
@@ -1149,7 +1130,7 @@ export function useMetadataSearchFuzzyAlbumSuspense<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
@@ -1166,8 +1147,6 @@ export function useMetadataSearchFuzzyAlbumSuspense<
 };
 /**
  * @summary Search for album (fuzzy)
-
-Generates title variations based on the album name and then searches in all providers
  */
 
 export function useMetadataSearchFuzzyAlbumSuspense<
@@ -1176,7 +1155,7 @@ export function useMetadataSearchFuzzyAlbumSuspense<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
@@ -1214,7 +1193,7 @@ export const getMetadataSearchFuzzyAlbumSuspenseInfiniteQueryOptions = <
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
@@ -1259,7 +1238,7 @@ export function useMetadataSearchFuzzyAlbumSuspenseInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
@@ -1280,7 +1259,7 @@ export function useMetadataSearchFuzzyAlbumSuspenseInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
@@ -1301,7 +1280,7 @@ export function useMetadataSearchFuzzyAlbumSuspenseInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
@@ -1318,8 +1297,6 @@ export function useMetadataSearchFuzzyAlbumSuspenseInfinite<
 };
 /**
  * @summary Search for album (fuzzy)
-
-Generates title variations based on the album name and then searches in all providers
  */
 
 export function useMetadataSearchFuzzyAlbumSuspenseInfinite<
@@ -1328,7 +1305,7 @@ export function useMetadataSearchFuzzyAlbumSuspenseInfinite<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
-  album: string,
+  album: number,
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<

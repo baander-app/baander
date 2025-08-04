@@ -26,20 +26,20 @@ import type { QueueMonitorResourceQueuedAt } from "./queueMonitorResourceQueuedA
 
 export interface QueueMonitorResource {
   id: number;
-  job_id: string;
+  jobId: string;
   name: QueueMonitorResourceName;
   queue: QueueMonitorResourceQueue;
-  started_at: QueueMonitorResourceStartedAt;
-  started_at_exact: QueueMonitorResourceStartedAtExact;
-  finished_at: QueueMonitorResourceFinishedAt;
-  finished_at_exact: QueueMonitorResourceFinishedAtExact;
+  startedAt: QueueMonitorResourceStartedAt;
+  startedAtExact: QueueMonitorResourceStartedAtExact;
+  finishedAt: QueueMonitorResourceFinishedAt;
+  finishedAtExact: QueueMonitorResourceFinishedAtExact;
   attempt: number;
   progress: QueueMonitorResourceProgress;
   exception: QueueMonitorResourceException;
-  exception_class: QueueMonitorResourceExceptionClass;
+  exceptionClass: QueueMonitorResourceExceptionClass;
   data: QueueMonitorResourceData;
   status: string;
-  job_uuid: QueueMonitorResourceJobUuid;
+  jobUuid: QueueMonitorResourceJobUuid;
   retried: boolean;
-  queued_at: QueueMonitorResourceQueuedAt;
+  queuedAt: QueueMonitorResourceQueuedAt;
 }

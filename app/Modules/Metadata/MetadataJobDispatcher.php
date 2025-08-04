@@ -191,6 +191,7 @@ class MetadataJobDispatcher
         ?int      $batchSize = null,
         ?string   $queueName = null,
         ?callable $progressCallback = null,
+        string    $syncType = 'general' // 'general', 'identifier', 'full'
     ): int
     {
         $batchSize = $batchSize ?? $this->defaultBatchSize;
@@ -209,14 +210,21 @@ class MetadataJobDispatcher
         $query->chunk($batchSize, function (Collection $artists) use (
             $forceUpdate,
             $queueName,
+            $syncType,
             &$jobCount,
             &$processed,
             $progressCallback,
             $totalArtists,
         ) {
             foreach ($artists as $artist) {
-                SyncArtistMetadataJob::dispatch($artist->id, $forceUpdate)
-                    ->onQueue($queueName);
+                $job = match($syncType) {
+                    'general' => SyncArtistJob::syncGeneral($artist->id, $forceUpdate),
+                    'identifier' => SyncArtistJob::syncIdentifierBased($artist->id, $forceUpdate),
+                    'full' => SyncArtistJob::syncAll($artist->id, $forceUpdate),
+                    default => SyncArtistJob::syncGeneral($artist->id, $forceUpdate)
+                };
+
+                $job->onQueue($queueName)->dispatch();
                 $jobCount++;
 
                 $processed++;

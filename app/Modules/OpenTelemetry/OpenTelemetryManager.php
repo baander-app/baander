@@ -151,7 +151,7 @@ class OpenTelemetryManager
 
     private function getRequestKey(Request $request): string
     {
-        $key = hash('sha256',
+        $key = hash('xxh3',
             $request->getMethod() .
             $request->getPathInfo() .
             spl_object_id($request),

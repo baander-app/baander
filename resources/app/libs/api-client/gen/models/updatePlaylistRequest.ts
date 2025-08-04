@@ -17,5 +17,5 @@ export interface UpdatePlaylistRequest {
   /** @maxLength 255 */
   name?: string;
   description?: UpdatePlaylistRequestDescription;
-  is_public?: boolean;
+  isPublic?: boolean;
 }

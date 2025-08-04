@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Modules\Nanoid\Concerns\HasNanoPublicId;
 use App\Modules\Translation\LocaleString;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Spatie\Sluggable\{HasSlug, SlugOptions};
 
 class Artist extends BaseModel
 {
-    use HasFactory, HasSlug;
+    use HasFactory, HasNanoPublicId;
 
     public static array $filterFields = [
         'name',
@@ -22,21 +23,20 @@ class Artist extends BaseModel
     protected $fillable = [
         'name',
         'slug',
+        'mbid',
+        'discogs_id',
+        'country',
+        'gender',
+        'type',
+        'life_span_begin',
+        'life_span_end',
+        'disambiguation',
+        'sort_name',
     ];
-
-    /**
-     * Get the options for generating the slug.
-     */
-    public function getSlugOptions(): SlugOptions
-    {
-        return SlugOptions::create()
-            ->generateSlugsFrom('name')
-            ->saveSlugsTo('slug');
-    }
 
     public function getRouteKeyName(): string
     {
-        return 'slug';
+        return 'public_id';
     }
 
     public function getNameAttribute()
@@ -67,6 +67,46 @@ class Artist extends BaseModel
     }
 
     /**
+     * Check if this artist has ended (died/disbanded)
+     */
+    public function hasEnded(): bool
+    {
+        return !is_null($this->life_span_end);
+    }
+
+    /**
+     * Check if this artist is still active
+     */
+    public function isActive(): bool
+    {
+        return is_null($this->life_span_end);
+    }
+
+    /**
+     * Scope to get artists that have ended
+     */
+    public function scopeEnded(Builder $query): Builder
+    {
+        return $query->whereNotNull('life_span_end');
+    }
+
+    /**
+     * Scope to get active artists
+     */
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->whereNull('life_span_end');
+    }
+
+    /**
+     * Scope to get artists by type
+     */
+    public function scopeOfType(Builder $query, string $type): Builder
+    {
+        return $query->where('type', $type);
+    }
+
+    /**
      * Create an unknown artist with localized name
      */
     public static function createUnknown(array $attributes = []): static
@@ -75,8 +115,6 @@ class Artist extends BaseModel
             'name' => LocaleString::delimitString('media.unknown_artist'),
         ], $attributes));
     }
-
-
 
     public function albums()
     {

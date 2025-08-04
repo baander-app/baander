@@ -4,16 +4,10 @@ import { useForm, Controller } from 'react-hook-form';
 import styles from './album-editor.module.scss';
 import { Form } from 'radix-ui';
 import { useGenresIndex } from '@/libs/api-client/gen/endpoints/genre/genre.ts';
+import { AlbumResource } from '@/libs/api-client/gen/models';
 
 interface AlbumEditorProps {
-  album?: {
-    id?: string;
-    title?: string;
-    year?: number;
-    mbid?: string;
-    discogs_id?: number;
-    genres?: { id: string; name: string }[];
-  };
+  album?: AlbumResource;
   librarySlug: string;
   onSubmit: (data: AlbumFormData) => void;
   onCancel?: () => void;
@@ -23,7 +17,7 @@ interface AlbumFormData {
   title: string;
   year?: number;
   mbid?: string;
-  discogs_id?: number;
+  discogsId?: number;
   genres: string[];
 }
 
@@ -105,7 +99,7 @@ export function AlbumEditor({ album, librarySlug, onSubmit, onCancel }: AlbumEdi
       title: album?.title || '',
       year: album?.year || undefined,
       mbid: album?.mbid || '',
-      discogs_id: album?.discogs_id || undefined,
+      discogsId: album?.discogsId || undefined,
       genres: album?.genres?.map(g => g.name) || [],
     }
   });

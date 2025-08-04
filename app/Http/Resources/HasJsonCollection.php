@@ -10,7 +10,7 @@ trait HasJsonCollection
     {
         return tap(new JsonAnonymousResourceCollection($resource, static::class), function ($collection) {
             if (property_exists(static::class, 'preserveKeys')) {
-                $collection->preserveKeys = (new static([]))->preserveKeys === true;
+                $collection->preserveKeys = new static([])->preserveKeys === true;
             }
         });
     }

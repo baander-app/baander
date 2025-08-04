@@ -12,8 +12,6 @@ use Illuminate\Support\LazyCollection;
 
 class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
 {
-    public string $logChannel = 'music';
-
     public function __construct(public Library $library)
     {
     }
@@ -56,7 +54,7 @@ class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
     {
         \Log::error('ScanMusicLibraryJob permanently failed', [
             'library_id' => $this->library->id,
-            'error' => $exception->getMessage()
+            'error'      => $exception->getMessage(),
         ]);
     }
 

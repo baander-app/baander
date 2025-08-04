@@ -14,8 +14,6 @@ class SyncSmartPlaylists extends BaseJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public string $logChannel = 'music';
-
     public function middleware(): array
     {
         return [new WithoutOverlapping('sync_smart_playlists')];

@@ -23,10 +23,10 @@ class MovieResource extends JsonResource
             'slug'       => $this->slug,
             'year'       => $this->year,
             'summary'    => $this->summary,
-            'created_at' => $this->created_at,
-            'updated_at' => $this->updated_at,
+            'createdAt' => $this->created_at,
+            'updatedAt' => $this->updated_at,
             $this->mergeWhen(isset($this->videos_count), [
-                'videos_count' => $this->videos_count,
+                'videoCount' => $this->videos_count,
             ]),
         ];
     }

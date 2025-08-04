@@ -29,7 +29,6 @@ class Song extends BaseModel implements DirectStreamableFile, Recommendable
     protected $with = ['album'];
 
     protected $fillable = [
-        'public_id',
         'album_id',
         'title',
         'path',

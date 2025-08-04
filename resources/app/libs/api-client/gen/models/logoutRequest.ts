@@ -13,5 +13,5 @@ The media information is organized and easily searchable, ensuring users can alw
  */
 
 export interface LogoutRequest {
-  refresh_token?: string;
+  refreshToken?: string;
 }

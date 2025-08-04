@@ -35,8 +35,8 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
      */
     public function middleware(): array
     {
-        $sha = hash('sha256', $this->directory);
-        return [new WithoutOverlapping("scan_music_directory_$sha")];
+        $hash = hash('xxh3', $this->directory);
+        return [new WithoutOverlapping("scan_music_directory_$hash")];
     }
 
     /**
@@ -105,7 +105,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         try {
             $filePath = $file->getRealPath();
 
-            $hash = hash('sha256', $filePath);
+            $hash = hash('xxh3', $filePath);
 
             if (!$mediaMeta->isAudioFile() || Song::whereHash($hash)->exists()) {
                 return;

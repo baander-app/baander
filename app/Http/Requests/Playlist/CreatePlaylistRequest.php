@@ -24,7 +24,7 @@ class CreatePlaylistRequest extends FormRequest
         return [
             'name'        => 'required|string|max:255',
             'description' => 'nullable|string',
-            'is_public'   => 'sometimes|boolean',
+            'isPublic'   => 'sometimes|boolean',
         ];
     }
 }

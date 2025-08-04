@@ -15,11 +15,9 @@ class SyncAlbumMetadataJob extends BaseJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public string $logChannel = 'music';
-
     public function __construct(
-        private int $albumId,
-        private bool $forceUpdate = false
+        private readonly int  $albumId,
+        private readonly bool $forceUpdate = false
     ) {}
 
     public function handle(): void
@@ -68,14 +66,44 @@ class SyncAlbumMetadataJob extends BaseJob implements ShouldQueue
         }
     }
 
+
     private function updateAlbumMetadata(Album $album, array $results): void
     {
         // Update album if data is present and force update is enabled or current data is missing
         if ($results['album'] && ($this->forceUpdate || !$album->year)) {
-            if ($results['album']['year']) {
-                $album->update([
-                    'year' => $results['album']['year']
-                ]);
+            $updateData = [];
+
+            // Update year if available
+            if (isset($results['album']['year']) && $results['album']['year']) {
+                if ($this->forceUpdate || !$album->year) {
+                    $updateData['year'] = $results['album']['year'];
+                }
+            }
+
+            // Update title if available
+            if (isset($results['album']['title']) && $results['album']['title']) {
+                if ($this->forceUpdate || !$album->title) {
+                    $updateData['title'] = $results['album']['title'];
+                }
+            }
+
+            // Update MusicBrainz ID if available
+            if (isset($results['album']['mbid']) && $results['album']['mbid']) {
+                if ($this->forceUpdate || !$album->mbid) {
+                    $updateData['mbid'] = $results['album']['mbid'];
+                }
+            }
+
+            // Update Discogs ID if available
+            if (isset($results['album']['discogs_id']) && $results['album']['discogs_id']) {
+                if ($this->forceUpdate || !$album->discogs_id) {
+                    $updateData['discogs_id'] = $results['album']['discogs_id'];
+                }
+            }
+
+            // Only update if we have data to update
+            if (!empty($updateData)) {
+                $album->update($updateData);
             }
         }
 

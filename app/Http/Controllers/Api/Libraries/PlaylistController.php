@@ -49,7 +49,7 @@ class PlaylistController extends Controller
         $playlist = new Playlist([
             'name'        => $request->get('name'),
             'description' => $request->get('description'),
-            'is_public'   => $request->boolean('is_public'),
+            'is_public'   => $request->boolean('isPublic'),
         ]);
 
         $playlist->user()->associate($request->user());
@@ -89,7 +89,7 @@ class PlaylistController extends Controller
         $playlist->update([
             'name'        => $request->get('name'),
             'description' => $request->get('description'),
-            'is_public'   => $request->boolean('is_public'),
+            'is_public'   => $request->boolean('isPublic'),
         ]);
 
         return new PlaylistResource($playlist);
@@ -377,7 +377,7 @@ class PlaylistController extends Controller
         $playlist = new Playlist([
             'name'        => $request->name,
             'description' => $request->description,
-            'is_public'   => $request->boolean('is_public'),
+            'is_public'   => $request->boolean('isPublic'),
             'is_smart'    => true,
             'smart_rules' => $request->rules,
         ]);

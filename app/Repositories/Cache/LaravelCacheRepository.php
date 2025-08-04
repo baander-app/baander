@@ -28,6 +28,6 @@ class LaravelCacheRepository implements CacheRepositoryInterface
 
     public function hashKey(string $key)
     {
-        return hash('sha256', $key);
+        return hash('xxh3', $key);
     }
 }

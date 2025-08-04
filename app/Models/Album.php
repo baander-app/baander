@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\HasLibraryAccess;
 use App\Modules\Eloquent\BaseBuilder;
+use App\Modules\Nanoid\Concerns\HasNanoPublicId;
 use App\Modules\Translation\LocaleString;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
@@ -16,7 +17,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Album extends BaseModel implements HasMedia
 {
-    use HasFactory, HasLibraryAccess, HasSlug, Versionable, InteractsWithMedia;
+    use HasNanoPublicId, HasFactory, HasLibraryAccess, Versionable, InteractsWithMedia;
 
     public static array $filterFields = [
         'title',
@@ -39,7 +40,6 @@ class Album extends BaseModel implements HasMedia
 
     protected $fillable = [
         'title',
-        'slug',
         'year',
         'mbid',
         'discogs_id',
@@ -48,19 +48,12 @@ class Album extends BaseModel implements HasMedia
     protected $versionable = [
         'title',
         'year',
+        'mbid',
+        'discogs_id',
     ];
 
     protected $perPage = 60;
 
-    /**
-     * Get the options for generating the slug.
-     */
-    public function getSlugOptions(): SlugOptions
-    {
-        return SlugOptions::create()
-            ->generateSlugsFrom(['title', 'year'])
-            ->saveSlugsTo('slug');
-    }
 
     public function registerMediaConversions(?Media $media = null): void
     {
@@ -70,7 +63,7 @@ class Album extends BaseModel implements HasMedia
 
     public function getRouteKeyName(): string
     {
-        return 'slug';
+        return 'public_id';
     }
 
     public function getTitleAttribute()
@@ -108,6 +101,11 @@ class Album extends BaseModel implements HasMedia
         return static::create(array_merge([
             'title' => LocaleString::delimitString('media.unknown_album'),
         ], $attributes));
+    }
+
+    public function getRouteKey()
+    {
+        return 'public_id';
     }
 
     public function artists()

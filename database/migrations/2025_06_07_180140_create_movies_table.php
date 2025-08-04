@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('movies', function (Blueprint $table) {
             $table->id();
+            $table->text('public_id')->unique('idx_movies_public_id');
 
             $table->foreignId('library_id')
                 ->references('id')
@@ -20,7 +21,6 @@ return new class extends Migration
                 ->cascadeOnDelete();
 
             $table->caseInsensitiveText('title');
-            $table->text('slug')->unique();
 
             $table->integer('year')->nullable();
             $table->text('summary')->nullable();

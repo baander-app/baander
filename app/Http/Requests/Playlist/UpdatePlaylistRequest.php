@@ -24,7 +24,7 @@ class UpdatePlaylistRequest extends FormRequest
         return [
             'name'        => 'string|max:255',
             'description' => 'nullable|string',
-            'is_public'   => 'boolean',
+            'isPublic'   => 'boolean',
         ];
     }
 }

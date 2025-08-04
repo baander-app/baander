@@ -25,7 +25,7 @@ class LogFileService
         return collect(File::allFiles(storage_path('logs')))
             ->map(function (SplFileInfo $log) {
                 return new LogFile(
-                    id: hash('sha256', $log->getRealPath()),
+                    id: hash('xxh3', $log->getRealPath()),
                     fileName: $log->getRelativePathname(),
                     path: $log->getRealPath(),
                     createdAt: Carbon::createFromTimestamp($log->getCTime()),

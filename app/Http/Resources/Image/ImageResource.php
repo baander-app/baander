@@ -22,14 +22,14 @@ class ImageResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'public_id' => $this->public_id,
+            'publicId' => $this->public_id,
             'path'      => $this->path,
             'extension' => $this->extension,
             'size'      => $this->size,
-            'mime_type' => $this->mime_type,
+            'mimeType' => $this->mime_type,
             'width'     => $this->width,
             'height'    => $this->height,
-            'blurhash'  => $this->blurhash,
+            'blurash'  => $this->blurhash,
             'url'       => route('api.image.serve', ['image' => $this->public_id]),
         ];
     }

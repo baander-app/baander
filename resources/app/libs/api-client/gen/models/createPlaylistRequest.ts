@@ -17,5 +17,5 @@ export interface CreatePlaylistRequest {
   /** @maxLength 255 */
   name: string;
   description?: CreatePlaylistRequestDescription;
-  is_public?: boolean;
+  isPublic?: boolean;
 }

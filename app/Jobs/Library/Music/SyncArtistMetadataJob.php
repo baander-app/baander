@@ -14,12 +14,12 @@ class SyncArtistMetadataJob extends BaseJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public string $logChannel = 'music';
-
     public function __construct(
-        private int $artistId,
-        private bool $forceUpdate = false
-    ) {}
+        private readonly int  $artistId,
+        private readonly bool $forceUpdate = false,
+    )
+    {
+    }
 
     public function handle(): void
     {
@@ -34,25 +34,31 @@ class SyncArtistMetadataJob extends BaseJob implements ShouldQueue
         try {
             $results = $metadataSyncService->syncArtist($artist);
 
-            if ($results['quality_score'] >= 0.7) {
+            // Use lower threshold if we're getting valuable identifiers
+            $hasIdentifiers = !empty($results['artist']['mbid']) || !empty($results['artist']['discogs_id']);
+            $qualityThreshold = $hasIdentifiers ? 0.6 : 0.7;
+
+            if ($results['quality_score'] >= $qualityThreshold) {
                 $this->updateArtistMetadata($artist, $results);
 
                 $this->logger()->info('Artist metadata synced successfully', [
-                    'artist_id' => $artist->id,
-                    'source' => $results['source'],
-                    'quality_score' => $results['quality_score']
+                    'artist_id'       => $artist->id,
+                    'source'          => $results['source'],
+                    'quality_score'   => $results['quality_score'],
+                    'has_identifiers' => $hasIdentifiers,
                 ]);
             } else {
                 $this->logger()->warning('Artist metadata sync rejected due to low quality', [
-                    'artist_id' => $artist->id,
-                    'quality_score' => $results['quality_score']
+                    'artist_id'      => $artist->id,
+                    'quality_score'  => $results['quality_score'],
+                    'threshold_used' => $qualityThreshold,
                 ]);
             }
 
         } catch (\Exception $e) {
             $this->logger()->error('Artist metadata sync job failed', [
                 'artist_id' => $this->artistId,
-                'error' => $e->getMessage()
+                'error'     => $e->getMessage(),
             ]);
 
             throw $e;
@@ -61,14 +67,125 @@ class SyncArtistMetadataJob extends BaseJob implements ShouldQueue
 
     private function updateArtistMetadata(Artist $artist, array $results): void
     {
-        // Currently, artist metadata mainly consists of name and external IDs
-        // Additional fields like bio, country, etc. could be added to the model later
+        if ($results['artist']) {
+            $updateData = [];
+            $identifiersUpdated = false;
 
-        // Log successful sync for now - can be extended when more artist fields are added
-        $this->logger()->info('Artist metadata processed', [
+            // First, handle identifiers - be more aggressive if quality score is high
+            $highConfidence = $results['quality_score'] >= 0.8;
+
+            if (isset($results['artist']['mbid']) && $results['artist']['mbid']) {
+                if ($this->forceUpdate || !$artist->mbid || $highConfidence) {
+                    $updateData['mbid'] = $results['artist']['mbid'];
+                    $identifiersUpdated = true;
+                }
+            }
+
+            if (isset($results['artist']['discogs_id']) && $results['artist']['discogs_id']) {
+                if ($this->forceUpdate || !$artist->discogs_id || $highConfidence) {
+                    $updateData['discogs_id'] = $results['artist']['discogs_id'];
+                    $identifiersUpdated = true;
+                }
+            }
+
+            // Handle other metadata fields
+            if (isset($results['artist']['name']) && $results['artist']['name']) {
+                if ($this->forceUpdate) {
+                    $updateData['name'] = $results['artist']['name'];
+                }
+            }
+
+            if (isset($results['artist']['country']) && $results['artist']['country']) {
+                if ($this->forceUpdate || !$artist->country) {
+                    $updateData['country'] = $results['artist']['country'];
+                }
+            }
+
+            if (isset($results['artist']['gender']) && $results['artist']['gender']) {
+                if ($this->forceUpdate || !$artist->gender) {
+                    $updateData['gender'] = $results['artist']['gender'];
+                }
+            }
+
+            if (isset($results['artist']['type']) && $results['artist']['type']) {
+                if ($this->forceUpdate || !$artist->type) {
+                    $updateData['type'] = $results['artist']['type'];
+                }
+            }
+
+            if (isset($results['artist']['life_span'])) {
+                $lifeSpan = $results['artist']['life_span'];
+
+                if (isset($lifeSpan['begin']) && $lifeSpan['begin']) {
+                    if ($this->forceUpdate || !$artist->life_span_begin) {
+                        $updateData['life_span_begin'] = $lifeSpan['begin'];
+                    }
+                }
+
+                if (isset($lifeSpan['end']) && $lifeSpan['end']) {
+                    if ($this->forceUpdate || !$artist->life_span_end) {
+                        $updateData['life_span_end'] = $lifeSpan['end'];
+                    }
+                }
+            }
+
+            if (isset($results['artist']['disambiguation']) && $results['artist']['disambiguation']) {
+                if ($this->forceUpdate || !$artist->disambiguation) {
+                    $updateData['disambiguation'] = $results['artist']['disambiguation'];
+                }
+            }
+
+            if (isset($results['artist']['sort_name']) && $results['artist']['sort_name']) {
+                if ($this->forceUpdate || !$artist->sort_name) {
+                    $updateData['sort_name'] = $results['artist']['sort_name'];
+                }
+            }
+
+            if (!empty($updateData)) {
+                $artist->update($updateData);
+
+                $this->logger()->info('Artist metadata updated', [
+                    'artist_id'           => $artist->id,
+                    'updated_fields'      => array_keys($updateData),
+                    'source'              => $results['source'],
+                    'identifiers_updated' => $identifiersUpdated,
+                ]);
+
+                // If we updated identifiers with high confidence, trigger additional metadata sync
+                if ($identifiersUpdated && $highConfidence) {
+                    $this->scheduleEnhancedMetadataSync($artist);
+                }
+            }
+        }
+
+
+//        if (!empty($results['aliases'])) {
+//            $this->updateArtistAliases($artist, $results['aliases']);
+//        }
+    }
+
+    private function updateArtistAliases(Artist $artist, array $aliases): void
+    {
+        $this->logger()->info('Artist aliases identified', [
             'artist_id' => $artist->id,
-            'albums_found' => count($results['albums'] ?? []),
-            'source' => $results['source']
+            'aliases'   => $aliases,
         ]);
     }
+
+    /**
+     * Schedule additional metadata sync using the newly populated identifiers
+     */
+    private function scheduleEnhancedMetadataSync(Artist $artist): void
+    {
+        $this->logger()->info('Scheduling enhanced metadata sync for artist with new identifiers', [
+            'artist_id'  => $artist->id,
+            'mbid'       => $artist->mbid,
+            'discogs_id' => $artist->discogs_id,
+        ]);
+
+        SyncArtistJob::syncIdentifierBased($artist->id, false)
+            ->delay(now()->addMinutes(2))
+            ->dispatch();
+    }
+
 }

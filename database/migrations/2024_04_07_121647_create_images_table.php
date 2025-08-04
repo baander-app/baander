@@ -17,7 +17,7 @@ return new class extends Migration {
             $table->text('extension');
             $table->text('mime_type');
             $table->text('blurhash');
-            $table->text('public_id')->index();
+            $table->text('public_id')->unique();
             $table->unsignedInteger('size');
             $table->unsignedInteger('width');
             $table->unsignedInteger('height');

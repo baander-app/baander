@@ -25,7 +25,7 @@ import type { AlbumWithoutSongsResource } from "./albumWithoutSongsResource";
 import type { ArtistResource } from "./artistResource";
 
 export interface SongResource {
-  public_id: string;
+  publicId: string;
   title: string;
   year: SongResourceYear;
   comment: SongResourceComment;

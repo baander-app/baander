@@ -4,13 +4,10 @@ namespace App\Models;
 
 use App\Observers\VideoObserver;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 #[ObservedBy(VideoObserver::class)]
 class Video extends BaseModel
 {
-    use HasFactory;
-
     protected $fillable = [
         'path',
         'duration',
@@ -38,6 +35,6 @@ class Video extends BaseModel
             'size' => $file->getSize(),
         ];
 
-        return hash('sha256', implode(',', $parts));
+        return hash('xxh3', implode(',', $parts));
     }
 }

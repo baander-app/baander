@@ -15,11 +15,9 @@ class SyncSongMetadataJob extends BaseJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public string $logChannel = 'music';
-
     public function __construct(
-        private int $songId,
-        private bool $forceUpdate = false
+        private readonly int $songId,
+        private readonly bool $forceUpdate = false
     ) {}
 
     public function handle(): void

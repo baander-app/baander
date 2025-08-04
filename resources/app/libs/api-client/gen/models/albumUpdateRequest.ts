@@ -32,6 +32,6 @@ export interface AlbumUpdateRequest {
    * @minimum 0
    * @maximum 999999999999
    */
-  discogs_id?: number;
+  discogsId?: number;
   genres?: number[];
 }

@@ -10,6 +10,7 @@ return new class extends Migration
     {
         Schema::create('third_party_credentials', function (Blueprint $table) {
             $table->id();
+            $table->text('public_id')->unique('idx_third_party_credentials_public_id');
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->string('provider'); // 'lastfm', 'spotify', 'discogs', etc.
             $table->timestamp('expires_at')->nullable();

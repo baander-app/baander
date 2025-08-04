@@ -21,7 +21,7 @@ export interface MovieResource {
   slug: string;
   year: MovieResourceYear;
   summary: MovieResourceSummary;
-  created_at: MovieResourceCreatedAt;
-  updated_at: MovieResourceUpdatedAt;
-  videos_count?: string;
+  createdAt: MovieResourceCreatedAt;
+  updatedAt: MovieResourceUpdatedAt;
+  videoCount?: string;
 }

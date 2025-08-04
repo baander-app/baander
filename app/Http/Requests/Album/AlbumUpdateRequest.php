@@ -25,7 +25,7 @@ class AlbumUpdateRequest extends FormRequest
             'title'      => 'required|string|min:1|max:255',
             'year'       => 'numeric|min:0|max:9999',
             'mbid'       => 'string|min:1|max:255',
-            'discogs_id' => 'numeric|min:0|max:999999999999',
+            'discogsId' => 'numeric|min:0|max:999999999999',
             'genres'     => 'array|distinct',
             'genres.*'   => 'exists:genres,id',
         ];

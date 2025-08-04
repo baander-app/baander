@@ -26,7 +26,6 @@ class GenreIndexRequest extends FormRequest
              * @query
              * Comma seperated string of fields you want to select. If nothing is defined `select *` is default.
              * - name
-             * - slug
              */
             'fields'      => 'string',
             /**

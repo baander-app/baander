@@ -21,7 +21,7 @@ import type { SongResource } from "./songResource";
 import type { PlaylistResourceOwner } from "./playlistResourceOwner";
 
 export interface PlaylistResource {
-  id: string;
+  publicId: string;
   name: string;
   description: PlaylistResourceDescription;
   isPublic: string;

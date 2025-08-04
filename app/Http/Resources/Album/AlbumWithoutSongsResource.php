@@ -24,8 +24,8 @@ class AlbumWithoutSongsResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
+            'publicId'  => $this->public_id,
             'title'     => $this->title,
-            'slug'      => $this->slug,
             'year'      => $this->year,
             'createdAt' => $this->created_at,
             'updatedAt' => $this->updated_at,

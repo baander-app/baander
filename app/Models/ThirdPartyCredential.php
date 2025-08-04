@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Modules\Nanoid\Concerns\HasNanoPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ThirdPartyCredential extends Model
 {
+    use HasNanoPublicId;
+
     protected $fillable = [
         'user_id',
         'provider',
@@ -18,6 +21,11 @@ class ThirdPartyCredential extends Model
         'expires_at' => 'datetime',
         'meta'       => 'array',
     ];
+
+    public function getRouteKeyName(): string
+    {
+        return 'public_id';
+    }
 
     public function user(): BelongsTo
     {

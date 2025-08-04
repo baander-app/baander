@@ -21,7 +21,7 @@ class PlaylistResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id'              => $this->public_id,
+            'publicId'              => $this->public_id,
             'name'            => $this->name,
             'description'     => $this->description,
             'isPublic'        => $this->is_public,
