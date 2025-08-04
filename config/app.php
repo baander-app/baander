@@ -176,6 +176,8 @@ return [
         App\Modules\BlurHash\BlurHashServiceProvider::class,
         \App\Modules\Logging\LoggerServiceProvider::class,
         \App\Modules\Recommendation\RecommendationServiceProvider::class,
+        \App\Modules\OpenTelemetry\OpenTelemetryServiceProvider::class,
+        \App\Modules\OpenTelemetry\Instrumentation\LaravelInstrumentation::class,
         App\Providers\FortifyServiceProvider::class,
 
         /*

@@ -5,6 +5,7 @@ import { useAppDispatch } from '@/store/hooks.ts';
 import { createNotification } from '@/store/notifications/notifications-slice.ts';
 import { globalAudioProcessor } from '@/services/global-audio-processor-service.ts';
 import { SongResource } from '@/libs/api-client/gen/models';
+import { useOpenTelemetry } from '@/providers/open-telemetry-provider.tsx';
 
 interface AudioPlayerContextType {
   audioRef: RefObject<HTMLAudioElement>;
@@ -51,9 +52,36 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
     setAudioRef,
     authenticatedSource,
   } = useMusicSource();
+  const { tracer, meter, errorCounter } = useOpenTelemetry();
+
+  // Create audio-specific metrics
+  const audioPlayCounter = meter.createCounter('audio_play_count', {
+    description: 'Number of times audio playback was started',
+  });
+
+  const audioPauseCounter = meter.createCounter('audio_pause_count', {
+    description: 'Number of times audio playback was paused',
+  });
+
+  const audioLoadDurationHistogram = meter.createHistogram('audio_load_duration', {
+    description: 'Time taken to load audio source',
+    unit: 'ms',
+  });
+
+  const audioBufferingHistogram = meter.createHistogram('audio_buffering_duration', {
+    description: 'Time spent buffering audio',
+    unit: 'ms',
+  });
+
+  const audioVolumeHistogram = meter.createHistogram('audio_volume_changes', {
+    description: 'Audio volume level changes',
+    unit: 'percent',
+  });
 
   const audioRef = useRef<HTMLAudioElement>(new Audio());
   const [processorConnected, setProcessorConnected] = useState(false);
+  const [loadStartTime, setLoadStartTime] = useState<number | null>(null);
+  const [bufferStartTime, setBufferStartTime] = useState<number | null>(null);
 
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
 
@@ -69,7 +97,15 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
 
   useEffect(() => {
     const handleUserInteraction = () => {
+      const span = tracer.startSpan('user_interaction_detected');
+      span.setAttributes({
+        'audio.interaction.type': 'first_user_interaction',
+        'audio.ready_state': audioRef.current?.readyState || 0,
+      });
+
       setHasUserInteracted(true);
+      span.end();
+
       // Remove listeners after first interaction
       document.removeEventListener('click', handleUserInteraction);
       document.removeEventListener('keydown', handleUserInteraction);
@@ -85,66 +121,164 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
       document.removeEventListener('keydown', handleUserInteraction);
       document.removeEventListener('touchstart', handleUserInteraction);
     };
-  }, []);
-
+  }, [tracer]);
 
   // Initialize global audio processor only once when audio element is created
   useEffect(() => {
     if (audioRef.current && !processorConnected) {
+      const span = tracer.startSpan('audio_processor_initialization');
       console.log('Initializing global audio processor...');
+
       globalAudioProcessor.initialize();
       globalAudioProcessor.connectAudioElement(audioRef.current)
         .then(() => {
           console.log('Audio processor connected successfully');
+          span.setStatus({ code: 1 });
+          span.setAttributes({
+            'audio.processor.connected': true,
+            'audio.processor.initialization_successful': true,
+          });
           setProcessorConnected(true);
         })
         .catch((error) => {
           console.warn('Failed to connect audio processor:', error);
+          span.recordException(error);
+          span.setStatus({ code: 2, message: error.message });
+          span.setAttributes({
+            'audio.processor.connected': false,
+            'audio.processor.initialization_successful': false,
+            'audio.processor.error': error.message,
+          });
+
+          errorCounter.add(1, {
+            type: 'audio_processor_connection_failed',
+            message: error.message,
+          });
+
           // Still mark as connected to prevent retries
           setProcessorConnected(true);
+        })
+        .finally(() => {
+          span.end();
         });
     }
-  }, [processorConnected]);
+  }, [processorConnected, tracer, errorCounter]);
 
   const playWithContextResume = useCallback(async () => {
     if (!audioRef.current || !isReady) {
       return;
     }
 
+    const span = tracer.startSpan('audio_play_with_context_resume');
+    const playStartTime = performance.now();
+
     try {
+      span.setAttributes({
+        'audio.song.id': song?.id || 'unknown',
+        'audio.song.title': song?.title || 'unknown',
+        'audio.current_time': audioRef.current.currentTime,
+        'audio.duration': audioRef.current.duration || 0,
+        'audio.volume': audioRef.current.volume,
+        'audio.ready_state': audioRef.current.readyState,
+      });
+
       // Try to resume the audio processor context if needed
       if (processorConnected && globalAudioProcessor) {
         await globalAudioProcessor.resumeContextIfNeeded?.();
       }
 
       await audioRef.current.play();
+
+      const playDuration = performance.now() - playStartTime;
+      audioPlayCounter.add(1, {
+        song_id: song?.id || 'unknown',
+        song_title: song?.title || 'unknown',
+        volume_level: Math.round(audioRef.current.volume * 100).toString(),
+      });
+
+      span.setAttributes({
+        'audio.play.duration_ms': playDuration,
+        'audio.play.successful': true,
+      });
+
       setIsPlaying(true);
+      span.setStatus({ code: 1 });
     } catch (error) {
+      const playDuration = performance.now() - playStartTime;
       console.warn('Play failed:', error);
+
+      span.recordException(error as Error);
+      span.setStatus({ code: 2, message: (error as Error).message });
+      span.setAttributes({
+        'audio.play.duration_ms': playDuration,
+        'audio.play.successful': false,
+        'audio.play.error': (error as Error).message,
+      });
+
+      errorCounter.add(1, {
+        type: 'audio_play_failed',
+        message: (error as Error).message,
+        song_id: song?.id || 'unknown',
+      });
+
       dispatch(createNotification({
         type: 'warning',
         title: 'Playback requires interaction',
         message: 'Please click the play button to start playback',
         toast: true,
       }));
+    } finally {
+      span.end();
     }
-  }, [isReady, dispatch, processorConnected]);
+  }, [isReady, dispatch, processorConnected, tracer, audioPlayCounter, errorCounter, song]);
 
   const togglePlayPause = useCallback(() => {
-    if (isPlaying) {
-      setIsPlaying(false);
-    } else if (isReady) {
-      playWithContextResume();
-    }
-  }, [isPlaying, isReady, playWithContextResume]);
+    const span = tracer.startSpan('audio_toggle_play_pause');
 
+    span.setAttributes({
+      'audio.current_state': isPlaying ? 'playing' : 'paused',
+      'audio.target_state': isPlaying ? 'paused' : 'playing',
+      'audio.song.id': song?.id || 'unknown',
+    });
+
+    if (isPlaying) {
+      audioPauseCounter.add(1, {
+        song_id: song?.id || 'unknown',
+        current_time: audioRef.current?.currentTime?.toString() || '0',
+      });
+      setIsPlaying(false);
+      span.setAttributes({ 'audio.action_taken': 'pause' });
+    } else if (isReady) {
+      span.setAttributes({ 'audio.action_taken': 'play' });
+      playWithContextResume();
+    } else {
+      span.setAttributes({
+        'audio.action_taken': 'none',
+        'audio.reason': 'not_ready'
+      });
+    }
+
+    span.end();
+  }, [isPlaying, isReady, playWithContextResume, tracer, audioPauseCounter, song]);
 
   const toggleMuteUnmute = () => {
+    const span = tracer.startSpan('audio_toggle_mute');
+
+    span.setAttributes({
+      'audio.current_mute_state': isMuted,
+      'audio.target_mute_state': !isMuted,
+      'audio.volume_before': currentVolume,
+    });
+
     if (isMuted) {
       unmute();
+      span.setAttributes({ 'audio.action_taken': 'unmute' });
     } else {
       mute();
+      span.setAttributes({ 'audio.action_taken': 'mute' });
     }
+
+    span.end();
   };
 
   const handleBufferProgress: ReactEventHandler<HTMLAudioElement> = (e) => {
@@ -159,6 +293,17 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
             audio.buffered.length - 1 - i,
           );
           setBuffered(bufferedLength);
+
+          // Track buffering metrics
+          const bufferPercentage = (bufferedLength / dur) * 100;
+          if (bufferStartTime && bufferPercentage > 10) {
+            const bufferDuration = performance.now() - bufferStartTime;
+            audioBufferingHistogram.record(bufferDuration, {
+              buffer_percentage: Math.round(bufferPercentage).toString(),
+              song_id: song?.id || 'unknown',
+            });
+            setBufferStartTime(null);
+          }
           break;
         }
       }
@@ -167,28 +312,62 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
 
   const handleTimeUpdate: ReactEventHandler<HTMLAudioElement> = (e) => {
     const audio = e.currentTarget;
-
     setCurrentProgress(audio.currentTime);
     handleBufferProgress(e);
   };
 
   const mute = () => {
     if (audioRef.current) {
+      const span = tracer.startSpan('audio_mute');
+      span.setAttributes({
+        'audio.volume_before': audioRef.current.volume,
+        'audio.volume_after': 0,
+      });
+
       audioRef.current.volume = 0;
       setIsMuted(true);
+      span.end();
     }
   };
 
   const unmute = useCallback(() => {
     if (audioRef.current) {
-      audioRef.current.volume = currentVolume / 100;
+      const span = tracer.startSpan('audio_unmute');
+      const targetVolume = currentVolume / 100;
+
+      span.setAttributes({
+        'audio.volume_before': 0,
+        'audio.volume_after': targetVolume,
+        'audio.target_volume_percent': currentVolume,
+      });
+
+      audioRef.current.volume = targetVolume;
       setIsMuted(false);
+      span.end();
     }
-  }, [currentVolume]);
+  }, [currentVolume, tracer]);
 
   useEffect(() => {
     const handleCanPlay = () => {
+      const span = tracer.startSpan('audio_can_play');
+
+      if (loadStartTime) {
+        const loadDuration = performance.now() - loadStartTime;
+        audioLoadDurationHistogram.record(loadDuration, {
+          song_id: song?.id || 'unknown',
+          song_title: song?.title || 'unknown',
+        });
+        setLoadStartTime(null);
+      }
+
+      span.setAttributes({
+        'audio.ready_state': audioRef.current?.readyState || 0,
+        'audio.duration': audioRef.current?.duration || 0,
+        'audio.song.id': song?.id || 'unknown',
+      });
+
       setIsReady(true);
+      span.end();
     };
 
     const currentAudioRef = audioRef.current;
@@ -201,13 +380,28 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
         currentAudioRef.removeEventListener('canplay', handleCanPlay);
       }
     };
-  }, []);
+  }, [tracer, audioLoadDurationHistogram, loadStartTime, song]);
 
   useEffect(() => {
     if (audioRef.current && currentVolume) {
-      audioRef.current.volume = currentVolume / 100;
+      const span = tracer.startSpan('audio_volume_change');
+      const newVolume = currentVolume / 100;
+
+      span.setAttributes({
+        'audio.volume_before': audioRef.current.volume,
+        'audio.volume_after': newVolume,
+        'audio.volume_percent': currentVolume,
+      });
+
+      audioVolumeHistogram.record(currentVolume, {
+        song_id: song?.id || 'unknown',
+        muted: isMuted.toString(),
+      });
+
+      audioRef.current.volume = newVolume;
+      span.end();
     }
-  }, [currentVolume]);
+  }, [currentVolume, tracer, audioVolumeHistogram, song, isMuted]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -231,14 +425,27 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
   useEffect(() => {
     const currentAudioRef = audioRef.current;
     return () => {
+      const span = tracer.startSpan('audio_player_cleanup');
+      span.setAttributes({
+        'audio.final_state': currentAudioRef.paused ? 'paused' : 'playing',
+        'audio.final_time': currentAudioRef.currentTime,
+      });
+
       currentAudioRef.pause();
+      span.end();
       // Note: Don't destroy the global processor here as it should persist
     };
-  }, []);
+  }, [tracer]);
 
   useEffect(() => {
     if (isPlaying && isReady) {
       playWithContextResume().catch((e) => {
+        errorCounter.add(1, {
+          type: 'audio_autoplay_failed',
+          message: e?.message ?? 'Unable to autoplay song',
+          song_id: song?.id || 'unknown',
+        });
+
         dispatch(createNotification({
           type: 'error',
           title: 'Audio player error',
@@ -249,16 +456,28 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
     } else {
       audioRef.current.pause();
     }
-  }, [isPlaying, isReady]);
+  }, [isPlaying, isReady, playWithContextResume, dispatch, errorCounter, song]);
 
   useEffect(() => {
     if (!authenticatedSource) {
       return;
     }
 
+    const span = tracer.startSpan('audio_source_change');
+    setLoadStartTime(performance.now());
+    setBufferStartTime(performance.now());
+
     // Don't create a new audio element if we already have one
     if (audioRef.current.src !== authenticatedSource) {
       console.log('Setting new audio source:', authenticatedSource);
+
+      span.setAttributes({
+        'audio.source.previous': audioRef.current.src || 'none',
+        'audio.source.new': authenticatedSource,
+        'audio.song.id': song?.id || 'unknown',
+        'audio.song.title': song?.title || 'unknown',
+      });
+
       audioRef.current.pause();
       audioRef.current.src = authenticatedSource;
 
@@ -273,23 +492,45 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
     audioRef.current.preload = 'auto';
 
     // @ts-ignore
-    audioRef.current.ondurationchange = (e) => setDuration(e.currentTarget.duration);
+    audioRef.current.ondurationchange = (e) => {
+      const duration = e.currentTarget.duration;
+      setDuration(duration);
+
+      const durationSpan = tracer.startSpan('audio_duration_change');
+      durationSpan.setAttributes({
+        'audio.duration': duration,
+        'audio.song.id': song?.id || 'unknown',
+      });
+      durationSpan.end();
+    };
     // @ts-ignore
     audioRef.current.ontimeupdate = (e) => handleTimeUpdate(e);
     // @ts-ignore
     audioRef.current.onprogress = (e) => handleBufferProgress(e);
 
     // Only autoplay if user has interacted
-
     if (hasUserInteracted) {
       audioRef.current.play().then(() => {
         setIsPlaying(true);
+        span.setAttributes({ 'audio.autoplay.successful': true });
       }).catch((error) => {
         console.warn('Autoplay failed:', error);
+        span.recordException(error);
+        span.setAttributes({
+          'audio.autoplay.successful': false,
+          'audio.autoplay.error': error.message,
+        });
+
+        errorCounter.add(1, {
+          type: 'audio_autoplay_failed',
+          message: error.message,
+          song_id: song?.id || 'unknown',
+        });
       });
     }
 
-  }, [authenticatedSource, volume, processorConnected, hasUserInteracted]);
+    span.end();
+  }, [authenticatedSource, volume, processorConnected, hasUserInteracted, tracer, errorCounter, song]);
 
   return (
     <AudioPlayerContext.Provider

@@ -36,10 +36,17 @@ class LoggerServiceProvider extends ServiceProvider
                 continue;
             }
 
-            $logger = Log::channel($channelAttribute->channel->value);
+            $baseLogger = Log::channel($channelAttribute->channel->value);
+
+            // Create structured logger with enhanced context
+            $structuredLogger = new StructuredLogger(
+                $baseLogger,
+                $reflection->getName(),
+                $channelAttribute->defaultContext
+            );
 
             $property->setAccessible(true);
-            $property->setValue($object, $logger);
+            $property->setValue($object, $structuredLogger);
         }
     }
 

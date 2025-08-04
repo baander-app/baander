@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, createContext, useContext } from 'react';
 import { trace, metrics } from '@opentelemetry/api';
+import { Counter, Histogram } from '@opentelemetry/api/build/src/metrics/Metric';
+import { Tracer } from '@opentelemetry/api/build/src/trace/tracer';
+import { Meter } from '@opentelemetry/api/build/src/metrics/Meter';
 
 interface OpenTelemetryContextType {
-  tracer: any;
-  meter: any;
-  pageViewCounter: any;
-  errorCounter: any;
-  performanceHistogram: any;
+  tracer: Tracer;
+  meter: Meter;
+  pageViewCounter: Counter<{description: string}>;
+  errorCounter: Counter<{description: string}>;
+  performanceHistogram: Histogram<{description: string}>;
 }
 
 const OpenTelemetryContext = createContext<OpenTelemetryContextType | null>(null);

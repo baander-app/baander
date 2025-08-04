@@ -113,42 +113,6 @@ class GenreHierarchyService
     }
 
     /**
-     * Simplified approach without Discogs data for testing
-     */
-    public function buildGenreHierarchySimple(array $genres): array
-    {
-        $hierarchy = [];
-
-        foreach ($genres as $genre) {
-            $genre = trim($genre);
-
-            // Get LastFM data only
-            try {
-                $tagInfo = $this->lastFmClient->tags->getTagInfo($genre);
-            } catch (\Exception $e) {
-                Log::warning("LastFM failed for {$genre}", ['error' => $e->getMessage()]);
-                $tagInfo = [];
-            }
-
-            $hierarchy[$genre] = [
-                'lastfm'  => [
-                    'info'        => $tagInfo,
-                    'similar'     => [],
-                    'popularity'  => $tagInfo['reach'] ?? 0,
-                    'description' => $tagInfo['wiki']['summary'] ?? null,
-                ],
-                'discogs' => [
-                    'related_styles' => [],
-                    'related_genres' => [],
-                    'release_count'  => 0,
-                ],
-            ];
-        }
-
-        return $this->organizeHierarchyWithAlternatives($hierarchy, $genres);
-    }
-
-    /**
      * Organize genre hierarchy using multiple relationship strategies
      */
     private function organizeHierarchyWithAlternatives(array $genreData, array $allGenres): array
@@ -205,99 +169,6 @@ class GenreHierarchyService
         }
 
         return $organized;
-    }
-
-    /**
-     * Build a normalized similarity matrix for fast lookup
-     */
-    private function buildSimilarityMatrix(array $genreData, array $allGenres, array $genreDetails): array
-    {
-        $matrix = [];
-
-        foreach ($allGenres as $genre1) {
-            $matrix[$genre1] = [];
-
-            foreach ($allGenres as $genre2) {
-                if ($genre1 === $genre2) {
-                    $matrix[$genre1][$genre2] = 1.0; // Self-similarity
-                    continue;
-                }
-
-                // Check if genre2 is in genre1's relationships
-                $similarity = 0.0;
-                $relationships = $genreDetails[$genre1]['relationships'] ?? [];
-
-                foreach ($relationships as $relationship) {
-                    if ($relationship['name'] === $genre2) {
-                        $similarity = $relationship['match'];
-                        break;
-                    }
-                }
-
-                // If no direct relationship, calculate based on shared characteristics
-                if ($similarity === 0.0) {
-                    $similarity = $this->calculateFallbackSimilarity($genre1, $genre2, $genreData);
-                }
-
-                $matrix[$genre1][$genre2] = $similarity;
-            }
-        }
-
-        return $matrix;
-    }
-
-    /**
-     * Calculate fallback similarity when no direct relationship exists
-     */
-    private function calculateFallbackSimilarity(string $genre1, string $genre2, array $genreData): float
-    {
-        // Check shared Discogs styles
-        $genre1Styles = $genreData[$genre1]['discogs']['related_styles'] ?? [];
-        $genre2Styles = $genreData[$genre2]['discogs']['related_styles'] ?? [];
-
-        if (!empty($genre1Styles) && !empty($genre2Styles)) {
-            $commonStyles = array_intersect($genre1Styles, $genre2Styles);
-            if (!empty($commonStyles)) {
-                return count($commonStyles) / max(count($genre1Styles), count($genre2Styles));
-            }
-        }
-
-        // String-based similarity as final fallback
-        return $this->calculateStringSimilarity($genre1, $genre2);
-    }
-
-    /**
-     * Calculate string-based similarity
-     */
-    private function calculateStringSimilarity(string $genre1, string $genre2): float
-    {
-        $genre1Lower = strtolower($genre1);
-        $genre2Lower = strtolower($genre2);
-
-        // Check for substring relationships
-        if (str_contains($genre1Lower, $genre2Lower) || str_contains($genre2Lower, $genre1Lower)) {
-            return 0.6;
-        }
-
-        // Check for common words
-        $words1 = explode(' ', $genre1Lower);
-        $words2 = explode(' ', $genre2Lower);
-        $commonWords = array_intersect($words1, $words2);
-
-        if (!empty($commonWords)) {
-            return count($commonWords) / max(count($words1), count($words2)) * 0.5;
-        }
-
-        // Levenshtein distance for very similar spellings
-        $maxLen = max(strlen($genre1Lower), strlen($genre2Lower));
-        if ($maxLen <= 20) { // Only for short genre names
-            $distance = levenshtein($genre1Lower, $genre2Lower);
-            if ($distance <= 3) {
-                return max(0.0, 1.0 - ($distance / $maxLen));
-            }
-        }
-
-        return 0.0;
     }
 
     /**
@@ -462,6 +333,135 @@ class GenreHierarchyService
         }
 
         return array_values($unique);
+    }
+
+    /**
+     * Build a normalized similarity matrix for fast lookup
+     */
+    private function buildSimilarityMatrix(array $genreData, array $allGenres, array $genreDetails): array
+    {
+        $matrix = [];
+
+        foreach ($allGenres as $genre1) {
+            $matrix[$genre1] = [];
+
+            foreach ($allGenres as $genre2) {
+                if ($genre1 === $genre2) {
+                    $matrix[$genre1][$genre2] = 1.0; // Self-similarity
+                    continue;
+                }
+
+                // Check if genre2 is in genre1's relationships
+                $similarity = 0.0;
+                $relationships = $genreDetails[$genre1]['relationships'] ?? [];
+
+                foreach ($relationships as $relationship) {
+                    if ($relationship['name'] === $genre2) {
+                        $similarity = $relationship['match'];
+                        break;
+                    }
+                }
+
+                // If no direct relationship, calculate based on shared characteristics
+                if ($similarity === 0.0) {
+                    $similarity = $this->calculateFallbackSimilarity($genre1, $genre2, $genreData);
+                }
+
+                $matrix[$genre1][$genre2] = $similarity;
+            }
+        }
+
+        return $matrix;
+    }
+
+    /**
+     * Calculate fallback similarity when no direct relationship exists
+     */
+    private function calculateFallbackSimilarity(string $genre1, string $genre2, array $genreData): float
+    {
+        // Check shared Discogs styles
+        $genre1Styles = $genreData[$genre1]['discogs']['related_styles'] ?? [];
+        $genre2Styles = $genreData[$genre2]['discogs']['related_styles'] ?? [];
+
+        if (!empty($genre1Styles) && !empty($genre2Styles)) {
+            $commonStyles = array_intersect($genre1Styles, $genre2Styles);
+            if (!empty($commonStyles)) {
+                return count($commonStyles) / max(count($genre1Styles), count($genre2Styles));
+            }
+        }
+
+        // String-based similarity as final fallback
+        return $this->calculateStringSimilarity($genre1, $genre2);
+    }
+
+    /**
+     * Calculate string-based similarity
+     */
+    private function calculateStringSimilarity(string $genre1, string $genre2): float
+    {
+        $genre1Lower = strtolower($genre1);
+        $genre2Lower = strtolower($genre2);
+
+        // Check for substring relationships
+        if (str_contains($genre1Lower, $genre2Lower) || str_contains($genre2Lower, $genre1Lower)) {
+            return 0.6;
+        }
+
+        // Check for common words
+        $words1 = explode(' ', $genre1Lower);
+        $words2 = explode(' ', $genre2Lower);
+        $commonWords = array_intersect($words1, $words2);
+
+        if (!empty($commonWords)) {
+            return count($commonWords) / max(count($words1), count($words2)) * 0.5;
+        }
+
+        // Levenshtein distance for very similar spellings
+        $maxLen = max(strlen($genre1Lower), strlen($genre2Lower));
+        if ($maxLen <= 20) { // Only for short genre names
+            $distance = levenshtein($genre1Lower, $genre2Lower);
+            if ($distance <= 3) {
+                return max(0.0, 1.0 - ($distance / $maxLen));
+            }
+        }
+
+        return 0.0;
+    }
+
+    /**
+     * Simplified approach without Discogs data for testing
+     */
+    public function buildGenreHierarchySimple(array $genres): array
+    {
+        $hierarchy = [];
+
+        foreach ($genres as $genre) {
+            $genre = trim($genre);
+
+            // Get LastFM data only
+            try {
+                $tagInfo = $this->lastFmClient->tags->getTagInfo($genre);
+            } catch (\Exception $e) {
+                Log::warning("LastFM failed for {$genre}", ['error' => $e->getMessage()]);
+                $tagInfo = [];
+            }
+
+            $hierarchy[$genre] = [
+                'lastfm'  => [
+                    'info'        => $tagInfo,
+                    'similar'     => [],
+                    'popularity'  => $tagInfo['reach'] ?? 0,
+                    'description' => $tagInfo['wiki']['summary'] ?? null,
+                ],
+                'discogs' => [
+                    'related_styles' => [],
+                    'related_genres' => [],
+                    'release_count'  => 0,
+                ],
+            ];
+        }
+
+        return $this->organizeHierarchyWithAlternatives($hierarchy, $genres);
     }
 
     /**

@@ -2,7 +2,6 @@
 
 namespace App\Console;
 
-use App\Jobs\Library\Metadata\ProbeQueueChecker;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -21,8 +20,6 @@ class Kernel extends ConsoleKernel
 
         // Clean up old failed jobs weekly
         $schedule->command('queue:flush')->weekly();
-
-        $schedule->job(new ProbeQueueChecker())->everyMinute();
     }
 
     /**

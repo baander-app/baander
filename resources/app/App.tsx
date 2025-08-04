@@ -10,9 +10,18 @@ import styles from './app.module.scss';
 import { removeToast } from '@/store/notifications/notifications-slice.ts';
 import { Iconify } from './ui/icons/iconify';
 import { useEffect } from 'react';
+import { useAuth } from '@/providers/auth-provider.tsx';
+import { useUsersMe } from '@/libs/api-client/gen/endpoints/user/user.ts';
+import { ROOT_SESSION_SPAN } from '@/libs/tracing/start-session-span.ts';
 
 // Instrument the main app component
 const App = () => {
+  const {isAuthenticated} = useAuth();
+  const {data: me} = useUsersMe({
+    query: {
+      enabled: isAuthenticated,
+    }
+  })
   const { toasts } = useAppSelector(state => state.notifications);
   const { theme } = useAppSelector(state => state.ui);
   const dispatch = useAppDispatch();
@@ -24,6 +33,17 @@ const App = () => {
   useEffect(() => {
     Notification.requestPermission();
   }, []);
+
+  useEffect(() => {
+    if (me) {
+      ROOT_SESSION_SPAN()?.setAttributes({
+        'user.publicId': me.publicId,
+        'user.name': me.name,
+        'user.email': me.email,
+        'user.isAdmin': me.isAdmin,
+      })
+    }
+  }, [isAuthenticated]);
 
   return (
     <HelmetProvider>

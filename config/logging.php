@@ -3,6 +3,7 @@
 use App\Modules\OpenTelemetry\MonologHandler as OpenTelemetryMonolog;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
+use Monolog\Processor\PsrLogMessageProcessor;
 
 
 return [

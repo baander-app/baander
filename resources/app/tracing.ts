@@ -1,3 +1,4 @@
+import { endSessionSpan, startSessionSpan } from '@/libs/tracing/start-session-span.ts';
 import {
   defaultResource,
   resourceFromAttributes,
@@ -111,6 +112,9 @@ registerInstrumentations({
     }),
   ],
 });
+
+startSessionSpan(crypto.randomUUID());
+window.addEventListener('beforeunload', () => endSessionSpan());
 
 // Export providers
 export { tracerProvider, meterProvider };

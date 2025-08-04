@@ -15,7 +15,9 @@ use Attribute;
 class LogChannel
 {
     public function __construct(
-        public readonly Channel $channel
+        public readonly Channel $channel,
+        public readonly bool $includeClass = true,
+        public readonly bool $includeMethod = false,
+        public readonly array $defaultContext = []
     ) {}
 }
-
