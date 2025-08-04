@@ -15,8 +15,8 @@ use Throwable;
 
 class QueueMonitorService
 {
-    private const string TIMESTAMP_EXACT_FORMAT = 'Y-m-d H:i:s.u';
-
+    // Remove this constant since we're not using exact timestamps anymore
+    // private const string TIMESTAMP_EXACT_FORMAT = 'Y-m-d H:i:s.u';
 
     public function handleJobQueued(JobQueued $event): void
     {
@@ -146,12 +146,11 @@ class QueueMonitorService
             'queue'  => $job->getQueue() ?: 'default',
             'status' => MonitorStatus::Queued,
         ], [
-            'job_uuid'         => $job->uuid(),
-            'name'             => $job->resolveName(),
-            'started_at'       => $now,
-            'started_at_exact' => $now->format(self::TIMESTAMP_EXACT_FORMAT),
-            'attempt'          => $job->attempts(),
-            'status'           => MonitorStatus::Running,
+            'job_uuid'   => $job->uuid(),
+            'name'       => $job->resolveName(),
+            'started_at' => $now,
+            'attempt'    => $job->attempts(),
+            'status'     => MonitorStatus::Running,
         ]);
 
         // Mark jobs with same job id (different execution) as stale
@@ -161,9 +160,8 @@ class QueueMonitorService
             ->whereNull('finished_at')
             ->each(function (QueueMonitor $monitor) {
                 $monitor->update([
-                    'finished_at'       => $now = Carbon::now(),
-                    'finished_at_exact' => $now->format(self::TIMESTAMP_EXACT_FORMAT),
-                    'status'            => MonitorStatus::Stale,
+                    'finished_at' => Carbon::now(),
+                    'status'      => MonitorStatus::Stale,
                 ]);
             });
     }
@@ -214,9 +212,8 @@ class QueueMonitorService
         }
 
         $attributes = [
-            'finished_at'       => $now,
-            'finished_at_exact' => $now->format(self::TIMESTAMP_EXACT_FORMAT),
-            'status'            => $status,
+            'finished_at' => $now,
+            'status'      => $status,
         ];
 
         if (null !== $exception) {

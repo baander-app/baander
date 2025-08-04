@@ -60,26 +60,6 @@ class QueueMonitor extends BaseModel
         $query->where('status', MonitorStatus::Succeeded);
     }
 
-    // Methods
-
-    public function getStartedAtExact(): ?Carbon
-    {
-        if (null === $this->started_at_exact) {
-            return null;
-        }
-
-        return Carbon::parse($this->started_at_exact);
-    }
-
-    public function getFinishedAtExact(): ?Carbon
-    {
-        if (null === $this->finished_at_exact) {
-            return null;
-        }
-
-        return Carbon::parse($this->finished_at_exact);
-    }
-
     /**
      * Get the estimated remaining seconds. This requires a job progress to be set.
      *
@@ -125,11 +105,8 @@ class QueueMonitor extends BaseModel
 
     public function getElapsedInterval(?Carbon $end = null): CarbonInterval
     {
-        if (null === $end) {
-            $end = $this->getFinishedAtExact() ?? $this->finished_at ?? Carbon::now();
-        }
-
-        $startedAt = $this->getStartedAtExact() ?? $this->started_at;
+        $end ??= $this->finished_at ?? Carbon::now();
+        $startedAt = $this->started_at;
 
         if (null === $startedAt) {
             return CarbonInterval::seconds(0);
