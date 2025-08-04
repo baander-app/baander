@@ -1,5 +1,5 @@
 import { EventCallback, EventMap } from '@/services/event-bridge/events';
-import { useEffect, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { eventBridge } from '@/services/event-bridge/bridge.ts';
 
 export function useEventBridge() {
@@ -44,7 +44,6 @@ export function useEventListener<K extends keyof EventMap>(
   deps: React.DependencyList = []
 ) {
   useEffect(() => {
-    const unsubscribe = eventBridge.on(event, callback);
-    return unsubscribe;
+    return eventBridge.on(event, callback);
   }, [event, ...deps]);
 }

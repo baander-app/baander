@@ -1,30 +1,30 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Box,
-  Flex,
-  Text,
-  Card,
-  Spinner,
-  IconButton,
-  Slider,
-  Tooltip,
-  Dialog,
-  Button,
-  ScrollArea,
   Badge,
-  Separator,
+  Box,
+  Button,
+  Card,
+  Dialog,
+  Flex,
+  IconButton,
+  ScrollArea,
   Select,
+  Separator,
+  Slider,
+  Spinner,
+  Text,
+  Tooltip,
 } from '@radix-ui/themes';
 import {
-  PlayIcon,
-  PauseIcon,
-  SpeakerLoudIcon,
-  SpeakerOffIcon,
-  FileTextIcon,
+  ChatBubbleIcon,
   Cross2Icon,
   DownloadIcon,
+  FileTextIcon,
+  PauseIcon,
+  PlayIcon,
+  SpeakerLoudIcon,
+  SpeakerOffIcon,
   TrashIcon,
-  ChatBubbleIcon,
 } from '@radix-ui/react-icons';
 import Hls from 'hls.js';
 import * as dashjs from 'dashjs';
@@ -265,8 +265,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     // Handle different track types
     if (trackId.startsWith('hls-') && hlsRef.current) {
-      const hlsTrackIndex = parseInt(trackId.replace('hls-', ''));
-      hlsRef.current.subtitleTrack = hlsTrackIndex;
+      hlsRef.current.subtitleTrack = parseInt(trackId.replace('hls-', ''));
     } else if (trackId.startsWith('dash-') && dashPlayerRef.current) {
       const dashTrackIndex = parseInt(trackId.replace('dash-', ''));
       dashPlayerRef.current.setTextTrack(dashTrackIndex);

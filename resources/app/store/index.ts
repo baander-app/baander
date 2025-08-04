@@ -22,7 +22,7 @@ const persistConfig = {
 const persistedReducer = persistReducer(persistConfig, rootReducer);// as unknown as typeof rootReducer;
 
 export const makeStore = () => {
-  const store = configureStore({
+  return configureStore({
     devTools: true,
     reducer: persistedReducer,
     middleware: (getDefaultMiddleware) =>
@@ -30,8 +30,6 @@ export const makeStore = () => {
         serializableCheck: false,
       }).concat(eventBridgeMiddleware)
   });
-
-  return store;
 };
 
 export const store = makeStore();

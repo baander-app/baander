@@ -1,6 +1,45 @@
 version: "1.0"
 linter: jetbrains/qodana-php:2025.1
+
 profile:
   name: qodana.recommended
+
+php:
+  version: "8.4"
+
+exclude:
+  - name: All
+    paths:
+      - third_party
+      - vendor
+      - node_modules
+      - storage
+      - bootstrap/cache
+      - public/build
+      - public/hot
+      - public/storage
+      - storage/app
+      - storage/framework
+      - storage/logs
+      - .phpunit.result.cache
+      - coverage
+      - dist
+      - build
+      - .vscode
+      - .idea
+      - .DS_Store
+      - packages/*/vendor
+
+failThreshold: 50
+
+# Enable specific auto-fixable inspections
 include:
-  - name: CheckDependencyLicenses
+  - name: PhpMissingReturnTypeInspection
+  - name: PhpMissingParamTypeInspection
+  - name: PhpDocMissingThrowsInspection
+  - name: PhpUnusedImportInspection
+  - name: PhpCodeStyleInspection
+
+fixes:
+  cleanup: true
+  format: true

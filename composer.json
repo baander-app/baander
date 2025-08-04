@@ -6,6 +6,7 @@
     "require": {
         "php": "^8.4",
         "ext-curl": "*",
+        "ext-ionotify": "*",
         "ext-dom": "*",
         "ext-fileinfo": "*",
         "ext-gd": "*",
@@ -20,6 +21,7 @@
         "ext-mbstring": "*",
         "ext-openssl": "*",
         "ext-pcntl": "*",
+        "ext-posix": "*",
         "ext-redis": "*",
         "ext-simplexml": "*",
         "ext-swoole": "*",
@@ -60,7 +62,9 @@
         "tpetry/laravel-postgresql-enhanced": "^3.0",
         "web-auth/webauthn-lib": "^5.1.2",
         "xenos/musicbrainz": "@dev",
-        "zend/php-reader": "@dev"
+        "zend/php-reader": "@dev",
+      "ext-inotify": "*",
+      "ext-exif": "*"
     },
     "require-dev": {
         "cweagans/composer-patches": "^1.7",
