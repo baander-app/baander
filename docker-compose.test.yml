@@ -1,0 +1,83 @@
+services:
+  postgres-test:
+    image: postgres:17.5-bookworm
+    container_name: baander-postgres-test
+    restart: unless-stopped
+    networks:
+      - baander-test-network
+    ports:
+      - "127.0.0.1:5433:5432"  # Different port to avoid conflicts
+    shm_size: 128mb
+    environment:
+      POSTGRES_DB: baander_test
+      POSTGRES_USER: baander_test
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./docker/test/postgres-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U baander_test -d baander_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis-test:
+    image: redis/redis-stack-server:edge
+    container_name: baander-redis-test
+    restart: unless-stopped
+    networks:
+      - baander-test-network
+    ports:
+      - "127.0.0.1:6380:6379"  # Different port to avoid conflicts
+    volumes:
+      - redis_test_data:/data
+      - ./docker/test/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Optional: Test runner container
+  app-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      #target: development
+    container_name: baander-app-test
+    networks:
+      - baander-test-network
+    volumes:
+      - .:/var/www/html
+    environment:
+      - APP_ENV=testing
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres-test
+      - DB_PORT=5432
+      - DB_DATABASE=baander_test
+      - DB_USERNAME=baander_test
+      - DB_PASSWORD=test_password
+      - REDIS_HOST=redis-test
+      - REDIS_PORT=6379
+      - CACHE_DRIVER=redis
+      - SESSION_DRIVER=redis
+      - QUEUE_CONNECTION=redis
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    profiles:
+      - test-runner
+
+networks:
+  baander-test-network:
+    driver: bridge
+
+volumes:
+  postgres_test_data:
+    driver: local
+  redis_test_data:
+    driver: local

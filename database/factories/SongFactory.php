@@ -17,7 +17,10 @@ class SongFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'title' => $this->faker->words(3, true),
+            'path' => $this->faker->filePath(),
+            'track' => $this->faker->numberBetween(1, 20),
+            'duration' => $this->faker->numberBetween(30, 300),
         ];
     }
 }

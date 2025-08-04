@@ -1,4 +1,5 @@
-FROM php:8-zts
+# Base stage with common dependencies
+FROM php:8-zts AS base
 
 # Copy FFmpeg binaries from static build
 COPY --from=martinjuul/ffmpeg-baander-static /usr/src/ffmpeg-build-script/workspace/bin/ffmpeg /bin/ffmpeg
@@ -10,15 +11,11 @@ ARG BUILD_ARGUMENT_ENV=dev
 ARG HOST_UID=1000
 ARG HOST_GID=1000
 ARG INSIDE_DOCKER_CONTAINER=1
-ARG XDEBUG_CONFIG=main
-ARG XDEBUG_VERSION=3.4.4
 
 ENV ENV=$BUILD_ARGUMENT_ENV \
     APP_HOME=/var/www/html \
     USERNAME=www-data \
     INSIDE_DOCKER_CONTAINER=$INSIDE_DOCKER_CONTAINER \
-    XDEBUG_CONFIG=$XDEBUG_CONFIG \
-    XDEBUG_VERSION=$XDEBUG_VERSION \
     COMPOSER_ALLOW_SUPERUSER=1
 
 # Validate environment
@@ -174,10 +171,6 @@ RUN set -xe \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# Install Xdebug
-RUN set -xe && \
-    pecl install xdebug-${XDEBUG_VERSION}
-
 # Setup user permissions
 RUN set -xe && \
     mkdir -p ${APP_HOME}/public && \
@@ -192,10 +185,6 @@ COPY ./docker/dev/ca.crt /usr/local/share/ca-certificates/ca-self.crt
 COPY ./docker/dev/juul.localdomain.crt /usr/local/share/ca-certificates/juul.localdomain.crt
 RUN update-ca-certificates
 
-# Copy and configure Xdebug
-COPY /docker/dev/xdebug-main.ini /docker/dev/xdebug.ini
-RUN mv /docker/dev/xdebug.ini /usr/local/etc/php/conf.d/
-
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 RUN chmod +x /usr/bin/composer
@@ -206,8 +195,14 @@ COPY --chown=root:root ./docker/general/supervisord.conf /etc/supervisor/conf.d/
 COPY --chown=root:crontab ./docker/general/cron /var/spool/cron/crontabs/root
 RUN chmod 0600 /var/spool/cron/crontabs/root
 
-# Set working directory and switch to app user
+# Set working directory
 WORKDIR ${APP_HOME}
+
+# Copy and configure Xdebug
+COPY /docker/dev/xdebug-main.ini /docker/dev/xdebug.ini
+RUN mv /docker/dev/xdebug.ini /usr/local/etc/php/conf.d/
+
+# Switch to app user
 USER ${USERNAME}
 
 # Add bash aliases
@@ -223,3 +218,37 @@ RUN chmod +x ./start-swoole-server
 RUN COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interaction --no-progress
 
 CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+
+# Production stage without Xdebug
+FROM base AS production
+
+# Switch to app user
+USER ${USERNAME}
+
+# Add bash aliases
+RUN echo 'alias artisan="php /var/www/html/artisan"' >> /home/${USERNAME}/.bashrc
+
+# Copy application files
+COPY --chown=${USERNAME}:${USERNAME} . ${APP_HOME}/
+COPY --chown=${USERNAME}:${USERNAME} .env ${APP_HOME}/.env
+COPY --chown=${USERNAME}:${USERNAME} start-swoole-server ${APP_HOME}/start-swoole-server
+RUN chmod +x ./start-swoole-server
+
+# Install Composer dependencies (production optimized)
+RUN COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-dev --no-interaction --no-progress
+
+CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+
+# Development stage with Xdebug
+FROM base AS development
+
+ARG XDEBUG_CONFIG=main
+ARG XDEBUG_VERSION=3.4.4
+
+ENV XDEBUG_CONFIG=$XDEBUG_CONFIG \
+    XDEBUG_VERSION=$XDEBUG_VERSION
+
+# Install Xdebug (only in development stage)
+RUN set -xe && \
+    pecl install xdebug-${XDEBUG_VERSION} && \
+    docker-php-ext-enable xdebug

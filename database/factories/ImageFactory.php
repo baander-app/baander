@@ -17,7 +17,12 @@ class ImageFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'path' => $this->faker->filePath(),
+            'extension' => 'jpg',
+            'mime_type' => 'image/jpeg',
+            'size' => $this->faker->numberBetween(1000, 50000),
+            'width' => 500,
+            'height' => 500,
         ];
     }
 }

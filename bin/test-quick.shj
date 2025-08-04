@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# Quick test runner for development
+set -e
+
+echo "Running quick tests in container..."
+
+# Check if test environment is running
+if ! docker compose -f docker-compose.test.yml ps app-test | grep -q "Up"; then
+    echo "Test environment not running. Starting..."
+    ./bin/test-setup.sh
+fi
+
+# Run phpunit with basic settings inside the container
+docker compose -f docker-compose.test.yml exec app-test ./vendor/bin/phpunit --stop-on-failure
+
+echo "Quick tests completed!"
