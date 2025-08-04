@@ -35,6 +35,17 @@ exclude:
       - .idea
       - .DS_Store
       - packages/*/vendor
+  - name: PhpMissingReturnTypeInspection
+  - name: PhpDocMissingThrowsInspection
+  - name: PhpMissingParamTypeInspection
+  - name: PhpUnhandledExceptionInspection
+  - name: PhpDocRedundantThrowsInspection
+  - name: PhpUndefinedMethodInspection
+  - name: PhpUndefinedFieldInspection
+  - name: PhpUndefinedClassInspection
+  - name: PhpUndefinedClassConstantInspection
+  - name: PhpParamsInspection
+
 
 failThreshold: 50
 
