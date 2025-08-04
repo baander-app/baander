@@ -357,13 +357,11 @@ class SongSearchService
     }
 
     /**
-     * Search for song with fuzzy matching
+     * Search for song with fuzzy matching - returns structured results
      */
     public function searchFuzzy(Song $song): array
     {
-        $results = [];
-
-        // Try variations of the song title
+        $allResults = [];
         $variations = $this->generateSongTitleVariations($song->title);
 
         foreach ($variations as $variation) {
@@ -378,17 +376,70 @@ class SongSearchService
             try {
                 $searchResults = $this->musicBrainzClient->search->recording($filter);
                 if (!$searchResults->isEmpty()) {
-                    $results['musicbrainz_' . $variation] = $searchResults->take(3);
+                    foreach ($searchResults->take(3) as $result) {
+                        $allResults[] = [
+                            'id' => $result->id,
+                            'source' => 'musicbrainz',
+                            'variation_used' => $variation,
+                            'data' => $this->convertMusicBrainzRecordingToArray($result),
+                            'raw_result' => $result,
+                        ];
+                    }
                 }
             } catch (\Exception $e) {
                 Log::debug('Song fuzzy search variation failed', [
+                    'source' => 'musicbrainz',
                     'variation' => $variation,
-                    'error'     => $e->getMessage(),
+                    'error' => $e->getMessage(),
                 ]);
             }
         }
 
-        return $results;
+        // Remove duplicates based on source + id
+        $uniqueResults = collect($allResults)
+            ->unique(fn($result) => $result['source'] . '_' . $result['id'])
+            ->values()
+            ->toArray();
+
+        // Score and sort results
+        $scoredResults = array_map(function ($result) use ($song) {
+            $qualityScore = $this->qualityValidator->scoreSongMatch($result['data'], $song);
+            $result['quality_score'] = $qualityScore;
+            $result['is_high_confidence'] = $this->qualityValidator->isHighConfidenceSongMatch(
+                $result['data'],
+                $song,
+                $qualityScore
+            );
+            return $result;
+        }, $uniqueResults);
+
+        // Sort by quality score descending
+        usort($scoredResults, fn($a, $b) => $b['quality_score'] <=> $a['quality_score']);
+
+        return [
+            'total_results' => count($scoredResults),
+            'variations_tried' => $variations,
+            'results' => $scoredResults,
+            'best_match' => !empty($scoredResults) ? $scoredResults[0] : null,
+            'high_confidence_matches' => array_filter($scoredResults, fn($result) => $result['is_high_confidence']),
+        ];
+    }
+
+    /**
+     * Convert MusicBrainz recording to standardized array format
+     */
+    private function convertMusicBrainzRecordingToArray($recording): array
+    {
+        return [
+            'id' => $recording->id,
+            'title' => $recording->title ?? '',
+            'length' => $recording->length ?? null,
+            'artist-credit' => $recording->artist_credit ?? [],
+            'releases' => $recording->releases ?? [],
+            'tags' => $recording->tags ?? [],
+            'score' => $recording->score ?? 0,
+            'disambiguation' => $recording->disambiguation ?? '',
+        ];
     }
 
     /**

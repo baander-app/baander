@@ -187,15 +187,13 @@ class ArtistSearchService
         return $baseScore;
     }
 
+
     /**
-     * Search for artist with fuzzy matching
-     * Now made public to be used by external services
+     * Search for artist with fuzzy matching - returns structured results
      */
     public function searchFuzzy(Artist $artist): array
     {
-        $results = [];
-
-        // Try variations of the artist name
+        $allResults = [];
         $variations = $this->generateArtistNameVariations($artist->name);
 
         foreach ($variations as $variation) {
@@ -206,12 +204,21 @@ class ArtistSearchService
             try {
                 $searchResults = $this->musicBrainzClient->search->artist($filter);
                 if (!$searchResults->isEmpty()) {
-                    $results['musicbrainz_' . $variation] = $searchResults->take(3);
+                    foreach ($searchResults->take(3) as $result) {
+                        $allResults[] = [
+                            'id' => $result->id,
+                            'source' => 'musicbrainz',
+                            'variation_used' => $variation,
+                            'data' => $this->convertMusicBrainzArtistToArray($result),
+                            'raw_result' => $result,
+                        ];
+                    }
                 }
             } catch (\Exception $e) {
                 Log::debug('Fuzzy search variation failed', [
+                    'source' => 'musicbrainz',
                     'variation' => $variation,
-                    'error'     => $e->getMessage(),
+                    'error' => $e->getMessage(),
                 ]);
             }
 
@@ -222,17 +229,84 @@ class ArtistSearchService
             try {
                 $discogsResults = $this->discogsClient->search->artist($discogsFilter);
                 if (!$discogsResults->isEmpty()) {
-                    $results['discogs_' . $variation] = $discogsResults->take(3);
+                    foreach ($discogsResults->take(3) as $result) {
+                        $allResults[] = [
+                            'id' => $result->id,
+                            'source' => 'discogs',
+                            'variation_used' => $variation,
+                            'data' => $this->convertDiscogsArtistToArray($result),
+                            'raw_result' => $result,
+                        ];
+                    }
                 }
             } catch (\Exception $e) {
                 Log::debug('Discogs fuzzy search variation failed', [
+                    'source' => 'discogs',
                     'variation' => $variation,
-                    'error'     => $e->getMessage(),
+                    'error' => $e->getMessage(),
                 ]);
             }
         }
 
-        return $results;
+        // Remove duplicates based on source + id
+        $uniqueResults = collect($allResults)
+            ->unique(fn($result) => $result['source'] . '_' . $result['id'])
+            ->values()
+            ->toArray();
+
+        // Score and sort results
+        $scoredResults = array_map(function ($result) use ($artist) {
+            $qualityScore = $this->qualityValidator->scoreArtistMatch($result['data'], $artist);
+            $result['quality_score'] = $qualityScore;
+            $result['is_high_confidence'] = $this->qualityValidator->isHighConfidenceArtistMatch(
+                $result['data'],
+                $artist,
+                $qualityScore
+            );
+            return $result;
+        }, $uniqueResults);
+
+        // Sort by quality score descending
+        usort($scoredResults, fn($a, $b) => $b['quality_score'] <=> $a['quality_score']);
+
+        return [
+            'total_results' => count($scoredResults),
+            'variations_tried' => $variations,
+            'results' => $scoredResults,
+            'best_match' => !empty($scoredResults) ? $scoredResults[0] : null,
+            'high_confidence_matches' => array_filter($scoredResults, fn($result) => $result['is_high_confidence']),
+        ];
+    }
+
+    /**
+     * Convert MusicBrainz artist to standardized array format
+     */
+    private function convertMusicBrainzArtistToArray($artist): array
+    {
+        return [
+            'id' => $artist->id,
+            'name' => $artist->name ?? '',
+            'type' => $artist->type ?? null,
+            'country' => $artist->country ?? null,
+            'life-span' => $artist->life_span ?? null,
+            'disambiguation' => $artist->disambiguation ?? '',
+            'tags' => $artist->tags ?? [],
+            'score' => $artist->score ?? 0,
+        ];
+    }
+
+    /**
+     * Convert Discogs artist to standardized array format
+     */
+    private function convertDiscogsArtistToArray($artist): array
+    {
+        return [
+            'id' => $artist->id,
+            'name' => $artist->title ?? $artist->name ?? '',
+            'profile' => $artist->profile ?? null,
+            'images' => $artist->images ?? [],
+            'urls' => $artist->urls ?? [],
+        ];
     }
 
     /**

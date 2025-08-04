@@ -578,14 +578,13 @@ class AlbumSearchService
         ]);
     }
 
+
     /**
-     * Search for album with fuzzy matching
+     * Search for album with fuzzy matching - returns structured results
      */
     public function searchFuzzy(Album $album): array
     {
-        $results = [];
-
-        // Try variations of the album title
+        $allResults = [];
         $variations = $this->generateAlbumTitleVariations($album->title);
 
         foreach ($variations as $variation) {
@@ -601,12 +600,21 @@ class AlbumSearchService
                 try {
                     $searchResults = $this->musicBrainzClient->search->release($filter);
                     if (!$searchResults->isEmpty()) {
-                        $results['musicbrainz_' . $variation] = $searchResults->take(3);
+                        foreach ($searchResults->take(3) as $result) {
+                            $allResults[] = [
+                                'id' => $result->id,
+                                'source' => 'musicbrainz',
+                                'variation_used' => $variation,
+                                'data' => $this->convertMusicBrainzReleaseToArray($result),
+                                'raw_result' => $result,
+                            ];
+                        }
                     }
                 } catch (\Exception $e) {
                     Log::debug('Fuzzy search variation failed', [
+                        'source' => 'musicbrainz',
                         'variation' => $variation,
-                        'error'     => $e->getMessage(),
+                        'error' => $e->getMessage(),
                     ]);
                 }
             }
@@ -623,18 +631,48 @@ class AlbumSearchService
                 try {
                     $searchResults = $this->discogsClient->search->release($filter);
                     if (!$searchResults->isEmpty()) {
-                        $results['discogs_' . $variation] = $searchResults->take(3);
+                        foreach ($searchResults->take(3) as $result) {
+                            $allResults[] = [
+                                'id' => $result->id,
+                                'source' => 'discogs',
+                                'variation_used' => $variation,
+                                'data' => $this->convertDiscogsReleaseToArray($result),
+                                'raw_result' => $result,
+                            ];
+                        }
                     }
                 } catch (\Exception $e) {
                     Log::debug('Discogs fuzzy search variation failed', [
+                        'source' => 'discogs',
                         'variation' => $variation,
-                        'error'     => $e->getMessage(),
+                        'error' => $e->getMessage(),
                     ]);
                 }
             }
         }
 
-        return $results;
+        // Remove duplicates based on source + id
+        $uniqueResults = collect($allResults)
+            ->unique(fn($result) => $result['source'] . '_' . $result['id'])
+            ->values()
+            ->toArray();
+
+        // Score and sort results
+        $scoredResults = array_map(function ($result) use ($album) {
+            $qualityScore = $this->qualityValidator->scoreAlbumMatch($result['data'], $album);
+            $result['quality_score'] = $qualityScore;
+            return $result;
+        }, $uniqueResults);
+
+        // Sort by quality score descending
+        usort($scoredResults, fn($a, $b) => $b['quality_score'] <=> $a['quality_score']);
+
+        return [
+            'total_results' => count($scoredResults),
+            'variations_tried' => $variations,
+            'results' => $scoredResults,
+            'best_match' => !empty($scoredResults) ? $scoredResults[0] : null,
+        ];
     }
 
     /**
