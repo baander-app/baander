@@ -22,7 +22,7 @@ class LINK extends Frame
         protected string $additionalData = '',
     )
     {
-        parent::__construct('LINK', Encoding::UTF8);
+        parent::__construct('LINK');
     }
 
     /**

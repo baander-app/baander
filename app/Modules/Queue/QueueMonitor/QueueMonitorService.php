@@ -51,7 +51,7 @@ class QueueMonitorService
     public function getJobId(JobContract $job): string
     {
         if ($jobId = $job->getJobId()) {
-            return (string)$jobId;
+            return $jobId;
         }
 
         return sha1($job->getRawBody());
@@ -76,7 +76,7 @@ class QueueMonitorService
             $data = json_encode($event->job->initialMonitorData());
         }
 
-        QueueMonitor::create([
+        (new \App\Models\QueueMonitor)->create([
             'job_id'    => $event->id,
             /** @phpstan-ignore-next-line */
             'job_uuid'  => isset($event->payload) ? $event->payload()['uuid'] : (is_numeric($event->id) ? null : $event->id),
@@ -110,7 +110,7 @@ class QueueMonitorService
             $initialData = $jobInstance->initialMonitorData();
         }
 
-        QueueMonitor::create([
+        (new \App\Models\QueueMonitor)->create([
             'job_id'    => $event->payload->decoded['id'] ?? $event->payload->decoded['uuid'],
             'job_uuid'  => $event->payload->decoded['uuid'] ?? null,
             'name'      => $event->payload->displayName(),
@@ -122,7 +122,7 @@ class QueueMonitorService
 
         // mark the retried job
         if ($event->payload->isRetry()) {
-            QueueMonitor::where('job_uuid', $event->payload->retryOf())->update(['retried' => true]);
+            (new \App\Models\QueueMonitor)->where('job_uuid', $event->payload->retryOf())->update(['retried' => true]);
         }
     }
 
@@ -141,7 +141,7 @@ class QueueMonitorService
 
         $now = Carbon::now();
 
-        $monitor = QueueMonitor::updateOrCreate([
+        $monitor = (new \App\Models\QueueMonitor)->updateOrCreate([
             'job_id' => $jobId = self::getJobId($job),
             'queue'  => $job->getQueue() ?: 'default',
             'status' => MonitorStatus::Queued,
@@ -154,7 +154,7 @@ class QueueMonitorService
         ]);
 
         // Mark jobs with same job id (different execution) as stale
-        QueueMonitor::where('id', '!=', $monitor->id)
+        (new \App\Models\QueueMonitor)->where('id', '!=', $monitor->id)
             ->where('job_id', $jobId)
             ->where('status', '!=', MonitorStatus::Failed)
             ->whereNull('finished_at')
@@ -181,7 +181,7 @@ class QueueMonitorService
             return;
         }
 
-        $monitor = QueueMonitor::where('job_id', self::getJobId($job))
+        $monitor = (new \App\Models\QueueMonitor)->where('job_id', self::getJobId($job))
             ->where('attempt', $job->attempts())
             ->orderByDesc('started_at')
             ->first();
@@ -229,7 +229,7 @@ class QueueMonitorService
     /**
      * Determine weather the Job should be monitored, default true.
      *
-     * @param object|string|MonitoredJobContract $job
+     * @param object|string $job
      * @return bool
      */
     public function shouldBeMonitored(object|string $job): bool

@@ -2,6 +2,7 @@
 
 namespace App\Modules\TextSimilarity;
 
+use InvalidArgumentException;
 use Normalizer;
 
 class TextSimilarityService
@@ -214,23 +215,23 @@ class TextSimilarityService
         for ($i = 0; $i < $length; $i++) {
             $char = mb_substr($text, $i, 1, 'UTF-8');
 
-            if (preg_match('/[\p{Latin}]/u', $char)) {
+            if (preg_match('/\p{Latin}/u', $char)) {
                 $scripts['Latin'] = true;
-            } else if (preg_match('/[\p{Han}]/u', $char)) {
+            } else if (preg_match('/\p{Han}/u', $char)) {
                 $scripts['Han'] = true;
-            } else if (preg_match('/[\p{Hiragana}]/u', $char)) {
+            } else if (preg_match('/\p{Hiragana}/u', $char)) {
                 $scripts['Hiragana'] = true;
-            } else if (preg_match('/[\p{Katakana}]/u', $char)) {
+            } else if (preg_match('/\p{Katakana}/u', $char)) {
                 $scripts['Katakana'] = true;
-            } else if (preg_match('/[\p{Cyrillic}]/u', $char)) {
+            } else if (preg_match('/\p{Cyrillic}/u', $char)) {
                 $scripts['Cyrillic'] = true;
-            } else if (preg_match('/[\p{Arabic}]/u', $char)) {
+            } else if (preg_match('/\p{Arabic}/u', $char)) {
                 $scripts['Arabic'] = true;
-            } else if (preg_match('/[\p{Hebrew}]/u', $char)) {
+            } else if (preg_match('/\p{Hebrew}/u', $char)) {
                 $scripts['Hebrew'] = true;
-            } else if (preg_match('/[\p{Greek}]/u', $char)) {
+            } else if (preg_match('/\p{Greek}/u', $char)) {
                 $scripts['Greek'] = true;
-            } else if (preg_match('/[\p{Devanagari}]/u', $char)) {
+            } else if (preg_match('/\p{Devanagari}/u', $char)) {
                 $scripts['Devanagari'] = true;
             }
         }
@@ -263,7 +264,7 @@ class TextSimilarityService
     public function calculateWeightedAverage(array $scores, array $weights): float
     {
         if (count($scores) !== count($weights)) {
-            throw new \InvalidArgumentException('Scores and weights arrays must have the same length');
+            throw new InvalidArgumentException('Scores and weights arrays must have the same length');
         }
 
         $weightedSum = 0;

@@ -10,6 +10,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
+use JetBrains\PhpStorm\NoReturn;
 
 class QueueTopCommand extends Command
 {
@@ -71,7 +72,7 @@ class QueueTopCommand extends Command
         register_shutdown_function([$this, 'cleanup']);
     }
 
-    public function handleSignal(int $signal, int|false $previousExitCode = 0): int|false
+    #[NoReturn] public function handleSignal(int $signal, int|false $previousExitCode = 0): int|false
     {
         $signalName = match($signal) {
             SIGTERM => 'SIGTERM',
@@ -286,7 +287,7 @@ class QueueTopCommand extends Command
     private function getJobStats(): array
     {
         try {
-            $query = QueueMonitor::where('created_at', '>=', now()->subHours(24))
+            $query = (new \App\Models\QueueMonitor)->where('created_at', '>=', now()->subHours(24))
                 ->selectRaw('name')
                 ->selectRaw('COUNT(*) as total')
                 ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as running', [MonitorStatus::Running->value])
@@ -332,13 +333,13 @@ class QueueTopCommand extends Command
         try {
             $now = now();
             return [
-                '1min' => QueueMonitor::where('finished_at', '>=', $now->copy()->subMinute())
+                '1min' => (new \App\Models\QueueMonitor)->where('finished_at', '>=', $now->copy()->subMinute())
                     ->where('status', MonitorStatus::Succeeded)
                     ->count(),
-                '5min' => QueueMonitor::where('finished_at', '>=', $now->copy()->subMinutes(5))
+                '5min' => (new \App\Models\QueueMonitor)->where('finished_at', '>=', $now->copy()->subMinutes(5))
                         ->where('status', MonitorStatus::Succeeded)
                         ->count() / 5,
-                '15min' => QueueMonitor::where('finished_at', '>=', $now->copy()->subMinutes(15))
+                '15min' => (new \App\Models\QueueMonitor)->where('finished_at', '>=', $now->copy()->subMinutes(15))
                         ->where('status', MonitorStatus::Succeeded)
                         ->count() / 15,
             ];
@@ -356,7 +357,7 @@ class QueueTopCommand extends Command
     private function getTotalToday(): int
     {
         try {
-            return QueueMonitor::whereDate('created_at', today())
+            return (new \App\Models\QueueMonitor)->whereDate('created_at', today())
                 ->where('status', MonitorStatus::Succeeded)
                 ->count();
         } catch (Exception $e) {

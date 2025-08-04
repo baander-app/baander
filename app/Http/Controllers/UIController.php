@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Baander;
 use App\Models\Song;
+use JetBrains\PhpStorm\NoReturn;
 
 class UIController
 {
@@ -14,9 +15,9 @@ class UIController
         ]);
     }
 
-    public function dbg()
+    #[NoReturn] public function dbg()
     {
-        $data = Song::find(1);
+        $data = (new \App\Models\Song)->find(1);
 
         $rec = $data->getRecommendations('same_genre');
 

@@ -20,7 +20,7 @@ class EQUA extends Frame
         protected array $adjustments = [],
     )
     {
-        parent::__construct('EQUA', Encoding::UTF8);
+        parent::__construct('EQUA');
     }
 
     /**

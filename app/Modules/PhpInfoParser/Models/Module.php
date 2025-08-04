@@ -50,7 +50,7 @@ class Module implements JsonSerializable
         return $this->groups()->flatMap->configs();
     }
 
-    public function jsonSerialize(): mixed
+    public function jsonSerialize(): array
     {
         return [
             'key'    => $this->key(),

@@ -3,6 +3,7 @@
 namespace App\Modules\Metadata\Matching\Validators;
 
 use App\Models\Album;
+use App\Models\BaseModel;
 use Illuminate\Support\Facades\Log;
 
 class AlbumQualityValidator extends BaseQualityValidator
@@ -10,7 +11,7 @@ class AlbumQualityValidator extends BaseQualityValidator
     private const float MIN_QUALITY_THRESHOLD = 0.4;
     private const float HIGH_CONFIDENCE_THRESHOLD = 0.7;
 
-    public function scoreMatch(array $metadata, Album|\App\Models\BaseModel $model): float
+    public function scoreMatch(array $metadata, Album|BaseModel $model): float
     {
         $score = 0;
         $maxScore = 0;
@@ -213,7 +214,7 @@ class AlbumQualityValidator extends BaseQualityValidator
         return $qualityScore >= self::MIN_QUALITY_THRESHOLD && !empty($metadata['title']);
     }
 
-    public function isHighConfidenceMatch(array $metadata, Album|\App\Models\BaseModel $model, float $qualityScore): bool
+    public function isHighConfidenceMatch(array $metadata, Album|BaseModel $model, float $qualityScore): bool
     {
         if ($qualityScore < self::HIGH_CONFIDENCE_THRESHOLD) {
             return false;

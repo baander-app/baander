@@ -3,6 +3,9 @@
 namespace App\Modules\FFmpeg;
 
 use App\Modules\FFmpeg\Drivers\PHPFFMpeg;
+use App\Modules\FFmpeg\Filesystem\Disk;
+use App\Modules\FFmpeg\Filesystem\MediaCollection;
+use FFMpeg\Coordinate\TimeCode;
 use Illuminate\Container\Container;
 use Illuminate\Filesystem\FilesystemManager;
 use Illuminate\Support\Arr;
@@ -16,22 +19,22 @@ class MediaOpener
     use ForwardsCalls;
 
     /**
-     * @var \App\Modules\FFmpeg\Filesystem\Disk
+     * @var Disk
      */
     private $disk;
 
     /**
-     * @var \App\Modules\FFmpeg\Drivers\PHPFFMpeg
+     * @var PHPFFMpeg
      */
     private $driver;
 
     /**
-     * @var \App\Modules\FFmpeg\Filesystem\MediaCollection
+     * @var MediaCollection
      */
     private $collection;
 
     /**
-     * @var \FFMpeg\Coordinate\TimeCode
+     * @var TimeCode
      */
     private $timecode;
 
@@ -40,11 +43,11 @@ class MediaOpener
      * Gets the underlying PHPFFMpeg instance from the container if none is given.
      * Instantiates a fresh MediaCollection if none is given.
      */
-    public function __construct($disk = null, PHPFFMpeg $driver = null, MediaCollection $mediaCollection = null)
+    public function __construct($disk = null, ?PHPFFMpeg $driver = null, ?\App\Modules\FFmpeg\MediaCollection $mediaCollection = null)
     {
         $this->fromDisk($disk ?: config('plugin.webman-tech.laravel-filesystem.filesystems.default'));
 
-        $this->driver = ($driver ?: Container::get(PHPFFMpeg::class))->fresh();
+        $this->driver = ($driver ?: (new \Illuminate\Container\Container)->get(PHPFFMpeg::class))->fresh();
 
         $this->collection = $mediaCollection ?: new MediaCollection();
     }
@@ -78,7 +81,7 @@ class MediaOpener
 
     private static function makeLocalDiskFromPath(string $path): Disk
     {
-        $adapter = Container::get(FilesystemManager::class)->createLocalDriver([
+        $adapter = (new \Illuminate\Container\Container)->get(FilesystemManager::class)->createLocalDriver([
             'root' => $path,
         ]);
 
@@ -204,14 +207,14 @@ class MediaOpener
             ->inFormat(new ImageFormat());
     }
 
-    public function exportFramesByAmount(int $amount, int $width = null, int $height = null, int $quality = null): MediaExporter
+    public function exportFramesByAmount(int $amount, ?int $width = null, ?int $height = null, ?int $quality = null): MediaExporter
     {
         $interval = ($this->getDurationInSeconds() + 1) / $amount;
 
         return $this->exportFramesByInterval($interval, $width, $height, $quality);
     }
 
-    public function exportFramesByInterval(float $interval, int $width = null, int $height = null, int $quality = null): MediaExporter
+    public function exportFramesByInterval(float $interval, ?int $width = null, ?int $height = null, ?int $quality = null): MediaExporter
     {
         return $this->exportTile(
             fn(TileFactory $tileFactory)
@@ -225,7 +228,7 @@ class MediaOpener
 
     public function cleanupTemporaryFiles(): self
     {
-        Container::get(TemporaryDirectories::class)->deleteAll();
+        (new \Illuminate\Container\Container)->get(TemporaryDirectories::class)->deleteAll();
 
         return $this;
     }
@@ -242,14 +245,14 @@ class MediaOpener
     /**
      * Returns the Media object from the driver.
      */
-    public function __invoke(): AbstractMediaType
+    public function __invoke(): \FFMpeg\Media\AbstractMediaType
     {
         return $this->getDriver()->get();
     }
 
     /**
      * Forwards all calls to the underlying driver.
-     * @return void
+     * @return MediaOpener|void
      */
     public function __call($method, $arguments)
     {

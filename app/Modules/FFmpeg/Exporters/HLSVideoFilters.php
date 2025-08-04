@@ -14,7 +14,7 @@ class HLSVideoFilters
     public const string MAPPING_GLUE = "_hls_";
 
     /**
-     * @var \App\Modules\FFmpeg\Drivers\PHPFFMpeg
+     * @var PHPFFMpeg
      */
     private $driver;
 

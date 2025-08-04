@@ -3,6 +3,7 @@
 namespace App\Modules\Metadata\MediaMeta;
 
 use App\Modules\Metadata\MediaMeta\Frame\Apic;
+use App\Modules\Metadata\MediaMeta\Frame\TIT2;
 use Exception;
 use FFMpeg\FFMpeg;
 use FFMpeg\FFProbe\DataMapping\StreamCollection;
@@ -165,9 +166,9 @@ class MediaMeta
     /**
      * Get the title frame of the audio file.
      *
-     * @return \App\Modules\Metadata\MediaMeta\Frame\TIT2|null The title frame, or null if not available
+     * @return TIT2|null The title frame, or null if not available
      */
-    public function getTitleFrame(): ?\App\Modules\Metadata\MediaMeta\Frame\TIT2
+    public function getTitleFrame(): ?TIT2
     {
         try {
             $id3v2 = $this->getID3v2();

@@ -27,6 +27,6 @@ class SynchronizeRecommendationsCommand extends Command
      */
     public function handle()
     {
-        Song::generateRecommendations('similar_genre', ['user_id' => User::first()->id]);
+        Song::generateRecommendations('similar_genre', ['user_id' => (new \App\Models\User)->first()->id]);
     }
 }

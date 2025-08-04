@@ -35,7 +35,7 @@ class PasskeyService
 
     public function getAllowedCredentials(PublicKeyCredentialUserEntity $userEntity)
     {
-        $registered = Passkey::whereId($userEntity->id)->get();
+        $registered = (new \App\Models\Passkey)->whereId($userEntity->id)->get();
 
         $allowedCredentials = $registered->map(function (Passkey $passkey) {
             return $passkey->data();

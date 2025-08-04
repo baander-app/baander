@@ -5,9 +5,9 @@ namespace Baander\RedisStack\Search\Query\Filters;
 class TagFilter
 {
     public function __construct(
-        private string $field,
-        private array $values,
-        private array $charactersToEscape = [' ', '-']
+        private readonly string $field,
+        private readonly array  $values,
+        private readonly array $charactersToEscape = [' ', '-']
     ) {}
 
     public function __toString(): string

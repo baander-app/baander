@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
+use SimpleXMLElement;
 
 class GenerateMbModels extends Command
 {
@@ -86,7 +87,7 @@ class GenerateMbModels extends Command
     /**
      * Extract properties (both elements and attributes) from the schema definition.
      *
-     * @param \SimpleXMLElement $define
+     * @param SimpleXMLElement $define
      * @param string $context
      * @param int $depth
      * @return array
@@ -117,7 +118,7 @@ class GenerateMbModels extends Command
      * Extracts properties from elements and attributes and adds them to the properties array.
      *
      * @param array $properties
-     * @param \SimpleXMLElement $element
+     * @param SimpleXMLElement $element
      * @param array $visited
      * @param int $depth
      * @return void

@@ -3,11 +3,12 @@
 namespace App\Http\Resources\User;
 
 use App\Http\Resources\HasJsonCollection;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * @mixin \App\Models\User
+ * @mixin User
  */
 class UserResource extends JsonResource
 {
@@ -24,7 +25,7 @@ class UserResource extends JsonResource
             'publicId'  => $this->public_id,
             'name'      => $this->name,
             'email'     => $this->email,
-            'isAdmin'   => (bool)$this->isAdmin(),
+            'isAdmin'   => $this->isAdmin(),
             'createdAt' => $this->created_at,
             'updatedAt' => $this->updated_at,
         ];

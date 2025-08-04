@@ -29,6 +29,6 @@ try {
             print_r($document);
         }
     }
-} catch (\Exception $e) {
+} catch (Exception $e) {
     echo 'Filter-based search failed: ' . $e->getMessage();
 }

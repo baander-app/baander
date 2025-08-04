@@ -17,6 +17,7 @@ use MusicBrainz\Filter\Search\ReleaseFilter;
 use MusicBrainz\MusicBrainz;
 use MusicBrainz\Value\ArtistCredit;
 use MusicBrainz\Value\ArtistCreditList;
+use Throwable;
 
 class MetaDataMusicBrainzAlbumJob extends BaseJob implements ShouldQueue
 {
@@ -25,7 +26,7 @@ class MetaDataMusicBrainzAlbumJob extends BaseJob implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct(private Album $album)
+    public function __construct(private readonly Album $album)
     {
         //
     }
@@ -43,7 +44,7 @@ class MetaDataMusicBrainzAlbumJob extends BaseJob implements ShouldQueue
         $pageFilter = new PageFilter(0, 1);
         try {
             $artistList = $musicBrainz->api()->search()->release($releaseFilter, $pageFilter);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::warning($e->getMessage());
             $this->delete();
             return;
@@ -78,7 +79,7 @@ class MetaDataMusicBrainzAlbumJob extends BaseJob implements ShouldQueue
         foreach ($credits as $credit) {
             /** @var ArtistCredit $credit */
 
-            $artists[] = Artist::firstOrCreate([
+            $artists[] = (new \App\Models\Artist)->firstOrCreate([
                 'name' => $credit->getName(),
             ])->id;
         }

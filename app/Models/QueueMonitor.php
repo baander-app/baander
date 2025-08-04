@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
+use Throwable;
 
 class QueueMonitor extends BaseModel
 {
@@ -130,9 +131,9 @@ class QueueMonitor extends BaseModel
      *
      * @param bool $rescue Wrap the exception recreation to catch exceptions
      *
-     * @return \Throwable|null
+     * @return Throwable|null
      */
-    public function getException(bool $rescue = true): ?\Throwable
+    public function getException(bool $rescue = true): ?Throwable
     {
         if (null === $this->exception_class) {
             return null;

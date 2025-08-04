@@ -122,7 +122,7 @@ class Media
         return $temporaryDirectoryDisk->path($path);
     }
 
-    public function copyAllFromTemporaryDirectory(string $visibility = null)
+    public function copyAllFromTemporaryDirectory(?string $visibility = null)
     {
         if (!$this->temporaryDirectory) {
             return $this;
@@ -143,7 +143,7 @@ class Media
         return $this;
     }
 
-    public function setVisibility(string $visibility = null)
+    public function setVisibility(?string $visibility = null)
     {
         $disk = $this->getDisk();
 

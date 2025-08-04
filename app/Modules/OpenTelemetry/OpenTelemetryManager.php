@@ -2,6 +2,7 @@
 
 namespace App\Modules\OpenTelemetry;
 
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use OpenTelemetry\API\Globals;
@@ -9,6 +10,7 @@ use OpenTelemetry\API\Logs\LoggerInterface;
 use OpenTelemetry\API\Logs\LogRecord;
 use OpenTelemetry\API\Metrics\MeterInterface;
 use OpenTelemetry\API\Trace\SpanInterface;
+use OpenTelemetry\API\Trace\SpanKind;
 use OpenTelemetry\API\Trace\StatusCode;
 use OpenTelemetry\API\Trace\TracerInterface;
 use OpenTelemetry\Context\Context;
@@ -36,7 +38,7 @@ class OpenTelemetryManager
                 'meter'  => get_class($this->meter),
                 'logger' => get_class($this->logger),
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::channel('otel_debug')->error('OpenTelemetryManager: Failed to initialize', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -59,7 +61,7 @@ class OpenTelemetryManager
 
         try {
             $spanBuilder = $this->tracer->spanBuilder($spanName)
-                ->setSpanKind(\OpenTelemetry\API\Trace\SpanKind::KIND_SERVER)
+                ->setSpanKind(SpanKind::KIND_SERVER)
                 ->setAttribute(TraceAttributes::HTTP_REQUEST_METHOD, $request->method())
                 ->setAttribute(TraceAttributes::URL_FULL, $request->fullUrl())
                 ->setAttribute(TraceAttributes::HTTP_ROUTE, $request->route()?->uri() ?? $request->getPathInfo())
@@ -91,7 +93,7 @@ class OpenTelemetryManager
             ]);
 
             return $span;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::channel('otel_debug')->error('OpenTelemetryManager: Failed to start HTTP span', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -141,7 +143,7 @@ class OpenTelemetryManager
                 'status_code'    => $response->getStatusCode(),
                 'content_length' => $contentLength,
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::channel('otel_debug')->error('OpenTelemetryManager: Failed to finish HTTP span', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -188,7 +190,7 @@ class OpenTelemetryManager
             }
 
             return null;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::channel('otel_debug')->error('OpenTelemetryManager: Failed to get response content length', [
                 'error' => $e->getMessage(),
             ]);
@@ -205,7 +207,7 @@ class OpenTelemetryManager
 
         try {
             $span = $this->tracer->spanBuilder('db.query')
-                ->setSpanKind(\OpenTelemetry\API\Trace\SpanKind::KIND_CLIENT)
+                ->setSpanKind(SpanKind::KIND_CLIENT)
                 ->setAttribute(TraceAttributes::DB_QUERY_TEXT, $query)
                 ->setAttribute(TraceAttributes::SERVER_ADDRESS, $connection)
                 ->setAttribute(TraceAttributes::DB_SYSTEM_NAME, 'postgresql')
@@ -214,7 +216,7 @@ class OpenTelemetryManager
             Log::channel('otel_debug')->info('OpenTelemetryManager: Database span started successfully');
 
             return $span;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::channel('otel_debug')->error('OpenTelemetryManager: Failed to start database span', [
                 'error' => $e->getMessage(),
             ]);
@@ -231,7 +233,7 @@ class OpenTelemetryManager
 
         try {
             $span = $this->tracer->spanBuilder("cache.{$operation}")
-                ->setSpanKind(\OpenTelemetry\API\Trace\SpanKind::KIND_CLIENT)
+                ->setSpanKind(SpanKind::KIND_CLIENT)
                 ->setAttribute(TraceAttributes::DB_SYSTEM_NAME, 'redis')
                 ->setAttribute('cache.key', $key)
                 ->setAttribute('cache.operation', $operation)
@@ -240,7 +242,7 @@ class OpenTelemetryManager
             Log::channel('otel_debug')->info('OpenTelemetryManager: Cache span started successfully');
 
             return $span;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::channel('otel_debug')->error('OpenTelemetryManager: Failed to start cache span', [
                 'error' => $e->getMessage(),
             ]);
@@ -261,7 +263,7 @@ class OpenTelemetryManager
             $counter->add($value, $attributes);
 
             Log::channel('otel_debug')->info('OpenTelemetryManager: Metric recorded successfully');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::channel('otel_debug')->error('OpenTelemetryManager: Failed to record metric', [
                 'name'  => $name,
                 'error' => $e->getMessage(),
@@ -282,7 +284,7 @@ class OpenTelemetryManager
             $histogram->record($value, $attributes);
 
             Log::channel('otel_debug')->info('OpenTelemetryManager: Histogram recorded successfully');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::channel('otel_debug')->error('OpenTelemetryManager: Failed to record histogram', [
                 'name'  => $name,
                 'error' => $e->getMessage(),
@@ -307,7 +309,7 @@ class OpenTelemetryManager
             $this->logger->emit($logRecord);
 
             Log::channel('otel_debug')->info('OpenTelemetryManager: Event logged successfully');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::channel('otel_debug')->error('OpenTelemetryManager: Failed to log event', [
                 'message' => $message,
                 'error'   => $e->getMessage(),
@@ -325,7 +327,7 @@ class OpenTelemetryManager
             Globals::loggerProvider()->forceFlush();
 
             Log::channel('otel_debug')->info('OpenTelemetryManager: Force flush completed successfully');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::channel('otel_debug')->error('OpenTelemetryManager: Force flush failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -343,7 +345,7 @@ class OpenTelemetryManager
             Globals::loggerProvider()->shutdown();
 
             Log::channel('otel_debug')->info('OpenTelemetryManager: Shutdown completed successfully');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::channel('otel_debug')->error('OpenTelemetryManager: Shutdown failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),

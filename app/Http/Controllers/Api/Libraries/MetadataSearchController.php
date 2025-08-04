@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api\Libraries;
 
 use App\Models\{Album, TokenAbility};
 use App\Modules\Metadata\Search\AlbumSearchService;
-use Illuminate\Http\Request;
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
 
 #[Prefix('/metadata/search')]

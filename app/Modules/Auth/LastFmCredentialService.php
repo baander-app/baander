@@ -4,6 +4,7 @@ namespace App\Modules\Auth;
 
 use App\Models\ThirdPartyCredential;
 use App\Models\User;
+use Exception;
 use Illuminate\Support\Facades\Log;
 
 class LastFmCredentialService
@@ -89,7 +90,7 @@ class LastFmCredentialService
             $credential->mergeMeta($userData);
             $credential->save();
             return true;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Failed to update Last.fm user data', [
                 'user_id' => $user->id,
                 'error' => $e->getMessage()

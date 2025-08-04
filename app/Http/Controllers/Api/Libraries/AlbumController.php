@@ -34,7 +34,7 @@ class AlbumController extends Controller
         $relations = $request->query('relations');
         $genres = $request->query('genres');
 
-        $albums = Album::query()
+        $albums = (new \App\Models\Album)->query()
             ->selectFields(Album::$filterFields, $fields)
             ->withRelations(Album::$filterRelations, $relations)
             ->when($relations, function (BaseBuilder $q) use ($relations) {

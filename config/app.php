@@ -1,5 +1,11 @@
 <?php
 
+use App\Modules\Logging\LoggerServiceProvider;
+use App\Modules\Metadata\MetadataServiceProvider;
+use App\Modules\OpenTelemetry\Instrumentation\LaravelInstrumentation;
+use App\Modules\OpenTelemetry\OpenTelemetryServiceProvider;
+use App\Modules\Queue\QueueMonitorProvider;
+use App\Modules\Recommendation\RecommendationServiceProvider;
 use Illuminate\Support\Facades\Facade;
 use Illuminate\Support\ServiceProvider;
 
@@ -174,10 +180,10 @@ return [
          */
         App\Modules\Nanoid\NanoIdServiceProvider::class,
         App\Modules\BlurHash\BlurHashServiceProvider::class,
-        \App\Modules\Logging\LoggerServiceProvider::class,
-        \App\Modules\Recommendation\RecommendationServiceProvider::class,
-        \App\Modules\OpenTelemetry\OpenTelemetryServiceProvider::class,
-        \App\Modules\OpenTelemetry\Instrumentation\LaravelInstrumentation::class,
+        LoggerServiceProvider::class,
+        RecommendationServiceProvider::class,
+        OpenTelemetryServiceProvider::class,
+        LaravelInstrumentation::class,
         App\Providers\FortifyServiceProvider::class,
         App\Modules\TextSimilarity\TextSimilarityServiceProvider::class,
 
@@ -188,10 +194,10 @@ return [
         App\Providers\AuthServiceProvider::class,
         App\Providers\BroadcastServiceProvider::class,
         App\Providers\EventServiceProvider::class,
-        \App\Modules\Queue\QueueMonitorProvider::class,
+        QueueMonitorProvider::class,
         App\Providers\HorizonServiceProvider::class,
         App\Providers\IntegrationsServiceProvider::class,
-        \App\Modules\Metadata\MetadataServiceProvider::class,
+        MetadataServiceProvider::class,
         App\Providers\RouteServiceProvider::class,
         App\Providers\ScrambleServiceProvider::class,
     ])->toArray(),

@@ -4,6 +4,7 @@ namespace Baander\RedisStack\Index;
 
 use Redis;
 use RedisException;
+use RuntimeException;
 
 abstract class AbstractIndex
 {
@@ -26,7 +27,7 @@ abstract class AbstractIndex
         try {
             return $this->redis->rawCommand($command, ...$arguments);
         } catch (RedisException $exception) {
-            throw new \RuntimeException("Redis command failed: {$exception->getMessage()}");
+            throw new RuntimeException("Redis command failed: {$exception->getMessage()}");
         }
     }
 }

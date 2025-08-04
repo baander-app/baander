@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Api\Auth\Concerns\HandlesUserTokens;
+use Exception;
 use App\Http\Requests\Auth\{ForgotPasswordRequest, LoginRequest, LogoutRequest, RegisterRequest, ResetPasswordRequest};
 use App\Http\Resources\Auth\NewAccessTokenResource;
 use App\Http\Resources\User\UserResource;
 use App\Jobs\Auth\RevokeTokenJob;
+use Illuminate\Http\JsonResponse;
 use App\Models\{PersonalAccessToken, TokenAbility, User};
 use App\Modules\Auth\GeoLocationService;
 use App\Modules\Auth\TokenBindingService;
@@ -19,6 +21,7 @@ use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\{Hash, Password};
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Post, Prefix};
+use Symfony\Component\HttpFoundation\Response as ResponseAlias;
 
 /**
  * @tags Auth
@@ -49,7 +52,7 @@ class AuthController
     #[Post('login', 'auth.login')]
     public function login(LoginRequest $request)
     {
-        $user = User::whereEmail($request->input('email'))->first();
+        $user = (new \App\Models\User)->whereEmail($request->input('email'))->first();
 
         if (!$user) {
             abort(401, 'Invalid credentials.');
@@ -94,7 +97,7 @@ class AuthController
      *
      * Needs refresh token with ability "issue-access-token"
      *
-     * @param Request $request
+     * @return JsonResponse
      * @response array{
      *     streamToken: NewAccessTokenResource,
      * }
@@ -132,7 +135,7 @@ class AuthController
     #[Post('register', 'auth.register')]
     public function register(RegisterRequest $request)
     {
-        $user = User::forceCreate([
+        $user = (new \App\Models\User)->forceCreate([
             'name'     => $request->input('name'),
             'email'    => $request->input('email'),
             'password' => Hash::make($request->input('password')),
@@ -217,7 +220,7 @@ class AuthController
         );
 
 
-        (new AnonymousNotifiable())->route('mail', $user->email)->notify(new ForgotPasswordNotification($url));
+        new AnonymousNotifiable()->route('mail', $user->email)->notify(new ForgotPasswordNotification($url));
 
         return response()->json(['message' => __('Reset password link sent to your email.')]);
     }
@@ -229,7 +232,7 @@ class AuthController
     #[Post('resetPassword', 'auth.resetPassword')]
     public function resetPassword(ResetPasswordRequest $request)
     {
-        $user = User::whereEmail($request->only('email'))->firstOrFail();
+        $user = (new \App\Models\User)->whereEmail($request->only('email'))->firstOrFail();
 
         if (!Password::getRepository()->exists($user, $request->input('token'))) {
             abort(400, 'Provided invalid token.');
@@ -255,8 +258,8 @@ class AuthController
     {
         $user = User::query()->findOrFail($id);
 
-        if (method_exists($user, 'createToken') && !hash_equals((string)$hash, sha1($user->getEmailForVerification()))) {
-            throw new \Exception('Invalid hash');
+        if (method_exists($user, 'createToken') && !hash_equals($hash, sha1($user->getEmailForVerification()))) {
+            throw new Exception('Invalid hash');
         }
 
         if ($user instanceof MustVerifyEmail && $user->markEmailAsVerified()) {
@@ -284,7 +287,7 @@ class AuthController
             RevokeTokenJob::dispatch($refreshToken);
         }
 
-        return response(null, Response::HTTP_NO_CONTENT);
+        return response(null, ResponseAlias::HTTP_NO_CONTENT);
     }
 
     /**

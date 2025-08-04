@@ -2,6 +2,7 @@
 
 namespace Baander\RedisStack\Index;
 
+use Exception;
 use Redis;
 
 class IndexManager
@@ -29,7 +30,7 @@ class IndexManager
         try {
             $this->redis->rawCommand('FT.INFO', $indexName);
             return true;
-        } catch (\Exception) {
+        } catch (Exception) {
             return false;
         }
     }

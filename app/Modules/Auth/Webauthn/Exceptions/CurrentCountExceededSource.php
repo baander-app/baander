@@ -2,7 +2,9 @@
 
 namespace App\Modules\Auth\Webauthn\Exceptions;
 
-class CurrentCountExceededSource extends \Exception
+use Exception;
+
+class CurrentCountExceededSource extends Exception
 {
     public static function throw(int $current, int $source): self
     {

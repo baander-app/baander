@@ -2,6 +2,8 @@
 
 namespace App\Extensions;
 
+use Exception;
+
 class StrExt
 {
     public static function between($str, $starting_word, $ending_word): ?string
@@ -22,13 +24,13 @@ class StrExt
             // Length of our required sub string
             $size = strpos($str, $ending_word, $subtring_start) - $subtring_start;
 
-            if ($size === false || $size <= 0) {
+            if ($size <= 0) {
                 return null;
             }
 
             // Return the substring from the index substring_start of length size
             return substr($str, $subtring_start, $size);
-        } catch (\Exception) {
+        } catch (Exception) {
             return null;
         }
     }

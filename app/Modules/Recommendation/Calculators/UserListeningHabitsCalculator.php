@@ -3,6 +3,7 @@
 namespace App\Modules\Recommendation\Calculators;
 
 use App\Modules\Recommendation\Contracts\CalculatorInterface;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -370,7 +371,7 @@ class UserListeningHabitsCalculator implements CalculatorInterface
     /**
      * Apply a filter to the database query
      *
-     * @param \Illuminate\Database\Query\Builder $query
+     * @param Builder $query
      * @param string $field
      * @param mixed $filterConfig
      * @return void

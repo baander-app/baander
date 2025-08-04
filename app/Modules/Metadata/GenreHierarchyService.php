@@ -7,6 +7,7 @@ use App\Http\Integrations\Discogs\Filters\ReleaseFilter;
 use App\Http\Integrations\LastFm\LastFmClient;
 use App\Http\Integrations\MusicBrainz\MusicBrainzClient;
 use App\Models\User;
+use Exception;
 use Illuminate\Support\Facades\Log;
 
 class GenreHierarchyService
@@ -38,7 +39,7 @@ class GenreHierarchyService
                 // Get LastFM data
                 try {
                     $tagInfo = $this->lastFmClient->tags->getTagInfo($genre);
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::warning("LastFM failed for {$genre}", ['error' => $e->getMessage()]);
                     $tagInfo = [];
                 }
@@ -101,7 +102,7 @@ class GenreHierarchyService
                 'method'         => 'search_only',
             ];
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::warning("Discogs search failed for {$genre}", ['error' => $e->getMessage()]);
             return [
                 'related_styles' => [],
@@ -441,7 +442,7 @@ class GenreHierarchyService
             // Get LastFM data only
             try {
                 $tagInfo = $this->lastFmClient->tags->getTagInfo($genre);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::warning("LastFM failed for {$genre}", ['error' => $e->getMessage()]);
                 $tagInfo = [];
             }

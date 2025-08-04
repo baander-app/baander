@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Modules\Metadata\GenreHierarchyService;
+use File;
 use Illuminate\Console\Command;
 
 class GenreBuilder extends Command
@@ -73,7 +74,7 @@ class GenreBuilder extends Command
         if ($this->option('simple')) {
             $this->info("Using simple version (string matching only)");
 
-            $content = \File::get(storage_path('metadata/music_genres_seed.csv'));
+            $content = File::get(storage_path('metadata/music_genres_seed.csv'));
             $lines = preg_split('/\r\n|\r|\n/', $content);
             $genres = array_filter(array_slice($lines, 1), fn($line) => !empty(trim($line)));
             $genres = array_map('trim', $genres);
@@ -113,7 +114,7 @@ class GenreBuilder extends Command
         }
 
         // Fix CSV parsing - handle both \r\n and \n line endings
-        $content = \File::get(storage_path('metadata/music_genres_seed.csv'));
+        $content = File::get(storage_path('metadata/music_genres_seed.csv'));
         $lines = preg_split('/\r\n|\r|\n/', $content);
 
         // Remove header line and filter empty lines, trim each line

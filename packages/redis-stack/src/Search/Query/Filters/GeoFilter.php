@@ -9,11 +9,11 @@ class GeoFilter
     private const array VALID_UNITS = ['m', 'km', 'mi', 'ft'];
 
     public function __construct(
-        private string $field,
-        private float $longitude,
-        private float $latitude,
-        private float $radius,
-        private string $unit = 'km'
+        private readonly string $field,
+        private readonly float  $longitude,
+        private readonly float  $latitude,
+        private readonly float  $radius,
+        private readonly string $unit = 'km'
     ) {
         if (!in_array($this->unit, self::VALID_UNITS, true)) {
             throw new InvalidArgumentException("$unit is not a valid unit.");

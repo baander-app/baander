@@ -34,6 +34,7 @@ use App\Modules\Metadata\MediaMeta\Frame\TSRC;
 use App\Modules\Metadata\MediaMeta\Frame\TYER;
 use App\Modules\Metadata\MediaMeta\Frame\USLT;
 use Exception;
+use finfo;
 
 /**
  * This class represents a file containing ID3v2 tags.
@@ -269,7 +270,7 @@ class Id3v2
      */
     public function setApicFrame(string $imagePath, string $imageType): self
     {
-        $mimeType = new \finfo(FILEINFO_MIME_TYPE)->file($imagePath);
+        $mimeType = new finfo(FILEINFO_MIME_TYPE)->file($imagePath);
         if ($mimeType === false) {
             return $this;
         }
@@ -1115,7 +1116,7 @@ class Id3v2
         // Read the entire file content
         fseek($handle, 0, SEEK_END);
         $fileSize = ftell($handle);
-        fseek($handle, 0, SEEK_SET);
+        fseek($handle, 0);
         $fileContent = fread($handle, $fileSize);
 
         // Check if the file already has an ID3v2 tag
@@ -1176,7 +1177,7 @@ class Id3v2
         $tagHeader .= chr($tagSize & 0x7F);
 
         // Write the tag and file content
-        fseek($handle, 0, SEEK_SET);
+        fseek($handle, 0);
         fwrite($handle, $tagHeader . $framesData . $fileContent);
         fclose($handle);
     }

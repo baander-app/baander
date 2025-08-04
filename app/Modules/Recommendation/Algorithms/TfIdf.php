@@ -44,10 +44,9 @@ class TfIdf implements AlgorithmInterface
         $allTerms = array_keys($allTerms);
 
         // Calculate term frequencies for each document
-        $termFrequencies = [];
-        foreach ($this->documents as $docId => $document) {
-            $termFrequencies[$docId] = $this->calculateTermFrequency($document);
-        }
+        $termFrequencies = array_map(function ($document) {
+            return $this->calculateTermFrequency($document);
+        }, $this->documents);
 
         // Calculate inverse document frequency for each term
         $idf = [];

@@ -7,6 +7,7 @@ use App\Http\Resources\Artist\ArtistResource;
 use App\Models\{Artist, TokenAbility};
 use App\Modules\Http\Pagination\JsonPaginator;
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 #[Prefix('/libraries/{library}/artists')]
 #[Middleware([
@@ -19,7 +20,7 @@ class ArtistController
     /**
      * Get a collection of artists
      *
-     * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection<JsonPaginator<ArtistResource>>
+     * @return AnonymousResourceCollection<JsonPaginator<ArtistResource>>
      */
     #[Get('/', 'api.artists.index')]
     public function index(ArtistIndexRequest $request)
@@ -27,7 +28,7 @@ class ArtistController
         $fields = $request->query('fields');
         $relations = $request->query('relations');
 
-        $data = Artist::query()
+        $data = (new \App\Models\Artist)->query()
             ->selectFields(Artist::$filterFields, $fields)
             ->withRelations(Artist::$filterRelations, $relations)
             ->paginate();

@@ -52,7 +52,7 @@ class ManageSanctumTokens extends Command
      */
     protected function cleanExpiredTokens()
     {
-        $count = PersonalAccessToken::whereNotNull('expires_at')
+        $count = (new \App\Models\PersonalAccessToken)->whereNotNull('expires_at')
             ->where('expires_at', '<', now())
             ->delete();
 
@@ -72,7 +72,7 @@ class ManageSanctumTokens extends Command
             return 1;
         }
 
-        $tokens = PersonalAccessToken::whereNull('expires_at')
+        $tokens = (new \App\Models\PersonalAccessToken)->whereNull('expires_at')
             ->orWhere('expires_at', '>', now())
             ->get();
 
@@ -122,11 +122,11 @@ class ManageSanctumTokens extends Command
      */
     protected function showStats()
     {
-        $totalTokens = PersonalAccessToken::count();
-        $activeTokens = PersonalAccessToken::whereNull('expires_at')
+        $totalTokens = (new \App\Models\PersonalAccessToken)->count();
+        $activeTokens = (new \App\Models\PersonalAccessToken)->whereNull('expires_at')
             ->orWhere('expires_at', '>', now())
             ->count();
-        $expiredTokens = PersonalAccessToken::whereNotNull('expires_at')
+        $expiredTokens = (new \App\Models\PersonalAccessToken)->whereNotNull('expires_at')
             ->where('expires_at', '<', now())
             ->count();
 

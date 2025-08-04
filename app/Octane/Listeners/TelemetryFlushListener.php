@@ -3,6 +3,7 @@
 namespace App\Octane\Listeners;
 
 use App\Modules\OpenTelemetry\OpenTelemetryManager;
+use Exception;
 use Illuminate\Support\Facades\Log;
 use Laravel\Octane\Events\RequestTerminated;
 
@@ -33,7 +34,7 @@ class TelemetryFlushListener
                 Log::channel('otel_debug')->info('TelemetryFlushListener: Immediate flush (no Swoole)');
                 $this->telemetry->forceFlush();
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::channel('otel_debug')->error('TelemetryFlushListener: Failed to flush telemetry data', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),

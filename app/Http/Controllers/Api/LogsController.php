@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\TokenAbility;
+use Exception;
 use App\Modules\Logging\LogStreamer\{Models\LogFile};
 use App\Modules\Logging\LogStreamer\LogFileService;
 use App\Modules\Logging\LogStreamer\SearchableLogFile;
@@ -63,7 +64,7 @@ class LogsController extends Controller
                     'info' => $fileInfo,
                 ],
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'error' => 'Failed to read log file: ' . $e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -103,7 +104,7 @@ class LogsController extends Controller
             return response()->json([
                 'data' => $content,
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'error' => 'Failed to read log content: ' . $e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -137,7 +138,7 @@ class LogsController extends Controller
                     'totalLines' => $lineCount,
                 ],
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'error' => 'Failed to count lines: ' . $e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -179,7 +180,7 @@ class LogsController extends Controller
             return response()->json([
                 'data' => $results,
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'error' => 'Search failed: ' . $e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -223,7 +224,7 @@ class LogsController extends Controller
                     'showingLines' => $lines,
                 ],
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'error' => 'Failed to tail log: ' . $e->getMessage(),
             ], 500);
@@ -264,7 +265,7 @@ class LogsController extends Controller
                     'showingLines' => $lines,
                 ],
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'error' => 'Failed to read log head: ' . $e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -314,7 +315,7 @@ class LogsController extends Controller
                     ],
                 ],
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'error' => 'Failed to generate stats: ' . $e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -395,7 +396,7 @@ class LogsController extends Controller
                         $totalMatches += $results->totalMatches;
                         $searchTime += $results->searchTimeMs;
                     }
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     // Log error but continue with other files
                     logger()->warning("Failed to search in log file {$file->path}: " . $e->getMessage());
                 }
@@ -412,7 +413,7 @@ class LogsController extends Controller
                     'results'              => $allResults,
                 ],
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'error' => 'Search failed: ' . $e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);

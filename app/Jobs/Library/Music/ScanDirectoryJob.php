@@ -14,6 +14,7 @@ use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\{DB, File};
 use Illuminate\Support\LazyCollection;
 use SplFileInfo;
+use Throwable;
 
 class ScanDirectoryJob extends BaseJob implements ShouldQueue
 {
@@ -40,7 +41,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
     }
 
     /**
-     * @throws \Throwable
+     * @throws Throwable
      */
     public function handle(): void
     {
@@ -92,7 +93,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
                 $song->saveOrFail();
                 $song->artists()->sync($this->getArtistIds($songData['artists']));
                 $song->genres()->sync($this->getGenreIds($songData['genres']));
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 $this->logger()->error("Failed to save song: $song->title", [
                     'exception' => $e,
                 ]);

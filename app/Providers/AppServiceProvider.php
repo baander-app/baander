@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Http\Integrations\Transcoder\TranscoderClient;
 use App\Repositories\Cache\CacheRepositoryInterface;
 use App\Repositories\Cache\LaravelCacheRepository;
+use DateTimeZone;
 use Ergebnis\Clock\SystemClock;
 use GuzzleHttp\Client;
 use Illuminate\Foundation\Application;
@@ -22,7 +23,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->scoped(SystemClock::class, function () {
-            $timeZone = new \DateTimeZone(config('app.timezone'));
+            $timeZone = new DateTimeZone(config('app.timezone'));
 
             return new SystemClock($timeZone);
         });

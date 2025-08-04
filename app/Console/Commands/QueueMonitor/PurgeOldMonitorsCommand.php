@@ -39,7 +39,7 @@ class PurgeOldMonitorsCommand extends Command
             return 1;
         }
 
-        $query = QueueMonitor::getModel()
+        $query = (new \App\Models\QueueMonitor)->getModel()
             ->newQuery()
             ->where('started_at', '<', $beforeDate);
 
@@ -68,7 +68,7 @@ class PurgeOldMonitorsCommand extends Command
                 return;
             }
 
-            DB::table(QueueMonitor::getModel()->getTable())
+            DB::table((new \App\Models\QueueMonitor)->getModel()->getTable())
                 ->whereIn('id', $models->pluck('id'))
                 ->delete();
         });

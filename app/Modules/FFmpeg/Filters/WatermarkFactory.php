@@ -24,12 +24,12 @@ class WatermarkFactory
     public const string BOTTOM = 'bottom';
 
     /**
-     * @var \App\Modules\FFmpeg\Filesystem\Disk
+     * @var Disk
      */
     private $disk;
 
     /**
-     * @var \App\Modules\FFmpeg\Filesystem\Media
+     * @var Media
      */
     private $media;
 
@@ -42,7 +42,7 @@ class WatermarkFactory
     private $left;
 
     /**
-     * @var \Spatie\Image\Image
+     * @var Image
      */
     private $image;
 
@@ -250,7 +250,7 @@ class WatermarkFactory
     /**
      * Returns an instance of Image.
      *
-     * @return \Spatie\Image\Image
+     * @return Image
      */
     private function image(): Image
     {

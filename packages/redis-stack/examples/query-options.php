@@ -19,6 +19,6 @@ try {
         ->setExpander('SYNONYM')      // Expand query with synonyms
         ->setPayload('special-query') // Associate a payload with this query
         ->execute();
-} catch (\Exception $e) {
+} catch (Exception $e) {
     echo 'Query options search failed: ' . $e->getMessage();
 }

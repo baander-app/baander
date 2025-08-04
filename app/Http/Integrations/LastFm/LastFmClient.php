@@ -2,6 +2,7 @@
 
 namespace App\Http\Integrations\LastFm;
 
+use App\Models\User;
 use App\Http\Integrations\LastFm\Handlers\{AuthHandler, LookupHandler, SearchHandler, TagHandler, UserHandler};
 use App\Modules\Auth\LastFmCredentialService;
 use GuzzleHttp\Client;
@@ -86,7 +87,7 @@ class LastFmClient
     /**
      * Get authenticated client for a specific user
      */
-    public function forUser(\App\Models\User $user): static
+    public function forUser(User $user): static
     {
         $sessionKey = $this->credentialService->getSessionKey($user);
 

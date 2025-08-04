@@ -25,7 +25,7 @@ class FindPasskeyToAuthenticateAction
             return null;
         }
 
-        $passkey = Passkey::firstWhere('credential_id', $publicKeyCredential->rawId);
+        $passkey = (new \App\Models\Passkey)->firstWhere('credential_id', $publicKeyCredential->rawId);
 
         if (!$passkey) {
             return null;

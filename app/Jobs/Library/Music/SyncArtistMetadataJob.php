@@ -5,6 +5,7 @@ namespace App\Jobs\Library\Music;
 use App\Jobs\BaseJob;
 use App\Models\Artist;
 use App\Modules\Metadata\MetadataSyncService;
+use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -24,7 +25,7 @@ class SyncArtistMetadataJob extends BaseJob implements ShouldQueue
     public function handle(): void
     {
         $metadataSyncService = app(MetadataSyncService::class);
-        $artist = Artist::find($this->artistId);
+        $artist = (new \App\Models\Artist)->find($this->artistId);
 
         if (!$artist) {
             $this->logger()->warning('Artist not found for metadata sync', ['artist_id' => $this->artistId]);
@@ -55,7 +56,7 @@ class SyncArtistMetadataJob extends BaseJob implements ShouldQueue
                 ]);
             }
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->logger()->error('Artist metadata sync job failed', [
                 'artist_id' => $this->artistId,
                 'error'     => $e->getMessage(),
@@ -168,14 +169,6 @@ class SyncArtistMetadataJob extends BaseJob implements ShouldQueue
         //        }
     }
 
-    private function updateArtistAliases(Artist $artist, array $aliases): void
-    {
-        $this->logger()->info('Artist aliases identified', [
-            'artist_id' => $artist->id,
-            'aliases'   => $aliases,
-        ]);
-    }
-
     /**
      * Schedule additional metadata sync using the newly populated identifiers
      */
@@ -187,7 +180,7 @@ class SyncArtistMetadataJob extends BaseJob implements ShouldQueue
             'discogs_id' => $artist->discogs_id,
         ]);
 
-        SyncArtistJob::syncIdentifierBased($artist->id, false)
+        SyncArtistJob::syncIdentifierBased($artist->id)
             ->delay(now()->addMinutes(2))
             ->dispatch();
     }

@@ -15,7 +15,7 @@ class MediaOpenerFactory
     private $driver;
     private $driverResolver;
 
-    public function __construct(string $defaultDisk, PHPFFMpeg $driver = null, callable $driverResolver = null)
+    public function __construct(string $defaultDisk, ?PHPFFMpeg $driver = null, ?callable $driverResolver = null)
     {
         $this->defaultDisk = $defaultDisk;
         $this->driver = $driver;

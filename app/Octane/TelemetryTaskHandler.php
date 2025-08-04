@@ -3,6 +3,7 @@
 namespace App\Octane;
 
 use App\Modules\OpenTelemetry\OpenTelemetryManager;
+use Exception;
 use Illuminate\Support\Facades\Log;
 
 class TelemetryTaskHandler
@@ -51,7 +52,7 @@ class TelemetryTaskHandler
                         'type' => $data['type'],
                     ]);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::channel('otel_debug')->error('TelemetryTaskHandler: Task failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),

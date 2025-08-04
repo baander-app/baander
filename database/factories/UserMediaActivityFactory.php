@@ -2,10 +2,11 @@
 
 namespace Database\Factories;
 
+use App\Models\UserMediaActivity;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\UserMediaActivity>
+ * @extends Factory<UserMediaActivity>
  */
 class UserMediaActivityFactory extends Factory
 {

@@ -9,7 +9,7 @@ return new class extends Migration {
     public function up()
     {
         Schema::create('queue_monitor', function (Blueprint $table) {
-            $table->id('id');
+            $table->id();
             $table->uuid('job_uuid')->nullable();
 
             $table->text('job_id')->index();

@@ -27,6 +27,6 @@ try {
             print_r($document);
         }
     }
-} catch (\Exception $e) {
+} catch (Exception $e) {
     echo 'Sorting and pagination search failed: ' . $e->getMessage();
 }

@@ -9,7 +9,7 @@ interface MonitoredJobContract
     public function queueProgressChunk(int $collectionCount, int $perChunk): void;
 
     /**
-     * @param array<mixed, mixed> $data
+     * @param array $data
      * @param bool $merge
      *
      * @return void
@@ -21,7 +21,7 @@ interface MonitoredJobContract
     public function progressCooldown(): int;
 
     /**
-     * @return array<mixed, mixed>|null
+     * @return array|null
      */
     public function initialMonitorData(): ?array;
 }

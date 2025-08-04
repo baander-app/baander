@@ -5,14 +5,16 @@ namespace App\Jobs\Library\Music;
 use App\Events\LibraryScanCompleted;
 use App\Jobs\BaseJob;
 use App\Models\Library;
+use Log;
 use Illuminate\Contracts\Queue\{ShouldBeUnique, ShouldQueue};
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\LazyCollection;
+use Throwable;
 
 class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
 {
-    public function __construct(private Library $library)
+    public function __construct(private readonly Library $library)
     {
     }
 
@@ -50,9 +52,9 @@ class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
         LibraryScanCompleted::dispatch($this->library);
     }
 
-    public function failed(\Throwable $exception): void
+    public function failed(Throwable $exception): void
     {
-        \Log::error('ScanMusicLibraryJob permanently failed', [
+        Log::error('ScanMusicLibraryJob permanently failed', [
             'library_id' => $this->library->id,
             'error'      => $exception->getMessage(),
         ]);

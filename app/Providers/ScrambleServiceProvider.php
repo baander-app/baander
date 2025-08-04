@@ -50,10 +50,8 @@ DESC;
             $whitelist = ['api/', 'webauthn'];
 
 
-            foreach ($whitelist as $str) {
-                if (Str::contains($route->uri, $str)) {
-                    return true;
-                }
+            if (array_any($whitelist, fn($str) => Str::contains($route->uri, $str))) {
+                return true;
             }
         });
     }

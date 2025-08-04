@@ -25,7 +25,6 @@ class DevServerCommand extends Command
         '/var/www/html/app',
         '/var/www/html/config',
         '/var/www/html/routes',
-        '/var/www/html/database',
     ];
 
     private const array COLORS = [
@@ -320,7 +319,7 @@ SHELL;
 
         // Display regular output with original colors intact
         if (!empty($output)) {
-            $this->displayColoredOutput($name, $output, false);
+            $this->displayColoredOutput($name, $output);
         }
 
         // Display error output

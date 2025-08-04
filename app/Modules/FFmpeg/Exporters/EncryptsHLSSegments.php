@@ -67,7 +67,7 @@ trait EncryptsHLSSegments
     /**
      * Listener that will rotate the key.
      *
-     * @var \App\Modules\FFmpeg\FFMpeg\StdListener
+     * @var StdListener
      */
     private $listener;
 
@@ -103,7 +103,7 @@ trait EncryptsHLSSegments
      *
      * @param string $key
      * @param string $filename
-     * @return self
+     * @return HLSExporter|EncryptsHLSSegments
      */
     public function withEncryptionKey($key, $filename = 'secret.key'): self
     {
@@ -111,9 +111,9 @@ trait EncryptsHLSSegments
         $this->encryptionIV = bin2hex(static::generateEncryptionKey());
 
         $this->encryptionKeyFilename = $filename;
-        $this->encryptionSecretsRoot = (new TemporaryDirectories(
+        $this->encryptionSecretsRoot = new TemporaryDirectories(
             config('laravel-ffmpeg.temporary_files_encrypted_hls', sys_get_temp_dir()),
-        ))->create();
+        )->create();
 
         return $this;
     }
@@ -125,7 +125,7 @@ trait EncryptsHLSSegments
      *
      * @param Closure $callback
      * @param int $segmentsPerKey
-     * @return self
+     * @return HLSExporter|EncryptsHLSSegments
      */
     public function withRotatingEncryptionKey(Closure $callback, int $segmentsPerKey = 1): self
     {
@@ -238,7 +238,7 @@ trait EncryptsHLSSegments
      * Remove the listener at the end of the export to
      * prevent duplicate event handlers.
      *
-     * @return self
+     * @return HLSExporter|EncryptsHLSSegments
      */
     private function removeHandlerThatRotatesEncryptionKey(): self
     {
@@ -258,8 +258,8 @@ trait EncryptsHLSSegments
      * With this method, we loop through all segment playlists and replace
      * the absolute path to the keys to a relative ones.
      *
-     * @param \Illuminate\Support\Collection $playlistMedia
-     * @return self
+     * @param Collection $playlistMedia
+     * @return HLSExporter|EncryptsHLSSegments
      */
     private function replaceAbsolutePathsHLSEncryption(Collection $playlistMedia): self
     {
@@ -288,12 +288,12 @@ trait EncryptsHLSSegments
     /**
      * Removes the encryption keys from the temporary disk.
      *
-     * @return self
+     * @return HLSExporter|EncryptsHLSSegments
      */
     private function cleanupHLSEncryption(): self
     {
         if ($this->encryptionSecretsRoot) {
-            (new Filesystem())->deleteDirectory($this->encryptionSecretsRoot);
+            new Filesystem()->deleteDirectory($this->encryptionSecretsRoot);
         }
 
         return $this;

@@ -21,7 +21,7 @@ class POPM extends Frame
         protected int    $counter = 0,
     )
     {
-        parent::__construct('POPM', Encoding::UTF8);
+        parent::__construct('POPM');
     }
 
     /**

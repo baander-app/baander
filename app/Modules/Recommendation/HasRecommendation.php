@@ -52,7 +52,6 @@ trait HasRecommendation
     /**
      * Generate recommendations for all models of this class
      *
-     * @param string $recommendationName
      * @return int Number of recommendations generated
      */
     public static function generateRecommendations(string $recommendationName, array $options = []): int

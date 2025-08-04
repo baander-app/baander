@@ -24,7 +24,6 @@ class RedisRepository
         $data = [];
 
         foreach ($reflection->getProperties() as $property) {
-            $property->setAccessible(true);
             $value = $property->getValue($entity);
             $data[$property->getName()] = $value;
         }

@@ -4,12 +4,14 @@ namespace App\Modules\Recommendation\Services;
 
 use App\Models\Recommendation;
 use App\Modules\Recommendation\Contracts\CalculatorInterface;
+use Illuminate\Cache\TaggableStore;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Psr\Log\LoggerInterface;
+use Throwable;
 
 class RecommendationService
 {
@@ -94,7 +96,7 @@ class RecommendationService
         $tagName = "recommendations:{$modelClass}:{$name}";
 
         // Use cache tags if the cache store supports them
-        if (Cache::getStore() instanceof \Illuminate\Cache\TaggableStore) {
+        if (Cache::getStore() instanceof TaggableStore) {
             return Cache::tags($tagName)->remember($cacheKey, $cacheTtl, function () use ($model, $name) {
                 return $this->fetchRecommendations($model, $name);
             });
@@ -231,7 +233,7 @@ class RecommendationService
         try {
             $recommendations = $calculator->calculate($models, $config);
             return $this->saveRecommendations($modelClass, $name, $recommendations, $config, $options);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->logger->error("Error generating recommendations: " . $e->getMessage());
             return 0;
         }
@@ -338,7 +340,7 @@ class RecommendationService
         $cacheKey = "recommendations:{$model->getTable()}:{$model->getKey()}:$name";
         $tagName = "recommendations:$modelClass:$name";
 
-        if (Cache::getStore() instanceof \Illuminate\Cache\TaggableStore) {
+        if (Cache::getStore() instanceof TaggableStore) {
             Cache::tags($tagName)->forget($cacheKey);
             return;
         }
@@ -356,7 +358,7 @@ class RecommendationService
     public function clearRecommendationCache(string $modelClass, string $name): void
     {
         // For stores that support tags, use tag-based clearing
-        if (Cache::getStore() instanceof \Illuminate\Cache\TaggableStore) {
+        if (Cache::getStore() instanceof TaggableStore) {
             $tagName = "recommendations:{$modelClass}:{$name}";
             Cache::tags($tagName)->flush();
             return;
@@ -427,7 +429,7 @@ class RecommendationService
         // Calculate recommendations for this specific model
         try {
             $recommendations = $calculator->calculate($model, $config);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->logger->error("Error generating recommendations for model: " . $e->getMessage());
             return 0;
         }

@@ -7,6 +7,7 @@ use App\Auth\Role as RoleEnum;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class AclSeed extends Seeder
 {
@@ -16,7 +17,7 @@ class AclSeed extends Seeder
     public function run(): void
     {
         // Reset permission cache
-        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         AclFactory::createPermissionsFor('albums');
         AclFactory::createPermissionsFor('libraries');

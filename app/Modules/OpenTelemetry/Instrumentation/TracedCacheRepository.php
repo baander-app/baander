@@ -4,6 +4,7 @@ namespace App\Modules\OpenTelemetry\Instrumentation;
 
 use App\Modules\OpenTelemetry\OpenTelemetryManager;
 use App\Modules\OpenTelemetry\SpanBuilder;
+use Closure;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Support\Facades\Log;
 use OpenTelemetry\API\Trace\StatusCode;
@@ -51,17 +52,17 @@ class TracedCacheRepository implements Repository
         return $this->traceOperation('forever', func_get_args());
     }
 
-    public function remember($key, $ttl, \Closure $callback)
+    public function remember($key, $ttl, Closure $callback)
     {
         return $this->traceOperation('remember', func_get_args());
     }
 
-    public function sear($key, \Closure $callback)
+    public function sear($key, Closure $callback)
     {
         return $this->traceOperation('sear', func_get_args());
     }
 
-    public function rememberForever($key, \Closure $callback)
+    public function rememberForever($key, Closure $callback)
     {
         return $this->traceOperation('rememberForever', func_get_args());
     }

@@ -5,8 +5,11 @@ namespace Baander\RedisStack;
 use Baander\RedisStack\Index\IndexManager;
 use Baander\RedisStack\Search\SearchManager;
 use Baander\RedisStack\Suggestions\SuggestionManager;
+use Exception;
+use Log;
 use Psr\Log\LoggerInterface;
 use Redis;
+use RuntimeException;
 
 class RedisStack
 {
@@ -16,7 +19,7 @@ class RedisStack
     public function __construct(Redis $redis, ?LoggerInterface $logger = null)
     {
         $this->redis = $redis;
-        self::$logger = $logger ?? \Log::getLogger();
+        self::$logger = $logger ?? Log::getLogger();
     }
 
     public static function getLogger(): ?LoggerInterface
@@ -56,8 +59,8 @@ class RedisStack
             // Adjust this based on your actual Redis setup.
             $this->redis->flushAll();
             return true;
-        } catch (\Exception $e) {
-            throw new \RuntimeException('Could not flush database: ' . $e->getMessage());
+        } catch (Exception $e) {
+            throw new RuntimeException('Could not flush database: ' . $e->getMessage());
         }
     }
 }

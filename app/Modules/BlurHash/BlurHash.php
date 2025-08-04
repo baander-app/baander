@@ -9,7 +9,6 @@ use App\Modules\BlurHash\Exceptions\DriverNotFoundException;
 use App\Modules\BlurHash\Exceptions\UnableToCreateImageException;
 use App\Modules\BlurHash\Exceptions\UnableToGetColorException;
 use App\Modules\BlurHash\Exceptions\UnableToSetPixelException;
-use Imagick;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 class BlurHash
@@ -283,7 +282,7 @@ class BlurHash
     ];
 
     /**
-     * @var GdDriver|ImagickDriver
+     * @var Driver
      */
     public Driver $driver;
 

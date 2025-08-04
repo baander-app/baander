@@ -14,7 +14,7 @@ use App\Modules\FFmpeg\Filters\WatermarkFactory;
 trait InteractsWithFilters
 {
     /**
-     * @var \Illuminate\Support\Collection
+     * @var Collection
      */
     protected $pendingComplexFilters;
 
@@ -125,7 +125,7 @@ trait InteractsWithFilters
     /**
      * Getter for the pending complex filters.
      *
-     * @return \Illuminate\Support\Collection
+     * @return Collection
      */
     public function getPendingComplexFilters(): Collection
     {

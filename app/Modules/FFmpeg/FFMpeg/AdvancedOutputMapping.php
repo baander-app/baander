@@ -21,24 +21,24 @@ class AdvancedOutputMapping
     private $outs;
 
     /**
-     * @var \FFMpeg\Format\FormatInterface
+     * @var FormatInterface
      */
     private $format;
 
     /**
-     * @var \App\Modules\FFmpeg\Filesystem\Media
+     * @var Media
      */
     private $output;
 
     /**
      * @var boolean
      */
-    private $forceDisableAudio = false;
+    private $forceDisableAudio;
 
     /**
      * @var boolean
      */
-    private $forceDisableVideo = false;
+    private $forceDisableVideo;
 
     public function __construct(array $outs, FormatInterface $format, Media $output, bool $forceDisableAudio = false, bool $forceDisableVideo = false)
     {

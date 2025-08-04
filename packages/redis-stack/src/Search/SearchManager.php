@@ -6,7 +6,7 @@ use Redis;
 
 class SearchManager
 {
-    public function __construct(private Redis $redis) {}
+    public function __construct(private readonly Redis $redis) {}
 
     /**
      * Execute a search query using a fluent query builder.

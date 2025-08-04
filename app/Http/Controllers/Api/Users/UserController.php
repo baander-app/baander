@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Users;
 use App\Http\Concerns\Filterable;
 use App\Http\Requests\User\{CreateUserRequest, UpdateUserRequest, UserIndexRequest};
 use App\Http\Resources\User\UserResource;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use App\Models\{TokenAbility, User};
 use App\Modules\Http\Pagination\JsonPaginator;
 use Illuminate\Http\Request;
@@ -23,7 +24,7 @@ class UserController
     /**
      * Get a collection of users
      *
-     * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection<JsonPaginator<UserResource>>
+     * @return AnonymousResourceCollection<JsonPaginator<UserResource>>
      */
     #[Get('/', 'api.users.index')]
     public function index(UserIndexRequest $request)
@@ -42,7 +43,7 @@ class UserController
     #[Post('/', 'api.users.store')]
     public function create(CreateUserRequest $request)
     {
-        $user = User::create($request->validated());
+        $user = (new \App\Models\User)->create($request->validated());
 
         return new UserResource($user);
     }

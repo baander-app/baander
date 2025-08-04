@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Exception;
 use Symfony\Component\Finder\Finder;
 
 class OpCacheService
@@ -31,7 +32,7 @@ class OpCacheService
                 }
 
                 $compiled++;
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
             }
         });
 

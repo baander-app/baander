@@ -2,10 +2,12 @@
 
 namespace Baander\RedisStack;
 
+use Redis;
+
 class RuntimeConfiguration
 {
     public function __construct(
-        private \Redis $redis
+        private readonly Redis $redis
     )
     {
     }
@@ -61,11 +63,11 @@ class RuntimeConfiguration
     public function resetOptionsToDefault(): void
     {
         // Reset to RedisSearch defaults
-        $this->setMinPrefix(2);
-        $this->setMaxExpansions(200);
-        $this->setTimeoutInMilliseconds(500);
+        $this->setMinPrefix();
+        $this->setMaxExpansions();
+        $this->setTimeoutInMilliseconds();
         $this->setOnTimeoutPolicyToReturn();
-        $this->setMinPhoneticTermLength(3);
+        $this->setMinPhoneticTermLength();
     }
 
     public function getForkGCCleanThreshold(): int

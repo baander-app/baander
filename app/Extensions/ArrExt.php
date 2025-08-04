@@ -2,11 +2,14 @@
 
 namespace App\Extensions;
 
+use RecursiveArrayIterator;
+use RecursiveIteratorIterator;
+
 class ArrExt
 {
     public static function dotKeys(array $arr): array
     {
-        $iterator = new \RecursiveIteratorIterator(new \RecursiveArrayIterator($arr));
+        $iterator = new RecursiveIteratorIterator(new RecursiveArrayIterator($arr));
         $res = [];
 
         foreach ($iterator as $leaf) {

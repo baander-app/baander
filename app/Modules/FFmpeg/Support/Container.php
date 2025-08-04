@@ -13,7 +13,6 @@ class Container
 {
     /**
      * Instance
-     * @param string $plugin
      * @return array|mixed|void|null
      */
     public static function instance()

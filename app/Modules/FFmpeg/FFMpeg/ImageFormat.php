@@ -40,7 +40,7 @@ class ImageFormat extends DefaultVideo
     /**
      * Returns the video codec.
      *
-     * @return string
+     * @return string|null
      */
     public function getVideoCodec()
     {

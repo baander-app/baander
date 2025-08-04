@@ -2,7 +2,9 @@
 
 namespace App\Exceptions;
 
-class InsightException extends \Exception
+use Exception;
+
+class InsightException extends Exception
 {
 
 }

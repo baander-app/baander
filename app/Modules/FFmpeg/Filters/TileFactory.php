@@ -65,7 +65,7 @@ class TileFactory
         return $this;
     }
 
-    public function scale(int $width = null, int $height = null): self
+    public function scale(?int $width = null, ?int $height = null): self
     {
         return $this->width($width ?: -1)->height($height ?: -1);
     }
@@ -92,7 +92,7 @@ class TileFactory
         return $this;
     }
 
-    public function quality(int $quality = null): self
+    public function quality(?int $quality = null): self
     {
         $this->quality = $quality;
 

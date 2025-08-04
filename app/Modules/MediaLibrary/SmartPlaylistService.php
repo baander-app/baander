@@ -10,7 +10,7 @@ class SmartPlaylistService
 {
     public function getSongsForRules(array $rules)
     {
-        $query = Song::query();
+        $query = (new \App\Models\Song)->query();
 
         foreach ($rules as $ruleGroup) {
             $query->where(function (Builder $q) use ($ruleGroup) {

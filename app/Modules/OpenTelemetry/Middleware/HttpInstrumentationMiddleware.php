@@ -4,9 +4,11 @@ namespace App\Modules\OpenTelemetry\Middleware;
 
 use App\Modules\OpenTelemetry\OpenTelemetryManager;
 use Closure;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use OpenTelemetry\API\Trace\Propagation\TraceContextPropagator;
+use OpenTelemetry\API\Trace\StatusCode;
 use OpenTelemetry\Context\Context;
 
 class HttpInstrumentationMiddleware
@@ -47,7 +49,7 @@ class HttpInstrumentationMiddleware
 
             return $response;
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::channel('otel_debug')->error('HttpInstrumentationMiddleware: Request failed', [
                 'error'    => $e->getMessage(),
                 'trace'    => $e->getTraceAsString(),
@@ -55,7 +57,7 @@ class HttpInstrumentationMiddleware
             ]);
 
             $span->recordException($e);
-            $span->setStatus(\OpenTelemetry\API\Trace\StatusCode::STATUS_ERROR, $e->getMessage());
+            $span->setStatus(StatusCode::STATUS_ERROR, $e->getMessage());
 
             throw $e;
         } finally {

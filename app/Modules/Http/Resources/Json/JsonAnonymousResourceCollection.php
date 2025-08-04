@@ -14,6 +14,6 @@ class JsonAnonymousResourceCollection extends AnonymousResourceCollection
             $this->resource->appends($this->queryParameters);
         }
 
-        return (new JsonPaginatedResourceResponse($this))->toResponse($request);
+        return new JsonPaginatedResourceResponse($this)->toResponse($request);
     }
 }

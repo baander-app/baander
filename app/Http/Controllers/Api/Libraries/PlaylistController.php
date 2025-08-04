@@ -9,12 +9,15 @@ use App\Http\Requests\Playlist\{CreatePlaylistRequest,
     UpdatePlaylistRequest,
     UpdateSmartPlaylistRulesRequest};
 use App\Http\Resources\Playlist\PlaylistResource;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 use App\Models\{Playlist, PlaylistStatistic, Song, TokenAbility, User};
 use App\Modules\Http\Pagination\JsonPaginator;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Auth;
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Post, Prefix, Put};
+use Throwable;
 
 #[Middleware(['force.json'])]
 #[Prefix('/playlists')]
@@ -41,7 +44,7 @@ class PlaylistController extends Controller
      *
      * @param CreatePlaylistRequest $request
      * @return PlaylistResource
-     * @throws \Throwable
+     * @throws Throwable
      */
     #[Post('', 'api.playlist.store', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
     public function store(CreatePlaylistRequest $request)
@@ -99,7 +102,7 @@ class PlaylistController extends Controller
      * Delete a playlist
      *
      * @param Playlist $playlist
-     * @return \Illuminate\Http\Response
+     * @return Response
      */
     #[Delete('{playlist}', 'api.playlist.destroy', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
     public function destroy(Playlist $playlist)
@@ -116,7 +119,7 @@ class PlaylistController extends Controller
      *
      * @param Playlist $playlist
      * @param Song $song
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     #[Post('{playlist}/songs/{song}', 'api.playlist.add-song', ['auth:sanctum',
                                                                 'ability:' . TokenAbility::ACCESS_API->value])]
@@ -138,7 +141,7 @@ class PlaylistController extends Controller
      *
      * @param Playlist $playlist
      * @param Song $song
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     #[Delete('{playlist}/songs/{song}', 'api.playlist.remove-song', [
         'auth:sanctum',
@@ -165,7 +168,7 @@ class PlaylistController extends Controller
      *
      * @param Request $request
      * @param Playlist $playlist
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     #[Post('{playlist}/reorder', 'api.playlist.reorder', [
         'auth:sanctum',
@@ -196,7 +199,7 @@ class PlaylistController extends Controller
      *
      * @param Request $request
      * @param Playlist $playlist
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     #[Post('{playlist}/collaborators', 'api.playlist.collaborators.store', [
         'auth:sanctum',
@@ -223,7 +226,7 @@ class PlaylistController extends Controller
      *
      * @param Playlist $playlist
      * @param User $user
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     #[Delete('{playlist}/collaborators/{user}', 'api.playlist.collaborators.destroy', [
         'auth:sanctum',
@@ -290,7 +293,7 @@ class PlaylistController extends Controller
      * Statistics - Record view
      *
      * @param Playlist $playlist
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     #[Post('{playlist}/statistics/record/view', 'api.playlist.statistics.record-view', [
         'auth:sanctum',
@@ -309,7 +312,7 @@ class PlaylistController extends Controller
      * Statistics - Record play
      *
      * @param Playlist $playlist
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     #[Post('{playlist}/statistics/record/play', 'api.playlist.statistics.record-play', [
         'auth:sanctum',
@@ -328,7 +331,7 @@ class PlaylistController extends Controller
      * Share
      *
      * @param Playlist $playlist
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     #[Post('{playlist}/statistics/record/share', 'api.playlist.statistics.record-share', [
         'auth:sanctum',
@@ -347,7 +350,7 @@ class PlaylistController extends Controller
      * Favorite
      *
      * @param Playlist $playlist
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     #[Post('{playlist}/statistics/record/favorite', 'api.playlist.statistics.record-favorite', [
         'auth:sanctum',
@@ -367,7 +370,7 @@ class PlaylistController extends Controller
      *
      * @param CreateSmartPlaylistRequest $request
      * @return PlaylistResource
-     * @throws \Throwable
+     * @throws Throwable
      */
     #[Post('/smart', 'api.playlist.smart-create', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
     public function createSmartPlaylist(CreateSmartPlaylistRequest $request)
@@ -415,7 +418,7 @@ class PlaylistController extends Controller
      * Smart playlist - Sync
      *
      * @param Playlist $playlist
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     #[Post('{playlist}/smart/sync', 'api.playlist.smart-sync', ['auth:sanctum',
                                                            'ability:' . TokenAbility::ACCESS_API->value])]

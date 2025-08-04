@@ -3,6 +3,7 @@
 namespace App\Modules\Metadata;
 
 use App\Models\Album;
+use Exception;
 use Illuminate\Support\Facades\Log;
 
 class LocalMetadataService
@@ -40,7 +41,7 @@ class LocalMetadataService
                 'quality_score' => $results['quality_score'],
             ]);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Local metadata enhancement failed', [
                 'album_id' => $album->id,
                 'error'    => $e->getMessage(),
@@ -108,33 +109,6 @@ class LocalMetadataService
         return min($score, 0.6); // Cap at 0.6 for local analysis
     }
 
-    private function analyzeGenres(Album $album): array
-    {
-        // Analyze genres from song metadata or file metadata
-        $genres = [];
-
-        // Get genres from associated songs
-        $songGenres = $album->songs
-            ->flatMap(function ($genre) {
-                return explode(',', $genre);
-            })
-            ->map(function ($genre) {
-                return trim($genre);
-            })
-            ->filter()
-            ->unique()
-            ->values()
-            ->toArray();
-
-        $genres = array_merge($genres, $songGenres);
-
-        // For Thai music, try to detect common Thai genres
-        $thaiGenres = $this->detectThaiGenres($album);
-        $genres = array_merge($genres, $thaiGenres);
-
-        return array_unique($genres);
-    }
-
     private function detectThaiGenres(Album $album): array
     {
         $genres = [];
@@ -142,7 +116,7 @@ class LocalMetadataService
         $artistName = strtolower($album->artists->first()->name ?? '');
 
         // Simple heuristics for Thai music genres
-        if (preg_match('/[\p{Thai}]/u', $album->title) || preg_match('/[\p{Thai}]/u', $artistName)) {
+        if (preg_match('/\p{Thai}/u', $album->title) || preg_match('/\p{Thai}/u', $artistName)) {
             // If contains Thai characters, likely Thai music
             $genres[] = 'Thai Pop';
 

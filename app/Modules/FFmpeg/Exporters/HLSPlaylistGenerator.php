@@ -38,7 +38,7 @@ class HLSPlaylistGenerator implements PlaylistGenerator
      * to each playlist.
      *
      * @param array $segmentPlaylists
-     * @param \App\Modules\FFmpeg\Drivers\PHPFFMpeg $driver
+     * @param PHPFFMpeg $driver
      * @return string
      */
     public function get(array $segmentPlaylists, PHPFFMpeg $driver): string
@@ -46,7 +46,7 @@ class HLSPlaylistGenerator implements PlaylistGenerator
         return Collection::make($segmentPlaylists)->map(function (Media $segmentPlaylist, $key) use ($driver) {
             $streamInfoLine = $this->getStreamInfoLine($segmentPlaylist, $key);
 
-            $media = (new MediaOpener($segmentPlaylist->getDisk(), $driver))
+            $media = new MediaOpener($segmentPlaylist->getDisk(), $driver)
                 ->openWithInputOptions($segmentPlaylist->getPath(), ['-allowed_extensions', 'ALL']);
 
             if ($media->getVideoStream()) {

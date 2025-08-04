@@ -2,8 +2,6 @@
 
 namespace App\Modules\Recommendation\Algorithms;
 
-use App\Modules\Recommendation\Contracts\AlgorithmInterface;
-
 class MinMaxNorm
 {
     public function __construct(
@@ -49,13 +47,12 @@ class MinMaxNorm
         }
 
         // Calculate min/max for each feature
-        $featureMinMax = [];
-        foreach ($features as $feature => $values) {
-            $featureMinMax[$feature] = [
+        $featureMinMax = array_map(function ($values) {
+            return [
                 'min' => min($values),
                 'max' => max($values)
             ];
-        }
+        }, $features);
 
         // Normalize each feature set
         foreach ($featureSets as $setKey => $set) {

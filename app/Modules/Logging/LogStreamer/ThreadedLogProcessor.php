@@ -4,15 +4,16 @@ namespace App\Modules\Logging\LogStreamer;
 
 use App\Modules\Logging\LogStreamer\Models\ContentChunk;
 use App\Modules\Logging\LogStreamer\Models\SearchResults;
+use Exception;
 use RuntimeException;
 use Swoole\Thread;
 use Swoole\Thread\Queue;
 
 class ThreadedLogProcessor
 {
-    private const MAX_THREADS = 4;
-    private const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
-    private const MIN_FILE_SIZE_FOR_THREADING = 512 * 1024; // 512KB
+    private const int MAX_THREADS = 4;
+    private const int|float CHUNK_SIZE = 1024 * 1024; // 1MB chunks
+    private const int|float MIN_FILE_SIZE_FOR_THREADING = 512 * 1024; // 512KB
 
     public function __construct(
         private readonly string $filePath
@@ -131,7 +132,7 @@ class ThreadedLogProcessor
             }
 
             return $totalLines;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return $this->countLinesSequential();
         }
     }

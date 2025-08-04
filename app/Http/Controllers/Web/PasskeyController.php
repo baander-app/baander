@@ -15,6 +15,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{Log, Session};
 use Spatie\RouteAttributes\Attributes\{Get, Post, Prefix};
+use Throwable;
 
 /**
  * @tags Auth
@@ -110,7 +111,7 @@ class PasskeyController extends Controller
                 $request->host(),
                 ['name' => $request->get('name')],
             );
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('Could not store passkey', [
                 'exception.message' => $e->getMessage(),
                 'exception.code'    => $e->getCode(),

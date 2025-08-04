@@ -11,7 +11,7 @@ class GeoField extends Field
     private float $radius;
     private string $unit;
 
-    private const ALLOWED_UNITS = ['m', 'km', 'mi', 'ft'];
+    private const array ALLOWED_UNITS = ['m', 'km', 'mi', 'ft'];
 
     public function __construct(string $fieldName, float $longitude, float $latitude, float $radius, string $unit = 'km')
     {

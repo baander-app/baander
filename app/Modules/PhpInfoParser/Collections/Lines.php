@@ -59,7 +59,7 @@ class Lines extends Collection
     public function shouldIgnore(): bool
     {
         return $this->currentIsBlank() // || str_contains($this->current(), '_______________________________________________________________________')
-            || in_array($this->current(), ['Configuration']);
+            || $this->current() == 'Configuration';
     }
 
     public function currentIsBlank(): bool
@@ -105,7 +105,7 @@ class Lines extends Collection
     public function isGroupTitle(): bool
     {
         // Some group titles have obvious signals
-        if (str_contains($this->current(), "                     ") || in_array($this->current(), ["Module Name"])) {
+        if (str_contains($this->current(), "                     ") || $this->current() == "Module Name") {
             return true;
         }
 

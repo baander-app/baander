@@ -3,6 +3,9 @@
 namespace App\Modules\Filesystem;
 
 use App\Modules\Filesystem\Exceptions\InotifyException;
+use FilesystemIterator;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 
 
 class InotifyWrapper
@@ -256,9 +259,9 @@ class InotifyWrapper
         $watchCount++;
 
         // Add watches for subdirectories
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::SELF_FIRST,
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::SELF_FIRST,
         );
 
         foreach ($iterator as $file) {

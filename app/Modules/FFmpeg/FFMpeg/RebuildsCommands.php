@@ -14,7 +14,7 @@ trait RebuildsCommands
      * Builds the command using the underlying library and then
      * prepends the input with the headers.
      *
-     * @param \FFMpeg\Format\FormatInterface $format
+     * @param FormatInterface $format
      * @param string $outputPathfile
      * @return array
      */

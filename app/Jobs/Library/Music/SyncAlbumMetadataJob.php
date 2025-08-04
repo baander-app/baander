@@ -4,7 +4,10 @@ namespace App\Jobs\Library\Music;
 
 use App\Jobs\BaseJob;
 use App\Models\Album;
+use App\Models\Genre;
 use App\Modules\Metadata\MetadataSyncService;
+use Error;
+use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -25,7 +28,7 @@ class SyncAlbumMetadataJob extends BaseJob implements ShouldQueue
     public function handle(): void
     {
         $metadataSyncService = app(MetadataSyncService::class);
-        $album = Album::find($this->albumId);
+        $album = (new \App\Models\Album)->find($this->albumId);
 
         if (!$album) {
             $this->logger()->warning('Album not found for metadata sync', ['album_id' => $this->albumId]);
@@ -58,7 +61,7 @@ class SyncAlbumMetadataJob extends BaseJob implements ShouldQueue
                 ]);
             }
 
-        } catch (\Exception|\Error $e) {
+        } catch (Exception|Error $e) {
             $this->logger()->error('Album metadata sync job failed', [
                 'album_id' => $this->albumId,
                 'error'    => $e->getMessage(),
@@ -122,7 +125,7 @@ class SyncAlbumMetadataJob extends BaseJob implements ShouldQueue
     private function updateSongGenres(Album $album, array $genreNames): void
     {
         $genres = collect($genreNames)->map(function ($genreName) {
-            return \App\Models\Genre::firstOrCreate(['name' => $genreName]);
+            return (new \App\Models\Genre)->firstOrCreate(['name' => $genreName]);
         });
 
         foreach ($album->songs as $song) {

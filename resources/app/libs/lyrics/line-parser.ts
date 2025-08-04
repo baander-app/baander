@@ -82,7 +82,7 @@ export function parseTags(line: string): null | [string[], string] {
   }
   const tag = matches[0];
   const content = line.slice(tag.length);
-  return [tag.slice(1, -1).split(/\]\s*\[/), content];
+  return [tag.slice(1, -1).split(/]\s*\[/), content];
 }
 
 /**

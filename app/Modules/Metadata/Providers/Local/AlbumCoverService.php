@@ -4,7 +4,6 @@ namespace App\Modules\Metadata\Providers\Local;
 
 use App\Jobs\Library\Music\SaveAlbumCoverJob;
 use App\Models\Album;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
 
@@ -33,7 +32,7 @@ class AlbumCoverService
      */
     public function findAlbumsWithoutCovers(array $options = []): Collection
     {
-        $query = Album::query()
+        $query = (new \App\Models\Album)->query()
             ->with(['cover', 'songs' => function ($query) {
                 $query->limit(1); // We only need one song per album for cover extraction
             }]);
@@ -136,9 +135,9 @@ class AlbumCoverService
     /**
      * Get statistics about albums and their cover status
      */
-    public function getCoverStatistics(int $libraryId = null): array
+    public function getCoverStatistics(?int $libraryId = null): array
     {
-        $query = Album::query();
+        $query = (new \App\Models\Album)->query();
 
         if ($libraryId) {
             $query->where('library_id', $libraryId);

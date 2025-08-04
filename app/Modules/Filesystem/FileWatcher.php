@@ -5,6 +5,7 @@ namespace App\Modules\Filesystem;
 use App\Modules\Filesystem\Exceptions\InotifyException;
 use Closure;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class FileWatcher
 {
@@ -159,7 +160,7 @@ class FileWatcher
         foreach ($this->callbacks as $callback) {
             try {
                 $callback($path, $event);
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 Log::error("FileWatcher callback error: " . $e->getMessage());
             }
         }

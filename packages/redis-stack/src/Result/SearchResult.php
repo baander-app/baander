@@ -2,6 +2,8 @@
 
 namespace Baander\RedisStack\Result;
 
+use stdClass;
+
 class SearchResult
 {
     protected $count;
@@ -52,7 +54,7 @@ class SearchResult
         $count = array_shift($raw);
         $documents = [];
         for ($i = 0; $i < count($raw); $i += $documentWidth) {
-            $document = $documentsAsArray ? [] : new \stdClass();
+            $document = $documentsAsArray ? [] : new stdClass();
             $documentsAsArray ?
                 $document['id'] = $raw[$i] :
                 $document->id = $raw[$i];

@@ -2,13 +2,16 @@
 
 namespace App\Modules\FFmpeg\Support;
 
+use App\Modules\FFmpeg\Http\DynamicHLSPlaylist;
+use App\Modules\FFmpeg\MediaOpener;
+
 /**
- * @method static \App\Modules\FFmpeg\Http\DynamicHLSPlaylist dynamicHLSPlaylist($disk)
- * @method static \App\Modules\FFmpeg\MediaOpener fromDisk($disk)
- * @method static \App\Modules\FFmpeg\MediaOpener fromFilesystem(\Illuminate\Contracts\Filesystem\Filesystem $filesystem)
- * @method static \App\Modules\FFmpeg\MediaOpener open($path)
- * @method static \App\Modules\FFmpeg\MediaOpener openUrl($path, array $headers = [])
- * @method static \App\Modules\FFmpeg\MediaOpener cleanupTemporaryFiles()
+ * @method static DynamicHLSPlaylist dynamicHLSPlaylist($disk)
+ * @method static MediaOpener fromDisk($disk)
+ * @method static MediaOpener fromFilesystem(\Illuminate\Contracts\Filesystem\Filesystem $filesystem)
+ * @method static MediaOpener open($path)
+ * @method static MediaOpener openUrl($path, array $headers = [])
+ * @method static MediaOpener cleanupTemporaryFiles()
  *
  * @see \App\Modules\FFmpeg\MediaOpener
  */

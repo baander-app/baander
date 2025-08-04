@@ -3,8 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\TokenAbility;
-use Illuminate\Http\Request;
 use SimpleXMLElement;
 use Spatie\RouteAttributes\Attributes\Get;
 use Spatie\RouteAttributes\Attributes\Middleware;
@@ -60,7 +58,7 @@ class SchemaController extends Controller
 
         $attributes = [];
         foreach ($element->attributes() as $attrName => $attrValue) {
-            $attributes[(string) $attrName] = (string) $attrValue;
+            $attributes[$attrName] = (string) $attrValue;
         }
 
         $childrenData = [];

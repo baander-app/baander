@@ -26,6 +26,6 @@ try {
             print_r($document);
         }
     }
-} catch (\Exception $e) {
+} catch (Exception $e) {
     echo 'Search failed: ' . $e->getMessage();
 }

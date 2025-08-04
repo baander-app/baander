@@ -2,7 +2,9 @@
 
 namespace Baander\RedisStack\Exceptions;
 
-class Exception extends \Error
+use Error;
+
+class Exception extends Error
 {
 
 }

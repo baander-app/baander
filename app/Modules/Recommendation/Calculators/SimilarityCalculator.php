@@ -6,6 +6,7 @@ use App\Modules\Recommendation\Algorithms\{EuclideanDistance, HammingDistance, J
 use App\Modules\Recommendation\Contracts\CalculatorInterface;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Throwable;
 
 class SimilarityCalculator implements CalculatorInterface
 {
@@ -105,7 +106,7 @@ class SimilarityCalculator implements CalculatorInterface
      * Normalize source data to a collection of models
      *
      * @param mixed $sourceData
-     * @return \Illuminate\Database\Eloquent\Collection
+     * @return Collection
      */
     private function normalizeSourceData($sourceData)
     {
@@ -173,7 +174,7 @@ class SimilarityCalculator implements CalculatorInterface
                 try {
                     $jaccardIndex = JaccardIndex::fromArrays($sourceTaxonomies, $targetTaxonomies);
                     $scores['taxonomy'] = $jaccardIndex->calculate() * 100;
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     // Handle calculation errors gracefully
                     $scores['taxonomy'] = 0;
                 }
@@ -194,7 +195,7 @@ class SimilarityCalculator implements CalculatorInterface
                     // Calculate feature similarity using Hamming distance for feature arrays
                     $hammingDistance = HammingDistance::forFeatureArrays($sourceFeatures, $targetFeatures);
                     $scores['feature'] = (1 - $hammingDistance) * 100;
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     $scores['feature'] = 0;
                 }
             }
@@ -214,7 +215,7 @@ class SimilarityCalculator implements CalculatorInterface
                     $euclideanDistance = new EuclideanDistance($normalizedSource, $normalizedTarget);
                     // The improved EuclideanDistance class handles similarity calculation correctly
                     $scores['numeric'] = $euclideanDistance->calculate(false) * 100;
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     $scores['numeric'] = 0;
                 }
             }

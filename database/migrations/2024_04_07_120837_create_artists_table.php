@@ -29,8 +29,8 @@ return new class extends Migration
             $table->caseInsensitiveText('sort_name')->nullable()->comment('Name for sorting purposes');
 
             // Add indexes for common queries
-            $table->index('country', 'idx_artists_country');;
-            $table->index('type', 'idx_artists_type');;
+            $table->index('country', 'idx_artists_country');
+            $table->index('type', 'idx_artists_type');
 
             $table->timestampsTz();
 

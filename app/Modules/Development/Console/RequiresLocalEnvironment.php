@@ -2,10 +2,11 @@
 
 namespace App\Modules\Development\Console;
 
+use Attribute;
 use Illuminate\Console\Command;
 use ReflectionMethod;
 
-#[\Attribute(\Attribute::TARGET_METHOD)]
+#[Attribute(Attribute::TARGET_METHOD)]
 class RequiresLocalEnvironment
 {
     public function check(Command $command): bool

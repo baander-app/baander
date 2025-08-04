@@ -53,7 +53,7 @@ class ETCO extends Frame
         protected int   $format = self::FORMAT_MILLISECONDS,
     )
     {
-        parent::__construct('ETCO', Encoding::UTF8);
+        parent::__construct('ETCO');
     }
 
     /**

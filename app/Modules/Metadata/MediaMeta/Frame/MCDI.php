@@ -19,7 +19,7 @@ class MCDI extends Frame
         protected string $cdToc = '',
     )
     {
-        parent::__construct('MCDI', Encoding::UTF8);
+        parent::__construct('MCDI');
     }
 
     /**

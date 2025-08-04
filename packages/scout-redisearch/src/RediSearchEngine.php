@@ -4,9 +4,11 @@ namespace Baander\ScoutRediSearch;
 
 use Baander\RedisStack\RedisStack;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\LazyCollection;
 use Laravel\Scout\Builder;
 use Laravel\Scout\Engines\Engine;
 use Laravel\Scout\Searchable;
+use RuntimeException;
 
 class RediSearchEngine extends Engine
 {
@@ -20,7 +22,7 @@ class RediSearchEngine extends Engine
     /**
      * Add or update documents in the index.
      *
-     * @param \Illuminate\Database\Eloquent\Collection<Searchable> $models
+     * @param Collection<Searchable> $models
      */
     public function update($models)
     {
@@ -32,7 +34,7 @@ class RediSearchEngine extends Engine
         if ($model && method_exists($model, 'searchableAs')) {
             $indexName = $model->searchableAs();
         } else {
-            throw new \RuntimeException('No searchable model found.');
+            throw new RuntimeException('No searchable model found.');
         }
 
         foreach ($models as $model) {
@@ -161,7 +163,7 @@ class RediSearchEngine extends Engine
      * @param Builder $builder
      * @param mixed $results
      * @param mixed $model
-     * @return \Illuminate\Support\LazyCollection
+     * @return LazyCollection
      */
     public function lazyMap(Builder $builder, $results, $model)
     {

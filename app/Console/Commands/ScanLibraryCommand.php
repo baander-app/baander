@@ -27,7 +27,7 @@ class ScanLibraryCommand extends Command
      */
     public function handle()
     {
-        $library = Library::first();
+        $library = (new \App\Models\Library)->first();
 
         dispatch(new ScanMusicLibraryJob(library: $library));
     }

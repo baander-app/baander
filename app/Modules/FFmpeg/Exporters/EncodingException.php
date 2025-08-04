@@ -30,7 +30,7 @@ class EncodingException extends RuntimeException
         return $this->getAlchemyException()?->getErrorOutput();
     }
 
-    public function getAlchemyException(): ?ExecutionFailureException
+    public function getAlchemyException(): \Throwable
     {
         return $this->getPrevious();
     }

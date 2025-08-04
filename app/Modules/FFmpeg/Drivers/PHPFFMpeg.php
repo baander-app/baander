@@ -13,19 +13,19 @@ use App\Modules\FFmpeg\FFMpeg\{AdvancedMedia, AudioMedia, FFProbe, VideoMedia};
 use App\Modules\FFmpeg\Filesystem\MediaCollection;
 
 /**
- * @mixin \FFMpeg\Media\AbstractMediaType
+ * @mixin AbstractMediaType
  */
 class PHPFFMpeg
 {
     use ForwardsCalls, InteractsWithFilters, InteractsWithMediaStreams;
 
     /**
-     * @var \FFMpeg\FFMpeg
+     * @var FFMpeg
      */
     private $ffmpeg;
 
     /**
-     * @var \App\Modules\FFmpeg\Filesystem\MediaCollection
+     * @var MediaCollection
      */
     private $mediaCollection;
 
@@ -35,7 +35,7 @@ class PHPFFMpeg
     private $forceAdvanced = false;
 
     /**
-     * @var \FFMpeg\Media\AbstractMediaType
+     * @var AbstractMediaType
      */
     private $media;
 

@@ -80,7 +80,7 @@ abstract class Result implements JsonSerializable
         return $this->configs;
     }
 
-    public function jsonSerialize(): mixed
+    public function jsonSerialize(): array
     {
         return [
             'version' => $this->version(),

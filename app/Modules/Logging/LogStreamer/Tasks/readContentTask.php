@@ -1,10 +1,11 @@
 <?php
 
+use JetBrains\PhpStorm\NoReturn;
 use Swoole\Thread;
 use Swoole\Thread\Queue;
 
 // Enhanced error handling
-function handleError(Queue $queue, string $message): void
+#[NoReturn] function handleError(Queue $queue, string $message): void
 {
     error_log("Read Content Task Error: $message");
     $queue->push('');

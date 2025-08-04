@@ -12,6 +12,7 @@ use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\{DB, File};
 use Illuminate\Support\LazyCollection;
+use Log;
 
 class ScanMovieLibraryJob extends BaseJob implements ShouldQueue
 {
@@ -44,19 +45,19 @@ class ScanMovieLibraryJob extends BaseJob implements ShouldQueue
             $path = $this->library->path;
 
             $directories = LazyCollection::make(File::directories($path));
-            \Log::channel('stdout')->info('Found ' . $directories->count() . ' directories in ' . $path);
+            Log::channel('stdout')->info('Found ' . $directories->count() . ' directories in ' . $path);
 
             $totalDirectories = count($directories);
             $processedDirectories = 0;
             $chunkSize = 10;
 
             $directories->chunk($chunkSize)->each(function ($chunk) use (&$processedDirectories, $totalDirectories, &$chunkSize) {
-                \Log::channel('stdout')->info('Processing ' . $processedDirectories . '/' . $totalDirectories . ' directories');
+                Log::channel('stdout')->info('Processing ' . $processedDirectories . '/' . $totalDirectories . ' directories');
                 foreach ($chunk as $directory) {
                     try {
                         $this->scanDirectory($directory);
                     } catch (\Exception $e) {
-                        \Log::channel('stdout')->error('Failed to scan directory: ' . $directory, [
+                        Log::channel('stdout')->error('Failed to scan directory: ' . $directory, [
                             'error' => $e->getMessage(),
                             'trace' => $e->getTraceAsString()
                         ]);
@@ -68,7 +69,7 @@ class ScanMovieLibraryJob extends BaseJob implements ShouldQueue
 
             unset($this->library, $this->movieCache);
         } catch (\Exception $e) {
-            \Log::channel('stdout')->error('ScanMovieLibraryJob failed', [
+            Log::channel('stdout')->error('ScanMovieLibraryJob failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
@@ -83,24 +84,24 @@ class ScanMovieLibraryJob extends BaseJob implements ShouldQueue
     {
         try {
             $files = LazyCollection::make(File::files($directory));
-            \Log::channel('stdout')->info('Found ' . $files->count() . ' files in ' . $directory);
+            Log::channel('stdout')->info('Found ' . $files->count() . ' files in ' . $directory);
 
             $movieInfo = $this->parseMovieFromDirectoryName($directory);
             if (!$movieInfo) {
-                \Log::channel('stdout')->error('Failed to parse movie info from directory name', [
+                Log::channel('stdout')->error('Failed to parse movie info from directory name', [
                     'directory' => $directory,
                 ]);
                 return;
             }
 
             $movie = $this->findOrCreateMovie($movieInfo);
-            \Log::channel('stdout')->info('Movie found/created', ['movie_id' => $movie->id, 'title' => $movie->title]);
+            Log::channel('stdout')->info('Movie found/created', ['movie_id' => $movie->id, 'title' => $movie->title]);
 
             $files->each(function (\SplFileInfo $file) {
                 try {
                     $mimeType = mime_content_type($file->getRealPath());
                 } catch (\Exception $e) {
-                    \Log::channel('stdout')->error('Failed to get mime type for file: ' . $file->getFilename(), [
+                    Log::channel('stdout')->error('Failed to get mime type for file: ' . $file->getFilename(), [
                         'path' => $file->getRealPath(),
                         'error' => $e->getMessage(),
                         'trace' => $e->getTraceAsString()
@@ -112,24 +113,24 @@ class ScanMovieLibraryJob extends BaseJob implements ShouldQueue
                     $mimeType = mime_content_type($file->getRealPath());
                     return explode('/', $mimeType)[0] === 'video';
                 } catch (\Exception $e) {
-                    \Log::channel('stdout')->error('Failed to get mime type for file: ' . $file->getFilename(), [
+                    Log::channel('stdout')->error('Failed to get mime type for file: ' . $file->getFilename(), [
                         'error' => $e->getMessage()
                     ]);
                     return false;
                 }
             });
 
-            \Log::channel('stdout')->info('Found video files', ['count' => $videoFiles->count()]);
+            Log::channel('stdout')->info('Found video files', ['count' => $videoFiles->count()]);
 
             if ($videoFiles->count() > 0) {
-                \Log::channel('stdout')->info('Processing video files...');
+                Log::channel('stdout')->info('Processing video files...');
                 $this->processVideoFiles($videoFiles, $movie);
-                \Log::channel('stdout')->info('Finished processing video files');
+                Log::channel('stdout')->info('Finished processing video files');
             } else {
-                \Log::channel('stdout')->info('No video files found in directory');
+                Log::channel('stdout')->info('No video files found in directory');
             }
         } catch (\Exception $e) {
-            \Log::channel('stdout')->error('Failed to scan directory: ' . $directory, [
+            Log::channel('stdout')->error('Failed to scan directory: ' . $directory, [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
@@ -229,7 +230,7 @@ class ScanMovieLibraryJob extends BaseJob implements ShouldQueue
                         DB::table('movie_video')->insert($videosToAssociate);
                     }
                 } catch (\Exception $e) {
-                    \Log::channel('stdout')->error('Failed to process video files chunk', [
+                    Log::channel('stdout')->error('Failed to process video files chunk', [
                         'movie_id' => $movie->id,
                         'error' => $e->getMessage(),
                         'trace' => $e->getTraceAsString()
@@ -238,7 +239,7 @@ class ScanMovieLibraryJob extends BaseJob implements ShouldQueue
                 }
             });
         } catch (\Exception $e) {
-            \Log::channel('stdout')->error('Failed to process video files', [
+            Log::channel('stdout')->error('Failed to process video files', [
                 'movie_id' => $movie->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()

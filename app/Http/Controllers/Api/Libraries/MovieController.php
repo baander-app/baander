@@ -29,7 +29,7 @@ class MovieController
     #[Get('/', 'api.movies.index')]
     public function index(Library $library)
     {
-        $movies = Movie::query()
+        $movies = (new \App\Models\Movie)->query()
             ->whereLibraryId($library->id)
             ->paginate();
 

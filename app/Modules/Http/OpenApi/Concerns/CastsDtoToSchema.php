@@ -30,7 +30,7 @@ trait CastsDtoToSchema
     /**
      * @return Parameter[]
      *
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     public function parametersFromDto(string $className): array
     {
@@ -40,7 +40,7 @@ trait CastsDtoToSchema
     /**
      * @return array<string, mixed>
      *
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     public function rulesFromDto(string $className): array
     {
@@ -50,7 +50,7 @@ trait CastsDtoToSchema
     /**
      * @return array<string, mixed>
      *
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     public function rulesFromDtoNoRecursion(string $className): array
     {
@@ -90,7 +90,7 @@ trait CastsDtoToSchema
     /**
      * @return array<string, mixed>
      *
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     protected function expandRules(NestedRules $rule, string $parentKey = ''): array
     {

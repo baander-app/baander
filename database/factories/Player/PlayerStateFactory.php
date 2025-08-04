@@ -2,10 +2,11 @@
 
 namespace Database\Factories\Player;
 
+use App\Models\Player\PlayerState;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Player\PlayerState>
+ * @extends Factory<PlayerState>
  */
 class PlayerStateFactory extends Factory
 {

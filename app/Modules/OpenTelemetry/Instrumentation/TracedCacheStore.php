@@ -4,6 +4,7 @@ namespace App\Modules\OpenTelemetry\Instrumentation;
 
 use App\Modules\OpenTelemetry\OpenTelemetryManager;
 use App\Modules\OpenTelemetry\SpanBuilder;
+use Exception;
 use Illuminate\Support\Facades\Log;
 use OpenTelemetry\API\Trace\StatusCode;
 
@@ -74,7 +75,7 @@ class TracedCacheStore
                     ]);
 
                     return $result;
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     $span->recordException($e);
                     $span->setStatus(StatusCode::STATUS_ERROR, $e->getMessage());
 

@@ -6,6 +6,7 @@ use App\Jobs\BaseJob;
 use App\Models\Album;
 use App\Modules\Metadata\MediaMeta\Frame\Apic;
 use App\Modules\Metadata\MediaMeta\MediaMeta;
+use Exception;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\Log;
@@ -64,7 +65,7 @@ class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
             // Use the first image if front cover isn't available
             try {
                 $cover = $mediaMeta->getFrontCoverImage() ?: $images[0];
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $this->logger()->warning('Failed to get front cover, using first available image', [
                     'error' => $e->getMessage(),
                     'album_id' => $this->album->id
@@ -81,7 +82,7 @@ class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
             cache()->put("album_cover_processed_{$this->album->id}", true, now()->addMinutes(10));
 
             $this->queueProgress(100);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Failed to save album cover', [
                 'album_id' => $this->album->id,
                 'error' => $e->getMessage(),

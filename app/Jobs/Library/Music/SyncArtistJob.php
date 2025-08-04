@@ -8,6 +8,7 @@ use App\Jobs\BaseJob;
 use App\Jobs\Library\Music\Concerns\UpdatesArtistMetadata;
 use App\Models\Artist;
 use App\Modules\Metadata\MetadataSyncService;
+use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -66,7 +67,7 @@ class SyncArtistJob extends BaseJob implements ShouldQueue
                 'identifiers_updated' => $identifiersUpdated,
             ]);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->logger()->error('Artist sync failed', [
                 'artist_id' => $this->artistId,
                 'error'     => $e->getMessage(),
@@ -94,7 +95,7 @@ class SyncArtistJob extends BaseJob implements ShouldQueue
                 'identifiers_updated' => $identifiersUpdated,
             ];
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->logger()->warning("Sync from $source failed", [
                 'artist_id' => $artist->id,
                 'source'    => $source,

@@ -110,9 +110,9 @@ class ContentBasedCalculator implements CalculatorInterface
      * Normalize source data to a collection of models
      *
      * @param mixed $sourceData
-     * @return \Illuminate\Database\Eloquent\Collection
+     * @return Collection|\Illuminate\Support\Collection
      */
-    private function normalizeSourceData($sourceData): Collection
+    private function normalizeSourceData($sourceData)
     {
         if ($sourceData instanceof Model) {
             return collect([$sourceData]);
@@ -131,6 +131,6 @@ class ContentBasedCalculator implements CalculatorInterface
             return $sourceData::all();
         }
 
-        return collect([]);
+        return collect();
     }
 }

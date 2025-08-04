@@ -3,7 +3,6 @@
 namespace App\Http\Integrations\LastFm\Handlers;
 
 use GuzzleHttp\Client;
-use GuzzleHttp\Exception\RequestException;
 use Illuminate\Support\Facades\Log;
 
 class AuthHandler

@@ -4,9 +4,10 @@ namespace App\Modules\Queue\QueueMonitor\Concerns;
 
 use App\Models\QueueMonitor;
 use App\Modules\Queue\QueueMonitor\QueueMonitorService;
+use Illuminate\Queue\InteractsWithQueue;
 
 /**
- * @mixin \Illuminate\Queue\InteractsWithQueue
+ * @mixin InteractsWithQueue
  */
 trait IsMonitored
 {
@@ -136,7 +137,7 @@ trait IsMonitored
             return null;
         }
 
-        return QueueMonitor::whereJob($jobId)
+        return (new \App\Models\QueueMonitor)->whereJob($jobId)
             ->orderBy('started_at', 'desc')
             ->first();
     }

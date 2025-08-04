@@ -18,8 +18,8 @@ class HammingDistance implements AlgorithmInterface
     {
         // Make both strings the same length with proper padding
         $maxLength = max(strlen($this->a), strlen($this->b));
-        $firstStr = str_pad($this->a, $maxLength, ' ');
-        $secondStr = str_pad($this->b, $maxLength, ' ');
+        $firstStr = str_pad($this->a, $maxLength);
+        $secondStr = str_pad($this->b, $maxLength);
 
         // Count differing characters
         $distance = 0;

@@ -14,14 +14,14 @@ use App\Modules\FFmpeg\MediaOpener;
 use App\Modules\FFmpeg\Support\ProcessOutput;
 
 /**
- * @mixin \App\Modules\FFmpeg\Drivers\PHPFFMpeg
+ * @mixin PHPFFMpeg
  */
 class MediaExporter
 {
     use ForwardsCalls, HandlesAdvancedMedia, HandlesConcatenation, HandlesFrames, HandlesTimelapse, HasProgressListener;
 
     /**
-     * @var \App\Modules\FFmpeg\Drivers\PHPFFMpeg
+     * @var PHPFFMpeg
      */
     protected $driver;
 

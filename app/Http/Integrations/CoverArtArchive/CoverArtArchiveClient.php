@@ -4,6 +4,7 @@ namespace App\Http\Integrations\CoverArtArchive;
 
 use GuzzleHttp\Client;
 use App\Http\Integrations\CoverArtArchive\Models\CoverArtResponse;
+use RuntimeException;
 
 class CoverArtArchiveClient
 {
@@ -18,7 +19,7 @@ class CoverArtArchiveClient
         $response = $this->client->getAsync(self::BASE_URL . $musicBrainzId)->wait();
 
         if ($response->getStatusCode() !== 200) {
-            throw new \RuntimeException('API request failed: ' . $response->getReasonPhrase());
+            throw new RuntimeException('API request failed: ' . $response->getReasonPhrase());
         }
 
         $data = json_decode($response->getBody()->getContents(), true);

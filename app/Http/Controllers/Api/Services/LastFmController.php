@@ -91,13 +91,12 @@ class LastFmController extends Controller
             return response()->json(['error' => 'User agent mismatch'])->setStatusCode(400);
         }
 
+        Cache::forget("lastfm_auth_state_{$state}");
         if ($authState['ip_address'] !== $request->ip()) {
-            Cache::forget("lastfm_auth_state_{$state}");
             return response()->json(['error' => 'IP address mismatch'])->setStatusCode(400);
         }
 
         // Clean up the state from cache (important to prevent replay attacks)
-        Cache::forget("lastfm_auth_state_{$state}");
 
         // Continue with Last.fm session creation using the new token
         $session = $this->lastFmClient->auth->getSession($newToken);
@@ -124,7 +123,7 @@ class LastFmController extends Controller
             'image'             => $userInfo['image'] ?? [],
         ];
 
-        ThirdPartyCredential::updateOrCreate(
+        (new \App\Models\ThirdPartyCredential)->updateOrCreate(
             [
                 'user_id'  => $authState['user_id'],
                 'provider' => 'lastfm',
@@ -151,7 +150,7 @@ class LastFmController extends Controller
     ])]
     public function disconnect()
     {
-        ThirdPartyCredential::where('user_id', auth()->id())
+        (new \App\Models\ThirdPartyCredential)->where('user_id', auth()->id())
             ->where('provider', 'lastfm')
             ->delete();
 

@@ -2,7 +2,9 @@
 
 namespace App\Modules\Filesystem\Exceptions;
 
-class UnreadablePathException extends \RuntimeException
+use RuntimeException;
+
+class UnreadablePathException extends RuntimeException
 {
 
 }

@@ -3,8 +3,11 @@
 namespace App\Jobs\Library\Music;
 
 use App\Jobs\BaseJob;
+use App\Models\Artist;
+use App\Models\Genre;
 use App\Models\Song;
 use App\Modules\Metadata\MetadataSyncService;
+use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -25,7 +28,7 @@ class SyncSongMetadataJob extends BaseJob implements ShouldQueue
     public function handle(): void
     {
         $metadataSyncService = app(MetadataSyncService::class);
-        $song = Song::find($this->songId);
+        $song = (new \App\Models\Song)->find($this->songId);
 
         if (!$song) {
             $this->logger()->warning('Song not found for metadata sync', ['song_id' => $this->songId]);
@@ -52,7 +55,7 @@ class SyncSongMetadataJob extends BaseJob implements ShouldQueue
                 ]);
             }
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->logger()->error('Song metadata sync job failed', [
                 'song_id' => $this->songId,
                 'error'   => $e->getMessage(),
@@ -110,7 +113,7 @@ class SyncSongMetadataJob extends BaseJob implements ShouldQueue
     private function updateSongGenres(Song $song, array $genreNames): void
     {
         $genres = collect($genreNames)->map(function ($genreName) {
-            return \App\Models\Genre::firstOrCreate(['name' => $genreName]);
+            return (new \App\Models\Genre)->firstOrCreate(['name' => $genreName]);
         });
 
         // Only update if song doesn't have genres, or if force update is enabled
@@ -127,7 +130,7 @@ class SyncSongMetadataJob extends BaseJob implements ShouldQueue
         }
 
         $artists = collect($artistsData)->map(function ($artistData) {
-            return \App\Models\Artist::firstOrCreate(['name' => $artistData['name']]);
+            return (new \App\Models\Artist)->firstOrCreate(['name' => $artistData['name']]);
         });
 
         $song->artists()->sync($artists->pluck('id'));

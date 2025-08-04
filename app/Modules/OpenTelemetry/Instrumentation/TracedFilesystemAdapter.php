@@ -4,6 +4,7 @@ namespace App\Modules\OpenTelemetry\Instrumentation;
 
 use App\Modules\OpenTelemetry\OpenTelemetryManager;
 use App\Modules\OpenTelemetry\SpanBuilder;
+use Exception;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Log;
 use OpenTelemetry\API\Trace\StatusCode;
@@ -197,7 +198,7 @@ class TracedFilesystemAdapter implements Filesystem
                     ]);
 
                     return $result;
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     $span->recordException($e);
                     $span->setStatus(StatusCode::STATUS_ERROR, $e->getMessage());
 
@@ -230,10 +231,7 @@ class TracedFilesystemAdapter implements Filesystem
         }
 
         // putFile and putFileAs have destination path as first parameter
-        if (in_array($method, ['putFile', 'putFileAs'])) {
-            return $parameters[0] ?? 'unknown';
-        }
-
         return $parameters[0] ?? 'unknown';
+
     }
 }

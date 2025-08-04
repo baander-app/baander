@@ -2,13 +2,14 @@
 
 namespace App\Modules\Auth;
 
+use Exception;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class GeoLocationService
 {
-    private const CACHE_TTL = 3600; // 1 hour
+    private const int CACHE_TTL = 3600; // 1 hour
 
     public function getLocationData(string $ipAddress): array
     {
@@ -49,7 +50,7 @@ class GeoLocationService
                     ];
                 }
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::warning('Failed to fetch geo location data', [
                 'ip' => $ipAddress,
                 'error' => $e->getMessage()

@@ -90,7 +90,7 @@ class MetadataJobDispatcher
         $batchSize = $batchSize ?? $this->defaultBatchSize;
         $queueName = $queueName ?? $this->defaultQueue;
 
-        $query = Album::query()->whereIn('id', $albumIds);
+        $query = (new \App\Models\Album)->query()->whereIn('id', $albumIds);
         $totalAlbums = $query->count();
 
         if ($totalAlbums === 0) {
@@ -152,7 +152,7 @@ class MetadataJobDispatcher
         $batchSize = $batchSize ?? $this->defaultBatchSize;
         $queueName = $queueName ?? $this->defaultQueue;
 
-        $query = Song::query()->whereIn('id', $songIds);
+        $query = (new \App\Models\Song)->query()->whereIn('id', $songIds);
         $totalSongs = $query->count();
 
         if ($totalSongs === 0) {
@@ -197,7 +197,7 @@ class MetadataJobDispatcher
         $batchSize = $batchSize ?? $this->defaultBatchSize;
         $queueName = $queueName ?? $this->defaultQueue;
 
-        $query = Artist::query()->whereIn('id', $artistIds);
+        $query = (new \App\Models\Artist)->query()->whereIn('id', $artistIds);
         $totalArtists = $query->count();
 
         if ($totalArtists === 0) {
@@ -253,7 +253,7 @@ class MetadataJobDispatcher
         $totalJobs = 0;
 
         // Sync all albums in the library
-        $albumQuery = Album::query()->where('library_id', $libraryId);
+        $albumQuery = (new \App\Models\Album)->query()->where('library_id', $libraryId);
         $totalAlbums = $albumQuery->count();
 
         if ($totalAlbums > 0) {
@@ -299,7 +299,7 @@ class MetadataJobDispatcher
 
         // Sync orphaned songs if requested
         if ($includeSongs) {
-            $orphanedSongsQuery = Song::query()
+            $orphanedSongsQuery = (new \App\Models\Song)->query()
                 ->whereHas('album', function ($query) use ($libraryId) {
                     $query->where('library_id', $libraryId);
                 })
@@ -333,7 +333,7 @@ class MetadataJobDispatcher
 
         // Sync unique artists if requested
         if ($includeArtists) {
-            $artistQuery = Artist::query()
+            $artistQuery = (new \App\Models\Artist)->query()
                 ->whereHas('albums', function ($query) use ($libraryId) {
                     $query->where('library_id', $libraryId);
                 });
@@ -370,14 +370,14 @@ class MetadataJobDispatcher
     public function getLibraryStats(int $libraryId): array
     {
         return [
-            'albums'         => Album::where('library_id', $libraryId)->count(),
-            'songs'          => Song::whereHas('album', function ($query) use ($libraryId) {
+            'albums'         => (new \App\Models\Album)->where('library_id', $libraryId)->count(),
+            'songs'          => (new \App\Models\Song)->whereHas('album', function ($query) use ($libraryId) {
                 $query->where('library_id', $libraryId);
             })->count(),
-            'artists'        => Artist::whereHas('albums', function ($query) use ($libraryId) {
+            'artists'        => (new \App\Models\Artist)->whereHas('albums', function ($query) use ($libraryId) {
                 $query->where('library_id', $libraryId);
             })->count(),
-            'orphaned_songs' => Song::whereHas('album', function ($query) use ($libraryId) {
+            'orphaned_songs' => (new \App\Models\Song)->whereHas('album', function ($query) use ($libraryId) {
                 $query->where('library_id', $libraryId);
             })->whereDoesntHave('album')->count(),
         ];
@@ -392,19 +392,19 @@ class MetadataJobDispatcher
         ];
 
         if (!empty($albumIds)) {
-            $validAlbums = Album::whereIn('id', $albumIds)->pluck('id')->toArray();
+            $validAlbums = (new \App\Models\Album)->whereIn('id', $albumIds)->pluck('id')->toArray();
             $results['albums']['valid'] = $validAlbums;
             $results['albums']['invalid'] = array_diff($albumIds, $validAlbums);
         }
 
         if (!empty($songIds)) {
-            $validSongs = Song::whereIn('id', $songIds)->pluck('id')->toArray();
+            $validSongs = (new \App\Models\Song)->whereIn('id', $songIds)->pluck('id')->toArray();
             $results['songs']['valid'] = $validSongs;
             $results['songs']['invalid'] = array_diff($songIds, $validSongs);
         }
 
         if (!empty($artistIds)) {
-            $validArtists = Artist::whereIn('id', $artistIds)->pluck('id')->toArray();
+            $validArtists = (new \App\Models\Artist)->whereIn('id', $artistIds)->pluck('id')->toArray();
             $results['artists']['valid'] = $validArtists;
             $results['artists']['invalid'] = array_diff($artistIds, $validArtists);
         }

@@ -5,6 +5,7 @@ namespace App\Exceptions\Jobs\Manager;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Log;
 use Throwable;
 
 class CouldNotFindJobException extends Exception
@@ -21,7 +22,7 @@ class CouldNotFindJobException extends Exception
     /**
      * @throws CouldNotFindJobException
      */
-    public static function throwFromController(\Throwable $e)
+    public static function throwFromController(Throwable $e)
     {
         $wrap = new self('Unable to start new job', CouldNotFindJobException::$FROM_CONTROLLER, $e);
         $wrap->jobClass = get_class($e);
@@ -43,6 +44,6 @@ class CouldNotFindJobException extends Exception
 
     public function report(): void
     {
-        \Log::error($this->getPrevious());
+        Log::error($this->getPrevious());
     }
 }

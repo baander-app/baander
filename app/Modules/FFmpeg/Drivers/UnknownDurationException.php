@@ -2,6 +2,8 @@
 
 namespace App\Modules\FFmpeg\Drivers;
 
-class UnknownDurationException extends \Exception
+use Exception;
+
+class UnknownDurationException extends Exception
 {
 }

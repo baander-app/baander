@@ -10,8 +10,8 @@ class FieldDefinition
     private ?int $maxLength = null;
 
     public function __construct(
-        private string $name,
-        private string $type,
+        private readonly string $name,
+        private string          $type,
     ) {
         $this->type = strtoupper($type);
     }

@@ -40,7 +40,7 @@ class ClearStuckJobs extends Command
         $this->line('');
 
         // Show old failed jobs
-        $oldFailedJobs = $this->jobCleanupService->getOldFailedJobs(24);
+        $oldFailedJobs = $this->jobCleanupService->getOldFailedJobs();
 
         if (count($oldFailedJobs) > 0) {
             $this->warn("Found " . count($oldFailedJobs) . " failed jobs older than 24 hours");

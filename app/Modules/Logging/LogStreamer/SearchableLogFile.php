@@ -6,6 +6,7 @@ use App\Modules\Logging\LogStreamer\Models\ContentChunk;
 use App\Modules\Logging\LogStreamer\Models\FileInfo;
 use App\Modules\Logging\LogStreamer\Models\SearchResult;
 use App\Modules\Logging\LogStreamer\Models\SearchResults;
+use Exception;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Swoole\Thread;
@@ -13,10 +14,10 @@ use Swoole\Thread\Queue;
 
 class SearchableLogFile
 {
-    private const DEFAULT_CHUNK_SIZE = 8192;
-    private const MB_SIZE = 1024 * 1024;
-    private const MAX_THREADS = 4;
-    private const MIN_FILE_SIZE_FOR_THREADING = 512 * 1024; // 512KB
+    private const int DEFAULT_CHUNK_SIZE = 8192;
+    private const int|float MB_SIZE = 1024 * 1024;
+    private const int MAX_THREADS = 4;
+    private const int|float MIN_FILE_SIZE_FOR_THREADING = 512 * 1024; // 512KB
 
     public function __construct(
         public readonly string $path,
@@ -206,7 +207,7 @@ class SearchableLogFile
             }
 
             return $totalLines;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Error counting lines in file: {$this->path}", [
                 'e.message' => $e->getMessage(),
             ]);

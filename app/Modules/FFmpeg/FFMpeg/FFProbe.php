@@ -59,7 +59,7 @@ class FFProbe extends FFMpegFFProbe
      * @param string $pathfile
      * @return \FFMpeg\FFProbe\DataMapping\StreamCollection
      * @throws \FFMpeg\Exception\InvalidArgumentException
-     * @throws \FFMpeg\Exception\RuntimeException
+     * @throws RuntimeException
      */
     public function streams($pathfile)
     {
@@ -76,7 +76,7 @@ class FFProbe extends FFMpegFFProbe
      * @param string $pathfile
      * @return \FFMpeg\FFProbe\DataMapping\Format A Format object
      * @throws \FFMpeg\Exception\InvalidArgumentException
-     * @throws \FFMpeg\Exception\RuntimeException
+     * @throws RuntimeException
      */
     public function format($pathfile)
     {

@@ -3,6 +3,7 @@
 namespace App\Modules\FFmpeg\Filesystem;
 
 use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Traits\ForwardsCalls;
 
 /**
@@ -13,7 +14,7 @@ class Disk
     use ForwardsCalls;
 
     /**
-     * @var string|\Illuminate\Contracts\Filesystem\Filesystem
+     * @var string|Filesystem
      */
     private $disk;
 
@@ -23,7 +24,7 @@ class Disk
     private $temporaryDirectory;
 
     /**
-     * @var \Illuminate\Filesystem\FilesystemAdapter
+     * @var FilesystemAdapter
      */
     private $filesystemAdapter;
 
@@ -103,11 +104,6 @@ class Disk
         }
 
         return $this->filesystemAdapter = Storage::disk($this->disk);
-    }
-
-    private function getFlysystemDriver(): LeagueFilesystem
-    {
-        return $this->getFilesystemAdapter()->getDriver();
     }
 
     private function getFlysystemAdapter(): FlysystemFilesystemAdapter

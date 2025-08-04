@@ -19,7 +19,6 @@ class SongController extends Controller
      *
      * @param SongIndexRequest $request
      * @param Library $library
-     * @param Album $album
      * @return JsonAnonymousResourceCollection<JsonPaginator<SongResource>>
      */
     #[Get('', 'api.songs.index', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
@@ -35,14 +34,14 @@ class SongController extends Controller
             'You cannot search for genre names and slugs at the same time',
         );
 
-        $songs = Song::query()
+        $songs = (new \App\Models\Song)->query()
             ->withRelations(Song::$filterRelations, $relations)
             ->when($genreSlugs, function ($query) use ($library, $genreSlugs) {
                 return $query->whereGenreSlugs($genreSlugs);
             })->when($genreNames, function ($query) use ($library, $genreNames) {
                 return $query->whereGenreNames($genreNames);
             })
-            ->orderBy(Album::select('title')->whereColumn('songs.album_id', 'albums.id'))
+            ->orderBy((new \App\Models\Album)->select('title')->whereColumn('songs.album_id', 'albums.id'))
             ->orderBy('track')
             ->paginate();
 
@@ -66,7 +65,7 @@ class SongController extends Controller
     {
         $relations = $request->query('relations');
 
-        $song = Song::query()->wherePublicId($publicId)
+        $song = (new \App\Models\Song)->query()->wherePublicId($publicId)
             ->withRelations(Song::$filterRelations, $relations)
             ->firstOrFail();
 

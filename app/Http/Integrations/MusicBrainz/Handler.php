@@ -3,6 +3,7 @@
 namespace App\Http\Integrations\MusicBrainz;
 
 use App\Baander;
+use Exception;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\Cache;
@@ -130,7 +131,7 @@ abstract class Handler
                 'error_class' => get_class($e),
             ]);
             return null;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Unexpected error in MusicBrainz request', [
                 'url'   => $this->baseUrl . $endpoint,
                 'error' => $e->getMessage(),

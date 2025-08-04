@@ -5,6 +5,7 @@ namespace App\Modules\Recommendation\Calculators;
 use App\Modules\Metadata\GenreHierarchyService;
 use App\Modules\Recommendation\Contracts\CalculatorInterface;
 use Illuminate\Support\Facades\{Cache, DB, Log};
+use InvalidArgumentException;
 
 class MusicGenreSimilarityCalculator implements CalculatorInterface
 {
@@ -19,7 +20,7 @@ class MusicGenreSimilarityCalculator implements CalculatorInterface
      * @param mixed $sourceData Source model(s) to calculate recommendations for
      * @param array $configuration Configuration parameters for calculation
      * @return array Array of recommendations [sourceId => [targetId => score]]
-     * @throws \InvalidArgumentException
+     * @throws InvalidArgumentException
      */
     public function calculate($sourceData, array $configuration): array
     {
@@ -373,7 +374,7 @@ class MusicGenreSimilarityCalculator implements CalculatorInterface
      *
      * @param array $configuration
      * @return void
-     * @throws \InvalidArgumentException
+     * @throws InvalidArgumentException
      */
     private function validateConfiguration(array $configuration): void
     {
@@ -381,7 +382,7 @@ class MusicGenreSimilarityCalculator implements CalculatorInterface
 
         foreach ($requiredParams as $param) {
             if (!isset($configuration[$param])) {
-                throw new \InvalidArgumentException("Missing required configuration parameter: {$param}");
+                throw new InvalidArgumentException("Missing required configuration parameter: {$param}");
             }
         }
     }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Integrations\Spotify;
 
+use App\Models\User;
 use App\Http\Integrations\Spotify\Handlers\{AuthHandler, SearchHandler, UserHandler, GenreHandler};
 use App\Modules\Auth\SpotifyCredentialService;
 use GuzzleHttp\Client;
@@ -84,7 +85,7 @@ class SpotifyClient
     /**
      * Get authenticated client for a specific user
      */
-    public function forUser(\App\Models\User $user): static
+    public function forUser(User $user): static
     {
         $accessToken = $this->credentialService->getAccessToken($user);
 

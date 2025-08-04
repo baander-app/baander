@@ -3,6 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Contracts\Routing\ResponseFactory;
+use Illuminate\Foundation\Application;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 use App\Http\Requests\QueueMetrics\{MetricsRequest, ShowQueueMetricsRequest};
 use App\Http\Requests\QueueMonitor\RetryJobRequest;
 use App\Http\Resources\QueueMonitor\QueueMonitorResource;
@@ -14,6 +18,7 @@ use App\Modules\Http\Resources\Json\JsonAnonymousResourceCollection;
 use App\Modules\Queue\QueueMetrics\QueueMetricsService;
 use App\Modules\Queue\QueueMonitor\MonitorStatus;
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Post, Prefix};
+use Throwable;
 
 #[Prefix('/queue-metrics')]
 #[Middleware([
@@ -108,7 +113,7 @@ class QueueController extends Controller
      *
      * @param RetryJobRequest $request
      * @param string $id
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     #[Post('/retry/{id}', 'api.queue-metrics.retry-job')]
     public function retry(RetryJobRequest $request, string $id)
@@ -125,7 +130,7 @@ class QueueController extends Controller
 
         try {
             $monitor->retry();
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             return response()->json([
                 'status'  => 'failed',
                 'message' => 'An error occurred while executing the job',
@@ -142,7 +147,7 @@ class QueueController extends Controller
      * Delete by id
      *
      * @param string $id
-     * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Foundation\Application|\Illuminate\Http\Response
+     * @return ResponseFactory|Application|Response
      */
     #[Delete('{id}', 'api.queue-metrics.delete')]
     public function delete(string $id)
@@ -157,7 +162,7 @@ class QueueController extends Controller
     /**
      * Purge all records
      *
-     * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Foundation\Application|\Illuminate\Http\Response
+     * @return ResponseFactory|Application|Response
      */
     #[Delete('/purge', 'api.queue-metrics.purge')]
     public function purge()

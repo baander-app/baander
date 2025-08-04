@@ -2,7 +2,6 @@
 
 namespace App\Modules\Development\Console\Commands;
 
-use App\Modules\Development\Console\DevelopmentCommand;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Storage;
@@ -34,7 +33,7 @@ class PruneLibrariesCommand extends \Illuminate\Console\Command
     public function handle(): int
     {
 
-        $library = Library::first();
+        $library = (new \App\Models\Library)->first();
 
         if (!$library) {
             $this->error('No libraries found to prune.');

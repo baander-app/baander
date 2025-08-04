@@ -4,6 +4,7 @@ namespace App\Modules\Development\Console;
 
 use Illuminate\Console\Command;
 use ReflectionMethod;
+use Symfony\Component\Console\Command\Command as CommandAlias;
 
 abstract class DevelopmentCommand extends Command
 {
@@ -11,7 +12,7 @@ abstract class DevelopmentCommand extends Command
     {
         // Automatically run prechecks based on attributes
         if (!$this->runAttributeBasedPrechecks()) {
-            return Command::FAILURE;
+            return CommandAlias::FAILURE;
         }
 
         // Call the child's handle method

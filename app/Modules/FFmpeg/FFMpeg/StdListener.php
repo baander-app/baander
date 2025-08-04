@@ -9,7 +9,7 @@ use Symfony\Component\Process\Process;
 
 class StdListener extends EventEmitter implements ListenerInterface
 {
-    public const TYPE_ALL = 'all';
+    public const string TYPE_ALL = 'all';
 
     /**
      * Name of the emitted event.
@@ -59,7 +59,7 @@ class StdListener extends EventEmitter implements ListenerInterface
     /**
      * Returns the collected output lines.
      *
-     * @return array
+     * @return ProcessOutput
      */
     public function get(): ProcessOutput
     {

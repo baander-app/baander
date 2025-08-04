@@ -4,7 +4,6 @@ namespace App\Modules\OpenTelemetry\Listeners;
 
 use App\Modules\OpenTelemetry\SpanBuilder;
 use Illuminate\Support\Facades\Log;
-use OpenTelemetry\API\Trace\StatusCode;
 
 class CustomEventListener
 {

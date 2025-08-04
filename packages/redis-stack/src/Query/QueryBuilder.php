@@ -3,6 +3,7 @@
 namespace Baander\RedisStack\Query;
 
 use Baander\RedisStack\Result\SearchResult;
+use InvalidArgumentException;
 use Redis;
 
 class QueryBuilder
@@ -42,7 +43,7 @@ class QueryBuilder
     public function query(string $query): self
     {
         if (empty($query)) {
-            throw new \InvalidArgumentException('Query cannot be empty.');
+            throw new InvalidArgumentException('Query cannot be empty.');
         }
         $this->query = $query;
         return $this;
@@ -74,7 +75,7 @@ class QueryBuilder
     public function geoFilter(string $field, float $lon, float $lat, float $radius, string $unit = 'km'): self
     {
         if (!in_array($unit, self::GEO_FILTER_UNITS, true)) {
-            throw new \InvalidArgumentException("Invalid geo unit: $unit");
+            throw new InvalidArgumentException("Invalid geo unit: $unit");
         }
         $this->geoFilters[] = sprintf('@%s:[%s %s %s %s]', $field, $lon, $lat, $radius, $unit);
         return $this;

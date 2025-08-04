@@ -5,9 +5,9 @@ namespace Baander\RedisStack\Search\Query\Filters;
 class NumericFilter
 {
     public function __construct(
-        private string $field,
-        private string|int|float $min,
-        private string|int|float|null $max = null
+        private readonly string           $field,
+        private readonly string|int|float $min,
+        private readonly string|int|float|null $max = null
     ) {}
 
     public function __toString(): string

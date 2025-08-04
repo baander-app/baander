@@ -66,13 +66,4 @@ class GeneratePasskeyRegisterOptionsAction
         return Str::random();
     }
 
-    private function getCredential(PublicKeyCredentialUserEntity $userEntity)
-    {
-
-    }
-
-    private function getServerPublicKeyCredentialCreationOptionsRequest(string $content)
-    {
-        return app(WebauthnService::class)->deserialize($content, PublicKeyCredentialCreationOptionsData::class);
-    }
 }

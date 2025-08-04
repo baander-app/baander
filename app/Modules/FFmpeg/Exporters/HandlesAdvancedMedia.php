@@ -5,11 +5,12 @@ namespace App\Modules\FFmpeg\Exporters;
 use FFMpeg\Format\FormatInterface;
 use App\Modules\FFmpeg\FFMpeg\AdvancedOutputMapping;
 use App\Modules\FFmpeg\Filesystem\Media;
+use Illuminate\Support\Collection;
 
 trait HandlesAdvancedMedia
 {
     /**
-     * @var \Illuminate\Support\Collection
+     * @var Collection
      */
     protected $maps;
 

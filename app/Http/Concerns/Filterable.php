@@ -3,7 +3,7 @@
 namespace App\Http\Concerns;
 
 use App\Modules\Eloquent\BaseBuilder;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 trait Filterable
@@ -74,9 +74,9 @@ trait Filterable
      * Apply the query filters, sorting, and pagination.
      *
      * @param Request $request
-     * @param \class-string $model
+     * @param class-string $model
      * @param array $columnsForGlobalFilter
-     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
+     * @return LengthAwarePaginator
      */
     protected function applyFilters(Request $request, string $model, array $columnsForGlobalFilter = [])
     {

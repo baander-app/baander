@@ -79,16 +79,12 @@ class SearchHandler extends BaseHandler
 
     public function searchByGenre(string $genre, string $type = 'all', int $limit = 30): array
     {
-        switch ($type) {
-            case 'artists':
-                return $this->artists($genre, $limit);
-            case 'albums':
-                return $this->albums($genre, $limit);
-            case 'tracks':
-                return $this->tracks($genre, $limit);
-            default:
-                return $this->searchAll($genre, $limit);
-        }
+        return match ($type) {
+            'artists' => $this->artists($genre, $limit),
+            'albums' => $this->albums($genre, $limit),
+            'tracks' => $this->tracks($genre, $limit),
+            default => $this->searchAll($genre, $limit),
+        };
     }
 
     public function searchSimilar(string $artistName, int $limit = 30): array

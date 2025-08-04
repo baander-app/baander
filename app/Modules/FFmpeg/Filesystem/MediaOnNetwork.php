@@ -63,10 +63,10 @@ class MediaOnNetwork
      * Downloads the Media from the internet and stores it in
      * a temporary directory.
      *
-     * @param callable $withCurl
-     * @return \App\Modules\FFmpeg\Filesystem\Media
+     * @param callable|null $withCurl
+     * @return Media
      */
-    public function toMedia(callable $withCurl = null): Media
+    public function toMedia(?callable $withCurl = null): Media
     {
         $disk = Disk::makeTemporaryDisk();
 

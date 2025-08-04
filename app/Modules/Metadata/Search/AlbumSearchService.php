@@ -9,6 +9,7 @@ use App\Http\Integrations\MusicBrainz\MusicBrainzClient;
 use App\Models\Album;
 use App\Modules\Metadata\Matching\MatchingStrategy;
 use App\Modules\Metadata\Matching\QualityValidator;
+use Exception;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -209,7 +210,7 @@ class AlbumSearchService
                 'best_match'              => $bestMatch,
             ];
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('MusicBrainz album search failed', [
                 'album_id' => $album->id,
                 'error'    => $e->getMessage(),
@@ -296,7 +297,7 @@ class AlbumSearchService
                     ]);
                 }
 
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::warning('MusicBrainz lookup attempt failed', [
                     'album_id'    => $albumId,
                     'release_id'  => $releaseId,
@@ -478,7 +479,7 @@ class AlbumSearchService
                 'best_match'              => $bestMatch,
             ];
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Discogs album search failed', [
                 'album_id' => $album->id,
                 'error'    => $e->getMessage(),
@@ -531,7 +532,7 @@ class AlbumSearchService
                     return $detailedData;
                 }
 
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::warning('Discogs lookup attempt failed', [
                     'album_id'   => $albumId,
                     'release_id' => $releaseId,
@@ -610,7 +611,7 @@ class AlbumSearchService
                             ];
                         }
                     }
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::debug('Fuzzy search variation failed', [
                         'source' => 'musicbrainz',
                         'variation' => $variation,
@@ -641,7 +642,7 @@ class AlbumSearchService
                             ];
                         }
                     }
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::debug('Discogs fuzzy search variation failed', [
                         'source' => 'discogs',
                         'variation' => $variation,
@@ -737,7 +738,7 @@ class AlbumSearchService
                 'test_results_count' => $testResults->count(),
             ];
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return [
                 'status'      => 'unhealthy',
                 'error'       => $e->getMessage(),

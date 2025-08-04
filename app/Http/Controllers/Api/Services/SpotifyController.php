@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Integrations\Spotify\SpotifyClient;
 use App\Models\ThirdPartyCredential;
 use App\Models\TokenAbility;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -163,7 +164,7 @@ class SpotifyController extends Controller
 
             return response()->json(['success' => true]);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Spotify callback error', [
                 'error'   => $e->getMessage(),
                 'user_id' => $authState['user_id'],
@@ -232,7 +233,7 @@ class SpotifyController extends Controller
                         $credential->delete();
                         return response()->json(['connected' => false, 'expired' => true]);
                     }
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::error('Spotify token refresh failed', [
                         'error'   => $e->getMessage(),
                         'user_id' => auth()->id(),
@@ -274,7 +275,7 @@ class SpotifyController extends Controller
         try {
             $profile = $this->spotifyClient->user->getCurrentUser();
             return response()->json($profile);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json(['error' => 'Failed to get user profile'])->setStatusCode(500);
         }
     }
@@ -295,7 +296,7 @@ class SpotifyController extends Controller
 
             $playlists = $this->spotifyClient->user->getUserPlaylists(null, $limit, $offset);
             return response()->json($playlists);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json(['error' => 'Failed to get playlists'])->setStatusCode(500);
         }
     }
@@ -323,7 +324,7 @@ class SpotifyController extends Controller
 
             $results = $this->spotifyClient->search->search($query, $types, $limit, $offset, $market);
             return response()->json($results);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json(['error' => 'Search failed'])->setStatusCode(500);
         }
     }
@@ -341,7 +342,7 @@ class SpotifyController extends Controller
         try {
             $genres = $this->spotifyClient->genres->getAvailableGenreSeeds();
             return response()->json($genres);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json(['error' => 'Failed to get genre seeds'])->setStatusCode(500);
         }
     }

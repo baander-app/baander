@@ -12,12 +12,12 @@ use App\Modules\FFmpeg\Filesystem\Media;
 class DynamicHLSPlaylist implements Responsable
 {
     /**
-     * @var \App\Modules\FFmpeg\Filesystem\Disk
+     * @var Disk
      */
     private $disk;
 
     /**
-     * @var \App\Modules\FFmpeg\Filesystem\Media
+     * @var Media
      */
     private $media;
 
@@ -152,7 +152,7 @@ class DynamicHLSPlaylist implements Responsable
      * Parses the lines into a Collection
      *
      * @param string $lines
-     * @return \Illuminate\Support\Collection
+     * @return Collection
      */
     public static function parseLines(string $lines): Collection
     {
@@ -198,7 +198,7 @@ class DynamicHLSPlaylist implements Responsable
      * Returns a collection of all processed segment playlists
      * and the processed main playlist.
      *
-     * @return \Illuminate\Support\Collection
+     * @return Collection
      */
     public function all(): Collection
     {

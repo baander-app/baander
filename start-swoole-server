@@ -52,18 +52,18 @@ $timerTable = require $octanePath . '/bin/createSwooleTimerTable.php';
 |
 */
 
-$server->on('start', fn(Server $server) => $bootstrap($serverState) && (new OnServerStart(
+$server->on('start', fn(Server $server) => $bootstrap($serverState) && new OnServerStart(
         new ServerStateFile($serverStateFile),
         new SwooleExtension,
         $serverState['appName'],
         $serverState['octaneConfig']['max_execution_time'] ?? 0,
         $timerTable,
         $serverState['octaneConfig']['tick'] ?? true,
-    ))($server));
+    )($server));
 
-$server->on('managerstart', fn() => $bootstrap($serverState) && (new OnManagerStart(
+$server->on('managerstart', fn() => $bootstrap($serverState) && new OnManagerStart(
         new SwooleExtension, $serverState['appName'],
-    ))());
+    )());
 
 /*
 |--------------------------------------------------------------------------
@@ -89,9 +89,9 @@ $workerState->timerTable = $timerTable;
 $workerState->tables = require $octanePath . '/bin/createSwooleTables.php';
 
 $server->on('workerstart', fn(Server $server, $workerId)
-    => (fn($basePath) => (new OnWorkerStart(
+    => (fn($basePath) => new OnWorkerStart(
     new SwooleExtension, $basePath, $serverState, $workerState,
-))($server, $workerId))($bootstrap($serverState)),
+)($server, $workerId))($bootstrap($serverState)),
 );
 
 /*

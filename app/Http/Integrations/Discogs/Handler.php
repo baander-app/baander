@@ -2,7 +2,9 @@
 
 namespace App\Http\Integrations\Discogs;
 
+use Exception;
 use GuzzleHttp\Client;
+use GuzzleHttp\Promise\Create;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
@@ -10,8 +12,8 @@ use App\Baander;
 
 abstract class Handler
 {
-    private const RATE_LIMIT_CACHE_KEY = 'discogs_rate_limit';
-    private const DEFAULT_RETRY_AFTER = 60; // seconds
+    private const string RATE_LIMIT_CACHE_KEY = 'discogs_rate_limit';
+    private const int DEFAULT_RETRY_AFTER = 60; // seconds
 
     public function __construct(protected readonly Client $client, protected readonly string $baseUrl)
     {}
@@ -78,7 +80,7 @@ abstract class Handler
             // Return null for all non-200 responses (including 500 errors)
             return null;
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Discogs API request failed', [
                 'endpoint' => $endpoint,
                 'error' => $e->getMessage()
@@ -96,7 +98,7 @@ abstract class Handler
                 'endpoint' => $endpoint,
                 'rate_limit_expires' => Cache::get(self::RATE_LIMIT_CACHE_KEY . '_expires')
             ]);
-            return \GuzzleHttp\Promise\Create::promiseFor(null);
+            return Create::promiseFor(null);
         }
 
         if (config('services.discogs.api_key')) {

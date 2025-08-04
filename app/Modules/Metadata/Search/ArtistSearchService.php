@@ -9,6 +9,7 @@ use App\Http\Integrations\MusicBrainz\MusicBrainzClient;
 use App\Models\Artist;
 use App\Modules\Metadata\Matching\MatchingStrategy;
 use App\Modules\Metadata\Matching\QualityValidator;
+use Exception;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -200,7 +201,7 @@ class ArtistSearchService
                 'best_match'              => $bestMatch,
             ];
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('MusicBrainz artist search failed', [
                 'artist_id' => $artist->id,
                 'error'     => $e->getMessage(),
@@ -271,7 +272,7 @@ class ArtistSearchService
                     ]);
                 }
 
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::warning('MusicBrainz lookup attempt failed', [
                     'artist_id'   => $localArtistId,
                     'mbid'        => $artistId,
@@ -443,7 +444,7 @@ class ArtistSearchService
                 'best_match'              => $bestMatch,
             ];
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Discogs artist search failed', [
                 'artist_id' => $artist->id,
                 'error'     => $e->getMessage(),
@@ -494,7 +495,7 @@ class ArtistSearchService
                     return $detailedData;
                 }
 
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::warning('Discogs lookup attempt failed', [
                     'artist_id'  => $localArtistId,
                     'discogs_id' => $artistId,
@@ -568,7 +569,7 @@ class ArtistSearchService
                             ];
                         }
                     }
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::debug('Fuzzy search variation failed', [
                         'source' => 'musicbrainz',
                         'variation' => $variation,
@@ -595,7 +596,7 @@ class ArtistSearchService
                             ];
                         }
                     }
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::debug('Discogs fuzzy search variation failed', [
                         'source' => 'discogs',
                         'variation' => $variation,

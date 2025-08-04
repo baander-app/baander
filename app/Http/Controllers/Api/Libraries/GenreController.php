@@ -29,7 +29,7 @@ class GenreController
         $fields = $request->query('fields');
         $librarySlug = $request->query('librarySlug');
 
-        $genres = Genre::query()
+        $genres = (new \App\Models\Genre)->query()
 //            ->selectFields(Genre::$filterFields, $fields)
             ->withRelations(Genre::$filterFields, $fields)
             ->paginate();

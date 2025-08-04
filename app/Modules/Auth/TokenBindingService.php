@@ -8,6 +8,7 @@ use App\Modules\Logging\Attributes\LogChannel;
 use App\Modules\Logging\Channel;
 use App\Notifications\SuspiciousLocationNotification;
 use App\Notifications\ConcurrentAccessNotification;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -199,7 +200,7 @@ class TokenBindingService
                 'current_ip' => $currentIp,
                 'concurrent_ips' => $concurrentIps,
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->logger->error('Failed to send concurrent access notification', [
                 'user_id' => $token->tokenable_id,
                 'error' => $e->getMessage(),
@@ -236,7 +237,7 @@ class TokenBindingService
                 Cache::forget("token_ip_usage:{$token->id}");
             }
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->logger->error('Failed to revoke user tokens', [
                 'user_id' => $userId,
                 'reason' => $reason,
@@ -419,7 +420,7 @@ class TokenBindingService
                 'new_country' => $locationData['country_code'] ?? 'unknown',
                 'ip_address'  => $ipAddress,
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->logger->error('Failed to send geo-location notification', [
                 'user_id' => $token->tokenable_id,
                 'error'   => $e->getMessage(),

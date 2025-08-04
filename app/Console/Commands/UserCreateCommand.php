@@ -3,7 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Models\User;
+use Hash;
 use Illuminate\Console\Command;
+use Throwable;
 
 class UserCreateCommand extends Command
 {
@@ -23,7 +25,7 @@ class UserCreateCommand extends Command
 
     /**
      * Execute the console command.
-     * @throws \Throwable
+     * @throws Throwable
      */
     public function handle()
     {
@@ -33,7 +35,7 @@ class UserCreateCommand extends Command
         }
 
         $data = $this->getUserData();
-        if (User::whereEmail($data['email'])->exists()) {
+        if ((new \App\Models\User)->whereEmail($data['email'])->exists()) {
             $this->error('User already exists');
             return 1;
         }
@@ -50,7 +52,7 @@ class UserCreateCommand extends Command
         return [
             'name'     => $this->ask('name'),
             'email'    => $this->ask('email'),
-            'password' => \Hash::make($this->secret('password')),
+            'password' => Hash::make($this->secret('password')),
         ];
     }
 }

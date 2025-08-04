@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Users;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UserToken\UserTokenIndexRequest;
 use App\Http\Resources\UserToken\PersonalAccessTokenViewResource;
+use Illuminate\Http\Response;
 use App\Models\{PersonalAccessToken, TokenAbility};
 use App\Modules\Http\Pagination\JsonPaginator;
 use Illuminate\Http\Request;
@@ -41,7 +42,7 @@ class UserTokenController extends Controller
      *
      * @param Request $request
      * @param PersonalAccessToken $token
-     * @return \Illuminate\Http\Response
+     * @return Response
      */
     #[Delete('/{token}')]
     public function revokeToken(Request $request, PersonalAccessToken $token)

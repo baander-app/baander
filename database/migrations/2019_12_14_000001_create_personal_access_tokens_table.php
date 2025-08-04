@@ -24,7 +24,7 @@ return new class extends Migration
             $table->text('device_name')->nullable();
             $table->text('client_fingerprint')->nullable();
             $table->text('session_id')->nullable();
-            $table->ipAddress('ip_address')->nullable();
+            $table->ipAddress()->nullable();
             $table->jsonb('ip_history')->nullable();
             $table->integer('ip_change_count')->default(0);
             $table->text('country_code', 2)->nullable();

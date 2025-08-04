@@ -7,6 +7,7 @@ use App\Http\Integrations\Discogs\Filters\ReleaseFilter as DiscogsReleaseFilter;
 use App\Http\Integrations\MusicBrainz\Filters\RecordingFilter;
 use App\Http\Integrations\MusicBrainz\MusicBrainzClient;
 use App\Models\Song;
+use Exception;
 use App\Modules\Metadata\Matching\{QualityValidator};
 use App\Modules\Metadata\Matching\MatchingStrategy;
 use Illuminate\Support\Facades\Log;
@@ -107,7 +108,7 @@ class SongSearchService
                 'quality_score' => $this->qualityValidator->scoreSongMatch($detailedData->toArray(), $song),
             ];
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::warning('MusicBrainz song search failed', [
                 'song_id' => $song->id,
                 'error'   => $e->getMessage(),
@@ -206,7 +207,7 @@ class SongSearchService
                             'quality_score' => $this->qualityValidator->scoreSongMatch($trackData, $song),
                         ];
                     }
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::debug('Exception during Discogs lookup', [
                         'release_id' => $release->id,
                         'error'      => $e->getMessage(),
@@ -217,7 +218,7 @@ class SongSearchService
 
             return null;
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::warning('Discogs song search failed', [
                 'song_id' => $song->id,
                 'error'   => $e->getMessage(),
@@ -281,7 +282,7 @@ class SongSearchService
                         try {
                             $recordingData = $this->musicBrainzClient->lookup->recording($track['recording']['id']);
                             return array_merge($track, $recordingData->toArray());
-                        } catch (\Exception) {
+                        } catch (Exception) {
                             // Return basic track data if detailed lookup fails
                         }
                     }
@@ -386,7 +387,7 @@ class SongSearchService
                         ];
                     }
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::debug('Song fuzzy search variation failed', [
                     'source' => 'musicbrainz',
                     'variation' => $variation,

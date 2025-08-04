@@ -24,7 +24,7 @@ class SyncSmartPlaylists extends BaseJob implements ShouldQueue
      */
     public function handle(): void
     {
-        $playlists = Playlist::whereIsSmart(true)->get();
+        $playlists = (new \App\Models\Playlist)->whereIsSmart(true)->get();
         $playlistCount = $playlists->count();
         $service = app(SmartPlaylistService::class);
 

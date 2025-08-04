@@ -34,14 +34,14 @@ class QueueMetricsService
         ];
 
         // Aggregated info for the last `$days` days
-        $aggregatedInfo = QueueMonitor::query()
+        $aggregatedInfo = (new \App\Models\QueueMonitor)->query()
             ->select($aggregationColumns)
             ->where('status', '!=', MonitorStatus::Running->value)
             ->where('started_at', '>=', Carbon::now()->subDays($aggregateDays))
             ->first();
 
         // Aggregated comparison info for the period between `$days * 2` and `$days` days ago
-        $aggregatedComparisonInfo = QueueMonitor::query()
+        $aggregatedComparisonInfo = (new \App\Models\QueueMonitor)->query()
             ->select($aggregationColumns)
             ->where('status', '!=', MonitorStatus::Running->value)
             ->where('started_at', '>=', Carbon::now()->subDays($aggregateDays * 2))

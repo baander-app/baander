@@ -7,6 +7,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Log;
 use Psr\Log\LoggerInterface;
 use ReflectionClass;
+use ReflectionNamedType;
 use ReflectionProperty;
 
 class LoggerServiceProvider extends ServiceProvider
@@ -45,7 +46,6 @@ class LoggerServiceProvider extends ServiceProvider
                 $channelAttribute->defaultContext
             );
 
-            $property->setAccessible(true);
             $property->setValue($object, $structuredLogger);
         }
     }
@@ -54,8 +54,7 @@ class LoggerServiceProvider extends ServiceProvider
     {
         $type = $property->getType();
 
-        return $type &&
-            $type instanceof \ReflectionNamedType &&
+        return $type instanceof ReflectionNamedType &&
             $type->getName() === LoggerInterface::class;
     }
 

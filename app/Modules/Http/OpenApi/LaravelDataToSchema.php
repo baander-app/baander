@@ -17,6 +17,12 @@ use Dedoc\Scramble\Support\Type\StringType;
 use Dedoc\Scramble\Support\Type\Type;
 use Dedoc\Scramble\Support\Type\Union;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use InvalidArgumentException;
+use ReflectionClass;
+use ReflectionNamedType;
+use ReflectionProperty;
+use ReflectionType;
+use ReflectionUnionType;
 use Spatie\LaravelData\Data;
 use Spatie\LaravelData\DataCollection;
 
@@ -48,8 +54,8 @@ class LaravelDataToSchema extends TypeToSchemaExtension
     public function toSchema(Type $type): ?OpenApiType
     {
         /** @var ObjectType $type */
-        $reflect = new \ReflectionClass($type->name);
-        $props = $reflect->getProperties(\ReflectionProperty::IS_PUBLIC);
+        $reflect = new ReflectionClass($type->name);
+        $props = $reflect->getProperties(ReflectionProperty::IS_PUBLIC);
 
         $ret = new OpenApiObjectType();
         collect($props)->each(function ($prop) use ($ret): void {
@@ -71,15 +77,15 @@ class LaravelDataToSchema extends TypeToSchemaExtension
     /**
      * Given a pure reflected PHP type, we return the corresponding Scramble type equivalent before Generator conversion.
      *
-     * @throws \InvalidArgumentException
+     * @throws InvalidArgumentException
      */
-    private function convertReflected(\ReflectionNamedType|\ReflectionUnionType|\ReflectionType|null $type): Type
+    private function convertReflected(ReflectionNamedType|ReflectionUnionType|ReflectionType|null $type): Type
     {
         if ($type === null) {
             return new NullType();
         }
 
-        if ($type instanceof \ReflectionUnionType) {
+        if ($type instanceof ReflectionUnionType) {
             return $this->handleUnionType($type);
         }
 
@@ -87,7 +93,7 @@ class LaravelDataToSchema extends TypeToSchemaExtension
             throw new \RuntimeException('Intersection types are not supported.');
         }
 
-        if (!$type instanceof \ReflectionNamedType) {
+        if (!$type instanceof ReflectionNamedType) {
             throw new \RuntimeException('Unexpected reflection type.');
         }
 
@@ -105,7 +111,7 @@ class LaravelDataToSchema extends TypeToSchemaExtension
         };
     }
 
-    private function handleUnionType(\ReflectionUnionType $union): Type
+    private function handleUnionType(ReflectionUnionType $union): Type
     {
         $types = collect($union->getTypes())->map(fn ($type) => $this->convertReflected($type))->all();
         return new Union($types);

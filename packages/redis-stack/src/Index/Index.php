@@ -4,6 +4,8 @@ namespace Baander\RedisStack\Index;
 
 use Baander\RedisStack\Query\QueryBuilder;
 use Baander\RedisStack\Result\SearchResult;
+use Exception;
+use InvalidArgumentException;
 
 class Index extends AbstractIndex implements IndexInterface
 {
@@ -15,7 +17,7 @@ class Index extends AbstractIndex implements IndexInterface
     public function create(): void
     {
         if (empty($this->fieldDefinitions)) {
-            throw new \InvalidArgumentException('Index requires at least one field!');
+            throw new InvalidArgumentException('Index requires at least one field!');
         }
 
         $schema = [$this->getIndexName(), 'ON', 'HASH'];
@@ -44,7 +46,7 @@ class Index extends AbstractIndex implements IndexInterface
         try {
             $this->rawCommand('FT.INFO', [$this->getIndexName()]);
             return true;
-        } catch (\Exception) {
+        } catch (Exception) {
             return false;
         }
     }

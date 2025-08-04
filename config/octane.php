@@ -1,5 +1,8 @@
 <?php
 
+use App\Octane\Listeners\TelemetryFlushListener;
+use App\Octane\Listeners\TelemetryShutdownListener;
+use App\Octane\TelemetryTaskHandler;
 use Laravel\Octane\Contracts\OperationTerminated;
 use Laravel\Octane\Events\RequestHandled;
 use Laravel\Octane\Events\RequestReceived;
@@ -12,8 +15,6 @@ use Laravel\Octane\Events\WorkerErrorOccurred;
 use Laravel\Octane\Events\WorkerStarting;
 use Laravel\Octane\Events\WorkerStopping;
 use Laravel\Octane\Listeners\CloseMonologHandlers;
-use Laravel\Octane\Listeners\CollectGarbage;
-use Laravel\Octane\Listeners\DisconnectFromDatabases;
 use Laravel\Octane\Listeners\EnsureUploadedFilesAreValid;
 use Laravel\Octane\Listeners\EnsureUploadedFilesCanBeMoved;
 use Laravel\Octane\Listeners\FlushOnce;
@@ -107,12 +108,12 @@ return [
 
         RequestTerminated::class => [
             FlushUploadedFiles::class,
-            \App\Octane\Listeners\TelemetryFlushListener::class,
+            TelemetryFlushListener::class,
         ],
 
         TaskReceived::class => [
             ...Octane::prepareApplicationForNextOperation(),
-            \App\Octane\TelemetryTaskHandler::class,
+            TelemetryTaskHandler::class,
         ],
 
         TaskTerminated::class => [
@@ -142,7 +143,7 @@ return [
 
         WorkerStopping::class => [
             CloseMonologHandlers::class,
-            \App\Octane\Listeners\TelemetryShutdownListener::class,
+            TelemetryShutdownListener::class,
         ],
     ],
 

@@ -29,7 +29,7 @@ class PruneExpiredTokensCommand extends Command
     public function handle()
     {
         $authTokenManager = app(AccessTokenService::class);
-        $result = (new PruneExpiredTokens($authTokenManager))->run();
+        $result = new PruneExpiredTokens($authTokenManager)->run();
 
         $count = Arr::get($result, 'removed', 0);
         $this->warn("Pruned {$count} expired tokens.");

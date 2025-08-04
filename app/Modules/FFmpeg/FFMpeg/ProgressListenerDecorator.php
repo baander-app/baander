@@ -18,7 +18,7 @@ class ProgressListenerDecorator implements ProgressableInterface, AudioInterface
     use ForwardsCalls;
 
     /**
-     * @var \FFMpeg\Format\AudioInterface|\FFMpeg\Format\VideoInterface
+     * @var AudioInterface|VideoInterface
      */
     protected $format;
 

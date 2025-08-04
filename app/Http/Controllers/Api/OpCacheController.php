@@ -107,7 +107,7 @@ class OpCacheController extends Controller
         $result = opcache_reset();
 
         return response()->json([
-            'success' => (bool)$result,
+            'success' => $result,
         ])->setStatusCode($result ? 200 : 500);
     }
 

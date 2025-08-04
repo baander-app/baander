@@ -68,7 +68,7 @@ class User extends Authenticatable implements HasPasskeys
      *
      * @param string $name
      * @param array $abilities
-     * @param \DateTimeInterface|null $expiresAt
+     * @param DateTimeInterface|null $expiresAt
      * @param array $device
      * @return NewAccessToken
      */

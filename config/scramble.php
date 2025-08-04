@@ -1,5 +1,9 @@
 <?php
 
+use App\Modules\Http\OpenApi\JsonPaginatorExtension;
+use App\Modules\Http\OpenApi\LaravelDataCollectionExtension;
+use App\Modules\Http\OpenApi\LaravelDataRequestExtension;
+use App\Modules\Http\OpenApi\LaravelDataToSchema;
 use Dedoc\Scramble\Http\Middleware\RestrictedDocsAccess;
 
 return [
@@ -93,9 +97,9 @@ DESCRIPTION
     ],
 
     'extensions' => [
-        \App\Modules\Http\OpenApi\JsonPaginatorExtension::class,
-        \App\Modules\Http\OpenApi\LaravelDataRequestExtension::class,
-        \App\Modules\Http\OpenApi\LaravelDataToSchema::class,
-        \App\Modules\Http\OpenApi\LaravelDataCollectionExtension::class,
+        JsonPaginatorExtension::class,
+        LaravelDataRequestExtension::class,
+        LaravelDataToSchema::class,
+        LaravelDataCollectionExtension::class,
     ],
 ];

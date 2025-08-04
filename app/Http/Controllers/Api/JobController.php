@@ -135,7 +135,7 @@ class JobController extends Controller
         $slug = $request->route('slug');
 
         try {
-            $library = Library::whereSlug($slug)->firstOrFail();
+            $library = (new \App\Models\Library)->whereSlug($slug)->firstOrFail();
         } catch (ModelNotFoundException $e) {
             throw CouldNotFindJobException::throwFromController($e);
         }

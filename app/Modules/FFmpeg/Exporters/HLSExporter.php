@@ -26,17 +26,17 @@ class HLSExporter extends MediaExporter
     private $keyFrameInterval = 48;
 
     /**
-     * @var \Illuminate\Support\Collection
+     * @var Collection
      */
     private $pendingFormats;
 
     /**
-     * @var \App\Modules\FFmpeg\Exporters\PlaylistGenerator
+     * @var PlaylistGenerator
      */
     private $playlistGenerator;
 
     /**
-     * @var \Closure
+     * @var Closure
      */
     private $segmentFilenameGenerator = null;
 
@@ -70,7 +70,7 @@ class HLSExporter extends MediaExporter
      * Method to set a different playlist generator than
      * the default HLSPlaylistGenerator.
      *
-     * @param \App\Modules\FFmpeg\Exporters\PlaylistGenerator $playlistGenerator
+     * @param PlaylistGenerator $playlistGenerator
      * @return self
      */
     public function withPlaylistGenerator(PlaylistGenerator $playlistGenerator): self
@@ -244,7 +244,7 @@ class HLSExporter extends MediaExporter
      * Returns a media collection of all segment playlists.
      *
      * @param string $path
-     * @return \Illuminate\Support\Collection
+     * @return Collection
      * @throws \App\Modules\FFmpeg\Exporters\NoFormatException
      */
     private function prepareSaving(string $path = null): Collection

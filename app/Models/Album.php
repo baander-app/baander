@@ -9,8 +9,6 @@ use App\Modules\Translation\LocaleString;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Overtrue\LaravelVersionable\Versionable;
-use Spatie\Sluggable\{HasSlug, SlugOptions};
-use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;

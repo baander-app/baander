@@ -12,7 +12,7 @@ function setupRedis(): Redis
     $redis = new Redis();
 
     try {
-        $redis->connect('redis', 6379); // Adjust host and port if necessary
+        $redis->connect('redis'); // Adjust host and port if necessary
         echo "Connected to Redis!\n";
     } catch (RedisException $e) {
         echo 'Failed to connect to Redis: ' . $e->getMessage();

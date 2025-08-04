@@ -18,7 +18,7 @@ class Group implements JsonSerializable
 
     public static function noteOnly($note): Group
     {
-        return (new static(collect()))->addNote($note);
+        return new static(collect())->addNote($note);
     }
 
     public function addNote($note): self
@@ -76,7 +76,7 @@ class Group implements JsonSerializable
         return trim(str_replace('Value', '', $heading));
     }
 
-    public function jsonSerialize(): mixed
+    public function jsonSerialize(): array
     {
         return [
             'key'           => $this->key(),

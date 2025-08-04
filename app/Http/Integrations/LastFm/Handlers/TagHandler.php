@@ -4,6 +4,7 @@ namespace App\Http\Integrations\LastFm\Handlers;
 
 use GuzzleHttp\Promise\PromiseInterface;
 use GuzzleHttp\Promise\Utils;
+use Log;
 
 class TagHandler extends BaseHandler
 {
@@ -34,7 +35,7 @@ class TagHandler extends BaseHandler
             'tag' => $tag,
         ]);
         // Debug the raw response
-        \Log::info("LastFM getSimilarTags raw response for tag: {$tag}", [
+        Log::info("LastFM getSimilarTags raw response for tag: {$tag}", [
             'full_response' => $data,
             'has_similartags' => isset($data['similartags']),
             'similartags_keys' => isset($data['similartags']) ? array_keys($data['similartags']) : null,
@@ -97,7 +98,7 @@ class TagHandler extends BaseHandler
             'method' => 'tag.getSimilar',
             'tag' => $tag,
         ])->then(function ($data) use ($tag) {
-            \Log::debug("LastFM getSimilarTags raw response for tag: $tag", $data);;
+            Log::debug("LastFM getSimilarTags raw response for tag: $tag", $data);
 
             return $data['similartags']['tag'] ?? [];
         });

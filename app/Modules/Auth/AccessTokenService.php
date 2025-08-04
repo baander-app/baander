@@ -8,17 +8,17 @@ class AccessTokenService
 {
     public function pruneExpiredTokens()
     {
-        return PersonalAccessToken::whereExpired()->delete();
+        return (new \App\Models\PersonalAccessToken)->whereExpired()->delete();
     }
 
     public function getExpiredTokenCount()
     {
-        return PersonalAccessToken::whereExpired()->count();
+        return (new \App\Models\PersonalAccessToken)->whereExpired()->count();
     }
 
     public function revokeToken(string $token): bool
     {
-        $model = PersonalAccessToken::whereToken($token)->firstOrFail();
+        $model = (new \App\Models\PersonalAccessToken)->whereToken($token)->firstOrFail();
 
         return $model->update([
             'expires_at' => now(),

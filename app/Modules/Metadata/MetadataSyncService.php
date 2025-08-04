@@ -7,6 +7,7 @@ use App\Modules\Metadata\Processing\MetadataProcessor;
 use App\Modules\Metadata\Search\{ArtistSearchService};
 use App\Modules\Metadata\Search\AlbumSearchService;
 use App\Modules\Metadata\Search\SongSearchService;
+use Exception;
 use Illuminate\Support\Facades\Log;
 
 class MetadataSyncService
@@ -51,7 +52,7 @@ class MetadataSyncService
             Log::debug('No suitable match found for song', ['song_id' => $song->id]);
             return $this->getEmptySongResult();
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Song metadata sync failed', [
                 'song_id' => $song->id,
                 'error'   => $e->getMessage(),
@@ -160,7 +161,7 @@ class MetadataSyncService
             Log::debug('No external match found, using local analysis', ['album_id' => $album->id]);
             return $this->localMetadataService->enhanceAlbumMetadata($album);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Album metadata sync failed', [
                 'album_id' => $album->id,
                 'error'    => $e->getMessage(),
@@ -210,7 +211,7 @@ class MetadataSyncService
             Log::debug('No suitable match found for artist', ['artist_id' => $artist->id]);
             return $this->getEmptyArtistResult();
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Artist metadata sync failed', [
                 'artist_id' => $artist->id,
                 'error'     => $e->getMessage(),

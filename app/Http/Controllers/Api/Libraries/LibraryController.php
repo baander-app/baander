@@ -10,6 +10,7 @@ use App\Modules\Http\Pagination\JsonPaginator;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Patch, Post, Prefix};
+use Symfony\Component\HttpFoundation\Response as ResponseAlias;
 
 #[Prefix('/libraries')]
 #[Middleware([
@@ -27,7 +28,7 @@ class LibraryController extends Controller
     #[Get('/', 'api.libraries.index')]
     public function index(LibraryIndexRequest $request)
     {
-        $libraries = Library::paginate();
+        $libraries = (new \App\Models\Library)->paginate();
 
         return LibraryResource::collection($libraries);
     }
@@ -40,7 +41,7 @@ class LibraryController extends Controller
     {
         $data = $request->validated();
 
-        $library = Library::create($data);
+        $library = (new \App\Models\Library)->create($data);
 
         return new LibraryResource($library);
     }
@@ -54,7 +55,7 @@ class LibraryController extends Controller
     #[Get('/{slug}', 'api.library.show')]
     public function show(string $slug)
     {
-        $library = Library::whereSlug($slug)->firstOrFail();
+        $library = (new \App\Models\Library)->whereSlug($slug)->firstOrFail();
 
         return new LibraryResource($library);
     }
@@ -65,7 +66,7 @@ class LibraryController extends Controller
     #[Patch('/{slug}', 'api.library.update')]
     public function update(string $slug, UpdateLibraryRequest $request)
     {
-        $library = Library::whereSlug($slug)->firstOrFail();
+        $library = (new \App\Models\Library)->whereSlug($slug)->firstOrFail();
 
         $library->update($request->validated());
 
@@ -78,8 +79,8 @@ class LibraryController extends Controller
     #[Delete('/{slug}', 'api.library.delete')]
     public function destroy(string $slug)
     {
-        Library::whereSlug($slug)->delete();
+        (new \App\Models\Library)->whereSlug($slug)->delete();
 
-        return response(null, Response::HTTP_NO_CONTENT);
+        return response(null, ResponseAlias::HTTP_NO_CONTENT);
     }
 }

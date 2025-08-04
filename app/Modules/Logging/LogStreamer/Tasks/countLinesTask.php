@@ -1,10 +1,11 @@
 <?php
 
+use JetBrains\PhpStorm\NoReturn;
 use Swoole\Thread;
 use Swoole\Thread\Queue;
 
 // Enhanced error handling and validation
-function handleError(Queue $queue, string $message): void
+#[NoReturn] function handleError(Queue $queue, string $message): void
 {
     error_log("Count Lines Task Error: $message");
     $queue->push(0);

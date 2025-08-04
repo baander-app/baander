@@ -2,8 +2,12 @@
 
 namespace Baander\RedisStack\Schema;
 
+use Baander\RedisStack\Attributes\Boolean;
+use Baander\RedisStack\Attributes\Date;
+use Baander\RedisStack\Attributes\Id;
+use Baander\RedisStack\Attributes\Number;
+use Baander\RedisStack\Attributes\Text;
 use ReflectionClass;
-use ReflectionProperty;
 
 class SchemaBuilder
 {
@@ -20,11 +24,11 @@ class SchemaBuilder
 
                 // Map attributes to schema fields
                 switch ($attributeName) {
-                    case \Baander\RedisStack\Attributes\Id::class:
+                    case Id::class:
                         $schema[$fieldName] = ['type' => 'string'];
                         break;
 
-                    case \Baander\RedisStack\Attributes\Text::class:
+                    case Text::class:
                         $options = $attribute->newInstance();
                         $schema[$fieldName] = [
                             'type' => 'text',
@@ -32,7 +36,7 @@ class SchemaBuilder
                         ];
                         break;
 
-                    case \Baander\RedisStack\Attributes\Number::class:
+                    case Number::class:
                         $options = $attribute->newInstance();
                         $schema[$fieldName] = [
                             'type' => 'number',
@@ -40,11 +44,11 @@ class SchemaBuilder
                         ];
                         break;
 
-                    case \Baander\RedisStack\Attributes\Boolean::class:
+                    case Boolean::class:
                         $schema[$fieldName] = ['type' => 'boolean'];
                         break;
 
-                    case \Baander\RedisStack\Attributes\Date::class:
+                    case Date::class:
                         $options = $attribute->newInstance();
                         $schema[$fieldName] = [
                             'type' => 'date',

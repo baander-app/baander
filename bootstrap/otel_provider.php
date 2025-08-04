@@ -5,6 +5,7 @@ declare(strict_types=1);
 use OpenTelemetry\API\Signals;
 use OpenTelemetry\API\Trace\Propagation\TraceContextPropagator;
 use OpenTelemetry\Contrib\Otlp\LogsExporter;
+use OpenTelemetry\Contrib\Otlp\MetricExporter;
 use OpenTelemetry\Contrib\Otlp\OtlpHttpTransportFactory;
 use OpenTelemetry\Contrib\Otlp\SpanExporter;
 use OpenTelemetry\SDK\Common\Attribute\Attributes;
@@ -59,7 +60,7 @@ if ($isInsecure) {
         null, // key
     ));
 
-    $metricsExporter = new \OpenTelemetry\Contrib\Otlp\MetricExporter($transportFactory->create(
+    $metricsExporter = new MetricExporter($transportFactory->create(
         $metricsUrl,
         'application/x-protobuf',
         [],  // headers
@@ -101,7 +102,7 @@ if ($isInsecure) {
         $certPath, // key
     ));
 
-    $metricsExporter = new \OpenTelemetry\Contrib\Otlp\MetricExporter($transportFactory->create(
+    $metricsExporter = new MetricExporter($transportFactory->create(
         $metricsUrl,
         'application/x-protobuf',
         [],  // headers

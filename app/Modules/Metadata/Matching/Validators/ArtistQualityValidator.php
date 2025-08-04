@@ -184,7 +184,7 @@ class ArtistQualityValidator extends BaseQualityValidator
         $score = 0;
 
         // Tags with genre relevance (check if key exists first)
-        if (isset($metadata['tags']) && is_array($metadata['tags']) && !empty($metadata['tags'])) {
+        if (is_array($metadata['tags']) && !empty($metadata['tags'])) {
             $tagCount = count($metadata['tags']);
             $score += min(0.4, $tagCount * 0.05); // More tags = more context
             Log::debug("Found {$tagCount} tags, scored " . min(0.4, $tagCount * 0.05) . " points");
@@ -206,7 +206,7 @@ class ArtistQualityValidator extends BaseQualityValidator
         }
 
         // Aliases (alternative names)
-        if (isset($metadata['aliases']) && is_array($metadata['aliases']) && !empty($metadata['aliases'])) {
+        if (is_array($metadata['aliases']) && !empty($metadata['aliases'])) {
             $score += 0.15;
             Log::debug("Found aliases, scored 0.15 points");
         }
@@ -225,17 +225,17 @@ class ArtistQualityValidator extends BaseQualityValidator
         }
 
         // Discogs-specific fields
-        if (isset($metadata['profile']) && !empty($metadata['profile'])) {
+        if (!empty($metadata['profile'])) {
             $score += 0.1;
             Log::debug("Found profile, scored 0.1 points");
         }
 
-        if (isset($metadata['images']) && is_array($metadata['images']) && !empty($metadata['images'])) {
+        if (is_array($metadata['images']) && !empty($metadata['images'])) {
             $score += 0.05;
             Log::debug("Found images, scored 0.05 points");
         }
 
-        if (isset($metadata['urls']) && is_array($metadata['urls']) && !empty($metadata['urls'])) {
+        if (is_array($metadata['urls']) && !empty($metadata['urls'])) {
             $score += 0.05;
             Log::debug("Found URLs, scored 0.05 points");
         }

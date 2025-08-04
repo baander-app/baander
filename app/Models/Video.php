@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Observers\VideoObserver;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use SplFileInfo;
 
 #[ObservedBy(VideoObserver::class)]
 class Video extends BaseModel
@@ -28,7 +29,7 @@ class Video extends BaseModel
             ->using(MovieVideo::class);
     }
 
-    public static function makeHash(\SplFileInfo $file): string
+    public static function makeHash(SplFileInfo $file): string
     {
         $parts = [
             'path' => $file->getRealPath(),
