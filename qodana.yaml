@@ -1,3 +1,4 @@
+
 version: "1.0"
 linter: jetbrains/qodana-php:2025.1
 
@@ -39,7 +40,3 @@ include:
   - name: PhpDocMissingThrowsInspection
   - name: PhpUnusedImportInspection
   - name: PhpCodeStyleInspection
-
-fixes:
-  cleanup: true
-  format: true
