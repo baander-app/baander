@@ -93,8 +93,8 @@ return [
         'options' => [
             'cluster'     => env('REDIS_CLUSTER', 'redis'),
             'prefix'      => env('REDIS_PREFIX', ''),
-            'serializer'  => Redis::SERIALIZER_IGBINARY,
-            'compression' => Redis::COMPRESSION_ZSTD,
+            'serializer'  => 2, //Redis::SERIALIZER_IGBINARY,
+            'compression' => 2, //Redis::COMPRESSION_ZSTD,
         ],
 
         'default' => [
