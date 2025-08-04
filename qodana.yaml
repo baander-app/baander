@@ -10,6 +10,8 @@ php:
 # Skip composer operations to avoid extension issues
 bootstrap: |
   export QODANA_SKIP_COMPOSER=true
+  composer install --ignore-platform-reqs
+  composer require --dev --ignore-platform-reqs barryvdh/laravel-ide-helper
 
 exclude:
   - name: All
