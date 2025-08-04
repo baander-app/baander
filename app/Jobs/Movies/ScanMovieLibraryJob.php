@@ -29,7 +29,7 @@ class ScanMovieLibraryJob extends BaseJob implements ShouldQueue
 
     public function middleware(): array
     {
-        return [new WithoutOverlapping($this->library->id)->dontRelease()];
+        return [new WithoutOverlapping($this->library->id)];
     }
 
     /**

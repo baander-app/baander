@@ -26,6 +26,8 @@ bundle-visualization.html
 /storage/muzak/
 /storage/movies/
 /storage/clockwork/*
+/storage/app/scheduler.sh
+/storage/app/swoole_http.pid
 .env.sentry-build-plugin
 /api.json
 /*.pem
