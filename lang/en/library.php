@@ -1,7 +1,10 @@
 <?php
 
 return [
-    'album' => [
-        'fallback' => 'Various artists',
+    'album'  => [
+        'unknown' => 'Unknown Album',
+    ],
+    'artist' => [
+        'unknown' => 'Unknown Artist',
     ],
 ];

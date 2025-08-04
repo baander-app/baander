@@ -84,6 +84,32 @@ class Album extends BaseModel implements HasMedia
         return $title;
     }
 
+    /**
+     * Check if this album is marked as unknown
+     */
+    public function isUnknown(): bool
+    {
+        return LocaleString::isLocaleString($this->attributes['title'] ?? '');
+    }
+
+    /**
+     * Check if metadata lookup should be skipped for this album
+     */
+    public function shouldSkipMetadataLookup(): bool
+    {
+        return $this->isUnknown();
+    }
+
+    /**
+     * Create an unknown album with localized title
+     */
+    public static function createUnknown(array $attributes = []): static
+    {
+        return static::create(array_merge([
+            'title' => LocaleString::delimitString('media.unknown_album'),
+        ], $attributes));
+    }
+
     public function artists()
     {
         return $this->belongsToMany(Artist::class)
