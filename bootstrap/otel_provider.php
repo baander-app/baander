@@ -19,6 +19,10 @@ use OpenTelemetry\SDK\Trace\SpanProcessor\BatchSpanProcessor;
 use OpenTelemetry\SDK\Trace\TracerProvider;
 use OpenTelemetry\SemConv\ResourceAttributes;
 
+if (!array_key_exists('OTEL_ENABLED', $_ENV)) {
+    return;
+}
+
 $resource = ResourceInfoFactory::emptyResource()->merge(
     ResourceInfo::create(
         Attributes::create([
