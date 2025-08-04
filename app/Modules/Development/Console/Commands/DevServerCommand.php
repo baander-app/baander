@@ -135,7 +135,7 @@ class DevServerCommand extends Command
             '--memory=512',
             '--timeout=3600',
             '--tries=3',
-            '--sleep=3',
+            '--sleep=0',
             '--rest=0'
         ];
 

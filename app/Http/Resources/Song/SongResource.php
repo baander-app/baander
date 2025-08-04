@@ -26,7 +26,7 @@ class SongResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'publicId'     => $this->public_id,
+            'publicId'      => $this->public_id,
             'title'         => $this->title,
             'year'          => $this->year,
             'comment'       => $this->comment,
@@ -35,14 +35,16 @@ class SongResource extends JsonResource
             'durationHuman' => (new HumanDuration)->humanize($this->length),
             'lyrics'        => $this->lyrics,
             'lyricsExist'   => (bool)$this->lyrics,
-            'modifiedTime' => $this->modified_time,
+            'modifiedTime'  => $this->modified_time,
             'path'          => $this->path,
             'track'         => $this->track,
             'size'          => $this->size,
             'sizeHuman'     => humanize_bytes($this->size),
             'mimeType'      => $this->mime_type,
             'hash'          => $this->hash,
-            'streamUrl' => route('api.stream.song-direct', ['song' => $this->public_id]),
+            'mbid'          => $this->mbid,
+            'discogsId'     => $this->discogs_id,
+            'streamUrl'     => route('api.stream.song-direct', ['song' => $this->public_id]),
             'createdAt'     => $this->created_at,
             'updatedAt'     => $this->updated_at,
             'album'         => AlbumWithoutSongsResource::make($this->whenLoaded('album')),
