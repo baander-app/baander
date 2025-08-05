@@ -7,11 +7,18 @@ use App\Http\Integrations\Discogs\Filters\ReleaseFilter;
 use App\Http\Integrations\LastFm\LastFmClient;
 use App\Http\Integrations\MusicBrainz\MusicBrainzClient;
 use App\Models\User;
+use App\Modules\Logging\Attributes\LogChannel;
+use App\Modules\Logging\Channel;
 use Exception;
-use Illuminate\Support\Facades\Log;
+use Psr\Log\LoggerInterface;
 
 class GenreHierarchyService
 {
+    #[LogChannel(
+        channel: Channel::Metadata,
+    )]
+    private LoggerInterface $logger;
+
     private readonly LastFmClient $lastFmClient;
 
     public function __construct(
@@ -31,7 +38,7 @@ class GenreHierarchyService
         $batches = array_chunk($genres, $batchSize);
 
         foreach ($batches as $batchIndex => $batch) {
-            Log::info("Processing batch {$batchIndex}", ['genres' => $batch]);
+            $this->logger->info("Processing batch {$batchIndex}", ['genres' => $batch]);
 
             foreach ($batch as $genre) {
                 $genre = trim($genre);
@@ -40,14 +47,14 @@ class GenreHierarchyService
                 try {
                     $tagInfo = $this->lastFmClient->tags->getTagInfo($genre);
                 } catch (Exception $e) {
-                    Log::warning("LastFM failed for {$genre}", ['error' => $e->getMessage()]);
+                    $this->logger->warning("LastFM failed for {$genre}", ['error' => $e->getMessage()]);
                     $tagInfo = [];
                 }
 
                 // Get Discogs data using search-only approach
                 $discogsData = $this->getDiscogsGenreData($genre);
 
-                Log::info("Processed genre: {$genre}", [
+                $this->logger->info("Processed genre: {$genre}", [
                     'lastfm_popularity'    => $tagInfo['reach'] ?? 0,
                     'discogs_styles_count' => count($discogsData['related_styles']),
                     'discogs_genres_count' => count($discogsData['related_genres']),
@@ -103,7 +110,7 @@ class GenreHierarchyService
             ];
 
         } catch (Exception $e) {
-            Log::warning("Discogs search failed for {$genre}", ['error' => $e->getMessage()]);
+            $this->logger->warning("Discogs search failed for {$genre}", ['error' => $e->getMessage()]);
             return [
                 'related_styles' => [],
                 'related_genres' => [],
@@ -118,7 +125,7 @@ class GenreHierarchyService
      */
     private function organizeHierarchyWithAlternatives(array $genreData, array $allGenres): array
     {
-        Log::info('Organizing hierarchy with relationship methods', ['genre_count' => count($genreData)]);
+        $this->logger->info('Organizing hierarchy with relationship methods', ['genre_count' => count($genreData)]);
 
         $organized = [
             'root_genres'        => [],
@@ -164,7 +171,7 @@ class GenreHierarchyService
 
         // Identify subgenres (genres that are children of others)
         foreach ($organized['relationships'] as $relationship) {
-            if (!in_array($relationship['child'], $organized['subgenres'])) {
+            if (!in_array($relationship['child'], $organized['subgenres'], true)) {
                 $organized['subgenres'][] = $relationship['child'];
             }
         }
@@ -194,7 +201,7 @@ class GenreHierarchyService
         // Strategy 3: Manual genre hierarchy rules
         $manualRelationships = $this->getManualGenreRelationships($genre);
         foreach ($manualRelationships as $rel) {
-            if (in_array($rel['name'], $allGenres)) {
+            if (in_array($rel['name'], $allGenres, true)) {
                 $relationships[] = array_merge($rel, ['source' => 'manual_rules']);
             }
         }
@@ -214,7 +221,9 @@ class GenreHierarchyService
         $relationships = [];
 
         foreach ($allGenres as $otherGenre) {
-            if ($genre === $otherGenre) continue;
+            if ($genre === $otherGenre) {
+                continue;
+            }
 
             $similarity = 0;
 
@@ -306,7 +315,7 @@ class GenreHierarchyService
 
         // Reverse matches (child -> parent)
         foreach ($manualRules as $parent => $children) {
-            if (in_array($lowerGenre, array_map('strtolower', $children))) {
+            if (in_array($lowerGenre, array_map('strtolower', $children), true)) {
                 $relationships[] = [
                     'name'  => $parent,
                     'match' => 0.9,
@@ -400,8 +409,8 @@ class GenreHierarchyService
      */
     private function calculateStringSimilarity(string $genre1, string $genre2): float
     {
-        $genre1Lower = strtolower($genre1);
-        $genre2Lower = strtolower($genre2);
+        $genre1Lower = mb_strtolower($genre1);
+        $genre2Lower = mb_strtolower($genre2);
 
         // Check for substring relationships
         if (str_contains($genre1Lower, $genre2Lower) || str_contains($genre2Lower, $genre1Lower)) {
@@ -418,7 +427,7 @@ class GenreHierarchyService
         }
 
         // Levenshtein distance for very similar spellings
-        $maxLen = max(strlen($genre1Lower), strlen($genre2Lower));
+        $maxLen = max(mb_strlen($genre1Lower), mb_strlen($genre2Lower));
         if ($maxLen <= 20) { // Only for short genre names
             $distance = levenshtein($genre1Lower, $genre2Lower);
             if ($distance <= 3) {
@@ -443,7 +452,7 @@ class GenreHierarchyService
             try {
                 $tagInfo = $this->lastFmClient->tags->getTagInfo($genre);
             } catch (Exception $e) {
-                Log::warning("LastFM failed for {$genre}", ['error' => $e->getMessage()]);
+                $this->logger->warning("LastFM failed for {$genre}", ['error' => $e->getMessage()]);
                 $tagInfo = [];
             }
 
@@ -475,16 +484,8 @@ class GenreHierarchyService
         }
 
         // Check the similarity matrix first
-        if (isset($hierarchyData['similarity_matrix'][$genre1][$genre2])) {
-            return $hierarchyData['similarity_matrix'][$genre1][$genre2];
-        }
-
-        // Check reverse direction
-        if (isset($hierarchyData['similarity_matrix'][$genre2][$genre1])) {
-            return $hierarchyData['similarity_matrix'][$genre2][$genre1];
-        }
-
-        // Fallback to string similarity
-        return $this->calculateStringSimilarity($genre1, $genre2);
+        return $hierarchyData['similarity_matrix'][$genre1][$genre2]
+            ?? $hierarchyData['similarity_matrix'][$genre2][$genre1]
+            ?? $this->calculateStringSimilarity($genre1, $genre2);
     }
 }

@@ -21,10 +21,8 @@ class Artist extends BaseModel
     ];
 
     protected $fillable = [
+        'public_id',
         'name',
-        'slug',
-        'mbid',
-        'discogs_id',
         'country',
         'gender',
         'type',
@@ -32,6 +30,14 @@ class Artist extends BaseModel
         'life_span_end',
         'disambiguation',
         'sort_name',
+        'mbid',
+        'discogs_id',
+        'spotify_id',
+    ];
+
+    protected $casts = [
+        'life_span_begin' => 'date',
+        'life_span_end' => 'date',
     ];
 
     public function getRouteKeyName(): string

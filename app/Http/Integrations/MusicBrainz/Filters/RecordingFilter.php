@@ -7,9 +7,11 @@ class RecordingFilter extends BaseFilter
     public function __construct(
         public ?string $title = null,
         public ?string $artistName = null,
-        int $limit = 25,
-        int $offset = 0
-    ) {
+        public ?string $release = null,
+        int            $limit = 25,
+        int            $offset = 0,
+    )
+    {
         parent::__construct($limit, $offset);
     }
 
@@ -25,15 +27,30 @@ class RecordingFilter extends BaseFilter
         return $this;
     }
 
+    public function getRelease(): ?string
+    {
+        return $this->release;
+    }
+
+    public function setRelease(?string $release): void
+    {
+        $this->release = $release;
+    }
+
     protected function buildQuery(): array
     {
         $query = [];
+
         if ($this->title) {
             $query[] = 'recording:' . $this->title;
         }
         if ($this->artistName) {
             $query[] = 'artist:' . $this->artistName;
         }
+        if ($this->release) {
+            $query[] = 'release:' . $this->release;
+        }
+
         return $query;
     }
 }

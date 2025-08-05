@@ -23,7 +23,7 @@ return new class extends Migration
 
             $table->index('album_id');
 
-            $table->caseInsensitiveText('title');
+            $table->text('title');
             $table->text('path');
             $table->integer('size');
             $table->text('mime_type');
@@ -38,6 +38,21 @@ return new class extends Migration
 
             $table->timestampsTz();
         });
+
+        $sql = <<<SQL
+CREATE INDEX idx_songs_title_fts
+          ON songs
+       USING pgroonga (title pgroonga_text_full_text_search_ops_v2)
+               WITH (tokenizer='TokenNgram("unify_alphabet", false)',
+                    normalizers = 'NormalizerNFKC130');
+SQL;
+
+        DB::statement($sql);
+
+        DB::statement(
+            'CREATE INDEX IF NOT EXISTS idx_artists_public_id_trgm '.
+            'ON artists USING gin (public_id gin_trgm_ops)'
+        );
     }
 
     /**

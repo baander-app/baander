@@ -2,13 +2,12 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\HasLogger;
 use App\Modules\Queue\QueueMonitor\Concerns\IsMonitored;
 use Illuminate\Bus\Queueable;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
-use Psr\Log\LoggerInterface;
 
 abstract class BaseJob
 {
@@ -16,10 +15,6 @@ abstract class BaseJob
         InteractsWithQueue,
         Queueable,
         SerializesModels,
-        IsMonitored;
-
-    protected function logger(): LoggerInterface
-    {
-        return Log::channel('stdout');
-    }
+        IsMonitored,
+        HasLogger;
 }

@@ -5,6 +5,8 @@ namespace App\Jobs\Library\Music;
 use App\Extensions\StrExt;
 use App\Jobs\BaseJob;
 use App\Models\{Album, Artist, Genre, Library, Song};
+use App\Modules\Logging\Attributes\LogChannel;
+use App\Modules\Logging\Channel;
 use App\Modules\Lyrics\Lrc;
 use App\Modules\Metadata\MediaMeta\MediaMeta;
 use App\Modules\Translation\LocaleString;
@@ -13,6 +15,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\{DB, File};
 use Illuminate\Support\LazyCollection;
+use Psr\Log\LoggerInterface;
 use SplFileInfo;
 use Throwable;
 
@@ -21,6 +24,11 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
     public const string ARTIST_SEPARATOR = ';';
     public const string GENRE_SEPARATOR = ';';
     private const int BATCH_SIZE = 50;
+
+    #[LogChannel(
+        channel: Channel::Metadata,
+    )]
+    private LoggerInterface $logger;
 
     public function __construct(
         private string  $directory,
@@ -57,6 +65,10 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
 
     private function processFiles(LazyCollection $files): void
     {
+        $this->getLogger()->info('Processing files in ' . $this->directory, [
+            'files' => $files->count(),
+        ]);
+
         $coverJobs = [];
         $songs = [];
         $processedFiles = 0;
@@ -72,6 +84,9 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
                 $this->queueProgressChunk($fileCount, self::BATCH_SIZE);
             }
         });
+        
+        
+        $this->getLogger()->info('Saving remaining songs');
 
         if (!empty($songs)) {
             $this->batchSaveSongs($songs);
@@ -94,7 +109,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
                 $song->artists()->sync($this->getArtistIds($songData['artists']));
                 $song->genres()->sync($this->getGenreIds($songData['genres']));
             } catch (Throwable $e) {
-                $this->logger()->error("Failed to save song: $song->title", [
+                $this->getLogger()->error("Failed to save song: $song->title", [
                     'exception' => $e,
                 ]);
             }
@@ -116,7 +131,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
                 $songs[] = $songData;
             }
         } catch (\Exception $e) {
-            $this->logger()->error("Failed to process file: {$file->getRealPath()}", [
+            $this->getLogger()->error("Failed to process file: {$file->getRealPath()}", [
                 'isReadable' => $file->isReadable(),
                 'isFile'     => $file->isFile(),
                 'exception'  => $e,
@@ -126,11 +141,15 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
 
     private function processMetadata(MediaMeta $mediaMeta, string $filePath, string $hash, SplFileInfo $file, array &$coverJobs): ?array
     {
+        $this->getLogger()->info("Processing metadata for file: $filePath");
+
         try {
             $directoryName = basename(File::basename($file));
             $album = $this->findOrCreateAlbum(directoryName: $directoryName, albumTitle: $mediaMeta->getAlbum(), year: $mediaMeta->getYear());
 
             if (!$album) {
+                $this->getLogger()->error("Failed to find or create album for file: $filePath");
+
                 return null;
             }
 
@@ -138,7 +157,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
             if ($songAttributes) {
                 $this->queueCoverJob($album, $coverJobs);
 
-                $cleanBadNames = fn($v) => trim($v) !== '' && $v !== null;
+                $cleanBadNames = static fn($v) => trim($v) !== '' && $v !== null;
 
                 $artists = $mediaMeta->getArtist();
                 $artists = is_array($artists) ? array_filter($mediaMeta->getArtist(), $cleanBadNames) : array_filter(explode(self::ARTIST_SEPARATOR, $artists ?? ''), $cleanBadNames);
@@ -155,7 +174,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
 
             return null;
         } catch (\Exception $e) {
-            $this->logger()->error("Error processing metadata for file: $filePath", [
+            $this->getLogger()->error("Error processing metadata for file: $filePath", [
                 'exception' => $e,
             ]);
             return null;
@@ -190,8 +209,8 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
 
             try {
                 $album->saveOrFail();
-            } catch (\Exception $e) {
-                $this->logger()->error("Failed to save album: $title", [
+            } catch (\Exception|\Throwable $e) {
+                $this->getLogger()->error("Failed to save album: $title", [
                     'exception' => $e,
                 ]);
                 return null;
@@ -206,6 +225,8 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         $mimeType = $mediaMeta->getMimeType();
 
         if (!$mimeType) {
+            $this->getLogger()->error("Failed to get mime type for file: $file");
+
             return null;
         }
 
@@ -224,21 +245,21 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
 
     private function getArtistIds(array $artists): array
     {
-        return array_map(function ($artistName) {
+        return array_map(static function ($artistName) {
             return Artist::firstOrCreate(['name' => trim($artistName)])->id;
         }, $artists);
     }
 
     private function getGenreIds(array $genres): array
     {
-        return array_map(function ($genreName) {
+        return array_map(static function ($genreName) {
             return Genre::firstOrCreate(['name' => ucfirst(trim($genreName))])->id;
         }, $genres);
     }
 
     private function queueCoverJob(Album $album, array &$coverJobs): void
     {
-        if (!in_array($album->id, $coverJobs)
+        if (!in_array($album->id, $coverJobs, true)
             && !$album->cover()->exists()
             && !$this->isCoverJobQueued($album, $coverJobs)) {
             SaveAlbumCoverJob::dispatch($album)->afterCommit();

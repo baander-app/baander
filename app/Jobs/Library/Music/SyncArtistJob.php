@@ -2,21 +2,27 @@
 
 namespace App\Jobs\Library\Music;
 
-use App\Http\Integrations\Discogs\DiscogsClient;
-use App\Http\Integrations\MusicBrainz\MusicBrainzClient;
 use App\Jobs\BaseJob;
 use App\Jobs\Library\Music\Concerns\UpdatesArtistMetadata;
 use App\Models\Artist;
-use App\Modules\Metadata\MetadataSyncService;
+use App\Modules\Logging\Attributes\LogChannel;
+use App\Modules\Logging\Channel;
+use App\Modules\Metadata\Search\ArtistSearchService;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\{InteractsWithQueue, SerializesModels};
+use Psr\Log\LoggerInterface;
 
 class SyncArtistJob extends BaseJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, UpdatesArtistMetadata;
+
+    #[LogChannel(
+        channel: Channel::Metadata,
+    )]
+    private LoggerInterface $logger;
 
     public function __construct(
         private readonly int   $artistId,
@@ -32,11 +38,11 @@ class SyncArtistJob extends BaseJob implements ShouldQueue
         $artist = Artist::find($this->artistId);
 
         if (!$artist) {
-            $this->logger()->warning('Artist not found for sync', ['artist_id' => $this->artistId]);
+            $this->getLogger()->warning('Artist not found for sync', ['artist_id' => $this->artistId]);
             return;
         }
 
-        $this->logger()->info('Starting artist sync', [
+        $this->getLogger()->info('Starting artist sync', [
             'artist_id'    => $artist->id,
             'sources'      => $this->sources,
             'force_update' => $this->forceUpdate,
@@ -61,14 +67,14 @@ class SyncArtistJob extends BaseJob implements ShouldQueue
                 $this->scheduleIdentifierBasedSync($artist);
             }
 
-            $this->logger()->info('Artist sync completed', [
+            $this->getLogger()->info('Artist sync completed', [
                 'artist_id'           => $artist->id,
                 'sync_results'        => $syncResults,
                 'identifiers_updated' => $identifiersUpdated,
             ]);
 
         } catch (Exception $e) {
-            $this->logger()->error('Artist sync failed', [
+            $this->getLogger()->error('Artist sync failed', [
                 'artist_id' => $this->artistId,
                 'error'     => $e->getMessage(),
             ]);
@@ -96,7 +102,7 @@ class SyncArtistJob extends BaseJob implements ShouldQueue
             ];
 
         } catch (Exception $e) {
-            $this->logger()->warning("Sync from $source failed", [
+            $this->getLogger()->warning("Sync from $source failed", [
                 'artist_id' => $artist->id,
                 'source'    => $source,
                 'error'     => $e->getMessage(),
@@ -118,39 +124,78 @@ class SyncArtistJob extends BaseJob implements ShouldQueue
 
     private function fetchFromMusicBrainz(Artist $artist): ?array
     {
-        if (!$artist->mbid) {
+        $searchService = app(ArtistSearchService::class);
+
+        // If we already have an MBID, we can use it directly for lookup
+        if ($artist->mbid) {
+            // Use the search service's internal method by searching for a specific artist
+            // This leverages the retry logic and error handling built into the service
+            $result = $searchService->searchMusicBrainz($artist);
+            return $result['data'] ?? null;
+        }
+
+        // If no MBID, search for the artist
+        $result = $searchService->searchMusicBrainz($artist);
+
+        if (!$result || ($result['quality_score'] ?? 0) < 0.7) {
             return null;
         }
 
-        $client = app(MusicBrainzClient::class);
-
-        return $client->getArtist($artist->mbid);
+        return $result['data'] ?? null;
     }
 
     private function fetchFromDiscogs(Artist $artist): ?array
     {
-        if (!$artist->discogs_id) {
+        $searchService = app(ArtistSearchService::class);
+
+        // If we already have a Discogs ID, search will use it
+        $result = $searchService->searchDiscogs($artist);
+
+        if (!$result || ($result['quality_score'] ?? 0) < 0.6) {
             return null;
         }
 
-        $client = app(DiscogsClient::class);
-        return $client->artist()->get($artist->discogs_id);
+        return $result['data'] ?? null;
     }
 
     private function fetchFromGeneral(Artist $artist): ?array
     {
-        $service = app(MetadataSyncService::class);
-        $results = $service->syncArtist($artist);
+        $searchService = app(ArtistSearchService::class);
+        // Use searchAllSources for general metadata gathering
+        $results = $searchService->searchAllSources($artist);
 
-        // Use lower threshold if we're getting valuable identifiers
-        $hasIdentifiers = !empty($results['artist']['mbid']) || !empty($results['artist']['discogs_id']);
+        $this->getLogger()->info('Search results', $results);
+
+        // Find the best result from all sources
+        $bestResult = null;
+        $bestScore = 0;
+
+        foreach ($results as $source => $result) {
+            if ($result && ($result['quality_score'] ?? 0) > $bestScore) {
+                $bestResult = $result;
+                $bestScore = $result['quality_score'];
+            }
+        }
+
+        // Use a lower threshold if we're getting valuable identifiers
+        $hasIdentifiers = !empty($bestResult['data']['id']) || !empty($bestResult['data']['mbid']) || !empty($bestResult['data']['discogs_id']);
         $qualityThreshold = $hasIdentifiers ? 0.6 : 0.7;
 
-        if ($results['quality_score'] < $qualityThreshold) {
+        if (!$bestResult || $bestScore < $qualityThreshold) {
             return null;
         }
 
-        return $results['artist'] ?? null;
+        // Convert the result to the expected format
+        $data = $bestResult['data'];
+
+        // Add identifiers based on source
+        if ($bestResult['source'] === 'musicbrainz' && !empty($bestResult['best_match']['id'])) {
+            $data['mbid'] = $bestResult['best_match']['id'];
+        } else if ($bestResult['source'] === 'discogs' && !empty($bestResult['best_match']['id'])) {
+            $data['discogs_id'] = $bestResult['best_match']['id'];
+        }
+
+        return $data;
     }
 
     protected function getFieldMappings(string $source): array
@@ -163,11 +208,13 @@ class SyncArtistJob extends BaseJob implements ShouldQueue
                 'type'                  => 'type',
                 'gender'                => 'gender',
                 'area.iso-3166-1-codes' => 'country',
+                'mbid'                  => 'mbid',
             ],
             'discogs' => [
-                'name'     => 'name',
-                'realname' => 'sort_name',
-                'profile'  => 'disambiguation',
+                'name'       => 'name',
+                'realname'   => 'sort_name',
+                'profile'    => 'disambiguation',
+                'discogs_id' => 'discogs_id',
             ],
             'general' => [
                 'name'           => 'name',
@@ -232,7 +279,7 @@ class SyncArtistJob extends BaseJob implements ShouldQueue
         }
 
         if (!empty($sources)) {
-            $this->logger()->info('Scheduling identifier-based sync', [
+            $this->getLogger()->info('Scheduling identifier-based sync', [
                 'artist_id' => $artist->id,
                 'sources'   => $sources,
             ]);

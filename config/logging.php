@@ -143,13 +143,6 @@ return [
             'path'   => storage_path('logs/laravel.log'),
         ],
 
-        'musicbrainz' => [
-            'driver'               => 'single',
-            'path'                 => storage_path('logs/musicbrainz.log'),
-            'level'                => env('LOG_LEVEL', 'debug'),
-            'replace_placeholders' => true,
-        ],
-
         'jobs' => [
             'driver'               => 'single',
             'path'                 => storage_path('logs/jobs.log'),
@@ -157,25 +150,27 @@ return [
             'replace_placeholders' => true,
         ],
 
-        'music_jobs' => [
+        'metadata_file' => [
             'driver'               => 'single',
-            'path'                 => storage_path('logs/music_jobs.log'),
+            'path'                 => storage_path('logs/metadata.log'),
             'level'                => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
         ],
 
-        //
-        //        'php_deprecations' => [
-        //            'driver'               => 'single',
-        //            'path'                 => storage_path('logs/deprecations.log'),
-        //            'level'                => env('LOG_LEVEL', 'debug'),
-        //            'replace_placeholders' => true,
-        //        ],
-        //
-        //        'deprecations' => [
-        //            'channel' => env('LOG_DEPRECATIONS_CHANNEL', 'php_deprecations'),
-        //            'trace'   => env('LOG_DEPRECATIONS_TRACE', false),
-        //        ],
+        'metadata_otel' => [
+            'driver' => 'custom',
+            'via'    => OpenTelemetryMonolog::class,
+            'name'   => 'metadata_otel',
+            'level'  => LogLevel::DEBUG,
+            'bubble' => true,
+        ],
+
+        'metadata' => [
+            'driver'            => 'stack',
+            'channels'          => ['metadata_file', 'metadata_otel'],
+            'ignore_exceptions' => false,
+        ],
+
     ],
 
 ];

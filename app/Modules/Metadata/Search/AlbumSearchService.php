@@ -4,17 +4,27 @@ namespace App\Modules\Metadata\Search;
 
 use App\Http\Integrations\Discogs\DiscogsClient;
 use App\Http\Integrations\Discogs\Filters\ReleaseFilter as DiscogsReleaseFilter;
+use App\Http\Integrations\Discogs\Models\Release as DiscogsRelease;
 use App\Http\Integrations\MusicBrainz\Filters\ReleaseFilter as MusicBrainzReleaseFilter;
+use App\Http\Integrations\MusicBrainz\Models\Release;
 use App\Http\Integrations\MusicBrainz\MusicBrainzClient;
 use App\Models\Album;
+use App\Modules\Logging\Attributes\LogChannel;
+use App\Modules\Logging\Channel;
 use App\Modules\Metadata\Matching\MatchingStrategy;
 use App\Modules\Metadata\Matching\QualityValidator;
 use Exception;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Psr\Log\LoggerInterface;
 
 class AlbumSearchService
 {
+    #[LogChannel(
+        channel: Channel::Metadata,
+    )]
+    private LoggerInterface $logger;
+    
     public function __construct(
         private readonly MusicBrainzClient $musicBrainzClient,
         private readonly DiscogsClient     $discogsClient,
@@ -29,7 +39,7 @@ class AlbumSearchService
      */
     public function searchAllSources(Album $album): array
     {
-        Log::debug('Starting searchAllSources for album', [
+        $this->logger->debug('Starting searchAllSources for album', [
             'album_id'      => $album->id,
             'title'         => $album->title,
             'artists_count' => $album->artists->count(),
@@ -43,7 +53,7 @@ class AlbumSearchService
             $results['musicbrainz'] = $this->searchMusicBrainz($album);
         } else {
             $results['musicbrainz'] = null;
-            Log::debug('Skipping MusicBrainz search', [
+            $this->logger->debug('Skipping MusicBrainz search', [
                 'album_id' => $album->id,
                 'reason'   => $this->isVariousArtistsAlbum($album) ? 'various_artists' : 'circuit_breaker',
             ]);
@@ -54,13 +64,13 @@ class AlbumSearchService
             $results['discogs'] = $this->searchDiscogs($album);
         } else {
             $results['discogs'] = null;
-            Log::debug('Skipping Discogs search', [
+            $this->logger->debug('Skipping Discogs search', [
                 'album_id' => $album->id,
                 'reason'   => $this->isVariousArtistsAlbum($album) ? 'various_artists' : 'circuit_breaker',
             ]);
         }
 
-        Log::debug('Search results summary', [
+        $this->logger->debug('Search results summary', [
             'album_id'          => $album->id,
             'musicbrainz_found' => $results['musicbrainz'] !== null,
             'discogs_found'     => $results['discogs'] !== null,
@@ -90,7 +100,7 @@ class AlbumSearchService
             'mixed',
         ];
 
-        return in_array(mb_strtolower($firstArtist), $variousArtistsNames);
+        return in_array(mb_strtolower($firstArtist), $variousArtistsNames, true);
     }
 
     private function canMakeMusicBrainzRequest(): bool
@@ -105,7 +115,7 @@ class AlbumSearchService
         $failures = Cache::get($failureKey, 0);
 
         if ($failures >= 15) {
-            Log::warning('MusicBrainz circuit breaker activated', [
+            $this->logger->warning('MusicBrainz circuit breaker activated', [
                 'failures_this_hour' => $failures,
             ]);
             return false;
@@ -121,7 +131,7 @@ class AlbumSearchService
     {
         // Skip various artists albums early
         if ($this->isVariousArtistsAlbum($album)) {
-            Log::debug('Skipping various artists album for MusicBrainz search', [
+            $this->logger->debug('Skipping various artists album for MusicBrainz search', [
                 'album_id' => $album->id,
                 'title'    => $album->title,
             ]);
@@ -130,7 +140,7 @@ class AlbumSearchService
 
         // Check circuit breaker
         if (!$this->canMakeMusicBrainzRequest()) {
-            Log::warning('MusicBrainz requests blocked by circuit breaker', [
+            $this->logger->warning('MusicBrainz requests blocked by circuit breaker', [
                 'album_id' => $album->id,
             ]);
             return null;
@@ -144,7 +154,7 @@ class AlbumSearchService
                 $filter->setArtistName($album->artists->first()->name);
             }
 
-            Log::debug('Searching MusicBrainz for album', [
+            $this->logger->debug('Searching MusicBrainz for album', [
                 'album_id'     => $album->id,
                 'title'        => $album->title,
                 'artist'       => $album->artists->first()->name ?? null,
@@ -153,14 +163,14 @@ class AlbumSearchService
 
             $searchResults = $this->musicBrainzClient->search->release($filter);
 
-            Log::debug('MusicBrainz raw search results', [
+            $this->logger->debug('MusicBrainz raw search results', [
                 'album_id'         => $album->id,
                 'total_results'    => $searchResults->count(),
                 'first_few_titles' => $searchResults->take(3)->pluck('title')->toArray(),
             ]);
 
             if ($searchResults->isEmpty()) {
-                Log::info('No MusicBrainz results found', ['album_id' => $album->id]);
+                $this->logger->info('No MusicBrainz results found', ['album_id' => $album->id]);
                 return null;
             }
 
@@ -176,7 +186,7 @@ class AlbumSearchService
             $bestMatch = $this->matchingStrategy->findBestAlbumMatch($resultsArray, $album);
 
             if (!$bestMatch) {
-                Log::info('No suitable MusicBrainz match found after strategy filtering', ['album_id' => $album->id]);
+                $this->logger->info('No suitable MusicBrainz match found after strategy filtering', ['album_id' => $album->id]);
                 return null;
             }
 
@@ -184,7 +194,7 @@ class AlbumSearchService
             $detailedData = $this->getMusicBrainzDetailedDataWithRetry($bestMatch['id'], $album->id);
 
             if (!$detailedData) {
-                Log::warning('Failed to get detailed MusicBrainz data after retries', [
+                $this->logger->warning('Failed to get detailed MusicBrainz data after retries', [
                     'album_id'   => $album->id,
                     'release_id' => $bestMatch['id'],
                 ]);
@@ -193,7 +203,7 @@ class AlbumSearchService
 
             $qualityScore = $this->qualityValidator->scoreAlbumMatch($detailedData->toArray(), $album);
 
-            Log::debug('MusicBrainz match completed', [
+            $this->logger->debug('MusicBrainz match completed', [
                 'album_id'          => $album->id,
                 'release_id'        => $bestMatch['id'],
                 'quality_score'     => $qualityScore,
@@ -211,7 +221,7 @@ class AlbumSearchService
             ];
 
         } catch (Exception $e) {
-            Log::error('MusicBrainz album search failed', [
+            $this->logger->error('MusicBrainz album search failed', [
                 'album_id' => $album->id,
                 'error'    => $e->getMessage(),
                 'trace'    => $e->getTraceAsString(),
@@ -263,13 +273,13 @@ class AlbumSearchService
     /**
      * Get MusicBrainz detailed data with retry logic
      */
-    private function getMusicBrainzDetailedDataWithRetry(string $releaseId, int $albumId, int $maxRetries = 3): mixed
+    private function getMusicBrainzDetailedDataWithRetry(string $releaseId, int $albumId): ?Release
     {
         $attempt = 1;
 
-        while ($attempt <= $maxRetries) {
+        while ($attempt <= 3) {
             try {
-                Log::debug('Attempting MusicBrainz lookup', [
+                $this->logger->debug('Attempting MusicBrainz lookup', [
                     'album_id'   => $albumId,
                     'release_id' => $releaseId,
                     'attempt'    => $attempt,
@@ -281,24 +291,25 @@ class AlbumSearchService
                 $duration = round((microtime(true) - $startTime) * 1000, 2);
 
                 if ($detailedData) {
-                    Log::debug('MusicBrainz lookup successful', [
+                    $this->logger->debug('MusicBrainz lookup successful', [
                         'album_id'    => $albumId,
                         'release_id'  => $releaseId,
                         'attempt'     => $attempt,
                         'duration_ms' => $duration,
                     ]);
+
                     return $detailedData;
-                } else {
-                    Log::warning('MusicBrainz lookup returned null', [
-                        'album_id'    => $albumId,
-                        'release_id'  => $releaseId,
-                        'attempt'     => $attempt,
-                        'duration_ms' => $duration,
-                    ]);
                 }
 
+                $this->logger->warning('MusicBrainz lookup returned null', [
+                    'album_id'    => $albumId,
+                    'release_id'  => $releaseId,
+                    'attempt'     => $attempt,
+                    'duration_ms' => $duration,
+                ]);
+
             } catch (Exception $e) {
-                Log::warning('MusicBrainz lookup attempt failed', [
+                $this->logger->warning('MusicBrainz lookup attempt failed', [
                     'album_id'    => $albumId,
                     'release_id'  => $releaseId,
                     'attempt'     => $attempt,
@@ -309,7 +320,7 @@ class AlbumSearchService
                 // Check if it's a rate limit error
                 if (str_contains(mb_strtolower($e->getMessage()), 'rate limit') ||
                     str_contains(mb_strtolower($e->getMessage()), '429')) {
-                    Log::warning('MusicBrainz rate limit detected', [
+                    $this->logger->warning('MusicBrainz rate limit detected', [
                         'album_id'   => $albumId,
                         'release_id' => $releaseId,
                     ]);
@@ -322,7 +333,7 @@ class AlbumSearchService
                 // Check if it's a network timeout
                 if (str_contains(mb_strtolower($e->getMessage()), 'timeout') ||
                     str_contains(mb_strtolower($e->getMessage()), 'curl')) {
-                    Log::warning('MusicBrainz network issue detected', [
+                    $this->logger->warning('MusicBrainz network issue detected', [
                         'album_id'   => $albumId,
                         'release_id' => $releaseId,
                         'error'      => $e->getMessage(),
@@ -330,9 +341,9 @@ class AlbumSearchService
                 }
             }
 
-            if ($attempt < $maxRetries) {
+            if ($attempt < 3) {
                 $waitTime = min($attempt * 2, 10); // Cap at 10 seconds
-                Log::debug('Waiting before MusicBrainz retry', [
+                $this->logger->debug('Waiting before MusicBrainz retry', [
                     'album_id'     => $albumId,
                     'wait_seconds' => $waitTime,
                     'next_attempt' => $attempt + 1,
@@ -355,7 +366,7 @@ class AlbumSearchService
         $failures = Cache::get($failureKey, 0);
         Cache::put($failureKey, $failures + 1, now()->addHour());
 
-        Log::debug('Recorded MusicBrainz failure', [
+        $this->logger->debug('Recorded MusicBrainz failure', [
             'total_failures_this_hour' => $failures + 1,
         ]);
     }
@@ -370,7 +381,7 @@ class AlbumSearchService
         $failures = Cache::get($failureKey, 0);
 
         if ($failures >= 10) {
-            Log::warning('Discogs circuit breaker activated', [
+            $this->logger->warning('Discogs circuit breaker activated', [
                 'failures_this_hour' => $failures,
             ]);
             return false;
@@ -385,7 +396,7 @@ class AlbumSearchService
     public function searchDiscogs(Album $album): ?array
     {
         if ($this->isVariousArtistsAlbum($album)) {
-            Log::debug('Skipping various artists album for external search', [
+            $this->logger->debug('Skipping various artists album for external search', [
                 'album_id' => $album->id,
                 'title'    => $album->title,
             ]);
@@ -393,7 +404,7 @@ class AlbumSearchService
         }
 
         if (!$this->canMakeDiscogsRequest()) {
-            Log::warning('Discogs rate limit reached, skipping search', [
+            $this->logger->warning('Discogs rate limit reached, skipping search', [
                 'album_id' => $album->id,
             ]);
             return null;
@@ -411,7 +422,7 @@ class AlbumSearchService
                 $filter->setYear($album->year);
             }
 
-            Log::debug('Searching Discogs for album', [
+            $this->logger->debug('Searching Discogs for album', [
                 'album_id'     => $album->id,
                 'title'        => $album->title,
                 'artist'       => $album->artists->first()->name ?? null,
@@ -421,14 +432,14 @@ class AlbumSearchService
 
             $searchResults = $this->discogsClient->search->release($filter);
 
-            Log::debug('Discogs raw search results', [
+            $this->logger->debug('Discogs raw search results', [
                 'album_id'         => $album->id,
                 'total_results'    => $searchResults->count(),
                 'first_few_titles' => $searchResults->take(3)->pluck('title')->toArray(),
             ]);
 
             if ($searchResults->isEmpty()) {
-                Log::info('No Discogs results found', ['album_id' => $album->id]);
+                $this->logger->info('No Discogs results found', ['album_id' => $album->id]);
                 return null;
             }
 
@@ -444,7 +455,7 @@ class AlbumSearchService
             $bestMatch = $this->matchingStrategy->findBestAlbumMatch($resultsArray, $album);
 
             if (!$bestMatch) {
-                Log::info('No suitable Discogs match found after strategy filtering', ['album_id' => $album->id]);
+                $this->logger->info('No suitable Discogs match found after strategy filtering', ['album_id' => $album->id]);
                 return null;
             }
 
@@ -452,7 +463,7 @@ class AlbumSearchService
             $detailedData = $this->getDiscogsDetailedDataWithRetry($bestMatch['id'], $album->id);
 
             if (!$detailedData) {
-                Log::warning('Failed to get detailed Discogs data after retries', [
+                $this->logger->warning('Failed to get detailed Discogs data after retries', [
                     'album_id'   => $album->id,
                     'release_id' => $bestMatch['id'],
                 ]);
@@ -461,7 +472,7 @@ class AlbumSearchService
 
             $qualityScore = $this->qualityValidator->scoreAlbumMatch($detailedData->toArray(), $album);
 
-            Log::debug('Discogs match completed', [
+            $this->logger->debug('Discogs match completed', [
                 'album_id'          => $album->id,
                 'release_id'        => $bestMatch['id'],
                 'quality_score'     => $qualityScore,
@@ -480,7 +491,7 @@ class AlbumSearchService
             ];
 
         } catch (Exception $e) {
-            Log::error('Discogs album search failed', [
+            $this->logger->error('Discogs album search failed', [
                 'album_id' => $album->id,
                 'error'    => $e->getMessage(),
                 'trace'    => $e->getTraceAsString(),
@@ -509,13 +520,13 @@ class AlbumSearchService
     /**
      * Get Discogs detailed data with retry logic
      */
-    private function getDiscogsDetailedDataWithRetry(string $releaseId, int $albumId, int $maxRetries = 2): mixed
+    private function getDiscogsDetailedDataWithRetry(string $releaseId, int $albumId, int $maxRetries = 2): ?DiscogsRelease
     {
         $attempt = 1;
 
         while ($attempt <= $maxRetries) {
             try {
-                Log::debug('Attempting Discogs lookup', [
+                $this->logger->debug('Attempting Discogs lookup', [
                     'album_id'   => $albumId,
                     'release_id' => $releaseId,
                     'attempt'    => $attempt,
@@ -524,7 +535,7 @@ class AlbumSearchService
                 $detailedData = $this->discogsClient->lookup->release($releaseId);
 
                 if ($detailedData) {
-                    Log::debug('Discogs lookup successful', [
+                    $this->logger->debug('Discogs lookup successful', [
                         'album_id'   => $albumId,
                         'release_id' => $releaseId,
                         'attempt'    => $attempt,
@@ -533,7 +544,7 @@ class AlbumSearchService
                 }
 
             } catch (Exception $e) {
-                Log::warning('Discogs lookup attempt failed', [
+                $this->logger->warning('Discogs lookup attempt failed', [
                     'album_id'   => $albumId,
                     'release_id' => $releaseId,
                     'attempt'    => $attempt,
@@ -542,7 +553,7 @@ class AlbumSearchService
 
                 // Don't retry on 500 errors immediately - they're usually server-side issues
                 if (str_contains($e->getMessage(), '500') || str_contains($e->getMessage(), 'Internal Server Error')) {
-                    Log::info('Skipping retry for Discogs server error', [
+                    $this->logger->info('Skipping retry for Discogs server error', [
                         'album_id'   => $albumId,
                         'release_id' => $releaseId,
                     ]);
@@ -552,7 +563,7 @@ class AlbumSearchService
 
             if ($attempt < $maxRetries) {
                 $waitTime = $attempt * 3; // Progressive backoff: 3s, 6s
-                Log::debug('Waiting before Discogs retry', [
+                $this->logger->debug('Waiting before Discogs retry', [
                     'album_id'     => $albumId,
                     'wait_seconds' => $waitTime,
                 ]);
@@ -574,7 +585,7 @@ class AlbumSearchService
         $failures = Cache::get($failureKey, 0);
         Cache::put($failureKey, $failures + 1, now()->addHour());
 
-        Log::debug('Recorded Discogs failure', [
+        $this->logger->debug('Recorded Discogs failure', [
             'total_failures_this_hour' => $failures + 1,
         ]);
     }
@@ -612,7 +623,7 @@ class AlbumSearchService
                         }
                     }
                 } catch (Exception $e) {
-                    Log::debug('Fuzzy search variation failed', [
+                    $this->logger->debug('Fuzzy search variation failed', [
                         'source' => 'musicbrainz',
                         'variation' => $variation,
                         'error' => $e->getMessage(),
@@ -643,7 +654,7 @@ class AlbumSearchService
                         }
                     }
                 } catch (Exception $e) {
-                    Log::debug('Discogs fuzzy search variation failed', [
+                    $this->logger->debug('Discogs fuzzy search variation failed', [
                         'source' => 'discogs',
                         'variation' => $variation,
                         'error' => $e->getMessage(),
@@ -666,7 +677,7 @@ class AlbumSearchService
         }, $uniqueResults);
 
         // Sort by quality score descending
-        usort($scoredResults, fn($a, $b) => $b['quality_score'] <=> $a['quality_score']);
+        usort($scoredResults, static fn($a, $b) => $b['quality_score'] <=> $a['quality_score']);
 
         return [
             'total_results' => count($scoredResults),

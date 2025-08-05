@@ -3,11 +3,19 @@
 namespace App\Modules\Metadata;
 
 use App\Models\Album;
+use App\Modules\Logging\Attributes\LogChannel;
+use App\Modules\Logging\Channel;
 use Exception;
 use Illuminate\Support\Facades\Log;
+use Psr\Log\LoggerInterface;
 
 class LocalMetadataService
 {
+    #[LogChannel(
+        channel: Channel::Metadata,
+    )]
+    private LoggerInterface $logger;
+    
     /**
      * Enhance album metadata using local data analysis
      */
@@ -36,13 +44,13 @@ class LocalMetadataService
                 'source'        => 'local_analysis',
             ];
 
-            Log::info('Local metadata enhancement completed', [
+            $this->logger->info('Local metadata enhancement completed', [
                 'album_id'      => $album->id,
                 'quality_score' => $results['quality_score'],
             ]);
 
         } catch (Exception $e) {
-            Log::error('Local metadata enhancement failed', [
+            $this->logger->error('Local metadata enhancement failed', [
                 'album_id' => $album->id,
                 'error'    => $e->getMessage(),
             ]);
@@ -92,13 +100,21 @@ class LocalMetadataService
         $score = 0.1; // Base score
 
         // Add points for available data
-        if ($album->year) $score += 0.1;
-        if ($album->artists->isNotEmpty()) $score += 0.1;
-        if ($album->songs->isNotEmpty()) $score += 0.1;
+        if ($album->year) {
+            $score += 0.1;
+        }
+        if ($album->artists->isNotEmpty()) {
+            $score += 0.1;
+        }
+        if ($album->songs->isNotEmpty()) {
+            $score += 0.1;
+        }
 
         // Add points for data richness
         $songCount = $album->songs()->count();
-        if ($songCount > 0) $score += min(0.2, $songCount * 0.02);
+        if ($songCount > 0) {
+            $score += min(0.2, $songCount * 0.02);
+        }
 
         // Add points for metadata completeness
         $songsWithLength = $album->songs()->whereNotNull('length')->count();
@@ -112,8 +128,8 @@ class LocalMetadataService
     private function detectThaiGenres(Album $album): array
     {
         $genres = [];
-        $title = strtolower($album->title);
-        $artistName = strtolower($album->artists->first()->name ?? '');
+        $title = mb_strtolower($album->title);
+        $artistName = mb_strtolower($album->artists->first()->name ?? '');
 
         // Simple heuristics for Thai music genres
         if (preg_match('/\p{Thai}/u', $album->title) || preg_match('/\p{Thai}/u', $artistName)) {

@@ -4,11 +4,19 @@ namespace App\Modules\Metadata\Providers\Local;
 
 use App\Jobs\Library\Music\SaveAlbumCoverJob;
 use App\Models\Album;
+use App\Modules\Logging\Attributes\LogChannel;
+use App\Modules\Logging\Channel;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
+use Psr\Log\LoggerInterface;
 
 class AlbumCoverService
 {
+    #[LogChannel(
+        channel: Channel::Metadata,
+    )]
+    private LoggerInterface $logger;
+    
     /**
      * Queue cover extraction jobs for albums without covers
      */
@@ -32,7 +40,7 @@ class AlbumCoverService
      */
     public function findAlbumsWithoutCovers(array $options = []): Collection
     {
-        $query = (new \App\Models\Album)->query()
+        $query = Album::query()
             ->with(['cover', 'songs' => function ($query) {
                 $query->limit(1); // We only need one song per album for cover extraction
             }]);
@@ -74,7 +82,7 @@ class AlbumCoverService
             $queued++;
         }
 
-        Log::info('Album cover jobs queued', [
+        $this->logger->info('Album cover jobs queued', [
             'total_albums' => $albums->count(),
             'queued' => $queued,
             'skipped' => $skipped,
@@ -98,7 +106,7 @@ class AlbumCoverService
 
         SaveAlbumCoverJob::dispatch($album, $force);
 
-        Log::debug('Album cover job queued', [
+        $this->logger->debug('Album cover job queued', [
             'album_id' => $album->id,
             'album_title' => $album->title,
             'force' => $force,
@@ -112,7 +120,7 @@ class AlbumCoverService
     {
         // Skip if album has no songs (can't extract cover)
         if ($album->songs->isEmpty()) {
-            Log::debug('Skipping album without songs', [
+            $this->logger->debug('Skipping album without songs', [
                 'album_id' => $album->id,
                 'album_title' => $album->title,
             ]);
@@ -122,7 +130,7 @@ class AlbumCoverService
         // Check if job is already queued to prevent duplicates
         $cacheKey = "album_cover_queued_{$album->id}";
         if (cache()->has($cacheKey) && !$force) {
-            Log::debug('Skipping already queued album', [
+            $this->logger->debug('Skipping already queued album', [
                 'album_id' => $album->id,
                 'album_title' => $album->title,
             ]);
@@ -137,7 +145,7 @@ class AlbumCoverService
      */
     public function getCoverStatistics(?int $libraryId = null): array
     {
-        $query = (new \App\Models\Album)->query();
+        $query = Album::query();
 
         if ($libraryId) {
             $query->where('library_id', $libraryId);
@@ -196,7 +204,7 @@ class AlbumCoverService
             }
         }
 
-        Log::info('Cleared queued status for album covers', ['cleared_count' => $cleared]);
+        $this->logger->info('Cleared queued status for album covers', ['cleared_count' => $cleared]);
 
         return $cleared;
     }

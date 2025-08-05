@@ -2,8 +2,10 @@
 
 namespace App\Modules\Metadata;
 
-use App\Jobs\Library\Music\{SyncAlbumMetadataJob, SyncArtistMetadataJob, SyncSongMetadataJob};
-use App\Models\{Album, Artist, Song};
+use App\Jobs\Library\Music\{SyncAlbumJob, SyncArtistJob, SyncSongMetadataJob};
+use App\Models\Album;
+use App\Models\Artist;
+use App\Models\Song;
 use Illuminate\Support\Collection;
 
 class MetadataJobDispatcher
@@ -85,12 +87,13 @@ class MetadataJobDispatcher
         bool      $includeSongs = false,
         bool      $includeArtists = false,
         ?callable $progressCallback = null,
+        string    $syncType = 'general', // 'general', 'identifier', 'full', 'legacy'
     ): int
     {
         $batchSize = $batchSize ?? $this->defaultBatchSize;
         $queueName = $queueName ?? $this->defaultQueue;
 
-        $query = (new \App\Models\Album)->query()->whereIn('id', $albumIds);
+        $query = Album::query()->whereIn('id', $albumIds);
         $totalAlbums = $query->count();
 
         if ($totalAlbums === 0) {
@@ -103,6 +106,7 @@ class MetadataJobDispatcher
         $query->chunk($batchSize, function (Collection $albums) use (
             $forceUpdate,
             $queueName,
+            $syncType,
             &$jobCount,
             &$processed,
             $includeSongs,
@@ -111,8 +115,17 @@ class MetadataJobDispatcher
             $totalAlbums,
         ) {
             foreach ($albums as $album) {
-                SyncAlbumMetadataJob::dispatch($album->id, $forceUpdate)
-                    ->onQueue($queueName);
+                // Dispatch album sync job
+                $job = match ($syncType) {
+                    'general' => SyncAlbumJob::syncGeneral($album->id, $forceUpdate),
+                    'identifier' => SyncAlbumJob::syncIdentifierBased($album->id, $forceUpdate),
+                    'full' => SyncAlbumJob::syncAll($album->id, $forceUpdate),
+                    'legacy' => SyncAlbumJob::syncLegacy($album->id, $forceUpdate),
+                    default => SyncAlbumJob::syncGeneral($album->id, $forceUpdate)
+                };
+
+                $job->onQueue($queueName);
+                dispatch($job);
                 $jobCount++;
 
                 if ($includeSongs) {
@@ -125,8 +138,9 @@ class MetadataJobDispatcher
 
                 if ($includeArtists) {
                     foreach ($album->artists as $artist) {
-                        SyncArtistMetadataJob::dispatch($artist->id, $forceUpdate)
-                            ->onQueue($queueName);
+                        SyncArtistJob::syncGeneral($artist->id, $forceUpdate)
+                            ->onQueue($queueName)
+                            ->dispatch($artist->id, $forceUpdate);
                         $jobCount++;
                     }
                 }
@@ -152,7 +166,7 @@ class MetadataJobDispatcher
         $batchSize = $batchSize ?? $this->defaultBatchSize;
         $queueName = $queueName ?? $this->defaultQueue;
 
-        $query = (new \App\Models\Song)->query()->whereIn('id', $songIds);
+        $query = Song::query()->whereIn('id', $songIds);
         $totalSongs = $query->count();
 
         if ($totalSongs === 0) {
@@ -191,13 +205,13 @@ class MetadataJobDispatcher
         ?int      $batchSize = null,
         ?string   $queueName = null,
         ?callable $progressCallback = null,
-        string    $syncType = 'general' // 'general', 'identifier', 'full'
+        string    $syncType = 'general', // 'general', 'identifier', 'full'
     ): int
     {
         $batchSize = $batchSize ?? $this->defaultBatchSize;
         $queueName = $queueName ?? $this->defaultQueue;
 
-        $query = (new \App\Models\Artist)->query()->whereIn('id', $artistIds);
+        $query = Artist::query()->whereIn('id', $artistIds);
         $totalArtists = $query->count();
 
         if ($totalArtists === 0) {
@@ -217,14 +231,16 @@ class MetadataJobDispatcher
             $totalArtists,
         ) {
             foreach ($artists as $artist) {
-                $job = match($syncType) {
+                $job = match ($syncType) {
                     'general' => SyncArtistJob::syncGeneral($artist->id, $forceUpdate),
                     'identifier' => SyncArtistJob::syncIdentifierBased($artist->id, $forceUpdate),
                     'full' => SyncArtistJob::syncAll($artist->id, $forceUpdate),
+                    'legacy' => SyncArtistJob::syncLegacy($artist->id, $forceUpdate), // For backward compatibility
                     default => SyncArtistJob::syncGeneral($artist->id, $forceUpdate)
                 };
 
-                $job->onQueue($queueName)->dispatch();
+                $job->onQueue($queueName);
+                dispatch($job);
                 $jobCount++;
 
                 $processed++;
@@ -245,6 +261,8 @@ class MetadataJobDispatcher
         bool      $includeSongs = false,
         bool      $includeArtists = false,
         ?callable $progressCallback = null,
+        string    $albumSyncType = 'general',
+        string    $artistSyncType = 'general',
     ): int
     {
         $batchSize = $batchSize ?? $this->defaultBatchSize;
@@ -253,7 +271,7 @@ class MetadataJobDispatcher
         $totalJobs = 0;
 
         // Sync all albums in the library
-        $albumQuery = (new \App\Models\Album)->query()->where('library_id', $libraryId);
+        $albumQuery = Album::query()->where('library_id', $libraryId);
         $totalAlbums = $albumQuery->count();
 
         if ($totalAlbums > 0) {
@@ -261,6 +279,8 @@ class MetadataJobDispatcher
             $albumQuery->chunk($batchSize, function (Collection $albums) use (
                 $forceUpdate,
                 $queueName,
+                $albumSyncType,
+                $artistSyncType,
                 &$totalJobs,
                 &$processed,
                 $includeSongs,
@@ -269,8 +289,17 @@ class MetadataJobDispatcher
                 $totalAlbums,
             ) {
                 foreach ($albums as $album) {
-                    SyncAlbumMetadataJob::dispatch($album->id, $forceUpdate)
-                        ->onQueue($queueName);
+                    // Dispatch album sync job
+                    $albumJob = match ($albumSyncType) {
+                        'general' => SyncAlbumJob::syncGeneral($album->id, $forceUpdate),
+                        'identifier' => SyncAlbumJob::syncIdentifierBased($album->id, $forceUpdate),
+                        'full' => SyncAlbumJob::syncAll($album->id, $forceUpdate),
+                        'legacy' => SyncAlbumJob::syncLegacy($album->id, $forceUpdate),
+                        default => SyncAlbumJob::syncGeneral($album->id, $forceUpdate)
+                    };
+
+                    $albumJob->onQueue($queueName);
+                    dispatch($albumJob);
                     $totalJobs++;
 
                     if ($includeSongs) {
@@ -283,8 +312,16 @@ class MetadataJobDispatcher
 
                     if ($includeArtists) {
                         foreach ($album->artists as $artist) {
-                            SyncArtistMetadataJob::dispatch($artist->id, $forceUpdate)
-                                ->onQueue($queueName);
+                            $artistJob = match ($artistSyncType) {
+                                'general' => SyncArtistJob::syncGeneral($artist->id, $forceUpdate),
+                                'identifier' => SyncArtistJob::syncIdentifierBased($artist->id, $forceUpdate),
+                                'full' => SyncArtistJob::syncAll($artist->id, $forceUpdate),
+                                'legacy' => SyncArtistJob::syncLegacy($artist->id, $forceUpdate),
+                                default => SyncArtistJob::syncGeneral($artist->id, $forceUpdate)
+                            };
+
+                            $artistJob->onQueue($queueName);
+                            dispatch($artistJob);
                             $totalJobs++;
                         }
                     }
@@ -299,7 +336,7 @@ class MetadataJobDispatcher
 
         // Sync orphaned songs if requested
         if ($includeSongs) {
-            $orphanedSongsQuery = (new \App\Models\Song)->query()
+            $orphanedSongsQuery = Song::query()
                 ->whereHas('album', function ($query) use ($libraryId) {
                     $query->where('library_id', $libraryId);
                 })
@@ -333,7 +370,7 @@ class MetadataJobDispatcher
 
         // Sync unique artists if requested
         if ($includeArtists) {
-            $artistQuery = (new \App\Models\Artist)->query()
+            $artistQuery = Artist::query()
                 ->whereHas('albums', function ($query) use ($libraryId) {
                     $query->where('library_id', $libraryId);
                 });
@@ -345,14 +382,23 @@ class MetadataJobDispatcher
                 $artistQuery->chunk($batchSize, function (Collection $artists) use (
                     $forceUpdate,
                     $queueName,
+                    $artistSyncType,
                     &$totalJobs,
                     &$processed,
                     $progressCallback,
                     $totalArtists,
                 ) {
                     foreach ($artists as $artist) {
-                        SyncArtistMetadataJob::dispatch($artist->id, $forceUpdate)
-                            ->onQueue($queueName);
+                        $artistJob = match ($artistSyncType) {
+                            'general' => SyncArtistJob::syncGeneral($artist->id, $forceUpdate),
+                            'identifier' => SyncArtistJob::syncIdentifierBased($artist->id, $forceUpdate),
+                            'full' => SyncArtistJob::syncAll($artist->id, $forceUpdate),
+                            'legacy' => SyncArtistJob::syncLegacy($artist->id, $forceUpdate),
+                            default => SyncArtistJob::syncGeneral($artist->id, $forceUpdate)
+                        };
+
+                        $artistJob->onQueue($queueName);
+                        dispatch($artistJob);
                         $totalJobs++;
 
                         $processed++;
@@ -370,14 +416,14 @@ class MetadataJobDispatcher
     public function getLibraryStats(int $libraryId): array
     {
         return [
-            'albums'         => (new \App\Models\Album)->where('library_id', $libraryId)->count(),
-            'songs'          => (new \App\Models\Song)->whereHas('album', function ($query) use ($libraryId) {
+            'albums'         => Album::where('library_id', $libraryId)->count(),
+            'songs'          => Song::whereHas('album', function ($query) use ($libraryId) {
                 $query->where('library_id', $libraryId);
             })->count(),
-            'artists'        => (new \App\Models\Artist)->whereHas('albums', function ($query) use ($libraryId) {
+            'artists'        => Artist::whereHas('albums', function ($query) use ($libraryId) {
                 $query->where('library_id', $libraryId);
             })->count(),
-            'orphaned_songs' => (new \App\Models\Song)->whereHas('album', function ($query) use ($libraryId) {
+            'orphaned_songs' => Song::whereHas('album', function ($query) use ($libraryId) {
                 $query->where('library_id', $libraryId);
             })->whereDoesntHave('album')->count(),
         ];
@@ -392,23 +438,69 @@ class MetadataJobDispatcher
         ];
 
         if (!empty($albumIds)) {
-            $validAlbums = (new \App\Models\Album)->whereIn('id', $albumIds)->pluck('id')->toArray();
+            $validAlbums = Album::whereIn('id', $albumIds)->pluck('id')->toArray();
             $results['albums']['valid'] = $validAlbums;
             $results['albums']['invalid'] = array_diff($albumIds, $validAlbums);
         }
 
         if (!empty($songIds)) {
-            $validSongs = (new \App\Models\Song)->whereIn('id', $songIds)->pluck('id')->toArray();
+            $validSongs = Song::whereIn('id', $songIds)->pluck('id')->toArray();
             $results['songs']['valid'] = $validSongs;
             $results['songs']['invalid'] = array_diff($songIds, $validSongs);
         }
 
         if (!empty($artistIds)) {
-            $validArtists = (new \App\Models\Artist)->whereIn('id', $artistIds)->pluck('id')->toArray();
+            $validArtists = Artist::whereIn('id', $artistIds)->pluck('id')->toArray();
             $results['artists']['valid'] = $validArtists;
             $results['artists']['invalid'] = array_diff($artistIds, $validArtists);
         }
 
         return $results;
+    }
+
+    /**
+     * Enhanced album sync methods with specific sync types
+     */
+    public function syncAlbumsGeneral(array $albumIds, bool $forceUpdate = false, ?int $batchSize = null, ?string $queueName = null): int
+    {
+        return $this->syncAlbums($albumIds, $forceUpdate, $batchSize, $queueName, false, false, null, 'general');
+    }
+
+    public function syncAlbumsIdentifierBased(array $albumIds, bool $forceUpdate = false, ?int $batchSize = null, ?string $queueName = null): int
+    {
+        return $this->syncAlbums($albumIds, $forceUpdate, $batchSize, $queueName, false, false, null, 'identifier');
+    }
+
+    public function syncAlbumsFull(array $albumIds, bool $forceUpdate = false, ?int $batchSize = null, ?string $queueName = null): int
+    {
+        return $this->syncAlbums($albumIds, $forceUpdate, $batchSize, $queueName, false, false, null, 'full');
+    }
+
+    public function syncAlbumsLegacy(array $albumIds, bool $forceUpdate = false, ?int $batchSize = null, ?string $queueName = null): int
+    {
+        return $this->syncAlbums($albumIds, $forceUpdate, $batchSize, $queueName, false, false, null, 'legacy');
+    }
+
+    /**
+     * Enhanced artist sync methods with specific sync types
+     */
+    public function syncArtistsGeneral(array $artistIds, bool $forceUpdate = false, ?int $batchSize = null, ?string $queueName = null): int
+    {
+        return $this->syncArtists($artistIds, $forceUpdate, $batchSize, $queueName, null, 'general');
+    }
+
+    public function syncArtistsIdentifierBased(array $artistIds, bool $forceUpdate = false, ?int $batchSize = null, ?string $queueName = null): int
+    {
+        return $this->syncArtists($artistIds, $forceUpdate, $batchSize, $queueName, null, 'identifier');
+    }
+
+    public function syncArtistsFull(array $artistIds, bool $forceUpdate = false, ?int $batchSize = null, ?string $queueName = null): int
+    {
+        return $this->syncArtists($artistIds, $forceUpdate, $batchSize, $queueName, null, 'full');
+    }
+
+    public function syncArtistsLegacy(array $artistIds, bool $forceUpdate = false, ?int $batchSize = null, ?string $queueName = null): int
+    {
+        return $this->syncArtists($artistIds, $forceUpdate, $batchSize, $queueName, null, 'legacy');
     }
 }

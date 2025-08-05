@@ -13,7 +13,7 @@ trait HasRecursiveRelationships
     /**
      * Create a new Eloquent query builder for the model.
      *
-     * @param  Builder  $query
+     * @param Builder $query
      * @return RecursiveBaseBuilder
      */
     public function newEloquentBuilder($query): RecursiveBaseBuilder

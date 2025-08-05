@@ -15,7 +15,11 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Album extends BaseModel implements HasMedia
 {
-    use HasNanoPublicId, HasFactory, HasLibraryAccess, Versionable, InteractsWithMedia;
+    use HasNanoPublicId,
+        HasFactory,
+        HasLibraryAccess,
+        Versionable,
+        InteractsWithMedia;
 
     public static array $filterFields = [
         'title',
@@ -37,17 +41,46 @@ class Album extends BaseModel implements HasMedia
     ];
 
     protected $fillable = [
+        'public_id',
+        'library_id',
         'title',
-        'year',
+        'type',
         'mbid',
         'discogs_id',
+        'spotify_id',
+        'year',
+        'label',
+        'catalog_number',
+        'barcode',
+        'country',
+        'language',
+        'disambiguation',
+        'annotation',
     ];
 
+    protected function casts(): array
+    {
+        return [
+            'type' => AlbumType::class,
+        ];
+    }
+
     protected $versionable = [
+        'public_id',
+        'library_id',
         'title',
-        'year',
+        'type',
         'mbid',
         'discogs_id',
+        'spotify_id',
+        'year',
+        'label',
+        'catalog_number',
+        'barcode',
+        'country',
+        'language',
+        'disambiguation',
+        'annotation',
     ];
 
     protected $perPage = 60;

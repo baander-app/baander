@@ -37,6 +37,11 @@ class LoggerServiceProvider extends ServiceProvider
                 continue;
             }
 
+            // Skip if logger is already initialized
+            if ($property->isInitialized($object)) {
+                continue;
+            }
+
             $baseLogger = Log::channel($channelAttribute->channel->value);
 
             // Create structured logger with enhanced context

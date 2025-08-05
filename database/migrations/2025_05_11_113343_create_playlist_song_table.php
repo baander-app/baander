@@ -27,7 +27,7 @@ return new class extends Migration {
 
             $table->timestampsTz();
 
-            $table->unique(['playlist_id', 'song_id']);
+            $table->unique(['playlist_id', 'song_id'], 'idx_playlist_song_unique');
         });
     }
 

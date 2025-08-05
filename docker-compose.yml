@@ -65,17 +65,39 @@ services:
       - baander-backtier
 
   postgres:
-    image: postgres:17.5-bookworm
     container_name: baander-postgres
+    build:
+      context: ./docker/
+      dockerfile: ./postgres/Dockerfile
+      args:
+        PGROONGA_VERSION: 4.0.1-1
+        POSTGRESQL_VERSION: 17
     restart: unless-stopped
     networks:
       - baander-backtier
     ports:
       - "127.0.0.1:5432:5432"
-    shm_size: 128mb
+    shm_size: 256mb
     environment:
       POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
+      PGDATA: /var/lib/postgresql/data/baanderdev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/conf/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    command: >
+      postgres
+      -c config_file=/etc/postgresql/postgresql.conf
+      -c logging_collector=on
+      -c log_directory=/var/log/postgresql
+      -c log_filename=postgresql-%Y-%m-%d_%H%M%S.log
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   redis:
     image: redis/redis-stack-server:edge
@@ -97,6 +119,10 @@ services:
 #      - "127.0.0.1:1025:1025"
 #      - "127.0.0.1:9912:9912"
 #      - "127.0.0.1:9913:9913"
+
+volumes:
+  postgres_data:
+    driver: local
 
 networks:
   baander-backtier:

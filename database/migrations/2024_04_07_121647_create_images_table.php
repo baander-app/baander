@@ -26,6 +26,11 @@ return new class extends Migration {
 
             $table->timestampsTz();
         });
+
+        DB::statement(
+            'CREATE INDEX IF NOT EXISTS idx_artists_public_id_trgm '.
+            'ON artists USING gin (public_id gin_trgm_ops)'
+        );
     }
 
     /**

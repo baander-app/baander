@@ -2,6 +2,7 @@
 
 namespace App\Http\Integrations\Discogs\Handlers;
 
+use App\Http\Integrations\Discogs\Filters\ArtistFilter;
 use App\Http\Integrations\Discogs\Handler;
 use App\Http\Integrations\Discogs\Models\{
     Artist,
@@ -19,7 +20,7 @@ class SearchHandler extends Handler
     /**
      * Search for artists and return models
      */
-    public function artist($filter): Collection
+    public function artist(ArtistFilter $filter): Collection
     {
         $data = $this->fetchEndpoint('database/search', array_merge($filter->toQueryParameters(), ['type' => 'artist']));
 

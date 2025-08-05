@@ -4,16 +4,22 @@ namespace App\Jobs\Library\Music;
 
 use App\Jobs\BaseJob;
 use App\Models\Album;
+use App\Modules\Logging\Attributes\LogChannel;
+use App\Modules\Logging\Channel;
 use App\Modules\Metadata\MediaMeta\Frame\Apic;
 use App\Modules\Metadata\MediaMeta\MediaMeta;
 use Exception;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Psr\Log\LoggerInterface;
 
 class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
 {
+    #[LogChannel(
+        channel: Channel::Metadata,
+    )]
+    private LoggerInterface $logger;
 
     /**
      * Create a new job instance.
@@ -44,6 +50,7 @@ class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
 
         // Early exit if cover already exists (saves processing time)
         if ($this->album->cover()->exists() && !$this->force) {
+            $this->getLogger()->info('Album cover already exists, skipping');
             $this->queueProgress(100);
             return;
         }
@@ -66,7 +73,7 @@ class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
             try {
                 $cover = $mediaMeta->getFrontCoverImage() ?: $images[0];
             } catch (Exception $e) {
-                $this->logger()->warning('Failed to get front cover, using first available image', [
+                $this->getLogger()->warning('Failed to get front cover, using first available image', [
                     'error' => $e->getMessage(),
                     'album_id' => $this->album->id
                 ]);
@@ -83,14 +90,13 @@ class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
 
             $this->queueProgress(100);
         } catch (Exception $e) {
-            Log::error('Failed to save album cover', [
+            $this->getLogger()->error('Failed to save album cover', [
                 'album_id' => $this->album->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
             ]);
             throw $e;
         } finally {
-            // Clear the queued flag since job is complete
+            // Clear the queued flag since the job is complete
             cache()->forget("album_cover_queued_{$this->album->id}");
             unset($this->album);
         }

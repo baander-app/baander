@@ -15,11 +15,16 @@ return new class extends Migration
             $table->id();
             $table->bigInteger('parent_id')->nullable();
 
-            $table->caseInsensitiveText('name')->index();
-            $table->text('slug')->unique();
+            $table->text('name');
+            $table->text('slug')->unique('idx_genres_slug');
 
             $table->timestampsTz();
         });
+
+        DB::statement(
+            'CREATE INDEX IF NOT EXISTS idx_genres_slug_trgm '.
+            'ON genres USING gin (slug gin_trgm_ops)'
+        );
     }
 
     /**

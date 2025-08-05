@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasLibraryStats;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Spatie\Sluggable\{HasSlug, SlugOptions};
 use Illuminate\Support\Carbon;
@@ -9,7 +10,7 @@ use Illuminate\Support\Facades\Storage;
 
 class Library extends BaseModel
 {
-    use HasFactory, HasSlug;
+    use HasFactory, HasSlug, HasLibraryStats;
 
     protected $fillable = [
         'name',
@@ -48,6 +49,28 @@ class Library extends BaseModel
             'driver' => 'local',
             'root'   => $this->path,
         ]);
+    }
+
+    /**
+     * Get a summary dashboard for this library
+     */
+    public function getDashboardData(): array
+    {
+        $stats = $this->getFormattedStats();
+
+        return [
+            'library' => [
+                'name' => $this->name,
+                'slug' => $this->slug,
+                'last_scan' => $this->last_scan?->diffForHumans(),
+            ],
+            'statistics' => $stats,
+            'recent_additions' => $this->albums()
+                ->with(['songs', 'artists'])
+                ->latest()
+                ->limit(5)
+                ->get(),
+        ];
     }
 
     public function albums()

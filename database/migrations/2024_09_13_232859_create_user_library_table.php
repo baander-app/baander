@@ -27,7 +27,7 @@ return new class extends Migration {
 
             $table->timestampsTz();
 
-            $table->unique(['user_id', 'library_id']);
+            $table->unique(['user_id', 'library_id'], 'idx_user_library_unique');
         });
     }
 

@@ -12,7 +12,7 @@ return new class extends Migration {
     {
         Schema::create('user_media_activities', function (Blueprint $table) {
             $table->id();
-            $table->text('public_id')->unique();
+            $table->text('public_id')->unique('idx_user_media_activities_public_id');
 
             $table->foreignId('user_id')
                 ->references('id')

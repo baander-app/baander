@@ -9,12 +9,15 @@ use Symfony\Component\Process\Process;
 
 class DevServerCommand extends Command
 {
-    protected $signature = 'dev:server {--stop : Stop the development server}';
+    protected $signature = 'dev:server {--stop : Stop the development server} {--monitor : Enable detailed process monitoring}';
     protected $description = 'Start development server with Octane, queue worker, and scheduler';
 
     private array $processes = [];
     private bool $running = true;
     private ?FileWatcher $fileWatcher = null;
+    private bool $monitoringEnabled = false;
+    private array $processStats = [];
+    private int $monitoringInterval = 5; // seconds
 
     // Constants for better performance and maintainability
     private const string PHP_PATH = '/usr/local/bin/php';
@@ -31,6 +34,7 @@ class DevServerCommand extends Command
         'octane'    => "\033[34m",     // Blue
         'queue'     => "\033[32m",      // Green
         'scheduler' => "\033[33m",  // Yellow
+        'monitor'   => "\033[35m",     // Magenta
         'default'   => "\033[37m",     // White
     ];
 
@@ -41,6 +45,8 @@ class DevServerCommand extends Command
         if ($this->option('stop')) {
             return $this->stopServer();
         }
+
+        $this->monitoringEnabled = $this->option('monitor');
 
         // Initialize file watcher
         $this->fileWatcher = new FileWatcher();
@@ -58,6 +64,9 @@ class DevServerCommand extends Command
         }
 
         $this->info('Starting development server with file watching...');
+        if ($this->monitoringEnabled) {
+            $this->info('Process monitoring enabled - CPU and memory usage will be tracked');
+        }
         $this->info('Press Ctrl+C to stop all processes');
         $this->line('');
 
@@ -214,8 +223,6 @@ class DevServerCommand extends Command
             '--tries=3',
             '--sleep=1',
             '--rest=0',
-            '--max-jobs=100',
-            '--max-time=300',
         ];
 
         return $this->createProcess($command);
@@ -295,6 +302,8 @@ SHELL;
 
     private function monitorProcessesWithOutput(): void
     {
+        $lastMonitorTime = time();
+
         while ($this->running) {
             // Check for file changes
             if ($this->checkForFileChanges()) {
@@ -305,10 +314,114 @@ SHELL;
             // Monitor all processes
             $this->monitorProcesses();
 
+            // Periodic detailed monitoring
+            if ($this->monitoringEnabled && (time() - $lastMonitorTime) >= $this->monitoringInterval) {
+                $this->performDetailedMonitoring();
+                $lastMonitorTime = time();
+            }
+
             usleep(100000); // 0.1 second
         }
 
         $this->stopAllProcesses();
+    }
+
+    private function performDetailedMonitoring(): void
+    {
+        foreach ($this->processes as $name => $process) {
+            if ($process->isRunning() && $process->getPid()) {
+                $pid = $process->getPid();
+                $stats = $this->getProcessStats($pid);
+
+                if ($stats) {
+                    $this->processStats[$name] = $stats;
+                    $this->displayProcessStats($name, $stats);
+
+                    // Check for memory warnings
+                    if ($name === 'queue') {
+                        $this->checkQueueMemoryWarnings($stats);
+                    }
+                }
+            }
+        }
+    }
+
+    private function getProcessStats(int $pid): ?array
+    {
+        // Get memory usage from /proc/PID/status
+        $statusFile = "/proc/$pid/status";
+        $statFile = "/proc/$pid/stat";
+
+        if (!file_exists($statusFile) || !file_exists($statFile)) {
+            return null;
+        }
+
+        $stats = [];
+
+        // Memory information from status file
+        $statusContent = file_get_contents($statusFile);
+        if (preg_match('/VmRSS:\s+(\d+)\s+kB/', $statusContent, $matches)) {
+            $stats['memory_kb'] = (int)$matches[1];
+            $stats['memory_mb'] = round($stats['memory_kb'] / 1024, 2);
+        }
+
+        if (preg_match('/VmSize:\s+(\d+)\s+kB/', $statusContent, $matches)) {
+            $stats['virtual_memory_kb'] = (int)$matches[1];
+            $stats['virtual_memory_mb'] = round($stats['virtual_memory_kb'] / 1024, 2);
+        }
+
+        // CPU information from stat file
+        $statContent = file_get_contents($statFile);
+        $statFields = explode(' ', $statContent);
+
+        if (count($statFields) >= 17) {
+            $utime = (int)$statFields[13]; // User time
+            $stime = (int)$statFields[14]; // System time
+            $stats['cpu_time'] = $utime + $stime;
+
+            // Calculate CPU percentage (simplified)
+            if (isset($this->processStats[$pid]['cpu_time'])) {
+                $timeDiff = $stats['cpu_time'] - $this->processStats[$pid]['cpu_time'];
+                $stats['cpu_percent'] = round(($timeDiff / $this->monitoringInterval) * 100, 2);
+            } else {
+                $stats['cpu_percent'] = 0;
+            }
+        }
+
+        $stats['timestamp'] = time();
+        $this->processStats[$pid] = $stats;
+
+        return $stats;
+    }
+
+    private function displayProcessStats(string $name, array $stats): void
+    {
+        $color = self::COLORS['monitor'];
+        $message = sprintf(
+            "[MONITOR-%s] Memory: %s MB (Virtual: %s MB) | CPU: %s%%",
+            strtoupper($name),
+            $stats['memory_mb'] ?? 'N/A',
+            $stats['virtual_memory_mb'] ?? 'N/A',
+            $stats['cpu_percent'] ?? 'N/A'
+        );
+
+        echo $color . $message . self::RESET . "\n";
+    }
+
+    private function checkQueueMemoryWarnings(array $stats): void
+    {
+        $memoryMB = $stats['memory_mb'] ?? 0;
+        $memoryLimitMB = 512; // From your queue process config
+
+        $usagePercent = ($memoryMB / $memoryLimitMB) * 100;
+
+        if ($usagePercent > 80) {
+            $this->warn("[QUEUE] High memory usage: {$memoryMB}MB ({$usagePercent}% of limit)");
+        }
+
+        if ($usagePercent > 95) {
+            $this->error("[QUEUE] Critical memory usage! Process may be killed soon.");
+        }
     }
 
     private function displayProcessOutput(string $name, Process $process): void
@@ -335,6 +448,7 @@ SHELL;
 
         $lines = explode("\n", trim($output));
         foreach ($lines as $line) {
+            $line = trim($line); // Trim leading/trailing whitespace
             if (!empty($line)) {
                 echo $color . $prefix . ' ' . $line . self::RESET . "\n";
             }

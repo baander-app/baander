@@ -20,6 +20,11 @@ return new class extends Migration
             $table->unique(['user_id', 'provider']);
             $table->index(['provider']);
         });
+
+        DB::statement(
+            'CREATE INDEX IF NOT EXISTS idx_third_party_credentials_public_id_trgm '.
+            'ON third_party_credentials USING gin (public_id gin_trgm_ops)'
+        );
     }
 
     public function down(): void

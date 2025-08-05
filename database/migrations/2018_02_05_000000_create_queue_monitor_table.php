@@ -12,17 +12,15 @@ return new class extends Migration {
             $table->id();
             $table->uuid('job_uuid')->nullable();
 
-            $table->text('job_id')->index();
-            $table->caseInsensitiveText('name')->nullable();
+            $table->text('job_id')->index('idx_queue_monitor_job_id');
+            $table->text('name')->nullable();
             $table->text('queue')->nullable();
             $table->enum('status', MonitorStatus::values())->default(MonitorStatus::Running)->after('queue');
             $table->dateTimeTz('queued_at')->nullable();
 
             $table->timestampTz('started_at')->nullable()->index();
-            $table->text('started_at_exact')->nullable();
 
             $table->timestampTz('finished_at')->nullable();
-            $table->text('finished_at_exact')->nullable();
 
             $table->integer('attempt')->default(0);
             $table->boolean('retried')->default(false);

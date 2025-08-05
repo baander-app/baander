@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('libraries', function (Blueprint $table) {
             $table->id();
 
-            $table->caseInsensitiveText('name');
+            $table->text('name');
             $table->text('slug')->unique();
 
             $table->text('path');
@@ -26,6 +26,11 @@ return new class extends Migration
 
             $table->timestampsTz();
         });
+
+        DB::statement(
+            'CREATE INDEX IF NOT EXISTS idx_libraries_slug_trgm '.
+            'ON libraries USING gin (slug gin_trgm_ops)'
+        );
     }
 
     /**

@@ -26,9 +26,7 @@ return new class extends Migration
                 ->cascadeOnDelete()
                 ->cascadeOnUpdate();
 
-            $table->unique(['album_id', 'artist_id']);
-            $table->index('album_id');
-            $table->index('artist_id');
+            $table->unique(['album_id', 'artist_id'], 'idx_album_artist_unique');
         });
     }
 

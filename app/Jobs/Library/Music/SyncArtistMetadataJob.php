@@ -4,16 +4,24 @@ namespace App\Jobs\Library\Music;
 
 use App\Jobs\BaseJob;
 use App\Models\Artist;
+use App\Modules\Logging\Attributes\LogChannel;
+use App\Modules\Logging\Channel;
 use App\Modules\Metadata\MetadataSyncService;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\{InteractsWithQueue, SerializesModels};
+use Psr\Log\LoggerInterface;
 
 class SyncArtistMetadataJob extends BaseJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    #[LogChannel(
+        channel: Channel::Metadata,
+    )]
+    private LoggerInterface $logger;
 
     public function __construct(
         private readonly int  $artistId,
@@ -28,28 +36,28 @@ class SyncArtistMetadataJob extends BaseJob implements ShouldQueue
         $artist = (new \App\Models\Artist)->find($this->artistId);
 
         if (!$artist) {
-            $this->logger()->warning('Artist not found for metadata sync', ['artist_id' => $this->artistId]);
+            $this->getLogger()->warning('Artist not found for metadata sync', ['artist_id' => $this->artistId]);
             return;
         }
 
         try {
             $results = $metadataSyncService->syncArtist($artist);
 
-            // Use lower threshold if we're getting valuable identifiers
+            // Use a lower threshold if we're getting valuable identifiers
             $hasIdentifiers = !empty($results['artist']['mbid']) || !empty($results['artist']['discogs_id']);
             $qualityThreshold = $hasIdentifiers ? 0.6 : 0.7;
 
             if ($results['quality_score'] >= $qualityThreshold) {
                 $this->updateArtistMetadata($artist, $results);
 
-                $this->logger()->info('Artist metadata synced successfully', [
+                $this->getLogger()->info('Artist metadata synced successfully', [
                     'artist_id'       => $artist->id,
                     'source'          => $results['source'],
                     'quality_score'   => $results['quality_score'],
                     'has_identifiers' => $hasIdentifiers,
                 ]);
             } else {
-                $this->logger()->warning('Artist metadata sync rejected due to low quality', [
+                $this->getLogger()->warning('Artist metadata sync rejected due to low quality', [
                     'artist_id'      => $artist->id,
                     'quality_score'  => $results['quality_score'],
                     'threshold_used' => $qualityThreshold,
@@ -57,7 +65,7 @@ class SyncArtistMetadataJob extends BaseJob implements ShouldQueue
             }
 
         } catch (Exception $e) {
-            $this->logger()->error('Artist metadata sync job failed', [
+            $this->getLogger()->error('Artist metadata sync job failed', [
                 'artist_id' => $this->artistId,
                 'error'     => $e->getMessage(),
             ]);
@@ -68,6 +76,9 @@ class SyncArtistMetadataJob extends BaseJob implements ShouldQueue
 
     private function updateArtistMetadata(Artist $artist, array $results): void
     {
+        $this->logger->debug('Updating artist metadata', [
+            'raw_results' => $results,
+        ]);
         if ($results['artist']) {
             $updateData = [];
             $identifiersUpdated = false;
@@ -75,21 +86,21 @@ class SyncArtistMetadataJob extends BaseJob implements ShouldQueue
             // First, handle identifiers - be more aggressive if quality score is high
             $highConfidence = $results['quality_score'] >= 0.8;
 
-            if (isset($results['artist']['mbid']) && $results['artist']['mbid']) {
+            if (isset($results['artist']['mbid'])) {
                 if (!$artist->mbid) {
                     $updateData['mbid'] = $results['artist']['mbid'];
                     $identifiersUpdated = true;
-                } elseif ($this->forceUpdate || $highConfidence) {
+                } else if ($this->forceUpdate || $highConfidence) {
                     $updateData['mbid'] = $results['artist']['mbid'];
                 }
             }
 
-            if (isset($results['artist']['discogs_id']) && $results['artist']['discogs_id']) {
-                // Always update if artist doesn't have discogs_id, or if force update, or if high confidence
-                if (!$artist->mbid) {
+            if (isset($results['artist']['discogs_id'])) {
+                // Fix: Check for discogs_id instead of mbid
+                if (!$artist->discogs_id) {
                     $updateData['discogs_id'] = $results['artist']['discogs_id'];
                     $identifiersUpdated = true;
-                } elseif ($this->forceUpdate || $highConfidence) {
+                } else if ($this->forceUpdate || $highConfidence) {
                     $updateData['discogs_id'] = $results['artist']['discogs_id'];
                 }
             }
@@ -150,11 +161,12 @@ class SyncArtistMetadataJob extends BaseJob implements ShouldQueue
             if (!empty($updateData)) {
                 $artist->update($updateData);
 
-                $this->logger()->info('Artist metadata updated', [
+                $this->getLogger()->info('Artist metadata updated', [
                     'artist_id'           => $artist->id,
                     'updated_fields'      => array_keys($updateData),
                     'source'              => $results['source'],
                     'identifiers_updated' => $identifiersUpdated,
+                    'raw_results'         => $results,
                 ]);
 
                 // If we updated identifiers with high confidence, trigger additional metadata sync
@@ -174,7 +186,7 @@ class SyncArtistMetadataJob extends BaseJob implements ShouldQueue
      */
     private function scheduleEnhancedMetadataSync(Artist $artist): void
     {
-        $this->logger()->info('Scheduling enhanced metadata sync for artist with new identifiers', [
+        $this->getLogger()->info('Scheduling enhanced metadata sync for artist with new identifiers', [
             'artist_id'  => $artist->id,
             'mbid'       => $artist->mbid,
             'discogs_id' => $artist->discogs_id,
@@ -182,7 +194,7 @@ class SyncArtistMetadataJob extends BaseJob implements ShouldQueue
 
         SyncArtistJob::syncIdentifierBased($artist->id)
             ->delay(now()->addMinutes(2))
-            ->dispatch();
+            ->dispatch($artist->id, $this->forceUpdate);
     }
 
 }

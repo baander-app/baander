@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasContentSimilarity;
 use App\Models\Concerns\HasLibraryAccess;
+use App\Models\Concerns\HasMusicMetadata;
 use App\Modules\Eloquent\BaseBuilder;
 use App\Modules\Http\Concerns\DirectStreamableFile;
 use App\Modules\Nanoid\Concerns\HasNanoPublicId;
@@ -15,7 +17,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  */
 class Song extends BaseModel implements DirectStreamableFile, Recommendable
 {
-    use HasFactory, HasLibraryAccess, HasNanoPublicId, HasRecommendation;
+    use HasFactory,
+        HasLibraryAccess,
+        HasNanoPublicId,
+        HasRecommendation,
+        HasContentSimilarity,
+        HasMusicMetadata;
 
     public static array $filterRelations = [
         'album',
@@ -91,6 +98,38 @@ class Song extends BaseModel implements DirectStreamableFile, Recommendable
         ];
     }
 
+    /**
+     * Get songs that are musically similar to this one
+     */
+    public function getMusicallySimilar(int $limit = 10)
+    {
+        return $this->findSimilarByContent($limit);
+    }
+
+    /**
+     * Get recommended songs based on this song's musical characteristics
+     */
+    public function getRecommendations(int $limit = 20)
+    {
+        return $this->getSimilarByMetadata([], $limit);
+    }
+
+    /**
+     * Create a radio station based on this song
+     */
+    public function createRadioStation(int $songCount = 50)
+    {
+        $genreIds = $this->genres->pluck('id')->toArray();
+        $artistIds = $this->artists->pluck('id')->toArray();
+
+        return static::findContentSimilar(
+            genreIds: $genreIds,
+            artistIds: $artistIds,
+            duration: $this->length,
+            year: $this->year,
+            limit: $songCount
+        );
+    }
 
     public function album()
     {

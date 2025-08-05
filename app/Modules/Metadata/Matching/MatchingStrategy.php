@@ -5,11 +5,19 @@ namespace App\Modules\Metadata\Matching;
 use App\Models\Album;
 use App\Models\Artist;
 use App\Models\Song;
+use App\Modules\Logging\Attributes\LogChannel;
+use App\Modules\Logging\Channel;
 use App\Modules\Metadata\Matching\Validators\ArtistQualityValidator;
 use Illuminate\Support\Facades\Log;
+use Psr\Log\LoggerInterface;
 
 class MatchingStrategy
 {
+    #[LogChannel(
+        channel: Channel::Metadata,
+    )]
+    private LoggerInterface $logger;
+    
     private ArtistQualityValidator $artistQualityValidator;
 
     public function __construct(ArtistQualityValidator $artistQualityValidator)
@@ -26,7 +34,7 @@ class MatchingStrategy
             return null;
         }
 
-        Log::debug('Finding best album match', [
+        $this->logger->debug('Finding best album match', [
             'album_id'      => $album->id,
             'results_count' => count($results),
             'album_title'   => $album->title,
@@ -35,7 +43,7 @@ class MatchingStrategy
         // Remove duplicates based on title and artist similarity
         $uniqueResults = $this->removeDuplicateResults($results);
 
-        Log::debug('Removed duplicate results', [
+        $this->logger->debug('Removed duplicate results', [
             'album_id'       => $album->id,
             'original_count' => count($results),
             'unique_count'   => count($uniqueResults),
@@ -45,7 +53,7 @@ class MatchingStrategy
         $filteredResults = $this->filterMusicReleases($uniqueResults, $album);
 
         if (count($filteredResults) < count($uniqueResults)) {
-            Log::debug('Filtered out non-music releases', [
+            $this->logger->debug('Filtered out non-music releases', [
                 'album_id'      => $album->id,
                 'before_filter' => count($uniqueResults),
                 'after_filter'  => count($filteredResults),
@@ -58,7 +66,7 @@ class MatchingStrategy
         $threshold = $baseThreshold * $metadataCompleteness;
         $threshold = max(0.3, $threshold);
 
-        Log::debug('Adaptive threshold calculated', [
+        $this->logger->debug('Adaptive threshold calculated', [
             'album_id'              => $album->id,
             'metadata_completeness' => $metadataCompleteness,
             'base_threshold'        => $baseThreshold,
@@ -71,7 +79,7 @@ class MatchingStrategy
         foreach ($filteredResults as $index => $result) {
             $score = $this->calculateAlbumMatchScore($result, $album);
 
-            Log::debug('Album match score calculated', [
+            $this->logger->debug('Album match score calculated', [
                 'album_id'     => $album->id,
                 'result_index' => $index,
                 'result_title' => $result['title'] ?? 'Unknown',
@@ -85,7 +93,7 @@ class MatchingStrategy
                 $bestMatch['match_score'] = $score;
 
                 if ($score >= 0.95) {
-                    Log::debug('Found excellent match, stopping search early', [
+                    $this->logger->debug('Found excellent match, stopping search early', [
                         'album_id'          => $album->id,
                         'match_title'       => $result['title'] ?? 'Unknown',
                         'final_score'       => $score,
@@ -98,14 +106,14 @@ class MatchingStrategy
         }
 
         if ($bestMatch) {
-            Log::debug('Best match found', [
+            $this->logger->debug('Best match found', [
                 'album_id'       => $album->id,
                 'match_title'    => $bestMatch['title'] ?? 'Unknown',
                 'final_score'    => $bestScore,
                 'used_threshold' => $threshold,
             ]);
         } else {
-            Log::debug('No suitable match found', [
+            $this->logger->debug('No suitable match found', [
                 'album_id'          => $album->id,
                 'threshold'         => $threshold,
                 'evaluated_results' => count($filteredResults),
@@ -132,7 +140,7 @@ class MatchingStrategy
                 } else {
                     $artist = $this->normalizeString($result['artists'][0]);
                 }
-            } elseif (isset($result['title']) && strpos($result['title'], ' - ') !== false) {
+            } elseif (isset($result['title']) && str_contains($result['title'], ' - ')) {
                 $parts = explode(' - ', $result['title'], 2);
                 $artist = $this->normalizeString(trim($parts[0]));
             }
@@ -150,17 +158,18 @@ class MatchingStrategy
 
     private function normalizeString(string $string): string
     {
-        $normalized = strtolower($string);
+        $normalized = mb_strtolower($string);
         $normalized = preg_replace('/\b(the|a|an)\b/', '', $normalized);
         $normalized = preg_replace('/[^\w\s]/', ' ', $normalized);
         $normalized = preg_replace('/\s+/', ' ', $normalized);
+
         return trim($normalized);
     }
 
     private function filterMusicReleases(array $results, Album $album): array
     {
         return array_filter($results, function ($result) use ($album) {
-            $title = strtolower($result['title'] ?? '');
+            $title = mb_strtolower($result['title'] ?? '');
 
             $nonMusicKeywords = [
                 'dvd', 'video', 'blu-ray', 'bluray', 'vhs', 'laserdisc',
@@ -169,7 +178,7 @@ class MatchingStrategy
 
             foreach ($nonMusicKeywords as $keyword) {
                 if (str_contains($title, $keyword)) {
-                    Log::debug('Filtering out non-music release', [
+                    $this->logger->debug('Filtering out non-music release', [
                         'album_id'       => $album->id,
                         'filtered_title' => $result['title'],
                         'reason'         => "Contains keyword: {$keyword}",
@@ -179,11 +188,11 @@ class MatchingStrategy
             }
 
             if (isset($result['primary-type'])) {
-                $primaryType = strtolower($result['primary-type']);
+                $primaryType = mb_strtolower($result['primary-type']);
                 $allowedTypes = ['album', 'ep', 'single', 'compilation', 'soundtrack', 'other'];
 
                 if (!in_array($primaryType, $allowedTypes)) {
-                    Log::debug('Filtering out non-music release by type', [
+                    $this->logger->debug('Filtering out non-music release by type', [
                         'album_id'       => $album->id,
                         'filtered_title' => $result['title'],
                         'primary_type'   => $result['primary-type'],
@@ -197,12 +206,13 @@ class MatchingStrategy
                 $videoTypes = ['video', 'documentary'];
 
                 foreach ($videoTypes as $videoType) {
-                    if (in_array($videoType, $secondaryTypes)) {
-                        Log::debug('Filtering out video release by secondary type', [
+                    if (in_array($videoType, $secondaryTypes, true)) {
+                        $this->logger->debug('Filtering out video release by secondary type', [
                             'album_id'        => $album->id,
                             'filtered_title'  => $result['title'],
                             'secondary_types' => $result['secondary-types'],
                         ]);
+
                         return false;
                     }
                 }
@@ -238,7 +248,7 @@ class MatchingStrategy
 
         $boost = $maxMissingScore > 0 ? $missingMetadataScore / $maxMissingScore : 0;
 
-        Log::debug('Metadata completeness analysis', [
+        $this->logger->debug('Metadata completeness analysis', [
             'album_id'             => $album->id,
             'missing_year'         => !$album->year,
             'missing_external_ids' => !$album->mbid && !$album->discogs_id,
@@ -279,14 +289,14 @@ class MatchingStrategy
             $maxSongIssues = 0;
 
             if (!$song->length || $song->length <= 0) {
-                $songIssues += 1;
+                ++$songIssues;
             }
-            $maxSongIssues += 1;
+            ++$maxSongIssues;
 
             if (!$song->track || $song->track <= 0) {
-                $songIssues += 1;
+                ++$songIssues;
             }
-            $maxSongIssues += 1;
+            ++$maxSongIssues;
 
             if ($song->genres->isEmpty()) {
                 $songIssues += 0.5;
@@ -299,7 +309,7 @@ class MatchingStrategy
             $maxSongIssues += 0.5;
 
             $totalIssues += $maxSongIssues > 0 ? $songIssues / $maxSongIssues : 0;
-            $maxIssues += 1;
+            ++$maxIssues;
         }
 
         return $maxIssues > 0 ? $totalIssues / $maxIssues : 0;
@@ -343,7 +353,7 @@ class MatchingStrategy
 
         $finalScore = $maxScore > 0 ? $score / $maxScore : 0;
 
-        Log::debug('Album match score breakdown', [
+        $this->logger->debug('Album match score breakdown', [
             'album_id'       => $album->id,
             'title_score'    => $titleSimilarity,
             'track_score'    => $trackScore,
@@ -376,13 +386,17 @@ class MatchingStrategy
         $diff = abs($resultYear - $album->year);
         if ($diff === 0) {
             return 1.0;
-        } elseif ($diff <= 2) {
-            return 0.7;
-        } elseif ($diff <= 5) {
-            return 0.4;
-        } else {
-            return 0.1;
         }
+
+        if ($diff <= 2) {
+            return 0.7;
+        }
+
+        if ($diff <= 5) {
+            return 0.4;
+        }
+
+        return 0.1;
     }
 
     private function calculateStringSimilarity(string $str1, string $str2): float
@@ -394,7 +408,7 @@ class MatchingStrategy
             return 1.0;
         }
 
-        $maxLength = max(strlen($str1), strlen($str2));
+        $maxLength = max(mb_strlen($str1), mb_strlen($str2));
         if ($maxLength === 0) {
             return 1.0;
         }
@@ -498,7 +512,7 @@ class MatchingStrategy
                     $artists[] = $artist;
                 }
             }
-        } elseif (isset($result['title']) && strpos($result['title'], ' - ') !== false) {
+        } elseif (isset($result['title']) && str_contains($result['title'], ' - ')) {
             $parts = explode(' - ', $result['title'], 2);
             if (count($parts) === 2) {
                 $artists[] = trim($parts[0]);
@@ -606,12 +620,16 @@ class MatchingStrategy
 
         if ($diff <= 10) {
             return 1.0;
-        } elseif ($diff <= 30) {
-            return 0.8;
-        } elseif ($diff <= 60) {
-            return 0.6;
-        } else {
-            return 0.2;
         }
+
+        if ($diff <= 30) {
+            return 0.8;
+        }
+
+        if ($diff <= 60) {
+            return 0.6;
+        }
+
+        return 0.2;
     }
 }

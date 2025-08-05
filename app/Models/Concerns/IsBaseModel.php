@@ -12,7 +12,8 @@ trait IsBaseModel
     public function formatForException(): string
     {
         return implode('|', [
-            get_class($this), "id:$$this->id",
+            get_class($this),
+            "id:$$this->id",
         ]);
     }
 

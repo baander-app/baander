@@ -19,7 +19,7 @@ return new class extends Migration
                 ->constrained()
                 ->onDelete('cascade');
 
-            $table->caseInsensitiveText('name');
+            $table->text('name');
             $table->text('description')->nullable();
 
             $table->boolean('is_public')->default(false);
@@ -29,6 +29,21 @@ return new class extends Migration
 
             $table->timestampsTz();
         });
+
+        $sql = <<<SQL
+CREATE INDEX idx_playlists_title_fts
+          ON playlists
+       USING pgroonga (name pgroonga_text_full_text_search_ops_v2)
+               WITH (tokenizer='TokenNgram("unify_alphabet", false)',
+                    normalizers = 'NormalizerNFKC130');
+SQL;
+
+        DB::statement($sql);
+
+        DB::statement(
+            'CREATE INDEX IF NOT EXISTS idx_playlists_public_id_trgm '.
+            'ON playlists USING gin (public_id gin_trgm_ops)'
+        );
     }
 
     /**

@@ -15,7 +15,7 @@ trait HasLibraryAccess
      */
     public function userHasAccessToLibrary(int $userId, int $libraryId): bool
     {
-        return (new \App\Models\UserLibrary)->where('user_id', $userId)
+        return (new UserLibrary)->where('user_id', $userId)
             ->where('library_id', $libraryId)
             ->exists();
     }

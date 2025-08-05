@@ -23,16 +23,12 @@ class SongSearchService
     {
     }
 
-    /**
-     * Search with album context for better accuracy
-     */
     public function searchWithAlbumContext(Song $song, array $albumMetadata): array
     {
         if (empty($albumMetadata) || ($albumMetadata['quality_score'] ?? 0) === 0) {
             return $this->searchAllSources($song);
         }
 
-        // Extract song data from album metadata
         $songData = $this->findSongInAlbumMetadata($song, $albumMetadata);
 
         if ($songData) {
@@ -59,6 +55,7 @@ class SongSearchService
             'musicbrainz' => $this->searchMusicBrainz($song),
             'discogs'     => $this->searchDiscogs($song),
         ];
+
     }
 
     /**

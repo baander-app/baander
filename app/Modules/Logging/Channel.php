@@ -12,8 +12,6 @@ enum Channel: string
     case Emergency = 'emergency';
     case Errorlog = 'errorlog';
     case Jobs = 'jobs';
-    case MusicBrainz = 'musicbrainz';
-    case MusicJobs = 'music_jobs';
     case Notifications = 'notifications';
     case Null = 'null';
     case Otel = 'otel';
@@ -24,4 +22,7 @@ enum Channel: string
     case Stderr = 'stderr';
     case Stdout = 'stdout';
     case Syslog = 'syslog';
+    case MetadataFile = 'metadata_file';
+    case MetadataOtel = 'metadata_otel';
+    case Metadata = 'metadata';
 }
