@@ -1259,12 +1259,432 @@ PHP;
         $this->writeFile($outputPath . '/Utils/AudioUtils.php', $utilityClass);
     }
 
+    private function generateAlgorithmSpecificExecution(string $algorithm, string $category): string
+    {
+        $cases = [];
+
+        // Generate specific cases for known algorithms
+        $algorithmExecutions = [
+            'AudioLoader' => "
+            case 'AudioLoader':
+                // Audio loading algorithm
+                if (!is_string(\$input)) {
+                    throw new AlgorithmException('AudioLoader expects file path');
+                }
+                
+                \$audioData = \$ffi->new('float**');
+                \$sampleRate = \$ffi->new('int');
+                \$channels = \$ffi->new('int');
+                \$length = \$ffi->new('int');
+                
+                \$result = \$ffi->essentia_audio_loader(\$input, \$audioData, \$sampleRate, \$channels, \$length);
+                
+                if (\$result != 0) {
+                    throw new AlgorithmException('Failed to load audio file');
+                }
+                
+                \$phpArray = [];
+                for (\$i = 0; \$i < \$length->cdata; \$i++) {
+                    \$phpArray[] = \$audioData[0][\$i];
+                }
+                
+                \$outputs = [
+                    'audio' => \$phpArray,
+                    'sampleRate' => \$sampleRate->cdata,
+                    'channels' => \$channels->cdata
+                ];
+                break;",
+
+            'MonoLoader' => "
+            case 'MonoLoader':
+                // Mono audio loading
+                if (!is_string(\$input)) {
+                    throw new AlgorithmException('MonoLoader expects file path');
+                }
+                
+                \$audioData = \$ffi->new('float*');
+                \$sampleRate = \$ffi->new('int');
+                \$length = \$ffi->new('int');
+                
+                \$result = \$ffi->essentia_mono_loader(\$input, \$audioData, \$sampleRate, \$length);
+                
+                if (\$result != 0) {
+                    throw new AlgorithmException('Failed to load mono audio file');
+                }
+                
+                \$phpArray = [];
+                for (\$i = 0; \$i < \$length->cdata; \$i++) {
+                    \$phpArray[] = \$audioData[\$i];
+                }
+                
+                \$outputs = [
+                    'audio' => \$phpArray,
+                    'sampleRate' => \$sampleRate->cdata
+                ];
+                break;",
+
+            'SpectralCentroid' => "
+            case 'SpectralCentroid':
+                // Spectral centroid calculation
+                \$inputSize = is_array(\$input) ? count(\$input) : (\$input instanceof AudioVector ? \$input->getLength() : 1024);
+                \$centroid = \$ffi->new('float');
+                
+                \$result = \$ffi->essentia_spectral_centroid(\$input, \$inputSize, \$centroid);
+                
+                if (\$result != 0) {
+                    throw new AlgorithmException('Spectral centroid computation failed');
+                }
+                
+                \$outputs = [\$centroid->cdata];
+                break;",
+
+            'MFCC' => "
+            case 'MFCC':
+                // MFCC computation
+                \$inputSize = is_array(\$input) ? count(\$input) : (\$input instanceof AudioVector ? \$input->getLength() : 1024);
+                \$numCoeffs = \$this->parameters['numCoeffs'] ?? 13;
+                \$coefficients = \$ffi->new(\"float[\$numCoeffs]\");
+                
+                \$result = \$ffi->essentia_mfcc(\$input, \$inputSize, \$coefficients, \$numCoeffs);
+                
+                if (\$result != 0) {
+                    throw new AlgorithmException('MFCC computation failed');
+                }
+                
+                \$outputs = [];
+                for (\$i = 0; \$i < \$numCoeffs; \$i++) {
+                    \$outputs[] = \$coefficients[\$i];
+                }
+                break;",
+
+            'PitchYin' => "
+            case 'PitchYin':
+                // Pitch detection using Yin algorithm
+                \$inputSize = is_array(\$input) ? count(\$input) : (\$input instanceof AudioVector ? \$input->getLength() : 1024);
+                \$pitch = \$ffi->new('float');
+                \$confidence = \$ffi->new('float');
+                
+                \$result = \$ffi->essentia_pitch_yin(\$input, \$inputSize, \$pitch, \$confidence);
+                
+                if (\$result != 0) {
+                    throw new AlgorithmException('Pitch detection failed');
+                }
+                
+                \$outputs = [\$pitch->cdata, \$confidence->cdata];
+                break;",
+
+            'PitchYinFFT' => "
+            case 'PitchYinFFT':
+                // Pitch detection using Yin FFT algorithm
+                \$inputSize = is_array(\$input) ? count(\$input) : (\$input instanceof AudioVector ? \$input->getLength() : 1024);
+                \$pitch = \$ffi->new('float');
+                \$confidence = \$ffi->new('float');
+                
+                \$result = \$ffi->essentia_pitch_yin_fft(\$input, \$inputSize, \$pitch, \$confidence);
+                
+                if (\$result != 0) {
+                    throw new AlgorithmException('Pitch YIN FFT detection failed');
+                }
+                
+                \$outputs = [\$pitch->cdata, \$confidence->cdata];
+                break;",
+
+            'RhythmExtractor' => "
+            case 'RhythmExtractor':
+                // Rhythm extraction
+                \$inputSize = is_array(\$input) ? count(\$input) : (\$input instanceof AudioVector ? \$input->getLength() : 1024);
+                \$bpm = \$ffi->new('float');
+                \$maxBeats = 1000;
+                \$beats = \$ffi->new(\"float[\$maxBeats]\");
+                \$numBeats = \$ffi->new('int');
+                
+                \$result = \$ffi->essentia_rhythm_extractor(\$input, \$inputSize, \$bpm, \$beats, \$maxBeats, \$numBeats);
+                
+                if (\$result != 0) {
+                    throw new AlgorithmException('Rhythm extraction failed');
+                }
+                
+                \$beatArray = [];
+                for (\$i = 0; \$i < \$numBeats->cdata; \$i++) {
+                    \$beatArray[] = \$beats[\$i];
+                }
+                
+                \$outputs = [\$bpm->cdata, ...\$beatArray];
+                break;",
+
+            'Energy' => "
+            case 'Energy':
+                // Energy computation
+                \$inputSize = is_array(\$input) ? count(\$input) : (\$input instanceof AudioVector ? \$input->getLength() : 1024);
+                \$energy = \$ffi->new('float');
+                
+                \$result = \$ffi->essentia_energy(\$input, \$inputSize, \$energy);
+                
+                if (\$result != 0) {
+                    throw new AlgorithmException('Energy computation failed');
+                }
+                
+                \$outputs = [\$energy->cdata];
+                break;",
+
+            'RMS' => "
+            case 'RMS':
+                // RMS computation
+                \$inputSize = is_array(\$input) ? count(\$input) : (\$input instanceof AudioVector ? \$input->getLength() : 1024);
+                \$rms = \$ffi->new('float');
+                
+                \$result = \$ffi->essentia_rms(\$input, \$inputSize, \$rms);
+                
+                if (\$result != 0) {
+                    throw new AlgorithmException('RMS computation failed');
+                }
+                
+                \$outputs = [\$rms->cdata];
+                break;",
+
+            'ZeroCrossingRate' => "
+            case 'ZeroCrossingRate':
+                // Zero crossing rate computation
+                \$inputSize = is_array(\$input) ? count(\$input) : (\$input instanceof AudioVector ? \$input->getLength() : 1024);
+                \$zcr = \$ffi->new('float');
+                
+                \$result = \$ffi->essentia_zero_crossing_rate(\$input, \$inputSize, \$zcr);
+                
+                if (\$result != 0) {
+                    throw new AlgorithmException('Zero crossing rate computation failed');
+                }
+                
+                \$outputs = [\$zcr->cdata];
+                break;",
+
+            'SpectralRolloff' => "
+            case 'SpectralRolloff':
+                // Spectral rolloff computation
+                \$inputSize = is_array(\$input) ? count(\$input) : (\$input instanceof AudioVector ? \$input->getLength() : 1024);
+                \$rolloff = \$ffi->new('float');
+                
+                \$result = \$ffi->essentia_spectral_rolloff(\$input, \$inputSize, \$rolloff);
+                
+                if (\$result != 0) {
+                    throw new AlgorithmException('Spectral rolloff computation failed');
+                }
+                
+                \$outputs = [\$rolloff->cdata];
+                break;",
+
+            'MelBands' => "
+            case 'MelBands':
+                // Mel bands computation
+                \$inputSize = is_array(\$input) ? count(\$input) : (\$input instanceof AudioVector ? \$input->getLength() : 1024);
+                \$numBands = \$this->parameters['numberBands'] ?? 24;
+                \$bands = \$ffi->new(\"float[\$numBands]\");
+                
+                \$result = \$ffi->essentia_mel_bands(\$input, \$inputSize, \$bands, \$numBands);
+                
+                if (\$result != 0) {
+                    throw new AlgorithmException('Mel bands computation failed');
+                }
+                
+                \$outputs = [];
+                for (\$i = 0; \$i < \$numBands; \$i++) {
+                    \$outputs[] = \$bands[\$i];
+                }
+                break;",
+
+            'FFT' => "
+            case 'FFT':
+                // FFT computation
+                \$inputSize = is_array(\$input) ? count(\$input) : (\$input instanceof AudioVector ? \$input->getLength() : 1024);
+                \$fftSize = \$this->parameters['size'] ?? \$inputSize;
+                \$real = \$ffi->new(\"float[\$fftSize]\");
+                \$imag = \$ffi->new(\"float[\$fftSize]\");
+                
+                \$result = \$ffi->essentia_fft(\$input, \$inputSize, \$real, \$imag, \$fftSize);
+                
+                if (\$result != 0) {
+                    throw new AlgorithmException('FFT computation failed');
+                }
+                
+                \$realArray = [];
+                \$imagArray = [];
+                for (\$i = 0; \$i < \$fftSize; \$i++) {
+                    \$realArray[] = \$real[\$i];
+                    \$imagArray[] = \$imag[\$i];
+                }
+                
+                \$outputs = [
+                    'real' => \$realArray,
+                    'imaginary' => \$imagArray
+                ];
+                break;",
+
+            'Windowing' => "
+            case 'Windowing':
+                // Windowing computation
+                \$inputSize = is_array(\$input) ? count(\$input) : (\$input instanceof AudioVector ? \$input->getLength() : 1024);
+                \$windowSize = \$this->parameters['size'] ?? \$inputSize;
+                \$output = \$ffi->new(\"float[\$windowSize]\");
+                
+                \$result = \$ffi->essentia_windowing(\$input, \$inputSize, \$output, \$windowSize);
+                
+                if (\$result != 0) {
+                    throw new AlgorithmException('Windowing computation failed');
+                }
+                
+                \$outputs = [];
+                for (\$i = 0; \$i < \$windowSize; \$i++) {
+                    \$outputs[] = \$output[\$i];
+                }
+                break;",
+        ];
+
+        // Only include the case for the current algorithm
+        if (isset($algorithmExecutions[$algorithm])) {
+            $cases[] = $algorithmExecutions[$algorithm];
+        }
+
+        return implode("\n", $cases);
+    }
+
+    private function generateValidParameters(string $algorithm, string $category): string
+    {
+        // Algorithm-specific parameter definitions
+        $parameterSets = [
+            // Audio I/O
+            'AudioLoader' => "['filename', 'computeMD5', 'sampleRate']",
+            'MonoLoader' => "['filename', 'sampleRate', 'downmix']",
+            'EasyLoader' => "['filename', 'sampleRate', 'startTime', 'endTime']",
+            'AudioWriter' => "['filename', 'format', 'sampleRate']",
+            'MonoWriter' => "['filename', 'format', 'sampleRate']",
+
+            // Audio Problems
+            'StartStopCut' => "['frameSize', 'hopSize', 'maximumStartTime', 'maximumStopTime', 'sampleRate', 'threshold']",
+            'ClickDetector' => "['frameSize', 'hopSize', 'order', 'powerEstimationThreshold', 'detectionThreshold', 'silenceThreshold']",
+            'DiscontinuityDetector' => "['frameSize', 'hopSize', 'detectionThreshold', 'energy_threshold', 'kernel_size', 'order']",
+            'FalseStereoDetector' => "['frameSize', 'hopSize', 'correlationThreshold']",
+            'GapsDetector' => "['frameSize', 'hopSize', 'silenceThreshold', 'minimumGapLength']",
+            'HumDetector' => "['frameSize', 'hopSize', 'minimumDuration', 'tolerance', 'sampleRate']",
+            'SaturationDetector' => "['frameSize', 'hopSize', 'differentialThreshold', 'energyThreshold', 'minimumDuration']",
+            'SNR' => "['frameSize', 'noiseThreshold', 'useBroadbandNoise']",
+
+            // Spectral
+            'MFCC' => "['numCoeffs', 'sampleRate', 'numberBands', 'lowFrequencyBound', 'highFrequencyBound', 'inputSize', 'type', 'weighting', 'warpingFormula', 'logType', 'normalize', 'dctType', 'liftering']",
+            'SpectralCentroid' => "['sampleRate']",
+            'SpectralRolloff' => "['sampleRate', 'cutoff']",
+            'SpectralFlux' => "['sampleRate', 'halfRectify']",
+            'SpectralContrast' => "['sampleRate', 'frameSize', 'numberBands', 'lowFrequencyBound', 'highFrequencyBound', 'neighbourRatio', 'staticDistribution']",
+            'MelBands' => "['sampleRate', 'inputSize', 'numberBands', 'lowFrequencyBound', 'highFrequencyBound', 'warpingFormula', 'weighting', 'normalize', 'type', 'log']",
+            'BarkBands' => "['sampleRate', 'inputSize', 'numberBands', 'normalize']",
+            'ERBBands' => "['sampleRate', 'inputSize', 'numberBands', 'lowFrequencyBound', 'highFrequencyBound', 'normalize', 'type', 'width']",
+            'SpectralPeaks' => "['sampleRate', 'threshold', 'minFrequency', 'maxFrequency', 'maxPeaks', 'interpolate', 'magnitudeThreshold', 'orderBy']",
+            'FFT' => "['size']",
+            'IFFT' => "['size']",
+            'Spectrum' => "['size']",
+            'PowerSpectrum' => "['size']",
+
+            // Temporal
+            'DynamicComplexity' => "['frameSize', 'sampleRate']",
+            'Energy' => "[]",
+            'EnergyBand' => "['sampleRate', 'startCutoffFrequency', 'stopCutoffFrequency']",
+            'EnergyBandRatio' => "['sampleRate', 'startFrequency', 'stopFrequency']",
+            'Envelope' => "['applyRectification', 'attackTime', 'releaseTime', 'sampleRate']",
+            'InstantPower' => "[]",
+            'Intensity' => "['sampleRate']",
+            'Larm' => "['attackTime', 'power', 'releaseTime', 'sampleRate']",
+            'Leq' => "[]",
+            'Loudness' => "[]",
+            'LoudnessEBUR128' => "['hopSize', 'sampleRate', 'startAtZero']",
+            'LoudnessVickers' => "['sampleRate']",
+            'ReplayGain' => "['sampleRate']",
+            'RMS' => "[]",
+            'ZeroCrossingRate' => "['threshold']",
+
+            // Tonal
+            'PitchYin' => "['frameSize', 'sampleRate', 'tolerance', 'interpolate', 'minFrequency', 'maxFrequency']",
+            'PitchYinFFT' => "['frameSize', 'sampleRate', 'tolerance', 'interpolate', 'minFrequency', 'maxFrequency']",
+            'PitchYinProbabilistic' => "['frameSize', 'sampleRate', 'tolerance', 'lowRMS', 'outputUnvoiced', 'preciseTime']",
+            'Key' => "['sampleRate', 'numHarmonics', 'slope', 'profileType', 'usePolyphony', 'useThreeChords']",
+            'HPCP' => "['sampleRate', 'minFrequency', 'maxFrequency', 'referenceFrequency', 'nonLinear', 'normalized', 'size', 'windowSize', 'maxShifted', 'splitFrequency', 'harmonics', 'bandPreset', 'bandSplitFrequency', 'weightType']",
+            'Chromagram' => "['sampleRate', 'minFrequency', 'maxFrequency', 'referenceFrequency', 'binsPerOctave', 'normalizeType', 'threshold']",
+
+            // Rhythm
+            'RhythmExtractor' => "['method', 'minTempo', 'maxTempo', 'frameHop']",
+            'RhythmExtractor2013' => "['method', 'minTempo', 'maxTempo']",
+            'BeatTrackerDegara' => "['maxTempo', 'minTempo']",
+            'BeatTrackerMultiFeature' => "['maxTempo', 'minTempo']",
+            'OnsetDetection' => "['method', 'sampleRate']",
+            'OnsetDetectionGlobal' => "['method', 'sampleRate', 'frameSize', 'hopSize']",
+            'TempoTap' => "['frameHop', 'frameSize', 'maxTempo', 'minTempo', 'numberFrames', 'sampleRate', 'tempoHints']",
+            'Onsets' => "['alpha', 'delay', 'frameRate', 'maxTempo', 'minTempo', 'silenceThreshold']",
+
+            // Filters
+            'BandPass' => "['bandwidth', 'cutoffFrequency', 'sampleRate']",
+            'BandReject' => "['bandwidth', 'cutoffFrequency', 'sampleRate']",
+            'HighPass' => "['cutoffFrequency', 'sampleRate']",
+            'LowPass' => "['cutoffFrequency', 'sampleRate']",
+            'AllPass' => "['bandwidth', 'cutoffFrequency', 'sampleRate', 'order']",
+            'EqualLoudness' => "['sampleRate']",
+            'DCRemoval' => "['cutoffFrequency', 'sampleRate']",
+            'IIR' => "['numerator', 'denominator']",
+
+            // Statistics
+            'Mean' => "[]",
+            'Variance' => "[]",
+            'Centroid' => "['range']",
+            'CentralMoments' => "['range', 'mode']",
+            'RawMoments' => "['range', 'mode']",
+            'DistributionShape' => "[]",
+            'Decrease' => "['range']",
+            'Flatness' => "[]",
+            'Crest' => "[]",
+            'Entropy' => "[]",
+
+            // Extractors
+            'LowLevelSpectralExtractor' => "['frameSize', 'hopSize', 'sampleRate']",
+            'TonalExtractor' => "['frameSize', 'hopSize', 'sampleRate']",
+            'RhythmDescriptors' => "['frameSize', 'hopSize', 'sampleRate']",
+            'FreesoundExtractor' => "['frameSize', 'hopSize', 'sampleRate']",
+
+            // Machine Learning
+            'TensorflowInputMusiCNN' => "['patchHopSize']",
+            'TensorflowInputVGGish' => "[]",
+            'TensorflowInputTempoCNN' => "[]",
+            'TensorflowInputFSDSINet' => "[]",
+
+            // Synthesis
+            'SineModelAnal' => "['sampleRate', 'maxnSines', 'magnitudeThreshold', 'minSineDur', 'freqDevOffset', 'freqDevSlope']",
+            'SineModelSynth' => "['sampleRate', 'fftSize', 'hopSize']",
+            'HarmonicModelAnal' => "['sampleRate', 'maxnSines', 'magnitudeThreshold', 'minSineDur', 'nHarmonics', 'harmThreshold']",
+            'HprModelAnal' => "['sampleRate', 'maxnSines', 'magnitudeThreshold', 'minSineDur', 'nHarmonics', 'harmThreshold', 'freqDevOffset', 'freqDevSlope']",
+            'HpsModelAnal' => "['sampleRate', 'maxnSines', 'magnitudeThreshold', 'minSineDur', 'nHarmonics', 'harmThreshold', 'freqDevOffset', 'freqDevSlope', 'stocf']",
+            'SprModelAnal' => "['sampleRate', 'maxnSines', 'magnitudeThreshold', 'minSineDur', 'freqDevOffset', 'freqDevSlope', 'stocf']",
+            'SpsModelAnal' => "['sampleRate', 'maxnSines', 'magnitudeThreshold', 'minSineDur', 'freqDevOffset', 'freqDevSlope', 'stocf']",
+
+            // Utility
+            'FrameCutter' => "['frameSize', 'hopSize', 'silentFrames', 'startFromZero', 'validFrameThresholdRatio']",
+            'Windowing' => "['type', 'size', 'zeroPadding', 'zeroPhase', 'normalized']",
+            'OverlapAdd' => "['frameSize', 'hopSize', 'gain']",
+            'Resample' => "['inputSampleRate', 'outputSampleRate', 'quality']",
+            'Scale' => "['factor', 'maxAbsValue', 'clipping']",
+            'UnaryOperator' => "['type', 'shift', 'scale']",
+            'BinaryOperator' => "['type']",
+            'Clipper' => "['min', 'max']",
+            'NoiseAdder' => "['level', 'fixSeed']",
+        ];
+
+        return $parameterSets[$algorithm] ?? "[]";
+    }
+
     private function generateIntelligentAlgorithmClass(string $algorithm, string $outputPath): void
     {
         $metadata = $this->algorithmMetadata[$algorithm] ?? [];
-        $category = $metadata['category'] ?? 'Misc';
+        $category = $metadata['category'] ?? 'Standard';
         $mode = $metadata['mode'] ?? 'standard';
         $description = $metadata['description'] ?? "Auto-generated wrapper for {$algorithm} algorithm";
+
+        // Generate algorithm-specific execution cases
+        $algorithmExecutionCases = $this->generateAlgorithmSpecificExecution($algorithm, $category);
+        $validParameters = $this->generateValidParameters($algorithm, $category);
 
         $classContent = <<<PHP
 <?php
@@ -1274,8 +1694,9 @@ declare(strict_types=1);
 namespace App\\Modules\\Essentia\\Algorithms\\{$category};
 
 use App\\Modules\\Essentia\\Algorithms\\BaseAlgorithm;
-use App\\Modules\\Essentia\\Exceptions\\AlgorithmException;
+use App\\Modules\\Essentia\\Exceptions\\{AlgorithmException, ConfigurationException};
 use App\\Modules\\Essentia\\Types\\AudioVector;
+use FFI;
 
 /**
  * {$description}
@@ -1288,10 +1709,25 @@ class {$algorithm} extends BaseAlgorithm
     protected string \$algorithmName = '{$algorithm}';
     protected string \$mode = '{$mode}';
     protected string \$category = '{$category}';
+    
+    private ?\FFI\CData \$algorithmHandle = null;
+    private bool \$configured = false;
+
+    public function __destruct()
+    {
+        if (\$this->algorithmHandle) {
+            \$this->cleanupAlgorithm();
+        }
+    }
 
     public function compute(\$input): array
     {
         try {
+            // Lazy initialization of the algorithm
+            if (!\$this->algorithmHandle) {
+                \$this->initializeAlgorithm();
+            }
+            
             // Input validation based on algorithm type
             \$this->validateAlgorithmInput(\$input);
             
@@ -1312,19 +1748,156 @@ class {$algorithm} extends BaseAlgorithm
         }
     }
 
+    private function initializeAlgorithm(): void
+    {
+        \$ffi = \$this->essentia->getFFI();
+        
+        try {
+            // Create algorithm instance
+            \$this->algorithmHandle = \$ffi->{\$this->getAlgorithmCreateFunction()}();
+            
+            if (!\$this->algorithmHandle) {
+                throw new AlgorithmException("Failed to create {$algorithm} algorithm instance");
+            }
+            
+            // Configure algorithm parameters
+            \$this->configureAlgorithmParameters();
+            \$this->configured = true;
+            
+        } catch (\\FFI\\Exception \$e) {
+            throw new AlgorithmException("FFI error initializing {$algorithm}: " . \$e->getMessage(), 0, \$e);
+        }
+    }
+
+    private function getAlgorithmCreateFunction(): string
+    {
+        // Convert algorithm name to C function name
+        \$functionName = 'essentia_create_' . strtolower(\$this->algorithmName);
+        return \$functionName;
+    }
+
+    private function configureAlgorithmParameters(): void
+    {
+        if (empty(\$this->parameters)) {
+            return;
+        }
+        
+        \$ffi = \$this->essentia->getFFI();
+        
+        foreach (\$this->parameters as \$key => \$value) {
+            try {
+                \$this->setAlgorithmParameter(\$ffi, \$key, \$value);
+            } catch (\\Exception \$e) {
+                throw new ConfigurationException("Failed to set parameter '\$key': " . \$e->getMessage(), 0, \$e);
+            }
+        }
+    }
+
+    private function setAlgorithmParameter(FFI \$ffi, string \$key, \$value): void
+    {
+        // Parameter setting logic based on value type
+        switch (gettype(\$value)) {
+            case 'integer':
+                \$ffi->essentia_algorithm_set_int_parameter(\$this->algorithmHandle, \$key, \$value);
+                break;
+            case 'double':
+                \$ffi->essentia_algorithm_set_real_parameter(\$this->algorithmHandle, \$key, (float) \$value);
+                break;
+            case 'string':
+                \$ffi->essentia_algorithm_set_string_parameter(\$this->algorithmHandle, \$key, \$value);
+                break;
+            case 'boolean':
+                \$ffi->essentia_algorithm_set_bool_parameter(\$this->algorithmHandle, \$key, \$value);
+                break;
+            case 'array':
+                \$this->setArrayParameter(\$ffi, \$key, \$value);
+                break;
+            default:
+                throw new ConfigurationException("Unsupported parameter type for '\$key': " . gettype(\$value));
+        }
+    }
+
+    private function setArrayParameter(FFI \$ffi, string \$key, array \$value): void
+    {
+        if (empty(\$value)) {
+            return;
+        }
+        
+        \$firstElement = reset(\$value);
+        
+        if (is_numeric(\$firstElement)) {
+            // Numeric array
+            \$size = count(\$value);
+            \$cArray = \$ffi->new("float[\$size]");
+            
+            for (\$i = 0; \$i < \$size; \$i++) {
+                \$cArray[\$i] = (float) \$value[\$i];
+            }
+            
+            \$ffi->essentia_algorithm_set_real_vector_parameter(\$this->algorithmHandle, \$key, \$cArray, \$size);
+        } else {
+            // String array
+            \$size = count(\$value);
+            \$cArray = \$ffi->new("char*[\$size]");
+            
+            for (\$i = 0; \$i < \$size; \$i++) {
+                \$cArray[\$i] = \$ffi->new("char[" . (strlen(\$value[\$i]) + 1) . "]");
+                FFI::memcpy(\$cArray[\$i], \$value[\$i], strlen(\$value[\$i]));
+            }
+            
+            \$ffi->essentia_algorithm_set_string_vector_parameter(\$this->algorithmHandle, \$key, \$cArray, \$size);
+        }
+    }
+
     private function validateAlgorithmInput(\$input): void
     {
         // Category-specific input validation
         switch (\$this->category) {
             case 'Spectral':
             case 'Temporal':
-                \$this->validateInput(\$input, 'array');
-                break;
-            case 'Io':
-                if (!is_string(\$input) && !(\$input instanceof AudioVector)) {
-                    throw new AlgorithmException('IO algorithms expect string path or AudioVector');
+            case 'Tonal':
+                if (!is_array(\$input) && !(\$input instanceof AudioVector)) {
+                    throw new AlgorithmException('{$category} algorithms expect array or AudioVector input');
                 }
                 break;
+                
+            case 'Io':
+                if (in_array(\$this->algorithmName, ['AudioLoader', 'MonoLoader', 'EasyLoader'])) {
+                    if (!is_string(\$input)) {
+                        throw new AlgorithmException('Loader algorithms expect string file path');
+                    }
+                    if (!file_exists(\$input)) {
+                        throw new AlgorithmException("Audio file not found: \$input");
+                    }
+                } elseif (in_array(\$this->algorithmName, ['AudioWriter', 'MonoWriter'])) {
+                    if (!(\$input instanceof AudioVector) && !is_array(\$input)) {
+                        throw new AlgorithmException('Writer algorithms expect AudioVector or array input');
+                    }
+                }
+                break;
+                
+            case 'Rhythm':
+                \$this->validateInput(\$input, 'array');
+                break;
+                
+            case 'Filters':
+                \$this->validateInput(\$input, 'array');
+                break;
+                
+            case 'MachineLearning':
+                // ML algorithms may have different input requirements
+                if (!is_array(\$input) && !(\$input instanceof AudioVector)) {
+                    throw new AlgorithmException('ML algorithms expect array or AudioVector input');
+                }
+                break;
+                
+            case 'Standard':
+                // Most flexible category
+                if (!is_array(\$input) && !(\$input instanceof AudioVector) && !is_numeric(\$input) && !is_string(\$input)) {
+                    throw new AlgorithmException('Unsupported input type');
+                }
+                break;
+                
             default:
                 // Generic validation
                 if (!is_array(\$input) && !(\$input instanceof AudioVector) && !is_numeric(\$input)) {
@@ -1339,22 +1912,265 @@ class {$algorithm} extends BaseAlgorithm
             return \$input->toCArray(\$this->essentia->getFFI());
         }
         
+        if (is_array(\$input)) {
+            \$ffi = \$this->essentia->getFFI();
+            \$size = count(\$input);
+            \$cArray = \$ffi->new("float[\$size]");
+            
+            for (\$i = 0; \$i < \$size; \$i++) {
+                \$cArray[\$i] = (float) \$input[\$i];
+            }
+            
+            return \$cArray;
+        }
+        
         return \$input;
     }
 
-    private function executeAlgorithm(\$input)
+    private function executeAlgorithm(\$input): array
     {
-        // This would contain the actual FFI calls to Essentia
-        // Implementation depends on the specific algorithm
+        \$ffi = \$this->essentia->getFFI();
         
-        // Placeholder for algorithm execution
-        return [];
+        try {
+            // Algorithm-specific execution logic
+            return \$this->executeSpecificAlgorithm(\$ffi, \$input);
+            
+        } catch (\\FFI\\Exception \$e) {
+            throw new AlgorithmException("FFI execution error: " . \$e->getMessage(), 0, \$e);
+        }
     }
 
-    private function processOutput(\$result): array
+    private function executeSpecificAlgorithm(FFI \$ffi, \$input): array
     {
-        // Process and format the output from Essentia
-        return is_array(\$result) ? \$result : [\$result];
+        // This method contains algorithm-specific execution logic
+        \$outputs = [];
+        
+        switch (\$this->algorithmName) {
+{$algorithmExecutionCases}
+            
+            default:
+                // Generic execution for unknown algorithms
+                \$outputs = \$this->executeGenericAlgorithm(\$ffi, \$input);
+        }
+        
+        return \$outputs;
+    }
+
+    private function executeGenericAlgorithm(FFI \$ffi, \$input): array
+    {
+        // Generic algorithm execution - assumes single input/output
+        try {
+            // Prepare output buffers
+            \$outputSize = \$this->estimateOutputSize(\$input);
+            \$output = \$ffi->new("float[\$outputSize]");
+            \$actualSize = \$ffi->new("int");
+            
+            // Execute algorithm
+            \$result = \$ffi->essentia_algorithm_compute(\$this->algorithmHandle, \$input, \$output, \$actualSize);
+            
+            if (\$result != 0) {
+                throw new AlgorithmException("Algorithm execution failed with code: \$result");
+            }
+            
+            // Convert output to PHP array
+            \$phpOutput = [];
+            for (\$i = 0; \$i < \$actualSize->cdata; \$i++) {
+                \$phpOutput[] = \$output[\$i];
+            }
+            
+            return \$phpOutput;
+            
+        } catch (\\Exception \$e) {
+            throw new AlgorithmException("Generic execution failed: " . \$e->getMessage(), 0, \$e);
+        }
+    }
+
+    private function estimateOutputSize(\$input): int
+    {
+        // Estimate output size based on algorithm category and input
+        switch (\$this->category) {
+            case 'Spectral':
+                // Spectral algorithms often output half the input size (FFT)
+                return is_array(\$input) ? count(\$input) / 2 : 1024;
+                
+            case 'Temporal':
+            case 'Tonal':
+                // Temporal/tonal algorithms often output similar or smaller size
+                return is_array(\$input) ? count(\$input) : 1024;
+                
+            case 'Stats':
+                // Statistical algorithms often output small fixed sizes
+                return 16;
+                
+            case 'Rhythm':
+                // Rhythm algorithms vary widely
+                return 256;
+                
+            default:
+                // Conservative default
+                return is_array(\$input) ? count(\$input) : 1024;
+        }
+    }
+
+    private function processOutput(array \$result): array
+    {
+        // Post-process the output based on algorithm characteristics
+        switch (\$this->category) {
+            case 'Spectral':
+                return \$this->processSpectralOutput(\$result);
+                
+            case 'Temporal':
+                return \$this->processTemporalOutput(\$result);
+                
+            case 'Tonal':
+                return \$this->processTonalOutput(\$result);
+                
+            case 'Rhythm':
+                return \$this->processRhythmOutput(\$result);
+                
+            case 'Stats':
+                return \$this->processStatsOutput(\$result);
+                
+            default:
+                // Return as-is for unknown categories
+                return \$result;
+        }
+    }
+
+    private function processSpectralOutput(array \$result): array
+    {
+        // Process spectral algorithm outputs
+        switch (\$this->algorithmName) {
+            case 'SpectralCentroid':
+            case 'SpectralRolloff':
+                return ['value' => \$result[0] ?? 0.0];
+                
+            case 'MFCC':
+                return ['coefficients' => \$result];
+                
+            case 'MelBands':
+            case 'BarkBands':
+                return ['bands' => \$result];
+                
+            case 'SpectralPeaks':
+                // Usually returns frequencies and magnitudes
+                \$half = count(\$result) / 2;
+                return [
+                    'frequencies' => array_slice(\$result, 0, \$half),
+                    'magnitudes' => array_slice(\$result, \$half)
+                ];
+                
+            default:
+                return ['spectrum' => \$result];
+        }
+    }
+
+    private function processTemporalOutput(array \$result): array
+    {
+        switch (\$this->algorithmName) {
+            case 'Energy':
+            case 'RMS':
+            case 'ZeroCrossingRate':
+                return ['value' => \$result[0] ?? 0.0];
+                
+            case 'Envelope':
+                return ['envelope' => \$result];
+                
+            default:
+                return ['values' => \$result];
+        }
+    }
+
+    private function processTonalOutput(array \$result): array
+    {
+        switch (\$this->algorithmName) {
+            case 'PitchYin':
+            case 'PitchYinFFT':
+                return [
+                    'pitch' => \$result[0] ?? 0.0,
+                    'confidence' => \$result[1] ?? 0.0
+                ];
+                
+            case 'Key':
+                return [
+                    'key' => \$result[0] ?? 'C',
+                    'scale' => \$result[1] ?? 'major',
+                    'strength' => \$result[2] ?? 0.0
+                ];
+                
+            case 'HPCP':
+            case 'Chromagram':
+                return ['chroma' => \$result];
+                
+            default:
+                return ['tonal_features' => \$result];
+        }
+    }
+
+    private function processRhythmOutput(array \$result): array
+    {
+        switch (\$this->algorithmName) {
+            case 'RhythmExtractor':
+                return [
+                    'bpm' => \$result[0] ?? 0.0,
+                    'beats' => array_slice(\$result, 1) ?? []
+                ];
+                
+            case 'OnsetDetection':
+                return ['onsets' => \$result];
+                
+            case 'TempoTap':
+                return ['tempo' => \$result[0] ?? 0.0];
+                
+            default:
+                return ['rhythm_features' => \$result];
+        }
+    }
+
+    private function processStatsOutput(array \$result): array
+    {
+        switch (\$this->algorithmName) {
+            case 'Mean':
+            case 'Variance':
+            case 'Centroid':
+                return ['value' => \$result[0] ?? 0.0];
+                
+            case 'DistributionShape':
+                return [
+                    'spread' => \$result[0] ?? 0.0,
+                    'skewness' => \$result[1] ?? 0.0,
+                    'kurtosis' => \$result[2] ?? 0.0
+                ];
+                
+            default:
+                return ['statistics' => \$result];
+        }
+    }
+
+    private function cleanupAlgorithm(): void
+    {
+        if (\$this->algorithmHandle) {
+            try {
+                \$ffi = \$this->essentia->getFFI();
+                \$ffi->essentia_delete_algorithm(\$this->algorithmHandle);
+            } catch (\\Exception \$e) {
+                // Ignore cleanup errors
+            }
+            \$this->algorithmHandle = null;
+        }
+    }
+
+    protected function isValidParameter(string \$parameter): bool
+    {
+        // Algorithm-specific parameter validation
+        \$validParams = \$this->getValidParameters();
+        return empty(\$validParams) || in_array(\$parameter, \$validParams);
+    }
+
+    private function getValidParameters(): array
+    {
+        // Return algorithm-specific valid parameters
+        return {$validParameters};
     }
 }
 PHP;
