@@ -11,6 +11,13 @@ ARG BUILD_ARGUMENT_ENV=dev
 ARG HOST_UID=1000
 ARG HOST_GID=1000
 ARG INSIDE_DOCKER_CONTAINER=1
+ARG ESSENTIA_VERSION=2.1_beta5
+
+ARG XDEBUG_CONFIG=main
+ARG XDEBUG_VERSION=3.4.4
+
+ENV XDEBUG_CONFIG=$XDEBUG_CONFIG \
+    XDEBUG_VERSION=$XDEBUG_VERSION
 
 ENV ENV=$BUILD_ARGUMENT_ENV \
     APP_HOME=/var/www/html \
@@ -18,27 +25,30 @@ ENV ENV=$BUILD_ARGUMENT_ENV \
     INSIDE_DOCKER_CONTAINER=$INSIDE_DOCKER_CONTAINER \
     COMPOSER_ALLOW_SUPERUSER=1
 
-# Validate environment
-RUN set -xe && \
-    if [ "${BUILD_ARGUMENT_ENV}" = "default" ]; then \
-        echo "Set BUILD_ARGUMENT_ENV in docker build-args like --build-arg BUILD_ARGUMENT_ENV=dev" && exit 2; \
-    elif [ "${BUILD_ARGUMENT_ENV}" = "dev" ]; then \
-        echo "Building development environment."; \
-    else \
-        echo "Set correct BUILD_ARGUMENT_ENV in docker build-args like --build-arg BUILD_ARGUMENT_ENV=dev. Available choices are dev" && exit 2; \
-    fi
-
 # Install system dependencies
 RUN set -xe && \
     curl -sL https://deb.nodesource.com/setup_24.x | bash - && \
     DEBIAN_FRONTEND=noninteractive apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get upgrade -yqq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -yqq -o=Dpkg::Use-Pty=0 \
+        build-essential \
+        git \
+        python3 \
+        python3-pip \
+        libeigen3-dev \
+        libyaml-dev \
+        libfftw3-dev \
+        libavcodec-dev \
+        libavformat-dev \
+        libavutil-dev \
+        libswresample-dev \
+        libsamplerate0-dev \
+        libtag1-dev \
+        libchromaprint-dev \
         ca-certificates \
         cron \
         curl \
         wget \
-        git \
         nano \
         nodejs \
         procps \
@@ -66,8 +76,6 @@ RUN set -xe && \
         libxpm-dev \
         libzip-dev \
         libzstd-dev \
-        libyaml-dev \
-        libuv1-dev \
         libuv1-dev \
         postgresql-client \
         redis-tools \
@@ -77,6 +85,9 @@ RUN set -xe && \
     npm i -g yarn && \
     rm -rf /var/lib/apt/lists/* && \
     apt-get clean
+
+# Download & verify
+RUN pip install --break-system-packages essentia
 
 # Configure PHP extensions
 RUN set -xe && \
@@ -202,6 +213,10 @@ WORKDIR ${APP_HOME}
 COPY /docker/dev/xdebug-main.ini /docker/dev/xdebug.ini
 RUN mv /docker/dev/xdebug.ini /usr/local/etc/php/conf.d/
 
+RUN set -xe && \
+    pecl install xdebug-${XDEBUG_VERSION} && \
+    docker-php-ext-enable xdebug
+
 # Switch to app user
 USER ${USERNAME}
 
@@ -218,37 +233,3 @@ RUN chmod +x ./start-swoole-server
 RUN COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interaction --no-progress
 
 CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
-
-# Production stage without Xdebug
-FROM base AS production
-
-# Switch to app user
-USER ${USERNAME}
-
-# Add bash aliases
-RUN echo 'alias artisan="php /var/www/html/artisan"' >> /home/${USERNAME}/.bashrc
-
-# Copy application files
-COPY --chown=${USERNAME}:${USERNAME} . ${APP_HOME}/
-COPY --chown=${USERNAME}:${USERNAME} .env ${APP_HOME}/.env
-COPY --chown=${USERNAME}:${USERNAME} start-swoole-server ${APP_HOME}/start-swoole-server
-RUN chmod +x ./start-swoole-server
-
-# Install Composer dependencies (production optimized)
-RUN COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-dev --no-interaction --no-progress
-
-CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
-
-# Development stage with Xdebug
-FROM base AS development
-
-ARG XDEBUG_CONFIG=main
-ARG XDEBUG_VERSION=3.4.4
-
-ENV XDEBUG_CONFIG=$XDEBUG_CONFIG \
-    XDEBUG_VERSION=$XDEBUG_VERSION
-
-# Install Xdebug (only in development stage)
-RUN set -xe && \
-    pecl install xdebug-${XDEBUG_VERSION} && \
-    docker-php-ext-enable xdebug

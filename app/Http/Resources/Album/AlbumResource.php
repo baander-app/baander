@@ -24,32 +24,41 @@ class AlbumResource extends AlbumWithoutSongsResource
     public function toArray(Request $request): array
     {
         return [
-            'publicId'  => $this->public_id,
-            'title'     => $this->title,
-            'year'      => $this->year,
-            'mbid'      => $this->mbid,
-            'discogsId' => $this->discogs_id,
-            'createdAt' => $this->created_at,
-            'updatedAt' => $this->updated_at,
+            'publicId'       => $this->public_id,
+            'title'          => $this->title,
+            'year'           => $this->year,
+            'type'           => $this->type,
+            'label'          => $this->label,
+            'catalogNumber'  => $this->catalog_number,
+            'barcode'        => $this->barcode,
+            'country'        => $this->country,
+            'language'       => $this->language,
+            'disambiguation' => $this->disambiguation,
+            'annotation'     => $this->annotation,
+            'spotifyId'      => $this->spotify_id,
+            'mbid'           => $this->mbid,
+            'discogsId'      => $this->discogs_id,
+            'createdAt'      => $this->created_at,
+            'updatedAt'      => $this->updated_at,
             /**
              * Cover relation
              */
-            'cover'     => ImageResource::make($this->whenLoaded('cover')),
+            'cover'          => ImageResource::make($this->whenLoaded('cover')),
             /**
              * Album artists relation
              */
-            'artists'   => ArtistResource::collection($this->whenLoaded('artists')),
+            'artists'        => ArtistResource::collection($this->whenLoaded('artists')),
             /**
              * Songs relation
              */
-            'songs'     => SongResource::collection($this->whenLoaded('songs')),
+            'songs'          => SongResource::collection($this->whenLoaded('songs')),
             /**
              * @var array{
              *   slug: string,
              *   name: string
              * }[]
              */
-            'genres'    => $this->whenLoaded('songs', function () {
+            'genres'         => $this->whenLoaded('songs', function () {
                 return $this->songs->flatMap(fn($song) => $song->genres)->unique('id')->values()->map(fn($genre) => [
                     'slug' => $genre->slug,
                     'name' => $genre->name,

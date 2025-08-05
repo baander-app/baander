@@ -31,10 +31,30 @@ return new class extends Migration
             $table->text('lyrics')->nullable();
             $table->integer('track')->nullable();
             $table->integer('disc')->nullable();
-            $table->integer('modified_time')->nullable();
+
             $table->integer('year')->nullable();
             $table->text('comment')->nullable();
             $table->string('hash')->comment('sha hash of the file')->index()->nullable();
+
+            $table->integer('bitrate')->nullable();
+            $table->integer('sample_rate')->nullable();
+            $table->integer('channels')->nullable();
+            $table->text('codec')->nullable();
+
+            $table->boolean('explicit')->default(false);
+
+            $table->decimal('energy', 2, 1)->nullable();
+            $table->decimal('danceability', 2, 1)->nullable();
+            $table->decimal('valence',2, 1)->nullable();
+            $table->decimal('acousticness',2, 1)->nullable();
+            $table->decimal('instrumentalness',2, 1)->nullable();
+            $table->decimal('liveness',2, 1)->nullable();
+            $table->decimal('spechiness',2, 1)->nullable();
+            $table->decimal('loudness',2, 1)->nullable();
+
+            $table->uuid('mbid')->nullable()->comment('MusicBrainz ID');
+            $table->bigInteger('discogs_id')->nullable()->comment('Discogs release ID');
+            $table->text('spotify_id')->nullable()->comment('Spotify album ID');
 
             $table->timestampsTz();
         });

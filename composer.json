@@ -6,9 +6,9 @@
     "require": {
         "php": "^8.4",
         "ext-curl": "*",
-        "ext-ionotify": "*",
         "ext-dom": "*",
         "ext-fileinfo": "*",
+        "ext-ffi": "*",
         "ext-gd": "*",
         "ext-hash": "*",
         "ext-iconv": "*",
