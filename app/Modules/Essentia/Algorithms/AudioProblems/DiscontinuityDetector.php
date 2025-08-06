@@ -539,6 +539,6 @@ class DiscontinuityDetector extends BaseAlgorithm
     private function getValidParameters(): array
     {
         // Return algorithm-specific valid parameters
-        return [];
+        return ['frameSize', 'hopSize', 'detectionThreshold', 'energy_threshold', 'kernel_size', 'order'];
     }
 }

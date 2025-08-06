@@ -516,6 +516,6 @@ class DynamicComplexity extends BaseAlgorithm
     private function getValidParameters(): array
     {
         // Return algorithm-specific valid parameters
-        return [];
+        return ['frameSize', 'sampleRate'];
     }
 }

@@ -14,9 +14,7 @@ The media information is organized and easily searchable, ensuring users can alw
 import type { QueueMonitorResourceName } from "./queueMonitorResourceName";
 import type { QueueMonitorResourceQueue } from "./queueMonitorResourceQueue";
 import type { QueueMonitorResourceStartedAt } from "./queueMonitorResourceStartedAt";
-import type { QueueMonitorResourceStartedAtExact } from "./queueMonitorResourceStartedAtExact";
 import type { QueueMonitorResourceFinishedAt } from "./queueMonitorResourceFinishedAt";
-import type { QueueMonitorResourceFinishedAtExact } from "./queueMonitorResourceFinishedAtExact";
 import type { QueueMonitorResourceProgress } from "./queueMonitorResourceProgress";
 import type { QueueMonitorResourceException } from "./queueMonitorResourceException";
 import type { QueueMonitorResourceExceptionClass } from "./queueMonitorResourceExceptionClass";
@@ -30,9 +28,7 @@ export interface QueueMonitorResource {
   name: QueueMonitorResourceName;
   queue: QueueMonitorResourceQueue;
   startedAt: QueueMonitorResourceStartedAt;
-  startedAtExact: QueueMonitorResourceStartedAtExact;
   finishedAt: QueueMonitorResourceFinishedAt;
-  finishedAtExact: QueueMonitorResourceFinishedAtExact;
   attempt: number;
   progress: QueueMonitorResourceProgress;
   exception: QueueMonitorResourceException;

@@ -50,7 +50,7 @@ export function SongDetail({ publicId }: SongDetailProps) {
 
   if (!data) return <Text>No data available</Text>;
 
-  const { public_id, path, durationHuman, sizeHuman, createdAt, updatedAt } = data;
+  const { path, durationHuman, sizeHuman, createdAt, updatedAt } = data;
 
   return (
     <Grid columns="2">
@@ -114,7 +114,7 @@ export function SongDetail({ publicId }: SongDetailProps) {
       </Box>
 
       <Box>
-        <Text>{public_id}</Text>
+        <Text>{publicId}</Text>
         <Text>{path}</Text>
         <Text>{durationHuman}</Text>
         <Text>{sizeHuman}</Text>

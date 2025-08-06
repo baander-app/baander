@@ -518,6 +518,6 @@ class EnergyBand extends BaseAlgorithm
     private function getValidParameters(): array
     {
         // Return algorithm-specific valid parameters
-        return [];
+        return ['sampleRate', 'startCutoffFrequency', 'stopCutoffFrequency'];
     }
 }

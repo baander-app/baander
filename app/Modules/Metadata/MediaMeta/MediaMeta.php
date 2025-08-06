@@ -512,7 +512,9 @@ class MediaMeta
         // Fall back to ID3v1
         try {
             $id3v1 = $this->getID3v1();
-            return $id3v1->getComment();
+            $comment = trim($id3v1->getComment());
+
+            return $comment !== '' ? $comment : null;
         } catch (Exception $e) {
             Log::debug(self::LOG_TAG . 'getComment: Failed to retrieve comment from ID3v1 tags', [
                 'error'     => $e->getMessage(),

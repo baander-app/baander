@@ -150,10 +150,7 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
             'audio.processor.error': error.message,
           });
 
-          errorCounter.add(1, {
-            type: 'audio_processor_connection_failed',
-            message: error.message,
-          });
+          errorCounter.add(1, { description: 'Failed to connect audio processor' });
 
           // Still mark as connected to prevent retries
           setProcessorConnected(true);
@@ -174,7 +171,7 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
 
     try {
       span.setAttributes({
-        'audio.song.id': song?.id || 'unknown',
+        'audio.song.publicId': song?.publicId || 'unknown',
         'audio.song.title': song?.title || 'unknown',
         'audio.current_time': audioRef.current.currentTime,
         'audio.duration': audioRef.current.duration || 0,
@@ -191,7 +188,7 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
 
       const playDuration = performance.now() - playStartTime;
       audioPlayCounter.add(1, {
-        song_id: song?.id || 'unknown',
+        song_id: song?.publicId || 'unknown',
         song_title: song?.title || 'unknown',
         volume_level: Math.round(audioRef.current.volume * 100).toString(),
       });
@@ -215,11 +212,7 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
         'audio.play.error': (error as Error).message,
       });
 
-      errorCounter.add(1, {
-        type: 'audio_play_failed',
-        message: (error as Error).message,
-        song_id: song?.id || 'unknown',
-      });
+      errorCounter.add(1, { description: 'Failed to play song' });
 
       dispatch(createNotification({
         type: 'warning',
@@ -238,12 +231,12 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
     span.setAttributes({
       'audio.current_state': isPlaying ? 'playing' : 'paused',
       'audio.target_state': isPlaying ? 'paused' : 'playing',
-      'audio.song.id': song?.id || 'unknown',
+      'audio.song.publicId': song?.publicId || 'unknown',
     });
 
     if (isPlaying) {
       audioPauseCounter.add(1, {
-        song_id: song?.id || 'unknown',
+        song_id: song?.publicId || 'unknown',
         current_time: audioRef.current?.currentTime?.toString() || '0',
       });
       setIsPlaying(false);
@@ -254,7 +247,7 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
     } else {
       span.setAttributes({
         'audio.action_taken': 'none',
-        'audio.reason': 'not_ready'
+        'audio.reason': 'not_ready',
       });
     }
 
@@ -300,7 +293,7 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
             const bufferDuration = performance.now() - bufferStartTime;
             audioBufferingHistogram.record(bufferDuration, {
               buffer_percentage: Math.round(bufferPercentage).toString(),
-              song_id: song?.id || 'unknown',
+              song_id: song?.publicId || 'unknown',
             });
             setBufferStartTime(null);
           }
@@ -354,7 +347,7 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
       if (loadStartTime) {
         const loadDuration = performance.now() - loadStartTime;
         audioLoadDurationHistogram.record(loadDuration, {
-          song_id: song?.id || 'unknown',
+          song_id: song?.publicId || 'unknown',
           song_title: song?.title || 'unknown',
         });
         setLoadStartTime(null);
@@ -363,7 +356,7 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
       span.setAttributes({
         'audio.ready_state': audioRef.current?.readyState || 0,
         'audio.duration': audioRef.current?.duration || 0,
-        'audio.song.id': song?.id || 'unknown',
+        'audio.song.publicId': song?.publicId || 'unknown',
       });
 
       setIsReady(true);
@@ -393,10 +386,7 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
         'audio.volume_percent': currentVolume,
       });
 
-      audioVolumeHistogram.record(currentVolume, {
-        song_id: song?.id || 'unknown',
-        muted: isMuted.toString(),
-      });
+      audioVolumeHistogram.record(currentVolume);
 
       audioRef.current.volume = newVolume;
       span.end();
@@ -440,11 +430,7 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
   useEffect(() => {
     if (isPlaying && isReady) {
       playWithContextResume().catch((e) => {
-        errorCounter.add(1, {
-          type: 'audio_autoplay_failed',
-          message: e?.message ?? 'Unable to autoplay song',
-          song_id: song?.id || 'unknown',
-        });
+        errorCounter.add(1, { description: 'Unable to autoplay song' });
 
         dispatch(createNotification({
           type: 'error',
@@ -474,7 +460,7 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
       span.setAttributes({
         'audio.source.previous': audioRef.current.src || 'none',
         'audio.source.new': authenticatedSource,
-        'audio.song.id': song?.id || 'unknown',
+        'audio.song.publicId': song?.publicId || 'unknown',
         'audio.song.title': song?.title || 'unknown',
       });
 
@@ -491,15 +477,16 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
     audioRef.current.volume = volume / 100;
     audioRef.current.preload = 'auto';
 
-    // @ts-ignore
+
     audioRef.current.ondurationchange = (e) => {
+      // @ts-ignore
       const duration = e.currentTarget.duration;
       setDuration(duration);
 
       const durationSpan = tracer.startSpan('audio_duration_change');
       durationSpan.setAttributes({
         'audio.duration': duration,
-        'audio.song.id': song?.id || 'unknown',
+        'audio.song.publicId': song?.publicId || 'unknown',
       });
       durationSpan.end();
     };
@@ -521,11 +508,7 @@ export function AudioPlayerContextProvider({ children }: { children: React.React
           'audio.autoplay.error': error.message,
         });
 
-        errorCounter.add(1, {
-          type: 'audio_autoplay_failed',
-          message: error.message,
-          song_id: song?.id || 'unknown',
-        });
+        errorCounter.add(1, { description: 'Unable to autoplay song' });
       });
     }
 

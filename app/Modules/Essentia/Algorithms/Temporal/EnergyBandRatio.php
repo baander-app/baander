@@ -519,6 +519,6 @@ class EnergyBandRatio extends BaseAlgorithm
     private function getValidParameters(): array
     {
         // Return algorithm-specific valid parameters
-        return [];
+        return ['sampleRate', 'startFrequency', 'stopFrequency'];
     }
 }

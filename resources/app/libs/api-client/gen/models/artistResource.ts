@@ -11,6 +11,15 @@ Implemented queuing functionality through Redis offers efficient job management 
 The media information is organized and easily searchable, ensuring users can always find what they are looking for quickly and easily.
  * OpenAPI spec version: 0.0.1
  */
+import type { ArtistResourceSortName } from "./artistResourceSortName";
+import type { ArtistResourceCountry } from "./artistResourceCountry";
+import type { ArtistResourceType } from "./artistResourceType";
+import type { ArtistResourceLifeSpanBegin } from "./artistResourceLifeSpanBegin";
+import type { ArtistResourceLifeSpanEnd } from "./artistResourceLifeSpanEnd";
+import type { ArtistResourceDisambiguation } from "./artistResourceDisambiguation";
+import type { ArtistResourceMbid } from "./artistResourceMbid";
+import type { ArtistResourceDiscogsId } from "./artistResourceDiscogsId";
+import type { ArtistResourceSpotifyId } from "./artistResourceSpotifyId";
 import type { ArtistResourceCreatedAt } from "./artistResourceCreatedAt";
 import type { ArtistResourceUpdatedAt } from "./artistResourceUpdatedAt";
 import type { ImageResource } from "./imageResource";
@@ -18,6 +27,15 @@ import type { ImageResource } from "./imageResource";
 export interface ArtistResource {
   publicId: string;
   name: string;
+  sortName: ArtistResourceSortName;
+  country: ArtistResourceCountry;
+  type: ArtistResourceType;
+  lifeSpanBegin: ArtistResourceLifeSpanBegin;
+  lifeSpanEnd: ArtistResourceLifeSpanEnd;
+  disambiguation: ArtistResourceDisambiguation;
+  mbid: ArtistResourceMbid;
+  discogsId: ArtistResourceDiscogsId;
+  spotifyId: ArtistResourceSpotifyId;
   createdAt: ArtistResourceCreatedAt;
   updatedAt: ArtistResourceUpdatedAt;
   /** Portrait relation */

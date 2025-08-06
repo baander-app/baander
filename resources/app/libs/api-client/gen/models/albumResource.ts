@@ -12,6 +12,15 @@ The media information is organized and easily searchable, ensuring users can alw
  * OpenAPI spec version: 0.0.1
  */
 import type { AlbumResourceYear } from "./albumResourceYear";
+import type { AlbumType } from "./albumType";
+import type { AlbumResourceLabel } from "./albumResourceLabel";
+import type { AlbumResourceCatalogNumber } from "./albumResourceCatalogNumber";
+import type { AlbumResourceBarcode } from "./albumResourceBarcode";
+import type { AlbumResourceCountry } from "./albumResourceCountry";
+import type { AlbumResourceLanguage } from "./albumResourceLanguage";
+import type { AlbumResourceDisambiguation } from "./albumResourceDisambiguation";
+import type { AlbumResourceAnnotation } from "./albumResourceAnnotation";
+import type { AlbumResourceSpotifyId } from "./albumResourceSpotifyId";
 import type { AlbumResourceMbid } from "./albumResourceMbid";
 import type { AlbumResourceDiscogsId } from "./albumResourceDiscogsId";
 import type { AlbumResourceCreatedAt } from "./albumResourceCreatedAt";
@@ -25,6 +34,15 @@ export interface AlbumResource {
   publicId: string;
   title: string;
   year: AlbumResourceYear;
+  type: AlbumType;
+  label: AlbumResourceLabel;
+  catalogNumber: AlbumResourceCatalogNumber;
+  barcode: AlbumResourceBarcode;
+  country: AlbumResourceCountry;
+  language: AlbumResourceLanguage;
+  disambiguation: AlbumResourceDisambiguation;
+  annotation: AlbumResourceAnnotation;
+  spotifyId: AlbumResourceSpotifyId;
   mbid: AlbumResourceMbid;
   discogsId: AlbumResourceDiscogsId;
   createdAt: AlbumResourceCreatedAt;

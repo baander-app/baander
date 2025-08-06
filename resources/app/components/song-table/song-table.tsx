@@ -115,11 +115,11 @@ export function SongTable({
 
   const handleSongClick = useCallback((publicId: string) => {
     const newQueue = [...songs];
-    const index = newQueue.findIndex(x => x.public_id === publicId);
+    const index = newQueue.findIndex(x => x.publicId === publicId);
     newQueue.splice(0, 0, newQueue.splice(index, 1)[0]);
     dispatch(setQueueAndSong({
       queue: newQueue,
-      playPublicId: newQueue[0].public_id,
+      playPublicId: newQueue[0].publicId,
     }));
   }, [dispatch, songs]);
 
@@ -215,7 +215,7 @@ function VirtualizedRows({ visibleRows, onSongClick }: VirtualizedRowsProps) {
       {visibleRows.map(({ virtualRow, row }) => (
         <tr
           key={row.id}
-          onClick={() => onSongClick(row.original.public_id)}
+          onClick={() => onSongClick(row.original.publicId)}
           className={`${styles.listItem} ${styles.virtualizedRow}`}
           style={{
             height: `${virtualRow.size}px`,
@@ -236,7 +236,7 @@ function VirtualizedRows({ visibleRows, onSongClick }: VirtualizedRowsProps) {
 
 function SongTitleCell({ song }: SongTitleCellProps) {
   const { currentSongPublicId } = useAppSelector(state => state.musicPlayer);
-  const isCurrentSong = currentSongPublicId === song.public_id;
+  const isCurrentSong = currentSongPublicId === song.publicId;
 
   return (
     <div className={styles.titleCell}>

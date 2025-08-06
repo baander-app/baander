@@ -12,14 +12,4 @@ The media information is organized and easily searchable, ensuring users can alw
  * OpenAPI spec version: 0.0.1
  */
 
-export interface ImageResource {
-  publicId: string;
-  path: string;
-  extension: string;
-  size: number;
-  mimeType: string;
-  width: number;
-  height: number;
-  blurhash: string;
-  url: string;
-}
+export type AlbumResourceCountry = string | null;

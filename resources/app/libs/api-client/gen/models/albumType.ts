@@ -12,14 +12,22 @@ The media information is organized and easily searchable, ensuring users can alw
  * OpenAPI spec version: 0.0.1
  */
 
-export interface ImageResource {
-  publicId: string;
-  path: string;
-  extension: string;
-  size: number;
-  mimeType: string;
-  width: number;
-  height: number;
-  blurhash: string;
-  url: string;
-}
+export type AlbumType = (typeof AlbumType)[keyof typeof AlbumType];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const AlbumType = {
+  studio: "studio",
+  live: "live",
+  compilation: "compilation",
+  soundtrack: "soundtrack",
+  remix: "remix",
+  ep: "ep",
+  single: "single",
+  demo: "demo",
+  mixtape: "mixtape",
+  bootleg: "bootleg",
+  interview: "interview",
+  audiobook: "audiobook",
+  spoken_word: "spoken_word",
+  other: "other",
+} as const;

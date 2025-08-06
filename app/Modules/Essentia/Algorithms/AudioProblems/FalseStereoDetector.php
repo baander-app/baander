@@ -510,6 +510,6 @@ class FalseStereoDetector extends BaseAlgorithm
     private function getValidParameters(): array
     {
         // Return algorithm-specific valid parameters
-        return [];
+        return ['frameSize', 'hopSize', 'correlationThreshold'];
     }
 }

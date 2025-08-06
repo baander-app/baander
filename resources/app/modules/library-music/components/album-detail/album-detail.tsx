@@ -88,12 +88,12 @@ function AlbumSongs({ songs }: AlbumSongProps) {
     console.groupEnd();
 
     const newQueue = [...songs];
-    const index = newQueue.findIndex(x => x.public_id === song.public_id);
+    const index = newQueue.findIndex(x => x.publicId === song.publicId);
     newQueue.splice(0, 0, newQueue.splice(index, 1)[0]);
 
     dispatch(setQueueAndSong({
       queue: newQueue,
-      playPublicId: song.public_id,
+      playPublicId: song.publicId,
     }));
   }, [dispatch]);
 
@@ -102,7 +102,7 @@ function AlbumSongs({ songs }: AlbumSongProps) {
     <TrackRow
       className={styles.trackRow}
       song={song}
-      key={song.public_id}
+      key={song.publicId}
       onClick={() => {
         onSongClick(song, songs);
       }}

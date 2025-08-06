@@ -11,6 +11,7 @@ Implemented queuing functionality through Redis offers efficient job management 
 The media information is organized and easily searchable, ensuring users can always find what they are looking for quickly and easily.
  * OpenAPI spec version: 0.0.1
  */
+import type { UserResourceIsAdmin } from "./userResourceIsAdmin";
 import type { UserResourceCreatedAt } from "./userResourceCreatedAt";
 import type { UserResourceUpdatedAt } from "./userResourceUpdatedAt";
 
@@ -18,7 +19,7 @@ export interface UserResource {
   publicId: string;
   name: string;
   email: string;
-  isAdmin: boolean;
+  isAdmin: UserResourceIsAdmin;
   createdAt: UserResourceCreatedAt;
   updatedAt: UserResourceUpdatedAt;
 }

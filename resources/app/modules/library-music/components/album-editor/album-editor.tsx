@@ -166,20 +166,20 @@ export function AlbumEditor({ album, librarySlug, onSubmit, onCancel }: AlbumEdi
           )}
         </Form.Field>
 
-        <Form.Field name="discogs_id">
+        <Form.Field name="discogsId">
           <Form.Label>Discogs ID</Form.Label>
           <Form.Control asChild>
             <TextField.Root
               type="number"
-              {...register('discogs_id', {
+              {...register('discogsId', {
                 min: { value: 0, message: 'Discogs ID must be positive' },
                 max: { value: 999999999999, message: 'Discogs ID is too large' }
               })}
               placeholder="Discogs ID"
             />
           </Form.Control>
-          {errors.discogs_id && (
-            <Form.Message>{errors.discogs_id.message}</Form.Message>
+          {errors.discogsId && (
+            <Form.Message>{errors.discogsId.message}</Form.Message>
           )}
         </Form.Field>
 

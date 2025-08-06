@@ -84,8 +84,8 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
                 $this->queueProgressChunk($fileCount, self::BATCH_SIZE);
             }
         });
-        
-        
+
+
         $this->getLogger()->info('Saving remaining songs');
 
         if (!empty($songs)) {
@@ -231,15 +231,15 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         }
 
         return [
-            'title'         => $mediaMeta->getTitle() ?? $file->getBasename() ?? LocaleString::delimitString('library.song.unknown'),
-            'track'         => $mediaMeta->getTrackNumber(),
-            'length'        => $mediaMeta->probeLength(),
-            'lyrics'        => $lyric ? StrExt::convertToUtf8($lyric) : null,
-            'path'          => $file->getRealPath(),
-            'mime_type'     => $mediaMeta->getMimeType(),
-            'modified_time' => $file->getMTime(),
-            'size'          => is_int($file->getSize()) ? $file->getSize() : 0,
-            'hash'          => $hash,
+            'title'     => $mediaMeta->getTitle() ?? $file->getBasename() ?? LocaleString::delimitString('library.song.unknown'),
+            'track'     => $mediaMeta->getTrackNumber(),
+            'length'    => $mediaMeta->probeLength(),
+            'lyrics'    => $lyric ? StrExt::convertToUtf8($lyric) : null,
+            'path'      => $file->getRealPath(),
+            'mime_type' => $mediaMeta->getMimeType(),
+            'size'      => is_int($file->getSize()) ? $file->getSize() : 0,
+            'hash'      => $hash,
+            'comment'   => $mediaMeta->getComment(),
         ];
     }
 

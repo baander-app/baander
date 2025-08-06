@@ -528,6 +528,6 @@ class Larm extends BaseAlgorithm
     private function getValidParameters(): array
     {
         // Return algorithm-specific valid parameters
-        return [];
+        return ['attackTime', 'power', 'releaseTime', 'sampleRate'];
     }
 }

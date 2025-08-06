@@ -69,14 +69,14 @@ export default function Albums() {
           {data?.data && (
             <>
               {data.data.map((album) => (
-                <div className={styles.album} key={album.slug}>
+                <div className={styles.album} key={album.publicId}>
                   <ContextMenu.Root>
                     <ContextMenu.Trigger>
                       <Album
                         title={album.title}
                         primaryArtist={album?.artists?.map(x => x.name).join(',') ?? 'Unknown'}
                         imgSrc={album?.cover?.url ?? undefined}
-                        onClick={() => setShowAlbumDetail(album.slug)}
+                        onClick={() => setShowAlbumDetail(album.publicId)}
                       />
                     </ContextMenu.Trigger>
 

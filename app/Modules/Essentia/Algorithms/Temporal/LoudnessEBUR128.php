@@ -555,6 +555,6 @@ class LoudnessEBUR128 extends BaseAlgorithm
     private function getValidParameters(): array
     {
         // Return algorithm-specific valid parameters
-        return [];
+        return ['hopSize', 'sampleRate', 'startAtZero'];
     }
 }

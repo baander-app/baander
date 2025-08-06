@@ -35,7 +35,7 @@ export default function Songs() {
     if (albumData) {
       const items = albumData.data.map(x => ({
         label: x.title,
-        key: x.slug,
+        key: x.publicId,
       }));
 
       setAlbums(items);
@@ -49,7 +49,7 @@ export default function Songs() {
     if (artistData) {
       const items = artistData.data.map(x => ({
         label: x.name,
-        key: x.slug,
+        key: x.publicId,
       }));
       setArtists(items);
     }

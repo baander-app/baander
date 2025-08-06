@@ -522,6 +522,6 @@ class Envelope extends BaseAlgorithm
     private function getValidParameters(): array
     {
         // Return algorithm-specific valid parameters
-        return ['attackTime', 'releaseTime', 'sampleRate'];
+        return ['applyRectification', 'attackTime', 'releaseTime', 'sampleRate'];
     }
 }

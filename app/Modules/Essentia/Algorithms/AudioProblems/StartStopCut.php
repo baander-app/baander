@@ -540,6 +540,6 @@ class StartStopCut extends BaseAlgorithm
     private function getValidParameters(): array
     {
         // Return algorithm-specific valid parameters
-        return [];
+        return ['frameSize', 'hopSize', 'maximumStartTime', 'maximumStopTime', 'sampleRate', 'threshold'];
     }
 }
