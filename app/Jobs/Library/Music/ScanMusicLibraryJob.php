@@ -38,9 +38,7 @@ class ScanMusicLibraryJob extends BaseJob implements ShouldQueue, ShouldBeUnique
         $this->library->updateLastScan();
         $path = $this->library->path;
 
-        // Get all subdirectories and include the root directory
-        $directories = LazyCollection::make(File::directories($path))
-            ->concat([$path]);
+        $directories = LazyCollection::make(File::directories($path));
 
         $this->getLogger()->info('Found ' . $directories->count() . ' directories in ' . $path);
 
