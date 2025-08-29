@@ -33,6 +33,8 @@
 - [Using XDebug](/docs/xdebug.md)
 - [Development artisan commands](docs/dev_artisan_commands.md)
 
+Use make help to see all available commands for the make file
+
 # Screenshots
 
 ![#login page](/docs/images/readme/page_login.png)
