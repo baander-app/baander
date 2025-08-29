@@ -41,34 +41,20 @@ import type {
   AuthenticationExceptionResponse,
   LogFile,
   LogsContent200,
-  LogsContent404,
-  LogsContent500,
   LogsContentParams,
-  LogsDownload404,
+  LogsDownload200,
   LogsHead200,
-  LogsHead404,
-  LogsHead500,
   LogsHeadParams,
   LogsLines200,
-  LogsLines404,
-  LogsLines500,
   LogsSearch200,
-  LogsSearch404,
-  LogsSearch500,
   LogsSearchAll200,
-  LogsSearchAll500,
   LogsSearchAllParams,
   LogsSearchParams,
   LogsShow200,
-  LogsShow404,
-  LogsShow500,
   LogsStats200,
-  LogsStats404,
-  LogsStats500,
   LogsTail200,
-  LogsTail404,
-  LogsTail500,
   LogsTailParams,
+  ModelNotFoundExceptionResponse,
   ValidationExceptionResponse,
 } from "../../models";
 
@@ -78,7 +64,9 @@ import type { ErrorType } from "../../../axios-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * @summary Get a collection of log files
+ * Returns a sorted list of all available log files in the system
+with metadata including file sizes, modification dates, and identifiers.
+ * @summary Get a collection of available log files
  */
 export const logsIndex = (
   options?: SecondParameter<typeof customInstance>,
@@ -199,7 +187,7 @@ export function useLogsIndexInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of log files
+ * @summary Get a collection of available log files
  */
 
 export function useLogsIndexInfinite<
@@ -322,7 +310,7 @@ export function useLogsIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of log files
+ * @summary Get a collection of available log files
  */
 
 export function useLogsIndex<
@@ -440,7 +428,7 @@ export function useLogsIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of log files
+ * @summary Get a collection of available log files
  */
 
 export function useLogsIndexSuspense<
@@ -568,7 +556,7 @@ export function useLogsIndexSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of log files
+ * @summary Get a collection of available log files
  */
 
 export function useLogsIndexSuspenseInfinite<
@@ -604,7 +592,9 @@ export function useLogsIndexSuspenseInfinite<
 }
 
 /**
- * @summary Show a log file
+ * Returns comprehensive metadata about a log file including file statistics,
+line counts, size information, and performance characteristics.
+ * @summary Get detailed information about a specific log file
  */
 export const logsShow = (
   logFile: string,
@@ -624,7 +614,7 @@ export const getLogsShowQueryKey = (logFile?: string) => {
 export const getLogsShowInfiniteQueryOptions = <
   TData = InfiniteData<Awaited<ReturnType<typeof logsShow>>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
   logFile: string,
@@ -663,13 +653,13 @@ export type LogsShowInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsShow>>
 >;
 export type LogsShowInfiniteQueryError = ErrorType<
-  AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+  AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
 >;
 
 export function useLogsShowInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsShow>>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
   logFile: string,
@@ -698,7 +688,7 @@ export function useLogsShowInfinite<
 export function useLogsShowInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsShow>>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
   logFile: string,
@@ -727,7 +717,7 @@ export function useLogsShowInfinite<
 export function useLogsShowInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsShow>>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
   logFile: string,
@@ -746,13 +736,13 @@ export function useLogsShowInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Show a log file
+ * @summary Get detailed information about a specific log file
  */
 
 export function useLogsShowInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsShow>>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
   logFile: string,
@@ -787,7 +777,7 @@ export function useLogsShowInfinite<
 export const getLogsShowQueryOptions = <
   TData = Awaited<ReturnType<typeof logsShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
   logFile: string,
@@ -820,13 +810,13 @@ export type LogsShowQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsShow>>
 >;
 export type LogsShowQueryError = ErrorType<
-  AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+  AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
 >;
 
 export function useLogsShow<
   TData = Awaited<ReturnType<typeof logsShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
   logFile: string,
@@ -851,7 +841,7 @@ export function useLogsShow<
 export function useLogsShow<
   TData = Awaited<ReturnType<typeof logsShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
   logFile: string,
@@ -876,7 +866,7 @@ export function useLogsShow<
 export function useLogsShow<
   TData = Awaited<ReturnType<typeof logsShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
   logFile: string,
@@ -891,13 +881,13 @@ export function useLogsShow<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Show a log file
+ * @summary Get detailed information about a specific log file
  */
 
 export function useLogsShow<
   TData = Awaited<ReturnType<typeof logsShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
   logFile: string,
@@ -926,7 +916,7 @@ export function useLogsShow<
 export const getLogsShowSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof logsShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
   logFile: string,
@@ -960,13 +950,13 @@ export type LogsShowSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsShow>>
 >;
 export type LogsShowSuspenseQueryError = ErrorType<
-  AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+  AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
 >;
 
 export function useLogsShowSuspense<
   TData = Awaited<ReturnType<typeof logsShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
   logFile: string,
@@ -987,7 +977,7 @@ export function useLogsShowSuspense<
 export function useLogsShowSuspense<
   TData = Awaited<ReturnType<typeof logsShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
   logFile: string,
@@ -1008,7 +998,7 @@ export function useLogsShowSuspense<
 export function useLogsShowSuspense<
   TData = Awaited<ReturnType<typeof logsShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
   logFile: string,
@@ -1027,13 +1017,13 @@ export function useLogsShowSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Show a log file
+ * @summary Get detailed information about a specific log file
  */
 
 export function useLogsShowSuspense<
   TData = Awaited<ReturnType<typeof logsShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
   logFile: string,
@@ -1068,7 +1058,7 @@ export function useLogsShowSuspense<
 export const getLogsShowSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<Awaited<ReturnType<typeof logsShow>>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
   logFile: string,
@@ -1106,13 +1096,13 @@ export type LogsShowSuspenseInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsShow>>
 >;
 export type LogsShowSuspenseInfiniteQueryError = ErrorType<
-  AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+  AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
 >;
 
 export function useLogsShowSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsShow>>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
   logFile: string,
@@ -1133,7 +1123,7 @@ export function useLogsShowSuspenseInfinite<
 export function useLogsShowSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsShow>>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
   logFile: string,
@@ -1154,7 +1144,7 @@ export function useLogsShowSuspenseInfinite<
 export function useLogsShowSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsShow>>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
   logFile: string,
@@ -1173,13 +1163,13 @@ export function useLogsShowSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Show a log file
+ * @summary Get detailed information about a specific log file
  */
 
 export function useLogsShowSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsShow>>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | LogsShow404 | LogsShow500
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
 >(
   logFile: string,
@@ -1215,7 +1205,9 @@ export function useLogsShowSuspenseInfinite<
 }
 
 /**
- * @summary Get log file content
+ * Retrieves log file content starting from a specific line number
+with configurable line limits for efficient pagination through large files.
+ * @summary Get paginated content from a log file
  */
 export const logsContent = (
   logFile: string,
@@ -1242,10 +1234,7 @@ export const getLogsContentInfiniteQueryOptions = <
     LogsContentParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsContent404
-    | ValidationExceptionResponse
-    | LogsContent500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -1298,10 +1287,7 @@ export type LogsContentInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsContent>>
 >;
 export type LogsContentInfiniteQueryError = ErrorType<
-  | AuthenticationExceptionResponse
-  | LogsContent404
-  | ValidationExceptionResponse
-  | LogsContent500
+  AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useLogsContentInfinite<
@@ -1310,10 +1296,7 @@ export function useLogsContentInfinite<
     LogsContentParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsContent404
-    | ValidationExceptionResponse
-    | LogsContent500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -1349,10 +1332,7 @@ export function useLogsContentInfinite<
     LogsContentParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsContent404
-    | ValidationExceptionResponse
-    | LogsContent500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -1388,10 +1368,7 @@ export function useLogsContentInfinite<
     LogsContentParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsContent404
-    | ValidationExceptionResponse
-    | LogsContent500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -1413,7 +1390,7 @@ export function useLogsContentInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get log file content
+ * @summary Get paginated content from a log file
  */
 
 export function useLogsContentInfinite<
@@ -1422,10 +1399,7 @@ export function useLogsContentInfinite<
     LogsContentParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsContent404
-    | ValidationExceptionResponse
-    | LogsContent500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -1467,10 +1441,7 @@ export function useLogsContentInfinite<
 export const getLogsContentQueryOptions = <
   TData = Awaited<ReturnType<typeof logsContent>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsContent404
-    | ValidationExceptionResponse
-    | LogsContent500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -1507,19 +1478,13 @@ export type LogsContentQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsContent>>
 >;
 export type LogsContentQueryError = ErrorType<
-  | AuthenticationExceptionResponse
-  | LogsContent404
-  | ValidationExceptionResponse
-  | LogsContent500
+  AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useLogsContent<
   TData = Awaited<ReturnType<typeof logsContent>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsContent404
-    | ValidationExceptionResponse
-    | LogsContent500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -1545,10 +1510,7 @@ export function useLogsContent<
 export function useLogsContent<
   TData = Awaited<ReturnType<typeof logsContent>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsContent404
-    | ValidationExceptionResponse
-    | LogsContent500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -1574,10 +1536,7 @@ export function useLogsContent<
 export function useLogsContent<
   TData = Awaited<ReturnType<typeof logsContent>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsContent404
-    | ValidationExceptionResponse
-    | LogsContent500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -1593,16 +1552,13 @@ export function useLogsContent<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get log file content
+ * @summary Get paginated content from a log file
  */
 
 export function useLogsContent<
   TData = Awaited<ReturnType<typeof logsContent>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsContent404
-    | ValidationExceptionResponse
-    | LogsContent500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -1632,10 +1588,7 @@ export function useLogsContent<
 export const getLogsContentSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof logsContent>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsContent404
-    | ValidationExceptionResponse
-    | LogsContent500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -1671,19 +1624,13 @@ export type LogsContentSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsContent>>
 >;
 export type LogsContentSuspenseQueryError = ErrorType<
-  | AuthenticationExceptionResponse
-  | LogsContent404
-  | ValidationExceptionResponse
-  | LogsContent500
+  AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useLogsContentSuspense<
   TData = Awaited<ReturnType<typeof logsContent>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsContent404
-    | ValidationExceptionResponse
-    | LogsContent500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -1705,10 +1652,7 @@ export function useLogsContentSuspense<
 export function useLogsContentSuspense<
   TData = Awaited<ReturnType<typeof logsContent>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsContent404
-    | ValidationExceptionResponse
-    | LogsContent500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -1730,10 +1674,7 @@ export function useLogsContentSuspense<
 export function useLogsContentSuspense<
   TData = Awaited<ReturnType<typeof logsContent>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsContent404
-    | ValidationExceptionResponse
-    | LogsContent500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -1753,16 +1694,13 @@ export function useLogsContentSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get log file content
+ * @summary Get paginated content from a log file
  */
 
 export function useLogsContentSuspense<
   TData = Awaited<ReturnType<typeof logsContent>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsContent404
-    | ValidationExceptionResponse
-    | LogsContent500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -1805,10 +1743,7 @@ export const getLogsContentSuspenseInfiniteQueryOptions = <
     LogsContentParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsContent404
-    | ValidationExceptionResponse
-    | LogsContent500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -1860,10 +1795,7 @@ export type LogsContentSuspenseInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsContent>>
 >;
 export type LogsContentSuspenseInfiniteQueryError = ErrorType<
-  | AuthenticationExceptionResponse
-  | LogsContent404
-  | ValidationExceptionResponse
-  | LogsContent500
+  AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useLogsContentSuspenseInfinite<
@@ -1872,10 +1804,7 @@ export function useLogsContentSuspenseInfinite<
     LogsContentParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsContent404
-    | ValidationExceptionResponse
-    | LogsContent500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -1902,10 +1831,7 @@ export function useLogsContentSuspenseInfinite<
     LogsContentParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsContent404
-    | ValidationExceptionResponse
-    | LogsContent500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -1932,10 +1858,7 @@ export function useLogsContentSuspenseInfinite<
     LogsContentParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsContent404
-    | ValidationExceptionResponse
-    | LogsContent500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -1957,7 +1880,7 @@ export function useLogsContentSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get log file content
+ * @summary Get paginated content from a log file
  */
 
 export function useLogsContentSuspenseInfinite<
@@ -1966,10 +1889,7 @@ export function useLogsContentSuspenseInfinite<
     LogsContentParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsContent404
-    | ValidationExceptionResponse
-    | LogsContent500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -2009,7 +1929,9 @@ export function useLogsContentSuspenseInfinite<
 }
 
 /**
- * @summary Count log file lines
+ * Returns the total line count for a log file using optimized counting
+algorithms that can handle very large files efficiently.
+ * @summary Count total lines in a log file
  */
 export const logsLines = (
   logFile: string,
@@ -2028,9 +1950,7 @@ export const getLogsLinesQueryKey = (logFile?: string) => {
 
 export const getLogsLinesInfiniteQueryOptions = <
   TData = InfiniteData<Awaited<ReturnType<typeof logsLines>>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsLines404 | LogsLines500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -2067,15 +1987,12 @@ export const getLogsLinesInfiniteQueryOptions = <
 export type LogsLinesInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsLines>>
 >;
-export type LogsLinesInfiniteQueryError = ErrorType<
-  AuthenticationExceptionResponse | LogsLines404 | LogsLines500
->;
+export type LogsLinesInfiniteQueryError =
+  ErrorType<AuthenticationExceptionResponse>;
 
 export function useLogsLinesInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsLines>>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsLines404 | LogsLines500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options: {
@@ -2102,9 +2019,7 @@ export function useLogsLinesInfinite<
 };
 export function useLogsLinesInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsLines>>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsLines404 | LogsLines500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -2131,9 +2046,7 @@ export function useLogsLinesInfinite<
 };
 export function useLogsLinesInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsLines>>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsLines404 | LogsLines500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -2151,14 +2064,12 @@ export function useLogsLinesInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Count log file lines
+ * @summary Count total lines in a log file
  */
 
 export function useLogsLinesInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsLines>>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsLines404 | LogsLines500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -2191,9 +2102,7 @@ export function useLogsLinesInfinite<
 
 export const getLogsLinesQueryOptions = <
   TData = Awaited<ReturnType<typeof logsLines>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsLines404 | LogsLines500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -2224,15 +2133,11 @@ export const getLogsLinesQueryOptions = <
 export type LogsLinesQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsLines>>
 >;
-export type LogsLinesQueryError = ErrorType<
-  AuthenticationExceptionResponse | LogsLines404 | LogsLines500
->;
+export type LogsLinesQueryError = ErrorType<AuthenticationExceptionResponse>;
 
 export function useLogsLines<
   TData = Awaited<ReturnType<typeof logsLines>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsLines404 | LogsLines500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options: {
@@ -2255,9 +2160,7 @@ export function useLogsLines<
 };
 export function useLogsLines<
   TData = Awaited<ReturnType<typeof logsLines>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsLines404 | LogsLines500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -2280,9 +2183,7 @@ export function useLogsLines<
 };
 export function useLogsLines<
   TData = Awaited<ReturnType<typeof logsLines>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsLines404 | LogsLines500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -2296,14 +2197,12 @@ export function useLogsLines<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Count log file lines
+ * @summary Count total lines in a log file
  */
 
 export function useLogsLines<
   TData = Awaited<ReturnType<typeof logsLines>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsLines404 | LogsLines500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -2330,9 +2229,7 @@ export function useLogsLines<
 
 export const getLogsLinesSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof logsLines>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsLines404 | LogsLines500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -2364,15 +2261,12 @@ export const getLogsLinesSuspenseQueryOptions = <
 export type LogsLinesSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsLines>>
 >;
-export type LogsLinesSuspenseQueryError = ErrorType<
-  AuthenticationExceptionResponse | LogsLines404 | LogsLines500
->;
+export type LogsLinesSuspenseQueryError =
+  ErrorType<AuthenticationExceptionResponse>;
 
 export function useLogsLinesSuspense<
   TData = Awaited<ReturnType<typeof logsLines>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsLines404 | LogsLines500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options: {
@@ -2391,9 +2285,7 @@ export function useLogsLinesSuspense<
 };
 export function useLogsLinesSuspense<
   TData = Awaited<ReturnType<typeof logsLines>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsLines404 | LogsLines500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -2412,9 +2304,7 @@ export function useLogsLinesSuspense<
 };
 export function useLogsLinesSuspense<
   TData = Awaited<ReturnType<typeof logsLines>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsLines404 | LogsLines500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -2432,14 +2322,12 @@ export function useLogsLinesSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Count log file lines
+ * @summary Count total lines in a log file
  */
 
 export function useLogsLinesSuspense<
   TData = Awaited<ReturnType<typeof logsLines>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsLines404 | LogsLines500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -2472,9 +2360,7 @@ export function useLogsLinesSuspense<
 
 export const getLogsLinesSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<Awaited<ReturnType<typeof logsLines>>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsLines404 | LogsLines500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -2510,15 +2396,12 @@ export const getLogsLinesSuspenseInfiniteQueryOptions = <
 export type LogsLinesSuspenseInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsLines>>
 >;
-export type LogsLinesSuspenseInfiniteQueryError = ErrorType<
-  AuthenticationExceptionResponse | LogsLines404 | LogsLines500
->;
+export type LogsLinesSuspenseInfiniteQueryError =
+  ErrorType<AuthenticationExceptionResponse>;
 
 export function useLogsLinesSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsLines>>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsLines404 | LogsLines500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options: {
@@ -2537,9 +2420,7 @@ export function useLogsLinesSuspenseInfinite<
 };
 export function useLogsLinesSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsLines>>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsLines404 | LogsLines500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -2558,9 +2439,7 @@ export function useLogsLinesSuspenseInfinite<
 };
 export function useLogsLinesSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsLines>>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsLines404 | LogsLines500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -2578,14 +2457,12 @@ export function useLogsLinesSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Count log file lines
+ * @summary Count total lines in a log file
  */
 
 export function useLogsLinesSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsLines>>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsLines404 | LogsLines500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -2620,801 +2497,9 @@ export function useLogsLinesSuspenseInfinite<
 }
 
 /**
- * @summary Search log file content
- */
-export const logsSearch = (
-  logFile: string,
-  params: LogsSearchParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal
-) => {
-  return customInstance<LogsSearch200>(
-    { url: `/api/logs/${logFile}/search`, method: "GET", params, signal },
-    options
-  );
-};
-
-export const getLogsSearchQueryKey = (
-  logFile?: string,
-  params?: LogsSearchParams
-) => {
-  return [`/api/logs/${logFile}/search`, ...(params ? [params] : [])] as const;
-};
-
-export const getLogsSearchInfiniteQueryOptions = <
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof logsSearch>>,
-    LogsSearchParams["page"]
-  >,
-  TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsSearch404
-    | ValidationExceptionResponse
-    | LogsSearch500
-  >
->(
-  logFile: string,
-  params: LogsSearchParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof logsSearch>>,
-        TError,
-        TData,
-        QueryKey,
-        LogsSearchParams["page"]
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  }
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getLogsSearchQueryKey(logFile, params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof logsSearch>>,
-    QueryKey,
-    LogsSearchParams["page"]
-  > = ({ signal, pageParam }) =>
-    logsSearch(
-      logFile,
-      { ...params, page: pageParam || params?.["page"] },
-      requestOptions,
-      signal
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!logFile,
-    ...queryOptions,
-  } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof logsSearch>>,
-    TError,
-    TData,
-    QueryKey,
-    LogsSearchParams["page"]
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type LogsSearchInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof logsSearch>>
->;
-export type LogsSearchInfiniteQueryError = ErrorType<
-  | AuthenticationExceptionResponse
-  | LogsSearch404
-  | ValidationExceptionResponse
-  | LogsSearch500
->;
-
-export function useLogsSearchInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof logsSearch>>,
-    LogsSearchParams["page"]
-  >,
-  TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsSearch404
-    | ValidationExceptionResponse
-    | LogsSearch500
-  >
->(
-  logFile: string,
-  params: LogsSearchParams,
-  options: {
-    query: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof logsSearch>>,
-        TError,
-        TData,
-        QueryKey,
-        LogsSearchParams["page"]
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof logsSearch>>,
-          TError,
-          Awaited<ReturnType<typeof logsSearch>>,
-          QueryKey
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient
-): DefinedUseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useLogsSearchInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof logsSearch>>,
-    LogsSearchParams["page"]
-  >,
-  TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsSearch404
-    | ValidationExceptionResponse
-    | LogsSearch500
-  >
->(
-  logFile: string,
-  params: LogsSearchParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof logsSearch>>,
-        TError,
-        TData,
-        QueryKey,
-        LogsSearchParams["page"]
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof logsSearch>>,
-          TError,
-          Awaited<ReturnType<typeof logsSearch>>,
-          QueryKey
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useLogsSearchInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof logsSearch>>,
-    LogsSearchParams["page"]
-  >,
-  TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsSearch404
-    | ValidationExceptionResponse
-    | LogsSearch500
-  >
->(
-  logFile: string,
-  params: LogsSearchParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof logsSearch>>,
-        TError,
-        TData,
-        QueryKey,
-        LogsSearchParams["page"]
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Search log file content
- */
-
-export function useLogsSearchInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof logsSearch>>,
-    LogsSearchParams["page"]
-  >,
-  TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsSearch404
-    | ValidationExceptionResponse
-    | LogsSearch500
-  >
->(
-  logFile: string,
-  params: LogsSearchParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof logsSearch>>,
-        TError,
-        TData,
-        QueryKey,
-        LogsSearchParams["page"]
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getLogsSearchInfiniteQueryOptions(
-    logFile,
-    params,
-    options
-  );
-
-  const query = useInfiniteQuery(
-    queryOptions,
-    queryClient
-  ) as UseInfiniteQueryResult<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-export const getLogsSearchQueryOptions = <
-  TData = Awaited<ReturnType<typeof logsSearch>>,
-  TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsSearch404
-    | ValidationExceptionResponse
-    | LogsSearch500
-  >
->(
-  logFile: string,
-  params: LogsSearchParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof logsSearch>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  }
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getLogsSearchQueryKey(logFile, params);
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof logsSearch>>> = ({
-    signal,
-  }) => logsSearch(logFile, params, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!logFile,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof logsSearch>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type LogsSearchQueryResult = NonNullable<
-  Awaited<ReturnType<typeof logsSearch>>
->;
-export type LogsSearchQueryError = ErrorType<
-  | AuthenticationExceptionResponse
-  | LogsSearch404
-  | ValidationExceptionResponse
-  | LogsSearch500
->;
-
-export function useLogsSearch<
-  TData = Awaited<ReturnType<typeof logsSearch>>,
-  TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsSearch404
-    | ValidationExceptionResponse
-    | LogsSearch500
-  >
->(
-  logFile: string,
-  params: LogsSearchParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof logsSearch>>, TError, TData>
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof logsSearch>>,
-          TError,
-          Awaited<ReturnType<typeof logsSearch>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useLogsSearch<
-  TData = Awaited<ReturnType<typeof logsSearch>>,
-  TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsSearch404
-    | ValidationExceptionResponse
-    | LogsSearch500
-  >
->(
-  logFile: string,
-  params: LogsSearchParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof logsSearch>>, TError, TData>
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof logsSearch>>,
-          TError,
-          Awaited<ReturnType<typeof logsSearch>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useLogsSearch<
-  TData = Awaited<ReturnType<typeof logsSearch>>,
-  TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsSearch404
-    | ValidationExceptionResponse
-    | LogsSearch500
-  >
->(
-  logFile: string,
-  params: LogsSearchParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof logsSearch>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Search log file content
- */
-
-export function useLogsSearch<
-  TData = Awaited<ReturnType<typeof logsSearch>>,
-  TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsSearch404
-    | ValidationExceptionResponse
-    | LogsSearch500
-  >
->(
-  logFile: string,
-  params: LogsSearchParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof logsSearch>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getLogsSearchQueryOptions(logFile, params, options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-export const getLogsSearchSuspenseQueryOptions = <
-  TData = Awaited<ReturnType<typeof logsSearch>>,
-  TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsSearch404
-    | ValidationExceptionResponse
-    | LogsSearch500
-  >
->(
-  logFile: string,
-  params: LogsSearchParams,
-  options?: {
-    query?: Partial<
-      UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof logsSearch>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  }
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getLogsSearchQueryKey(logFile, params);
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof logsSearch>>> = ({
-    signal,
-  }) => logsSearch(logFile, params, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
-    Awaited<ReturnType<typeof logsSearch>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type LogsSearchSuspenseQueryResult = NonNullable<
-  Awaited<ReturnType<typeof logsSearch>>
->;
-export type LogsSearchSuspenseQueryError = ErrorType<
-  | AuthenticationExceptionResponse
-  | LogsSearch404
-  | ValidationExceptionResponse
-  | LogsSearch500
->;
-
-export function useLogsSearchSuspense<
-  TData = Awaited<ReturnType<typeof logsSearch>>,
-  TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsSearch404
-    | ValidationExceptionResponse
-    | LogsSearch500
-  >
->(
-  logFile: string,
-  params: LogsSearchParams,
-  options: {
-    query: Partial<
-      UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof logsSearch>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient
-): UseSuspenseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useLogsSearchSuspense<
-  TData = Awaited<ReturnType<typeof logsSearch>>,
-  TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsSearch404
-    | ValidationExceptionResponse
-    | LogsSearch500
-  >
->(
-  logFile: string,
-  params: LogsSearchParams,
-  options?: {
-    query?: Partial<
-      UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof logsSearch>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient
-): UseSuspenseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useLogsSearchSuspense<
-  TData = Awaited<ReturnType<typeof logsSearch>>,
-  TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsSearch404
-    | ValidationExceptionResponse
-    | LogsSearch500
-  >
->(
-  logFile: string,
-  params: LogsSearchParams,
-  options?: {
-    query?: Partial<
-      UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof logsSearch>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient
-): UseSuspenseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Search log file content
- */
-
-export function useLogsSearchSuspense<
-  TData = Awaited<ReturnType<typeof logsSearch>>,
-  TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsSearch404
-    | ValidationExceptionResponse
-    | LogsSearch500
-  >
->(
-  logFile: string,
-  params: LogsSearchParams,
-  options?: {
-    query?: Partial<
-      UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof logsSearch>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient
-): UseSuspenseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getLogsSearchSuspenseQueryOptions(
-    logFile,
-    params,
-    options
-  );
-
-  const query = useSuspenseQuery(
-    queryOptions,
-    queryClient
-  ) as UseSuspenseQueryResult<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-export const getLogsSearchSuspenseInfiniteQueryOptions = <
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof logsSearch>>,
-    LogsSearchParams["page"]
-  >,
-  TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsSearch404
-    | ValidationExceptionResponse
-    | LogsSearch500
-  >
->(
-  logFile: string,
-  params: LogsSearchParams,
-  options?: {
-    query?: Partial<
-      UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof logsSearch>>,
-        TError,
-        TData,
-        QueryKey,
-        LogsSearchParams["page"]
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  }
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getLogsSearchQueryKey(logFile, params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof logsSearch>>,
-    QueryKey,
-    LogsSearchParams["page"]
-  > = ({ signal, pageParam }) =>
-    logsSearch(
-      logFile,
-      { ...params, page: pageParam || params?.["page"] },
-      requestOptions,
-      signal
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    ...queryOptions,
-  } as UseSuspenseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof logsSearch>>,
-    TError,
-    TData,
-    QueryKey,
-    LogsSearchParams["page"]
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type LogsSearchSuspenseInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof logsSearch>>
->;
-export type LogsSearchSuspenseInfiniteQueryError = ErrorType<
-  | AuthenticationExceptionResponse
-  | LogsSearch404
-  | ValidationExceptionResponse
-  | LogsSearch500
->;
-
-export function useLogsSearchSuspenseInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof logsSearch>>,
-    LogsSearchParams["page"]
-  >,
-  TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsSearch404
-    | ValidationExceptionResponse
-    | LogsSearch500
-  >
->(
-  logFile: string,
-  params: LogsSearchParams,
-  options: {
-    query: Partial<
-      UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof logsSearch>>,
-        TError,
-        TData,
-        QueryKey,
-        LogsSearchParams["page"]
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient
-): UseSuspenseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useLogsSearchSuspenseInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof logsSearch>>,
-    LogsSearchParams["page"]
-  >,
-  TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsSearch404
-    | ValidationExceptionResponse
-    | LogsSearch500
-  >
->(
-  logFile: string,
-  params: LogsSearchParams,
-  options?: {
-    query?: Partial<
-      UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof logsSearch>>,
-        TError,
-        TData,
-        QueryKey,
-        LogsSearchParams["page"]
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient
-): UseSuspenseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useLogsSearchSuspenseInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof logsSearch>>,
-    LogsSearchParams["page"]
-  >,
-  TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsSearch404
-    | ValidationExceptionResponse
-    | LogsSearch500
-  >
->(
-  logFile: string,
-  params: LogsSearchParams,
-  options?: {
-    query?: Partial<
-      UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof logsSearch>>,
-        TError,
-        TData,
-        QueryKey,
-        LogsSearchParams["page"]
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient
-): UseSuspenseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Search log file content
- */
-
-export function useLogsSearchSuspenseInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof logsSearch>>,
-    LogsSearchParams["page"]
-  >,
-  TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsSearch404
-    | ValidationExceptionResponse
-    | LogsSearch500
-  >
->(
-  logFile: string,
-  params: LogsSearchParams,
-  options?: {
-    query?: Partial<
-      UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof logsSearch>>,
-        TError,
-        TData,
-        QueryKey,
-        LogsSearchParams["page"]
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient
-): UseSuspenseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getLogsSearchSuspenseInfiniteQueryOptions(
-    logFile,
-    params,
-    options
-  );
-
-  const query = useSuspenseInfiniteQuery(
-    queryOptions,
-    queryClient
-  ) as UseSuspenseInfiniteQueryResult<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-/**
- * @summary Get log file tail
+ * Returns the most recent lines from a log file, similar to the Unix tail command.
+Useful for monitoring recent activity and debugging current issues.
+ * @summary Get the last N lines from a log file (tail functionality)
  */
 export const logsTail = (
   logFile: string,
@@ -3441,10 +2526,7 @@ export const getLogsTailInfiniteQueryOptions = <
     LogsTailParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsTail404
-    | ValidationExceptionResponse
-    | LogsTail500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -3497,10 +2579,7 @@ export type LogsTailInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsTail>>
 >;
 export type LogsTailInfiniteQueryError = ErrorType<
-  | AuthenticationExceptionResponse
-  | LogsTail404
-  | ValidationExceptionResponse
-  | LogsTail500
+  AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useLogsTailInfinite<
@@ -3509,10 +2588,7 @@ export function useLogsTailInfinite<
     LogsTailParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsTail404
-    | ValidationExceptionResponse
-    | LogsTail500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -3548,10 +2624,7 @@ export function useLogsTailInfinite<
     LogsTailParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsTail404
-    | ValidationExceptionResponse
-    | LogsTail500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -3587,10 +2660,7 @@ export function useLogsTailInfinite<
     LogsTailParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsTail404
-    | ValidationExceptionResponse
-    | LogsTail500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -3612,7 +2682,7 @@ export function useLogsTailInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get log file tail
+ * @summary Get the last N lines from a log file (tail functionality)
  */
 
 export function useLogsTailInfinite<
@@ -3621,10 +2691,7 @@ export function useLogsTailInfinite<
     LogsTailParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsTail404
-    | ValidationExceptionResponse
-    | LogsTail500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -3666,10 +2733,7 @@ export function useLogsTailInfinite<
 export const getLogsTailQueryOptions = <
   TData = Awaited<ReturnType<typeof logsTail>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsTail404
-    | ValidationExceptionResponse
-    | LogsTail500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -3704,19 +2768,13 @@ export type LogsTailQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsTail>>
 >;
 export type LogsTailQueryError = ErrorType<
-  | AuthenticationExceptionResponse
-  | LogsTail404
-  | ValidationExceptionResponse
-  | LogsTail500
+  AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useLogsTail<
   TData = Awaited<ReturnType<typeof logsTail>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsTail404
-    | ValidationExceptionResponse
-    | LogsTail500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -3742,10 +2800,7 @@ export function useLogsTail<
 export function useLogsTail<
   TData = Awaited<ReturnType<typeof logsTail>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsTail404
-    | ValidationExceptionResponse
-    | LogsTail500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -3771,10 +2826,7 @@ export function useLogsTail<
 export function useLogsTail<
   TData = Awaited<ReturnType<typeof logsTail>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsTail404
-    | ValidationExceptionResponse
-    | LogsTail500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -3790,16 +2842,13 @@ export function useLogsTail<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get log file tail
+ * @summary Get the last N lines from a log file (tail functionality)
  */
 
 export function useLogsTail<
   TData = Awaited<ReturnType<typeof logsTail>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsTail404
-    | ValidationExceptionResponse
-    | LogsTail500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -3829,10 +2878,7 @@ export function useLogsTail<
 export const getLogsTailSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof logsTail>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsTail404
-    | ValidationExceptionResponse
-    | LogsTail500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -3868,19 +2914,13 @@ export type LogsTailSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsTail>>
 >;
 export type LogsTailSuspenseQueryError = ErrorType<
-  | AuthenticationExceptionResponse
-  | LogsTail404
-  | ValidationExceptionResponse
-  | LogsTail500
+  AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useLogsTailSuspense<
   TData = Awaited<ReturnType<typeof logsTail>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsTail404
-    | ValidationExceptionResponse
-    | LogsTail500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -3902,10 +2942,7 @@ export function useLogsTailSuspense<
 export function useLogsTailSuspense<
   TData = Awaited<ReturnType<typeof logsTail>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsTail404
-    | ValidationExceptionResponse
-    | LogsTail500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -3927,10 +2964,7 @@ export function useLogsTailSuspense<
 export function useLogsTailSuspense<
   TData = Awaited<ReturnType<typeof logsTail>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsTail404
-    | ValidationExceptionResponse
-    | LogsTail500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -3950,16 +2984,13 @@ export function useLogsTailSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get log file tail
+ * @summary Get the last N lines from a log file (tail functionality)
  */
 
 export function useLogsTailSuspense<
   TData = Awaited<ReturnType<typeof logsTail>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsTail404
-    | ValidationExceptionResponse
-    | LogsTail500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4002,10 +3033,7 @@ export const getLogsTailSuspenseInfiniteQueryOptions = <
     LogsTailParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsTail404
-    | ValidationExceptionResponse
-    | LogsTail500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4057,10 +3085,7 @@ export type LogsTailSuspenseInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsTail>>
 >;
 export type LogsTailSuspenseInfiniteQueryError = ErrorType<
-  | AuthenticationExceptionResponse
-  | LogsTail404
-  | ValidationExceptionResponse
-  | LogsTail500
+  AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useLogsTailSuspenseInfinite<
@@ -4069,10 +3094,7 @@ export function useLogsTailSuspenseInfinite<
     LogsTailParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsTail404
-    | ValidationExceptionResponse
-    | LogsTail500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4099,10 +3121,7 @@ export function useLogsTailSuspenseInfinite<
     LogsTailParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsTail404
-    | ValidationExceptionResponse
-    | LogsTail500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4129,10 +3148,7 @@ export function useLogsTailSuspenseInfinite<
     LogsTailParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsTail404
-    | ValidationExceptionResponse
-    | LogsTail500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4154,7 +3170,7 @@ export function useLogsTailSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get log file tail
+ * @summary Get the last N lines from a log file (tail functionality)
  */
 
 export function useLogsTailSuspenseInfinite<
@@ -4163,10 +3179,7 @@ export function useLogsTailSuspenseInfinite<
     LogsTailParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsTail404
-    | ValidationExceptionResponse
-    | LogsTail500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4206,7 +3219,9 @@ export function useLogsTailSuspenseInfinite<
 }
 
 /**
- * @summary Get log file head
+ * Returns the first lines from a log file, similar to the Unix head command.
+Useful for examining log file structure and initial entries.
+ * @summary Get the first N lines from a log file (head functionality)
  */
 export const logsHead = (
   logFile: string,
@@ -4233,10 +3248,7 @@ export const getLogsHeadInfiniteQueryOptions = <
     LogsHeadParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsHead404
-    | ValidationExceptionResponse
-    | LogsHead500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4289,10 +3301,7 @@ export type LogsHeadInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsHead>>
 >;
 export type LogsHeadInfiniteQueryError = ErrorType<
-  | AuthenticationExceptionResponse
-  | LogsHead404
-  | ValidationExceptionResponse
-  | LogsHead500
+  AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useLogsHeadInfinite<
@@ -4301,10 +3310,7 @@ export function useLogsHeadInfinite<
     LogsHeadParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsHead404
-    | ValidationExceptionResponse
-    | LogsHead500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4340,10 +3346,7 @@ export function useLogsHeadInfinite<
     LogsHeadParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsHead404
-    | ValidationExceptionResponse
-    | LogsHead500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4379,10 +3382,7 @@ export function useLogsHeadInfinite<
     LogsHeadParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsHead404
-    | ValidationExceptionResponse
-    | LogsHead500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4404,7 +3404,7 @@ export function useLogsHeadInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get log file head
+ * @summary Get the first N lines from a log file (head functionality)
  */
 
 export function useLogsHeadInfinite<
@@ -4413,10 +3413,7 @@ export function useLogsHeadInfinite<
     LogsHeadParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsHead404
-    | ValidationExceptionResponse
-    | LogsHead500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4458,10 +3455,7 @@ export function useLogsHeadInfinite<
 export const getLogsHeadQueryOptions = <
   TData = Awaited<ReturnType<typeof logsHead>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsHead404
-    | ValidationExceptionResponse
-    | LogsHead500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4496,19 +3490,13 @@ export type LogsHeadQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsHead>>
 >;
 export type LogsHeadQueryError = ErrorType<
-  | AuthenticationExceptionResponse
-  | LogsHead404
-  | ValidationExceptionResponse
-  | LogsHead500
+  AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useLogsHead<
   TData = Awaited<ReturnType<typeof logsHead>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsHead404
-    | ValidationExceptionResponse
-    | LogsHead500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4534,10 +3522,7 @@ export function useLogsHead<
 export function useLogsHead<
   TData = Awaited<ReturnType<typeof logsHead>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsHead404
-    | ValidationExceptionResponse
-    | LogsHead500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4563,10 +3548,7 @@ export function useLogsHead<
 export function useLogsHead<
   TData = Awaited<ReturnType<typeof logsHead>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsHead404
-    | ValidationExceptionResponse
-    | LogsHead500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4582,16 +3564,13 @@ export function useLogsHead<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get log file head
+ * @summary Get the first N lines from a log file (head functionality)
  */
 
 export function useLogsHead<
   TData = Awaited<ReturnType<typeof logsHead>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsHead404
-    | ValidationExceptionResponse
-    | LogsHead500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4621,10 +3600,7 @@ export function useLogsHead<
 export const getLogsHeadSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof logsHead>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsHead404
-    | ValidationExceptionResponse
-    | LogsHead500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4660,19 +3636,13 @@ export type LogsHeadSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsHead>>
 >;
 export type LogsHeadSuspenseQueryError = ErrorType<
-  | AuthenticationExceptionResponse
-  | LogsHead404
-  | ValidationExceptionResponse
-  | LogsHead500
+  AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useLogsHeadSuspense<
   TData = Awaited<ReturnType<typeof logsHead>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsHead404
-    | ValidationExceptionResponse
-    | LogsHead500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4694,10 +3664,7 @@ export function useLogsHeadSuspense<
 export function useLogsHeadSuspense<
   TData = Awaited<ReturnType<typeof logsHead>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsHead404
-    | ValidationExceptionResponse
-    | LogsHead500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4719,10 +3686,7 @@ export function useLogsHeadSuspense<
 export function useLogsHeadSuspense<
   TData = Awaited<ReturnType<typeof logsHead>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsHead404
-    | ValidationExceptionResponse
-    | LogsHead500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4742,16 +3706,13 @@ export function useLogsHeadSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get log file head
+ * @summary Get the first N lines from a log file (head functionality)
  */
 
 export function useLogsHeadSuspense<
   TData = Awaited<ReturnType<typeof logsHead>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsHead404
-    | ValidationExceptionResponse
-    | LogsHead500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4794,10 +3755,7 @@ export const getLogsHeadSuspenseInfiniteQueryOptions = <
     LogsHeadParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsHead404
-    | ValidationExceptionResponse
-    | LogsHead500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4849,10 +3807,7 @@ export type LogsHeadSuspenseInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsHead>>
 >;
 export type LogsHeadSuspenseInfiniteQueryError = ErrorType<
-  | AuthenticationExceptionResponse
-  | LogsHead404
-  | ValidationExceptionResponse
-  | LogsHead500
+  AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useLogsHeadSuspenseInfinite<
@@ -4861,10 +3816,7 @@ export function useLogsHeadSuspenseInfinite<
     LogsHeadParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsHead404
-    | ValidationExceptionResponse
-    | LogsHead500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4891,10 +3843,7 @@ export function useLogsHeadSuspenseInfinite<
     LogsHeadParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsHead404
-    | ValidationExceptionResponse
-    | LogsHead500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4921,10 +3870,7 @@ export function useLogsHeadSuspenseInfinite<
     LogsHeadParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsHead404
-    | ValidationExceptionResponse
-    | LogsHead500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4946,7 +3892,7 @@ export function useLogsHeadSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get log file head
+ * @summary Get the first N lines from a log file (head functionality)
  */
 
 export function useLogsHeadSuspenseInfinite<
@@ -4955,10 +3901,7 @@ export function useLogsHeadSuspenseInfinite<
     LogsHeadParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | LogsHead404
-    | ValidationExceptionResponse
-    | LogsHead500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   logFile: string,
@@ -4998,7 +3941,9 @@ export function useLogsHeadSuspenseInfinite<
 }
 
 /**
- * @summary Get log file statistics
+ * Analyzes log file content to provide detailed statistics including
+log level counts, performance metrics, and optimization recommendations.
+ * @summary Get comprehensive statistics for a log file
  */
 export const logsStats = (
   logFile: string,
@@ -5017,9 +3962,7 @@ export const getLogsStatsQueryKey = (logFile?: string) => {
 
 export const getLogsStatsInfiniteQueryOptions = <
   TData = InfiniteData<Awaited<ReturnType<typeof logsStats>>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsStats404 | LogsStats500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -5056,15 +3999,12 @@ export const getLogsStatsInfiniteQueryOptions = <
 export type LogsStatsInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsStats>>
 >;
-export type LogsStatsInfiniteQueryError = ErrorType<
-  AuthenticationExceptionResponse | LogsStats404 | LogsStats500
->;
+export type LogsStatsInfiniteQueryError =
+  ErrorType<AuthenticationExceptionResponse>;
 
 export function useLogsStatsInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsStats>>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsStats404 | LogsStats500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options: {
@@ -5091,9 +4031,7 @@ export function useLogsStatsInfinite<
 };
 export function useLogsStatsInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsStats>>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsStats404 | LogsStats500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -5120,9 +4058,7 @@ export function useLogsStatsInfinite<
 };
 export function useLogsStatsInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsStats>>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsStats404 | LogsStats500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -5140,14 +4076,12 @@ export function useLogsStatsInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get log file statistics
+ * @summary Get comprehensive statistics for a log file
  */
 
 export function useLogsStatsInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsStats>>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsStats404 | LogsStats500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -5180,9 +4114,7 @@ export function useLogsStatsInfinite<
 
 export const getLogsStatsQueryOptions = <
   TData = Awaited<ReturnType<typeof logsStats>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsStats404 | LogsStats500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -5213,15 +4145,11 @@ export const getLogsStatsQueryOptions = <
 export type LogsStatsQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsStats>>
 >;
-export type LogsStatsQueryError = ErrorType<
-  AuthenticationExceptionResponse | LogsStats404 | LogsStats500
->;
+export type LogsStatsQueryError = ErrorType<AuthenticationExceptionResponse>;
 
 export function useLogsStats<
   TData = Awaited<ReturnType<typeof logsStats>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsStats404 | LogsStats500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options: {
@@ -5244,9 +4172,7 @@ export function useLogsStats<
 };
 export function useLogsStats<
   TData = Awaited<ReturnType<typeof logsStats>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsStats404 | LogsStats500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -5269,9 +4195,7 @@ export function useLogsStats<
 };
 export function useLogsStats<
   TData = Awaited<ReturnType<typeof logsStats>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsStats404 | LogsStats500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -5285,14 +4209,12 @@ export function useLogsStats<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get log file statistics
+ * @summary Get comprehensive statistics for a log file
  */
 
 export function useLogsStats<
   TData = Awaited<ReturnType<typeof logsStats>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsStats404 | LogsStats500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -5319,9 +4241,7 @@ export function useLogsStats<
 
 export const getLogsStatsSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof logsStats>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsStats404 | LogsStats500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -5353,15 +4273,12 @@ export const getLogsStatsSuspenseQueryOptions = <
 export type LogsStatsSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsStats>>
 >;
-export type LogsStatsSuspenseQueryError = ErrorType<
-  AuthenticationExceptionResponse | LogsStats404 | LogsStats500
->;
+export type LogsStatsSuspenseQueryError =
+  ErrorType<AuthenticationExceptionResponse>;
 
 export function useLogsStatsSuspense<
   TData = Awaited<ReturnType<typeof logsStats>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsStats404 | LogsStats500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options: {
@@ -5380,9 +4297,7 @@ export function useLogsStatsSuspense<
 };
 export function useLogsStatsSuspense<
   TData = Awaited<ReturnType<typeof logsStats>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsStats404 | LogsStats500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -5401,9 +4316,7 @@ export function useLogsStatsSuspense<
 };
 export function useLogsStatsSuspense<
   TData = Awaited<ReturnType<typeof logsStats>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsStats404 | LogsStats500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -5421,14 +4334,12 @@ export function useLogsStatsSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get log file statistics
+ * @summary Get comprehensive statistics for a log file
  */
 
 export function useLogsStatsSuspense<
   TData = Awaited<ReturnType<typeof logsStats>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsStats404 | LogsStats500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -5461,9 +4372,7 @@ export function useLogsStatsSuspense<
 
 export const getLogsStatsSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<Awaited<ReturnType<typeof logsStats>>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsStats404 | LogsStats500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -5499,15 +4408,12 @@ export const getLogsStatsSuspenseInfiniteQueryOptions = <
 export type LogsStatsSuspenseInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsStats>>
 >;
-export type LogsStatsSuspenseInfiniteQueryError = ErrorType<
-  AuthenticationExceptionResponse | LogsStats404 | LogsStats500
->;
+export type LogsStatsSuspenseInfiniteQueryError =
+  ErrorType<AuthenticationExceptionResponse>;
 
 export function useLogsStatsSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsStats>>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsStats404 | LogsStats500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options: {
@@ -5526,9 +4432,7 @@ export function useLogsStatsSuspenseInfinite<
 };
 export function useLogsStatsSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsStats>>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsStats404 | LogsStats500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -5547,9 +4451,7 @@ export function useLogsStatsSuspenseInfinite<
 };
 export function useLogsStatsSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsStats>>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsStats404 | LogsStats500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -5567,14 +4469,12 @@ export function useLogsStatsSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get log file statistics
+ * @summary Get comprehensive statistics for a log file
  */
 
 export function useLogsStatsSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsStats>>>,
-  TError = ErrorType<
-    AuthenticationExceptionResponse | LogsStats404 | LogsStats500
-  >
+  TError = ErrorType<AuthenticationExceptionResponse>
 >(
   logFile: string,
   options?: {
@@ -5609,14 +4509,740 @@ export function useLogsStatsSuspenseInfinite<
 }
 
 /**
- * @summary Download log file
+ * Performs high-performance pattern matching within log files with support
+for case-sensitive/insensitive searches and configurable result limits.
+ * @summary Search for patterns within a log file
+ */
+export const logsSearch = (
+  logFile: string,
+  params: LogsSearchParams,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal
+) => {
+  return customInstance<LogsSearch200>(
+    { url: `/api/logs/${logFile}/search`, method: "GET", params, signal },
+    options
+  );
+};
+
+export const getLogsSearchQueryKey = (
+  logFile?: string,
+  params?: LogsSearchParams
+) => {
+  return [`/api/logs/${logFile}/search`, ...(params ? [params] : [])] as const;
+};
+
+export const getLogsSearchInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof logsSearch>>,
+    LogsSearchParams["page"]
+  >,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ValidationExceptionResponse
+  >
+>(
+  logFile: string,
+  params: LogsSearchParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof logsSearch>>,
+        TError,
+        TData,
+        QueryKey,
+        LogsSearchParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getLogsSearchQueryKey(logFile, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof logsSearch>>,
+    QueryKey,
+    LogsSearchParams["page"]
+  > = ({ signal, pageParam }) =>
+    logsSearch(
+      logFile,
+      { ...params, page: pageParam || params?.["page"] },
+      requestOptions,
+      signal
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!logFile,
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof logsSearch>>,
+    TError,
+    TData,
+    QueryKey,
+    LogsSearchParams["page"]
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type LogsSearchInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof logsSearch>>
+>;
+export type LogsSearchInfiniteQueryError = ErrorType<
+  AuthenticationExceptionResponse | ValidationExceptionResponse
+>;
+
+export function useLogsSearchInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof logsSearch>>,
+    LogsSearchParams["page"]
+  >,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ValidationExceptionResponse
+  >
+>(
+  logFile: string,
+  params: LogsSearchParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof logsSearch>>,
+        TError,
+        TData,
+        QueryKey,
+        LogsSearchParams["page"]
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof logsSearch>>,
+          TError,
+          Awaited<ReturnType<typeof logsSearch>>,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useLogsSearchInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof logsSearch>>,
+    LogsSearchParams["page"]
+  >,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ValidationExceptionResponse
+  >
+>(
+  logFile: string,
+  params: LogsSearchParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof logsSearch>>,
+        TError,
+        TData,
+        QueryKey,
+        LogsSearchParams["page"]
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof logsSearch>>,
+          TError,
+          Awaited<ReturnType<typeof logsSearch>>,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useLogsSearchInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof logsSearch>>,
+    LogsSearchParams["page"]
+  >,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ValidationExceptionResponse
+  >
+>(
+  logFile: string,
+  params: LogsSearchParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof logsSearch>>,
+        TError,
+        TData,
+        QueryKey,
+        LogsSearchParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Search for patterns within a log file
+ */
+
+export function useLogsSearchInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof logsSearch>>,
+    LogsSearchParams["page"]
+  >,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ValidationExceptionResponse
+  >
+>(
+  logFile: string,
+  params: LogsSearchParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof logsSearch>>,
+        TError,
+        TData,
+        QueryKey,
+        LogsSearchParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getLogsSearchInfiniteQueryOptions(
+    logFile,
+    params,
+    options
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getLogsSearchQueryOptions = <
+  TData = Awaited<ReturnType<typeof logsSearch>>,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ValidationExceptionResponse
+  >
+>(
+  logFile: string,
+  params: LogsSearchParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof logsSearch>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getLogsSearchQueryKey(logFile, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof logsSearch>>> = ({
+    signal,
+  }) => logsSearch(logFile, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!logFile,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof logsSearch>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type LogsSearchQueryResult = NonNullable<
+  Awaited<ReturnType<typeof logsSearch>>
+>;
+export type LogsSearchQueryError = ErrorType<
+  AuthenticationExceptionResponse | ValidationExceptionResponse
+>;
+
+export function useLogsSearch<
+  TData = Awaited<ReturnType<typeof logsSearch>>,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ValidationExceptionResponse
+  >
+>(
+  logFile: string,
+  params: LogsSearchParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof logsSearch>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof logsSearch>>,
+          TError,
+          Awaited<ReturnType<typeof logsSearch>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useLogsSearch<
+  TData = Awaited<ReturnType<typeof logsSearch>>,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ValidationExceptionResponse
+  >
+>(
+  logFile: string,
+  params: LogsSearchParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof logsSearch>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof logsSearch>>,
+          TError,
+          Awaited<ReturnType<typeof logsSearch>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useLogsSearch<
+  TData = Awaited<ReturnType<typeof logsSearch>>,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ValidationExceptionResponse
+  >
+>(
+  logFile: string,
+  params: LogsSearchParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof logsSearch>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Search for patterns within a log file
+ */
+
+export function useLogsSearch<
+  TData = Awaited<ReturnType<typeof logsSearch>>,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ValidationExceptionResponse
+  >
+>(
+  logFile: string,
+  params: LogsSearchParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof logsSearch>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getLogsSearchQueryOptions(logFile, params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getLogsSearchSuspenseQueryOptions = <
+  TData = Awaited<ReturnType<typeof logsSearch>>,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ValidationExceptionResponse
+  >
+>(
+  logFile: string,
+  params: LogsSearchParams,
+  options?: {
+    query?: Partial<
+      UseSuspenseQueryOptions<
+        Awaited<ReturnType<typeof logsSearch>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getLogsSearchQueryKey(logFile, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof logsSearch>>> = ({
+    signal,
+  }) => logsSearch(logFile, params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
+    Awaited<ReturnType<typeof logsSearch>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type LogsSearchSuspenseQueryResult = NonNullable<
+  Awaited<ReturnType<typeof logsSearch>>
+>;
+export type LogsSearchSuspenseQueryError = ErrorType<
+  AuthenticationExceptionResponse | ValidationExceptionResponse
+>;
+
+export function useLogsSearchSuspense<
+  TData = Awaited<ReturnType<typeof logsSearch>>,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ValidationExceptionResponse
+  >
+>(
+  logFile: string,
+  params: LogsSearchParams,
+  options: {
+    query: Partial<
+      UseSuspenseQueryOptions<
+        Awaited<ReturnType<typeof logsSearch>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseSuspenseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useLogsSearchSuspense<
+  TData = Awaited<ReturnType<typeof logsSearch>>,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ValidationExceptionResponse
+  >
+>(
+  logFile: string,
+  params: LogsSearchParams,
+  options?: {
+    query?: Partial<
+      UseSuspenseQueryOptions<
+        Awaited<ReturnType<typeof logsSearch>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseSuspenseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useLogsSearchSuspense<
+  TData = Awaited<ReturnType<typeof logsSearch>>,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ValidationExceptionResponse
+  >
+>(
+  logFile: string,
+  params: LogsSearchParams,
+  options?: {
+    query?: Partial<
+      UseSuspenseQueryOptions<
+        Awaited<ReturnType<typeof logsSearch>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseSuspenseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Search for patterns within a log file
+ */
+
+export function useLogsSearchSuspense<
+  TData = Awaited<ReturnType<typeof logsSearch>>,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ValidationExceptionResponse
+  >
+>(
+  logFile: string,
+  params: LogsSearchParams,
+  options?: {
+    query?: Partial<
+      UseSuspenseQueryOptions<
+        Awaited<ReturnType<typeof logsSearch>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseSuspenseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getLogsSearchSuspenseQueryOptions(
+    logFile,
+    params,
+    options
+  );
+
+  const query = useSuspenseQuery(
+    queryOptions,
+    queryClient
+  ) as UseSuspenseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getLogsSearchSuspenseInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof logsSearch>>,
+    LogsSearchParams["page"]
+  >,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ValidationExceptionResponse
+  >
+>(
+  logFile: string,
+  params: LogsSearchParams,
+  options?: {
+    query?: Partial<
+      UseSuspenseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof logsSearch>>,
+        TError,
+        TData,
+        QueryKey,
+        LogsSearchParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getLogsSearchQueryKey(logFile, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof logsSearch>>,
+    QueryKey,
+    LogsSearchParams["page"]
+  > = ({ signal, pageParam }) =>
+    logsSearch(
+      logFile,
+      { ...params, page: pageParam || params?.["page"] },
+      requestOptions,
+      signal
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    ...queryOptions,
+  } as UseSuspenseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof logsSearch>>,
+    TError,
+    TData,
+    QueryKey,
+    LogsSearchParams["page"]
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type LogsSearchSuspenseInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof logsSearch>>
+>;
+export type LogsSearchSuspenseInfiniteQueryError = ErrorType<
+  AuthenticationExceptionResponse | ValidationExceptionResponse
+>;
+
+export function useLogsSearchSuspenseInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof logsSearch>>,
+    LogsSearchParams["page"]
+  >,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ValidationExceptionResponse
+  >
+>(
+  logFile: string,
+  params: LogsSearchParams,
+  options: {
+    query: Partial<
+      UseSuspenseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof logsSearch>>,
+        TError,
+        TData,
+        QueryKey,
+        LogsSearchParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseSuspenseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useLogsSearchSuspenseInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof logsSearch>>,
+    LogsSearchParams["page"]
+  >,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ValidationExceptionResponse
+  >
+>(
+  logFile: string,
+  params: LogsSearchParams,
+  options?: {
+    query?: Partial<
+      UseSuspenseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof logsSearch>>,
+        TError,
+        TData,
+        QueryKey,
+        LogsSearchParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseSuspenseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useLogsSearchSuspenseInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof logsSearch>>,
+    LogsSearchParams["page"]
+  >,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ValidationExceptionResponse
+  >
+>(
+  logFile: string,
+  params: LogsSearchParams,
+  options?: {
+    query?: Partial<
+      UseSuspenseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof logsSearch>>,
+        TError,
+        TData,
+        QueryKey,
+        LogsSearchParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseSuspenseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Search for patterns within a log file
+ */
+
+export function useLogsSearchSuspenseInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof logsSearch>>,
+    LogsSearchParams["page"]
+  >,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ValidationExceptionResponse
+  >
+>(
+  logFile: string,
+  params: LogsSearchParams,
+  options?: {
+    query?: Partial<
+      UseSuspenseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof logsSearch>>,
+        TError,
+        TData,
+        QueryKey,
+        LogsSearchParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseSuspenseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getLogsSearchSuspenseInfiniteQueryOptions(
+    logFile,
+    params,
+    options
+  );
+
+  const query = useSuspenseInfiniteQuery(
+    queryOptions,
+    queryClient
+  ) as UseSuspenseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Provides direct download access to log files for offline analysis
+or archival purposes. Returns the file as a plain text download.
+ * @summary Download a log file
  */
 export const logsDownload = (
   logFile: string,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
-  return customInstance<string>(
+  return customInstance<LogsDownload200>(
     { url: `/api/logs/${logFile}/download`, method: "GET", signal },
     options
   );
@@ -5628,7 +5254,9 @@ export const getLogsDownloadQueryKey = (logFile?: string) => {
 
 export const getLogsDownloadInfiniteQueryOptions = <
   TData = InfiniteData<Awaited<ReturnType<typeof logsDownload>>>,
-  TError = ErrorType<AuthenticationExceptionResponse | LogsDownload404>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   logFile: string,
   options?: {
@@ -5666,12 +5294,14 @@ export type LogsDownloadInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsDownload>>
 >;
 export type LogsDownloadInfiniteQueryError = ErrorType<
-  AuthenticationExceptionResponse | LogsDownload404
+  AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
 >;
 
 export function useLogsDownloadInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsDownload>>>,
-  TError = ErrorType<AuthenticationExceptionResponse | LogsDownload404>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   logFile: string,
   options: {
@@ -5698,7 +5328,9 @@ export function useLogsDownloadInfinite<
 };
 export function useLogsDownloadInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsDownload>>>,
-  TError = ErrorType<AuthenticationExceptionResponse | LogsDownload404>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   logFile: string,
   options?: {
@@ -5725,7 +5357,9 @@ export function useLogsDownloadInfinite<
 };
 export function useLogsDownloadInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsDownload>>>,
-  TError = ErrorType<AuthenticationExceptionResponse | LogsDownload404>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   logFile: string,
   options?: {
@@ -5743,12 +5377,14 @@ export function useLogsDownloadInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Download log file
+ * @summary Download a log file
  */
 
 export function useLogsDownloadInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsDownload>>>,
-  TError = ErrorType<AuthenticationExceptionResponse | LogsDownload404>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   logFile: string,
   options?: {
@@ -5781,7 +5417,9 @@ export function useLogsDownloadInfinite<
 
 export const getLogsDownloadQueryOptions = <
   TData = Awaited<ReturnType<typeof logsDownload>>,
-  TError = ErrorType<AuthenticationExceptionResponse | LogsDownload404>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   logFile: string,
   options?: {
@@ -5815,12 +5453,14 @@ export type LogsDownloadQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsDownload>>
 >;
 export type LogsDownloadQueryError = ErrorType<
-  AuthenticationExceptionResponse | LogsDownload404
+  AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
 >;
 
 export function useLogsDownload<
   TData = Awaited<ReturnType<typeof logsDownload>>,
-  TError = ErrorType<AuthenticationExceptionResponse | LogsDownload404>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   logFile: string,
   options: {
@@ -5843,7 +5483,9 @@ export function useLogsDownload<
 };
 export function useLogsDownload<
   TData = Awaited<ReturnType<typeof logsDownload>>,
-  TError = ErrorType<AuthenticationExceptionResponse | LogsDownload404>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   logFile: string,
   options?: {
@@ -5866,7 +5508,9 @@ export function useLogsDownload<
 };
 export function useLogsDownload<
   TData = Awaited<ReturnType<typeof logsDownload>>,
-  TError = ErrorType<AuthenticationExceptionResponse | LogsDownload404>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   logFile: string,
   options?: {
@@ -5880,12 +5524,14 @@ export function useLogsDownload<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Download log file
+ * @summary Download a log file
  */
 
 export function useLogsDownload<
   TData = Awaited<ReturnType<typeof logsDownload>>,
-  TError = ErrorType<AuthenticationExceptionResponse | LogsDownload404>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   logFile: string,
   options?: {
@@ -5912,7 +5558,9 @@ export function useLogsDownload<
 
 export const getLogsDownloadSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof logsDownload>>,
-  TError = ErrorType<AuthenticationExceptionResponse | LogsDownload404>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   logFile: string,
   options?: {
@@ -5945,12 +5593,14 @@ export type LogsDownloadSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsDownload>>
 >;
 export type LogsDownloadSuspenseQueryError = ErrorType<
-  AuthenticationExceptionResponse | LogsDownload404
+  AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
 >;
 
 export function useLogsDownloadSuspense<
   TData = Awaited<ReturnType<typeof logsDownload>>,
-  TError = ErrorType<AuthenticationExceptionResponse | LogsDownload404>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   logFile: string,
   options: {
@@ -5969,7 +5619,9 @@ export function useLogsDownloadSuspense<
 };
 export function useLogsDownloadSuspense<
   TData = Awaited<ReturnType<typeof logsDownload>>,
-  TError = ErrorType<AuthenticationExceptionResponse | LogsDownload404>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   logFile: string,
   options?: {
@@ -5988,7 +5640,9 @@ export function useLogsDownloadSuspense<
 };
 export function useLogsDownloadSuspense<
   TData = Awaited<ReturnType<typeof logsDownload>>,
-  TError = ErrorType<AuthenticationExceptionResponse | LogsDownload404>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   logFile: string,
   options?: {
@@ -6006,12 +5660,14 @@ export function useLogsDownloadSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Download log file
+ * @summary Download a log file
  */
 
 export function useLogsDownloadSuspense<
   TData = Awaited<ReturnType<typeof logsDownload>>,
-  TError = ErrorType<AuthenticationExceptionResponse | LogsDownload404>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   logFile: string,
   options?: {
@@ -6044,7 +5700,9 @@ export function useLogsDownloadSuspense<
 
 export const getLogsDownloadSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<Awaited<ReturnType<typeof logsDownload>>>,
-  TError = ErrorType<AuthenticationExceptionResponse | LogsDownload404>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   logFile: string,
   options?: {
@@ -6081,12 +5739,14 @@ export type LogsDownloadSuspenseInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsDownload>>
 >;
 export type LogsDownloadSuspenseInfiniteQueryError = ErrorType<
-  AuthenticationExceptionResponse | LogsDownload404
+  AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
 >;
 
 export function useLogsDownloadSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsDownload>>>,
-  TError = ErrorType<AuthenticationExceptionResponse | LogsDownload404>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   logFile: string,
   options: {
@@ -6105,7 +5765,9 @@ export function useLogsDownloadSuspenseInfinite<
 };
 export function useLogsDownloadSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsDownload>>>,
-  TError = ErrorType<AuthenticationExceptionResponse | LogsDownload404>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   logFile: string,
   options?: {
@@ -6124,7 +5786,9 @@ export function useLogsDownloadSuspenseInfinite<
 };
 export function useLogsDownloadSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsDownload>>>,
-  TError = ErrorType<AuthenticationExceptionResponse | LogsDownload404>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   logFile: string,
   options?: {
@@ -6142,12 +5806,14 @@ export function useLogsDownloadSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Download log file
+ * @summary Download a log file
  */
 
 export function useLogsDownloadSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof logsDownload>>>,
-  TError = ErrorType<AuthenticationExceptionResponse | LogsDownload404>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   logFile: string,
   options?: {
@@ -6182,7 +5848,10 @@ export function useLogsDownloadSuspenseInfinite<
 }
 
 /**
- * @summary Search across all log files
+ * Performs pattern matching across multiple log files in parallel,
+providing consolidated search results with performance metrics
+and per-file result breakdowns.
+ * @summary Search across multiple log files simultaneously
  */
 export const logsSearchAll = (
   params: LogsSearchAllParams,
@@ -6205,9 +5874,7 @@ export const getLogsSearchAllInfiniteQueryOptions = <
     LogsSearchAllParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | ValidationExceptionResponse
-    | LogsSearchAll500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   params: LogsSearchAllParams,
@@ -6252,9 +5919,7 @@ export type LogsSearchAllInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsSearchAll>>
 >;
 export type LogsSearchAllInfiniteQueryError = ErrorType<
-  | AuthenticationExceptionResponse
-  | ValidationExceptionResponse
-  | LogsSearchAll500
+  AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useLogsSearchAllInfinite<
@@ -6263,9 +5928,7 @@ export function useLogsSearchAllInfinite<
     LogsSearchAllParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | ValidationExceptionResponse
-    | LogsSearchAll500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   params: LogsSearchAllParams,
@@ -6300,9 +5963,7 @@ export function useLogsSearchAllInfinite<
     LogsSearchAllParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | ValidationExceptionResponse
-    | LogsSearchAll500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   params: LogsSearchAllParams,
@@ -6337,9 +5998,7 @@ export function useLogsSearchAllInfinite<
     LogsSearchAllParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | ValidationExceptionResponse
-    | LogsSearchAll500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   params: LogsSearchAllParams,
@@ -6360,7 +6019,7 @@ export function useLogsSearchAllInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Search across all log files
+ * @summary Search across multiple log files simultaneously
  */
 
 export function useLogsSearchAllInfinite<
@@ -6369,9 +6028,7 @@ export function useLogsSearchAllInfinite<
     LogsSearchAllParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | ValidationExceptionResponse
-    | LogsSearchAll500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   params: LogsSearchAllParams,
@@ -6408,9 +6065,7 @@ export function useLogsSearchAllInfinite<
 export const getLogsSearchAllQueryOptions = <
   TData = Awaited<ReturnType<typeof logsSearchAll>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | ValidationExceptionResponse
-    | LogsSearchAll500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   params: LogsSearchAllParams,
@@ -6440,17 +6095,13 @@ export type LogsSearchAllQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsSearchAll>>
 >;
 export type LogsSearchAllQueryError = ErrorType<
-  | AuthenticationExceptionResponse
-  | ValidationExceptionResponse
-  | LogsSearchAll500
+  AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useLogsSearchAll<
   TData = Awaited<ReturnType<typeof logsSearchAll>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | ValidationExceptionResponse
-    | LogsSearchAll500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   params: LogsSearchAllParams,
@@ -6475,9 +6126,7 @@ export function useLogsSearchAll<
 export function useLogsSearchAll<
   TData = Awaited<ReturnType<typeof logsSearchAll>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | ValidationExceptionResponse
-    | LogsSearchAll500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   params: LogsSearchAllParams,
@@ -6502,9 +6151,7 @@ export function useLogsSearchAll<
 export function useLogsSearchAll<
   TData = Awaited<ReturnType<typeof logsSearchAll>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | ValidationExceptionResponse
-    | LogsSearchAll500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   params: LogsSearchAllParams,
@@ -6519,15 +6166,13 @@ export function useLogsSearchAll<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Search across all log files
+ * @summary Search across multiple log files simultaneously
  */
 
 export function useLogsSearchAll<
   TData = Awaited<ReturnType<typeof logsSearchAll>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | ValidationExceptionResponse
-    | LogsSearchAll500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   params: LogsSearchAllParams,
@@ -6556,9 +6201,7 @@ export function useLogsSearchAll<
 export const getLogsSearchAllSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof logsSearchAll>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | ValidationExceptionResponse
-    | LogsSearchAll500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   params: LogsSearchAllParams,
@@ -6592,17 +6235,13 @@ export type LogsSearchAllSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsSearchAll>>
 >;
 export type LogsSearchAllSuspenseQueryError = ErrorType<
-  | AuthenticationExceptionResponse
-  | ValidationExceptionResponse
-  | LogsSearchAll500
+  AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useLogsSearchAllSuspense<
   TData = Awaited<ReturnType<typeof logsSearchAll>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | ValidationExceptionResponse
-    | LogsSearchAll500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   params: LogsSearchAllParams,
@@ -6623,9 +6262,7 @@ export function useLogsSearchAllSuspense<
 export function useLogsSearchAllSuspense<
   TData = Awaited<ReturnType<typeof logsSearchAll>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | ValidationExceptionResponse
-    | LogsSearchAll500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   params: LogsSearchAllParams,
@@ -6646,9 +6283,7 @@ export function useLogsSearchAllSuspense<
 export function useLogsSearchAllSuspense<
   TData = Awaited<ReturnType<typeof logsSearchAll>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | ValidationExceptionResponse
-    | LogsSearchAll500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   params: LogsSearchAllParams,
@@ -6667,15 +6302,13 @@ export function useLogsSearchAllSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Search across all log files
+ * @summary Search across multiple log files simultaneously
  */
 
 export function useLogsSearchAllSuspense<
   TData = Awaited<ReturnType<typeof logsSearchAll>>,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | ValidationExceptionResponse
-    | LogsSearchAll500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   params: LogsSearchAllParams,
@@ -6713,9 +6346,7 @@ export const getLogsSearchAllSuspenseInfiniteQueryOptions = <
     LogsSearchAllParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | ValidationExceptionResponse
-    | LogsSearchAll500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   params: LogsSearchAllParams,
@@ -6764,9 +6395,7 @@ export type LogsSearchAllSuspenseInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof logsSearchAll>>
 >;
 export type LogsSearchAllSuspenseInfiniteQueryError = ErrorType<
-  | AuthenticationExceptionResponse
-  | ValidationExceptionResponse
-  | LogsSearchAll500
+  AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useLogsSearchAllSuspenseInfinite<
@@ -6775,9 +6404,7 @@ export function useLogsSearchAllSuspenseInfinite<
     LogsSearchAllParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | ValidationExceptionResponse
-    | LogsSearchAll500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   params: LogsSearchAllParams,
@@ -6803,9 +6430,7 @@ export function useLogsSearchAllSuspenseInfinite<
     LogsSearchAllParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | ValidationExceptionResponse
-    | LogsSearchAll500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   params: LogsSearchAllParams,
@@ -6831,9 +6456,7 @@ export function useLogsSearchAllSuspenseInfinite<
     LogsSearchAllParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | ValidationExceptionResponse
-    | LogsSearchAll500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   params: LogsSearchAllParams,
@@ -6854,7 +6477,7 @@ export function useLogsSearchAllSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Search across all log files
+ * @summary Search across multiple log files simultaneously
  */
 
 export function useLogsSearchAllSuspenseInfinite<
@@ -6863,9 +6486,7 @@ export function useLogsSearchAllSuspenseInfinite<
     LogsSearchAllParams["page"]
   >,
   TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | ValidationExceptionResponse
-    | LogsSearchAll500
+    AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   params: LogsSearchAllParams,

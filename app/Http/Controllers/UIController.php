@@ -15,14 +15,15 @@ class UIController
         ]);
     }
 
-    #[NoReturn] public function dbg()
+    #[NoReturn]
+    public function dbg()
     {
-        $data = (new \App\Models\Song)->find(1);
+        $data = (new Song)->find(1);
 
         $rec = $data->getRecommendations('same_genre');
 
         dd([
-            'song' => $data->toArray(),
+            'song'  => $data->toArray(),
             'recom' => $rec->each(fn($a) => $a->get('title'))->toArray(),
         ]);
     }

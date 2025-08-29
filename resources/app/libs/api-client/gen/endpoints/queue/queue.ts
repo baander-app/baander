@@ -43,13 +43,15 @@ import type {
 
 import type {
   AuthenticationExceptionResponse,
+  AuthorizationExceptionResponse,
+  ModelNotFoundExceptionResponse,
   QueueMetricsMetrics200Item,
   QueueMetricsMetricsParams,
   QueueMetricsQueues200Item,
   QueueMetricsRetryJob200,
   QueueMetricsRetryJob400,
-  QueueMetricsShow200,
   QueueMetricsShowParams,
+  QueueMonitorResource,
   RetryJobRequest,
   ValidationExceptionResponse,
 } from "../../models";
@@ -60,14 +62,17 @@ import type { ErrorType, BodyType } from "../../../axios-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * @summary Get a collection of monitor entries
+ * Returns filtered and paginated queue job monitoring data with support for
+filtering by status, queue name, job name, and custom ordering options.
+Provides comprehensive job execution tracking and debugging information.
+ * @summary Get paginated collection of queue monitor entries
  */
 export const queueMetricsShow = (
   params?: QueueMetricsShowParams,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
-  return customInstance<QueueMetricsShow200>(
+  return customInstance<QueueMonitorResource[]>(
     { url: `/api/queue-metrics`, method: "GET", params, signal },
     options
   );
@@ -85,7 +90,9 @@ export const getQueueMetricsShowInfiniteQueryOptions = <
     QueueMetricsShowParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsShowParams,
@@ -131,7 +138,9 @@ export type QueueMetricsShowInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof queueMetricsShow>>
 >;
 export type QueueMetricsShowInfiniteQueryError = ErrorType<
-  AuthenticationExceptionResponse | ValidationExceptionResponse
+  | AuthenticationExceptionResponse
+  | AuthorizationExceptionResponse
+  | ValidationExceptionResponse
 >;
 
 export function useQueueMetricsShowInfinite<
@@ -140,7 +149,9 @@ export function useQueueMetricsShowInfinite<
     QueueMetricsShowParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params: undefined | QueueMetricsShowParams,
@@ -175,7 +186,9 @@ export function useQueueMetricsShowInfinite<
     QueueMetricsShowParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsShowParams,
@@ -210,7 +223,9 @@ export function useQueueMetricsShowInfinite<
     QueueMetricsShowParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsShowParams,
@@ -231,7 +246,7 @@ export function useQueueMetricsShowInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of monitor entries
+ * @summary Get paginated collection of queue monitor entries
  */
 
 export function useQueueMetricsShowInfinite<
@@ -240,7 +255,9 @@ export function useQueueMetricsShowInfinite<
     QueueMetricsShowParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsShowParams,
@@ -277,7 +294,9 @@ export function useQueueMetricsShowInfinite<
 export const getQueueMetricsShowQueryOptions = <
   TData = Awaited<ReturnType<typeof queueMetricsShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsShowParams,
@@ -312,13 +331,17 @@ export type QueueMetricsShowQueryResult = NonNullable<
   Awaited<ReturnType<typeof queueMetricsShow>>
 >;
 export type QueueMetricsShowQueryError = ErrorType<
-  AuthenticationExceptionResponse | ValidationExceptionResponse
+  | AuthenticationExceptionResponse
+  | AuthorizationExceptionResponse
+  | ValidationExceptionResponse
 >;
 
 export function useQueueMetricsShow<
   TData = Awaited<ReturnType<typeof queueMetricsShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params: undefined | QueueMetricsShowParams,
@@ -347,7 +370,9 @@ export function useQueueMetricsShow<
 export function useQueueMetricsShow<
   TData = Awaited<ReturnType<typeof queueMetricsShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsShowParams,
@@ -376,7 +401,9 @@ export function useQueueMetricsShow<
 export function useQueueMetricsShow<
   TData = Awaited<ReturnType<typeof queueMetricsShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsShowParams,
@@ -395,13 +422,15 @@ export function useQueueMetricsShow<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of monitor entries
+ * @summary Get paginated collection of queue monitor entries
  */
 
 export function useQueueMetricsShow<
   TData = Awaited<ReturnType<typeof queueMetricsShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsShowParams,
@@ -434,7 +463,9 @@ export function useQueueMetricsShow<
 export const getQueueMetricsShowSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof queueMetricsShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsShowParams,
@@ -469,13 +500,17 @@ export type QueueMetricsShowSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof queueMetricsShow>>
 >;
 export type QueueMetricsShowSuspenseQueryError = ErrorType<
-  AuthenticationExceptionResponse | ValidationExceptionResponse
+  | AuthenticationExceptionResponse
+  | AuthorizationExceptionResponse
+  | ValidationExceptionResponse
 >;
 
 export function useQueueMetricsShowSuspense<
   TData = Awaited<ReturnType<typeof queueMetricsShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params: undefined | QueueMetricsShowParams,
@@ -496,7 +531,9 @@ export function useQueueMetricsShowSuspense<
 export function useQueueMetricsShowSuspense<
   TData = Awaited<ReturnType<typeof queueMetricsShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsShowParams,
@@ -517,7 +554,9 @@ export function useQueueMetricsShowSuspense<
 export function useQueueMetricsShowSuspense<
   TData = Awaited<ReturnType<typeof queueMetricsShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsShowParams,
@@ -536,13 +575,15 @@ export function useQueueMetricsShowSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of monitor entries
+ * @summary Get paginated collection of queue monitor entries
  */
 
 export function useQueueMetricsShowSuspense<
   TData = Awaited<ReturnType<typeof queueMetricsShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsShowParams,
@@ -580,7 +621,9 @@ export const getQueueMetricsShowSuspenseInfiniteQueryOptions = <
     QueueMetricsShowParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsShowParams,
@@ -630,7 +673,9 @@ export type QueueMetricsShowSuspenseInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof queueMetricsShow>>
 >;
 export type QueueMetricsShowSuspenseInfiniteQueryError = ErrorType<
-  AuthenticationExceptionResponse | ValidationExceptionResponse
+  | AuthenticationExceptionResponse
+  | AuthorizationExceptionResponse
+  | ValidationExceptionResponse
 >;
 
 export function useQueueMetricsShowSuspenseInfinite<
@@ -639,7 +684,9 @@ export function useQueueMetricsShowSuspenseInfinite<
     QueueMetricsShowParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params: undefined | QueueMetricsShowParams,
@@ -665,7 +712,9 @@ export function useQueueMetricsShowSuspenseInfinite<
     QueueMetricsShowParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsShowParams,
@@ -691,7 +740,9 @@ export function useQueueMetricsShowSuspenseInfinite<
     QueueMetricsShowParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsShowParams,
@@ -712,7 +763,7 @@ export function useQueueMetricsShowSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of monitor entries
+ * @summary Get paginated collection of queue monitor entries
  */
 
 export function useQueueMetricsShowSuspenseInfinite<
@@ -721,7 +772,9 @@ export function useQueueMetricsShowSuspenseInfinite<
     QueueMetricsShowParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsShowParams,
@@ -759,7 +812,9 @@ export function useQueueMetricsShowSuspenseInfinite<
 }
 
 /**
- * @summary Get a list of queue names
+ * Returns a distinct list of all queue names currently in the monitoring system.
+Useful for populating filter dropdowns and understanding queue structure.
+ * @summary Get list of all available queue names
  */
 export const queueMetricsQueues = (
   options?: SecondParameter<typeof customInstance>,
@@ -777,7 +832,9 @@ export const getQueueMetricsQueuesQueryKey = () => {
 
 export const getQueueMetricsQueuesInfiniteQueryOptions = <
   TData = InfiniteData<Awaited<ReturnType<typeof queueMetricsQueues>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(options?: {
   query?: Partial<
     UseInfiniteQueryOptions<
@@ -806,12 +863,15 @@ export const getQueueMetricsQueuesInfiniteQueryOptions = <
 export type QueueMetricsQueuesInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof queueMetricsQueues>>
 >;
-export type QueueMetricsQueuesInfiniteQueryError =
-  ErrorType<AuthenticationExceptionResponse>;
+export type QueueMetricsQueuesInfiniteQueryError = ErrorType<
+  AuthenticationExceptionResponse | AuthorizationExceptionResponse
+>;
 
 export function useQueueMetricsQueuesInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof queueMetricsQueues>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options: {
     query: Partial<
@@ -837,7 +897,9 @@ export function useQueueMetricsQueuesInfinite<
 };
 export function useQueueMetricsQueuesInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof queueMetricsQueues>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -863,7 +925,9 @@ export function useQueueMetricsQueuesInfinite<
 };
 export function useQueueMetricsQueuesInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof queueMetricsQueues>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -880,12 +944,14 @@ export function useQueueMetricsQueuesInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a list of queue names
+ * @summary Get list of all available queue names
  */
 
 export function useQueueMetricsQueuesInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof queueMetricsQueues>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -917,7 +983,9 @@ export function useQueueMetricsQueuesInfinite<
 
 export const getQueueMetricsQueuesQueryOptions = <
   TData = Awaited<ReturnType<typeof queueMetricsQueues>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -946,12 +1014,15 @@ export const getQueueMetricsQueuesQueryOptions = <
 export type QueueMetricsQueuesQueryResult = NonNullable<
   Awaited<ReturnType<typeof queueMetricsQueues>>
 >;
-export type QueueMetricsQueuesQueryError =
-  ErrorType<AuthenticationExceptionResponse>;
+export type QueueMetricsQueuesQueryError = ErrorType<
+  AuthenticationExceptionResponse | AuthorizationExceptionResponse
+>;
 
 export function useQueueMetricsQueues<
   TData = Awaited<ReturnType<typeof queueMetricsQueues>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options: {
     query: Partial<
@@ -977,7 +1048,9 @@ export function useQueueMetricsQueues<
 };
 export function useQueueMetricsQueues<
   TData = Awaited<ReturnType<typeof queueMetricsQueues>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -1003,7 +1076,9 @@ export function useQueueMetricsQueues<
 };
 export function useQueueMetricsQueues<
   TData = Awaited<ReturnType<typeof queueMetricsQueues>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -1020,12 +1095,14 @@ export function useQueueMetricsQueues<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a list of queue names
+ * @summary Get list of all available queue names
  */
 
 export function useQueueMetricsQueues<
   TData = Awaited<ReturnType<typeof queueMetricsQueues>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -1055,7 +1132,9 @@ export function useQueueMetricsQueues<
 
 export const getQueueMetricsQueuesSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof queueMetricsQueues>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(options?: {
   query?: Partial<
     UseSuspenseQueryOptions<
@@ -1084,12 +1163,15 @@ export const getQueueMetricsQueuesSuspenseQueryOptions = <
 export type QueueMetricsQueuesSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof queueMetricsQueues>>
 >;
-export type QueueMetricsQueuesSuspenseQueryError =
-  ErrorType<AuthenticationExceptionResponse>;
+export type QueueMetricsQueuesSuspenseQueryError = ErrorType<
+  AuthenticationExceptionResponse | AuthorizationExceptionResponse
+>;
 
 export function useQueueMetricsQueuesSuspense<
   TData = Awaited<ReturnType<typeof queueMetricsQueues>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options: {
     query: Partial<
@@ -1107,7 +1189,9 @@ export function useQueueMetricsQueuesSuspense<
 };
 export function useQueueMetricsQueuesSuspense<
   TData = Awaited<ReturnType<typeof queueMetricsQueues>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -1125,7 +1209,9 @@ export function useQueueMetricsQueuesSuspense<
 };
 export function useQueueMetricsQueuesSuspense<
   TData = Awaited<ReturnType<typeof queueMetricsQueues>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -1142,12 +1228,14 @@ export function useQueueMetricsQueuesSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a list of queue names
+ * @summary Get list of all available queue names
  */
 
 export function useQueueMetricsQueuesSuspense<
   TData = Awaited<ReturnType<typeof queueMetricsQueues>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -1179,7 +1267,9 @@ export function useQueueMetricsQueuesSuspense<
 
 export const getQueueMetricsQueuesSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<Awaited<ReturnType<typeof queueMetricsQueues>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(options?: {
   query?: Partial<
     UseSuspenseInfiniteQueryOptions<
@@ -1212,12 +1302,15 @@ export const getQueueMetricsQueuesSuspenseInfiniteQueryOptions = <
 export type QueueMetricsQueuesSuspenseInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof queueMetricsQueues>>
 >;
-export type QueueMetricsQueuesSuspenseInfiniteQueryError =
-  ErrorType<AuthenticationExceptionResponse>;
+export type QueueMetricsQueuesSuspenseInfiniteQueryError = ErrorType<
+  AuthenticationExceptionResponse | AuthorizationExceptionResponse
+>;
 
 export function useQueueMetricsQueuesSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof queueMetricsQueues>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options: {
     query: Partial<
@@ -1235,7 +1328,9 @@ export function useQueueMetricsQueuesSuspenseInfinite<
 };
 export function useQueueMetricsQueuesSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof queueMetricsQueues>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -1253,7 +1348,9 @@ export function useQueueMetricsQueuesSuspenseInfinite<
 };
 export function useQueueMetricsQueuesSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof queueMetricsQueues>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -1270,12 +1367,14 @@ export function useQueueMetricsQueuesSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a list of queue names
+ * @summary Get list of all available queue names
  */
 
 export function useQueueMetricsQueuesSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof queueMetricsQueues>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -1307,7 +1406,10 @@ export function useQueueMetricsQueuesSuspenseInfinite<
 }
 
 /**
- * @summary Get a metrics collection
+ * Returns detailed metrics about queue performance including job counts,
+execution times, failure rates, and trend analysis over the specified
+time period for system monitoring and optimization.
+ * @summary Get comprehensive queue metrics and statistics
  */
 export const queueMetricsMetrics = (
   params?: QueueMetricsMetricsParams,
@@ -1332,7 +1434,9 @@ export const getQueueMetricsMetricsInfiniteQueryOptions = <
     QueueMetricsMetricsParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsMetricsParams,
@@ -1378,7 +1482,9 @@ export type QueueMetricsMetricsInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof queueMetricsMetrics>>
 >;
 export type QueueMetricsMetricsInfiniteQueryError = ErrorType<
-  AuthenticationExceptionResponse | ValidationExceptionResponse
+  | AuthenticationExceptionResponse
+  | AuthorizationExceptionResponse
+  | ValidationExceptionResponse
 >;
 
 export function useQueueMetricsMetricsInfinite<
@@ -1387,7 +1493,9 @@ export function useQueueMetricsMetricsInfinite<
     QueueMetricsMetricsParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params: undefined | QueueMetricsMetricsParams,
@@ -1422,7 +1530,9 @@ export function useQueueMetricsMetricsInfinite<
     QueueMetricsMetricsParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsMetricsParams,
@@ -1457,7 +1567,9 @@ export function useQueueMetricsMetricsInfinite<
     QueueMetricsMetricsParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsMetricsParams,
@@ -1478,7 +1590,7 @@ export function useQueueMetricsMetricsInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a metrics collection
+ * @summary Get comprehensive queue metrics and statistics
  */
 
 export function useQueueMetricsMetricsInfinite<
@@ -1487,7 +1599,9 @@ export function useQueueMetricsMetricsInfinite<
     QueueMetricsMetricsParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsMetricsParams,
@@ -1527,7 +1641,9 @@ export function useQueueMetricsMetricsInfinite<
 export const getQueueMetricsMetricsQueryOptions = <
   TData = Awaited<ReturnType<typeof queueMetricsMetrics>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsMetricsParams,
@@ -1562,13 +1678,17 @@ export type QueueMetricsMetricsQueryResult = NonNullable<
   Awaited<ReturnType<typeof queueMetricsMetrics>>
 >;
 export type QueueMetricsMetricsQueryError = ErrorType<
-  AuthenticationExceptionResponse | ValidationExceptionResponse
+  | AuthenticationExceptionResponse
+  | AuthorizationExceptionResponse
+  | ValidationExceptionResponse
 >;
 
 export function useQueueMetricsMetrics<
   TData = Awaited<ReturnType<typeof queueMetricsMetrics>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params: undefined | QueueMetricsMetricsParams,
@@ -1597,7 +1717,9 @@ export function useQueueMetricsMetrics<
 export function useQueueMetricsMetrics<
   TData = Awaited<ReturnType<typeof queueMetricsMetrics>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsMetricsParams,
@@ -1626,7 +1748,9 @@ export function useQueueMetricsMetrics<
 export function useQueueMetricsMetrics<
   TData = Awaited<ReturnType<typeof queueMetricsMetrics>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsMetricsParams,
@@ -1645,13 +1769,15 @@ export function useQueueMetricsMetrics<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a metrics collection
+ * @summary Get comprehensive queue metrics and statistics
  */
 
 export function useQueueMetricsMetrics<
   TData = Awaited<ReturnType<typeof queueMetricsMetrics>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsMetricsParams,
@@ -1684,7 +1810,9 @@ export function useQueueMetricsMetrics<
 export const getQueueMetricsMetricsSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof queueMetricsMetrics>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsMetricsParams,
@@ -1719,13 +1847,17 @@ export type QueueMetricsMetricsSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof queueMetricsMetrics>>
 >;
 export type QueueMetricsMetricsSuspenseQueryError = ErrorType<
-  AuthenticationExceptionResponse | ValidationExceptionResponse
+  | AuthenticationExceptionResponse
+  | AuthorizationExceptionResponse
+  | ValidationExceptionResponse
 >;
 
 export function useQueueMetricsMetricsSuspense<
   TData = Awaited<ReturnType<typeof queueMetricsMetrics>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params: undefined | QueueMetricsMetricsParams,
@@ -1746,7 +1878,9 @@ export function useQueueMetricsMetricsSuspense<
 export function useQueueMetricsMetricsSuspense<
   TData = Awaited<ReturnType<typeof queueMetricsMetrics>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsMetricsParams,
@@ -1767,7 +1901,9 @@ export function useQueueMetricsMetricsSuspense<
 export function useQueueMetricsMetricsSuspense<
   TData = Awaited<ReturnType<typeof queueMetricsMetrics>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsMetricsParams,
@@ -1786,13 +1922,15 @@ export function useQueueMetricsMetricsSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a metrics collection
+ * @summary Get comprehensive queue metrics and statistics
  */
 
 export function useQueueMetricsMetricsSuspense<
   TData = Awaited<ReturnType<typeof queueMetricsMetrics>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsMetricsParams,
@@ -1833,7 +1971,9 @@ export const getQueueMetricsMetricsSuspenseInfiniteQueryOptions = <
     QueueMetricsMetricsParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsMetricsParams,
@@ -1883,7 +2023,9 @@ export type QueueMetricsMetricsSuspenseInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof queueMetricsMetrics>>
 >;
 export type QueueMetricsMetricsSuspenseInfiniteQueryError = ErrorType<
-  AuthenticationExceptionResponse | ValidationExceptionResponse
+  | AuthenticationExceptionResponse
+  | AuthorizationExceptionResponse
+  | ValidationExceptionResponse
 >;
 
 export function useQueueMetricsMetricsSuspenseInfinite<
@@ -1892,7 +2034,9 @@ export function useQueueMetricsMetricsSuspenseInfinite<
     QueueMetricsMetricsParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params: undefined | QueueMetricsMetricsParams,
@@ -1918,7 +2062,9 @@ export function useQueueMetricsMetricsSuspenseInfinite<
     QueueMetricsMetricsParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsMetricsParams,
@@ -1944,7 +2090,9 @@ export function useQueueMetricsMetricsSuspenseInfinite<
     QueueMetricsMetricsParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsMetricsParams,
@@ -1965,7 +2113,7 @@ export function useQueueMetricsMetricsSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a metrics collection
+ * @summary Get comprehensive queue metrics and statistics
  */
 
 export function useQueueMetricsMetricsSuspenseInfinite<
@@ -1974,7 +2122,9 @@ export function useQueueMetricsMetricsSuspenseInfinite<
     QueueMetricsMetricsParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   params?: QueueMetricsMetricsParams,
@@ -2012,7 +2162,10 @@ export function useQueueMetricsMetricsSuspenseInfinite<
 }
 
 /**
- * @summary Retry a job
+ * Attempts to retry a previously failed job by re-dispatching it to the queue.
+Only failed jobs that haven't been retried and have valid job UUIDs can be retried.
+Includes safety checks and error handling.
+ * @summary Retry a failed queue job
  */
 export const queueMetricsRetryJob = (
   id: string,
@@ -2036,6 +2189,8 @@ export const getQueueMetricsRetryJobMutationOptions = <
   TError = ErrorType<
     | QueueMetricsRetryJob400
     | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
     | ValidationExceptionResponse
   >,
   TContext = unknown
@@ -2081,16 +2236,20 @@ export type QueueMetricsRetryJobMutationBody = BodyType<RetryJobRequest>;
 export type QueueMetricsRetryJobMutationError = ErrorType<
   | QueueMetricsRetryJob400
   | AuthenticationExceptionResponse
+  | AuthorizationExceptionResponse
+  | ModelNotFoundExceptionResponse
   | ValidationExceptionResponse
 >;
 
 /**
- * @summary Retry a job
+ * @summary Retry a failed queue job
  */
 export const useQueueMetricsRetryJob = <
   TError = ErrorType<
     | QueueMetricsRetryJob400
     | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
     | ValidationExceptionResponse
   >,
   TContext = unknown
@@ -2116,7 +2275,10 @@ export const useQueueMetricsRetryJob = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Delete by id
+ * Permanently removes a queue monitor record from the system.
+This only affects monitoring data and does not impact actual queue jobs.
+Used for cleaning up monitoring history.
+ * @summary Delete a specific queue monitor entry
  */
 export const queueMetricsDelete = (
   id: string,
@@ -2129,7 +2291,11 @@ export const queueMetricsDelete = (
 };
 
 export const getQueueMetricsDeleteMutationOptions = <
-  TError = ErrorType<AuthenticationExceptionResponse>,
+  TError = ErrorType<
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
+  >,
   TContext = unknown
 >(options?: {
   mutation?: UseMutationOptions<
@@ -2170,14 +2336,21 @@ export type QueueMetricsDeleteMutationResult = NonNullable<
   Awaited<ReturnType<typeof queueMetricsDelete>>
 >;
 
-export type QueueMetricsDeleteMutationError =
-  ErrorType<AuthenticationExceptionResponse>;
+export type QueueMetricsDeleteMutationError = ErrorType<
+  | AuthenticationExceptionResponse
+  | AuthorizationExceptionResponse
+  | ModelNotFoundExceptionResponse
+>;
 
 /**
- * @summary Delete by id
+ * @summary Delete a specific queue monitor entry
  */
 export const useQueueMetricsDelete = <
-  TError = ErrorType<AuthenticationExceptionResponse>,
+  TError = ErrorType<
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
+  >,
   TContext = unknown
 >(
   options?: {
@@ -2201,7 +2374,10 @@ export const useQueueMetricsDelete = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Purge all records
+ * Completely clears all queue monitoring data from the system.
+This is a destructive operation that removes all historical job tracking
+information. Use with extreme caution in production environments.
+ * @summary Purge all queue monitor records
  */
 export const queueMetricsPurge = (
   options?: SecondParameter<typeof customInstance>
@@ -2213,7 +2389,9 @@ export const queueMetricsPurge = (
 };
 
 export const getQueueMetricsPurgeMutationOptions = <
-  TError = ErrorType<AuthenticationExceptionResponse>,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >,
   TContext = unknown
 >(options?: {
   mutation?: UseMutationOptions<
@@ -2252,14 +2430,17 @@ export type QueueMetricsPurgeMutationResult = NonNullable<
   Awaited<ReturnType<typeof queueMetricsPurge>>
 >;
 
-export type QueueMetricsPurgeMutationError =
-  ErrorType<AuthenticationExceptionResponse>;
+export type QueueMetricsPurgeMutationError = ErrorType<
+  AuthenticationExceptionResponse | AuthorizationExceptionResponse
+>;
 
 /**
- * @summary Purge all records
+ * @summary Purge all queue monitor records
  */
 export const useQueueMetricsPurge = <
-  TError = ErrorType<AuthenticationExceptionResponse>,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >,
   TContext = unknown
 >(
   options?: {

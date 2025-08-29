@@ -11,8 +11,7 @@ Implemented queuing functionality through Redis offers efficient job management 
 The media information is organized and easily searchable, ensuring users can always find what they are looking for quickly and easily.
  * OpenAPI spec version: 0.0.1
  */
-import type { LogsTail200Data } from "./logsTail200Data";
+import type { LogsTail200AnyOf } from "./logsTail200AnyOf";
+import type { LogsTail200AnyOfThree } from "./logsTail200AnyOfThree";
 
-export type LogsTail200 = {
-  data: LogsTail200Data;
-};
+export type LogsTail200 = LogsTail200AnyOf | LogsTail200AnyOfThree;

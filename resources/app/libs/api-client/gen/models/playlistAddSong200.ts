@@ -11,8 +11,7 @@ Implemented queuing functionality through Redis offers efficient job management 
 The media information is organized and easily searchable, ensuring users can always find what they are looking for quickly and easily.
  * OpenAPI spec version: 0.0.1
  */
-import type { PlaylistAddSong200Message } from "./playlistAddSong200Message";
 
 export type PlaylistAddSong200 = {
-  message: PlaylistAddSong200Message;
+  message: string;
 };

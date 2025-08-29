@@ -7,8 +7,8 @@ use App\Http\Requests\Album\AlbumIndexRequest;
 use App\Http\Requests\Album\AlbumUpdateRequest;
 use App\Http\Resources\Album\AlbumResource;
 use App\Models\{Album, Library, TokenAbility};
-use App\Modules\{Http\Pagination\JsonPaginator};
 use App\Modules\Eloquent\BaseBuilder;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix, Put};
 
@@ -21,20 +21,29 @@ use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix, Put};
 class AlbumController extends Controller
 {
     /**
-     * Get a collection of albums
+     * Get a paginated collection of albums from a specific library
      *
-     * @param Library $library
-     * @param AlbumIndexRequest $request
-     * @return AnonymousResourceCollection<JsonPaginator<AlbumResource>>
+     * Returns a filtered and paginated list of albums from the specified library.
+     * Supports field selection, relation inclusion, and genre filtering for optimized queries.
+     *
+     * @param Library $library The library to retrieve albums from
+     * @param AlbumIndexRequest $request Request with filtering and pagination parameters
+     *
+     * @response AnonymousResourceCollection<JsonPaginator<AlbumResource>>
      */
     #[Get('/', 'api.albums.index')]
-    public function index(Library $library, AlbumIndexRequest $request)
+    public function index(Library $library, AlbumIndexRequest $request): AnonymousResourceCollection
     {
+        /** @var string|null $fields Comma-separated list of fields to select */
         $fields = $request->query('fields');
+
+        /** @var string|null $relations Comma-separated list of relations to include */
         $relations = $request->query('relations');
+
+        /** @var string|null $genres Comma-separated list of genre names to filter by */
         $genres = $request->query('genres');
 
-        $albums = (new \App\Models\Album)->query()
+        $albums = Album::query()
             ->selectFields(Album::$filterFields, $fields)
             ->withRelations(Album::$filterRelations, $relations)
             ->when($relations, function (BaseBuilder $q) use ($relations) {
@@ -56,11 +65,16 @@ class AlbumController extends Controller
     }
 
     /**
-     * Get an album
+     * Get a specific album with detailed information
      *
-     * @param Library $library
-     * @param Album $album
-     * @return AlbumResource
+     * Retrieves a single album from the specified library with all related data
+     * including artists, cover art, and songs for comprehensive display.
+     *
+     * @param Library $library The library containing the album
+     * @param Album $album The album to retrieve
+     *
+     * @throws ModelNotFoundException When an album is not found in the library
+     * @response AlbumResource
      */
     #[Get('{album}', 'api.albums.show')]
     public function show(Library $library, Album $album)
@@ -71,8 +85,21 @@ class AlbumController extends Controller
         return new AlbumResource($album);
     }
 
+    /**
+     * Update an existing album
+     *
+     * Updates album metadata and information using the provided data.
+     * Only the fields included in the request will be modified.
+     *
+     * @param Library $library The library containing the album
+     * @param Album $album The album to update
+     * @param AlbumUpdateRequest $request Request containing validated update data
+     *
+     * @throws ModelNotFoundException When an album is not found in the library
+     * @response AlbumResource
+     */
     #[Put('{album}', 'api.albums.update')]
-    public function update(Library $library, Album $album, AlbumUpdateRequest $request)
+    public function update(Library $library, Album $album, AlbumUpdateRequest $request): AlbumResource
     {
         $album->setRelation('library', $library);
         $album->update($request->validated());

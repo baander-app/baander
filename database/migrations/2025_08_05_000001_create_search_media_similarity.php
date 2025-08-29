@@ -194,6 +194,7 @@ END;
             body: "
 DECLARE
     result JSON;
+    input_library_id BIGINT := library_id;
 BEGIN
     SELECT json_build_object(
         'total_songs', COUNT(DISTINCT s.id),
@@ -211,7 +212,7 @@ BEGIN
     LEFT JOIN artists art ON ast.artist_id = art.id
     LEFT JOIN genre_song gs ON s.id = gs.song_id
     LEFT JOIN genres g ON gs.genre_id = g.id
-    WHERE l.id = library_id
+    WHERE l.id = input_library_id
     GROUP BY l.id, l.name;
     
     RETURN result;

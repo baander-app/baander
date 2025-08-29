@@ -44,7 +44,6 @@ import type {
 import type {
   AlbumResource,
   AlbumUpdateRequest,
-  AlbumsIndex200,
   AlbumsIndexParams,
   AuthenticationExceptionResponse,
   ModelNotFoundExceptionResponse,
@@ -57,7 +56,9 @@ import type { ErrorType, BodyType } from "../../../axios-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * @summary Get a collection of albums
+ * Returns a filtered and paginated list of albums from the specified library.
+Supports field selection, relation inclusion, and genre filtering for optimized queries.
+ * @summary Get a paginated collection of albums from a specific library
  */
 export const albumsIndex = (
   library: string,
@@ -65,7 +66,7 @@ export const albumsIndex = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
-  return customInstance<AlbumsIndex200>(
+  return customInstance<AlbumResource[]>(
     { url: `/api/libraries/${library}/albums`, method: "GET", params, signal },
     options
   );
@@ -253,7 +254,7 @@ export function useAlbumsIndexInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of albums
+ * @summary Get a paginated collection of albums from a specific library
  */
 
 export function useAlbumsIndexInfinite<
@@ -427,7 +428,7 @@ export function useAlbumsIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of albums
+ * @summary Get a paginated collection of albums from a specific library
  */
 
 export function useAlbumsIndex<
@@ -581,7 +582,7 @@ export function useAlbumsIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of albums
+ * @summary Get a paginated collection of albums from a specific library
  */
 
 export function useAlbumsIndexSuspense<
@@ -779,7 +780,7 @@ export function useAlbumsIndexSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of albums
+ * @summary Get a paginated collection of albums from a specific library
  */
 
 export function useAlbumsIndexSuspenseInfinite<
@@ -830,7 +831,9 @@ export function useAlbumsIndexSuspenseInfinite<
 }
 
 /**
- * @summary Get an album
+ * Retrieves a single album from the specified library with all related data
+including artists, cover art, and songs for comprehensive display.
+ * @summary Get a specific album with detailed information
  */
 export const albumsShow = (
   library: string,
@@ -978,7 +981,7 @@ export function useAlbumsShowInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get an album
+ * @summary Get a specific album with detailed information
  */
 
 export function useAlbumsShowInfinite<
@@ -1135,7 +1138,7 @@ export function useAlbumsShow<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get an album
+ * @summary Get a specific album with detailed information
  */
 
 export function useAlbumsShow<
@@ -1277,7 +1280,7 @@ export function useAlbumsShowSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get an album
+ * @summary Get a specific album with detailed information
  */
 
 export function useAlbumsShowSuspense<
@@ -1433,7 +1436,7 @@ export function useAlbumsShowSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get an album
+ * @summary Get a specific album with detailed information
  */
 
 export function useAlbumsShowSuspenseInfinite<
@@ -1476,6 +1479,11 @@ export function useAlbumsShowSuspenseInfinite<
   return query;
 }
 
+/**
+ * Updates album metadata and information using the provided data.
+Only the fields included in the request will be modified.
+ * @summary Update an existing album
+ */
 export const albumsUpdate = (
   library: string,
   album: string,
@@ -1545,6 +1553,9 @@ export type AlbumsUpdateMutationError = ErrorType<
   | ValidationExceptionResponse
 >;
 
+/**
+ * @summary Update an existing album
+ */
 export const useAlbumsUpdate = <
   TError = ErrorType<
     | AuthenticationExceptionResponse

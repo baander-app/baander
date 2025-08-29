@@ -11,8 +11,9 @@ Implemented queuing functionality through Redis offers efficient job management 
 The media information is organized and easily searchable, ensuring users can always find what they are looking for quickly and easily.
  * OpenAPI spec version: 0.0.1
  */
-import type { AuthPasskeyRegister200Message } from "./authPasskeyRegister200Message";
+import type { AuthPasskeyRegister200AnyOf } from "./authPasskeyRegister200AnyOf";
+import type { AuthPasskeyRegister200AnyOfTwo } from "./authPasskeyRegister200AnyOfTwo";
 
-export type AuthPasskeyRegister200 = {
-  message: AuthPasskeyRegister200Message;
-};
+export type AuthPasskeyRegister200 =
+  | AuthPasskeyRegister200AnyOf
+  | AuthPasskeyRegister200AnyOfTwo;

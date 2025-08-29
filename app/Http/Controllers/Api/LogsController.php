@@ -4,14 +4,25 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\TokenAbility;
-use Exception;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use App\Modules\Logging\LogStreamer\{Models\LogFile};
 use App\Modules\Logging\LogStreamer\LogFileService;
 use App\Modules\Logging\LogStreamer\SearchableLogFile;
 use App\Modules\Logging\LogStreamer\ThreadedLogProcessor;
+use Exception;
 use Illuminate\Http\{JsonResponse, Request, Response};
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
+/**
+ * Application log file management and analysis controller
+ *
+ * Provides comprehensive log file operations including viewing, searching, downloading,
+ * and statistical analysis. Supports high-performance operations on large log files
+ * with threading and optimized search capabilities.
+ */
 #[Prefix('/logs')]
 #[Middleware([
     'auth:sanctum',
@@ -27,25 +38,49 @@ class LogsController extends Controller
     }
 
     /**
-     * Get a collection of log files
+     * Get a collection of available log files
      *
-     * @return LogFile[]
+     * Returns a sorted list of all available log files in the system
+     * with metadata including file sizes, modification dates, and identifiers.
+     *
+     * @response array<LogFile>
      */
     #[Get('/', 'api.logs.index')]
-    public function index()
+    public function index(): array
     {
-        return $this->logFileService->getSortedFiles();
+        /** @var array<LogFile> $files Sorted array of available log files */
+        $files = $this->logFileService->getSortedFiles();
+
+        // Array of available log files sorted by modification date.
+        return $files;
     }
 
     /**
-     * Show a log file
+     * Get detailed information about a specific log file
      *
-     * @param string $logFile
-     * @return JsonResponse
+     * Returns comprehensive metadata about a log file including file statistics,
+     * line counts, size information, and performance characteristics.
+     *
+     * @param string $logFile The log file identifier
+     *
+     * @throws ModelNotFoundException When log file is not found
+     * @response array{
+     *   data: array{
+     *     file: LogFile,
+     *     info: array{
+     *       size: int,
+     *       lines: int,
+     *       lastModified: string,
+     *       isLargeFile: boolean,
+     *       shouldUseThreading: boolean
+     *     }
+     *   }
+     * }|array{error: string}
      */
     #[Get('/{logFile}', 'api.logs.show')]
-    public function show(string $logFile)
+    public function show(string $logFile): JsonResponse
     {
+        /** @var LogFile|null $file */
         $file = $this->logFileService->getFileById($logFile);
 
         if (!$file) {
@@ -56,8 +91,10 @@ class LogsController extends Controller
 
         try {
             $searchableFile = new SearchableLogFile($file->path);
+            /** @var object $fileInfo Comprehensive file information */
             $fileInfo = $searchableFile->getFileInfo();
 
+            // Log file information with detailed metadata.
             return response()->json([
                 'data' => [
                     'file' => $file,
@@ -72,20 +109,33 @@ class LogsController extends Controller
     }
 
     /**
-     * Get log file content
+     * Get paginated content from a log file
      *
-     * @param Request $request
-     * @param string $logFile
-     * @return JsonResponse
+     * Retrieves log file content starting from a specific line number
+     * with configurable line limits for efficient pagination through large files.
+     *
+     * @param Request $request Request with optional after_line and max_lines parameters
+     * @param string $logFile The log file identifier
+     *
+     * @throws ValidationException When parameters are invalid
+     * @response array{
+     *   data: array{
+     *     lines: array<string>,
+     *     startLine: int,
+     *     endLine: int,
+     *     hasMore: boolean
+     *   }
+     * }|array{error: string}
      */
     #[Get('/{logFile}/content', 'api.logs.content')]
-    public function content(Request $request, string $logFile)
+    public function content(Request $request, string $logFile): JsonResponse
     {
         $request->validate([
             'after_line' => 'sometimes|integer|min:0',
             'max_lines'  => 'sometimes|integer|min:1|max:10000',
         ]);
 
+        /** @var LogFile|null $file */
         $file = $this->logFileService->getFileById($logFile);
 
         if (!$file) {
@@ -96,11 +146,17 @@ class LogsController extends Controller
 
         try {
             $searchableFile = new SearchableLogFile($file->path);
+
+            /** @var int $afterLine Starting line number for content retrieval */
             $afterLine = $request->integer('after_line', 0);
+
+            /** @var int $maxLines Maximum number of lines to return */
             $maxLines = $request->integer('max_lines', 1000);
 
+            /** @var object $content Paginated log content */
             $content = $searchableFile->contentAfterLine($afterLine, $maxLines);
 
+            // Paginated log file content.
             return response()->json([
                 'data' => $content,
             ]);
@@ -112,14 +168,24 @@ class LogsController extends Controller
     }
 
     /**
-     * Count log file lines
+     * Count total lines in a log file
      *
-     * @param string $logFile
-     * @return JsonResponse
+     * Returns the total line count for a log file using optimized counting
+     * algorithms that can handle very large files efficiently.
+     *
+     * @param string $logFile The log file identifier
+     *
+     * @response array{
+     *   data: array{
+     *     file: string,
+     *     totalLines: int
+     *   }
+     * }|array{error: string}
      */
     #[Get('/{logFile}/lines', 'api.logs.lines')]
-    public function lines(string $logFile)
+    public function lines(string $logFile): JsonResponse
     {
+        /** @var LogFile|null $file */
         $file = $this->logFileService->getFileById($logFile);
 
         if (!$file) {
@@ -130,8 +196,11 @@ class LogsController extends Controller
 
         try {
             $processor = new ThreadedLogProcessor($file->path);
+
+            /** @var int $lineCount Total number of lines in the file */
             $lineCount = $processor->countLines();
 
+            // Log file line count information.
             return response()->json([
                 'data' => [
                     'file'       => $logFile,
@@ -146,53 +215,22 @@ class LogsController extends Controller
     }
 
     /**
-     * Search log file content
+     * Get the last N lines from a log file (tail functionality)
      *
-     * @param Request $request
-     * @param string $logFile
-     * @return JsonResponse
-     */
-    #[Get('/{logFile}/search', 'api.logs.search')]
-    public function search(Request $request, string $logFile)
-    {
-        $request->validate([
-            'pattern'       => 'required|string|min:1|max:500',
-            'caseSensitive' => 'sometimes|boolean',
-            'maxResults'    => 'sometimes|integer|min:1|max:1000',
-        ]);
-
-        $file = $this->logFileService->getFileById($logFile);
-
-        if (!$file) {
-            return response()->json([
-                'error' => 'Log file not found',
-            ], 404);
-        }
-
-        try {
-            $searchableFile = new SearchableLogFile($file->path);
-            $pattern = $request->string('pattern');
-            $caseSensitive = $request->boolean('caseSensitive', true);
-            $maxResults = $request->integer('maxResults', 100);
-
-            $results = $searchableFile->search($pattern, $caseSensitive, $maxResults);
-
-            return response()->json([
-                'data' => $results,
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'error' => 'Search failed: ' . $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Get log file tail
+     * Returns the most recent lines from a log file, similar to the Unix tail command.
+     * Useful for monitoring recent activity and debugging current issues.
      *
-     * @param Request $request
-     * @param string $logFile
-     * @return JsonResponse
+     * @param Request $request Request with optional lines parameter
+     * @param string $logFile The log file identifier
+     *
+     * @throws ValidationException When lines parameter is invalid
+     * @response array{
+     *   data: array{
+     *     content: array<string>,
+     *     totalLines: int,
+     *     showingLines: int
+     *   }
+     * }|array{error: string}
      */
     #[Get('/{logFile}/tail', 'api.logs.tail')]
     public function tail(Request $request, string $logFile): JsonResponse
@@ -201,6 +239,7 @@ class LogsController extends Controller
             'lines' => 'sometimes|integer|min:1|max:1000',
         ]);
 
+        /** @var LogFile|null $file */
         $file = $this->logFileService->getFileById($logFile);
 
         if (!$file) {
@@ -211,12 +250,20 @@ class LogsController extends Controller
 
         try {
             $searchableFile = new SearchableLogFile($file->path);
+
+            /** @var int $lines Number of lines to show from the end */
             $lines = $request->integer('lines', 50);
+
+            /** @var int $totalLines Total lines in the file */
             $totalLines = $searchableFile->numberOfLines();
+
+            /** @var int $startLine Starting line for tail operation */
             $startLine = max(0, $totalLines - $lines);
 
+            /** @var object $content Tail content from the log file */
             $content = $searchableFile->contentAfterLine($startLine, $lines);
 
+            // Tail content from log file.
             return response()->json([
                 'data' => [
                     'content'      => $content,
@@ -232,11 +279,21 @@ class LogsController extends Controller
     }
 
     /**
-     * Get log file head
+     * Get the first N lines from a log file (head functionality)
      *
-     * @param Request $request
-     * @param string $logFile
-     * @return JsonResponse
+     * Returns the first lines from a log file, similar to the Unix head command.
+     * Useful for examining log file structure and initial entries.
+     *
+     * @param Request $request Request with optional lines parameter
+     * @param string $logFile The log file identifier
+     *
+     * @throws ValidationException When lines parameter is invalid
+     * @response array{
+     *   data: array{
+     *     content: array<string>,
+     *     showingLines: int
+     *   }
+     * }|array{error: string}
      */
     #[Get('/{logFile}/head', 'api.logs.head')]
     public function head(Request $request, string $logFile): JsonResponse
@@ -245,6 +302,7 @@ class LogsController extends Controller
             'lines' => 'sometimes|integer|min:1|max:1000',
         ]);
 
+        /** @var LogFile|null $file */
         $file = $this->logFileService->getFileById($logFile);
 
         if (!$file) {
@@ -255,10 +313,14 @@ class LogsController extends Controller
 
         try {
             $searchableFile = new SearchableLogFile($file->path);
+
+            /** @var int $lines Number of lines to show from the beginning */
             $lines = $request->integer('lines', 50);
 
+            /** @var object $content Head content from the log file */
             $content = $searchableFile->contentAfterLine(0, $lines);
 
+            // Head content from log file.
             return response()->json([
                 'data' => [
                     'content'      => $content,
@@ -273,14 +335,38 @@ class LogsController extends Controller
     }
 
     /**
-     * Get log file statistics
+     * Get comprehensive statistics for a log file
      *
-     * @param string $logFile
-     * @return JsonResponse
+     * Analyzes log file content to provide detailed statistics including
+     * log level counts, performance metrics, and optimization recommendations.
+     *
+     * @param string $logFile The log file identifier
+     *
+     * @response array{
+     *   data: array{
+     *     fileInfo: array{
+     *       size: int,
+     *       lines: int,
+     *       lastModified: string
+     *     },
+     *     logLevels: array{
+     *       error: int,
+     *       warning: int,
+     *       info: int,
+     *       debug: int
+     *     },
+     *     performance: array{
+     *       isLargeFile: boolean,
+     *       shouldUseThreading: boolean,
+     *       optimalThreads: int
+     *     }
+     *   }
+     * }|array{error: string}
      */
     #[Get('/{logFile}/stats', 'api.logs.stats')]
     public function stats(string $logFile): JsonResponse
     {
+        /** @var LogFile|null $file */
         $file = $this->logFileService->getFileById($logFile);
 
         if (!$file) {
@@ -291,18 +377,28 @@ class LogsController extends Controller
 
         try {
             $searchableFile = new SearchableLogFile($file->path);
+
+            /** @var object $fileInfo Basic file information */
             $fileInfo = $searchableFile->getFileInfo();
 
-            // Get some basic log level statistics
+            // Analyze log levels for statistical breakdown
+            /** @var int $errorCount Number of ERROR level entries */
             $errorCount = $searchableFile->search('ERROR', false, null)->totalMatches;
+
+            /** @var int $warningCount Number of WARNING level entries */
             $warningCount = $searchableFile->search('WARNING', false, null)->totalMatches;
+
+            /** @var int $infoCount Number of INFO level entries */
             $infoCount = $searchableFile->search('INFO', false, null)->totalMatches;
+
+            /** @var int $debugCount Number of DEBUG level entries */
             $debugCount = $searchableFile->search('DEBUG', false, null)->totalMatches;
 
+            // Comprehensive log file statistics.
             return response()->json([
                 'data' => [
-                    'fileInfo'   => $fileInfo,
-                    'logLevels'  => [
+                    'fileInfo'    => $fileInfo,
+                    'logLevels'   => [
                         'error'   => $errorCount,
                         'warning' => $warningCount,
                         'info'    => $infoCount,
@@ -311,7 +407,7 @@ class LogsController extends Controller
                     'performance' => [
                         'isLargeFile'        => $fileInfo->isLargeFile(),
                         'shouldUseThreading' => $fileInfo->shouldUseThreading(),
-                        'optimalThreads'      => $fileInfo->optimalThreads,
+                        'optimalThreads'     => $fileInfo->optimalThreads,
                     ],
                 ],
             ]);
@@ -323,14 +419,88 @@ class LogsController extends Controller
     }
 
     /**
-     * Download log file
+     * Search for patterns within a log file
      *
-     * @param string $logFile
-     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse|JsonResponse
+     * Performs high-performance pattern matching within log files with support
+     * for case-sensitive/insensitive searches and configurable result limits.
+     *
+     * @param Request $request Request with pattern, caseSensitive, and maxResults parameters
+     * @param string $logFile The log file identifier to search
+     *
+     * @throws ValidationException When search parameters are invalid
+     * @response array{
+     *   data: array{
+     *     pattern: string,
+     *     caseSensitive: boolean,
+     *     totalMatches: int,
+     *     searchTimeMs: float,
+     *     results: array<array{
+     *       lineNumber: int,
+     *       content: string,
+     *       matchPosition: int
+     *     }>
+     *   }
+     * }|array{error: string}
+     */
+    #[Get('/{logFile}/search', 'api.logs.search')]
+    public function search(Request $request, string $logFile): JsonResponse
+    {
+        $request->validate([
+            'pattern'       => 'required|string|min:1|max:500',
+            'caseSensitive' => 'sometimes|boolean',
+            'maxResults'    => 'sometimes|integer|min:1|max:1000',
+        ]);
+
+        /** @var LogFile|null $file */
+        $file = $this->logFileService->getFileById($logFile);
+
+        if (!$file) {
+            return response()->json([
+                'error' => 'Log file not found',
+            ], 404);
+        }
+
+        try {
+            $searchableFile = new SearchableLogFile($file->path);
+
+            /** @var string $pattern Search pattern */
+            $pattern = $request->string('pattern');
+
+            /** @var bool $caseSensitive Whether search should be case-sensitive */
+            $caseSensitive = $request->boolean('caseSensitive', true);
+
+            /** @var int $maxResults Maximum number of results to return */
+            $maxResults = $request->integer('maxResults', 100);
+
+            /** @var object $results Search results with matches and metadata */
+            $results = $searchableFile->search($pattern, $caseSensitive, $maxResults);
+
+            // Search results from log file.
+            return response()->json([
+                'data' => $results,
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'error' => 'Search failed: ' . $e->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Download a log file
+     *
+     * Provides direct download access to log files for offline analysis
+     * or archival purposes. Returns the file as a plain text download.
+     *
+     * @param string $logFile The log file identifier to download
+     *
+     * @throws ModelNotFoundException When log file is not found
+     * @response BinaryFileResponse|array{error: string}
      */
     #[Get('/{logFile}/download', 'api.logs.download')]
-    public function download(string $logFile)
+    public function download(string $logFile): BinaryFileResponse|JsonResponse
     {
+        /** @var LogFile|null $file */
         $file = $this->logFileService->getFileById($logFile);
 
         if (!$file) {
@@ -345,47 +515,91 @@ class LogsController extends Controller
             ], 404);
         }
 
+        // Log file download stream.
         return response()->download($file->path, $file->fileName, [
             'Content-Type' => 'text/plain',
         ]);
     }
 
     /**
-     * Search across all log files
+     * Search across multiple log files simultaneously
      *
-     * @param Request $request
-     * @return JsonResponse
+     * Performs pattern matching across multiple log files in parallel,
+     * providing consolidated search results with performance metrics
+     * and per-file result breakdowns.
+     *
+     * @param Request $request Request with search parameters and optional file filtering
+     *
+     * @throws ValidationException When search parameters are invalid
+     * @response array{
+     *   data: array{
+     *     pattern: string,
+     *     caseSensitive: boolean,
+     *     totalFilesSearched: int,
+     *     filesWithMatches: int,
+     *     totalMatches: int,
+     *     searchTimeMs: float,
+     *     results: array<array{
+     *       file: LogFile,
+     *       results: array{
+     *         totalMatches: int,
+     *         searchTimeMs: float,
+     *         matches: array<array{
+     *           lineNumber: int,
+     *           content: string,
+     *           matchPosition: int
+     *         }>
+     *       }
+     *     }>
+     *   }
+     * }|array{error: string}
      */
     #[Get('/search/all', 'api.logs.search-all')]
-    public function searchAll(Request $request)
+    public function searchAll(Request $request): JsonResponse
     {
         $request->validate([
-            'pattern'              => 'required|string|min:1|max:500',
-            'caseSensitive'       => 'sometimes|boolean',
+            'pattern'           => 'required|string|min:1|max:500',
+            'caseSensitive'     => 'sometimes|boolean',
             'maxResultsPerFile' => 'sometimes|integer|min:1|max:100',
-            'files'                => 'sometimes|array',
-            'files.*'              => 'string',
+            'files'             => 'sometimes|array',
+            'files.*'           => 'string',
         ]);
 
         try {
+            /** @var string $pattern Search pattern */
             $pattern = $request->string('pattern');
+
+            /** @var bool $caseSensitive Whether search should be case-sensitive */
             $caseSensitive = $request->boolean('caseSensitive', true);
+
+            /** @var int $maxResultsPerFile Maximum results per individual file */
             $maxResultsPerFile = $request->integer('maxResultsPerFile', 10);
+
+            /** @var array<string> $requestedFiles Specific files to search (optional) */
             $requestedFiles = $request->input('files', []);
 
+            /** @var Collection $files Files to search */
             $files = $this->logFileService->getFiles();
 
+            // Filter to specific files if requested
             if (!empty($requestedFiles)) {
                 $files = $files->whereIn('id', $requestedFiles);
             }
 
+            /** @var array $allResults Consolidated search results */
             $allResults = [];
+
+            /** @var int $totalMatches Total matches across all files */
             $totalMatches = 0;
+
+            /** @var float $searchTime Total search time across all files */
             $searchTime = 0;
 
+            // Search through each file
             foreach ($files as $file) {
                 try {
                     $searchableFile = new SearchableLogFile($file->path);
+                    /** @var object $results Results from searching this file */
                     $results = $searchableFile->search($pattern, $caseSensitive, $maxResultsPerFile);
 
                     if (!$results->isEmpty()) {
@@ -402,15 +616,16 @@ class LogsController extends Controller
                 }
             }
 
+            // Consolidated search results across all log files.
             return response()->json([
                 'data' => [
-                    'pattern'              => $pattern,
-                    'caseSensitive'       => $caseSensitive,
+                    'pattern'            => $pattern,
+                    'caseSensitive'      => $caseSensitive,
                     'totalFilesSearched' => $files->count(),
                     'filesWithMatches'   => count($allResults),
-                    'totalMatches'        => $totalMatches,
+                    'totalMatches'       => $totalMatches,
                     'searchTimeMs'       => round($searchTime, 2),
-                    'results'              => $allResults,
+                    'results'            => $allResults,
                 ],
             ]);
         } catch (Exception $e) {

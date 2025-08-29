@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasLibraryStats;
+use App\Models\Concerns\HasMeta;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Spatie\Sluggable\{HasSlug, SlugOptions};
 use Illuminate\Support\Carbon;
@@ -10,7 +11,7 @@ use Illuminate\Support\Facades\Storage;
 
 class Library extends BaseModel
 {
-    use HasFactory, HasSlug, HasLibraryStats;
+    use HasFactory, HasSlug, HasLibraryStats, HasMeta;
 
     protected $fillable = [
         'name',

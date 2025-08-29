@@ -24,8 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [streamToken, setStreamToken] = useState<NewAccessTokenResource>();
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isRefreshingRef = useRef<boolean>(false);
-
-  const isAuthenticated = !!Token.get() && !isLoading;
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // Initialize auth state from storage
   useEffect(() => {
@@ -52,14 +51,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Setup stream token refresh when authenticated
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !isLoading) {
       startStreamTokenRefresh();
     } else {
       clearRefreshInterval();
     }
 
     return clearRefreshInterval;
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isLoading]);
 
   const initializeAuthState = useCallback(() => {
     try {
@@ -69,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (authToken && storedSessionId) {
         setSessionId(storedSessionId);
+        setIsAuthenticated(true);
       }
 
       if (storedStreamToken && !Token.isExpired(storedStreamToken.expiresAt)) {
@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Set up interval for periodic refresh
     refreshIntervalRef.current = setInterval(refreshStreamTokenIfNeeded, 30_000);
-  }, []);
+  }, [isAuthenticated]);
 
   const refreshStreamTokenIfNeeded = useCallback(async () => {
     if (!isAuthenticated || isRefreshingRef.current) {
@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isRefreshingRef.current = false;
       }
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isRefreshingRef.current]);
 
   const clearRefreshInterval = useCallback(() => {
     if (refreshIntervalRef.current) {
@@ -143,6 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       await loginService(credentials);
+      setIsAuthenticated(true);
       // State will be updated via event bridge listener
     } catch (error) {
       clearAuthState();
@@ -156,6 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       await logoutService();
+      setIsAuthenticated(false);
       // State will be cleared via event bridge listener
     } catch (error) {
       console.warn('Logout failed:', error);

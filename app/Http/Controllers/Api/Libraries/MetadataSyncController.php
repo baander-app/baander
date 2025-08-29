@@ -28,18 +28,18 @@ class MetadataSyncController extends Controller
     public function sync(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'album_ids' => 'sometimes|array',
-            'album_ids.*' => 'integer|exists:albums,id',
-            'song_ids' => 'sometimes|array',
-            'song_ids.*' => 'integer|exists:songs,id',
-            'artist_ids' => 'sometimes|array',
-            'artist_ids.*' => 'integer|exists:artists,id',
-            'library_id' => 'sometimes|integer|exists:libraries,id',
-            'include_songs' => 'sometimes|boolean',
+            'album_ids'       => 'sometimes|array',
+            'album_ids.*'     => 'integer|exists:albums,id',
+            'song_ids'        => 'sometimes|array',
+            'song_ids.*'      => 'integer|exists:songs,id',
+            'artist_ids'      => 'sometimes|array',
+            'artist_ids.*'    => 'integer|exists:artists,id',
+            'library_id'      => 'sometimes|integer|exists:libraries,id',
+            'include_songs'   => 'sometimes|boolean',
             'include_artists' => 'sometimes|boolean',
-            'force_update' => 'sometimes|boolean',
-            'batch_size' => 'sometimes|integer|min:1|max:100',
-            'queue' => 'sometimes|string',
+            'force_update'    => 'sometimes|boolean',
+            'batch_size'      => 'sometimes|integer|min:1|max:100',
+            'queue'           => 'sometimes|string',
         ]);
 
         $albumIds = $validated['album_ids'] ?? [];
@@ -49,7 +49,7 @@ class MetadataSyncController extends Controller
 
         if (!$libraryId && empty($albumIds) && empty($songIds) && empty($artistIds)) {
             throw ValidationException::withMessages([
-                'sync' => 'You must specify at least one of: album_ids, song_ids, artist_ids, or library_id'
+                'sync' => 'You must specify at least one of: album_ids, song_ids, artist_ids, or library_id',
             ]);
         }
 
@@ -62,20 +62,20 @@ class MetadataSyncController extends Controller
             $validated['batch_size'] ?? null,
             $validated['queue'] ?? null,
             $validated['include_songs'] ?? false,
-            $validated['include_artists'] ?? false
+            $validated['include_artists'] ?? false,
         );
 
         return response()->json([
-            'message' => 'Metadata sync jobs queued successfully',
-            'jobs_queued' => $totalJobs,
+            'message'      => 'Metadata sync jobs queued successfully',
+            'jobs_queued'  => $totalJobs,
             'sync_details' => [
-                'albums' => count($albumIds),
-                'songs' => count($songIds),
-                'artists' => count($artistIds),
-                'library_id' => $libraryId,
-                'include_songs' => $validated['include_songs'] ?? false,
+                'albums'          => count($albumIds),
+                'songs'           => count($songIds),
+                'artists'         => count($artistIds),
+                'library_id'      => $libraryId,
+                'include_songs'   => $validated['include_songs'] ?? false,
                 'include_artists' => $validated['include_artists'] ?? false,
-            ]
+            ],
         ]);
     }
 
@@ -86,7 +86,7 @@ class MetadataSyncController extends Controller
 
         return response()->json([
             'library_id' => $libraryId,
-            'stats' => $stats
+            'stats'      => $stats,
         ]);
     }
 
@@ -94,22 +94,22 @@ class MetadataSyncController extends Controller
     public function validateIds(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'album_ids' => 'sometimes|array',
-            'album_ids.*' => 'integer',
-            'song_ids' => 'sometimes|array',
-            'song_ids.*' => 'integer',
-            'artist_ids' => 'sometimes|array',
+            'album_ids'    => 'sometimes|array',
+            'album_ids.*'  => 'integer',
+            'song_ids'     => 'sometimes|array',
+            'song_ids.*'   => 'integer',
+            'artist_ids'   => 'sometimes|array',
             'artist_ids.*' => 'integer',
         ]);
 
         $validation = $this->metadataSyncService->validateIds(
             $validated['album_ids'] ?? [],
             $validated['song_ids'] ?? [],
-            $validated['artist_ids'] ?? []
+            $validated['artist_ids'] ?? [],
         );
 
         return response()->json([
-            'validation_results' => $validation
+            'validation_results' => $validation,
         ]);
     }
 }

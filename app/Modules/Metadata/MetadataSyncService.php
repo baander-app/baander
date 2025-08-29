@@ -1,4 +1,3 @@
-
 <?php
 
 namespace App\Modules\Metadata;
@@ -294,7 +293,6 @@ class MetadataSyncService
             'full' => SyncArtistJob::syncAll($artist->id, $forceUpdate),
             'musicbrainz' => SyncArtistJob::syncFromMusicBrainz($artist->id, $forceUpdate),
             'discogs' => SyncArtistJob::syncFromDiscogs($artist->id, $forceUpdate),
-            'legacy' => SyncArtistJob::syncLegacy($artist->id, $forceUpdate),
             default => SyncArtistJob::syncGeneral($artist->id, $forceUpdate)
         };
 

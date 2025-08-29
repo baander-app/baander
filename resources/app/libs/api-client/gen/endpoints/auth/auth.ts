@@ -46,21 +46,20 @@ import type {
   AuthLogin200,
   AuthLogin401,
   AuthPasskeyLogin200,
-  AuthPasskeyLogin401,
   AuthPasskeyOptions200,
   AuthPasskeyRegister200,
-  AuthPasskeyRegister500,
   AuthPasskeyRegisterOption200,
   AuthRefreshToken200,
   AuthRegister200,
   AuthResetPassword200,
   AuthResetPassword400,
   AuthStreamToken200,
+  AuthTokens200Item,
   AuthTokensRevoke200,
-  AuthTokensRevoke400,
   AuthTokensRevokeAll200,
   AuthenticateUsingPasskeyRequest,
   AuthenticationExceptionResponse,
+  AuthorizationExceptionResponse,
   ForgotPasswordRequest,
   LoginRequest,
   LogoutRequest,
@@ -78,7 +77,9 @@ import type { ErrorType, BodyType } from "../../../axios-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * @summary Login
+ * Authenticates a user with email and password, creates access and refresh tokens
+with device binding and location tracking for security purposes.
+ * @summary Authenticate user and create session
  */
 export const authLogin = (
   loginRequest: BodyType<LoginRequest>,
@@ -144,7 +145,7 @@ export type AuthLoginMutationError = ErrorType<
 >;
 
 /**
- * @summary Login
+ * @summary Authenticate user and create session
  */
 export const useAuthLogin = <
   TError = ErrorType<AuthLogin401 | ValidationExceptionResponse>,
@@ -171,8 +172,9 @@ export const useAuthLogin = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * Needs refresh token with ability "issue-access-token"
- * @summary Refresh token
+ * Creates a new access token using a valid refresh token. Updates device
+binding information and maintains session continuity.
+ * @summary Refresh access token using refresh token
  */
 export const authRefreshToken = (
   options?: SecondParameter<typeof customInstance>,
@@ -185,7 +187,9 @@ export const authRefreshToken = (
 };
 
 export const getAuthRefreshTokenMutationOptions = <
-  TError = ErrorType<AuthenticationExceptionResponse>,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >,
   TContext = unknown
 >(options?: {
   mutation?: UseMutationOptions<
@@ -224,14 +228,17 @@ export type AuthRefreshTokenMutationResult = NonNullable<
   Awaited<ReturnType<typeof authRefreshToken>>
 >;
 
-export type AuthRefreshTokenMutationError =
-  ErrorType<AuthenticationExceptionResponse>;
+export type AuthRefreshTokenMutationError = ErrorType<
+  AuthenticationExceptionResponse | AuthorizationExceptionResponse
+>;
 
 /**
- * @summary Refresh token
+ * @summary Refresh access token using refresh token
  */
 export const useAuthRefreshToken = <
-  TError = ErrorType<AuthenticationExceptionResponse>,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >,
   TContext = unknown
 >(
   options?: {
@@ -255,8 +262,9 @@ export const useAuthRefreshToken = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * Needs refresh token with ability "issue-access-token"
- * @summary Get a stream token
+ * Generates a short-lived token specifically for media streaming operations.
+These tokens have limited scope and shorter expiration for enhanced security.
+ * @summary Create a stream-specific access token
  */
 export const authStreamToken = (
   options?: SecondParameter<typeof customInstance>,
@@ -269,7 +277,9 @@ export const authStreamToken = (
 };
 
 export const getAuthStreamTokenMutationOptions = <
-  TError = ErrorType<AuthenticationExceptionResponse>,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >,
   TContext = unknown
 >(options?: {
   mutation?: UseMutationOptions<
@@ -308,14 +318,17 @@ export type AuthStreamTokenMutationResult = NonNullable<
   Awaited<ReturnType<typeof authStreamToken>>
 >;
 
-export type AuthStreamTokenMutationError =
-  ErrorType<AuthenticationExceptionResponse>;
+export type AuthStreamTokenMutationError = ErrorType<
+  AuthenticationExceptionResponse | AuthorizationExceptionResponse
+>;
 
 /**
- * @summary Get a stream token
+ * @summary Create a stream-specific access token
  */
 export const useAuthStreamToken = <
-  TError = ErrorType<AuthenticationExceptionResponse>,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >,
   TContext = unknown
 >(
   options?: {
@@ -339,7 +352,9 @@ export const useAuthStreamToken = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Register
+ * Creates a new user account with the provided information and automatically
+logs them in with access and refresh tokens.
+ * @summary Register a new user account
  */
 export const authRegister = (
   registerRequest: BodyType<RegisterRequest>,
@@ -403,7 +418,7 @@ export type AuthRegisterMutationBody = BodyType<RegisterRequest>;
 export type AuthRegisterMutationError = ErrorType<ValidationExceptionResponse>;
 
 /**
- * @summary Register
+ * @summary Register a new user account
  */
 export const useAuthRegister = <
   TError = ErrorType<ValidationExceptionResponse>,
@@ -430,14 +445,15 @@ export const useAuthRegister = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * Returns information about all active tokens including IP history
- * @summary Get user's active tokens/sessions
+ * Returns detailed information about all active tokens/sessions including
+IP history, location data, and device information for security management.
+ * @summary Get user's active sessions and tokens
  */
 export const authTokens = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
-  return customInstance<string>(
+  return customInstance<AuthTokens200Item[]>(
     { url: `/api/auth/tokens`, method: "GET", signal },
     options
   );
@@ -552,7 +568,7 @@ export function useAuthTokensInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get user's active tokens/sessions
+ * @summary Get user's active sessions and tokens
  */
 
 export function useAuthTokensInfinite<
@@ -675,7 +691,7 @@ export function useAuthTokens<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get user's active tokens/sessions
+ * @summary Get user's active sessions and tokens
  */
 
 export function useAuthTokens<
@@ -793,7 +809,7 @@ export function useAuthTokensSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get user's active tokens/sessions
+ * @summary Get user's active sessions and tokens
  */
 
 export function useAuthTokensSuspense<
@@ -921,7 +937,7 @@ export function useAuthTokensSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get user's active tokens/sessions
+ * @summary Get user's active sessions and tokens
  */
 
 export function useAuthTokensSuspenseInfinite<
@@ -957,7 +973,9 @@ export function useAuthTokensSuspenseInfinite<
 }
 
 /**
- * @summary Revoke all tokens except current
+ * Revokes all active tokens except the current session. Useful for security
+purposes when user wants to log out all other devices.
+ * @summary Revoke all sessions except current
  */
 export const authTokensRevokeAll = (
   options?: SecondParameter<typeof customInstance>
@@ -1012,7 +1030,7 @@ export type AuthTokensRevokeAllMutationError =
   ErrorType<AuthenticationExceptionResponse>;
 
 /**
- * @summary Revoke all tokens except current
+ * @summary Revoke all sessions except current
  */
 export const useAuthTokensRevokeAll = <
   TError = ErrorType<AuthenticationExceptionResponse>,
@@ -1039,7 +1057,9 @@ export const useAuthTokensRevokeAll = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Revoke a specific token
+ * Permanently revokes a specific token, ending that session. Cannot be used
+to revoke the current session - use logout endpoint instead.
+ * @summary Revoke a specific token/session
  */
 export const authTokensRevoke = (
   tokenId: string,
@@ -1052,7 +1072,11 @@ export const authTokensRevoke = (
 };
 
 export const getAuthTokensRevokeMutationOptions = <
-  TError = ErrorType<AuthTokensRevoke400 | AuthenticationExceptionResponse>,
+  TError = ErrorType<
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
+  >,
   TContext = unknown
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1094,14 +1118,20 @@ export type AuthTokensRevokeMutationResult = NonNullable<
 >;
 
 export type AuthTokensRevokeMutationError = ErrorType<
-  AuthTokensRevoke400 | AuthenticationExceptionResponse
+  | AuthenticationExceptionResponse
+  | ModelNotFoundExceptionResponse
+  | ValidationExceptionResponse
 >;
 
 /**
- * @summary Revoke a specific token
+ * @summary Revoke a specific token/session
  */
 export const useAuthTokensRevoke = <
-  TError = ErrorType<AuthTokensRevoke400 | AuthenticationExceptionResponse>,
+  TError = ErrorType<
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
+  >,
   TContext = unknown
 >(
   options?: {
@@ -1125,7 +1155,9 @@ export const useAuthTokensRevoke = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Request reset password link
+ * Sends a password reset link to the specified email address if a user
+account exists. The link contains a secure token for verification.
+ * @summary Request a password-reset link
  */
 export const authForgotPassword = (
   forgotPasswordRequest: BodyType<ForgotPasswordRequest>,
@@ -1145,7 +1177,9 @@ export const authForgotPassword = (
 };
 
 export const getAuthForgotPasswordMutationOptions = <
-  TError = ErrorType<ValidationExceptionResponse>,
+  TError = ErrorType<
+    ModelNotFoundExceptionResponse | ValidationExceptionResponse
+  >,
   TContext = unknown
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1186,14 +1220,17 @@ export type AuthForgotPasswordMutationResult = NonNullable<
   Awaited<ReturnType<typeof authForgotPassword>>
 >;
 export type AuthForgotPasswordMutationBody = BodyType<ForgotPasswordRequest>;
-export type AuthForgotPasswordMutationError =
-  ErrorType<ValidationExceptionResponse>;
+export type AuthForgotPasswordMutationError = ErrorType<
+  ModelNotFoundExceptionResponse | ValidationExceptionResponse
+>;
 
 /**
- * @summary Request reset password link
+ * @summary Request a password-reset link
  */
 export const useAuthForgotPassword = <
-  TError = ErrorType<ValidationExceptionResponse>,
+  TError = ErrorType<
+    ModelNotFoundExceptionResponse | ValidationExceptionResponse
+  >,
   TContext = unknown
 >(
   options?: {
@@ -1217,7 +1254,9 @@ export const useAuthForgotPassword = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Reset password
+ * Resets the user's password using a valid reset token. All existing
+tokens are revoked for security after a password change.
+ * @summary Reset user password
  */
 export const authResetPassword = (
   resetPasswordRequest: BodyType<ResetPasswordRequest>,
@@ -1237,7 +1276,11 @@ export const authResetPassword = (
 };
 
 export const getAuthResetPasswordMutationOptions = <
-  TError = ErrorType<AuthResetPassword400 | ValidationExceptionResponse>,
+  TError = ErrorType<
+    | AuthResetPassword400
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
+  >,
   TContext = unknown
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1279,14 +1322,20 @@ export type AuthResetPasswordMutationResult = NonNullable<
 >;
 export type AuthResetPasswordMutationBody = BodyType<ResetPasswordRequest>;
 export type AuthResetPasswordMutationError = ErrorType<
-  AuthResetPassword400 | ValidationExceptionResponse
+  | AuthResetPassword400
+  | ModelNotFoundExceptionResponse
+  | ValidationExceptionResponse
 >;
 
 /**
- * @summary Reset password
+ * @summary Reset user password
  */
 export const useAuthResetPassword = <
-  TError = ErrorType<AuthResetPassword400 | ValidationExceptionResponse>,
+  TError = ErrorType<
+    | AuthResetPassword400
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
+  >,
   TContext = unknown
 >(
   options?: {
@@ -1310,7 +1359,9 @@ export const useAuthResetPassword = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Verify email
+ * Verifies a user's email address using the verification link sent during
+registration or email change. Marks the email as verified.
+ * @summary Verify the user email address
  */
 export const authVerifyEmail = (
   id: number,
@@ -1370,7 +1421,7 @@ export type AuthVerifyEmailMutationError =
   ErrorType<ModelNotFoundExceptionResponse>;
 
 /**
- * @summary Verify email
+ * @summary Verify the user email address
  */
 export const useAuthVerifyEmail = <
   TError = ErrorType<ModelNotFoundExceptionResponse>,
@@ -1397,8 +1448,9 @@ export const useAuthVerifyEmail = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * Invalidates the current session
- * @summary Logout
+ * Revokes the current access and refresh tokens, effectively logging out
+the user from the current session/device.
+ * @summary Log out the current session
  */
 export const authLogout = (
   logoutRequest: BodyType<LogoutRequest>,
@@ -1466,7 +1518,7 @@ export type AuthLogoutMutationError = ErrorType<
 >;
 
 /**
- * @summary Logout
+ * @summary Log out the current session
  */
 export const useAuthLogout = <
   TError = ErrorType<
@@ -1495,7 +1547,10 @@ export const useAuthLogout = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Get a passkey challenge
+ * Creates a cryptographic challenge for passkey authentication including
+allowed credentials and relying party information. This challenge must
+be used with the WebAuthn JavaScript API for authentication.
+ * @summary Generate WebAuthn authentication challenge
  */
 export const authPasskeyOptions = (
   options?: SecondParameter<typeof customInstance>,
@@ -1615,7 +1670,7 @@ export function useAuthPasskeyOptionsInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a passkey challenge
+ * @summary Generate WebAuthn authentication challenge
  */
 
 export function useAuthPasskeyOptionsInfinite<
@@ -1754,7 +1809,7 @@ export function useAuthPasskeyOptions<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a passkey challenge
+ * @summary Generate WebAuthn authentication challenge
  */
 
 export function useAuthPasskeyOptions<
@@ -1875,7 +1930,7 @@ export function useAuthPasskeyOptionsSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a passkey challenge
+ * @summary Generate WebAuthn authentication challenge
  */
 
 export function useAuthPasskeyOptionsSuspense<
@@ -2002,7 +2057,7 @@ export function useAuthPasskeyOptionsSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a passkey challenge
+ * @summary Generate WebAuthn authentication challenge
  */
 
 export function useAuthPasskeyOptionsSuspenseInfinite<
@@ -2039,7 +2094,10 @@ export function useAuthPasskeyOptionsSuspenseInfinite<
 }
 
 /**
- * @summary Login with a passkey
+ * Verifies the WebAuthn assertion from the user's authenticator and logs them in
+if successful. Creates session tokens and handles redirect logic for seamless
+authentication experience.
+ * @summary Authenticate using WebAuthn passkey
  */
 export const authPasskeyLogin = (
   authenticateUsingPasskeyRequest: BodyType<AuthenticateUsingPasskeyRequest>,
@@ -2059,7 +2117,7 @@ export const authPasskeyLogin = (
 };
 
 export const getAuthPasskeyLoginMutationOptions = <
-  TError = ErrorType<AuthPasskeyLogin401 | ValidationExceptionResponse>,
+  TError = ErrorType<ValidationExceptionResponse>,
   TContext = unknown
 >(options?: {
   mutation?: UseMutationOptions<
@@ -2101,15 +2159,14 @@ export type AuthPasskeyLoginMutationResult = NonNullable<
 >;
 export type AuthPasskeyLoginMutationBody =
   BodyType<AuthenticateUsingPasskeyRequest>;
-export type AuthPasskeyLoginMutationError = ErrorType<
-  AuthPasskeyLogin401 | ValidationExceptionResponse
->;
+export type AuthPasskeyLoginMutationError =
+  ErrorType<ValidationExceptionResponse>;
 
 /**
- * @summary Login with a passkey
+ * @summary Authenticate using WebAuthn passkey
  */
 export const useAuthPasskeyLogin = <
-  TError = ErrorType<AuthPasskeyLogin401 | ValidationExceptionResponse>,
+  TError = ErrorType<ValidationExceptionResponse>,
   TContext = unknown
 >(
   options?: {
@@ -2133,7 +2190,10 @@ export const useAuthPasskeyLogin = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Get passkey registration options
+ * Creates a cryptographic challenge for registering a new passkey to the
+authenticated user's account. The challenge includes user information
+and credential creation parameters.
+ * @summary Generate WebAuthn registration challenge for new passkey
  */
 export const authPasskeyRegisterOption = (
   options?: SecondParameter<typeof customInstance>,
@@ -2151,7 +2211,9 @@ export const getAuthPasskeyRegisterOptionQueryKey = () => {
 
 export const getAuthPasskeyRegisterOptionInfiniteQueryOptions = <
   TData = InfiniteData<Awaited<ReturnType<typeof authPasskeyRegisterOption>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(options?: {
   query?: Partial<
     UseInfiniteQueryOptions<
@@ -2181,12 +2243,15 @@ export const getAuthPasskeyRegisterOptionInfiniteQueryOptions = <
 export type AuthPasskeyRegisterOptionInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof authPasskeyRegisterOption>>
 >;
-export type AuthPasskeyRegisterOptionInfiniteQueryError =
-  ErrorType<AuthenticationExceptionResponse>;
+export type AuthPasskeyRegisterOptionInfiniteQueryError = ErrorType<
+  AuthenticationExceptionResponse | AuthorizationExceptionResponse
+>;
 
 export function useAuthPasskeyRegisterOptionInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof authPasskeyRegisterOption>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options: {
     query: Partial<
@@ -2212,7 +2277,9 @@ export function useAuthPasskeyRegisterOptionInfinite<
 };
 export function useAuthPasskeyRegisterOptionInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof authPasskeyRegisterOption>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -2238,7 +2305,9 @@ export function useAuthPasskeyRegisterOptionInfinite<
 };
 export function useAuthPasskeyRegisterOptionInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof authPasskeyRegisterOption>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -2255,12 +2324,14 @@ export function useAuthPasskeyRegisterOptionInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get passkey registration options
+ * @summary Generate WebAuthn registration challenge for new passkey
  */
 
 export function useAuthPasskeyRegisterOptionInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof authPasskeyRegisterOption>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -2293,7 +2364,9 @@ export function useAuthPasskeyRegisterOptionInfinite<
 
 export const getAuthPasskeyRegisterOptionQueryOptions = <
   TData = Awaited<ReturnType<typeof authPasskeyRegisterOption>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -2323,12 +2396,15 @@ export const getAuthPasskeyRegisterOptionQueryOptions = <
 export type AuthPasskeyRegisterOptionQueryResult = NonNullable<
   Awaited<ReturnType<typeof authPasskeyRegisterOption>>
 >;
-export type AuthPasskeyRegisterOptionQueryError =
-  ErrorType<AuthenticationExceptionResponse>;
+export type AuthPasskeyRegisterOptionQueryError = ErrorType<
+  AuthenticationExceptionResponse | AuthorizationExceptionResponse
+>;
 
 export function useAuthPasskeyRegisterOption<
   TData = Awaited<ReturnType<typeof authPasskeyRegisterOption>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options: {
     query: Partial<
@@ -2354,7 +2430,9 @@ export function useAuthPasskeyRegisterOption<
 };
 export function useAuthPasskeyRegisterOption<
   TData = Awaited<ReturnType<typeof authPasskeyRegisterOption>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -2380,7 +2458,9 @@ export function useAuthPasskeyRegisterOption<
 };
 export function useAuthPasskeyRegisterOption<
   TData = Awaited<ReturnType<typeof authPasskeyRegisterOption>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -2397,12 +2477,14 @@ export function useAuthPasskeyRegisterOption<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get passkey registration options
+ * @summary Generate WebAuthn registration challenge for new passkey
  */
 
 export function useAuthPasskeyRegisterOption<
   TData = Awaited<ReturnType<typeof authPasskeyRegisterOption>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -2432,7 +2514,9 @@ export function useAuthPasskeyRegisterOption<
 
 export const getAuthPasskeyRegisterOptionSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof authPasskeyRegisterOption>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(options?: {
   query?: Partial<
     UseSuspenseQueryOptions<
@@ -2462,12 +2546,15 @@ export const getAuthPasskeyRegisterOptionSuspenseQueryOptions = <
 export type AuthPasskeyRegisterOptionSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof authPasskeyRegisterOption>>
 >;
-export type AuthPasskeyRegisterOptionSuspenseQueryError =
-  ErrorType<AuthenticationExceptionResponse>;
+export type AuthPasskeyRegisterOptionSuspenseQueryError = ErrorType<
+  AuthenticationExceptionResponse | AuthorizationExceptionResponse
+>;
 
 export function useAuthPasskeyRegisterOptionSuspense<
   TData = Awaited<ReturnType<typeof authPasskeyRegisterOption>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options: {
     query: Partial<
@@ -2485,7 +2572,9 @@ export function useAuthPasskeyRegisterOptionSuspense<
 };
 export function useAuthPasskeyRegisterOptionSuspense<
   TData = Awaited<ReturnType<typeof authPasskeyRegisterOption>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -2503,7 +2592,9 @@ export function useAuthPasskeyRegisterOptionSuspense<
 };
 export function useAuthPasskeyRegisterOptionSuspense<
   TData = Awaited<ReturnType<typeof authPasskeyRegisterOption>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -2520,12 +2611,14 @@ export function useAuthPasskeyRegisterOptionSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get passkey registration options
+ * @summary Generate WebAuthn registration challenge for new passkey
  */
 
 export function useAuthPasskeyRegisterOptionSuspense<
   TData = Awaited<ReturnType<typeof authPasskeyRegisterOption>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -2558,7 +2651,9 @@ export function useAuthPasskeyRegisterOptionSuspense<
 
 export const getAuthPasskeyRegisterOptionSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<Awaited<ReturnType<typeof authPasskeyRegisterOption>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(options?: {
   query?: Partial<
     UseSuspenseInfiniteQueryOptions<
@@ -2592,12 +2687,15 @@ export const getAuthPasskeyRegisterOptionSuspenseInfiniteQueryOptions = <
 export type AuthPasskeyRegisterOptionSuspenseInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof authPasskeyRegisterOption>>
 >;
-export type AuthPasskeyRegisterOptionSuspenseInfiniteQueryError =
-  ErrorType<AuthenticationExceptionResponse>;
+export type AuthPasskeyRegisterOptionSuspenseInfiniteQueryError = ErrorType<
+  AuthenticationExceptionResponse | AuthorizationExceptionResponse
+>;
 
 export function useAuthPasskeyRegisterOptionSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof authPasskeyRegisterOption>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options: {
     query: Partial<
@@ -2615,7 +2713,9 @@ export function useAuthPasskeyRegisterOptionSuspenseInfinite<
 };
 export function useAuthPasskeyRegisterOptionSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof authPasskeyRegisterOption>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -2633,7 +2733,9 @@ export function useAuthPasskeyRegisterOptionSuspenseInfinite<
 };
 export function useAuthPasskeyRegisterOptionSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof authPasskeyRegisterOption>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -2650,12 +2752,14 @@ export function useAuthPasskeyRegisterOptionSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get passkey registration options
+ * @summary Generate WebAuthn registration challenge for new passkey
  */
 
 export function useAuthPasskeyRegisterOptionSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof authPasskeyRegisterOption>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >
 >(
   options?: {
     query?: Partial<
@@ -2687,7 +2791,10 @@ export function useAuthPasskeyRegisterOptionSuspenseInfinite<
 }
 
 /**
- * @summary Register passkey
+ * Processes the WebAuthn attestation response to register a new passkey
+credential for the user's account. Includes validation and secure storage
+of the credential with optional naming.
+ * @summary Register a new passkey for the authenticated user
  */
 export const authPasskeyRegister = (
   storePasskeyRequest: BodyType<StorePasskeyRequest>,
@@ -2709,8 +2816,8 @@ export const authPasskeyRegister = (
 export const getAuthPasskeyRegisterMutationOptions = <
   TError = ErrorType<
     | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
     | ValidationExceptionResponse
-    | AuthPasskeyRegister500
   >,
   TContext = unknown
 >(options?: {
@@ -2754,18 +2861,18 @@ export type AuthPasskeyRegisterMutationResult = NonNullable<
 export type AuthPasskeyRegisterMutationBody = BodyType<StorePasskeyRequest>;
 export type AuthPasskeyRegisterMutationError = ErrorType<
   | AuthenticationExceptionResponse
+  | AuthorizationExceptionResponse
   | ValidationExceptionResponse
-  | AuthPasskeyRegister500
 >;
 
 /**
- * @summary Register passkey
+ * @summary Register a new passkey for the authenticated user
  */
 export const useAuthPasskeyRegister = <
   TError = ErrorType<
     | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
     | ValidationExceptionResponse
-    | AuthPasskeyRegister500
   >,
   TContext = unknown
 >(

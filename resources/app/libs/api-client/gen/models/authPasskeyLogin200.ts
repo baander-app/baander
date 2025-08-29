@@ -12,5 +12,8 @@ The media information is organized and easily searchable, ensuring users can alw
  * OpenAPI spec version: 0.0.1
  */
 import type { AuthPasskeyLogin200AnyOf } from "./authPasskeyLogin200AnyOf";
+import type { AuthPasskeyLogin200AnyOfFour } from "./authPasskeyLogin200AnyOfFour";
 
-export type AuthPasskeyLogin200 = AuthPasskeyLogin200AnyOf | string;
+export type AuthPasskeyLogin200 =
+  | AuthPasskeyLogin200AnyOf
+  | AuthPasskeyLogin200AnyOfFour;

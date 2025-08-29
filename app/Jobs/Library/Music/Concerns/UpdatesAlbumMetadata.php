@@ -60,14 +60,32 @@ trait UpdatesAlbumMetadata
     {
         return match($source) {
             'musicbrainz' => [
-                'title' => 'title',
-                'date' => 'year',
-                'id' => 'mbid',
+                'title'         => 'title',
+                'date'          => 'year',
+                'id'            => 'mbid',
+                'country'       => 'country',
+                'disambiguation' => 'disambiguation',
+                'barcode'       => 'barcode',
+                'status'        => 'status',
+                'packaging'     => 'packaging',
             ],
             'discogs' => [
-                'title' => 'title',
-                'year' => 'year',
-                'id' => 'discogs_id',
+                'title'      => 'title',
+                'year'       => 'year',
+                'id'         => 'discogs_id',
+                'country'    => 'country',
+                'notes'      => 'annotation',
+            ],
+            'general' => [
+                'title'          => 'title',
+                'year'           => 'year',
+                'mbid'           => 'mbid',
+                'discogs_id'     => 'discogs_id',
+                'country'        => 'country',
+                'disambiguation' => 'disambiguation',
+                'barcode'        => 'barcode',
+                'label'          => 'label',
+                'catalog_number' => 'catalog_number',
             ],
             default => []
         };

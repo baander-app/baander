@@ -35,7 +35,7 @@ class SchemaController extends Controller
 
         // Load all schema definitions into a map for quick lookup
         foreach ($schemas->define as $define) {
-            $this->schemaDefinitions[(string) $define['name']] = $define;
+            $this->schemaDefinitions[(string)$define['name']] = $define;
         }
 
         // Generate a structured JSON from the schema definitions
@@ -58,7 +58,7 @@ class SchemaController extends Controller
 
         $attributes = [];
         foreach ($element->attributes() as $attrName => $attrValue) {
-            $attributes[$attrName] = (string) $attrValue;
+            $attributes[$attrName] = (string)$attrValue;
         }
 
         $childrenData = [];
@@ -68,9 +68,9 @@ class SchemaController extends Controller
         }
 
         return [
-            'name' => $name,
+            'name'       => $name,
             'attributes' => $attributes,
-            'children' => $childrenData,
+            'children'   => $childrenData,
         ];
     }
 

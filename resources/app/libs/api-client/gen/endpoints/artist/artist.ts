@@ -39,7 +39,6 @@ import type {
 
 import type {
   ArtistResource,
-  ArtistsIndex200,
   ArtistsIndexParams,
   AuthenticationExceptionResponse,
   ModelNotFoundExceptionResponse,
@@ -52,7 +51,9 @@ import type { ErrorType } from "../../../axios-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * @summary Get a collection of artists
+ * Returns a filtered and paginated list of artists from the specified library.
+Supports field selection and relation inclusion for optimized queries.
+ * @summary Get a paginated collection of artists from a specific library
  */
 export const artistsIndex = (
   library: string,
@@ -60,7 +61,7 @@ export const artistsIndex = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
-  return customInstance<ArtistsIndex200>(
+  return customInstance<ArtistResource[]>(
     { url: `/api/libraries/${library}/artists`, method: "GET", params, signal },
     options
   );
@@ -82,7 +83,9 @@ export const getArtistsIndexInfiniteQueryOptions = <
     ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   library: string,
@@ -135,7 +138,9 @@ export type ArtistsIndexInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof artistsIndex>>
 >;
 export type ArtistsIndexInfiniteQueryError = ErrorType<
-  AuthenticationExceptionResponse | ValidationExceptionResponse
+  | AuthenticationExceptionResponse
+  | ModelNotFoundExceptionResponse
+  | ValidationExceptionResponse
 >;
 
 export function useArtistsIndexInfinite<
@@ -144,7 +149,9 @@ export function useArtistsIndexInfinite<
     ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   library: string,
@@ -180,7 +187,9 @@ export function useArtistsIndexInfinite<
     ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   library: string,
@@ -216,7 +225,9 @@ export function useArtistsIndexInfinite<
     ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   library: string,
@@ -238,7 +249,7 @@ export function useArtistsIndexInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of artists
+ * @summary Get a paginated collection of artists from a specific library
  */
 
 export function useArtistsIndexInfinite<
@@ -247,7 +258,9 @@ export function useArtistsIndexInfinite<
     ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   library: string,
@@ -289,7 +302,9 @@ export function useArtistsIndexInfinite<
 export const getArtistsIndexQueryOptions = <
   TData = Awaited<ReturnType<typeof artistsIndex>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   library: string,
@@ -326,13 +341,17 @@ export type ArtistsIndexQueryResult = NonNullable<
   Awaited<ReturnType<typeof artistsIndex>>
 >;
 export type ArtistsIndexQueryError = ErrorType<
-  AuthenticationExceptionResponse | ValidationExceptionResponse
+  | AuthenticationExceptionResponse
+  | ModelNotFoundExceptionResponse
+  | ValidationExceptionResponse
 >;
 
 export function useArtistsIndex<
   TData = Awaited<ReturnType<typeof artistsIndex>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   library: string,
@@ -358,7 +377,9 @@ export function useArtistsIndex<
 export function useArtistsIndex<
   TData = Awaited<ReturnType<typeof artistsIndex>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   library: string,
@@ -384,7 +405,9 @@ export function useArtistsIndex<
 export function useArtistsIndex<
   TData = Awaited<ReturnType<typeof artistsIndex>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   library: string,
@@ -400,13 +423,15 @@ export function useArtistsIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of artists
+ * @summary Get a paginated collection of artists from a specific library
  */
 
 export function useArtistsIndex<
   TData = Awaited<ReturnType<typeof artistsIndex>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   library: string,
@@ -436,7 +461,9 @@ export function useArtistsIndex<
 export const getArtistsIndexSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof artistsIndex>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   library: string,
@@ -472,13 +499,17 @@ export type ArtistsIndexSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof artistsIndex>>
 >;
 export type ArtistsIndexSuspenseQueryError = ErrorType<
-  AuthenticationExceptionResponse | ValidationExceptionResponse
+  | AuthenticationExceptionResponse
+  | ModelNotFoundExceptionResponse
+  | ValidationExceptionResponse
 >;
 
 export function useArtistsIndexSuspense<
   TData = Awaited<ReturnType<typeof artistsIndex>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   library: string,
@@ -500,7 +531,9 @@ export function useArtistsIndexSuspense<
 export function useArtistsIndexSuspense<
   TData = Awaited<ReturnType<typeof artistsIndex>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   library: string,
@@ -522,7 +555,9 @@ export function useArtistsIndexSuspense<
 export function useArtistsIndexSuspense<
   TData = Awaited<ReturnType<typeof artistsIndex>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   library: string,
@@ -542,13 +577,15 @@ export function useArtistsIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of artists
+ * @summary Get a paginated collection of artists from a specific library
  */
 
 export function useArtistsIndexSuspense<
   TData = Awaited<ReturnType<typeof artistsIndex>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   library: string,
@@ -591,7 +628,9 @@ export const getArtistsIndexSuspenseInfiniteQueryOptions = <
     ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   library: string,
@@ -643,7 +682,9 @@ export type ArtistsIndexSuspenseInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof artistsIndex>>
 >;
 export type ArtistsIndexSuspenseInfiniteQueryError = ErrorType<
-  AuthenticationExceptionResponse | ValidationExceptionResponse
+  | AuthenticationExceptionResponse
+  | ModelNotFoundExceptionResponse
+  | ValidationExceptionResponse
 >;
 
 export function useArtistsIndexSuspenseInfinite<
@@ -652,7 +693,9 @@ export function useArtistsIndexSuspenseInfinite<
     ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   library: string,
@@ -679,7 +722,9 @@ export function useArtistsIndexSuspenseInfinite<
     ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   library: string,
@@ -706,7 +751,9 @@ export function useArtistsIndexSuspenseInfinite<
     ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   library: string,
@@ -728,7 +775,7 @@ export function useArtistsIndexSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of artists
+ * @summary Get a paginated collection of artists from a specific library
  */
 
 export function useArtistsIndexSuspenseInfinite<
@@ -737,7 +784,9 @@ export function useArtistsIndexSuspenseInfinite<
     ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
   >
 >(
   library: string,
@@ -777,7 +826,9 @@ export function useArtistsIndexSuspenseInfinite<
 }
 
 /**
- * @summary Get an artist
+ * Retrieves a single artist from the specified library with comprehensive
+information including albums, songs, and other related data.
+ * @summary Get a specific artist with detailed information
  */
 export const artistsShow = (
   library: string,
@@ -929,7 +980,7 @@ export function useArtistsShowInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get an artist
+ * @summary Get a specific artist with detailed information
  */
 
 export function useArtistsShowInfinite<
@@ -1086,7 +1137,7 @@ export function useArtistsShow<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get an artist
+ * @summary Get a specific artist with detailed information
  */
 
 export function useArtistsShow<
@@ -1228,7 +1279,7 @@ export function useArtistsShowSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get an artist
+ * @summary Get a specific artist with detailed information
  */
 
 export function useArtistsShowSuspense<
@@ -1384,7 +1435,7 @@ export function useArtistsShowSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get an artist
+ * @summary Get a specific artist with detailed information
  */
 
 export function useArtistsShowSuspenseInfinite<

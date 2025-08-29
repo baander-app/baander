@@ -16,10 +16,6 @@ class SecurityHeadersMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (Str::contains($request->path(), 'log-viewer')) {
-            return $next($request);
-        }
-
         $response = $next($request);
 
         $headers = [

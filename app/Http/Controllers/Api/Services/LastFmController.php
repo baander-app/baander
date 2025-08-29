@@ -123,7 +123,7 @@ class LastFmController extends Controller
             'image'             => $userInfo['image'] ?? [],
         ];
 
-        (new \App\Models\ThirdPartyCredential)->updateOrCreate(
+        (new ThirdPartyCredential)->updateOrCreate(
             [
                 'user_id'  => $authState['user_id'],
                 'provider' => 'lastfm',
@@ -150,7 +150,7 @@ class LastFmController extends Controller
     ])]
     public function disconnect()
     {
-        (new \App\Models\ThirdPartyCredential)->where('user_id', auth()->id())
+        (new ThirdPartyCredential)->where('user_id', auth()->id())
             ->where('provider', 'lastfm')
             ->delete();
 

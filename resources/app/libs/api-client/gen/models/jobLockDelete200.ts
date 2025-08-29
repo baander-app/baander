@@ -11,9 +11,8 @@ Implemented queuing functionality through Redis offers efficient job management 
 The media information is organized and easily searchable, ensuring users can always find what they are looking for quickly and easily.
  * OpenAPI spec version: 0.0.1
  */
-import type { JobLockDelete200Message } from "./jobLockDelete200Message";
 
 export type JobLockDelete200 = {
   success: boolean;
-  message: JobLockDelete200Message;
+  message: string;
 };

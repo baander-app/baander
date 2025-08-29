@@ -44,7 +44,6 @@ import type {
 import type {
   AuthenticationExceptionResponse,
   GenreResource,
-  GenresIndex200,
   GenresIndexParams,
   ModelNotFoundExceptionResponse,
   UpdateGenreRequest,
@@ -57,14 +56,16 @@ import type { ErrorType, BodyType } from "../../../axios-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * @summary Get a collection of genres
+ * Returns a filtered and paginated list of all music genres in the system.
+Supports field selection and library filtering for optimized queries.
+ * @summary Get a paginated collection of music genres
  */
 export const genresIndex = (
   params?: GenresIndexParams,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
-  return customInstance<GenresIndex200>(
+  return customInstance<GenreResource[]>(
     { url: `/api/genres`, method: "GET", params, signal },
     options
   );
@@ -225,7 +226,7 @@ export function useGenresIndexInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of genres
+ * @summary Get a paginated collection of music genres
  */
 
 export function useGenresIndexInfinite<
@@ -372,7 +373,7 @@ export function useGenresIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of genres
+ * @summary Get a paginated collection of music genres
  */
 
 export function useGenresIndex<
@@ -508,7 +509,7 @@ export function useGenresIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of genres
+ * @summary Get a paginated collection of music genres
  */
 
 export function useGenresIndexSuspense<
@@ -683,7 +684,7 @@ export function useGenresIndexSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of genres
+ * @summary Get a paginated collection of music genres
  */
 
 export function useGenresIndexSuspenseInfinite<
@@ -730,7 +731,9 @@ export function useGenresIndexSuspenseInfinite<
 }
 
 /**
- * @summary Get a genre
+ * Retrieves a single genre with comprehensive information including
+associated artists, albums, and usage statistics.
+ * @summary Get a specific genre with detailed information
  */
 export const genresShow = (
   genre: string,
@@ -872,7 +875,7 @@ export function useGenresShowInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a genre
+ * @summary Get a specific genre with detailed information
  */
 
 export function useGenresShowInfinite<
@@ -1019,7 +1022,7 @@ export function useGenresShow<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a genre
+ * @summary Get a specific genre with detailed information
  */
 
 export function useGenresShow<
@@ -1155,7 +1158,7 @@ export function useGenresShowSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a genre
+ * @summary Get a specific genre with detailed information
  */
 
 export function useGenresShowSuspense<
@@ -1301,7 +1304,7 @@ export function useGenresShowSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a genre
+ * @summary Get a specific genre with detailed information
  */
 
 export function useGenresShowSuspenseInfinite<
@@ -1343,7 +1346,9 @@ export function useGenresShowSuspenseInfinite<
 }
 
 /**
- * @summary Update a genre
+ * Updates genre information including name, description, and metadata.
+Only the fields included in the request will be modified.
+ * @summary Update an existing genre
  */
 export const genresUpdate = (
   genre: string,
@@ -1414,7 +1419,7 @@ export type GenresUpdateMutationError = ErrorType<
 >;
 
 /**
- * @summary Update a genre
+ * @summary Update an existing genre
  */
 export const useGenresUpdate = <
   TError = ErrorType<
@@ -1445,6 +1450,8 @@ export const useGenresUpdate = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
+ * Permanently removes a genre from the system. This action will also
+remove the genre association from all related albums and songs.
  * @summary Delete a genre
  */
 export const genresDestroy = (

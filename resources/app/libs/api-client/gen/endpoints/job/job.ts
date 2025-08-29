@@ -43,6 +43,7 @@ import type {
 
 import type {
   AuthenticationExceptionResponse,
+  AuthorizationExceptionResponse,
   JobCleanup200,
   JobCleanupBody,
   JobFailedCleanup200,
@@ -59,7 +60,9 @@ import type { ErrorType, BodyType } from "../../../axios-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * @summary Get job locks
+ * Returns information about active job locks including TTL, age, and status.
+Used for monitoring job execution and identifying stuck or long-running jobs.
+ * @summary Get all job locks for a specific job type
  */
 export const jobLocks = (
   options?: SecondParameter<typeof customInstance>,
@@ -176,7 +179,7 @@ export function useJobLocksInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get job locks
+ * @summary Get all job locks for a specific job type
  */
 
 export function useJobLocksInfinite<
@@ -299,7 +302,7 @@ export function useJobLocks<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get job locks
+ * @summary Get all job locks for a specific job type
  */
 
 export function useJobLocks<
@@ -413,7 +416,7 @@ export function useJobLocksSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get job locks
+ * @summary Get all job locks for a specific job type
  */
 
 export function useJobLocksSuspense<
@@ -541,7 +544,7 @@ export function useJobLocksSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get job locks
+ * @summary Get all job locks for a specific job type
  */
 
 export function useJobLocksSuspenseInfinite<
@@ -577,7 +580,9 @@ export function useJobLocksSuspenseInfinite<
 }
 
 /**
- * @summary Get job lock
+ * Retrieves detailed information about a specific job lock including
+its current state, time-to-live, and age for debugging purposes.
+ * @summary Get specific job lock information
  */
 export const jobLock = (
   jobClass: string,
@@ -716,7 +721,7 @@ export function useJobLockInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get job lock
+ * @summary Get specific job lock information
  */
 
 export function useJobLockInfinite<
@@ -855,7 +860,7 @@ export function useJobLock<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get job lock
+ * @summary Get specific job lock information
  */
 
 export function useJobLock<
@@ -986,7 +991,7 @@ export function useJobLockSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get job lock
+ * @summary Get specific job lock information
  */
 
 export function useJobLockSuspense<
@@ -1127,7 +1132,7 @@ export function useJobLockSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get job lock
+ * @summary Get specific job lock information
  */
 
 export function useJobLockSuspenseInfinite<
@@ -1169,7 +1174,10 @@ export function useJobLockSuspenseInfinite<
 }
 
 /**
- * @summary Destroy job lock
+ * Manually removes a job lock, typically used to clear stuck jobs that
+are preventing new instances from running. Use with caution as this
+can interfere with actively running jobs.
+ * @summary Force remove a specific job lock
  */
 export const jobLockDelete = (
   jobClass: string,
@@ -1228,7 +1236,7 @@ export type JobLockDeleteMutationError =
   ErrorType<AuthenticationExceptionResponse>;
 
 /**
- * @summary Destroy job lock
+ * @summary Force remove a specific job lock
  */
 export const useJobLockDelete = <
   TError = ErrorType<AuthenticationExceptionResponse>,
@@ -1255,7 +1263,9 @@ export const useJobLockDelete = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Cleanup jobs
+ * Analyzes the job system for stuck locks and failed jobs, providing a summary
+of issues found. Can perform actual cleanup when dry_run is set to false.
+ * @summary Get job cleanup summary and optionally perform cleanup
  */
 export const jobCleanup = (
   jobCleanupBody: BodyType<JobCleanupBody>,
@@ -1320,7 +1330,7 @@ export type JobCleanupMutationError =
   ErrorType<AuthenticationExceptionResponse>;
 
 /**
- * @summary Cleanup jobs
+ * @summary Get job cleanup summary and optionally perform cleanup
  */
 export const useJobCleanup = <
   TError = ErrorType<AuthenticationExceptionResponse>,
@@ -1347,7 +1357,9 @@ export const useJobCleanup = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Clear failed jobs
+ * Removes failed jobs older than the specified time threshold from the
+failed jobs table. Helps maintain system performance and storage efficiency.
+ * @summary Clear failed jobs from the queue
  */
 export const jobFailedCleanup = (
   jobFailedCleanupBody: BodyType<JobFailedCleanupBody>,
@@ -1412,7 +1424,7 @@ export type JobFailedCleanupMutationError =
   ErrorType<AuthenticationExceptionResponse>;
 
 /**
- * @summary Clear failed jobs
+ * @summary Clear failed jobs from the queue
  */
 export const useJobFailedCleanup = <
   TError = ErrorType<AuthenticationExceptionResponse>,
@@ -1439,7 +1451,9 @@ export const useJobFailedCleanup = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Scan a library
+ * Dispatches a background job to scan a library for new media content.
+The job type (music or movie) is automatically determined by the library type.
+ * @summary Start a library scanning job
  */
 export const jobLibraryScan = (
   slug: string,
@@ -1453,7 +1467,9 @@ export const jobLibraryScan = (
 };
 
 export const getJobLibraryScanMutationOptions = <
-  TError = ErrorType<AuthenticationExceptionResponse>,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >,
   TContext = unknown
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1494,14 +1510,17 @@ export type JobLibraryScanMutationResult = NonNullable<
   Awaited<ReturnType<typeof jobLibraryScan>>
 >;
 
-export type JobLibraryScanMutationError =
-  ErrorType<AuthenticationExceptionResponse>;
+export type JobLibraryScanMutationError = ErrorType<
+  AuthenticationExceptionResponse | AuthorizationExceptionResponse
+>;
 
 /**
- * @summary Scan a library
+ * @summary Start a library scanning job
  */
 export const useJobLibraryScan = <
-  TError = ErrorType<AuthenticationExceptionResponse>,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | AuthorizationExceptionResponse
+  >,
   TContext = unknown
 >(
   options?: {

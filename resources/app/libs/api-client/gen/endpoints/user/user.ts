@@ -43,11 +43,11 @@ import type {
 
 import type {
   AuthenticationExceptionResponse,
+  AuthorizationExceptionResponse,
   CreateUserRequest,
   ModelNotFoundExceptionResponse,
   UpdateUserRequest,
   UserResource,
-  UsersIndex200,
   UsersIndexParams,
   ValidationExceptionResponse,
 } from "../../models";
@@ -58,14 +58,17 @@ import type { ErrorType, BodyType } from "../../../axios-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * @summary Get a collection of users
+ * Returns a filtered and paginated list of all users in the system.
+Supports global search across name and email fields, plus advanced filtering
+options for administrative user management.
+ * @summary Get a paginated collection of users
  */
 export const usersIndex = (
   params?: UsersIndexParams,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
-  return customInstance<UsersIndex200>(
+  return customInstance<UserResource[]>(
     { url: `/api/users`, method: "GET", params, signal },
     options
   );
@@ -226,7 +229,7 @@ export function useUsersIndexInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of users
+ * @summary Get a paginated collection of users
  */
 
 export function useUsersIndexInfinite<
@@ -373,7 +376,7 @@ export function useUsersIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of users
+ * @summary Get a paginated collection of users
  */
 
 export function useUsersIndex<
@@ -509,7 +512,7 @@ export function useUsersIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of users
+ * @summary Get a paginated collection of users
  */
 
 export function useUsersIndexSuspense<
@@ -684,7 +687,7 @@ export function useUsersIndexSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of users
+ * @summary Get a paginated collection of users
  */
 
 export function useUsersIndexSuspenseInfinite<
@@ -731,8 +734,9 @@ export function useUsersIndexSuspenseInfinite<
 }
 
 /**
- * This is endpoint allows administrators to create users
- * @summary Create user
+ * Administrative endpoint that allows authorized users to create new user accounts
+with specified roles and permissions. Created users will receive email verification.
+ * @summary Create a new user account
  */
 export const usersStore = (
   createUserRequest: BodyType<CreateUserRequest>,
@@ -753,7 +757,9 @@ export const usersStore = (
 
 export const getUsersStoreMutationOptions = <
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >,
   TContext = unknown
 >(options?: {
@@ -796,15 +802,19 @@ export type UsersStoreMutationResult = NonNullable<
 >;
 export type UsersStoreMutationBody = BodyType<CreateUserRequest>;
 export type UsersStoreMutationError = ErrorType<
-  AuthenticationExceptionResponse | ValidationExceptionResponse
+  | AuthenticationExceptionResponse
+  | AuthorizationExceptionResponse
+  | ValidationExceptionResponse
 >;
 
 /**
- * @summary Create user
+ * @summary Create a new user account
  */
 export const useUsersStore = <
   TError = ErrorType<
-    AuthenticationExceptionResponse | ValidationExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ValidationExceptionResponse
   >,
   TContext = unknown
 >(
@@ -829,7 +839,9 @@ export const useUsersStore = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Update a user
+ * Updates user information including profile data, roles, and permissions.
+Users can update their own profiles, while administrators can update any user.
+ * @summary Update an existing user
  */
 export const usersUpdate = (
   user: string,
@@ -850,6 +862,7 @@ export const usersUpdate = (
 export const getUsersUpdateMutationOptions = <
   TError = ErrorType<
     | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
     | ModelNotFoundExceptionResponse
     | ValidationExceptionResponse
   >,
@@ -895,16 +908,18 @@ export type UsersUpdateMutationResult = NonNullable<
 export type UsersUpdateMutationBody = BodyType<UpdateUserRequest>;
 export type UsersUpdateMutationError = ErrorType<
   | AuthenticationExceptionResponse
+  | AuthorizationExceptionResponse
   | ModelNotFoundExceptionResponse
   | ValidationExceptionResponse
 >;
 
 /**
- * @summary Update a user
+ * @summary Update an existing user
  */
 export const useUsersUpdate = <
   TError = ErrorType<
     | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
     | ModelNotFoundExceptionResponse
     | ValidationExceptionResponse
   >,
@@ -931,7 +946,9 @@ export const useUsersUpdate = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Get small user detail info
+ * Retrieves public profile information for a specific user.
+Sensitive information is filtered based on privacy settings and permissions.
+ * @summary Get a specific user's public profile
  */
 export const usersShow = (
   user: string,
@@ -951,7 +968,9 @@ export const getUsersShowQueryKey = (user?: string) => {
 export const getUsersShowInfiniteQueryOptions = <
   TData = InfiniteData<Awaited<ReturnType<typeof usersShow>>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
   >
 >(
   user: string,
@@ -990,13 +1009,17 @@ export type UsersShowInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof usersShow>>
 >;
 export type UsersShowInfiniteQueryError = ErrorType<
-  AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  | AuthenticationExceptionResponse
+  | AuthorizationExceptionResponse
+  | ModelNotFoundExceptionResponse
 >;
 
 export function useUsersShowInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof usersShow>>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
   >
 >(
   user: string,
@@ -1025,7 +1048,9 @@ export function useUsersShowInfinite<
 export function useUsersShowInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof usersShow>>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
   >
 >(
   user: string,
@@ -1054,7 +1079,9 @@ export function useUsersShowInfinite<
 export function useUsersShowInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof usersShow>>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
   >
 >(
   user: string,
@@ -1073,13 +1100,15 @@ export function useUsersShowInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get small user detail info
+ * @summary Get a specific user's public profile
  */
 
 export function useUsersShowInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof usersShow>>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
   >
 >(
   user: string,
@@ -1114,7 +1143,9 @@ export function useUsersShowInfinite<
 export const getUsersShowQueryOptions = <
   TData = Awaited<ReturnType<typeof usersShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
   >
 >(
   user: string,
@@ -1147,13 +1178,17 @@ export type UsersShowQueryResult = NonNullable<
   Awaited<ReturnType<typeof usersShow>>
 >;
 export type UsersShowQueryError = ErrorType<
-  AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  | AuthenticationExceptionResponse
+  | AuthorizationExceptionResponse
+  | ModelNotFoundExceptionResponse
 >;
 
 export function useUsersShow<
   TData = Awaited<ReturnType<typeof usersShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
   >
 >(
   user: string,
@@ -1178,7 +1213,9 @@ export function useUsersShow<
 export function useUsersShow<
   TData = Awaited<ReturnType<typeof usersShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
   >
 >(
   user: string,
@@ -1203,7 +1240,9 @@ export function useUsersShow<
 export function useUsersShow<
   TData = Awaited<ReturnType<typeof usersShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
   >
 >(
   user: string,
@@ -1218,13 +1257,15 @@ export function useUsersShow<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get small user detail info
+ * @summary Get a specific user's public profile
  */
 
 export function useUsersShow<
   TData = Awaited<ReturnType<typeof usersShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
   >
 >(
   user: string,
@@ -1253,7 +1294,9 @@ export function useUsersShow<
 export const getUsersShowSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof usersShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
   >
 >(
   user: string,
@@ -1287,13 +1330,17 @@ export type UsersShowSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof usersShow>>
 >;
 export type UsersShowSuspenseQueryError = ErrorType<
-  AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  | AuthenticationExceptionResponse
+  | AuthorizationExceptionResponse
+  | ModelNotFoundExceptionResponse
 >;
 
 export function useUsersShowSuspense<
   TData = Awaited<ReturnType<typeof usersShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
   >
 >(
   user: string,
@@ -1314,7 +1361,9 @@ export function useUsersShowSuspense<
 export function useUsersShowSuspense<
   TData = Awaited<ReturnType<typeof usersShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
   >
 >(
   user: string,
@@ -1335,7 +1384,9 @@ export function useUsersShowSuspense<
 export function useUsersShowSuspense<
   TData = Awaited<ReturnType<typeof usersShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
   >
 >(
   user: string,
@@ -1354,13 +1405,15 @@ export function useUsersShowSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get small user detail info
+ * @summary Get a specific user's public profile
  */
 
 export function useUsersShowSuspense<
   TData = Awaited<ReturnType<typeof usersShow>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
   >
 >(
   user: string,
@@ -1395,7 +1448,9 @@ export function useUsersShowSuspense<
 export const getUsersShowSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<Awaited<ReturnType<typeof usersShow>>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
   >
 >(
   user: string,
@@ -1433,13 +1488,17 @@ export type UsersShowSuspenseInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof usersShow>>
 >;
 export type UsersShowSuspenseInfiniteQueryError = ErrorType<
-  AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  | AuthenticationExceptionResponse
+  | AuthorizationExceptionResponse
+  | ModelNotFoundExceptionResponse
 >;
 
 export function useUsersShowSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof usersShow>>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
   >
 >(
   user: string,
@@ -1460,7 +1519,9 @@ export function useUsersShowSuspenseInfinite<
 export function useUsersShowSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof usersShow>>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
   >
 >(
   user: string,
@@ -1481,7 +1542,9 @@ export function useUsersShowSuspenseInfinite<
 export function useUsersShowSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof usersShow>>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
   >
 >(
   user: string,
@@ -1500,13 +1563,15 @@ export function useUsersShowSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get small user detail info
+ * @summary Get a specific user's public profile
  */
 
 export function useUsersShowSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof usersShow>>>,
   TError = ErrorType<
-    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
   >
 >(
   user: string,
@@ -1539,7 +1604,10 @@ export function useUsersShowSuspenseInfinite<
 }
 
 /**
- * @summary Delete a user
+ * Permanently removes a user account and all associated data. This action
+cannot be undone. All user tokens are revoked and associated content is handled
+according to the configured deletion policy.
+ * @summary Delete a user account
  */
 export const usersDestroy = (
   user: string,
@@ -1552,7 +1620,11 @@ export const usersDestroy = (
 };
 
 export const getUsersDestroyMutationOptions = <
-  TError = ErrorType<AuthenticationExceptionResponse>,
+  TError = ErrorType<
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
+  >,
   TContext = unknown
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1593,14 +1665,21 @@ export type UsersDestroyMutationResult = NonNullable<
   Awaited<ReturnType<typeof usersDestroy>>
 >;
 
-export type UsersDestroyMutationError =
-  ErrorType<AuthenticationExceptionResponse>;
+export type UsersDestroyMutationError = ErrorType<
+  | AuthenticationExceptionResponse
+  | AuthorizationExceptionResponse
+  | ModelNotFoundExceptionResponse
+>;
 
 /**
- * @summary Delete a user
+ * @summary Delete a user account
  */
 export const useUsersDestroy = <
-  TError = ErrorType<AuthenticationExceptionResponse>,
+  TError = ErrorType<
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
+  >,
   TContext = unknown
 >(
   options?: {
@@ -1624,7 +1703,9 @@ export const useUsersDestroy = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Get the authenticated user
+ * Returns the profile information of the currently authenticated user
+including roles, permissions, and associated libraries.
+ * @summary Get authenticated user profile
  */
 export const usersMe = (
   options?: SecondParameter<typeof customInstance>,
@@ -1741,7 +1822,7 @@ export function useUsersMeInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get the authenticated user
+ * @summary Get authenticated user profile
  */
 
 export function useUsersMeInfinite<
@@ -1864,7 +1945,7 @@ export function useUsersMe<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get the authenticated user
+ * @summary Get authenticated user profile
  */
 
 export function useUsersMe<
@@ -1978,7 +2059,7 @@ export function useUsersMeSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get the authenticated user
+ * @summary Get authenticated user profile
  */
 
 export function useUsersMeSuspense<
@@ -2106,7 +2187,7 @@ export function useUsersMeSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get the authenticated user
+ * @summary Get authenticated user profile
  */
 
 export function useUsersMeSuspenseInfinite<

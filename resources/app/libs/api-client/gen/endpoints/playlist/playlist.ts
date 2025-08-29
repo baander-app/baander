@@ -76,7 +76,9 @@ import type { ErrorType, BodyType } from "../../../axios-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * @summary Get a collection of playlists
+ * Returns playlists owned by the authenticated user and public playlists
+that are visible to all users. Results are paginated for performance.
+ * @summary Get a paginated collection of playlists
  */
 export const playlistIndex = (
   options?: SecondParameter<typeof customInstance>,
@@ -197,7 +199,7 @@ export function usePlaylistIndexInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of playlists
+ * @summary Get a paginated collection of playlists
  */
 
 export function usePlaylistIndexInfinite<
@@ -321,7 +323,7 @@ export function usePlaylistIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of playlists
+ * @summary Get a paginated collection of playlists
  */
 
 export function usePlaylistIndex<
@@ -439,7 +441,7 @@ export function usePlaylistIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of playlists
+ * @summary Get a paginated collection of playlists
  */
 
 export function usePlaylistIndexSuspense<
@@ -567,7 +569,7 @@ export function usePlaylistIndexSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of playlists
+ * @summary Get a paginated collection of playlists
  */
 
 export function usePlaylistIndexSuspenseInfinite<
@@ -603,7 +605,9 @@ export function usePlaylistIndexSuspenseInfinite<
 }
 
 /**
- * @summary Create a playlist
+ * Creates a new playlist owned by the authenticated user with the provided
+name, description, and visibility settings.
+ * @summary Create a new playlist
  */
 export const playlistStore = (
   createPlaylistRequest: BodyType<CreatePlaylistRequest>,
@@ -671,7 +675,7 @@ export type PlaylistStoreMutationError = ErrorType<
 >;
 
 /**
- * @summary Create a playlist
+ * @summary Create a new playlist
  */
 export const usePlaylistStore = <
   TError = ErrorType<
@@ -700,7 +704,9 @@ export const usePlaylistStore = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Show a playlist
+ * Retrieves a single playlist with comprehensive information including
+songs, artists, album data, and cover art. Authorization is enforced.
+ * @summary Get a specific playlist with detailed information
  */
 export const playlistShow = (
   playlist: string,
@@ -898,7 +904,7 @@ export function usePlaylistShowInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Show a playlist
+ * @summary Get a specific playlist with detailed information
  */
 
 export function usePlaylistShowInfinite<
@@ -1078,7 +1084,7 @@ export function usePlaylistShow<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Show a playlist
+ * @summary Get a specific playlist with detailed information
  */
 
 export function usePlaylistShow<
@@ -1238,7 +1244,7 @@ export function usePlaylistShowSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Show a playlist
+ * @summary Get a specific playlist with detailed information
  */
 
 export function usePlaylistShowSuspense<
@@ -1442,7 +1448,7 @@ export function usePlaylistShowSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Show a playlist
+ * @summary Get a specific playlist with detailed information
  */
 
 export function usePlaylistShowSuspenseInfinite<
@@ -1494,111 +1500,8 @@ export function usePlaylistShowSuspenseInfinite<
 }
 
 /**
- * @summary Update a playlist
- */
-export const playlistUpdate = (
-  playlist: string,
-  updatePlaylistRequest: BodyType<UpdatePlaylistRequest>,
-  options?: SecondParameter<typeof customInstance>
-) => {
-  return customInstance<PlaylistResource>(
-    {
-      url: `/api/playlists/${playlist}`,
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      data: updatePlaylistRequest,
-    },
-    options
-  );
-};
-
-export const getPlaylistUpdateMutationOptions = <
-  TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | AuthorizationExceptionResponse
-    | ModelNotFoundExceptionResponse
-    | ValidationExceptionResponse
-  >,
-  TContext = unknown
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof playlistUpdate>>,
-    TError,
-    { playlist: string; data: BodyType<UpdatePlaylistRequest> },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof playlistUpdate>>,
-  TError,
-  { playlist: string; data: BodyType<UpdatePlaylistRequest> },
-  TContext
-> => {
-  const mutationKey = ["playlistUpdate"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof playlistUpdate>>,
-    { playlist: string; data: BodyType<UpdatePlaylistRequest> }
-  > = (props) => {
-    const { playlist, data } = props ?? {};
-
-    return playlistUpdate(playlist, data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type PlaylistUpdateMutationResult = NonNullable<
-  Awaited<ReturnType<typeof playlistUpdate>>
->;
-export type PlaylistUpdateMutationBody = BodyType<UpdatePlaylistRequest>;
-export type PlaylistUpdateMutationError = ErrorType<
-  | AuthenticationExceptionResponse
-  | AuthorizationExceptionResponse
-  | ModelNotFoundExceptionResponse
-  | ValidationExceptionResponse
->;
-
-/**
- * @summary Update a playlist
- */
-export const usePlaylistUpdate = <
-  TError = ErrorType<
-    | AuthenticationExceptionResponse
-    | AuthorizationExceptionResponse
-    | ModelNotFoundExceptionResponse
-    | ValidationExceptionResponse
-  >,
-  TContext = unknown
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof playlistUpdate>>,
-      TError,
-      { playlist: string; data: BodyType<UpdatePlaylistRequest> },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient
-): UseMutationResult<
-  Awaited<ReturnType<typeof playlistUpdate>>,
-  TError,
-  { playlist: string; data: BodyType<UpdatePlaylistRequest> },
-  TContext
-> => {
-  const mutationOptions = getPlaylistUpdateMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+ * Permanently removes a playlist and all its associated data including
+song associations, statistics, and collaborator relationships.
  * @summary Delete a playlist
  */
 export const playlistDestroy = (
@@ -1695,7 +1598,116 @@ export const usePlaylistDestroy = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Add a song
+ * Updates playlist metadata including name, description, and visibility settings.
+Only playlist owners and authorized collaborators can update playlists.
+ * @summary Update an existing playlist
+ */
+export const playlistUpdate = (
+  playlist: string,
+  updatePlaylistRequest: BodyType<UpdatePlaylistRequest>,
+  options?: SecondParameter<typeof customInstance>
+) => {
+  return customInstance<PlaylistResource>(
+    {
+      url: `/api/playlists/${playlist}`,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      data: updatePlaylistRequest,
+    },
+    options
+  );
+};
+
+export const getPlaylistUpdateMutationOptions = <
+  TError = ErrorType<
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
+  >,
+  TContext = unknown
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof playlistUpdate>>,
+    TError,
+    { playlist: string; data: BodyType<UpdatePlaylistRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof playlistUpdate>>,
+  TError,
+  { playlist: string; data: BodyType<UpdatePlaylistRequest> },
+  TContext
+> => {
+  const mutationKey = ["playlistUpdate"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof playlistUpdate>>,
+    { playlist: string; data: BodyType<UpdatePlaylistRequest> }
+  > = (props) => {
+    const { playlist, data } = props ?? {};
+
+    return playlistUpdate(playlist, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PlaylistUpdateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof playlistUpdate>>
+>;
+export type PlaylistUpdateMutationBody = BodyType<UpdatePlaylistRequest>;
+export type PlaylistUpdateMutationError = ErrorType<
+  | AuthenticationExceptionResponse
+  | AuthorizationExceptionResponse
+  | ModelNotFoundExceptionResponse
+  | ValidationExceptionResponse
+>;
+
+/**
+ * @summary Update an existing playlist
+ */
+export const usePlaylistUpdate = <
+  TError = ErrorType<
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
+  >,
+  TContext = unknown
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof playlistUpdate>>,
+      TError,
+      { playlist: string; data: BodyType<UpdatePlaylistRequest> },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof playlistUpdate>>,
+  TError,
+  { playlist: string; data: BodyType<UpdatePlaylistRequest> },
+  TContext
+> => {
+  const mutationOptions = getPlaylistUpdateMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+/**
+ * Adds a song to the specified playlist at the next available position.
+Prevents duplicate songs from being added to the same playlist.
+ * @summary Add a song to a playlist
  */
 export const playlistAddSong = (
   playlist: string,
@@ -1762,7 +1774,7 @@ export type PlaylistAddSongMutationError = ErrorType<
 >;
 
 /**
- * @summary Add a song
+ * @summary Add a song to a playlist
  */
 export const usePlaylistAddSong = <
   TError = ErrorType<
@@ -1793,7 +1805,9 @@ export const usePlaylistAddSong = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Remove a song
+ * Removes a song from the playlist and automatically reorders remaining
+songs to maintain consecutive positioning.
+ * @summary Remove a song from a playlist
  */
 export const playlistRemoveSong = (
   playlist: string,
@@ -1859,7 +1873,7 @@ export type PlaylistRemoveSongMutationError = ErrorType<
 >;
 
 /**
- * @summary Remove a song
+ * @summary Remove a song from a playlist
  */
 export const usePlaylistRemoveSong = <
   TError = ErrorType<
@@ -1890,7 +1904,9 @@ export const usePlaylistRemoveSong = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Reorder songs
+ * Updates the position of songs in the playlist based on the provided
+ordered array of song IDs. All song IDs must exist in the playlist.
+ * @summary Reorder songs in a playlist
  */
 export const playlistReorder = (
   playlist: string,
@@ -1965,7 +1981,7 @@ export type PlaylistReorderMutationError = ErrorType<
 >;
 
 /**
- * @summary Reorder songs
+ * @summary Reorder songs in a playlist
  */
 export const usePlaylistReorder = <
   TError = ErrorType<
@@ -1997,7 +2013,9 @@ export const usePlaylistReorder = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Add collaborator
+ * Adds a user as a collaborator to the playlist with the specified role.
+Collaborators can have 'editor' or 'contributor' permissions.
+ * @summary Add a collaborator to a playlist
  */
 export const playlistCollaboratorsStore = (
   playlist: string,
@@ -2073,7 +2091,7 @@ export type PlaylistCollaboratorsStoreMutationError = ErrorType<
 >;
 
 /**
- * @summary Add collaborator
+ * @summary Add a collaborator to a playlist
  */
 export const usePlaylistCollaboratorsStore = <
   TError = ErrorType<
@@ -2105,7 +2123,9 @@ export const usePlaylistCollaboratorsStore = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Remove collaborator
+ * Removes a user's collaborator access from the playlist.
+Only playlist owners can remove collaborators.
+ * @summary Remove a collaborator from a playlist
  */
 export const playlistCollaboratorsDestroy = (
   playlist: string,
@@ -2174,7 +2194,7 @@ export type PlaylistCollaboratorsDestroyMutationError = ErrorType<
 >;
 
 /**
- * @summary Remove collaborator
+ * @summary Remove a collaborator from a playlist
  */
 export const usePlaylistCollaboratorsDestroy = <
   TError = ErrorType<
@@ -2206,7 +2226,9 @@ export const usePlaylistCollaboratorsDestroy = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Clone playlist
+ * Creates a copy of the playlist with all songs and their positions.
+The cloned playlist is owned by the current user and is private by default.
+ * @summary Clone an existing playlist
  */
 export const playlistClone = (
   playlist: string,
@@ -2272,7 +2294,7 @@ export type PlaylistCloneMutationError = ErrorType<
 >;
 
 /**
- * @summary Clone playlist
+ * @summary Clone an existing playlist
  */
 export const usePlaylistClone = <
   TError = ErrorType<
@@ -2303,7 +2325,9 @@ export const usePlaylistClone = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Get statistics
+ * Retrieves comprehensive statistics for the playlist including
+view count, play count, shares, and favorites.
+ * @summary Get playlist statistics
  */
 export const playlistStatistics = (
   playlist: string,
@@ -2456,7 +2480,7 @@ export function usePlaylistStatisticsInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get statistics
+ * @summary Get playlist statistics
  */
 
 export function usePlaylistStatisticsInfinite<
@@ -2635,7 +2659,7 @@ export function usePlaylistStatistics<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get statistics
+ * @summary Get playlist statistics
  */
 
 export function usePlaylistStatistics<
@@ -2788,7 +2812,7 @@ export function usePlaylistStatisticsSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get statistics
+ * @summary Get playlist statistics
  */
 
 export function usePlaylistStatisticsSuspense<
@@ -2950,7 +2974,7 @@ export function usePlaylistStatisticsSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get statistics
+ * @summary Get playlist statistics
  */
 
 export function usePlaylistStatisticsSuspenseInfinite<
@@ -2994,7 +3018,7 @@ export function usePlaylistStatisticsSuspenseInfinite<
 }
 
 /**
- * @summary Statistics - Record view
+ * @summary Record a playlist view
  */
 export const playlistStatisticsRecordView = (
   playlist: string,
@@ -3064,7 +3088,7 @@ export type PlaylistStatisticsRecordViewMutationError = ErrorType<
 >;
 
 /**
- * @summary Statistics - Record view
+ * @summary Record a playlist view
  */
 export const usePlaylistStatisticsRecordView = <
   TError = ErrorType<
@@ -3096,7 +3120,9 @@ export const usePlaylistStatisticsRecordView = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Statistics - Record play
+ * Increments the play counter when the playlist is played.
+Used for tracking playlist engagement and popularity metrics.
+ * @summary Record a playlist play
  */
 export const playlistStatisticsRecordPlay = (
   playlist: string,
@@ -3166,7 +3192,7 @@ export type PlaylistStatisticsRecordPlayMutationError = ErrorType<
 >;
 
 /**
- * @summary Statistics - Record play
+ * @summary Record a playlist play
  */
 export const usePlaylistStatisticsRecordPlay = <
   TError = ErrorType<
@@ -3198,7 +3224,9 @@ export const usePlaylistStatisticsRecordPlay = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Share
+ * Increments the share counter when the playlist is shared.
+Used for tracking viral and social engagement metrics.
+ * @summary Record a playlist share
  */
 export const playlistStatisticsRecordShare = (
   playlist: string,
@@ -3268,7 +3296,7 @@ export type PlaylistStatisticsRecordShareMutationError = ErrorType<
 >;
 
 /**
- * @summary Share
+ * @summary Record a playlist share
  */
 export const usePlaylistStatisticsRecordShare = <
   TError = ErrorType<
@@ -3300,7 +3328,9 @@ export const usePlaylistStatisticsRecordShare = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Favorite
+ * Increments the favorite counter when users mark the playlist as favorite.
+Used for tracking user engagement and playlist quality metrics.
+ * @summary Record a playlist favorite
  */
 export const playlistStatisticsRecordFavorite = (
   playlist: string,
@@ -3370,7 +3400,7 @@ export type PlaylistStatisticsRecordFavoriteMutationError = ErrorType<
 >;
 
 /**
- * @summary Favorite
+ * @summary Record a playlist favorite
  */
 export const usePlaylistStatisticsRecordFavorite = <
   TError = ErrorType<
@@ -3402,7 +3432,9 @@ export const usePlaylistStatisticsRecordFavorite = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Smart playlist - Create
+ * Creates a new smart playlist that automatically populates with songs
+matching the specified rules and criteria.
+ * @summary Create a smart playlist
  */
 export const playlistSmartCreate = (
   createSmartPlaylistRequest: BodyType<CreateSmartPlaylistRequest>,
@@ -3471,7 +3503,7 @@ export type PlaylistSmartCreateMutationError = ErrorType<
 >;
 
 /**
- * @summary Smart playlist - Create
+ * @summary Create a smart playlist
  */
 export const usePlaylistSmartCreate = <
   TError = ErrorType<
@@ -3500,7 +3532,9 @@ export const usePlaylistSmartCreate = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Smart playlist - Update rules
+ * Manually triggers a sync of the smart playlist to refresh the song list
+based on the current rules and available songs in the library.
+ * @summary Synchronize smart playlist
  */
 export const playlistSmartUpdate = (
   playlist: string,
@@ -3576,7 +3610,7 @@ export type PlaylistSmartUpdateMutationError = ErrorType<
 >;
 
 /**
- * @summary Smart playlist - Update rules
+ * @summary Synchronize smart playlist
  */
 export const usePlaylistSmartUpdate = <
   TError = ErrorType<
@@ -3609,7 +3643,9 @@ export const usePlaylistSmartUpdate = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Smart playlist - Sync
+ * Updates the rules for a smart playlist and re-syncs the song list
+to match the new criteria.
+ * @summary Update smart playlist rules
  */
 export const playlistSmartSync = (
   playlist: string,
@@ -3677,7 +3713,7 @@ export type PlaylistSmartSyncMutationError = ErrorType<
 >;
 
 /**
- * @summary Smart playlist - Sync
+ * @summary Update smart playlist rules
  */
 export const usePlaylistSmartSync = <
   TError = ErrorType<

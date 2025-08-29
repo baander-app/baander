@@ -12,10 +12,10 @@ The media information is organized and easily searchable, ensuring users can alw
  * OpenAPI spec version: 0.0.1
  */
 import type { JobCleanup200StuckLocks } from "./jobCleanup200StuckLocks";
-import type { JobCleanup200OldFailedJobs } from "./jobCleanup200OldFailedJobs";
+import type { JobCleanup200FailedJobsItem } from "./jobCleanup200FailedJobsItem";
 
 export type JobCleanup200 = {
   stuck_locks: JobCleanup200StuckLocks;
-  old_failed_jobs: JobCleanup200OldFailedJobs;
-  dry_run: string;
+  failed_jobs: JobCleanup200FailedJobsItem[];
+  dry_run: boolean;
 };

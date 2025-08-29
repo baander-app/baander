@@ -43,9 +43,10 @@ import type {
 
 import type {
   AuthenticationExceptionResponse,
+  AuthorizationExceptionResponse,
   ModelNotFoundExceptionResponse,
-  UserTokenGetUserTokens200,
-  UserTokenGetUserTokensParams,
+  PersonalAccessTokenViewResource,
+  UserTokensIndexParams,
   ValidationExceptionResponse,
 } from "../../models";
 
@@ -55,46 +56,49 @@ import type { ErrorType } from "../../../axios-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * @summary Get a collection of tokens
+ * Returns all active tokens for the authenticated user including detailed
+security information such as device details, IP history, location data,
+and usage statistics for session management.
+ * @summary Get a paginated collection of user's personal access tokens
  */
-export const userTokenGetUserTokens = (
+export const userTokensIndex = (
   user: string,
-  params?: UserTokenGetUserTokensParams,
+  params?: UserTokensIndexParams,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
-  return customInstance<UserTokenGetUserTokens200>(
+  return customInstance<PersonalAccessTokenViewResource[]>(
     { url: `/api/users/tokens/${user}`, method: "GET", params, signal },
     options
   );
 };
 
-export const getUserTokenGetUserTokensQueryKey = (
+export const getUserTokensIndexQueryKey = (
   user?: string,
-  params?: UserTokenGetUserTokensParams
+  params?: UserTokensIndexParams
 ) => {
   return [`/api/users/tokens/${user}`, ...(params ? [params] : [])] as const;
 };
 
-export const getUserTokenGetUserTokensInfiniteQueryOptions = <
+export const getUserTokensIndexInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof userTokenGetUserTokens>>,
-    UserTokenGetUserTokensParams["page"]
+    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   user: string,
-  params?: UserTokenGetUserTokensParams,
+  params?: UserTokensIndexParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+        Awaited<ReturnType<typeof userTokensIndex>>,
         TError,
         TData,
         QueryKey,
-        UserTokenGetUserTokensParams["page"]
+        UserTokensIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -103,14 +107,14 @@ export const getUserTokenGetUserTokensInfiniteQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getUserTokenGetUserTokensQueryKey(user, params);
+    queryOptions?.queryKey ?? getUserTokensIndexQueryKey(user, params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+    Awaited<ReturnType<typeof userTokensIndex>>,
     QueryKey,
-    UserTokenGetUserTokensParams["page"]
+    UserTokensIndexParams["page"]
   > = ({ signal, pageParam }) =>
-    userTokenGetUserTokens(
+    userTokensIndex(
       user,
       { ...params, page: pageParam || params?.["page"] },
       requestOptions,
@@ -123,47 +127,47 @@ export const getUserTokenGetUserTokensInfiniteQueryOptions = <
     enabled: !!user,
     ...queryOptions,
   } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+    Awaited<ReturnType<typeof userTokensIndex>>,
     TError,
     TData,
     QueryKey,
-    UserTokenGetUserTokensParams["page"]
+    UserTokensIndexParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type UserTokenGetUserTokensInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof userTokenGetUserTokens>>
+export type UserTokensIndexInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof userTokensIndex>>
 >;
-export type UserTokenGetUserTokensInfiniteQueryError = ErrorType<
+export type UserTokensIndexInfiniteQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
-export function useUserTokenGetUserTokensInfinite<
+export function useUserTokensIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof userTokenGetUserTokens>>,
-    UserTokenGetUserTokensParams["page"]
+    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   user: string,
-  params: undefined | UserTokenGetUserTokensParams,
+  params: undefined | UserTokensIndexParams,
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+        Awaited<ReturnType<typeof userTokensIndex>>,
         TError,
         TData,
         QueryKey,
-        UserTokenGetUserTokensParams["page"]
+        UserTokensIndexParams["page"]
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+          Awaited<ReturnType<typeof userTokensIndex>>,
           TError,
-          Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+          Awaited<ReturnType<typeof userTokensIndex>>,
           QueryKey
         >,
         "initialData"
@@ -174,32 +178,32 @@ export function useUserTokenGetUserTokensInfinite<
 ): DefinedUseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useUserTokenGetUserTokensInfinite<
+export function useUserTokensIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof userTokenGetUserTokens>>,
-    UserTokenGetUserTokensParams["page"]
+    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   user: string,
-  params?: UserTokenGetUserTokensParams,
+  params?: UserTokensIndexParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+        Awaited<ReturnType<typeof userTokensIndex>>,
         TError,
         TData,
         QueryKey,
-        UserTokenGetUserTokensParams["page"]
+        UserTokensIndexParams["page"]
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+          Awaited<ReturnType<typeof userTokensIndex>>,
           TError,
-          Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+          Awaited<ReturnType<typeof userTokensIndex>>,
           QueryKey
         >,
         "initialData"
@@ -210,25 +214,25 @@ export function useUserTokenGetUserTokensInfinite<
 ): UseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useUserTokenGetUserTokensInfinite<
+export function useUserTokensIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof userTokenGetUserTokens>>,
-    UserTokenGetUserTokensParams["page"]
+    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   user: string,
-  params?: UserTokenGetUserTokensParams,
+  params?: UserTokensIndexParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+        Awaited<ReturnType<typeof userTokensIndex>>,
         TError,
         TData,
         QueryKey,
-        UserTokenGetUserTokensParams["page"]
+        UserTokensIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -238,28 +242,28 @@ export function useUserTokenGetUserTokensInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of tokens
+ * @summary Get a paginated collection of user's personal access tokens
  */
 
-export function useUserTokenGetUserTokensInfinite<
+export function useUserTokensIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof userTokenGetUserTokens>>,
-    UserTokenGetUserTokensParams["page"]
+    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   user: string,
-  params?: UserTokenGetUserTokensParams,
+  params?: UserTokensIndexParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+        Awaited<ReturnType<typeof userTokensIndex>>,
         TError,
         TData,
         QueryKey,
-        UserTokenGetUserTokensParams["page"]
+        UserTokensIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -268,7 +272,7 @@ export function useUserTokenGetUserTokensInfinite<
 ): UseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getUserTokenGetUserTokensInfiniteQueryOptions(
+  const queryOptions = getUserTokensIndexInfiniteQueryOptions(
     user,
     params,
     options
@@ -286,18 +290,18 @@ export function useUserTokenGetUserTokensInfinite<
   return query;
 }
 
-export const getUserTokenGetUserTokensQueryOptions = <
-  TData = Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+export const getUserTokensIndexQueryOptions = <
+  TData = Awaited<ReturnType<typeof userTokensIndex>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   user: string,
-  params?: UserTokenGetUserTokensParams,
+  params?: UserTokensIndexParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+        Awaited<ReturnType<typeof userTokensIndex>>,
         TError,
         TData
       >
@@ -308,12 +312,11 @@ export const getUserTokenGetUserTokensQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getUserTokenGetUserTokensQueryKey(user, params);
+    queryOptions?.queryKey ?? getUserTokensIndexQueryKey(user, params);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof userTokenGetUserTokens>>
-  > = ({ signal }) =>
-    userTokenGetUserTokens(user, params, requestOptions, signal);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof userTokensIndex>>> = ({
+    signal,
+  }) => userTokensIndex(user, params, requestOptions, signal);
 
   return {
     queryKey,
@@ -321,40 +324,40 @@ export const getUserTokenGetUserTokensQueryOptions = <
     enabled: !!user,
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+    Awaited<ReturnType<typeof userTokensIndex>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type UserTokenGetUserTokensQueryResult = NonNullable<
-  Awaited<ReturnType<typeof userTokenGetUserTokens>>
+export type UserTokensIndexQueryResult = NonNullable<
+  Awaited<ReturnType<typeof userTokensIndex>>
 >;
-export type UserTokenGetUserTokensQueryError = ErrorType<
+export type UserTokensIndexQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
-export function useUserTokenGetUserTokens<
-  TData = Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+export function useUserTokensIndex<
+  TData = Awaited<ReturnType<typeof userTokensIndex>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   user: string,
-  params: undefined | UserTokenGetUserTokensParams,
+  params: undefined | UserTokensIndexParams,
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+        Awaited<ReturnType<typeof userTokensIndex>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+          Awaited<ReturnType<typeof userTokensIndex>>,
           TError,
-          Awaited<ReturnType<typeof userTokenGetUserTokens>>
+          Awaited<ReturnType<typeof userTokensIndex>>
         >,
         "initialData"
       >;
@@ -364,27 +367,27 @@ export function useUserTokenGetUserTokens<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useUserTokenGetUserTokens<
-  TData = Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+export function useUserTokensIndex<
+  TData = Awaited<ReturnType<typeof userTokensIndex>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   user: string,
-  params?: UserTokenGetUserTokensParams,
+  params?: UserTokensIndexParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+        Awaited<ReturnType<typeof userTokensIndex>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+          Awaited<ReturnType<typeof userTokensIndex>>,
           TError,
-          Awaited<ReturnType<typeof userTokenGetUserTokens>>
+          Awaited<ReturnType<typeof userTokensIndex>>
         >,
         "initialData"
       >;
@@ -394,18 +397,18 @@ export function useUserTokenGetUserTokens<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useUserTokenGetUserTokens<
-  TData = Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+export function useUserTokensIndex<
+  TData = Awaited<ReturnType<typeof userTokensIndex>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   user: string,
-  params?: UserTokenGetUserTokensParams,
+  params?: UserTokensIndexParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+        Awaited<ReturnType<typeof userTokensIndex>>,
         TError,
         TData
       >
@@ -417,21 +420,21 @@ export function useUserTokenGetUserTokens<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of tokens
+ * @summary Get a paginated collection of user's personal access tokens
  */
 
-export function useUserTokenGetUserTokens<
-  TData = Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+export function useUserTokensIndex<
+  TData = Awaited<ReturnType<typeof userTokensIndex>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   user: string,
-  params?: UserTokenGetUserTokensParams,
+  params?: UserTokensIndexParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+        Awaited<ReturnType<typeof userTokensIndex>>,
         TError,
         TData
       >
@@ -442,11 +445,7 @@ export function useUserTokenGetUserTokens<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getUserTokenGetUserTokensQueryOptions(
-    user,
-    params,
-    options
-  );
+  const queryOptions = getUserTokensIndexQueryOptions(user, params, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -458,18 +457,18 @@ export function useUserTokenGetUserTokens<
   return query;
 }
 
-export const getUserTokenGetUserTokensSuspenseQueryOptions = <
-  TData = Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+export const getUserTokensIndexSuspenseQueryOptions = <
+  TData = Awaited<ReturnType<typeof userTokensIndex>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   user: string,
-  params?: UserTokenGetUserTokensParams,
+  params?: UserTokensIndexParams,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+        Awaited<ReturnType<typeof userTokensIndex>>,
         TError,
         TData
       >
@@ -480,39 +479,38 @@ export const getUserTokenGetUserTokensSuspenseQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getUserTokenGetUserTokensQueryKey(user, params);
+    queryOptions?.queryKey ?? getUserTokensIndexQueryKey(user, params);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof userTokenGetUserTokens>>
-  > = ({ signal }) =>
-    userTokenGetUserTokens(user, params, requestOptions, signal);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof userTokensIndex>>> = ({
+    signal,
+  }) => userTokensIndex(user, params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
-    Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+    Awaited<ReturnType<typeof userTokensIndex>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type UserTokenGetUserTokensSuspenseQueryResult = NonNullable<
-  Awaited<ReturnType<typeof userTokenGetUserTokens>>
+export type UserTokensIndexSuspenseQueryResult = NonNullable<
+  Awaited<ReturnType<typeof userTokensIndex>>
 >;
-export type UserTokenGetUserTokensSuspenseQueryError = ErrorType<
+export type UserTokensIndexSuspenseQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
-export function useUserTokenGetUserTokensSuspense<
-  TData = Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+export function useUserTokensIndexSuspense<
+  TData = Awaited<ReturnType<typeof userTokensIndex>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   user: string,
-  params: undefined | UserTokenGetUserTokensParams,
+  params: undefined | UserTokensIndexParams,
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+        Awaited<ReturnType<typeof userTokensIndex>>,
         TError,
         TData
       >
@@ -523,18 +521,18 @@ export function useUserTokenGetUserTokensSuspense<
 ): UseSuspenseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useUserTokenGetUserTokensSuspense<
-  TData = Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+export function useUserTokensIndexSuspense<
+  TData = Awaited<ReturnType<typeof userTokensIndex>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   user: string,
-  params?: UserTokenGetUserTokensParams,
+  params?: UserTokensIndexParams,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+        Awaited<ReturnType<typeof userTokensIndex>>,
         TError,
         TData
       >
@@ -545,18 +543,18 @@ export function useUserTokenGetUserTokensSuspense<
 ): UseSuspenseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useUserTokenGetUserTokensSuspense<
-  TData = Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+export function useUserTokensIndexSuspense<
+  TData = Awaited<ReturnType<typeof userTokensIndex>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   user: string,
-  params?: UserTokenGetUserTokensParams,
+  params?: UserTokensIndexParams,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+        Awaited<ReturnType<typeof userTokensIndex>>,
         TError,
         TData
       >
@@ -568,21 +566,21 @@ export function useUserTokenGetUserTokensSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of tokens
+ * @summary Get a paginated collection of user's personal access tokens
  */
 
-export function useUserTokenGetUserTokensSuspense<
-  TData = Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+export function useUserTokensIndexSuspense<
+  TData = Awaited<ReturnType<typeof userTokensIndex>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   user: string,
-  params?: UserTokenGetUserTokensParams,
+  params?: UserTokensIndexParams,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+        Awaited<ReturnType<typeof userTokensIndex>>,
         TError,
         TData
       >
@@ -593,7 +591,7 @@ export function useUserTokenGetUserTokensSuspense<
 ): UseSuspenseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getUserTokenGetUserTokensSuspenseQueryOptions(
+  const queryOptions = getUserTokensIndexSuspenseQueryOptions(
     user,
     params,
     options
@@ -611,25 +609,25 @@ export function useUserTokenGetUserTokensSuspense<
   return query;
 }
 
-export const getUserTokenGetUserTokensSuspenseInfiniteQueryOptions = <
+export const getUserTokensIndexSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof userTokenGetUserTokens>>,
-    UserTokenGetUserTokensParams["page"]
+    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   user: string,
-  params?: UserTokenGetUserTokensParams,
+  params?: UserTokensIndexParams,
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+        Awaited<ReturnType<typeof userTokensIndex>>,
         TError,
         TData,
         QueryKey,
-        UserTokenGetUserTokensParams["page"]
+        UserTokensIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -638,14 +636,14 @@ export const getUserTokenGetUserTokensSuspenseInfiniteQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getUserTokenGetUserTokensQueryKey(user, params);
+    queryOptions?.queryKey ?? getUserTokensIndexQueryKey(user, params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+    Awaited<ReturnType<typeof userTokensIndex>>,
     QueryKey,
-    UserTokenGetUserTokensParams["page"]
+    UserTokensIndexParams["page"]
   > = ({ signal, pageParam }) =>
-    userTokenGetUserTokens(
+    userTokensIndex(
       user,
       { ...params, page: pageParam || params?.["page"] },
       requestOptions,
@@ -657,40 +655,40 @@ export const getUserTokenGetUserTokensSuspenseInfiniteQueryOptions = <
     queryFn,
     ...queryOptions,
   } as UseSuspenseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+    Awaited<ReturnType<typeof userTokensIndex>>,
     TError,
     TData,
     QueryKey,
-    UserTokenGetUserTokensParams["page"]
+    UserTokensIndexParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type UserTokenGetUserTokensSuspenseInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof userTokenGetUserTokens>>
+export type UserTokensIndexSuspenseInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof userTokensIndex>>
 >;
-export type UserTokenGetUserTokensSuspenseInfiniteQueryError = ErrorType<
+export type UserTokensIndexSuspenseInfiniteQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
-export function useUserTokenGetUserTokensSuspenseInfinite<
+export function useUserTokensIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof userTokenGetUserTokens>>,
-    UserTokenGetUserTokensParams["page"]
+    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   user: string,
-  params: undefined | UserTokenGetUserTokensParams,
+  params: undefined | UserTokensIndexParams,
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+        Awaited<ReturnType<typeof userTokensIndex>>,
         TError,
         TData,
         QueryKey,
-        UserTokenGetUserTokensParams["page"]
+        UserTokensIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -699,25 +697,25 @@ export function useUserTokenGetUserTokensSuspenseInfinite<
 ): UseSuspenseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useUserTokenGetUserTokensSuspenseInfinite<
+export function useUserTokensIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof userTokenGetUserTokens>>,
-    UserTokenGetUserTokensParams["page"]
+    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   user: string,
-  params?: UserTokenGetUserTokensParams,
+  params?: UserTokensIndexParams,
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+        Awaited<ReturnType<typeof userTokensIndex>>,
         TError,
         TData,
         QueryKey,
-        UserTokenGetUserTokensParams["page"]
+        UserTokensIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -726,25 +724,25 @@ export function useUserTokenGetUserTokensSuspenseInfinite<
 ): UseSuspenseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useUserTokenGetUserTokensSuspenseInfinite<
+export function useUserTokensIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof userTokenGetUserTokens>>,
-    UserTokenGetUserTokensParams["page"]
+    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   user: string,
-  params?: UserTokenGetUserTokensParams,
+  params?: UserTokensIndexParams,
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+        Awaited<ReturnType<typeof userTokensIndex>>,
         TError,
         TData,
         QueryKey,
-        UserTokenGetUserTokensParams["page"]
+        UserTokensIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -754,28 +752,28 @@ export function useUserTokenGetUserTokensSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of tokens
+ * @summary Get a paginated collection of user's personal access tokens
  */
 
-export function useUserTokenGetUserTokensSuspenseInfinite<
+export function useUserTokensIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof userTokenGetUserTokens>>,
-    UserTokenGetUserTokensParams["page"]
+    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndexParams["page"]
   >,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
 >(
   user: string,
-  params?: UserTokenGetUserTokensParams,
+  params?: UserTokensIndexParams,
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof userTokenGetUserTokens>>,
+        Awaited<ReturnType<typeof userTokensIndex>>,
         TError,
         TData,
         QueryKey,
-        UserTokenGetUserTokensParams["page"]
+        UserTokensIndexParams["page"]
       >
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -784,7 +782,7 @@ export function useUserTokenGetUserTokensSuspenseInfinite<
 ): UseSuspenseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getUserTokenGetUserTokensSuspenseInfiniteQueryOptions(
+  const queryOptions = getUserTokensIndexSuspenseInfiniteQueryOptions(
     user,
     params,
     options
@@ -803,9 +801,12 @@ export function useUserTokenGetUserTokensSuspenseInfinite<
 }
 
 /**
- * @summary Revoke a given token
+ * Permanently revokes a personal access token, ending the associated session.
+Users can only revoke their own tokens. Includes security validation to
+prevent unauthorized token revocation.
+ * @summary Revoke a specific personal access token
  */
-export const userTokenRevokeToken = (
+export const userTokensRevoke = (
   token: number,
   options?: SecondParameter<typeof customInstance>
 ) => {
@@ -815,26 +816,28 @@ export const userTokenRevokeToken = (
   );
 };
 
-export const getUserTokenRevokeTokenMutationOptions = <
+export const getUserTokensRevokeMutationOptions = <
   TError = ErrorType<
-    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
   >,
   TContext = unknown
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof userTokenRevokeToken>>,
+    Awaited<ReturnType<typeof userTokensRevoke>>,
     TError,
     { token: number },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof userTokenRevokeToken>>,
+  Awaited<ReturnType<typeof userTokensRevoke>>,
   TError,
   { token: number },
   TContext
 > => {
-  const mutationKey = ["userTokenRevokeToken"];
+  const mutationKey = ["userTokensRevoke"];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
@@ -844,37 +847,41 @@ export const getUserTokenRevokeTokenMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof userTokenRevokeToken>>,
+    Awaited<ReturnType<typeof userTokensRevoke>>,
     { token: number }
   > = (props) => {
     const { token } = props ?? {};
 
-    return userTokenRevokeToken(token, requestOptions);
+    return userTokensRevoke(token, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type UserTokenRevokeTokenMutationResult = NonNullable<
-  Awaited<ReturnType<typeof userTokenRevokeToken>>
+export type UserTokensRevokeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof userTokensRevoke>>
 >;
 
-export type UserTokenRevokeTokenMutationError = ErrorType<
-  AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+export type UserTokensRevokeMutationError = ErrorType<
+  | AuthenticationExceptionResponse
+  | AuthorizationExceptionResponse
+  | ModelNotFoundExceptionResponse
 >;
 
 /**
- * @summary Revoke a given token
+ * @summary Revoke a specific personal access token
  */
-export const useUserTokenRevokeToken = <
+export const useUserTokensRevoke = <
   TError = ErrorType<
-    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+    | AuthenticationExceptionResponse
+    | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
   >,
   TContext = unknown
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof userTokenRevokeToken>>,
+      Awaited<ReturnType<typeof userTokensRevoke>>,
       TError,
       { token: number },
       TContext
@@ -883,12 +890,12 @@ export const useUserTokenRevokeToken = <
   },
   queryClient?: QueryClient
 ): UseMutationResult<
-  Awaited<ReturnType<typeof userTokenRevokeToken>>,
+  Awaited<ReturnType<typeof userTokensRevoke>>,
   TError,
   { token: number },
   TContext
 > => {
-  const mutationOptions = getUserTokenRevokeTokenMutationOptions(options);
+  const mutationOptions = getUserTokensRevokeMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

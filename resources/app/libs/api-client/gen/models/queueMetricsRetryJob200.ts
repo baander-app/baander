@@ -11,9 +11,8 @@ Implemented queuing functionality through Redis offers efficient job management 
 The media information is organized and easily searchable, ensuring users can always find what they are looking for quickly and easily.
  * OpenAPI spec version: 0.0.1
  */
-import type { QueueMetricsRetryJob200AnyOf } from "./queueMetricsRetryJob200AnyOf";
-import type { QueueMetricsRetryJob200AnyOfFour } from "./queueMetricsRetryJob200AnyOfFour";
 
-export type QueueMetricsRetryJob200 =
-  | QueueMetricsRetryJob200AnyOf
-  | QueueMetricsRetryJob200AnyOfFour;
+export type QueueMetricsRetryJob200 = {
+  status: string;
+  message: string;
+};

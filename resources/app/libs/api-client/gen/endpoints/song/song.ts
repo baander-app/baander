@@ -41,7 +41,6 @@ import type {
   AuthenticationExceptionResponse,
   ModelNotFoundExceptionResponse,
   SongResource,
-  SongsIndex200,
   SongsIndex400,
   SongsIndexParams,
   SongsShowParams,
@@ -54,7 +53,10 @@ import type { ErrorType } from "../../../axios-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * @summary Get a collection of songs
+ * Returns a filtered and paginated list of songs from the specified library.
+Supports relation inclusion and genre filtering. Songs are ordered by album title
+and track number for a consistent browsing experience.
+ * @summary Get a paginated collection of songs from a specific library
  */
 export const songsIndex = (
   library: string,
@@ -62,7 +64,7 @@ export const songsIndex = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
-  return customInstance<SongsIndex200>(
+  return customInstance<SongResource[]>(
     { url: `/api/libraries/${library}/songs`, method: "GET", params, signal },
     options
   );
@@ -255,7 +257,7 @@ export function useSongsIndexInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of songs
+ * @summary Get a paginated collection of songs from a specific library
  */
 
 export function useSongsIndexInfinite<
@@ -435,7 +437,7 @@ export function useSongsIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of songs
+ * @summary Get a paginated collection of songs from a specific library
  */
 
 export function useSongsIndex<
@@ -595,7 +597,7 @@ export function useSongsIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of songs
+ * @summary Get a paginated collection of songs from a specific library
  */
 
 export function useSongsIndexSuspense<
@@ -799,7 +801,7 @@ export function useSongsIndexSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of songs
+ * @summary Get a paginated collection of songs from a specific library
  */
 
 export function useSongsIndexSuspenseInfinite<
@@ -851,7 +853,10 @@ export function useSongsIndexSuspenseInfinite<
 }
 
 /**
- * @summary Get a song by public id
+ * Retrieves a single song from the specified library using its public ID.
+Supports relation inclusion for comprehensive song information including
+artists, album data, genres, and audio metadata.
+ * @summary Get a specific song by its public identifier
  */
 export const songsShow = (
   library: string,
@@ -1059,7 +1064,7 @@ export function useSongsShowInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a song by public id
+ * @summary Get a specific song by its public identifier
  */
 
 export function useSongsShowInfinite<
@@ -1237,7 +1242,7 @@ export function useSongsShow<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a song by public id
+ * @summary Get a specific song by its public identifier
  */
 
 export function useSongsShow<
@@ -1401,7 +1406,7 @@ export function useSongsShowSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a song by public id
+ * @summary Get a specific song by its public identifier
  */
 
 export function useSongsShowSuspense<
@@ -1606,7 +1611,7 @@ export function useSongsShowSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a song by public id
+ * @summary Get a specific song by its public identifier
  */
 
 export function useSongsShowSuspenseInfinite<

@@ -41,7 +41,6 @@ import type {
   AuthenticationExceptionResponse,
   ModelNotFoundExceptionResponse,
   MovieResource,
-  MoviesIndex200,
 } from "../../models";
 
 import { customInstance } from "../../../axios-instance";
@@ -50,14 +49,16 @@ import type { ErrorType } from "../../../axios-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * @summary Get a collection of movies
+ * Returns a paginated list of all movies contained within the specified video library.
+Movies are filtered by the library to ensure only content from the requested library is returned.
+ * @summary Get a paginated collection of movies from a specific library
  */
 export const moviesIndex = (
   library: string,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
-  return customInstance<MoviesIndex200>(
+  return customInstance<MovieResource[]>(
     { url: `/api/libraries/${library}/movies`, method: "GET", signal },
     options
   );
@@ -192,7 +193,7 @@ export function useMoviesIndexInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of movies
+ * @summary Get a paginated collection of movies from a specific library
  */
 
 export function useMoviesIndexInfinite<
@@ -339,7 +340,7 @@ export function useMoviesIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of movies
+ * @summary Get a paginated collection of movies from a specific library
  */
 
 export function useMoviesIndex<
@@ -475,7 +476,7 @@ export function useMoviesIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of movies
+ * @summary Get a paginated collection of movies from a specific library
  */
 
 export function useMoviesIndexSuspense<
@@ -621,7 +622,7 @@ export function useMoviesIndexSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of movies
+ * @summary Get a paginated collection of movies from a specific library
  */
 
 export function useMoviesIndexSuspenseInfinite<
@@ -663,7 +664,9 @@ export function useMoviesIndexSuspenseInfinite<
 }
 
 /**
- * @summary Get a movie
+ * Retrieves a single movie from the specified library with comprehensive
+information including cast, crew, genres, technical details, and metadata.
+ * @summary Get a specific movie with detailed information
  */
 export const moviesShow = (
   library: string,
@@ -811,7 +814,7 @@ export function useMoviesShowInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a movie
+ * @summary Get a specific movie with detailed information
  */
 
 export function useMoviesShowInfinite<
@@ -968,7 +971,7 @@ export function useMoviesShow<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a movie
+ * @summary Get a specific movie with detailed information
  */
 
 export function useMoviesShow<
@@ -1110,7 +1113,7 @@ export function useMoviesShowSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a movie
+ * @summary Get a specific movie with detailed information
  */
 
 export function useMoviesShowSuspense<
@@ -1266,7 +1269,7 @@ export function useMoviesShowSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a movie
+ * @summary Get a specific movie with detailed information
  */
 
 export function useMoviesShowSuspenseInfinite<

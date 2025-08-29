@@ -11,8 +11,7 @@ Implemented queuing functionality through Redis offers efficient job management 
 The media information is organized and easily searchable, ensuring users can always find what they are looking for quickly and easily.
  * OpenAPI spec version: 0.0.1
  */
-import type { AuthResetPassword200Message } from "./authResetPassword200Message";
 
 export type AuthResetPassword200 = {
-  message: AuthResetPassword200Message;
+  message: string;
 };

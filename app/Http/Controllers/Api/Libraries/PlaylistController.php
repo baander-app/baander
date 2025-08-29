@@ -3,18 +3,21 @@
 namespace App\Http\Controllers\Api\Libraries;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Http\Pagination\JsonPaginator;
 use App\Http\Requests\Playlist\{CreatePlaylistRequest,
     CreateSmartPlaylistRequest,
     PlaylistShowRequest,
     UpdatePlaylistRequest,
     UpdateSmartPlaylistRulesRequest};
 use App\Http\Resources\Playlist\PlaylistResource;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Response;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Validation\ValidationException;
 use App\Models\{Playlist, PlaylistStatistic, Song, TokenAbility, User};
-use App\Modules\Http\Pagination\JsonPaginator;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Post, Prefix, Put};
 use Throwable;
@@ -24,7 +27,10 @@ use Throwable;
 class PlaylistController extends Controller
 {
     /**
-     * Get a collection of playlists
+     * Get a paginated collection of playlists
+     *
+     * Returns playlists owned by the authenticated user and public playlists
+     * that are visible to all users. Results are paginated for performance.
      *
      * @param Request $request
      * @return AnonymousResourceCollection<JsonPaginator<PlaylistResource>>
@@ -40,11 +46,16 @@ class PlaylistController extends Controller
     }
 
     /**
-     * Create a playlist
+     * Create a new playlist
      *
-     * @param CreatePlaylistRequest $request
-     * @return PlaylistResource
-     * @throws Throwable
+     * Creates a new playlist owned by the authenticated user with the provided
+     * name, description, and visibility settings.
+     *
+     * @param CreatePlaylistRequest $request Request containing validated playlist data
+     *
+     * @throws Throwable When playlist creation fails
+     * @response PlaylistResource
+     * @status 201
      */
     #[Post('', 'api.playlist.store', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
     public function store(CreatePlaylistRequest $request)
@@ -62,10 +73,17 @@ class PlaylistController extends Controller
     }
 
     /**
-     * Show a playlist
+     * Get a specific playlist with detailed information
      *
-     * @param Playlist $playlist
-     * @return PlaylistResource
+     * Retrieves a single playlist with comprehensive information including
+     * songs, artists, album data, and cover art. Authorization is enforced.
+     *
+     * @param PlaylistShowRequest $request Request for playlist access
+     * @param Playlist $playlist The playlist to retrieve
+     *
+     * @throws AuthorizationException When a user cannot view a playlist
+     * @throws ModelNotFoundException When a playlist is not found
+     * @response PlaylistResource
      */
     #[Get('{playlist}', 'api.playlist.show', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
     public function show(PlaylistShowRequest $request, Playlist $playlist)
@@ -78,31 +96,16 @@ class PlaylistController extends Controller
     }
 
     /**
-     * Update a playlist
-     *
-     * @param UpdatePlaylistRequest $request
-     * @param Playlist $playlist
-     * @return PlaylistResource
-     */
-    #[Put('{playlist}', 'api.playlist.update', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
-    public function update(UpdatePlaylistRequest $request, Playlist $playlist)
-    {
-        $this->authorize('update', $playlist);
-
-        $playlist->update([
-            'name'        => $request->get('name'),
-            'description' => $request->get('description'),
-            'is_public'   => $request->boolean('isPublic'),
-        ]);
-
-        return new PlaylistResource($playlist);
-    }
-
-    /**
      * Delete a playlist
      *
-     * @param Playlist $playlist
-     * @return Response
+     * Permanently removes a playlist and all its associated data including
+     * song associations, statistics, and collaborator relationships.
+     *
+     * @param Playlist $playlist The playlist to delete
+     *
+     * @throws AuthorizationException When user cannot delete playlist
+     * @throws ModelNotFoundException When playlist is not found
+     * @status 204
      */
     #[Delete('{playlist}', 'api.playlist.destroy', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
     public function destroy(Playlist $playlist)
@@ -115,11 +118,17 @@ class PlaylistController extends Controller
     }
 
     /**
-     * Add a song
+     * Add a song to a playlist
      *
-     * @param Playlist $playlist
-     * @param Song $song
-     * @return JsonResponse
+     * Adds a song to the specified playlist at the next available position.
+     * Prevents duplicate songs from being added to the same playlist.
+     *
+     * @param Playlist $playlist The playlist to add the song to
+     * @param Song $song The song to add
+     *
+     * @throws AuthorizationException When a user cannot update a playlist
+     * @throws ModelNotFoundException When a playlist or song is not found
+     * @response array{message: string}
      */
     #[Post('{playlist}/songs/{song}', 'api.playlist.add-song', ['auth:sanctum',
                                                                 'ability:' . TokenAbility::ACCESS_API->value])]
@@ -137,11 +146,17 @@ class PlaylistController extends Controller
     }
 
     /**
-     * Remove a song
+     * Remove a song from a playlist
      *
-     * @param Playlist $playlist
-     * @param Song $song
-     * @return JsonResponse
+     * Removes a song from the playlist and automatically reorders remaining
+     * songs to maintain consecutive positioning.
+     *
+     * @param Playlist $playlist The playlist to remove the song from
+     * @param Song $song The song to remove
+     *
+     * @throws AuthorizationException When a user cannot update a playlist
+     * @throws ModelNotFoundException When a playlist or song is not found
+     * @response array{message: string}
      */
     #[Delete('{playlist}/songs/{song}', 'api.playlist.remove-song', [
         'auth:sanctum',
@@ -164,11 +179,46 @@ class PlaylistController extends Controller
     }
 
     /**
-     * Reorder songs
+     * Update an existing playlist
      *
-     * @param Request $request
-     * @param Playlist $playlist
-     * @return JsonResponse
+     * Updates playlist metadata including name, description, and visibility settings.
+     * Only playlist owners and authorized collaborators can update playlists.
+     *
+     * @param UpdatePlaylistRequest $request Request containing validated update data
+     * @param Playlist $playlist The playlist to update
+     *
+     * @throws AuthorizationException When a user cannot update a playlist
+     * @throws ModelNotFoundException When a playlist is not found
+     * @response PlaylistResource
+     */
+    #[Put('{playlist}', 'api.playlist.update', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
+    public function update(UpdatePlaylistRequest $request, Playlist $playlist): PlaylistResource
+    {
+        $this->authorize('update', $playlist);
+
+        $playlist->update([
+            'name'        => $request->get('name'),
+            'description' => $request->get('description'),
+            'is_public'   => $request->boolean('isPublic'),
+        ]);
+
+        $playlist->refresh(['user', 'cover']);
+
+        return new PlaylistResource($playlist);
+    }
+
+    /**
+     * Reorder songs in a playlist
+     *
+     * Updates the position of songs in the playlist based on the provided
+     * ordered array of song IDs. All song IDs must exist in the playlist.
+     *
+     * @param Request $request Request containing ordered song IDs
+     * @param Playlist $playlist The playlist to reorder
+     *
+     * @throws AuthorizationException When user cannot update playlist
+     * @throws ValidationException When song IDs are invalid
+     * @response array{message: string}
      */
     #[Post('{playlist}/reorder', 'api.playlist.reorder', [
         'auth:sanctum',
@@ -195,7 +245,10 @@ class PlaylistController extends Controller
     }
 
     /**
-     * Add collaborator
+     * Add a collaborator to a playlist
+     *
+     * Adds a user as a collaborator to the playlist with the specified role.
+     * Collaborators can have 'editor' or 'contributor' permissions.
      *
      * @param Request $request
      * @param Playlist $playlist
@@ -222,7 +275,10 @@ class PlaylistController extends Controller
     }
 
     /**
-     * Remove collaborator
+     * Remove a collaborator from a playlist
+     *
+     * Removes a user's collaborator access from the playlist.
+     * Only playlist owners can remove collaborators.
      *
      * @param Playlist $playlist
      * @param User $user
@@ -242,7 +298,10 @@ class PlaylistController extends Controller
     }
 
     /**
-     * Clone playlist
+     * Clone an existing playlist
+     *
+     * Creates a copy of the playlist with all songs and their positions.
+     * The cloned playlist is owned by the current user and is private by default.
      *
      * @param Playlist $playlist
      * @return PlaylistResource
@@ -271,7 +330,10 @@ class PlaylistController extends Controller
     }
 
     /**
-     * Get statistics
+     * Get playlist statistics
+     *
+     * Retrieves comprehensive statistics for the playlist including
+     * view count, play count, shares, and favorites.
      *
      * @param Playlist $playlist
      * @return PlaylistStatistic
@@ -290,7 +352,7 @@ class PlaylistController extends Controller
     }
 
     /**
-     * Statistics - Record view
+     * Record a playlist view
      *
      * @param Playlist $playlist
      * @return JsonResponse
@@ -309,10 +371,15 @@ class PlaylistController extends Controller
     }
 
     /**
-     * Statistics - Record play
+     * Record a playlist play
      *
-     * @param Playlist $playlist
-     * @return JsonResponse
+     * Increments the play counter when the playlist is played.
+     * Used for tracking playlist engagement and popularity metrics.
+     *
+     * @param Playlist $playlist The playlist that was played
+     *
+     * @throws AuthorizationException When a user cannot view a playlist
+     * @response array{message: string}
      */
     #[Post('{playlist}/statistics/record/play', 'api.playlist.statistics.record-play', [
         'auth:sanctum',
@@ -328,10 +395,15 @@ class PlaylistController extends Controller
     }
 
     /**
-     * Share
+     * Record a playlist share
      *
-     * @param Playlist $playlist
-     * @return JsonResponse
+     * Increments the share counter when the playlist is shared.
+     * Used for tracking viral and social engagement metrics.
+     *
+     * @param Playlist $playlist The playlist that was shared
+     *
+     * @throws AuthorizationException When user cannot view playlist
+     * @response array{message: string}
      */
     #[Post('{playlist}/statistics/record/share', 'api.playlist.statistics.record-share', [
         'auth:sanctum',
@@ -347,10 +419,15 @@ class PlaylistController extends Controller
     }
 
     /**
-     * Favorite
+     * Record a playlist favorite
      *
-     * @param Playlist $playlist
-     * @return JsonResponse
+     * Increments the favorite counter when users mark the playlist as favorite.
+     * Used for tracking user engagement and playlist quality metrics.
+     *
+     * @param Playlist $playlist The playlist that was favorited
+     *
+     * @throws AuthorizationException When user cannot view playlist
+     * @response array{message: string}
      */
     #[Post('{playlist}/statistics/record/favorite', 'api.playlist.statistics.record-favorite', [
         'auth:sanctum',
@@ -366,11 +443,16 @@ class PlaylistController extends Controller
     }
 
     /**
-     * Smart playlist - Create
+     * Create a smart playlist
      *
-     * @param CreateSmartPlaylistRequest $request
-     * @return PlaylistResource
-     * @throws Throwable
+     * Creates a new smart playlist that automatically populates with songs
+     * matching the specified rules and criteria.
+     *
+     * @param CreateSmartPlaylistRequest $request Request containing playlist data and rules
+     *
+     * @throws Throwable When smart playlist creation fails
+     * @response PlaylistResource
+     * @status 201
      */
     #[Post('/smart', 'api.playlist.smart-create', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
     public function createSmartPlaylist(CreateSmartPlaylistRequest $request)
@@ -393,7 +475,10 @@ class PlaylistController extends Controller
     }
 
     /**
-     * Smart playlist - Update rules
+     * Synchronize smart playlist
+     *
+     * Manually triggers a sync of the smart playlist to refresh the song list
+     * based on the current rules and available songs in the library.
      *
      * @param UpdateSmartPlaylistRulesRequest $request
      * @param Playlist $playlist
@@ -415,7 +500,10 @@ class PlaylistController extends Controller
     }
 
     /**
-     * Smart playlist - Sync
+     * Update smart playlist rules
+     *
+     * Updates the rules for a smart playlist and re-syncs the song list
+     * to match the new criteria.
      *
      * @param Playlist $playlist
      * @return JsonResponse

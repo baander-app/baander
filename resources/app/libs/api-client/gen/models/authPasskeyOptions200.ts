@@ -11,13 +11,12 @@ Implemented queuing functionality through Redis offers efficient job management 
 The media information is organized and easily searchable, ensuring users can always find what they are looking for quickly and easily.
  * OpenAPI spec version: 0.0.1
  */
+import type { AuthPasskeyOptions200AllowCredentialsItem } from "./authPasskeyOptions200AllowCredentialsItem";
 
 export type AuthPasskeyOptions200 = {
   challenge: string;
   rpId: string;
-  /**
-   * @minItems 0
-   * @maxItems 0
-   */
-  allowCredentials: string[];
+  allowCredentials: AuthPasskeyOptions200AllowCredentialsItem[];
+  userVerification: string;
+  timeout: number;
 };

@@ -15,7 +15,6 @@ use App\Modules\Metadata\Matching\MatchingStrategy;
 use App\Modules\Metadata\Matching\QualityValidator;
 use Exception;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 use Psr\Log\LoggerInterface;
 
 class AlbumSearchService
@@ -24,7 +23,7 @@ class AlbumSearchService
         channel: Channel::Metadata,
     )]
     private LoggerInterface $logger;
-    
+
     public function __construct(
         private readonly MusicBrainzClient $musicBrainzClient,
         private readonly DiscogsClient     $discogsClient,
@@ -237,7 +236,7 @@ class AlbumSearchService
     /**
      * Convert MusicBrainz release object to array format expected by MatchingStrategy
      */
-    private function convertMusicBrainzReleaseToArray($release): array
+    private function convertMusicBrainzReleaseToArray(Release $release): array
     {
         $trackCount = 0;
 
@@ -267,6 +266,9 @@ class AlbumSearchService
             // Add track count for better matching
             'track_count'         => $trackCount > 0 ? $trackCount : null,
             'media'               => $release->media ?? [],
+            'barcode'             => $release->barcode ?? null,
+            'country'             => $release->iso_3166_2_code ?? null,
+            'disambiguation'      => $release->disambiguation ?? null,
         ];
     }
 
@@ -503,7 +505,7 @@ class AlbumSearchService
     /**
      * Convert Discogs release object to array format expected by MatchingStrategy
      */
-    private function convertDiscogsReleaseToArray($release): array
+    private function convertDiscogsReleaseToArray(DiscogsRelease $release): array
     {
         return [
             'id'      => $release->id,
@@ -614,19 +616,19 @@ class AlbumSearchService
                     if (!$searchResults->isEmpty()) {
                         foreach ($searchResults->take(3) as $result) {
                             $allResults[] = [
-                                'id' => $result->id,
-                                'source' => 'musicbrainz',
+                                'id'             => $result->id,
+                                'source'         => 'musicbrainz',
                                 'variation_used' => $variation,
-                                'data' => $this->convertMusicBrainzReleaseToArray($result),
-                                'raw_result' => $result,
+                                'data'           => $this->convertMusicBrainzReleaseToArray($result),
+                                'raw_result'     => $result,
                             ];
                         }
                     }
                 } catch (Exception $e) {
                     $this->logger->debug('Fuzzy search variation failed', [
-                        'source' => 'musicbrainz',
+                        'source'    => 'musicbrainz',
                         'variation' => $variation,
-                        'error' => $e->getMessage(),
+                        'error'     => $e->getMessage(),
                     ]);
                 }
             }
@@ -645,19 +647,19 @@ class AlbumSearchService
                     if (!$searchResults->isEmpty()) {
                         foreach ($searchResults->take(3) as $result) {
                             $allResults[] = [
-                                'id' => $result->id,
-                                'source' => 'discogs',
+                                'id'             => $result->id,
+                                'source'         => 'discogs',
                                 'variation_used' => $variation,
-                                'data' => $this->convertDiscogsReleaseToArray($result),
-                                'raw_result' => $result,
+                                'data'           => $this->convertDiscogsReleaseToArray($result),
+                                'raw_result'     => $result,
                             ];
                         }
                     }
                 } catch (Exception $e) {
                     $this->logger->debug('Discogs fuzzy search variation failed', [
-                        'source' => 'discogs',
+                        'source'    => 'discogs',
                         'variation' => $variation,
-                        'error' => $e->getMessage(),
+                        'error'     => $e->getMessage(),
                     ]);
                 }
             }
@@ -680,10 +682,10 @@ class AlbumSearchService
         usort($scoredResults, static fn($a, $b) => $b['quality_score'] <=> $a['quality_score']);
 
         return [
-            'total_results' => count($scoredResults),
+            'total_results'    => count($scoredResults),
             'variations_tried' => $variations,
-            'results' => $scoredResults,
-            'best_match' => !empty($scoredResults) ? $scoredResults[0] : null,
+            'results'          => $scoredResults,
+            'best_match'       => !empty($scoredResults) ? $scoredResults[0] : null,
         ];
     }
 

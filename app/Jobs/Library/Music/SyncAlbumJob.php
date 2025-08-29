@@ -30,7 +30,6 @@ class SyncAlbumJob extends BaseJob implements ShouldQueue
         private readonly bool  $forceUpdate = false,
         private readonly array $sources = ['general'],
         private readonly bool  $cascade = true,
-        private readonly bool  $useLegacyService = false, // For backward compatibility
     )
     {
     }
@@ -60,15 +59,10 @@ class SyncAlbumJob extends BaseJob implements ShouldQueue
             'sources'            => $this->sources,
             'force_update'       => $this->forceUpdate,
             'cascade'            => $this->cascade,
-            'use_legacy_service' => $this->useLegacyService,
         ]);
 
         try {
-            if ($this->useLegacyService) {
-                $this->handleLegacySync($album);
-            } else {
-                $this->handleModernSync($album);
-            }
+            $this->handleModernSync($album);
         } catch (Exception $e) {
             $this->getLogger()->error('Album sync failed', [
                 'album_id' => $this->albumId,
@@ -76,45 +70,6 @@ class SyncAlbumJob extends BaseJob implements ShouldQueue
             ]);
 
             throw $e;
-        }
-    }
-
-    private function handleLegacySync(Album $album): void
-    {
-        $metadataSyncService = app(MetadataSyncService::class);
-        $results = $metadataSyncService->syncAlbum($album);
-
-        if (!is_array($results) || !isset($results['quality_score'])) {
-            $this->getLogger()->warning('Invalid metadata sync results structure (legacy)', [
-                'album_id'     => $this->albumId,
-                'results_type' => gettype($results),
-            ]);
-            return;
-        }
-
-        $hasIdentifiers = !empty($results['album']['mbid']) || !empty($results['album']['discogs_id']);
-        $qualityThreshold = $hasIdentifiers ? 0.4 : 0.5;
-
-        if ($results['quality_score'] >= $qualityThreshold) {
-            $this->updateAlbumMetadata($album, $results['album'], $results['source']);
-
-            $this->getLogger()->info('Album metadata synced successfully (legacy)', [
-                'album_id'        => $album->id,
-                'source'          => $results['source'],
-                'quality_score'   => $results['quality_score'],
-                'has_identifiers' => $hasIdentifiers,
-            ]);
-
-            // Schedule enhanced sync if identifiers were updated
-            if ($hasIdentifiers && $results['quality_score'] >= 0.7) {
-                $this->scheduleEnhancedMetadataSync($album);
-            }
-        } else {
-            $this->getLogger()->warning('Album metadata sync rejected due to low quality (legacy)', [
-                'album_id'       => $album->id,
-                'quality_score'  => $results['quality_score'],
-                'threshold_used' => $qualityThreshold,
-            ]);
         }
     }
 
@@ -262,86 +217,6 @@ class SyncAlbumJob extends BaseJob implements ShouldQueue
         return $data;
     }
 
-    protected function getFieldMappings(string $source): array
-    {
-        return match ($source) {
-            'musicbrainz' => [
-                'title'         => 'title',
-                'date'          => 'year',
-                'id'            => 'mbid',
-                'country'       => 'country',
-                'disambiguation' => 'disambiguation',
-                'barcode'       => 'barcode',
-                'status'        => 'status',
-                'packaging'     => 'packaging',
-            ],
-            'discogs' => [
-                'title'      => 'title',
-                'year'       => 'year',
-                'id'         => 'discogs_id',
-                'country'    => 'country',
-                'notes'      => 'annotation',
-            ],
-            'general' => [
-                'title'          => 'title',
-                'year'           => 'year',
-                'mbid'           => 'mbid',
-                'discogs_id'     => 'discogs_id',
-                'country'        => 'country',
-                'disambiguation' => 'disambiguation',
-                'barcode'        => 'barcode',
-                'label'          => 'label',
-                'catalog_number' => 'catalog_number',
-            ],
-            default => []
-        };
-    }
-
-    protected function processComplexFields(Album $album, array $data, string $source): array
-    {
-        $updateData = [];
-
-        // Handle release date extraction for year
-        if (isset($data['date']) && !isset($updateData['year'])) {
-            $year = $this->extractYear($data['date']);
-            if ($year && $this->shouldUpdateField($album, 'year', $year)) {
-                $updateData['year'] = $year;
-            }
-        }
-
-        // Handle label information from MusicBrainz
-        if ($source === 'musicbrainz' && isset($data['label-info'])) {
-            $labelInfo = is_array($data['label-info']) ? $data['label-info'][0] ?? null : $data['label-info'];
-
-            if ($labelInfo) {
-                if (!empty($labelInfo['label']['name']) && $this->shouldUpdateField($album, 'label', $labelInfo['label']['name'])) {
-                    $updateData['label'] = $labelInfo['label']['name'];
-                }
-
-                if (!empty($labelInfo['catalog-number']) && $this->shouldUpdateField($album, 'catalog_number', $labelInfo['catalog-number'])) {
-                    $updateData['catalog_number'] = $labelInfo['catalog-number'];
-                }
-            }
-        }
-
-        // Handle label information from Discogs
-        if ($source === 'discogs' && isset($data['labels'])) {
-            $label = is_array($data['labels']) ? $data['labels'][0] ?? null : $data['labels'];
-
-            if ($label) {
-                if (!empty($label['name']) && $this->shouldUpdateField($album, 'label', $label['name'])) {
-                    $updateData['label'] = $label['name'];
-                }
-
-                if (!empty($label['catno']) && $this->shouldUpdateField($album, 'catalog_number', $label['catno'])) {
-                    $updateData['catalog_number'] = $label['catno'];
-                }
-            }
-        }
-
-        return $updateData;
-    }
-
     private function extractYear($date): ?int
     {
         if (empty($date)) {
@@ -358,19 +233,6 @@ class SyncAlbumJob extends BaseJob implements ShouldQueue
     private function hasIdentifierFields(array $fields): bool
     {
         return !empty(array_intersect(['mbid', 'discogs_id'], $fields));
-    }
-
-    private function scheduleEnhancedMetadataSync(Album $album): void
-    {
-        $this->getLogger()->info('Scheduling enhanced metadata sync for album with new identifiers', [
-            'album_id'   => $album->id,
-            'mbid'       => $album->mbid,
-            'discogs_id' => $album->discogs_id,
-        ]);
-
-        static::syncIdentifierBased($album->id, $this->forceUpdate)
-            ->delay(now()->addMinutes(2))
-            ->dispatch();
     }
 
     private function scheduleIdentifierBasedSync(Album $album): void
@@ -420,12 +282,6 @@ class SyncAlbumJob extends BaseJob implements ShouldQueue
     public static function syncAll(int $albumId, bool $forceUpdate = false): self
     {
         return new self($albumId, $forceUpdate, ['general', 'musicbrainz', 'discogs'], false);
-    }
-
-    // For backward compatibility with SyncAlbumMetadataJob
-    public static function syncLegacy(int $albumId, bool $forceUpdate = false): self
-    {
-        return new self($albumId, $forceUpdate, ['general'], true, true);
     }
 
     /**

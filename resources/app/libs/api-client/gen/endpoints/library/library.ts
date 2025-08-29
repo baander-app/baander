@@ -45,9 +45,10 @@ import type {
   AuthenticationExceptionResponse,
   AuthorizationExceptionResponse,
   CreateLibraryRequest,
-  LibrariesIndex200,
   LibrariesIndexParams,
   LibraryResource,
+  LibraryStatsResource,
+  ModelNotFoundExceptionResponse,
   UpdateLibraryRequest,
   ValidationExceptionResponse,
 } from "../../models";
@@ -58,14 +59,16 @@ import type { ErrorType, BodyType } from "../../../axios-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * @summary Get a collection of media libraries
+ * Returns a paginated list of all available media libraries with basic information.
+Does not include detailed statistics - use the show endpoint for comprehensive data.
+ * @summary Get a paginated collection of media libraries
  */
 export const librariesIndex = (
   params?: LibrariesIndexParams,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
-  return customInstance<LibrariesIndex200>(
+  return customInstance<LibraryResource[]>(
     { url: `/api/libraries`, method: "GET", params, signal },
     options
   );
@@ -226,7 +229,7 @@ export function useLibrariesIndexInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of media libraries
+ * @summary Get a paginated collection of media libraries
  */
 
 export function useLibrariesIndexInfinite<
@@ -373,7 +376,7 @@ export function useLibrariesIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of media libraries
+ * @summary Get a paginated collection of media libraries
  */
 
 export function useLibrariesIndex<
@@ -509,7 +512,7 @@ export function useLibrariesIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of media libraries
+ * @summary Get a paginated collection of media libraries
  */
 
 export function useLibrariesIndexSuspense<
@@ -684,7 +687,7 @@ export function useLibrariesIndexSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a collection of media libraries
+ * @summary Get a paginated collection of media libraries
  */
 
 export function useLibrariesIndexSuspenseInfinite<
@@ -731,7 +734,9 @@ export function useLibrariesIndexSuspenseInfinite<
 }
 
 /**
- * @summary Create a library
+ * Creates a new library with the provided configuration. The library will be
+available for media scanning after creation.
+ * @summary Create a new media library
  */
 export const libraryCreate = (
   createLibraryRequest: BodyType<CreateLibraryRequest>,
@@ -799,7 +804,7 @@ export type LibraryCreateMutationError = ErrorType<
 >;
 
 /**
- * @summary Create a library
+ * @summary Create a new media library
  */
 export const useLibraryCreate = <
   TError = ErrorType<
@@ -828,14 +833,16 @@ export const useLibraryCreate = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * @summary Show library
+ * Retrieves a single library by its slug identifier and includes both
+formatted (human-readable) and raw statistical data about the library's content.
+ * @summary Show library with comprehensive statistics
  */
 export const libraryShow = (
   slug: string,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
-  return customInstance<LibraryResource>(
+  return customInstance<LibraryStatsResource>(
     { url: `/api/libraries/${slug}`, method: "GET", signal },
     options
   );
@@ -847,7 +854,9 @@ export const getLibraryShowQueryKey = (slug?: string) => {
 
 export const getLibraryShowInfiniteQueryOptions = <
   TData = InfiniteData<Awaited<ReturnType<typeof libraryShow>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   slug: string,
   options?: {
@@ -884,12 +893,15 @@ export const getLibraryShowInfiniteQueryOptions = <
 export type LibraryShowInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof libraryShow>>
 >;
-export type LibraryShowInfiniteQueryError =
-  ErrorType<AuthenticationExceptionResponse>;
+export type LibraryShowInfiniteQueryError = ErrorType<
+  AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+>;
 
 export function useLibraryShowInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof libraryShow>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   slug: string,
   options: {
@@ -916,7 +928,9 @@ export function useLibraryShowInfinite<
 };
 export function useLibraryShowInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof libraryShow>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   slug: string,
   options?: {
@@ -943,7 +957,9 @@ export function useLibraryShowInfinite<
 };
 export function useLibraryShowInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof libraryShow>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   slug: string,
   options?: {
@@ -961,12 +977,14 @@ export function useLibraryShowInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Show library
+ * @summary Show library with comprehensive statistics
  */
 
 export function useLibraryShowInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof libraryShow>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   slug: string,
   options?: {
@@ -999,7 +1017,9 @@ export function useLibraryShowInfinite<
 
 export const getLibraryShowQueryOptions = <
   TData = Awaited<ReturnType<typeof libraryShow>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   slug: string,
   options?: {
@@ -1032,11 +1052,15 @@ export const getLibraryShowQueryOptions = <
 export type LibraryShowQueryResult = NonNullable<
   Awaited<ReturnType<typeof libraryShow>>
 >;
-export type LibraryShowQueryError = ErrorType<AuthenticationExceptionResponse>;
+export type LibraryShowQueryError = ErrorType<
+  AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+>;
 
 export function useLibraryShow<
   TData = Awaited<ReturnType<typeof libraryShow>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   slug: string,
   options: {
@@ -1059,7 +1083,9 @@ export function useLibraryShow<
 };
 export function useLibraryShow<
   TData = Awaited<ReturnType<typeof libraryShow>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   slug: string,
   options?: {
@@ -1082,7 +1108,9 @@ export function useLibraryShow<
 };
 export function useLibraryShow<
   TData = Awaited<ReturnType<typeof libraryShow>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   slug: string,
   options?: {
@@ -1096,12 +1124,14 @@ export function useLibraryShow<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Show library
+ * @summary Show library with comprehensive statistics
  */
 
 export function useLibraryShow<
   TData = Awaited<ReturnType<typeof libraryShow>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   slug: string,
   options?: {
@@ -1128,7 +1158,9 @@ export function useLibraryShow<
 
 export const getLibraryShowSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof libraryShow>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   slug: string,
   options?: {
@@ -1160,12 +1192,15 @@ export const getLibraryShowSuspenseQueryOptions = <
 export type LibraryShowSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof libraryShow>>
 >;
-export type LibraryShowSuspenseQueryError =
-  ErrorType<AuthenticationExceptionResponse>;
+export type LibraryShowSuspenseQueryError = ErrorType<
+  AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+>;
 
 export function useLibraryShowSuspense<
   TData = Awaited<ReturnType<typeof libraryShow>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   slug: string,
   options: {
@@ -1184,7 +1219,9 @@ export function useLibraryShowSuspense<
 };
 export function useLibraryShowSuspense<
   TData = Awaited<ReturnType<typeof libraryShow>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   slug: string,
   options?: {
@@ -1203,7 +1240,9 @@ export function useLibraryShowSuspense<
 };
 export function useLibraryShowSuspense<
   TData = Awaited<ReturnType<typeof libraryShow>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   slug: string,
   options?: {
@@ -1221,12 +1260,14 @@ export function useLibraryShowSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Show library
+ * @summary Show library with comprehensive statistics
  */
 
 export function useLibraryShowSuspense<
   TData = Awaited<ReturnType<typeof libraryShow>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   slug: string,
   options?: {
@@ -1259,7 +1300,9 @@ export function useLibraryShowSuspense<
 
 export const getLibraryShowSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<Awaited<ReturnType<typeof libraryShow>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   slug: string,
   options?: {
@@ -1295,12 +1338,15 @@ export const getLibraryShowSuspenseInfiniteQueryOptions = <
 export type LibraryShowSuspenseInfiniteQueryResult = NonNullable<
   Awaited<ReturnType<typeof libraryShow>>
 >;
-export type LibraryShowSuspenseInfiniteQueryError =
-  ErrorType<AuthenticationExceptionResponse>;
+export type LibraryShowSuspenseInfiniteQueryError = ErrorType<
+  AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+>;
 
 export function useLibraryShowSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof libraryShow>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   slug: string,
   options: {
@@ -1319,7 +1365,9 @@ export function useLibraryShowSuspenseInfinite<
 };
 export function useLibraryShowSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof libraryShow>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   slug: string,
   options?: {
@@ -1338,7 +1386,9 @@ export function useLibraryShowSuspenseInfinite<
 };
 export function useLibraryShowSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof libraryShow>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   slug: string,
   options?: {
@@ -1356,12 +1406,14 @@ export function useLibraryShowSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Show library
+ * @summary Show library with comprehensive statistics
  */
 
 export function useLibraryShowSuspenseInfinite<
   TData = InfiniteData<Awaited<ReturnType<typeof libraryShow>>>,
-  TError = ErrorType<AuthenticationExceptionResponse>
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >
 >(
   slug: string,
   options?: {
@@ -1396,7 +1448,9 @@ export function useLibraryShowSuspenseInfinite<
 }
 
 /**
- * @summary Update a library specified by the provided slug
+ * Updates library configuration using the provided slug identifier.
+Only the fields included in the request will be updated.
+ * @summary Update an existing library
  */
 export const libraryUpdate = (
   slug: string,
@@ -1418,6 +1472,7 @@ export const getLibraryUpdateMutationOptions = <
   TError = ErrorType<
     | AuthenticationExceptionResponse
     | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
     | ValidationExceptionResponse
   >,
   TContext = unknown
@@ -1463,16 +1518,18 @@ export type LibraryUpdateMutationBody = BodyType<UpdateLibraryRequest>;
 export type LibraryUpdateMutationError = ErrorType<
   | AuthenticationExceptionResponse
   | AuthorizationExceptionResponse
+  | ModelNotFoundExceptionResponse
   | ValidationExceptionResponse
 >;
 
 /**
- * @summary Update a library specified by the provided slug
+ * @summary Update an existing library
  */
 export const useLibraryUpdate = <
   TError = ErrorType<
     | AuthenticationExceptionResponse
     | AuthorizationExceptionResponse
+    | ModelNotFoundExceptionResponse
     | ValidationExceptionResponse
   >,
   TContext = unknown
@@ -1498,6 +1555,8 @@ export const useLibraryUpdate = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
+ * Permanently removes a library and all associated data. This action cannot be undone.
+Media files on disk are not affected, only the library record is removed.
  * @summary Delete a library
  */
 export const libraryDelete = (
@@ -1511,7 +1570,9 @@ export const libraryDelete = (
 };
 
 export const getLibraryDeleteMutationOptions = <
-  TError = ErrorType<AuthenticationExceptionResponse>,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >,
   TContext = unknown
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1552,14 +1613,17 @@ export type LibraryDeleteMutationResult = NonNullable<
   Awaited<ReturnType<typeof libraryDelete>>
 >;
 
-export type LibraryDeleteMutationError =
-  ErrorType<AuthenticationExceptionResponse>;
+export type LibraryDeleteMutationError = ErrorType<
+  AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+>;
 
 /**
  * @summary Delete a library
  */
 export const useLibraryDelete = <
-  TError = ErrorType<AuthenticationExceptionResponse>,
+  TError = ErrorType<
+    AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
+  >,
   TContext = unknown
 >(
   options?: {
