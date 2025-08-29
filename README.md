@@ -39,13 +39,17 @@
 ![#songs page](/docs/images/readme/page_songs.png)
 ![#songs lyrics page](/docs/images/readme/page_songs_lyrics.png)
 
-## Api documentation
+## Documentation
 
-We use [Scramble](https://scramble.dedoc.co/) to generate the documentation.
+### Source code
 
-See the repository [https://github.com/baander-app/api-explorer](api-explorer) or the latest deployed documentation at [api-docs.baander.dev](https://api-docs.baander.dev/)
+Source code for the documentation is located at [https://source-docs.baander.dev](https://source-docs.baander.dev)
 
-Visit `yourapp.tld/api/docs` for the documentation page.
+It can also be found at [https://github.com/baander-app/api-source](https://github.com/baander-app/api-source)
+
+### Rest API
+
+See the repository [https://github.com/baander-app/api-explorer](api-explorer) or the latest deployed documentation at [api-docs.baander.dev](https://api-docs.baander.dev/) to see it locally on your deployed instance visit `yourapp.tld/api/docs` for the documentation page.
 ![#login page](/docs/images/readme/page_api_docs.png)
 
 The openapi collection is available at `yourapp.tld/api/docs.json`
