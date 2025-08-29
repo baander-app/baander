@@ -11,9 +11,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\ValidationException;
 use App\Models\{TokenAbility, User};
-use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Http\Response;
+use Illuminate\Http\{Request, Response};
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Patch, Post, Prefix};
 
 /**
@@ -40,11 +38,9 @@ class UserController extends Controller
      * options for administrative user management.
      *
      * @param UserIndexRequest $request Request with filtering and pagination parameters
-     *
-     * @response AnonymousResourceCollection<JsonPaginator<UserResource>>
      */
     #[Get('/', 'api.users.index')]
-    public function index(UserIndexRequest $request): AnonymousResourceCollection
+    public function index(UserIndexRequest $request)
     {
         /** @var array<string> $columnsForGlobalFilter Searchable columns for global filter */
         $columnsForGlobalFilter = ['name', 'email'];

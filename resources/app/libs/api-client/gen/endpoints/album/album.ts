@@ -44,6 +44,7 @@ import type {
 import type {
   AlbumResource,
   AlbumUpdateRequest,
+  AlbumsIndex200,
   AlbumsIndexParams,
   AuthenticationExceptionResponse,
   ModelNotFoundExceptionResponse,
@@ -66,7 +67,7 @@ export const albumsIndex = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
-  return customInstance<AlbumResource[]>(
+  return customInstance<AlbumsIndex200>(
     { url: `/api/libraries/${library}/albums`, method: "GET", params, signal },
     options
   );

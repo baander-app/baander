@@ -41,6 +41,7 @@ import type {
   AuthenticationExceptionResponse,
   ModelNotFoundExceptionResponse,
   SongResource,
+  SongsIndex200,
   SongsIndex400,
   SongsIndexParams,
   SongsShowParams,
@@ -64,7 +65,7 @@ export const songsIndex = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
-  return customInstance<SongResource[]>(
+  return customInstance<SongsIndex200>(
     { url: `/api/libraries/${library}/songs`, method: "GET", params, signal },
     options
   );

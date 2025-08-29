@@ -41,6 +41,7 @@ import type {
   AuthenticationExceptionResponse,
   ModelNotFoundExceptionResponse,
   MovieResource,
+  MoviesIndex200,
 } from "../../models";
 
 import { customInstance } from "../../../axios-instance";
@@ -58,7 +59,7 @@ export const moviesIndex = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
-  return customInstance<MovieResource[]>(
+  return customInstance<MoviesIndex200>(
     { url: `/api/libraries/${library}/movies`, method: "GET", signal },
     options
   );

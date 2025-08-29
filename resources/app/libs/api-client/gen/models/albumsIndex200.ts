@@ -12,11 +12,11 @@ The media information is organized and easily searchable, ensuring users can alw
  * OpenAPI spec version: 0.0.1
  */
 import type { AlbumResource } from "./albumResource";
-import type { AlbumsIndex200Meta } from "./albumsIndex200Meta";
 import type { AlbumsIndex200Links } from "./albumsIndex200Links";
+import type { AlbumsIndex200Meta } from "./albumsIndex200Meta";
 
 export type AlbumsIndex200 = {
   data: AlbumResource[];
-  meta: AlbumsIndex200Meta;
   links: AlbumsIndex200Links;
+  meta: AlbumsIndex200Meta;
 };

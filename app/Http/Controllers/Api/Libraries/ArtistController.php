@@ -8,7 +8,6 @@ use App\Http\Resources\Artist\ArtistResource;
 use App\Models\{Album, Artist, Library, TokenAbility};
 use App\Modules\Eloquent\BaseBuilder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
 
 #[Prefix('/libraries/{library}/artists')]
@@ -27,11 +26,9 @@ class ArtistController extends Controller
      *
      * @param Library $library The library to retrieve artists from
      * @param ArtistIndexRequest $request Request with filtering and pagination parameters
-     *
-     * @response AnonymousResourceCollection<JsonPaginator<ArtistResource>>
      */
     #[Get('/', 'api.artists.index')]
-    public function index(Library $library, ArtistIndexRequest $request): AnonymousResourceCollection
+    public function index(Library $library, ArtistIndexRequest $request)
     {
         $fields = $request->query('fields');
         $relations = $request->query('relations');

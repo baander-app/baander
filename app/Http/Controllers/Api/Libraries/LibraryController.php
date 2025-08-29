@@ -8,7 +8,6 @@ use App\Http\Resources\Library\LibraryResource;
 use App\Http\Resources\Library\LibraryStatsResource;
 use App\Models\{Enums\MetaKey, Library, TokenAbility};
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Patch, Post, Prefix};
 use Symfony\Component\HttpFoundation\Response as ResponseAlias;
@@ -26,11 +25,9 @@ class LibraryController extends Controller
      *
      * Returns a paginated list of all available media libraries with basic information.
      * Does not include detailed statistics - use the show endpoint for comprehensive data.
-     *
-     * @response AnonymousResourceCollection<JsonPaginator<LibraryResource>>
      */
     #[Get('/', 'api.libraries.index')]
-    public function index(LibraryIndexRequest $request): AnonymousResourceCollection
+    public function index(LibraryIndexRequest $request)
     {
         $libraries = (new Library)->paginate();
 

@@ -12,11 +12,11 @@ The media information is organized and easily searchable, ensuring users can alw
  * OpenAPI spec version: 0.0.1
  */
 import type { LibraryResource } from "./libraryResource";
-import type { LibrariesIndex200Meta } from "./librariesIndex200Meta";
 import type { LibrariesIndex200Links } from "./librariesIndex200Links";
+import type { LibrariesIndex200Meta } from "./librariesIndex200Meta";
 
 export type LibrariesIndex200 = {
   data: LibraryResource[];
-  meta: LibrariesIndex200Meta;
   links: LibrariesIndex200Links;
+  meta: LibrariesIndex200Meta;
 };

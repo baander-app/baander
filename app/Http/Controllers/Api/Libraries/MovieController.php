@@ -8,7 +8,6 @@ use App\Models\Library;
 use App\Models\Movie;
 use App\Models\TokenAbility;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Spatie\RouteAttributes\Attributes\Get;
 use Spatie\RouteAttributes\Attributes\Middleware;
@@ -29,11 +28,9 @@ class MovieController extends Controller
      * Movies are filtered by the library to ensure only content from the requested library is returned.
      *
      * @param Library $library The video library to retrieve movies from
-     *
-     * @response AnonymousResourceCollection<JsonPaginator<MovieResource>>
      */
     #[Get('/', 'api.movies.index')]
-    public function index(Library $library): AnonymousResourceCollection
+    public function index(Library $library)
     {
         $movies = Movie::query()
             ->whereLibraryId($library->id)

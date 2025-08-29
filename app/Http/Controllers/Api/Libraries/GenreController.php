@@ -8,7 +8,6 @@ use App\Http\Resources\Genre\GenreResource;
 use App\Models\{Genre, TokenAbility};
 use App\Modules\Eloquent\BaseBuilder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Patch, Prefix};
 
@@ -27,11 +26,9 @@ class GenreController extends Controller
      * Supports field selection and library filtering for optimized queries.
      *
      * @param GenreIndexRequest $request Request with filtering and pagination parameters
-     *
-     * @response AnonymousResourceCollection<JsonPaginator<GenreResource>>
      */
     #[Get('/', 'api.genres.index')]
-    public function index(GenreIndexRequest $request): AnonymousResourceCollection
+    public function index(GenreIndexRequest $request)
     {
         /** @var string|null $fields Comma-separated list of fields to select */
         $fields = $request->query('fields');

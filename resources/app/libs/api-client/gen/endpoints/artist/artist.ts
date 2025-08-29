@@ -39,6 +39,7 @@ import type {
 
 import type {
   ArtistResource,
+  ArtistsIndex200,
   ArtistsIndexParams,
   AuthenticationExceptionResponse,
   ModelNotFoundExceptionResponse,
@@ -61,7 +62,7 @@ export const artistsIndex = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
-  return customInstance<ArtistResource[]>(
+  return customInstance<ArtistsIndex200>(
     { url: `/api/libraries/${library}/artists`, method: "GET", params, signal },
     options
   );

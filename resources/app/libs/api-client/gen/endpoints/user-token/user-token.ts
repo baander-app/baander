@@ -45,7 +45,7 @@ import type {
   AuthenticationExceptionResponse,
   AuthorizationExceptionResponse,
   ModelNotFoundExceptionResponse,
-  PersonalAccessTokenViewResource,
+  UserTokensIndex200,
   UserTokensIndexParams,
   ValidationExceptionResponse,
 } from "../../models";
@@ -67,7 +67,7 @@ export const userTokensIndex = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
-  return customInstance<PersonalAccessTokenViewResource[]>(
+  return customInstance<UserTokensIndex200>(
     { url: `/api/users/tokens/${user}`, method: "GET", params, signal },
     options
   );

@@ -12,11 +12,11 @@ The media information is organized and easily searchable, ensuring users can alw
  * OpenAPI spec version: 0.0.1
  */
 import type { GenreResource } from "./genreResource";
-import type { GenresIndex200Meta } from "./genresIndex200Meta";
 import type { GenresIndex200Links } from "./genresIndex200Links";
+import type { GenresIndex200Meta } from "./genresIndex200Meta";
 
 export type GenresIndex200 = {
   data: GenreResource[];
-  meta: GenresIndex200Meta;
   links: GenresIndex200Links;
+  meta: GenresIndex200Meta;
 };

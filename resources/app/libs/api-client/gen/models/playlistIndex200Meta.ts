@@ -11,5 +11,23 @@ Implemented queuing functionality through Redis offers efficient job management 
 The media information is organized and easily searchable, ensuring users can always find what they are looking for quickly and easily.
  * OpenAPI spec version: 0.0.1
  */
+import type { PlaylistIndex200MetaFrom } from "./playlistIndex200MetaFrom";
+import type { PlaylistIndex200MetaLinksItem } from "./playlistIndex200MetaLinksItem";
+import type { PlaylistIndex200MetaPath } from "./playlistIndex200MetaPath";
+import type { PlaylistIndex200MetaTo } from "./playlistIndex200MetaTo";
 
-export type PlaylistIndex200Meta = { [key: string]: unknown };
+export type PlaylistIndex200Meta = {
+  current_page: number;
+  from: PlaylistIndex200MetaFrom;
+  last_page: number;
+  /** Generated paginator links. */
+  links: PlaylistIndex200MetaLinksItem[];
+  /** Base path for paginator generated URLs. */
+  path: PlaylistIndex200MetaPath;
+  /** Number of items shown per page. */
+  per_page: number;
+  /** Number of the last item in the slice. */
+  to: PlaylistIndex200MetaTo;
+  /** Total number of items being paginated. */
+  total: number;
+};

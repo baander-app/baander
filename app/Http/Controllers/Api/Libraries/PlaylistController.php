@@ -33,7 +33,6 @@ class PlaylistController extends Controller
      * that are visible to all users. Results are paginated for performance.
      *
      * @param Request $request
-     * @return AnonymousResourceCollection<JsonPaginator<PlaylistResource>>
      */
     #[Get('', 'api.playlist.index', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
     public function index(Request $request)

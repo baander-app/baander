@@ -44,6 +44,7 @@ import type {
 import type {
   AuthenticationExceptionResponse,
   GenreResource,
+  GenresIndex200,
   GenresIndexParams,
   ModelNotFoundExceptionResponse,
   UpdateGenreRequest,
@@ -65,7 +66,7 @@ export const genresIndex = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
-  return customInstance<GenreResource[]>(
+  return customInstance<GenresIndex200>(
     { url: `/api/genres`, method: "GET", params, signal },
     options
   );

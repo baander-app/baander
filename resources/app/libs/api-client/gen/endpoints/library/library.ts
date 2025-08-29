@@ -45,6 +45,7 @@ import type {
   AuthenticationExceptionResponse,
   AuthorizationExceptionResponse,
   CreateLibraryRequest,
+  LibrariesIndex200,
   LibrariesIndexParams,
   LibraryResource,
   LibraryStatsResource,
@@ -68,7 +69,7 @@ export const librariesIndex = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
-  return customInstance<LibraryResource[]>(
+  return customInstance<LibrariesIndex200>(
     { url: `/api/libraries`, method: "GET", params, signal },
     options
   );

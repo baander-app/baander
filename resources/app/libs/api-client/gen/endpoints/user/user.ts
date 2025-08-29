@@ -48,6 +48,7 @@ import type {
   ModelNotFoundExceptionResponse,
   UpdateUserRequest,
   UserResource,
+  UsersIndex200,
   UsersIndexParams,
   ValidationExceptionResponse,
 } from "../../models";
@@ -68,7 +69,7 @@ export const usersIndex = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
-  return customInstance<UserResource[]>(
+  return customInstance<UsersIndex200>(
     { url: `/api/users`, method: "GET", params, signal },
     options
   );

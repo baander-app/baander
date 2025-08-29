@@ -12,11 +12,11 @@ The media information is organized and easily searchable, ensuring users can alw
  * OpenAPI spec version: 0.0.1
  */
 import type { UserResource } from "./userResource";
-import type { UsersIndex200Meta } from "./usersIndex200Meta";
 import type { UsersIndex200Links } from "./usersIndex200Links";
+import type { UsersIndex200Meta } from "./usersIndex200Meta";
 
 export type UsersIndex200 = {
   data: UserResource[];
-  meta: UsersIndex200Meta;
   links: UsersIndex200Links;
+  meta: UsersIndex200Meta;
 };

@@ -126,7 +126,7 @@ export function RootMenu() {
     playlists.forEach(playlist => {
       musicSection.links.push({
         label: playlist.name,
-        to: `/playlists/music/${playlist.id}`,
+        to: `/playlists/music/${playlist.publicId}`,
         type: 'playlist',
       });
     });
@@ -183,8 +183,8 @@ export function RootMenu() {
 
       <ScrollArea>
         <Box className={styles.menuContainer}>
-          <NavLink 
-            to="/" 
+          <NavLink
+            to="/"
             className={styles.homeLink}
           >
             <Flex align="center" gap="2">

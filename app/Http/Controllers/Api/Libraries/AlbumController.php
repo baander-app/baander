@@ -9,7 +9,6 @@ use App\Http\Resources\Album\AlbumResource;
 use App\Models\{Album, Library, TokenAbility};
 use App\Modules\Eloquent\BaseBuilder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix, Put};
 
 #[Prefix('/libraries/{library}/albums')]
@@ -28,11 +27,9 @@ class AlbumController extends Controller
      *
      * @param Library $library The library to retrieve albums from
      * @param AlbumIndexRequest $request Request with filtering and pagination parameters
-     *
-     * @response AnonymousResourceCollection<JsonPaginator<AlbumResource>>
      */
     #[Get('/', 'api.albums.index')]
-    public function index(Library $library, AlbumIndexRequest $request): AnonymousResourceCollection
+    public function index(Library $library, AlbumIndexRequest $request)
     {
         /** @var string|null $fields Comma-separated list of fields to select */
         $fields = $request->query('fields');

@@ -27,7 +27,6 @@ class SongController extends Controller
      * @param Library $library The library to retrieve songs from
      *
      * @throws ValidationException When both genreNames and genreSlugs are provided
-     * @response JsonAnonymousResourceCollection<JsonPaginator<SongResource>>
      */
     #[Get('', 'api.songs.index', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
     public function index(SongIndexRequest $request, Library $library): JsonAnonymousResourceCollection

@@ -8,9 +8,7 @@ use App\Http\Resources\UserToken\PersonalAccessTokenViewResource;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use App\Models\{PersonalAccessToken, TokenAbility, User};
-use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Http\Response;
+use Illuminate\Http\{Request, Response};
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Prefix};
 
 /**
@@ -35,11 +33,9 @@ class UserTokenController extends Controller
      * and usage statistics for session management.
      *
      * @param UserTokenIndexRequest $request Request with pagination and filtering parameters
-     *
-     * @response AnonymousResourceCollection<JsonPaginator<PersonalAccessTokenViewResource>>
      */
     #[Get('/{user}', 'api.user-tokens.index')]
-    public function getUserTokens(UserTokenIndexRequest $request): AnonymousResourceCollection
+    public function getUserTokens(UserTokenIndexRequest $request)
     {
         /** @var User $user */
         $user = $request->user();
