@@ -2284,7 +2284,7 @@ export const queueMetricsDelete = (
   id: string,
   options?: SecondParameter<typeof customInstance>
 ) => {
-  return customInstance<null>(
+  return customInstance<string>(
     { url: `/api/queue-metrics/${id}`, method: "DELETE" },
     options
   );

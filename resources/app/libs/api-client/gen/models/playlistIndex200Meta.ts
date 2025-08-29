@@ -12,17 +12,4 @@ The media information is organized and easily searchable, ensuring users can alw
  * OpenAPI spec version: 0.0.1
  */
 
-export type PlaylistIndex200Meta = {
-  /** Total number of items being paginated. */
-  total: number;
-  /** The number of items for the current page */
-  count: number;
-  /** The number of items per page */
-  limit: number;
-  /** The number of current page */
-  currentPage: number;
-  /** The number of next page */
-  nextPage: number;
-  /** The number of last page */
-  lastPage: number;
-};
+export type PlaylistIndex200Meta = { [key: string]: unknown };

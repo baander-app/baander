@@ -12,11 +12,11 @@ The media information is organized and easily searchable, ensuring users can alw
  * OpenAPI spec version: 0.0.1
  */
 import type { PlaylistResource } from "./playlistResource";
-import type { PlaylistIndex200Meta } from "./playlistIndex200Meta";
 import type { PlaylistIndex200Links } from "./playlistIndex200Links";
+import type { PlaylistIndex200Meta } from "./playlistIndex200Meta";
 
 export type PlaylistIndex200 = {
   data: PlaylistResource[];
-  meta: PlaylistIndex200Meta;
   links: PlaylistIndex200Links;
+  meta: PlaylistIndex200Meta;
 };
