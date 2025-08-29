@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { Button, Container, Dialog, Flex, Heading, Inset } from '@radix-ui/themes';
 import { useDateFormatter } from '@/providers/dayjs-provider.tsx';
 import { TokenDetail } from '@/modules/user-settings/features/tokens/token-detail.tsx';
-import { useUserTokenGetUserTokens } from '@/libs/api-client/gen/endpoints/user-token/user-token.ts';
 import { PersonalAccessTokenViewResource } from '@/libs/api-client/gen/models';
 import { revokeAllTokensExceptCurrent } from '@/services/auth/auth.service.ts';
 import { useAppDispatch } from '@/store/hooks';
 import { createNotification } from '@/store/notifications/notifications-slice.ts';
+import { useUserTokensIndex } from '@/libs/api-client/gen/endpoints/user-token/user-token.ts';
 
 export function Sessions() {
-  const { data, isLoading, refetch } = useUserTokenGetUserTokens('1');
+  const { data, isLoading, refetch } = useUserTokensIndex('1');
   const { formatDate } = useDateFormatter();
   const [openSession, setOpenSession] = useState<PersonalAccessTokenViewResource | undefined>();
   const dispatch = useAppDispatch();
@@ -65,7 +65,7 @@ export function Sessions() {
                 <td>Loading...</td>
               </tr>
             ) : (
-               data?.data.map((session) => (
+               data?.map((session) => (
                  <Dialog.Trigger key={session.id}>
                    <tr key={session.id} onClick={() => setViewSession(session)}>
                      <td>{session.name}</td>
