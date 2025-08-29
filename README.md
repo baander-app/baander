@@ -43,7 +43,7 @@
 
 ### Source code
 
-Source code for the documentation is located at [https://source-docs.baander.dev](https://source-docs.baander.dev)
+Documentation for the source is located at [https://source-docs.baander.dev](https://source-docs.baander.dev)
 
 It can also be found at [https://github.com/baander-app/api-source](https://github.com/baander-app/api-source)
 
