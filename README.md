@@ -63,3 +63,10 @@ Apache 2.0 See [LICENSE](/LICENSE)
 ## Copyright
 
 Copyright 2024 <a href="https://www.juul.xyz/">Martin Christiansen</a>
+
+## Issues and feature requests
+
+At the moment, this project is in a very early stage. If you have any suggestions or feature requests, it is not possible.
+You can, however, create a pull request on the [GitHub repository](https://github.com/baander-app/baander).
+
+This is a hobby project, and I do not guarantee any support.
