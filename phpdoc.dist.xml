@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<phpdocumentor
+        configVersion="3"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="https://www.phpdoc.org"
+        xsi:noNamespaceSchemaLocation="https://docs.phpdoc.org/latest/phpdoc.xsd"
+>
+    <title>Bånder</title>
+    <paths>
+        <output>docs/phpdoc</output>
+        <cache>storage/phpdoc/cache</cache>
+    </paths>
+
+    <version number="latest">
+        <folder>docs/phpdoc</folder>
+        <api>
+            <source dsn=".">
+                <path>app</path>
+                <path>packages</path>
+                <path>config</path>
+                <path>database/migrations</path>
+                <path>database/factories</path>
+                <path>routes</path>
+            </source>
+
+            <ignore>
+                <path>vendor/**/*</path>
+                <path>storage/**/*</path>
+                <path>bootstrap/cache/**/*</path>
+                <path>node_modules/**/*</path>
+                <path>tests/**/*</path>
+                <path>stubs/**/*</path>
+                <path>third_party/**/*</path>
+                <path>patches/**/*</path>
+                <path>public/**/*</path>
+                <path>resources/**/*</path>
+                <path>lang/**/*</path>
+            </ignore>
+
+            <extensions>
+                <extension>php</extension>
+            </extensions>
+
+            <visibility>public</visibility>
+            <visibility>protected</visibility>
+            <visibility>private</visibility>
+
+            <markers>
+                <marker>TODO</marker>
+                <marker>FIXME</marker>
+            </markers>
+
+            <include-source>true</include-source>
+        </api>
+    </version>
+</phpdocumentor>
