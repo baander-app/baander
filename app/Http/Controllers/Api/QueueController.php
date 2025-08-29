@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Logging\Attributes\LogChannel;
+use App\Modules\Logging\Channel;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Collection;
@@ -19,6 +21,7 @@ use App\Modules\Queue\QueueMonitor\MonitorStatus;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Post, Prefix};
+use Psr\Log\LoggerInterface;
 use Throwable;
 
 /**
@@ -36,6 +39,10 @@ use Throwable;
 ])]
 class QueueController extends Controller
 {
+    /** @noinspection PhpPropertyOnlyWrittenInspection */
+    #[LogChannel(Channel::Daily)]
+    private readonly LoggerInterface $logger;
+
     public function __construct(private readonly QueueMetricsService $metricsService)
     {
     }
@@ -57,16 +64,9 @@ class QueueController extends Controller
     {
         $this->gateCheckViewDashboard();
 
-        /** @var bool|null $queuedFirst Whether to prioritize queued jobs in ordering */
         $queuedFirst = $request->query('queuedFirst');
-
-        /** @var string|null $status Filter by job status (failed, succeeded, running, etc.) */
         $status = $request->query('status');
-
-        /** @var string|null $queue Filter by specific queue name */
         $queue = $request->query('queue');
-
-        /** @var string|null $name Filter by job name pattern */
         $name = $request->query('name');
 
         $models = QueueMonitor::query()
@@ -176,37 +176,30 @@ class QueueController extends Controller
     public function retry(RetryJobRequest $request, string $id): JsonResponse
     {
         $this->gateCheckViewDashboard();
-
-        /** @var QueueMonitor $monitor */
         $monitor = QueueMonitor::whereId($id)
             ->whereStatus(MonitorStatus::Failed)
             ->whereRetried(false)
             ->whereNotNull('job_uuid')
             ->firstOrFail();
 
-        // Verify job can be safely retried
-        abort_if(!$monitor->canBeRetried(), 400, 'Job cannot be retried');
+        abort_if(!$monitor->canBeRetried(), Response::HTTP_BAD_REQUEST, 'Job cannot be retried');
 
         try {
-            // Attempt to retry the failed job
             $monitor->retry();
 
-            // Log successful retry for audit trail
-            logger()->info('Queue job retried successfully', [
+            $this->logger->info('Queue job retried successfully', [
                 'monitor_id' => $monitor->id,
                 'job_name'   => $monitor->name,
                 'queue'      => $monitor->queue,
                 'retried_by' => $request->user()->id ?? 'system',
             ]);
 
-            // Successful job retry confirmation.
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Job has been successfully retried',
             ]);
         } catch (Throwable $exception) {
-            // Log retry failure for debugging
-            logger()->error('Queue job retry failed', [
+            $this->logger->error('Queue job retry failed', [
                 'monitor_id'   => $monitor->id,
                 'job_name'     => $monitor->name,
                 'error'        => $exception->getMessage(),
@@ -217,7 +210,7 @@ class QueueController extends Controller
             return response()->json([
                 'status'  => 'failed',
                 'message' => 'An error occurred while executing the job',
-            ], 500);
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -242,15 +235,14 @@ class QueueController extends Controller
         $deleted = QueueMonitor::whereId($id)->delete();
 
         if ($deleted) {
-            // Log deletion for audit trail
-            logger()->info('Queue monitor entry deleted', [
+            $this->logger->info('Queue monitor entry deleted', [
                 'monitor_id' => $id,
                 'deleted_by' => request()->user()->id ?? 'system',
             ]);
         }
 
         // Queue monitor entry successfully deleted - no content returned.
-        return response(null, 204);
+        return response(null, HTTP::NO_CONTENT);
     }
 
     /**
@@ -268,20 +260,16 @@ class QueueController extends Controller
     {
         $this->gateCheckViewDashboard();
 
-        // Get count before purging for logging
         $recordCount = QueueMonitor::count();
-
-        // Perform the purge operation
         QueueMonitor::truncate();
 
-        // Log purge operation for audit trail
-        logger()->warning('All queue monitor records purged', [
+        $this->logger->warning('All queue monitor records purged', [
             'records_deleted' => $recordCount,
             'purged_by'       => request()->user()->id ?? 'system',
             'timestamp'       => now(),
         ]);
 
         // All queue monitor records successfully purged - no content returned.
-        return response(null, 204);
+        return response(null, Response::HTTP_NO_CONTENT);
     }
 }

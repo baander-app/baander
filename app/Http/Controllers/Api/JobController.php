@@ -12,8 +12,7 @@ use App\Models\{Library, TokenAbility};
 use App\Services\JobCleanupService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Bus\DispatchesJobs;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Http\{JsonResponse, Request};
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Post, Prefix};
 
 /**
@@ -107,10 +106,8 @@ class JobController extends Controller
     #[Delete('/locks/{jobClass}/lock/{jobId}', 'api.job.lock-delete')]
     public function destroyJobLock(string $jobClass, string $jobId): JsonResponse
     {
-        /** @var bool $status Lock removal status */
         $status = $this->jobCleanupService->clearSpecificJobLock($jobClass, $jobId);
 
-        // Job lock removal status.
         return response()->json([
             'success' => $status === true,
             'message' => $status === true ? 'Job lock cleared.' : 'Job lock not found.',
@@ -149,13 +146,9 @@ class JobController extends Controller
     #[Post('/cleanup', 'api.job.cleanup')]
     public function cleanupJobs(Request $request): JsonResponse
     {
-        /** @var bool $dryRun Whether to perform actual cleanup or just analyze */
         $dryRun = $request->boolean('dryRun', true);
-
-        /** @var array $result Cleanup analysis and results */
         $result = $this->jobCleanupService->getCleanupSummary($dryRun);
 
-        // Job cleanup summary and results.
         return response()->json($result);
     }
 
@@ -175,10 +168,7 @@ class JobController extends Controller
     #[Post('/failed', 'api.job.failed-cleanup')]
     public function clearFailedJobs(Request $request): JsonResponse
     {
-        /** @var int $hoursOld Age threshold in hours for jobs to be cleared */
         $hoursOld = $request->integer('hoursOld', 24);
-
-        /** @var bool $dryRun Whether to perform actual cleanup or just analyze */
         $dryRun = $request->boolean('dryRun', true);
 
         $this->jobCleanupService->clearFailedJobs($hoursOld, $dryRun);
@@ -208,10 +198,7 @@ class JobController extends Controller
     #[Post('/scanLibrary/{slug}', 'api.job.library-scan')]
     public function startLibraryScan(Request $request): JsonResponse
     {
-        // Verify user has permission to execute jobs
         $this->gateCheckExecuteJob();
-
-        /** @var string $slug Library slug from route parameter */
         $slug = $request->route('slug');
 
         try {
@@ -221,14 +208,11 @@ class JobController extends Controller
             throw CouldNotFindJobException::throwFromController($e);
         }
 
-        // Dispatch appropriate scanning job based on library type
         $job = match ($library->type) {
             'movie' => ScanMovieLibraryJob::dispatch($library),
             'music' => ScanMusicLibraryJob::dispatch($library),
             default => throw new InvalidArgumentException("Unsupported library type: {$library->type}")
         };
-
-        /** @var string $jobName Full job class name for logging */
         $jobName = get_class($job);
 
         // Library scanning job dispatched successfully.

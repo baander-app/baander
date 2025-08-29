@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\TokenAbility;
+use App\Modules\Logging\Attributes\LogChannel;
+use App\Modules\Logging\Channel;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
@@ -14,6 +16,7 @@ use App\Modules\Logging\LogStreamer\ThreadedLogProcessor;
 use Exception;
 use Illuminate\Http\{JsonResponse, Request, Response};
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
+use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
@@ -31,6 +34,10 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 ])]
 class LogsController extends Controller
 {
+    /** @noinspection PhpPropertyOnlyWrittenInspection */
+    #[LogChannel(Channel::Daily)]
+    private readonly LoggerInterface $logger;
+
     public function __construct(
         private readonly LogFileService $logFileService,
     )
@@ -146,14 +153,8 @@ class LogsController extends Controller
 
         try {
             $searchableFile = new SearchableLogFile($file->path);
-
-            /** @var int $afterLine Starting line number for content retrieval */
             $afterLine = $request->integer('after_line', 0);
-
-            /** @var int $maxLines Maximum number of lines to return */
             $maxLines = $request->integer('max_lines', 1000);
-
-            /** @var object $content Paginated log content */
             $content = $searchableFile->contentAfterLine($afterLine, $maxLines);
 
             // Paginated log file content.
@@ -196,8 +197,6 @@ class LogsController extends Controller
 
         try {
             $processor = new ThreadedLogProcessor($file->path);
-
-            /** @var int $lineCount Total number of lines in the file */
             $lineCount = $processor->countLines();
 
             // Log file line count information.
@@ -250,17 +249,9 @@ class LogsController extends Controller
 
         try {
             $searchableFile = new SearchableLogFile($file->path);
-
-            /** @var int $lines Number of lines to show from the end */
             $lines = $request->integer('lines', 50);
-
-            /** @var int $totalLines Total lines in the file */
             $totalLines = $searchableFile->numberOfLines();
-
-            /** @var int $startLine Starting line for tail operation */
             $startLine = max(0, $totalLines - $lines);
-
-            /** @var object $content Tail content from the log file */
             $content = $searchableFile->contentAfterLine($startLine, $lines);
 
             // Tail content from log file.
@@ -377,21 +368,10 @@ class LogsController extends Controller
 
         try {
             $searchableFile = new SearchableLogFile($file->path);
-
-            /** @var object $fileInfo Basic file information */
             $fileInfo = $searchableFile->getFileInfo();
-
-            // Analyze log levels for statistical breakdown
-            /** @var int $errorCount Number of ERROR level entries */
             $errorCount = $searchableFile->search('ERROR', false, null)->totalMatches;
-
-            /** @var int $warningCount Number of WARNING level entries */
             $warningCount = $searchableFile->search('WARNING', false, null)->totalMatches;
-
-            /** @var int $infoCount Number of INFO level entries */
             $infoCount = $searchableFile->search('INFO', false, null)->totalMatches;
-
-            /** @var int $debugCount Number of DEBUG level entries */
             $debugCount = $searchableFile->search('DEBUG', false, null)->totalMatches;
 
             // Comprehensive log file statistics.
@@ -462,17 +442,9 @@ class LogsController extends Controller
 
         try {
             $searchableFile = new SearchableLogFile($file->path);
-
-            /** @var string $pattern Search pattern */
             $pattern = $request->string('pattern');
-
-            /** @var bool $caseSensitive Whether search should be case-sensitive */
             $caseSensitive = $request->boolean('caseSensitive', true);
-
-            /** @var int $maxResults Maximum number of results to return */
             $maxResults = $request->integer('maxResults', 100);
-
-            /** @var object $results Search results with matches and metadata */
             $results = $searchableFile->search($pattern, $caseSensitive, $maxResults);
 
             // Search results from log file.
@@ -566,19 +538,10 @@ class LogsController extends Controller
         ]);
 
         try {
-            /** @var string $pattern Search pattern */
             $pattern = $request->string('pattern');
-
-            /** @var bool $caseSensitive Whether search should be case-sensitive */
             $caseSensitive = $request->boolean('caseSensitive', true);
-
-            /** @var int $maxResultsPerFile Maximum results per individual file */
             $maxResultsPerFile = $request->integer('maxResultsPerFile', 10);
-
-            /** @var array<string> $requestedFiles Specific files to search (optional) */
             $requestedFiles = $request->input('files', []);
-
-            /** @var Collection $files Files to search */
             $files = $this->logFileService->getFiles();
 
             // Filter to specific files if requested
@@ -586,13 +549,8 @@ class LogsController extends Controller
                 $files = $files->whereIn('id', $requestedFiles);
             }
 
-            /** @var array $allResults Consolidated search results */
             $allResults = [];
-
-            /** @var int $totalMatches Total matches across all files */
             $totalMatches = 0;
-
-            /** @var float $searchTime Total search time across all files */
             $searchTime = 0;
 
             // Search through each file
@@ -612,7 +570,7 @@ class LogsController extends Controller
                     }
                 } catch (Exception $e) {
                     // Log error but continue with other files
-                    logger()->warning("Failed to search in log file {$file->path}: " . $e->getMessage());
+                    $this->logger->warning("Failed to search in log file {$file->path}: " . $e->getMessage());
                 }
             }
 
