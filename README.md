@@ -43,6 +43,8 @@
 
 We use [Scramble](https://scramble.dedoc.co/) to generate the documentation.
 
+See the repository [https://github.com/baander-app/api-explorer](api-explorer) or the latest deployed documentation at [api-docs.baander.dev](https://api-docs.baander.dev/)
+
 Visit `yourapp.tld/api/docs` for the documentation page.
 ![#login page](/docs/images/readme/page_api_docs.png)
 
