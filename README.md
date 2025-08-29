@@ -31,6 +31,7 @@
 - [Docker services](/docs/dev_docker_services.md)
 - [Phpstorm configuration](/docs/phpstorm.md)
 - [Using XDebug](/docs/xdebug.md)
+- [Development artisan commands](docs/dev_artisan_commands.md)
 
 # Screenshots
 
