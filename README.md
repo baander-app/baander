@@ -41,18 +41,17 @@
 
 ## Documentation
 
-### Source code
+### Source Code
+- **Online**: [source-docs.baander.dev](https://source-docs.baander.dev)
+- **Repository**: [github.com/baander-app/api-source](https://github.com/baander-app/api-source)
 
-Documentation for the source is located at [https://source-docs.baander.dev](https://source-docs.baander.dev)
+### REST API
+- **Online**: [api-docs.baander.dev](https://api-docs.baander.dev)
+- **Repository**: [github.com/baander-app/api-explorer](https://github.com/baander-app/api-explorer)
+- **Local**: `yourapp.tld/api/docs`
+- **OpenAPI JSON**: `yourapp.tld/api/docs.json`
 
-It can also be found at [https://github.com/baander-app/api-source](https://github.com/baander-app/api-source)
-
-### Rest API
-
-See the repository [https://github.com/baander-app/api-explorer](api-explorer) or the latest deployed documentation at [api-docs.baander.dev](https://api-docs.baander.dev/) to see it locally on your deployed instance visit `yourapp.tld/api/docs` for the documentation page.
-![#login page](/docs/images/readme/page_api_docs.png)
-
-The openapi collection is available at `yourapp.tld/api/docs.json`
+![API Documentation](/docs/images/readme/page_api_docs.png)
 
 ## License
 
