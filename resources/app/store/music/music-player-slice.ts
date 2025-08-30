@@ -87,7 +87,7 @@ export const musicPlayerSlice = createSlice({
     setQueueAndSong(state, action: PayloadAction<{ queue: SongResource[], playPublicId: string }>) {
       state.source = PlaybackSource.LIBRARY;
       state.queue = action.payload.queue;
-      state.currentSongIndex = state.queue.findIndex(song => song.public_id === action.payload.playPublicId);
+      state.currentSongIndex = state.queue.findIndex(song => song.publicId === action.payload.playPublicId);
       state.currentSongPublicId = action.payload.playPublicId;
     },
     removeSongFromQueue: (state, action: PayloadAction<number>) => {
@@ -99,7 +99,7 @@ export const musicPlayerSlice = createSlice({
       } else {
         state.currentSongIndex = 0; // Loop back to the start if at the end
       }
-      state.currentSongPublicId = state.queue[state.currentSongIndex].public_id;
+      state.currentSongPublicId = state.queue[state.currentSongIndex].publicId;
     },
     playPreviousSong: (state) => {
       if (state.currentSongIndex > 0) {
@@ -107,12 +107,12 @@ export const musicPlayerSlice = createSlice({
       } else {
         state.currentSongIndex = state.queue.length - 1; // Loop back to the end if at the start
       }
-      state.currentSongPublicId = state.queue[state.currentSongIndex].public_id;
+      state.currentSongPublicId = state.queue[state.currentSongIndex].publicId;
     },
     setCurrentSongIndex: (state, action: PayloadAction<number>) => {
       if (action.payload >= 0 && action.payload < state.queue.length) {
         state.currentSongIndex = action.payload;
-        state.currentSongPublicId = state.queue[state.currentSongIndex].public_id;
+        state.currentSongPublicId = state.queue[state.currentSongIndex].publicId;
       }
     },
     setIsShuffleEnabled: (state, action: PayloadAction<boolean>) => {
