@@ -33,7 +33,7 @@ class ArtistController extends Controller
         $fields = $request->query('fields');
         $relations = $request->query('relations');
 
-        $artists = Album::query()
+        $artists = Artist::query()
             ->selectFields(Artist::$filterFields, $fields)
             ->withRelations(Artist::$filterRelations, $relations)
             ->when($relations, function (BaseBuilder $q) use ($relations) {

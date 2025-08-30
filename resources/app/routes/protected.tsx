@@ -11,7 +11,8 @@ import { LibraryMoviesRoutes } from '@/modules/library-movies/routes/_routes.tsx
 import { LibraryType } from '@/models/library-type.ts';
 import { Overview } from '@/modules/overview/overview.tsx';
 import { LibraryMusicPlaylistsRoutes } from '@/modules/library-music-playlists/_routes.tsx';
-import { useLibraryShow } from '@/libs/api-client/gen/endpoints/library/library.ts';
+import { useLibraryShowSuspense } from '@/libs/api-client/gen/endpoints/library/library.ts';
+import { ErrorRoutes } from '@/modules/error/routes/_routes.tsx';
 
 const App = () => {
   return (
@@ -38,20 +39,18 @@ const DashboardApp = () => {
 const LibraryRoutes = () => {
   const { library } = usePathParam<{ library: string }>();
 
-  const { data: libraryData, failureReason, isLoading } = useLibraryShow(library);
+  const { data } = useLibraryShowSuspense(library);
 
-  if (isLoading) return <div>Loading...</div>;
-  if (failureReason) return <div>Error: {failureReason.message}</div>;
-
-  switch (libraryData?.type) {
+  switch (data.type) {
     case LibraryType.Music:
       return <LibraryMusicRoutes/>;
     case LibraryType.Movie:
       return <LibraryMoviesRoutes/>;
     default:
-      return <Navigate to="/"/>;
+      return <Navigate to="/error/not-found"/>;
   }
 };
+
 
 export const protectedRoutes: RouteObject[] = [
   {
@@ -60,7 +59,7 @@ export const protectedRoutes: RouteObject[] = [
     children: [
       {
         path: '/',
-        element: <Overview title="Albums" />
+        element: <Overview title="Albums"/>,
       },
       {
         path: '/library/:library/*',
@@ -68,11 +67,15 @@ export const protectedRoutes: RouteObject[] = [
       },
       {
         path: '/playlists/music/*',
-        element: <LibraryMusicPlaylistsRoutes />
+        element: <LibraryMusicPlaylistsRoutes/>,
       },
       {
         path: '/user/settings/*',
         element: <UserSettingsRoutes/>,
+      },
+      {
+        path: '/error/*',
+        element: <ErrorRoutes/>,
       },
       {
         path: '*',
@@ -89,6 +92,10 @@ export const protectedRoutes: RouteObject[] = [
         element: <DashboardRoutes/>,
       },
     ],
+  },
+  {
+    path: '/error/*',
+    element: <ErrorRoutes/>,
   },
   {
     path: '/*',

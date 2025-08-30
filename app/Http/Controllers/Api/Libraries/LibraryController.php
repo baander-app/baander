@@ -65,14 +65,14 @@ class LibraryController extends Controller
      * @param string $slug The library's URL-friendly identifier
      *
      * @throws ModelNotFoundException When library is not found
-     * @response LibraryStatsResource
+     * @response LibraryResource
      */
     #[Get('/{slug}', 'api.library.show')]
-    public function show(string $slug): LibraryStatsResource
+    public function show(string $slug)
     {
         $library = Library::whereSlug($slug)->firstOrFail();
 
-        return new LibraryStatsResource($library);
+        return new LibraryResource($library);
     }
 
     /**

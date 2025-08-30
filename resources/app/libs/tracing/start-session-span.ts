@@ -4,7 +4,7 @@ const SESSION_TRACER = trace.getTracer('session-tracer');
 let _sessionSpan: Span | null = null;
 
 export function startSessionSpan(sessionId: string): void {
-  if (_sessionSpan) return;                        // already started
+  if (_sessionSpan || !window.BaanderAppConfig.tracing.enabled) return;
 
   _sessionSpan = SESSION_TRACER.startSpan('user-session', {
     attributes: {
@@ -13,7 +13,7 @@ export function startSessionSpan(sessionId: string): void {
     },
   });
 
-  /* 🔑 keep the span in the global context so every child span
+  /* keep the span in the global context so every child span
        automatically becomes part of the same trace */
   context.with(trace.setSpan(context.active(), _sessionSpan), () => {
     // nothing else required – context is now active

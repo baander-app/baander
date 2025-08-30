@@ -10,13 +10,21 @@ interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
+interface TracingConfigData {
+  enabled: boolean;
+  url: string;
+  token: string;
+}
+
 declare interface Window {
-  BaanderAppInfo: {
+  BaanderAppConfig: {
     name: string;
     url: string;
+    apiUrl: string;
     environment: 'local' | 'production' | 'testing';
     debug: boolean;
     locale: string;
     version: string;
-  };
+    tracing: TracingConfigData;
+  }
 }

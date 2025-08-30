@@ -1,8 +1,11 @@
 import React, { useEffect, useMemo, createContext, useContext } from 'react';
-import { trace, metrics } from '@opentelemetry/api';
+import { trace, metrics, createNoopMeter } from '@opentelemetry/api';
 import { Counter, Histogram } from '@opentelemetry/api/build/src/metrics/Metric';
 import { Tracer } from '@opentelemetry/api/build/src/trace/tracer';
 import { Meter } from '@opentelemetry/api/build/src/metrics/Meter';
+import { Span } from '@opentelemetry/api/build/src/trace/span';
+import { SpanOptions } from '@opentelemetry/api/build/src/trace/SpanOptions';
+import { Context } from '@opentelemetry/api/build/src/context/types';
 
 interface OpenTelemetryContextType {
   tracer: Tracer;
@@ -18,9 +21,58 @@ interface OpenTelemetryProviderProps {
   children: React.ReactNode;
 }
 
+const createNoopSpan = (): Span => ({
+  spanContext: () => ({ traceId: '', spanId: '', traceFlags: 0 }),
+  setAttribute: () => createNoopSpan(),
+  setAttributes: () => createNoopSpan(),
+  addEvent: () => createNoopSpan(),
+  addLink: () => createNoopSpan(),
+  addLinks: () => createNoopSpan(),
+  setStatus: () => createNoopSpan(),
+  updateName: () => createNoopSpan(),
+  end: () => {},
+  isRecording: () => false,
+  recordException: () => {},
+});
+
+const createNoopTracer = (): Tracer => ({
+  startSpan: (): Span => createNoopSpan(),
+  startActiveSpan: <F extends (span: Span) => unknown>(
+    optionsOrFn: F | SpanOptions,
+    contextOrFn?: F | Context,
+    fn?: F
+  ): ReturnType<F> => {
+    const span = createNoopSpan();
+    // Handle different overload signatures
+    if (typeof optionsOrFn === 'function') {
+      return optionsOrFn(span) as ReturnType<F>;
+    }
+    if (typeof contextOrFn === 'function') {
+      return contextOrFn(span) as ReturnType<F>;
+    }
+    if (typeof fn === 'function') {
+      return fn(span) as ReturnType<F>;
+    }
+    return undefined as any;
+  }
+});
+
 export const OpenTelemetryProvider: React.FC<OpenTelemetryProviderProps> = ({ children }) => {
-  const tracer = useMemo(() => trace.getTracer('baander-web'), []);
-  const meter = useMemo(() => metrics.getMeter('baander-web'), []);
+  const isTracingEnabled = window.BaanderAppConfig?.tracing?.enabled ?? false;
+
+  const tracer = useMemo(() => {
+    if (!isTracingEnabled) {
+      return createNoopTracer();
+    }
+    return trace.getTracer('baander-web');
+  }, [isTracingEnabled]);
+
+  const meter = useMemo(() => {
+    if (!isTracingEnabled) {
+      return createNoopMeter();
+    }
+    return metrics.getMeter('baander-web');
+  }, [isTracingEnabled]);
 
   // Create metrics
   const pageViewCounter = useMemo(() =>
@@ -46,6 +98,11 @@ export const OpenTelemetryProvider: React.FC<OpenTelemetryProviderProps> = ({ ch
   );
 
   useEffect(() => {
+    // Only set up tracking when tracing is enabled
+    if (!isTracingEnabled) {
+      return;
+    }
+
     // Track initial page view
     pageViewCounter.add(1, {
       path: window.location.pathname,
@@ -96,7 +153,7 @@ export const OpenTelemetryProvider: React.FC<OpenTelemetryProviderProps> = ({ ch
       window.removeEventListener('error', handleError);
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
     };
-  }, [tracer, pageViewCounter, errorCounter]);
+  }, [tracer, pageViewCounter, errorCounter, isTracingEnabled]);
 
   const contextValue = useMemo(() => ({
     tracer,

@@ -48,9 +48,6 @@ class UserController extends Controller
         // Apply filters and pagination using the Filterable trait
         $users = $this->applyFilters($request, User::class, $columnsForGlobalFilter);
 
-        // Load common relations for better performance in list view
-        $users->load(['roles', 'libraries']);
-
         // Paginated collection of user resources with applied filters.
         return UserResource::collection($users);
     }
@@ -110,9 +107,6 @@ class UserController extends Controller
         // Apply validated updates to the user
         $user->update($request->validated());
 
-        // Load fresh data after update
-        $user->refresh(['roles', 'libraries']);
-
         // Updated user resource.
         return new UserResource($user);
     }
@@ -132,9 +126,6 @@ class UserController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-
-        // Load comprehensive user data for profile view
-        $user->loadMissing(['roles', 'libraries', 'preferences']);
 
         // Current user's profile resource.
         return new UserResource($user);
@@ -156,9 +147,6 @@ class UserController extends Controller
     public function show(User $user): UserResource
     {
         $this->authorize('view', $user);
-
-        // Load public-facing relationships
-        $user->loadMissing(['roles']);
 
         // Public user profile resource.
         return new UserResource($user);
@@ -184,11 +172,6 @@ class UserController extends Controller
 
         // Revoke all tokens for security
         $user->tokens()->delete();
-
-        // Handle associated data according to deletion policy
-        // (playlists, comments, etc. may be transferred or deleted)
-
-        // Remove the user account
         $user->delete();
 
         // User successfully deleted - no content returned.

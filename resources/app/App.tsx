@@ -14,14 +14,13 @@ import { useAuth } from '@/providers/auth-provider.tsx';
 import { useUsersMe } from '@/libs/api-client/gen/endpoints/user/user.ts';
 import { ROOT_SESSION_SPAN } from '@/libs/tracing/start-session-span.ts';
 
-// Instrument the main app component
 const App = () => {
-  const {isAuthenticated} = useAuth();
-  const {data: me} = useUsersMe({
+  const { isAuthenticated } = useAuth();
+  const { data: me } = useUsersMe({
     query: {
       enabled: isAuthenticated,
-    }
-  })
+    },
+  });
   const { toasts } = useAppSelector(state => state.notifications);
   const { theme } = useAppSelector(state => state.ui);
   const dispatch = useAppDispatch();
@@ -41,7 +40,7 @@ const App = () => {
         'user.name': me.name,
         'user.email': me.email,
         'user.isAdmin': me.isAdmin,
-      })
+      });
     }
   }, [isAuthenticated]);
 

@@ -37,4 +37,10 @@ return [
         'track_rate_limits'         => env('OTEL_TRACK_RATE_LIMITS', true),
         'track_unauthorized_access' => env('OTEL_TRACK_UNAUTHORIZED_ACCESS', true),
     ],
+
+    'frontend' => [
+        'enabled' => env('OTEL_FRONTEND_ENABLED', false),
+        'url'     => env('OTEL_FRONTEND_URL', null),
+        'token'   => env('OTEL_FRONTEND_TOKEN', null),
+    ],
 ];

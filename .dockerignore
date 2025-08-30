@@ -1,5 +1,8 @@
-.git
-storage/muzak
-/storage/movies
+.github
+.junie
+docs
 node_modules
 vendor
+storage/muzak
+storage/logs/*.{log,json}
+qodana.yaml

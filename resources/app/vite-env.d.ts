@@ -4,14 +4,5 @@
 
 global {
   let LARAVEL_TRANSLATIONS: any;
-
-  interface Window {
-    BaanderAppInfo: {
-      name: string;
-      environment: 'local' | 'production' | 'testing';
-      debug: boolean;
-      locale: string;
-    }
-  }
 }
 

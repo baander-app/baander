@@ -48,7 +48,6 @@ import type {
   LibrariesIndex200,
   LibrariesIndexParams,
   LibraryResource,
-  LibraryStatsResource,
   ModelNotFoundExceptionResponse,
   UpdateLibraryRequest,
   ValidationExceptionResponse,
@@ -843,7 +842,7 @@ export const libraryShow = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal
 ) => {
-  return customInstance<LibraryStatsResource>(
+  return customInstance<LibraryResource>(
     { url: `/api/libraries/${slug}`, method: "GET", signal },
     options
   );
