@@ -3,6 +3,7 @@ import { Flex, IconButton, Slider } from '@radix-ui/themes';
 import { Iconify } from '@/ui/icons/iconify.tsx';
 import { MUSIC_CONTROL_ICON_SIZE } from '@/modules/library-music-player/constants.ts';
 import { useState, useCallback } from 'react';
+import styles from './volume-slider.module.scss';
 
 function getVolumeIcon(isMuted: boolean, volume: number): string {
   if (isMuted || volume === 0) {
@@ -50,22 +51,13 @@ export function VolumeSlider() {
       align="center"
       justify="center"
       gap="2"
-      style={{ position: 'relative' }}
+      className={styles.container}
     >
       <IconButton
         onClick={toggleMuteUnmute}
         variant="ghost"
         size="2"
-        style={{
-          transition: 'transform 0.2s ease',
-          cursor: 'pointer'
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'scale(1.1)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'scale(1)';
-        }}
+        className={styles.iconButton}
       >
         <Iconify
           fontSize={MUSIC_CONTROL_ICON_SIZE}
@@ -74,12 +66,7 @@ export function VolumeSlider() {
       </IconButton>
 
       <div
-        style={{
-          position: 'relative',
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center'
-        }}
+        className={styles.sliderContainer}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
         onKeyDown={handleKeyDown}
@@ -90,47 +77,18 @@ export function VolumeSlider() {
           max={100}
           step={1}
           size="2"
-          style={{
-            flex: 1,
-            cursor: 'pointer'
-          }}
+          className={styles.slider}
           aria-label="Volume"
         />
 
         {isHovering && (
           <div
+            className={styles.tooltip}
             style={{
-              position: 'absolute',
-              top: '-35px',
               left: `${displayVolume}%`,
-              transform: 'translateX(-50%)',
-              background: 'var(--color-panel-solid)',
-              color: 'var(--accent-9)',
-              padding: '4px 8px',
-              borderRadius: 'var(--radius-2)',
-              fontSize: '12px',
-              fontWeight: 'bold',
-              whiteSpace: 'nowrap',
-              border: '1px solid var(--accent-6)',
-              boxShadow: 'var(--shadow-4)',
-              pointerEvents: 'none',
-              zIndex: 10,
             }}
           >
             {displayVolume}%
-            <div
-              style={{
-                position: 'absolute',
-                top: '100%',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: 0,
-                height: 0,
-                borderLeft: '4px solid transparent',
-                borderRight: '4px solid transparent',
-                borderTop: '4px solid var(--accent-6)',
-              }}
-            />
           </div>
         )}
       </div>

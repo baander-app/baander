@@ -1,0 +1,54 @@
+.container {
+  position: relative;
+}
+
+.iconButton {
+  transition: transform 0.2s ease;
+  cursor: pointer;
+
+  &:hover {
+    transform: scale(1.1);
+  }
+}
+
+.sliderContainer {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.slider {
+  flex: 1;
+  cursor: pointer;
+}
+
+.tooltip {
+  position: absolute;
+  top: -35px;
+  transform: translateX(-50%);
+  background: var(--color-panel-solid);
+  color: var(--accent-9);
+  padding: 4px 8px;
+  border-radius: var(--radius-2);
+  font-size: 12px;
+  font-weight: bold;
+  white-space: nowrap;
+  border: 1px solid var(--accent-6);
+  box-shadow: var(--shadow-4);
+  pointer-events: none;
+  z-index: 10;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 4px solid var(--accent-6);
+  }
+}
