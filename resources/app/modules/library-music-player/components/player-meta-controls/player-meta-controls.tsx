@@ -1,9 +1,7 @@
 import {
   EqButton,
   LyricsButton,
-  VisualizerButton,
 } from '@/modules/library-music-player/components/player-buttons/player-buttons.tsx';
-import { Waveform } from '@/ui/waveform/waveform.tsx';
 import styles from './player-meta-controls.module.scss';
 import { VolumeSlider } from '@/modules/library-music-player/components/volume-slider/volume-slider.tsx';
 import { useLyrics } from '@/ui/lyrics-viewer/providers/lyrics-provider.tsx';
@@ -19,7 +17,6 @@ export interface PlayerMetaControlsProps {
 }
 
 export function PlayerMetaControls({ song }: PlayerMetaControlsProps) {
-  const [showWaveform, waveformHandlers] = useDisclosure(false);
   const [showLyrics, lyricHandlers] = useDisclosure(false);
   const [showEq, eqHandlers] = useDisclosure(false);
   const { setLyrics } = useLyrics();
@@ -36,11 +33,6 @@ export function PlayerMetaControls({ song }: PlayerMetaControlsProps) {
       <div className={styles.playerMetaControls}>
         <VolumeSlider />
 
-        <VisualizerButton
-          isActive={showWaveform}
-          onClick={() => waveformHandlers.toggle()}
-        />
-
         <LyricsButton
           aria-disabled={song?.lyricsExist === false}
           className={styles.lyrics}
@@ -55,10 +47,6 @@ export function PlayerMetaControls({ song }: PlayerMetaControlsProps) {
           onClick={() => eqHandlers.toggle()}
           />
       </div>
-
-      {showWaveform && (
-        <Waveform key="waveform" onClose={() => waveformHandlers.close()} />
-      )}
 
       {showLyrics && (
         <Box style={{ position: 'absolute', right: 20, bottom: 90 }}>
