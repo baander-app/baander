@@ -110,27 +110,35 @@
   align-items: center;
   justify-content: center;
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  user-select: none;
 }
 
 .volumeSlider {
   position: absolute;
-  width: 60px;
-  height: 60px;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   background: transparent;
   border: none;
   appearance: none;
   cursor: pointer;
+  opacity: 0; /* Hide the actual slider but keep it for accessibility */
+}
 
-  &::-webkit-slider-thumb {
-    appearance: none;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: #00ff00;
-    cursor: pointer;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  }
+
+.knobIndicator {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 20px;
+  background: #00ff00;
+  border-radius: 2px;
+  box-shadow: 0 0 4px rgba(0, 255, 0, 0.5);
+  transform-origin: center 32px; /* Distance from center of knob */
+  transition: transform 0.1s ease;
 }
 
 .volumeValue {
@@ -138,7 +146,9 @@
   font-size: 14px;
   font-weight: bold;
   color: #00ff00;
+  pointer-events: none;
 }
+
 
 .knobLabel {
   font-size: 10px;
@@ -570,13 +580,15 @@
 }
 
 .slider {
-  writing-mode: bt-lr;
+  writing-mode: vertical-lr;
+  -webkit-appearance: slider-vertical;
   width: 20px;
   height: 150px;
   background: #333;
   border-radius: 10px;
   border: 1px solid #555;
   cursor: pointer;
+  transform: rotate(180deg); /* Flip so lower values are at bottom */
 
   &::-webkit-slider-thumb {
     -webkit-appearance: none;
@@ -587,7 +599,18 @@
     cursor: pointer;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   }
+
+  &::-moz-range-thumb {
+    width: 16px;
+    height: 8px;
+    border-radius: 4px;
+    background: #00ff00;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    border: none;
+  }
 }
+
 
 .gainValue {
   font-size: 9px;

@@ -1,12 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { useAudioPlayer } from '@/modules/library-music-player/providers/audio-player-provider.tsx';
 import { globalAudioProcessor } from '@/services/global-audio-processor-service.ts';
-import {
-  setLufs,
-  setNormalizationGain,
-  setVolumeNormalization,
-} from '@/store/music/music-player-slice';
+import { setLufs, setNormalizationGain, setVolumeNormalization } from '@/store/music/music-player-slice';
 import styles from './equalizer.module.scss';
 
 interface EqualizerProps {
@@ -40,7 +36,7 @@ const EQ_BANDS: EqualizerBand[] = [
   { frequency: 2000, label: '2K', gain: 0, q: 0.7 },
   { frequency: 4000, label: '4K', gain: 0, q: 0.7 },
   { frequency: 8000, label: '8K', gain: 0, q: 0.7 },
-  { frequency: 16000, label: '16K', gain: 0, q: 0.7 }
+  { frequency: 16000, label: '16K', gain: 0, q: 0.7 },
 ];
 
 const EQ_PRESETS = {
@@ -55,21 +51,22 @@ const EQ_PRESETS = {
   'ACOUSTIC': [3, 2, 1, 2, 3, 2, 3, 4, 3, 2],
   'BASS_BOOST': [7, 5, 3, 2, 0, 0, 0, 0, 0, 0],
   'TREBLE_BOOST': [0, 0, 0, 0, 0, 2, 4, 6, 8, 9],
-  'CUSTOM': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  'CUSTOM': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 };
 
 export const Equalizer: React.FC<EqualizerProps> = ({
-                                                                                          className
-                                                                                        }) => {
+                                                      className,
+                                                    }) => {
   const dispatch = useAppDispatch();
   const animationFrame = useRef<number | undefined>(undefined);
+  const knobRef = useRef<HTMLDivElement>(null);
 
   const {
     volume,
     setCurrentVolume,
     isMuted,
     toggleMuteUnmute,
-    isPlaying
+    isPlaying,
   } = useAudioPlayer();
 
   const { volume: volumeState } = useAppSelector(state => state.musicPlayer);
@@ -81,7 +78,7 @@ export const Equalizer: React.FC<EqualizerProps> = ({
     processorActive: false,
     connectionStatus: 'unknown',
     lastUpdateTime: 0,
-    mode: 'unknown'
+    mode: 'unknown',
   });
 
   const [eqState, setEqState] = useState({
@@ -103,7 +100,7 @@ export const Equalizer: React.FC<EqualizerProps> = ({
     rightChannel: 0,
     lufs: -30,
     peakFrequency: 0,
-    rms: 0
+    rms: 0,
   }));
 
   useEffect(() => {
@@ -112,7 +109,7 @@ export const Equalizer: React.FC<EqualizerProps> = ({
     console.log('Setting up analysis effect...', {
       hasProcessor: !!audioProcessor,
       isPlaying,
-      eqEnabled: eqState.isEnabled
+      eqEnabled: eqState.isEnabled,
     });
 
     if (audioProcessor && isPlaying) {
@@ -131,7 +128,7 @@ export const Equalizer: React.FC<EqualizerProps> = ({
             processorActive: isActive,
             lastUpdateTime: Date.now(),
             connectionStatus: isActive ? 'active' : 'inactive',
-            mode: (audioProcessor as any).passiveMode ? 'passive' : 'direct'
+            mode: (audioProcessor as any).passiveMode ? 'passive' : 'direct',
           }));
 
           if (data) {
@@ -144,7 +141,7 @@ export const Equalizer: React.FC<EqualizerProps> = ({
                 frequencyDataLength: data.frequencyData.length,
                 timeDomainDataLength: data.timeDomainData.length,
                 peakFrequency: data.peakFrequency,
-                mode: debugInfo.mode
+                mode: debugInfo.mode,
               });
             }
 
@@ -160,7 +157,7 @@ export const Equalizer: React.FC<EqualizerProps> = ({
               const targetLufs = eqState.lufsTarget;
               const currentLufs = data.lufs;
               const gainDifference = targetLufs - currentLufs;
-              const maxGainAdjustment = 6
+              const maxGainAdjustment = 6;
               const limitedGain = Math.max(-maxGainAdjustment, Math.min(maxGainAdjustment, gainDifference));
 
               // Only update every 10 frames to prevent rapid fluctuations
@@ -192,7 +189,7 @@ export const Equalizer: React.FC<EqualizerProps> = ({
         ...prev,
         processorExists: !!audioProcessor,
         processorActive: false,
-        connectionStatus: !audioProcessor ? 'no processor' : !isPlaying ? 'not playing' : 'ready'
+        connectionStatus: !audioProcessor ? 'no processor' : !isPlaying ? 'not playing' : 'ready',
       }));
     }
 
@@ -225,8 +222,8 @@ export const Equalizer: React.FC<EqualizerProps> = ({
       currentPreset: presetName,
       bands: prev.bands.map((band, index) => ({
         ...band,
-        gain: presetValues[index] || 0
-      }))
+        gain: presetValues[index] || 0,
+      })),
     }));
   }, []);
 
@@ -235,8 +232,8 @@ export const Equalizer: React.FC<EqualizerProps> = ({
       ...prev,
       currentPreset: 'CUSTOM',
       bands: prev.bands.map((band, index) =>
-        index === bandIndex ? { ...band, gain } : band
-      )
+        index === bandIndex ? { ...band, gain } : band,
+      ),
     }));
   }, []);
 
@@ -262,20 +259,69 @@ export const Equalizer: React.FC<EqualizerProps> = ({
   const handleMasterGainChange = useCallback((value: number) => {
     setEqState(prev => ({
       ...prev,
-      masterGain: value
+      masterGain: value,
     }));
   }, []);
 
   const handleLufsTargetChange = useCallback((value: number) => {
     setEqState(prev => ({
       ...prev,
-      lufsTarget: value
+      lufsTarget: value,
     }));
 
     if (normalization.enabled) {
       dispatch(setNormalizationGain(0));
     }
   }, [dispatch, normalization.enabled]);
+
+  const handleKnobMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!knobRef.current) return;
+
+      const rect = knobRef.current.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+
+      const deltaX = moveEvent.clientX - centerX;
+      const deltaY = moveEvent.clientY - centerY;
+
+      let angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+      angle = (angle + 90 + 360) % 360; // Normalize to 0-360 with 0 at top
+
+      // Map angle to volume (0-100)
+      // Knob range: 300 degrees (30 degrees dead zone at bottom)
+      const minAngle = 30; // Start angle
+      const maxAngle = 330; // End angle
+
+      let normalizedAngle;
+      if (angle >= minAngle && angle <= 180) {
+        normalizedAngle = angle - minAngle;
+      } else if (angle > 180 && angle <= maxAngle) {
+        normalizedAngle = angle - minAngle;
+      } else {
+        // In dead zone, snap to nearest edge
+        normalizedAngle = angle < 180 ? 0 : 300;
+      }
+
+      const volumeValue = Math.round((normalizedAngle / 300) * 100);
+      const clampedVolume = Math.max(0, Math.min(100, volumeValue));
+
+      handleVolumeChange(clampedVolume);
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [handleVolumeChange]);
+
+  // Calculate knob rotation based on volume
+  const knobRotation = (volume / 100) * 300 + 30; // 30-330 degree range
 
   const renderVFDDisplay = () => (
     <div className={styles.vfdDisplay}>
@@ -312,7 +358,7 @@ export const Equalizer: React.FC<EqualizerProps> = ({
                   className={styles.spectrumBar}
                   style={{
                     height: `${Math.max(2, height)}%`,
-                    backgroundColor: height > 80 ? '#ff4444' : height > 60 ? '#ffaa00' : '#00ff00'
+                    backgroundColor: height > 80 ? '#ff4444' : height > 60 ? '#ffaa00' : '#00ff00',
                   }}
                 />
               );
@@ -333,7 +379,7 @@ export const Equalizer: React.FC<EqualizerProps> = ({
                   style={{
                     width: `${Math.min(100, analysisData.leftChannel)}%`,
                     backgroundColor: analysisData.leftChannel > 80 ? '#ff4444' :
-                                     analysisData.leftChannel > 60 ? '#ffaa00' : '#00ff00'
+                                     analysisData.leftChannel > 60 ? '#ffaa00' : '#00ff00',
                   }}
                 />
               </div>
@@ -349,7 +395,7 @@ export const Equalizer: React.FC<EqualizerProps> = ({
                   style={{
                     width: `${Math.min(100, analysisData.rightChannel)}%`,
                     backgroundColor: analysisData.rightChannel > 80 ? '#ff4444' :
-                                     analysisData.rightChannel > 60 ? '#ffaa00' : '#00ff00'
+                                     analysisData.rightChannel > 60 ? '#ffaa00' : '#00ff00',
                   }}
                 />
               </div>
@@ -385,9 +431,9 @@ export const Equalizer: React.FC<EqualizerProps> = ({
               <svg width="100%" height="100%" viewBox="0 0 200 100">
                 <defs>
                   <linearGradient id="phaseGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#00ff00" />
-                    <stop offset="50%" stopColor="#ffff00" />
-                    <stop offset="100%" stopColor="#ff0000" />
+                    <stop offset="0%" stopColor="#00ff00"/>
+                    <stop offset="50%" stopColor="#ffff00"/>
+                    <stop offset="100%" stopColor="#ff0000"/>
                   </linearGradient>
                 </defs>
                 <path
@@ -473,7 +519,11 @@ export const Equalizer: React.FC<EqualizerProps> = ({
 
           <div className={styles.volumeSection}>
             <div className={styles.knobContainer}>
-              <div className={styles.volumeKnob}>
+              <div
+                className={styles.volumeKnob}
+                ref={knobRef}
+                onMouseDown={handleKnobMouseDown}
+              >
                 <input
                   type="range"
                   min="0"
@@ -481,6 +531,11 @@ export const Equalizer: React.FC<EqualizerProps> = ({
                   value={volume}
                   onChange={(e) => handleVolumeChange(parseInt(e.target.value))}
                   className={styles.volumeSlider}
+                  aria-label="Volume"
+                />
+                <div
+                  className={styles.knobIndicator}
+                  style={{ transform: `translateX(-50%) rotate(${knobRotation}deg)` }}
                 />
                 <div className={styles.volumeValue}>{volume}</div>
               </div>
@@ -505,7 +560,7 @@ export const Equalizer: React.FC<EqualizerProps> = ({
               className={`${styles.controlBtn} ${eqState.compressionEnabled ? styles.active : ''}`}
               onClick={() => setEqState(prev => ({
                 ...prev,
-                compressionEnabled: !prev.compressionEnabled
+                compressionEnabled: !prev.compressionEnabled,
               }))}
             >
               COMP
