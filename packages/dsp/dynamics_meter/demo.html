@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>dynamics_meter.wasm demo</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background:#111; color:#eee; margin:20px; }
+        pre { background:#000; padding:12px; border-radius:6px; }
+        button { padding:8px 12px; }
+    </style>
+</head>
+<body>
+<button id="start">Start</button>
+<pre id="out">Waiting…</pre>
+<script type="module">
+  import { loadDynamics } from './dynamics_meter.js';
+  const api = await loadDynamics('./dynamics_meter.wasm');
+  const sr = 48000, frames = 128, ch = 2;
+  api.init(10 /*att ms*/, 200 /*rel ms*/, sr);
+
+  const buf = new Float32Array(frames*ch);
+  const heapF32 = new Float32Array(api.memory.buffer);
+  const ptr = 1024*1024; // demo scratch
+  let t = 0;
+
+  function fill() {
+    const f = 220 + 220*Math.abs(Math.sin(t/10000));
+    for (let i=0;i<frames;i++) {
+      const s = Math.sin(2*Math.PI*f*((t+i)/sr)) * (0.3 + 0.2*Math.sin(t/4000));
+      buf[i*2] = s; buf[i*2+1] = s;
+    }
+    t += frames;
+  }
+
+  function loop() {
+    fill();
+    heapF32.set(buf, ptr>>2);
+    api.process(ptr, frames, ch);
+
+    const rmsL = api.rmsL(), rmsR = api.rmsR();
+    const peakL = api.peakL(), peakR = api.peakR();
+    const crestL = api.crestL(), crestR = api.crestR();
+
+    document.getElementById('out').textContent =
+      `RMS L: ${ (20*Math.log10(Math.max(rmsL,1e-9))).toFixed(2)} dBFS\n` +
+      `RMS R: ${ (20*Math.log10(Math.max(rmsR,1e-9))).toFixed(2)} dBFS\n` +
+      `PK  L: ${ (20*Math.log10(Math.max(peakL,1e-9))).toFixed(2)} dBFS\n` +
+      `PK  R: ${ (20*Math.log10(Math.max(peakR,1e-9))).toFixed(2)} dBFS\n` +
+      `Crest L: ${ crestL.toFixed(2)} dB\n` +
+      `Crest R: ${ crestR.toFixed(2)} dB`;
+    requestAnimationFrame(loop);
+  }
+  document.getElementById('start').onclick = () => requestAnimationFrame(loop);
+</script>
+</body>
+</html>

@@ -2,7 +2,6 @@ import { useEffect, useMemo } from 'react';
 import { Flex } from '@radix-ui/themes';
 import { useMusicSource } from '@/providers/music-source-provider.tsx';
 import { PlayerStateInput } from '@/services/libraries/player-state.ts';
-import { useAudioPlayer } from '@/modules/library-music-player/providers/audio-player-provider.tsx';
 import { PlayerControls } from '@/modules/library-music-player/components/player-controls/player-controls.tsx';
 import PlayerFacePlate from '@/modules/library-music-player/components/player-face-plate/player-face-plate.tsx';
 import {
@@ -12,13 +11,20 @@ import { LyricsProvider } from '@/ui/lyrics-viewer/providers/lyrics-provider.tsx
 import { selectSong } from '@/store/music/music-player-slice.ts';
 import { useAppSelector } from '@/store/hooks.ts';
 import { useSongsShow } from '@/libs/api-client/gen/endpoints/song/song.ts';
+import {
+  usePlayerActions, usePlayerAudioElement, usePlayerBuffered,
+  usePlayerCurrentTime,
+  usePlayerDuration,
+  usePlayerIsPlaying,
+} from '@/modules/library-music-player/store';
 
 export function InlinePlayer() {
   const sourceSong = useAppSelector(selectSong);
-
-  useEffect(() => {
-    console.log('sourceSong', sourceSong);
-  }, [sourceSong]);
+  const buffered = usePlayerBuffered();
+  const duration = usePlayerDuration();
+  const isPlaying = usePlayerIsPlaying();
+  const currentTime = usePlayerCurrentTime();
+  const audioElement = usePlayerAudioElement();
 
   const {
     authenticatedSource,
@@ -31,7 +37,7 @@ export function InlinePlayer() {
     }
   });
 
-  const { setSong } = useAudioPlayer();
+  const { setSong } = usePlayerActions();
 
   useEffect(() => {
     if (song) {
@@ -42,14 +48,9 @@ export function InlinePlayer() {
   }, [song]);
 
   const {
-    audioRef,
-    isPlaying,
-    duration,
-    currentProgress,
-    setCurrentProgress,
-    buffered,
-    togglePlayPause,
-  } = useAudioPlayer();
+    seekTo,
+    togglePlayPause
+  } = usePlayerActions();
 
   useEffect(() => {
     let timerId = setInterval(() => {
@@ -60,7 +61,7 @@ export function InlinePlayer() {
       const data: PlayerStateInput = {
         isPlaying,
         volumePercent: 100,
-        progressMs: currentProgress,
+        progressMs: currentTime * 1000,
       };
     }, 5000);
 
@@ -70,11 +71,11 @@ export function InlinePlayer() {
   }, []);
 
   const setProgress = (e: number) => {
-    if (!audioRef.current) return;
+    if (!audioElement) return;
 
-    audioRef.current.currentTime = e;
+    audioElement.currentTime = e;
 
-    setCurrentProgress(e);
+    seekTo(e);
   };
 
   const coverUrl = useMemo(() => {
@@ -101,7 +102,7 @@ export function InlinePlayer() {
           <PlayerFacePlate
             buffered={buffered}
             duration={duration}
-            currentProgress={currentProgress}
+            currentProgress={currentTime}
             setProgress={progress => setProgress(progress)}
             viewModel={{
               coverUrl,

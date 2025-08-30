@@ -1,13 +1,12 @@
 import { SyntheticEvent } from 'react';
 import { Box, Button, Flex, Text, TextField } from '@radix-ui/themes';
 import styles from './login.module.scss';
-import { VinylSpinAnimation } from '@/ui/animations/vinyl-spin-animation/vinyl-spin-animation.tsx';
 import { Form } from 'radix-ui';
 import { Link } from 'react-router-dom';
-import { useAuth } from '@/providers/auth-provider.tsx';
+import { useAuthStore } from '@/modules/auth/store';
 
 export default function Login() {
-  const {login} = useAuth();
+  const {login} = useAuthStore();
 
   const onSubmit = async (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -38,7 +37,7 @@ export default function Login() {
 
         <Form.Root className={styles.form} onSubmit={onSubmit}>
           <Box className={styles.animationSection}>
-            <VinylSpinAnimation className={styles.animation}/>
+            {/*<VinylSpinAnimation className={styles.animation}/>*/}
           </Box>
 
           <Flex direction="column" gap="3">

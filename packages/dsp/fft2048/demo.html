@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>fft2048 WASM demo</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 20px; background: #111; color: #eee; }
+        canvas { background: #000; display: block; margin-top: 12px; border-radius: 6px; }
+        .row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+        button { padding: 8px 12px; font-size: 14px; }
+        small { opacity: 0.7; }
+    </style>
+</head>
+<body>
+<div class="row">
+    <button id="play">Play & analyze</button>
+    <button id="mic">Use microphone</button>
+    <small>Build: make build — Serve: make serve-demo (http://localhost:8000)</small>
+</div>
+
+<canvas id="freq" width="256" height="200"></canvas>
+<canvas id="wave" width="512" height="100"></canvas>
+
+<script type="module">
+  const ac = new (window.AudioContext || window.webkitAudioContext)();
+  const freqCv = document.getElementById('freq');
+  const waveCv = document.getElementById('wave');
+  const fctx = freqCv.getContext('2d');
+  const wctx = waveCv.getContext('2d');
+
+  // Resolve URLs robustly relative to this HTML file
+  const base = new URL(import.meta.url);
+  const wasmURL = new URL('./fft2048.wasm', base).href;
+  const workletURL = new URL('./wasm-spectrum.js', base).href;
+
+  // Remove harsh embedded WAV; we’ll use a gentle oscillator instead
+  // const WAV_URL = 'data:audio/wav;base64,...'; // no longer used
+
+  // Load WASM bytes and the worklet
+  let worklet;
+  try {
+    const wasmBytes = await (await fetch(wasmURL)).arrayBuffer();
+    await ac.audioWorklet.addModule(workletURL);
+
+    worklet = new AudioWorkletNode(ac, 'wasm-spectrum', {
+      numberOfInputs: 1,
+      numberOfOutputs: 1,
+      channelCount: 2,
+      channelCountMode: 'explicit',
+      channelInterpretation: 'speakers',
+    });
+
+    worklet.port.onmessage = (e) => {
+      const msg = e.data || {};
+      if (msg.type === 'ready') {
+        console.log('[fft2048] worklet ready');
+      } else if (msg.type === 'error') {
+        console.error('[fft2048] worklet error:', msg);
+      } else if (msg.type === 'spectrum') {
+        drawSpectrum(msg.frequencyData);
+        drawWaveform(msg.timeDomainData);
+      }
+    };
+
+    // Send the WASM into the worklet
+    worklet.port.postMessage({ type: 'wasm', bytes: new Uint8Array(wasmBytes) });
+
+    // Warn if not ready within 2s to catch path/instantiation issues
+    setTimeout(() => console.warn('[fft2048] no ready message yet (check paths/cors)'), 2000);
+  } catch (e) {
+    console.error('[fft2048] failed to setup worklet:', e);
+  }
+
+  function drawSpectrum(freq) {
+    fctx.clearRect(0, 0, freqCv.width, freqCv.height);
+    fctx.fillStyle = '#4ade80';
+    const h = freqCv.height;
+    for (let i = 0; i < freq.length; i++) {
+      const v = freq[i] / 255;
+      const barH = Math.max(1, v * h);
+      fctx.fillRect(i, h - barH, 1, barH);
+    }
+  }
+
+  function drawWaveform(wave) {
+    wctx.clearRect(0, 0, waveCv.width, waveCv.height);
+    wctx.strokeStyle = '#60a5fa';
+    wctx.lineWidth = 1;
+    wctx.beginPath();
+    const h = waveCv.height;
+    for (let i = 0; i < wave.length; i++) {
+      const y = h - (wave[i] / 255) * h;
+      if (i === 0) wctx.moveTo(i, y);
+      else wctx.lineTo(i, y);
+    }
+    wctx.stroke();
+  }
+
+  // Simple wiring helpers
+  let srcNode = null;
+  let oscNode = null;
+  let oscGain = null;
+
+  document.getElementById('play').onclick = async () => {
+    try {
+      if (ac.state === 'suspended') await ac.resume();
+
+      // If already playing, stop previous source
+      if (srcNode) { try { srcNode.stop(); srcNode.disconnect(); } catch(e){} srcNode = null; }
+      if (oscNode) { try { oscNode.stop(); oscNode.disconnect(); } catch(e){} oscNode = null; }
+      if (oscGain) { try { oscGain.disconnect(); } catch(e){} oscGain = null; }
+
+      // Pleasant sine at 220 Hz with gentle volume and short fade-in
+      oscNode = ac.createOscillator();
+      oscNode.type = 'sine';
+      oscNode.frequency.value = 220; // A3; try 261.63 for C4, or 440 for A4
+
+      oscGain = ac.createGain();
+      oscGain.gain.value = 0.0; // start silent, then ramp
+      const targetGain = 0.08;  // comfortable level
+      oscGain.gain.linearRampToValueAtTime(targetGain, ac.currentTime + 0.05);
+
+      // Route oscillator -> gain -> worklet -> destination
+      oscNode.connect(oscGain);
+      if (worklet) {
+        oscGain.connect(worklet).connect(ac.destination);
+      } else {
+        oscGain.connect(ac.destination);
+      }
+      oscNode.start();
+
+      console.log('[fft2048] oscillator started at 220 Hz');
+    } catch (e) {
+      console.error('[fft2048] play failed:', e);
+    }
+  };
+
+  document.getElementById('mic').onclick = async () => {
+    try {
+      if (ac.state === 'suspended') await ac.resume();
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mic = ac.createMediaStreamSource(stream);
+      if (worklet) {
+        mic.connect(worklet).connect(ac.destination);
+      } else {
+        mic.connect(ac.destination);
+      }
+      console.log('[fft2048] mic connected');
+    } catch (e) {
+      console.error('[fft2048] mic failed:', e);
+    }
+  };
+</script>
+</body>
+</html>

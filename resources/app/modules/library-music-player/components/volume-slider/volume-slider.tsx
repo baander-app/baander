@@ -1,9 +1,9 @@
-import { useAudioPlayer } from '@/modules/library-music-player/providers/audio-player-provider.tsx';
 import { Flex, IconButton, Slider } from '@radix-ui/themes';
 import { Iconify } from '@/ui/icons/iconify.tsx';
 import { MUSIC_CONTROL_ICON_SIZE } from '@/modules/library-music-player/constants.ts';
 import { useState, useCallback } from 'react';
 import styles from './volume-slider.module.scss';
+import { usePlayerActions, usePlayerIsMuted, usePlayerVolumePercent } from '@/modules/library-music-player/store';
 
 function getVolumeIcon(isMuted: boolean, volume: number): string {
   if (isMuted || volume === 0) {
@@ -22,27 +22,27 @@ function getVolumeIcon(isMuted: boolean, volume: number): string {
 }
 
 export function VolumeSlider() {
+  const isMuted = usePlayerIsMuted();
+  const volumePercent = usePlayerVolumePercent();
   const {
-    volume,
-    setCurrentVolume,
-    isMuted,
-    toggleMuteUnmute,
-  } = useAudioPlayer();
+    setVolumePercent,
+    toggleMute
+  } = usePlayerActions();
 
   const [isHovering, setIsHovering] = useState(false);
 
   const handleVolumeChange = useCallback((value: number[]) => {
-    setCurrentVolume(value[0]);
-  }, [setCurrentVolume]);
+    setVolumePercent(value[0]);
+  }, [setVolumePercent]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === ' ') {
       e.preventDefault();
-      toggleMuteUnmute();
+      toggleMute();
     }
-  }, [toggleMuteUnmute]);
+  }, [toggleMute]);
 
-  const displayVolume = isMuted ? 0 : volume;
+  const displayVolume = isMuted ? 0 : volumePercent;
 
   return (
     <Flex
@@ -54,14 +54,14 @@ export function VolumeSlider() {
       className={styles.container}
     >
       <IconButton
-        onClick={toggleMuteUnmute}
+        onClick={toggleMute}
         variant="ghost"
         size="2"
         className={styles.iconButton}
       >
         <Iconify
           fontSize={MUSIC_CONTROL_ICON_SIZE}
-          icon={getVolumeIcon(isMuted, volume)}
+          icon={getVolumeIcon(isMuted, volumePercent)}
         />
       </IconButton>
 

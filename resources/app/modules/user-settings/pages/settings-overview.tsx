@@ -3,12 +3,12 @@ import { Box, Button } from '@radix-ui/themes';
 import { DevPanel } from '@/modules/user-settings/features/dev-panel.tsx';
 import { useAppDispatch, useAppSelector } from '@/store/hooks.ts';
 import { setTheme } from '@/store/users/ui-slice.ts';
-import { useAuth } from '@/providers/auth-provider.tsx';
+import { useAuthStore } from '@/modules/auth/store';
 
 export function SettingsOverview() {
   const { theme } = useAppSelector(state => state.ui);
   const dispatch = useAppDispatch();
-  const { logout } = useAuth();
+  const { logout } = useAuthStore();
 
   const toggleTheme = () => {
     dispatch(setTheme(theme === 'light' ? 'dark' : 'light'));

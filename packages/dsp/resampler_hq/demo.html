@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>resampler_hq.wasm demo</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background:#111; color:#eee; margin:20px; }
+        pre { background:#000; padding:12px; border-radius:6px; }
+        button { padding:8px 12px; }
+    </style>
+</head>
+<body>
+<button id="run">Resample 48k->44.1k</button>
+<pre id="out">Waiting…</pre>
+<script type="module">
+  import { loadResampler } from './resampler_hq.js';
+  const api = await loadResampler('./resampler_hq.wasm');
+  const out = document.getElementById('out');
+
+  document.getElementById('run').onclick = () => {
+    const inRate = 48000, outRate = 44100, ch = 1;
+    const ctx = api.create(inRate, outRate, ch, 32);
+
+    // 20ms of sine at 1kHz
+    const inFrames = Math.floor(0.02*inRate);
+    const inBuf = new Float32Array(inFrames*ch);
+    for (let i=0;i<inFrames;i++) inBuf[i] = Math.sin(2*Math.PI*1000*(i/inRate));
+
+    // Reserve output
+    const outFramesCap = Math.ceil(inFrames * outRate / inRate) + 8;
+    const outBuf = new Float32Array(outFramesCap*ch);
+
+    // Copy to WASM heap via a scratch region
+    const heapF32 = new Float32Array(api.memory.buffer);
+    const inPtr  = 1<<20;
+    const outPtr = inPtr + inBuf.byteLength;
+    heapF32.set(inBuf, inPtr>>2);
+
+    const written = api.resample(ctx, inPtr, inFrames, outPtr, outFramesCap);
+    const outSlice = heapF32.subarray(outPtr>>2, (outPtr>>2) + written*ch);
+    out.textContent = `Input frames: ${inFrames}\nOutput frames: ${written}\nFirst 8 samples: ${Array.from(outSlice.slice(0,8)).map(v=>v.toFixed(4)).join(', ')}`;
+
+    api.destroy(ctx);
+  };
+</script>
+</body>
+</html>

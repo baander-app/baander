@@ -46,17 +46,15 @@ class GlobalAudioProcessorService {
     }
   }
 
-  public async resumeContextIfNeeded(): Promise<void> {
-    if (!this.processor) {
-      console.warn('Audio processor not initialized');
-      return;
+  public setPlayingState(isPlaying: boolean) {
+    if (this.processor) {
+      this.processor.setPlayingState(isPlaying);
     }
+  }
 
-    try {
-      await this.processor.resumeContextIfNeeded();
-    } catch (error) {
-      console.warn('Failed to resume audio context through global processor:', error);
-      throw error;
+  public async resumeContextIfNeeded(): Promise<void> {
+    if (this.processor) {
+      return this.processor.resumeContextIfNeeded();
     }
   }
 
@@ -68,10 +66,12 @@ class GlobalAudioProcessorService {
     if (this.processor) {
       this.processor.destroy();
       this.processor = null;
-      this.isInitialized = false;
-      this.connectionAttempted = false;
     }
+    this.isInitialized = false;
+    this.connectionAttempted = false;
+    this.pendingAudioElement = null;
   }
+
 
   public reset() {
     this.connectionAttempted = false;

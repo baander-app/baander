@@ -34,3 +34,4 @@ bundle-visualization.html
 repomix-output.xml
 /scramble_export.js
 /scramble:export.js
+/packages/dsp/**/*.wasm

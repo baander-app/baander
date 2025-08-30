@@ -1,8 +1,9 @@
 import React, { createContext, ReactEventHandler, ReactNode, useContext, useEffect, useState } from 'react';
 import { Lrc } from '@/libs/lyrics/lrc.ts';
 import { AudioLyricSynchronizer } from '@/libs/lyrics/audio-lyric-synchronizer.ts';
-import { useAudioPlayer } from '@/modules/library-music-player/providers/audio-player-provider.tsx';
 import { useAppSelector } from '@/store/hooks.ts';
+import { usePlayerAudioElement, usePlayerSong } from '@/modules/library-music-player/store';
+import { useSongsShow } from '@/libs/api-client/gen/endpoints/song/song.ts';
 
 interface LyricsProviderContextProps {
   lyrics: Lrc | undefined;
@@ -17,10 +18,17 @@ const LyricsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { lyrics: lyricOptions } = useAppSelector(state => state.musicPlayer);
 
   const [lyrics, _setLyrics] = useState<Lrc>();
-  const { song } = useAudioPlayer();
+  const playerSong = usePlayerSong();
+
+  const canQuery = Boolean(playerSong?.libraryId && playerSong.publicId)
+  const { data } = useSongsShow(playerSong?.libraryId!, playerSong?.publicId!, undefined, {
+    query: {
+      enabled: canQuery,
+    },
+  });
   const audioLyricsSynchronizer = new AudioLyricSynchronizer();
 
-  const { audioRef } = useAudioPlayer();
+  const audioElement = usePlayerAudioElement();
 
   useEffect(() => {
     if (lyricOptions.offsetMs && audioLyricsSynchronizer.defaultOffset !== lyricOptions.offsetMs) {
@@ -29,23 +37,23 @@ const LyricsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   }, [lyricOptions, audioLyricsSynchronizer]);
 
   useEffect(() => {
-    if (song?.lyrics) {
-      setLyrics(song.lyrics);
+    if (data?.lyrics) {
+      setLyrics(data.lyrics);
     }
-  }, [song, song?.lyrics]);
+  }, [data, data?.lyrics]);
 
   useEffect(() => {
-    const handler: ReactEventHandler<HTMLAudioElement> = () => {
-      audioLyricsSynchronizer.timeUpdate(audioRef.current.currentTime);
+    const handler = () => {
+      if (!audioElement) {
+        return;
+      }
+      audioLyricsSynchronizer.timeUpdate(audioElement.currentTime);
     };
 
-    const audioRefCurrent = audioRef.current;
-    // @ts-ignore
-    audioRefCurrent.addEventListener('timeupdate', handler);
+    audioElement?.addEventListener('timeupdate', handler);
 
     return () => {
-      // @ts-ignore
-      audioRefCurrent.removeEventListener('timeupdate', handler);
+      audioElement?.removeEventListener('timeupdate', handler);
     };
   }, []);
 

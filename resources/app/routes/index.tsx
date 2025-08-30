@@ -1,10 +1,10 @@
 import { publicRoutes } from '@/routes/public';
 import { useRoutes } from 'react-router-dom';
 import { protectedRoutes } from '@/routes/protected';
-import { useAuth } from '@/providers/auth-provider.tsx';
+import { useIsAuthenticated } from '@/modules/auth/store';
 
 export function AppRoutes() {
-  const { isAuthenticated } = useAuth();
+  const isAuthenticated = useIsAuthenticated();
 
   // see https://github.com/alan2207/bulletproof-react/blob/master/src/routes/index.tsx
   const routes = isAuthenticated ? protectedRoutes : publicRoutes;

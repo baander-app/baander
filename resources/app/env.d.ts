@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+/// <reference path="../../packages/dsp/dsp.d.ts" />
 
 interface ImportMetaEnv {
   readonly VITE_APP_NAME: string;

@@ -18,7 +18,6 @@ import { createIDBPersister, queryClient } from '@/common/react-query.ts';
 import { RadixProvider } from '@/providers/radix-provider.tsx';
 import { Reset } from '@radix-ui/themes';
 import { TestModeProvider } from '@/providers/test-mode-provider.tsx';
-import { AuthProvider } from '@/providers/auth-provider.tsx';
 import { OpenTelemetryProvider } from '@/providers/open-telemetry-provider.tsx';
 // @ts-ignore
 globalThis.Ziggy = Ziggy;
@@ -29,22 +28,20 @@ ReactDOM.createRoot(document.getElementById('baanderapproot') as HTMLElement).re
   <React.StrictMode>
     <TestModeProvider>
       <OpenTelemetryProvider>
-        <AuthProvider>
-          <PersistQueryClientProvider
-            client={queryClient}
-            persistOptions={{ buster: 'baander', persister: reactQueryPersister }}
-          >
-            <Provider store={store}>
-              <DateFormatterProvider>
-                <RadixProvider>
-                  <Reset>
-                    <App/>
-                  </Reset>
-                </RadixProvider>
-              </DateFormatterProvider>
-            </Provider>
-          </PersistQueryClientProvider>
-        </AuthProvider>
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{ buster: 'baander', persister: reactQueryPersister }}
+        >
+          <Provider store={store}>
+            <DateFormatterProvider>
+              <RadixProvider>
+                <Reset>
+                  <App/>
+                </Reset>
+              </RadixProvider>
+            </DateFormatterProvider>
+          </Provider>
+        </PersistQueryClientProvider>
       </OpenTelemetryProvider>
     </TestModeProvider>
   </React.StrictMode>,

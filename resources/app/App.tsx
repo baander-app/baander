@@ -10,15 +10,15 @@ import styles from './app.module.scss';
 import { removeToast } from '@/store/notifications/notifications-slice.ts';
 import { Iconify } from './ui/icons/iconify';
 import { useEffect } from 'react';
-import { useAuth } from '@/providers/auth-provider.tsx';
 import { useUsersMe } from '@/libs/api-client/gen/endpoints/user/user.ts';
 import { ROOT_SESSION_SPAN } from '@/libs/tracing/start-session-span.ts';
+import { useAuthStatus } from '@/modules/auth/store';
 
 const App = () => {
-  const { isAuthenticated } = useAuth();
+  const authStatus = useAuthStatus();
   const { data: me } = useUsersMe({
     query: {
-      enabled: isAuthenticated,
+      enabled: authStatus === 'authenticated',
     },
   });
   const { toasts } = useAppSelector(state => state.notifications);
@@ -42,7 +42,7 @@ const App = () => {
         'user.isAdmin': me.isAdmin,
       });
     }
-  }, [isAuthenticated]);
+  }, [me]);
 
   return (
     <HelmetProvider>

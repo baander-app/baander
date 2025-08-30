@@ -9,7 +9,7 @@ import { LyricsViewer } from '@/ui/lyrics-viewer/lyrics-viewer.tsx';
 import { useEffect } from 'react';
 import { useDisclosure } from '@/hooks/use-disclosure';
 import { Box } from '@radix-ui/themes';
-import { Equalizer } from '@/modules/sony-eq/equalizer.tsx';
+import { Equalizer } from '@/modules/dsp/equalizer/equalizer.tsx';
 import { SongResource } from '@/libs/api-client/gen/models';
 
 export interface PlayerMetaControlsProps {
@@ -55,10 +55,11 @@ export function PlayerMetaControls({ song }: PlayerMetaControlsProps) {
       )}
 
       {showEq && (
-        <Box style={{ position: 'absolute', right: 20, bottom: 90, zIndex: 100 }}>
+        <Box style={{ position: 'absolute', right: 20, bottom: 120, zIndex: 100 }}>
           <Equalizer />
         </Box>
       )}
+
     </>
   );
 }

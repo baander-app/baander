@@ -1,4 +1,4 @@
-import { RefObject, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, RefObject, useCallback, useEffect, useRef, useState } from 'react';
 import { Iconify } from '@/ui/icons/iconify';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setQueueAndSong } from '@/store/music/music-player-slice';
@@ -98,6 +98,20 @@ const COLUMN_DEFINITIONS: ColumnDef<SongResource>[] = [
     size: 60,
   },
 ];
+
+const SongTitleCell = memo(({ song }: SongTitleCellProps) => {
+  const { currentSongPublicId } = useAppSelector(state => state.musicPlayer);
+  const isCurrentSong = currentSongPublicId === song.publicId;
+
+  return (
+    <div className={styles.titleCell}>
+      {isCurrentSong && <SpeakerLoudIcon className={styles.titleCellNowPlayingIcon}/>}
+      <div className={styles.titleCellTitle}>{song.title}</div>
+    </div>
+  );
+});
+
+SongTitleCell.displayName = 'SongTitleCell';
 
 export function SongTable({
                             songs,
@@ -231,18 +245,6 @@ function VirtualizedRows({ visibleRows, onSongClick }: VirtualizedRowsProps) {
       ))}
       </tbody>
     </table>
-  );
-}
-
-function SongTitleCell({ song }: SongTitleCellProps) {
-  const { currentSongPublicId } = useAppSelector(state => state.musicPlayer);
-  const isCurrentSong = currentSongPublicId === song.publicId;
-
-  return (
-    <div className={styles.titleCell}>
-      {isCurrentSong && <SpeakerLoudIcon className={styles.titleCellNowPlayingIcon}/>}
-      <div className={styles.titleCellTitle}>{song.title}</div>
-    </div>
   );
 }
 

@@ -4,7 +4,6 @@ import { Suspense } from 'react';
 import { LibraryMusicRoutes } from '@/modules/library-music/routes/_routes.tsx';
 import { DashboardLayout } from '@/layouts/dashboard-layout/dashboard-layout.tsx';
 import { DashboardRoutes } from '@/modules/dashboard/routes.tsx';
-import { AudioPlayerContextProvider } from '@/modules/library-music-player/providers/audio-player-provider.tsx';
 import { UserSettingsRoutes } from '@/modules/user-settings/routes.tsx';
 import { usePathParam } from '@/hooks/use-path-param.ts';
 import { LibraryMoviesRoutes } from '@/modules/library-movies/routes/_routes.tsx';
@@ -16,13 +15,11 @@ import { ErrorRoutes } from '@/modules/error/routes/_routes.tsx';
 
 const App = () => {
   return (
-    <AudioPlayerContextProvider>
-      <RootLayout>
-        <Suspense>
-          <Outlet/>
-        </Suspense>
-      </RootLayout>
-    </AudioPlayerContextProvider>
+    <RootLayout>
+      <Suspense>
+        <Outlet/>
+      </Suspense>
+    </RootLayout>
   );
 };
 

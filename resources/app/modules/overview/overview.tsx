@@ -26,13 +26,6 @@ export function Overview({title}: OverviewProps) {
       <Section title="Albums">
         <Heading mb="2">{title}</Heading>
 
-        {albums.length > 0 && (
-          <Carousel
-            slides={albums}
-            options={{
-            slidesToScroll: 9,
-          }}/>
-        )}
       </Section>
     </Flex>
   );
