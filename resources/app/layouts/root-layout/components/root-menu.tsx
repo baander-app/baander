@@ -166,7 +166,6 @@ export function RootMenu() {
       iconName: 'heroicons:user-circle-solid',
       links: [
         { label: 'Settings', to: '/user/settings' },
-        { label: 'Equalizer', to: '/user/settings/equalizer' },
         { label: 'Sessions', to: '/user/settings/sessions' },
         { label: 'Passkeys', to: '/user/settings/passkeys' },
       ],
