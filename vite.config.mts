@@ -4,11 +4,8 @@ import { fileURLToPath } from 'url';
 import { resolve } from 'path';
 import richSvg from 'vite-plugin-react-rich-svg';
 import manifestSRI from 'vite-plugin-manifest-sri';
-import filterReplace from 'vite-plugin-filter-replace';
 import react from '@vitejs/plugin-react';
-import { optimizeCssModules } from 'vite-plugin-optimize-css-modules';
 import Info from 'unplugin-info/vite';
-import { visualizer } from 'rollup-plugin-visualizer';
 import laravelTranslations from 'vite-plugin-laravel-translations';
 
 const ReactCompilerConfig = {};
@@ -23,8 +20,6 @@ export default defineConfig(config => {
   return {
     define: {
       __APP_ENV__: JSON.stringify(env.APP_ENV),
-      OTEL_EXPORTER_OTLP_ENDPOINT: env.OTEL_EXPORTER_OTLP_ENDPOINT,
-      OTEL_EXPORTER_OTLP_ENDPOINT_API_KEY: env.OTEL_EXPORTER_OTLP_ENDPOINT_API_KEY,
     },
     server: {
       port: 3000,
@@ -49,8 +44,8 @@ export default defineConfig(config => {
         },
       }),
       laravelTranslations({ namespace: 'translation' }),
-      visualizer({ open: false, template: 'flamegraph', filename: 'bundle-visualization.html' }),
-      optimizeCssModules(),
+      // visualizer({ open: false, template: 'flamegraph', filename: 'bundle-visualization.html' }),
+      // optimizeCssModules(),
       Info(),
       richSvg(),
       manifestSRI(),

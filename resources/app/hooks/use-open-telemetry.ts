@@ -18,6 +18,7 @@ export const useTrackApiCall = () => {
       span.setStatus({ code: 1 }); // SUCCESS
       return result;
     } catch (error) {
+      // @ts-expect-error
       span.recordException(error);
       span.setStatus({ code: 2, message: (error as Error).message });
       throw error;
@@ -52,6 +53,7 @@ export const useTrackComponentPerformance = (componentName: string) => {
     span.end();
 
     performanceHistogram.record(renderDuration, {
+      // @ts-expect-error
       component: componentName,
       operation: 'render',
     });

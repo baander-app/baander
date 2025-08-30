@@ -1,5 +1,5 @@
 import React from 'react';
-import { SongResource } from '@/api-client/requests';
+import { SongResource } from '@/libs/api-client/gen/models';
 
 export interface TrackRowProps extends React.HTMLAttributes<HTMLTableRowElement> {
   song: SongResource;

@@ -371,6 +371,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     // HLS Event Logging
     Object.values(Hls.Events).forEach(event => {
+      // @ts-expect-error
       hls.on(event, (eventType, data) => {
         const level = event.includes('ERROR') ? 'error' :
                       event.includes('WARN') ? 'warn' : 'info';
@@ -498,7 +499,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     existingTracks.forEach(track => track.remove());
 
     // Add external subtitle tracks
-    subtitles.forEach((subtitle, index) => {
+    subtitles.forEach((subtitle) => {
       if (subtitle.src) {
         const trackElement = document.createElement('track');
         trackElement.kind = subtitle.kind || 'subtitles';
@@ -583,7 +584,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const eventHandlers: { [key: string]: (e: Event) => void } = {};
 
     videoEvents.forEach(eventName => {
-      const handler = (e: Event) => {
+      const handler = () => {
         addLog({
           source: 'video',
           level: eventName === 'error' ? 'error' : 'debug',

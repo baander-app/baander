@@ -2,6 +2,9 @@ import { defineConfig } from 'orval';
 
 export default defineConfig({
   baander: {
+    hooks: {
+
+    },
     input: {
       target: './api.json',
     },
