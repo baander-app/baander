@@ -89,6 +89,7 @@ class Kernel extends HttpKernel
         'auth.session'     => \Illuminate\Session\Middleware\AuthenticateSession::class,
         'cache.headers'    => \Illuminate\Http\Middleware\SetCacheHeaders::class,
         'can'              => \Illuminate\Auth\Middleware\Authorize::class,
+        'cors.policy'      => \App\Http\Middleware\AddCorsPolicyHeaders::class,
         'force.json'       => \App\Http\Middleware\ForceJsonResponse::class,
         'guest'            => \App\Http\Middleware\RedirectIfAuthenticated::class,
         'password.confirm' => \Illuminate\Auth\Middleware\RequirePassword::class,

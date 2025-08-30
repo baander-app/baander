@@ -1,113 +1,98 @@
 class MagicSoupProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    this.lufsBuffer = [];
-    this.windowSize = 400; // 400ms window
-    this.sampleRate = 48000;
+
+    // Analysis state
+    this.analysisBufferSize = 2048;
+    this.analysisBuffer = new Float32Array(this.analysisBufferSize);
+    this.bufferIndex = 0;
+
+    // LUFS calculation state
+    this.lufsBuffer = new Float32Array(400); // 400 sample LUFS window
+    this.lufsIndex = 0;
+    this.lufsWindowSize = 400;
+
+    // Performance optimization - reduce analysis frequency
     this.frameCount = 0;
+    this.analysisInterval = 128; // Only analyze every 128 frames (~2.7ms at 48kHz)
+
+    // Pre-compute constants for LUFS
+    this.k = -0.691; // LUFS K-weighting constant
+    this.preGain = Math.pow(10, 14.7 / 20); // Pre-gain for LUFS
   }
 
   process(inputs, outputs, parameters) {
     const input = inputs[0];
     const output = outputs[0];
 
-    if (input.length > 0) {
-      this.sampleRate = globalThis.sampleRate;
-
-      // Calculate analysis data
-      const analysisData = this.analyzeAudio(input);
-
-      // Send analysis to main thread every 30 frames (~30fps)
-      if (this.frameCount % 30 === 0) {
-        this.port.postMessage({
-          type: 'analysis',
-          ...analysisData
-        });
-      }
-
-      this.frameCount++;
-
-      // Pass through audio with potential processing
-      for (let channel = 0; channel < output.length; channel++) {
-        if (input[channel]) {
+    // Pass audio through unchanged
+    if (input && output && input.length > 0) {
+      for (let channel = 0; channel < input.length; channel++) {
+        if (output[channel]) {
           output[channel].set(input[channel]);
         }
+      }
+
+      // Perform analysis at reduced frequency
+      this.frameCount++;
+      if (this.frameCount % this.analysisInterval === 0) {
+        this.performAnalysis(input);
       }
     }
 
     return true;
   }
 
-  analyzeAudio(input) {
-    const lufs = this.calculateLufs(input);
-    const levels = this.calculateChannelLevels(input);
-    const rms = this.calculateRMS(input);
+  performAnalysis(inputChannels) {
+    if (!inputChannels || inputChannels.length === 0) return;
 
-    return {
-      lufs,
-      leftLevel: levels.left,
-      rightLevel: levels.right,
-      rms
-    };
-  }
+    const leftChannel = inputChannels[0];
+    const rightChannel = inputChannels[1] || inputChannels[0]; // Fallback to mono
 
-  calculateLufs(input) {
-    let sum = 0;
-    let sampleCount = 0;
-
-    for (let channel = 0; channel < input.length; channel++) {
-      const channelData = input[channel];
-      for (let i = 0; i < channelData.length; i++) {
-        const sample = channelData[i];
-        sum += sample * sample;
-        sampleCount++;
-      }
-    }
-
-    const rms = Math.sqrt(sum / sampleCount);
-    const lufs = -0.691 + 10 * Math.log10(rms * rms + 1e-10);
-
-    // Apply windowing
-    this.lufsBuffer.push(lufs);
-    if (this.lufsBuffer.length > this.windowSize) {
-      this.lufsBuffer.shift();
-    }
-
-    return this.lufsBuffer.reduce((acc, val) => acc + val, 0) / this.lufsBuffer.length;
-  }
-
-  calculateChannelLevels(input) {
-    if (input.length === 0) return { left: 0, right: 0 };
-
-    const leftData = input[0];
-    const rightData = input.length > 1 ? input[1] : leftData;
-
+    // Calculate RMS levels for each channel
     let leftSum = 0, rightSum = 0;
+    const sampleCount = leftChannel.length;
 
-    for (let i = 0; i < leftData.length; i++) {
-      leftSum += leftData[i] * leftData[i];
-      rightSum += rightData[i] * rightData[i];
+    // Optimized RMS calculation
+    for (let i = 0; i < sampleCount; i++) {
+      const leftSample = leftChannel[i];
+      const rightSample = rightChannel[i];
+
+      leftSum += leftSample * leftSample;
+      rightSum += rightSample * rightSample;
+
+      // Store samples in analysis buffer for frequency analysis
+      this.analysisBuffer[this.bufferIndex] = (leftSample + rightSample) * 0.5;
+      this.bufferIndex = (this.bufferIndex + 1) % this.analysisBufferSize;
     }
 
-    return {
-      left: Math.sqrt(leftSum / leftData.length) * 100,
-      right: Math.sqrt(rightSum / rightData.length) * 100
-    };
-  }
+    // Convert to dB levels (0-100 scale)
+    const leftLevel = Math.sqrt(leftSum / sampleCount) * 100;
+    const rightLevel = Math.sqrt(rightSum / sampleCount) * 100;
 
-  calculateRMS(input) {
-    let sum = 0;
-    let sampleCount = 0;
+    // Calculate LUFS using simplified K-weighting
+    const rms = Math.sqrt((leftSum + rightSum) / (sampleCount * 2));
+    const lufs = this.k + 10 * Math.log10(rms * rms * this.preGain + 1e-10);
 
-    for (let channel = 0; channel < input.length; channel++) {
-      const channelData = input[channel];
-      for (let i = 0; i < channelData.length; i++) {
-        sum += channelData[i] * channelData[i];
-        sampleCount++;
-      }
+    // Update LUFS buffer for smoothing
+    this.lufsBuffer[this.lufsIndex] = lufs;
+    this.lufsIndex = (this.lufsIndex + 1) % this.lufsWindowSize;
+
+    // Calculate smoothed LUFS
+    let lufsSum = 0;
+    for (let i = 0; i < this.lufsWindowSize; i++) {
+      lufsSum += this.lufsBuffer[i];
     }
+    const smoothedLufs = lufsSum / this.lufsWindowSize;
 
-    return Math.sqrt(sum / sampleCount);
+    // Send analysis data to main thread
+    this.port.postMessage({
+      type: 'analysis',
+      lufs: smoothedLufs,
+      leftChannel: Math.min(100, leftLevel),
+      rightChannel: Math.min(100, rightLevel),
+      rms: rms
+    });
   }
 }
 
