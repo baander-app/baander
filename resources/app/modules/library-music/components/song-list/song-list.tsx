@@ -54,8 +54,6 @@ export function SongList() {
       return;
     }
 
-    console.log('Triggering fetch next page', { hasNextPage, isFetchingNextPage });
-
     isFetchingRef.current = true;
     fetchNextPage().finally(() => {
       isFetchingRef.current = false;
