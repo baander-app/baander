@@ -1,0 +1,9 @@
+Bånder Desktop is a fast, privacy-respecting music player for your self-hosted Bånder server.
+
+• Stream and browse your personal library with smooth search and playlists.
+• Built for performance and reliability with modern Electron and web tech.
+• You control your data — Bånder Desktop connects to your own server.
+
+Resources:
+• Project: https://github.com/baander-app/
+• API docs: https://api-docs.baander.dev/

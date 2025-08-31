@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node", "electron"],
+    "lib": ["ES2023"]
+  },
+  "include": [
+    "src/main/**/*.ts",
+    "src/ipc/**/*.ts",
+    "src/shared/**/*.ts"
+  ],
+  "exclude": [
+    "dist",
+    "dist-electron",
+    "release"
+  ]
+}

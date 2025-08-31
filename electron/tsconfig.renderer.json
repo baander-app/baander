@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "lib": ["DOM", "DOM.Iterable", "ES2023"],
+    "noEmit": true
+  },
+  "include": [
+    "src/renderer/**/*.ts",
+    "src/renderer/**/*.tsx",
+    "src/shared/**/*.ts",
+    "../resources/app/**/*.ts",
+    "../resources/app/**/*.tsx",
+    "typings/**/*.d.ts",
+    "src/preload/types/**/*.d.ts"
+  ],
+  "exclude": [
+    "dist",
+    "dist-electron",
+    "release"
+  ]
+}

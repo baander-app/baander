@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta
+            http-equiv="Content-Security-Policy"
+            content="
+      default-src 'self' blob: data:;
+      script-src 'self' 'unsafe-inline';
+      style-src 'self' 'unsafe-inline';
+      img-src * data: blob:;
+      connect-src 'self' http: https:;
+    "
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Configure Server</title>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 24px; }
+        .row { margin-bottom: 12px; }
+        input[type='url'] { width: 100%; padding: 8px; }
+        button { padding: 8px 12px; }
+        .hint { color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+<h2>Configure Server</h2>
+<div class="row">
+    <label for="serverUrl">Server URL</label>
+    <input id="serverUrl" type="url" placeholder="https://your-domain.example" required />
+    <div class="hint">Use HTTPS. Example: https://baander.test</div>
+</div>
+<div class="row">
+    <button id="saveBtn">Save</button>
+</div>
+
+<script type="module">
+  const input = document.getElementById('serverUrl');
+  const btn = document.getElementById('saveBtn');
+
+  // Load current value if any
+  window.BaanderElectron.config.getServerUrl().then(v => { if (v) input.value = v; });
+
+  function normalize(u) {
+    try {
+      const url = new URL(u);
+      return url.origin;
+    } catch {
+      return '';
+    }
+  }
+
+  btn.addEventListener('click', async () => {
+    const val = normalize(input.value.trim());
+    if (!val) {
+      alert('Please enter a valid URL (e.g., https://baander.test)');
+      input.focus();
+      return;
+    }
+    await window.BaanderElectron.config.setServerUrl(val);
+    await window.BaanderElectron.config.finishSetup();
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') btn.click();
+  });
+</script>
+</body>
+</html>

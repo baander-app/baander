@@ -1,0 +1,40 @@
+name: Release
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - run: yarn install --frozen-lockfile
+
+      # Windows/Linux produce their own artifacts; mac is required for mac builds
+      - name: Build app
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            yarn dist:win
+          elif [ "$RUNNER_OS" = "Linux" ]; then
+            yarn dist:linux
+          else
+            yarn dist:mac
+          fi
+        shell: bash
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os }}-artifacts
+          path: electron/release/**
