@@ -7,16 +7,28 @@ copyright: "© 2025 Martin Christiansen"
 afterPack: "electron/build/afterPack.cjs"
 
 directories:
-  output: electron/release
+  output: dist/electron/release
   buildResources: electron/build
 
 files:
-  - electron/dist/**            # renderer build
-  - electron/dist-electron/**   # main + preload
+  - from: "dist/electron/renderer"
+    to: "."
+  - from: "dist/electron/main"
+    to: "."
+  - from: "electron/public"
+    to: "public"
+  - from: "dist/electron/preload"
+    to: "."
   - package.json
 
+extraResources:
+  - from: "electron/public/dsp"
+    to: "dsp"
+  - from: "electron/public/audio-worklets"
+    to: "audio-worklets"
+
 extraMetadata:
-  main: electron/dist-electron/main/index.js
+  main: index.js
 
 win:
   target:
@@ -33,7 +45,6 @@ nsis:
   artifactName: "${name}-${version}-Setup.${ext}"
   displayLanguageSelector: false
   deleteAppDataOnUninstall: true
-
 
 mac:
   target:

@@ -2,6 +2,7 @@ import { authLogin, authLogout, authTokensRevokeAll } from '@/libs/api-client/ge
 import { Token } from '@/services/auth/token.ts';
 import { tokenBindingService } from '@/services/auth/token-binding.service.ts';
 import { eventBridge } from '../event-bridge/bridge';
+import { LOCAL_STORAGE_KEY } from '@/common/constants.ts';
 
 export async function login(credentials: { email: string; password: string }) {
   try {
@@ -53,6 +54,8 @@ export function revokeAllTokensExceptCurrent() {
 }
 
 function clearAuthData() {
+  window.BaanderElectron.config.clearUser(LOCAL_STORAGE_KEY.USER_NAME);
+  localStorage.clear();
   Token.clear();
   tokenBindingService.clear();
 }

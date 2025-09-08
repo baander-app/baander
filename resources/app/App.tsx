@@ -11,6 +11,7 @@ import { useEffect } from 'react';
 import CloseIcon from '~icons/ion/close';
 import { initializeGlobalAudioProcessor } from '@/modules/library-music-player/store';
 import { isWeb } from '@/utils/platform.ts';
+import { DeepLinkProvider } from '@/providers/deep-link-provider.tsx';
 
 const isFileProtocol = window.location.protocol === 'file:';
 const Router = isFileProtocol ? HashRouter : BrowserRouter;
@@ -41,7 +42,9 @@ const App = () => {
         appearance={theme}
       >
         <Router>
-          <AppRoutes/>
+          <DeepLinkProvider>
+            <AppRoutes/>
+          </DeepLinkProvider>
         </Router>
 
         <ReactQueryDevtools/>

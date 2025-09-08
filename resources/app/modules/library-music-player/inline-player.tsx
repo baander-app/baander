@@ -15,6 +15,7 @@ import {
   usePlayerCurrentTime,
   usePlayerDuration,
   usePlayerIsPlaying,
+  usePlayerAudioElement,
 } from '@/modules/library-music-player/store';
 import { useShowByPublicIdSong } from '@/libs/api-client/gen/endpoints/library-resource/library-resource.ts';
 import { ensureStreamToken } from '@/services/auth/ensure-stream-token.ts';
@@ -26,7 +27,9 @@ export function InlinePlayer() {
   const duration = usePlayerDuration();
   const isPlaying = usePlayerIsPlaying();
   const currentTime = usePlayerCurrentTime();
-  const audioElement = useRef<HTMLAudioElement | null>(null);
+  const existingAudioElement = usePlayerAudioElement();
+  const cleanupRef = useRef<(() => void) | null>(null);
+  const hasInitialized = useRef(false);
   const currentSong = useAppSelector(selectSong);
   const [currentStreamUrl, setCurrentStreamUrl] = useState<string | null>(null);
   const {
@@ -44,14 +47,24 @@ export function InlinePlayer() {
   });
 
   useEffect(() => {
-    if (!audioElement.current) {
-      audioElement.current = new Audio();
+    if (!existingAudioElement && !hasInitialized.current) {
+      hasInitialized.current = true;
+
+      const audioElement = new Audio();
       if (isElectron()) {
-        audioElement.current.crossOrigin = 'anonymous';
+        audioElement.crossOrigin = 'anonymous';
       }
 
-      attachAudioElement(audioElement.current);
+      cleanupRef.current = attachAudioElement(audioElement);
     }
+
+    return () => {
+      if (cleanupRef.current) {
+        cleanupRef.current();
+        cleanupRef.current = null;
+      }
+      hasInitialized.current = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -70,14 +83,15 @@ export function InlinePlayer() {
   }, [currentSong?.streamUrl]);
 
   useEffect(() => {
-    if (audioElement.current && currentStreamUrl) {
-      audioElement.current.src = currentStreamUrl;
-      audioElement.current.play();
-    } else if (audioElement.current && !currentStreamUrl) {
-      audioElement.current.src = '';
-      audioElement.current.pause();
+    const audioElement = existingAudioElement;
+    if (audioElement && currentStreamUrl) {
+      audioElement.src = currentStreamUrl;
+      audioElement.play();
+    } else if (audioElement && !currentStreamUrl) {
+      audioElement.src = '';
+      audioElement.pause();
     }
-  }, [currentStreamUrl]);
+  }, [currentStreamUrl, existingAudioElement]);
 
   useEffect(() => {
     if (song) {
@@ -85,13 +99,13 @@ export function InlinePlayer() {
     } else {
       setSong(null);
     }
-  }, [song]);
-
+  }, [song, setSong]);
 
   const setProgress = (e: number) => {
-    if (!audioElement.current) return;
+    const audioElement = existingAudioElement;
+    if (!audioElement) return;
 
-    audioElement.current.currentTime = e;
+    audioElement.currentTime = e;
     seekTo(e);
   };
 

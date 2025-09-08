@@ -36,6 +36,7 @@ declare interface Window {
       setServerUrl(url: string): Promise<boolean>;
       getUser(username: string): Promise<string | undefined>;
       setUser(username: string, password: string): Promise<void>;
+      clearUser(username: string): Promise<void>;
       finishSetup(): Promise<boolean>;
     };
   };
