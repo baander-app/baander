@@ -1,4 +1,4 @@
-import { app } from 'electron';
+import { app, screen } from 'electron';
 import { installOrUpdateCorsShim } from './security/cors-shim';
 import { createMainWindow } from './windows/main-window';
 import { createConfigWindow } from './windows/config-window';
@@ -8,10 +8,16 @@ import { createMenuTranslator } from './menu/i18n';
 import { setupTray, destroyTray } from './menu/tray';
 import { initMainProcessImpl, getServerUrlSync } from '../shared/config-store';
 import { createRequire } from 'node:module';
-import { enableCrossOriginIsolation } from './security/cross-origin-isolation-shim';
+import { DeepLinkService } from './services/deep-link.service';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { setCliFlags } from './flags';
 
+if(process.platform === 'win32') {
+  process.env.FONTCONFIG_FILE = path.join(import.meta.url, 'fonts.conf');
+}
+
+setCliFlags();
 
 // Initialize the config store for the main process
 initMainProcessImpl(app, fs, path);
@@ -19,26 +25,16 @@ initMainProcessImpl(app, fs, path);
 const require = createRequire(import.meta.url);
 require('v8-compile-cache');
 
+// Initialize deep link service
+const deepLinkService = new DeepLinkService(getServerUrlSync);
+deepLinkService.initializeProtocol();
+
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
   app.quit();
 } else {
-  // If a second instance is launched, focus/restore existing window
-  app.on('second-instance', (_event, _argv, _workingDirectory) => {
-    // Decide which window should be focused based on current configuration
-    const configured = getServerUrlSync();
-    const win = configured ? (createMainWindow as any).get?.() : (createConfigWindow as any)?.get?.() || null;
-
-    // If no window exists (rare), create the appropriate one
-    const target = win ?? (configured ? createMainWindow() : createConfigWindow());
-    enableCrossOriginIsolation(target);
-
-    if (target) {
-      if (target.isMinimized()) target.restore();
-      if (!target.isVisible()) target.show();
-      target.focus();
-    }
-  });
+  // Setup deep link event listeners
+  deepLinkService.setupEventListeners();
 }
 
 function getRendererOrigin() {
@@ -46,6 +42,12 @@ function getRendererOrigin() {
 }
 
 app.whenReady().then(async () => {
+  const primary = screen.getPrimaryDisplay();
+  if (primary.scaleFactor !== 1) {
+    app.commandLine.appendSwitch('high-dpi-support', '1');
+    app.commandLine.appendSwitch('force-device-scale-factor', '1');
+  }
+
   const rendererOrigin = getRendererOrigin();
 
   const t = createMenuTranslator();
@@ -68,7 +70,16 @@ app.whenReady().then(async () => {
   setupTray(ctx);
 
   installOrUpdateCorsShim(getServerUrlSync(), rendererOrigin);
-  registerIpc({ rendererOrigin });
+
+  // Register IPC with expanded context
+  registerIpc({
+    rendererOrigin,
+    getServerUrlSync,
+    deepLinkService: {
+      getPendingUrl: () => deepLinkService.getPendingUrl(),
+      clearPendingUrl: () => deepLinkService.clearPendingUrl(),
+    }
+  });
 
   const configured = getServerUrlSync();
   // Create the window first so we know which session it uses

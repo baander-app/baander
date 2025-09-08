@@ -7,3 +7,7 @@ export async function getUser(username: string) {
 export async function setUser(username: string, password: string) {
   return credentialService.set('baander', username, password);
 }
+
+export async function clearUser(username: string) {
+  return credentialService.delete('baander', username);
+}

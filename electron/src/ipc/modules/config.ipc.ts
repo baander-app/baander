@@ -1,12 +1,10 @@
-import { ipcMain } from 'electron';
+import { app, ipcMain } from 'electron';
 import { installOrUpdateCorsShim } from '../../main/security/cors-shim';
 import { createMainWindow } from '../../main/windows/main-window';
 import { getConfigWindow } from '../../main/windows/config-window';
 import type { IpcContext } from '../index';
-import { getUser, setUser } from '../../shared/credentials';
+import { clearUser, getUser, setUser } from '../../shared/credentials';
 import { initMainProcessImpl } from '../../shared/config-store';
-
-import { app } from 'electron';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { mainLog } from '../../main/log';
@@ -40,6 +38,17 @@ export function registerConfigIpc(ctx: IpcContext) {
       return true;
     } catch (e) {
       mainLog.error('Failed to save user:', e);
+      return false;
+    }
+  });
+
+  ipcMain.handle('baander:config:clear-user', async (_, username: string) => {
+    try {
+      const res = await clearUser(username);
+      mainLog.log('User cleared:', res);
+      return res;
+    } catch (e) {
+      mainLog.error('Failed to clear user:', e);
       return false;
     }
   });

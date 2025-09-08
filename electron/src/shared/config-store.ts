@@ -6,15 +6,6 @@ type ConfigShape = {
   serverUrl?: string;
 };
 
-// Safely detect if we're in Electron's main process
-// @ts-expect-error
-const isMainProcess = typeof process !== 'undefined' &&
-  // @ts-expect-error
-  process.type !== 'renderer' &&
-  // Check for both commonjs and esm environments
-  // @ts-expect-error
-  (typeof global !== 'undefined' && 'electron' in global);
-
 // Safely detect if we're in a renderer process with Electron APIs
 const isElectronRenderer = typeof window !== 'undefined' &&
   typeof (window as any).BaanderElectron !== 'undefined';
@@ -148,10 +139,10 @@ export function loadConfigSync(): ConfigShape {
   return {};
 }
 
-export function getServerUrlSync(): string | undefined {
+export function getServerUrlSync(): string | null {
   if (_mainProcessImpl) {
     return _mainProcessImpl.getServerUrl();
   }
-  return undefined;
+  return null;
 }
 

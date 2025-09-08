@@ -1,4 +1,3 @@
-
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
@@ -22,6 +21,7 @@
   ],
   "exclude": [
     "dist",
+    "../dist",
     "dist-electron",
     "release"
   ]

@@ -6,7 +6,7 @@ const preflightCache = new Map<number, { reqHeaders?: string; reqMethod?: string
 
 let removeHandlers: (() => void) | null = null;
 
-export function installOrUpdateCorsShim(userServerURL: string | undefined, rendererOrigin: string) {
+export function installOrUpdateCorsShim(userServerURL: string | null, rendererOrigin: string) {
   const ses = session.defaultSession;
   if (!ses) return;
 

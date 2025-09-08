@@ -85,6 +85,7 @@ export function createConfigWindow() {
   if (configWindow && !configWindow.isDestroyed()) return configWindow;
 
   configWindow = new BrowserWindow({
+    backgroundColor: '#fff',
     width: 520,
     height: 320,
     resizable: false,
@@ -94,7 +95,7 @@ export function createConfigWindow() {
     show: true,
     title: 'Bånder — Configure Server',
     webPreferences: {
-      preload: join(__dirname, '../preload.cjs'),
+      preload: join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -119,8 +120,12 @@ export function createConfigWindow() {
       app.exit(1);
     });
   } else {
-    // Serve from built files
-    configWindow.loadFile(join(__dirname, '../../dist/config/index.html')).catch(err => {
+    // Determine path based on whether app is packed
+    const configPath = app.isPackaged
+                       ? 'config/index.html'  // In packaged app.asar
+                       : join(__dirname, '../../dist/config/index.html');  // In development build
+
+    configWindow.loadFile(configPath).catch(err => {
       mainLog.error('[fatal] Failed to load built config HTML', err);
       try {
         dialog.showMessageBoxSync(configWindow!, {

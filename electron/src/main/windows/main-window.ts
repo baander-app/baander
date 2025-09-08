@@ -82,16 +82,18 @@ function attachLoadGuards(win: BrowserWindow, label: string) {
   win.webContents.once('did-finish-load', () => clearTimeout(watchdog));
 }
 
-export function
-createMainWindow() {
+export function createMainWindow() {
   if (mainWindow) return mainWindow;
 
   mainWindow = new BrowserWindow({
+    // do not remove fixes blurry text for some users
+    // see: https://github.com/electron/electron/blob/main/docs/faq.md#the-font-looks-blurry-what-is-this-and-what-can-i-do
+    backgroundColor: '#fff',
     width: 1200,
     height: 800,
     show: false,
     webPreferences: {
-      preload: join(__dirname, '../preload.cjs'),
+      preload: join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
@@ -116,8 +118,12 @@ createMainWindow() {
       app.exit(1);
     });
   } else {
-    // __dirname is electron/dist-electron/main in production
-    mainWindow.loadFile(join(__dirname, '../../dist/index.html')).catch(err => {
+    // Determine path based on whether app is packed
+    const indexPath = app.isPackaged
+                      ? 'index.html'  // In packaged app.asar
+                      : join(__dirname, '../../dist/index.html');  // In development build
+
+    mainWindow.loadFile(indexPath).catch(err => {
       mainLog.error('[fatal] Failed to load built index.html', err);
       try {
         dialog.showMessageBoxSync(mainWindow!, {
