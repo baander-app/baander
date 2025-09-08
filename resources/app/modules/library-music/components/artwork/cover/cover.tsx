@@ -1,5 +1,6 @@
-import { Icon } from '@iconify/react';
+
 import styles from './cover.module.scss';
+import { Iconify } from '@/ui/icons/iconify.tsx';
 
 interface CoverProps {
   imgSrc?: string;
@@ -30,7 +31,7 @@ function FallbackImage({ size = 150, interactive = false }: { size?: number, int
   return (
     <div style={{ height: size, width: size }}
          className={`${styles.coverFallBack} ${interactive ? styles.interactive : undefined}`}>
-      <Icon icon="akar-icons:music-album-fill" height={size / 3} opacity={0.3}/>
+      <Iconify icon="akar-icons:music-album-fill" height={size / 3} opacity={0.3}/>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { app, session } from 'electron';
+import { getServerUrl } from '../../shared/config-store';
 
 export function hardenSecurity() {
   app.commandLine.appendSwitch('disable-site-isolation-trials');
@@ -6,7 +7,7 @@ export function hardenSecurity() {
   // Disable or restrict navigation to unknown origins
   app.on('web-contents-created', (_event, contents) => {
     contents.on('will-navigate', (e, url) => {
-      const allowed = ['file:', 'http://localhost:', 'https://localhost:'];
+      const allowed = ['file:', 'http://localhost:', 'https://localhost:', `${getServerUrl()}:`];
       if (!allowed.some(a => url.startsWith(a))) e.preventDefault();
     });
 

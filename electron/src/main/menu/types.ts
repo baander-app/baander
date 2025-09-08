@@ -14,7 +14,7 @@ export type AppStateForMenu = {
 };
 
 export type AppMenuContext = {
-  platform: Platform;
+  platform: NodeJS.Platform;
   t: (key: string) => string; // simple i18n hook, replace later if needed
   state: AppStateForMenu;
 };

@@ -2,7 +2,7 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "types": ["node", "electron"],
-    "lib": ["ES2023"],
+    "lib": ["dom", "es2023"],
     "noEmit": true
   },
   "include": [

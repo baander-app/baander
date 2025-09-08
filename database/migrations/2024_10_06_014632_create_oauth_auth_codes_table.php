@@ -6,34 +6,25 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('oauth_auth_codes', function (Blueprint $table) {
-            $table->char('id', 80)->primary();
-            $table->foreignId('user_id')->index();
-            $table->foreignUuid('client_id');
-            $table->text('scopes')->nullable();
-            $table->boolean('revoked');
-            $table->dateTimeTz('expires_at')->nullable();
+            $table->uuid('id')->primary();
+            $table->text('code_id')->unique()->index();
+            $table->uuid('user_id');
+            $table->uuid('client_id');
+            $table->jsonb('scopes')->nullable();
+            $table->boolean('revoked')->default(false);
+            $table->timestampTz('expires_at');
+            $table->timestampsTz();
+
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+            $table->foreign('client_id')->references('id')->on('oauth_clients')->onDelete('cascade');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('oauth_auth_codes');
-    }
-
-    /**
-     * Get the migration connection name.
-     */
-    public function getConnection(): ?string
-    {
-        return $this->connection ?? config('passport.connection');
     }
 };

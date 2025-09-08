@@ -836,7 +836,7 @@ export function useAlbumsIndexSuspenseInfinite<
 including artists, cover art, and songs for comprehensive display.
  * @summary Get a specific album with detailed information
  */
-export const albumsShow = (
+export const albumShow = (
   library: string,
   album: string,
   options?: SecondParameter<typeof customInstance>,
@@ -848,12 +848,12 @@ export const albumsShow = (
   );
 };
 
-export const getAlbumsShowQueryKey = (library?: string, album?: string) => {
+export const getAlbumShowQueryKey = (library?: string, album?: string) => {
   return [`/api/libraries/${library}/albums/${album}`] as const;
 };
 
-export const getAlbumsShowInfiniteQueryOptions = <
-  TData = InfiniteData<Awaited<ReturnType<typeof albumsShow>>>,
+export const getAlbumShowInfiniteQueryOptions = <
+  TData = InfiniteData<Awaited<ReturnType<typeof albumShow>>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -863,7 +863,7 @@ export const getAlbumsShowInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof albumsShow>>,
+        Awaited<ReturnType<typeof albumShow>>,
         TError,
         TData
       >
@@ -874,11 +874,11 @@ export const getAlbumsShowInfiniteQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getAlbumsShowQueryKey(library, album);
+    queryOptions?.queryKey ?? getAlbumShowQueryKey(library, album);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof albumsShow>>> = ({
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof albumShow>>> = ({
     signal,
-  }) => albumsShow(library, album, requestOptions, signal);
+  }) => albumShow(library, album, requestOptions, signal);
 
   return {
     queryKey,
@@ -886,21 +886,21 @@ export const getAlbumsShowInfiniteQueryOptions = <
     enabled: !!(library && album),
     ...queryOptions,
   } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof albumsShow>>,
+    Awaited<ReturnType<typeof albumShow>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type AlbumsShowInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof albumsShow>>
+export type AlbumShowInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof albumShow>>
 >;
-export type AlbumsShowInfiniteQueryError = ErrorType<
+export type AlbumShowInfiniteQueryError = ErrorType<
   AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
 >;
 
-export function useAlbumsShowInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof albumsShow>>>,
+export function useAlbumShowInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof albumShow>>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -910,16 +910,16 @@ export function useAlbumsShowInfinite<
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof albumsShow>>,
+        Awaited<ReturnType<typeof albumShow>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof albumsShow>>,
+          Awaited<ReturnType<typeof albumShow>>,
           TError,
-          Awaited<ReturnType<typeof albumsShow>>
+          Awaited<ReturnType<typeof albumShow>>
         >,
         "initialData"
       >;
@@ -929,8 +929,8 @@ export function useAlbumsShowInfinite<
 ): DefinedUseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAlbumsShowInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof albumsShow>>>,
+export function useAlbumShowInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof albumShow>>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -940,16 +940,16 @@ export function useAlbumsShowInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof albumsShow>>,
+        Awaited<ReturnType<typeof albumShow>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof albumsShow>>,
+          Awaited<ReturnType<typeof albumShow>>,
           TError,
-          Awaited<ReturnType<typeof albumsShow>>
+          Awaited<ReturnType<typeof albumShow>>
         >,
         "initialData"
       >;
@@ -959,8 +959,8 @@ export function useAlbumsShowInfinite<
 ): UseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAlbumsShowInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof albumsShow>>>,
+export function useAlbumShowInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof albumShow>>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -970,7 +970,7 @@ export function useAlbumsShowInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof albumsShow>>,
+        Awaited<ReturnType<typeof albumShow>>,
         TError,
         TData
       >
@@ -985,8 +985,8 @@ export function useAlbumsShowInfinite<
  * @summary Get a specific album with detailed information
  */
 
-export function useAlbumsShowInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof albumsShow>>>,
+export function useAlbumShowInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof albumShow>>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -996,7 +996,7 @@ export function useAlbumsShowInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof albumsShow>>,
+        Awaited<ReturnType<typeof albumShow>>,
         TError,
         TData
       >
@@ -1007,7 +1007,7 @@ export function useAlbumsShowInfinite<
 ): UseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getAlbumsShowInfiniteQueryOptions(
+  const queryOptions = getAlbumShowInfiniteQueryOptions(
     library,
     album,
     options
@@ -1025,8 +1025,8 @@ export function useAlbumsShowInfinite<
   return query;
 }
 
-export const getAlbumsShowQueryOptions = <
-  TData = Awaited<ReturnType<typeof albumsShow>>,
+export const getAlbumShowQueryOptions = <
+  TData = Awaited<ReturnType<typeof albumShow>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -1035,7 +1035,7 @@ export const getAlbumsShowQueryOptions = <
   album: string,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof albumsShow>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof albumShow>>, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   }
@@ -1043,33 +1043,31 @@ export const getAlbumsShowQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getAlbumsShowQueryKey(library, album);
+    queryOptions?.queryKey ?? getAlbumShowQueryKey(library, album);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof albumsShow>>> = ({
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof albumShow>>> = ({
     signal,
-  }) => albumsShow(library, album, requestOptions, signal);
+  }) => albumShow(library, album, requestOptions, signal);
 
   return {
     queryKey,
     queryFn,
     enabled: !!(library && album),
     ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof albumsShow>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+  } as UseQueryOptions<Awaited<ReturnType<typeof albumShow>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
 };
 
-export type AlbumsShowQueryResult = NonNullable<
-  Awaited<ReturnType<typeof albumsShow>>
+export type AlbumShowQueryResult = NonNullable<
+  Awaited<ReturnType<typeof albumShow>>
 >;
-export type AlbumsShowQueryError = ErrorType<
+export type AlbumShowQueryError = ErrorType<
   AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
 >;
 
-export function useAlbumsShow<
-  TData = Awaited<ReturnType<typeof albumsShow>>,
+export function useAlbumShow<
+  TData = Awaited<ReturnType<typeof albumShow>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -1078,13 +1076,13 @@ export function useAlbumsShow<
   album: string,
   options: {
     query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof albumsShow>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof albumShow>>, TError, TData>
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof albumsShow>>,
+          Awaited<ReturnType<typeof albumShow>>,
           TError,
-          Awaited<ReturnType<typeof albumsShow>>
+          Awaited<ReturnType<typeof albumShow>>
         >,
         "initialData"
       >;
@@ -1094,8 +1092,8 @@ export function useAlbumsShow<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAlbumsShow<
-  TData = Awaited<ReturnType<typeof albumsShow>>,
+export function useAlbumShow<
+  TData = Awaited<ReturnType<typeof albumShow>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -1104,13 +1102,13 @@ export function useAlbumsShow<
   album: string,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof albumsShow>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof albumShow>>, TError, TData>
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof albumsShow>>,
+          Awaited<ReturnType<typeof albumShow>>,
           TError,
-          Awaited<ReturnType<typeof albumsShow>>
+          Awaited<ReturnType<typeof albumShow>>
         >,
         "initialData"
       >;
@@ -1120,8 +1118,8 @@ export function useAlbumsShow<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAlbumsShow<
-  TData = Awaited<ReturnType<typeof albumsShow>>,
+export function useAlbumShow<
+  TData = Awaited<ReturnType<typeof albumShow>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -1130,7 +1128,7 @@ export function useAlbumsShow<
   album: string,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof albumsShow>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof albumShow>>, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -1142,8 +1140,8 @@ export function useAlbumsShow<
  * @summary Get a specific album with detailed information
  */
 
-export function useAlbumsShow<
-  TData = Awaited<ReturnType<typeof albumsShow>>,
+export function useAlbumShow<
+  TData = Awaited<ReturnType<typeof albumShow>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -1152,7 +1150,7 @@ export function useAlbumsShow<
   album: string,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof albumsShow>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof albumShow>>, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -1160,7 +1158,7 @@ export function useAlbumsShow<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getAlbumsShowQueryOptions(library, album, options);
+  const queryOptions = getAlbumShowQueryOptions(library, album, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -1172,8 +1170,8 @@ export function useAlbumsShow<
   return query;
 }
 
-export const getAlbumsShowSuspenseQueryOptions = <
-  TData = Awaited<ReturnType<typeof albumsShow>>,
+export const getAlbumShowSuspenseQueryOptions = <
+  TData = Awaited<ReturnType<typeof albumShow>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -1183,7 +1181,7 @@ export const getAlbumsShowSuspenseQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof albumsShow>>,
+        Awaited<ReturnType<typeof albumShow>>,
         TError,
         TData
       >
@@ -1194,28 +1192,28 @@ export const getAlbumsShowSuspenseQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getAlbumsShowQueryKey(library, album);
+    queryOptions?.queryKey ?? getAlbumShowQueryKey(library, album);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof albumsShow>>> = ({
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof albumShow>>> = ({
     signal,
-  }) => albumsShow(library, album, requestOptions, signal);
+  }) => albumShow(library, album, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
-    Awaited<ReturnType<typeof albumsShow>>,
+    Awaited<ReturnType<typeof albumShow>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type AlbumsShowSuspenseQueryResult = NonNullable<
-  Awaited<ReturnType<typeof albumsShow>>
+export type AlbumShowSuspenseQueryResult = NonNullable<
+  Awaited<ReturnType<typeof albumShow>>
 >;
-export type AlbumsShowSuspenseQueryError = ErrorType<
+export type AlbumShowSuspenseQueryError = ErrorType<
   AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
 >;
 
-export function useAlbumsShowSuspense<
-  TData = Awaited<ReturnType<typeof albumsShow>>,
+export function useAlbumShowSuspense<
+  TData = Awaited<ReturnType<typeof albumShow>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -1225,7 +1223,7 @@ export function useAlbumsShowSuspense<
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof albumsShow>>,
+        Awaited<ReturnType<typeof albumShow>>,
         TError,
         TData
       >
@@ -1236,8 +1234,8 @@ export function useAlbumsShowSuspense<
 ): UseSuspenseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAlbumsShowSuspense<
-  TData = Awaited<ReturnType<typeof albumsShow>>,
+export function useAlbumShowSuspense<
+  TData = Awaited<ReturnType<typeof albumShow>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -1247,7 +1245,7 @@ export function useAlbumsShowSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof albumsShow>>,
+        Awaited<ReturnType<typeof albumShow>>,
         TError,
         TData
       >
@@ -1258,8 +1256,8 @@ export function useAlbumsShowSuspense<
 ): UseSuspenseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAlbumsShowSuspense<
-  TData = Awaited<ReturnType<typeof albumsShow>>,
+export function useAlbumShowSuspense<
+  TData = Awaited<ReturnType<typeof albumShow>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -1269,7 +1267,7 @@ export function useAlbumsShowSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof albumsShow>>,
+        Awaited<ReturnType<typeof albumShow>>,
         TError,
         TData
       >
@@ -1284,8 +1282,8 @@ export function useAlbumsShowSuspense<
  * @summary Get a specific album with detailed information
  */
 
-export function useAlbumsShowSuspense<
-  TData = Awaited<ReturnType<typeof albumsShow>>,
+export function useAlbumShowSuspense<
+  TData = Awaited<ReturnType<typeof albumShow>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -1295,7 +1293,7 @@ export function useAlbumsShowSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof albumsShow>>,
+        Awaited<ReturnType<typeof albumShow>>,
         TError,
         TData
       >
@@ -1306,7 +1304,7 @@ export function useAlbumsShowSuspense<
 ): UseSuspenseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getAlbumsShowSuspenseQueryOptions(
+  const queryOptions = getAlbumShowSuspenseQueryOptions(
     library,
     album,
     options
@@ -1324,8 +1322,8 @@ export function useAlbumsShowSuspense<
   return query;
 }
 
-export const getAlbumsShowSuspenseInfiniteQueryOptions = <
-  TData = InfiniteData<Awaited<ReturnType<typeof albumsShow>>>,
+export const getAlbumShowSuspenseInfiniteQueryOptions = <
+  TData = InfiniteData<Awaited<ReturnType<typeof albumShow>>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -1335,7 +1333,7 @@ export const getAlbumsShowSuspenseInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof albumsShow>>,
+        Awaited<ReturnType<typeof albumShow>>,
         TError,
         TData
       >
@@ -1346,32 +1344,32 @@ export const getAlbumsShowSuspenseInfiniteQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getAlbumsShowQueryKey(library, album);
+    queryOptions?.queryKey ?? getAlbumShowQueryKey(library, album);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof albumsShow>>> = ({
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof albumShow>>> = ({
     signal,
-  }) => albumsShow(library, album, requestOptions, signal);
+  }) => albumShow(library, album, requestOptions, signal);
 
   return {
     queryKey,
     queryFn,
     ...queryOptions,
   } as UseSuspenseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof albumsShow>>,
+    Awaited<ReturnType<typeof albumShow>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type AlbumsShowSuspenseInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof albumsShow>>
+export type AlbumShowSuspenseInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof albumShow>>
 >;
-export type AlbumsShowSuspenseInfiniteQueryError = ErrorType<
+export type AlbumShowSuspenseInfiniteQueryError = ErrorType<
   AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
 >;
 
-export function useAlbumsShowSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof albumsShow>>>,
+export function useAlbumShowSuspenseInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof albumShow>>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -1381,7 +1379,7 @@ export function useAlbumsShowSuspenseInfinite<
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof albumsShow>>,
+        Awaited<ReturnType<typeof albumShow>>,
         TError,
         TData
       >
@@ -1392,8 +1390,8 @@ export function useAlbumsShowSuspenseInfinite<
 ): UseSuspenseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAlbumsShowSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof albumsShow>>>,
+export function useAlbumShowSuspenseInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof albumShow>>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -1403,7 +1401,7 @@ export function useAlbumsShowSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof albumsShow>>,
+        Awaited<ReturnType<typeof albumShow>>,
         TError,
         TData
       >
@@ -1414,8 +1412,8 @@ export function useAlbumsShowSuspenseInfinite<
 ): UseSuspenseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAlbumsShowSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof albumsShow>>>,
+export function useAlbumShowSuspenseInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof albumShow>>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -1425,7 +1423,7 @@ export function useAlbumsShowSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof albumsShow>>,
+        Awaited<ReturnType<typeof albumShow>>,
         TError,
         TData
       >
@@ -1440,8 +1438,8 @@ export function useAlbumsShowSuspenseInfinite<
  * @summary Get a specific album with detailed information
  */
 
-export function useAlbumsShowSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof albumsShow>>>,
+export function useAlbumShowSuspenseInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof albumShow>>>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -1451,7 +1449,7 @@ export function useAlbumsShowSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof albumsShow>>,
+        Awaited<ReturnType<typeof albumShow>>,
         TError,
         TData
       >
@@ -1462,7 +1460,7 @@ export function useAlbumsShowSuspenseInfinite<
 ): UseSuspenseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getAlbumsShowSuspenseInfiniteQueryOptions(
+  const queryOptions = getAlbumShowSuspenseInfiniteQueryOptions(
     library,
     album,
     options

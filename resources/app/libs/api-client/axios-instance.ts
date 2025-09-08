@@ -6,13 +6,21 @@ export interface CustomAxiosRequestConfig extends AxiosRequestConfig {
   _didRetry?: boolean;
 }
 
+const headers: Record<string, string> = {
+  'accept': 'application/json',
+  'X-Requested-With': 'XMLHttpRequest',
+}
+
+const csrfToken = document.head.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+if (csrfToken) {
+  headers['X-CSRF-TOKEN'] = csrfToken;
+}
+
+
 export const AXIOS_INSTANCE = Axios.create({
   baseURL: import.meta.env.VITE_APP_URL,
-  headers: {
-    'accept': 'application/json',
-    'X-CSRF-TOKEN': document.head.querySelector('meta[name="csrf-token"]')!.getAttribute('content') as string,
-    'X-Requested-With': 'XMLHttpRequest',
-  },
+  headers,
   withCredentials: true,
 }); // use your own URL here or environment variable
 

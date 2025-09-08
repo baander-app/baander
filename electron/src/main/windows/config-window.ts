@@ -1,6 +1,7 @@
 import { BrowserWindow, app, dialog } from 'electron';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { mainLog } from '../log';
 
 let configWindow: BrowserWindow | null = null;
 
@@ -10,7 +11,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 function attachLoadGuards(win: BrowserWindow, label: string) {
   // Crash the app if the page fails to load, but first show an alert
   win.webContents.on('did-fail-load', (_e, errorCode, errorDescription, validatedURL) => {
-    console.error(`[fatal] ${label} failed to load`, { errorCode, errorDescription, validatedURL });
+    mainLog.error(`[fatal] ${label} failed to load`, { errorCode, errorDescription, validatedURL });
     try {
       dialog.showMessageBoxSync(win, {
         type: 'error',
@@ -22,9 +23,50 @@ function attachLoadGuards(win: BrowserWindow, label: string) {
     app.exit(1);
   });
 
+  // Also surface preload script errors
+  win.webContents.on('preload-error', (_e, preloadPath, error) => {
+    mainLog.error(`[fatal] ${label} preload error`, { preloadPath, error });
+    try {
+      dialog.showMessageBoxSync(win, {
+        type: 'error',
+        title: `${label} preload failed`,
+        message: `${label} preload script error`,
+        detail: `Preload: ${preloadPath}\n${(error && (error.stack || error.message)) || String(error)}`,
+      });
+    } catch {}
+    app.exit(1);
+  });
+
+  // Surface renderer crashes and OOMs
+  win.webContents.on('render-process-gone', (_e, details) => {
+    mainLog.error(`[fatal] ${label} renderer gone`, details);
+    try {
+      dialog.showMessageBoxSync(win, {
+        type: 'error',
+        title: `${label} crashed`,
+        message: `${label} renderer process terminated`,
+        detail: `Reason: ${details.reason}\nExit code: ${details.exitCode}\n${details.reason === 'oom' ? 'Out of memory.' : ''}`,
+      });
+    } catch {}
+    app.exit(1);
+  });
+
+  // Warn when the page becomes unresponsive
+  win.on('unresponsive', () => {
+    mainLog.error(`[fatal] ${label} became unresponsive`);
+    try {
+      dialog.showMessageBoxSync(win, {
+        type: 'error',
+        title: `${label} unresponsive`,
+        message: `${label} is not responding`,
+        detail: 'Please wait or restart the application.',
+      });
+    } catch {}
+  });
+
   // Crash the app if it doesn't finish loading in time, but first show an alert
   const watchdog = setTimeout(() => {
-    console.error(`[fatal] ${label} did not finish loading in time`);
+    mainLog.error(`[fatal] ${label} did not finish loading in time`);
     try {
       dialog.showMessageBoxSync(win, {
         type: 'error',
@@ -52,7 +94,7 @@ export function createConfigWindow() {
     show: true,
     title: 'Bånder — Configure Server',
     webPreferences: {
-      preload: join(__dirname, '../preload.mjs'),
+      preload: join(__dirname, '../preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -65,7 +107,7 @@ export function createConfigWindow() {
   if (devServerUrl) {
     // Serve from Vite: /config/index.html
     configWindow.loadURL(new URL('/config/index.html', devServerUrl).toString()).catch(err => {
-      console.error('[fatal] Failed to load config URL', err);
+      mainLog.error('[fatal] Failed to load config URL', err);
       try {
         dialog.showMessageBoxSync(configWindow!, {
           type: 'error',
@@ -79,7 +121,7 @@ export function createConfigWindow() {
   } else {
     // Serve from built files
     configWindow.loadFile(join(__dirname, '../../dist/config/index.html')).catch(err => {
-      console.error('[fatal] Failed to load built config HTML', err);
+      mainLog.error('[fatal] Failed to load built config HTML', err);
       try {
         dialog.showMessageBoxSync(configWindow!, {
           type: 'error',

@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Http\Integrations\Transcoder\TranscoderClient;
+use App\Modules\OAuth\OAuthServiceProvider;
 use App\Repositories\Cache\CacheRepositoryInterface;
 use App\Repositories\Cache\LaravelCacheRepository;
 use DateTimeZone;
@@ -14,6 +15,8 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\ImageManager;
+use Nyholm\Psr7\Factory\Psr17Factory;
+use Symfony\Bridge\PsrHttpMessage\Factory\PsrHttpFactory;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -22,6 +25,21 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->register(OAuthServiceProvider::class);
+
+        // Register PSR HTTP Factory for OAuth server
+        $this->app->singleton(PsrHttpFactory::class, function () {
+            $psr17Factory = new Psr17Factory();
+
+            return new PsrHttpFactory(
+                $psr17Factory,
+                $psr17Factory,
+                $psr17Factory,
+                $psr17Factory
+            );
+        });
+
+
         $this->app->scoped(SystemClock::class, function () {
             $timeZone = new DateTimeZone(config('app.timezone'));
 

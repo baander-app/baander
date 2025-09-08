@@ -18,7 +18,7 @@ type AuthState = {
 
   // Actions
   hydrateFromStorage: () => void;
-  login: (credentials: { email: string; password: string }) => Promise<void>;
+  login: (credentials: { email: string; password: string }, rememberMe?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   revokeAllTokensExceptCurrent: () => Promise<void>;
 };
@@ -46,7 +46,7 @@ export const useAuthStore = create<AuthState>()(
           }
         },
 
-        login: async (credentials) => {
+        login: async (credentials, rememberMe) => {
           set({ status: 'loading' });
           try {
             const res = await loginFn(credentials);
@@ -57,6 +57,11 @@ export const useAuthStore = create<AuthState>()(
               isAuthenticated: true,
               sessionId: sid,
             });
+
+            console.log({rememberMe})
+            if (rememberMe) {
+              await window.BaanderElectron.config.setUser(credentials.email, credentials.password);
+            }
           } catch (e) {
             set({ status: 'unauthenticated', isAuthenticated: false, sessionId: null });
             throw e;

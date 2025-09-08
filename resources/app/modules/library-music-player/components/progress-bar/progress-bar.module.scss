@@ -1,29 +1,44 @@
+// Progress bar variables
+$track-height: 6px;
+$thumb-size: 12px;
+$background-color: rgba(255, 255, 255, 0.1);
+$buffered-color: var(--accent-6);
+$hover-transition: 0.2s ease;
+
 .progressSliderContainer {
   position: relative;
   width: 100%;
-  height: 8px;
+  height: 16px;
   cursor: pointer;
-  user-select: none;
+  display: flex;
+  align-items: center;
 
-  &:hover {
+  &:focus {
+    outline: none;
+
     .progressTrack {
-      height: 10px;
-    }
-
-    .progressThumb {
-      opacity: 1;
-      transform: translate(-50%, -50%) scale(1.2);
-    }
-
-    .timeTooltip {
-      opacity: 1;
+      box-shadow: 0 0 0 2px rgba(65, 105, 225, 0.5);
     }
   }
 
-  &:focus-within {
-    .progressTrack {
-      outline: 2px solid var(--accent-8);
-      outline-offset: 2px;
+  &.isDisabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  &.isLoading {
+    opacity: 0.7;
+    cursor: wait;
+  }
+
+  &.hasError {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &:hover {
+    .progressThumb {
+      opacity: 1;
     }
   }
 }
@@ -31,11 +46,10 @@
 .progressTrack {
   position: relative;
   width: 100%;
-  height: 8px;
-  background-color: var(--gray-5);
-  border-radius: 4px;
+  height: $track-height;
+  background-color: $background-color;
+  border-radius: calc($track-height / 2);
   overflow: hidden;
-  transition: height 0.2s ease;
 }
 
 .bufferedProgress {
@@ -43,13 +57,8 @@
   top: 0;
   left: 0;
   height: 100%;
-  background-color: var(--gray-7);
-  border-radius: 4px;
-  z-index: 1;
-  background-color: var(--gray-7); // constant color, no animation
-  border-radius: 4px;
-  z-index: 1;
-  transition: none;
+  background-color: $buffered-color;
+  will-change: width;
 }
 
 .currentProgress {
@@ -57,77 +66,40 @@
   top: 0;
   left: 0;
   height: 100%;
-  background: linear-gradient(90deg, var(--accent-9), var(--accent-10));
-  border-radius: 4px;
-  z-index: 2;
-  transition: none; // avoid always-in-flight transitions
+  background-color: var(--accent-9);
+  will-change: width;
 }
 
 .progressThumb {
   position: absolute;
-  top: 50%;
-  left: 0;
-  transform: translate(-50%, -50%) scale(0);
-  width: 16px;
-  height: 16px;
-  background: var(--accent-9);
-  border: 2px solid var(--color-panel-solid);
+  height: $thumb-size;
+  width: $thumb-size;
+  background-color: #fff;
   border-radius: 50%;
+  top: 50%;
+  margin-left: -6px;
   opacity: 0;
-  transition: all 0.2s ease;
-  z-index: 3;
-  cursor: grab;
-
-  &:active {
-    cursor: grabbing;
-    transform: translate(-50%, -50%) scale(1.3);
-  }
+  transition: opacity $hover-transition;
+  z-index: 1;
+  will-change: transform, left;
 
   &.isDragging {
-    transform: translate(-50%, -50%) scale(1.3);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     opacity: 1;
   }
 }
 
-// Show thumb on hover of the entire container
-.progressSliderContainer:hover .progressThumb {
-  opacity: 1;
-  transform: translate(-50%, -50%) scale(1.2);
-}
-
 .timeTooltip {
   position: absolute;
-  bottom: 100%;
-  left: 0;
+  bottom: 24px;
   transform: translateX(-50%);
-  background: var(--color-panel-solid);
-  color: var(--gray-12);
-  padding: 4px 8px;
-  border-radius: var(--radius-2);
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
   font-size: 12px;
-  font-weight: 500;
   white-space: nowrap;
-  opacity: 0;
-  transition: opacity 0.2s ease;
   pointer-events: none;
-  z-index: 4;
-  margin-bottom: 8px;
-  border: 1px solid var(--gray-6);
-  box-shadow: var(--shadow-3);
-
-  &::after {
-    content: '';
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 0;
-    height: 0;
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 4px solid var(--gray-6);
-  }
+  z-index: 10;
 }
 
 .hiddenInput {
@@ -135,68 +107,32 @@
   opacity: 0;
   width: 100%;
   height: 100%;
-  cursor: pointer;
+  top: 0;
+  left: 0;
   margin: 0;
-  padding: 0;
-
-  &:focus {
-    outline: none;
-  }
+  pointer-events: none;
 }
 
-.isLoading {
-  .progressTrack {
-    background: none;
-    background-color: var(--gray-6);
-    background-size: auto;
-    animation: none;
-  }
+.errorState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 16px;
+  color: #ff5252;
+  font-size: 12px;
+  gap: 8px;
 }
 
-.progressSliderContainer:focus-visible {
-  .progressTrack {
-    outline: 2px solid var(--accent-8);
-    outline-offset: 2px;
-  }
-}
+.retryButton {
+  background: none;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  cursor: pointer;
 
-// Mobile responsiveness
-@media (max-width: 768px) {
-  .progressSliderContainer {
-    height: 12px;
-
-    &:hover {
-      .progressTrack {
-        height: 12px;
-      }
-    }
-  }
-
-  .progressTrack {
-    height: 12px;
-  }
-
-  .progressThumb {
-    width: 20px;
-    height: 20px;
-  }
-
-  .timeTooltip {
-    font-size: 14px;
-    padding: 6px 10px;
-  }
-}
-
-// Disabled state
-.isDisabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-
-  .progressThumb {
-    cursor: not-allowed;
-  }
-
-  .hiddenInput {
-    cursor: not-allowed;
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.1);
   }
 }

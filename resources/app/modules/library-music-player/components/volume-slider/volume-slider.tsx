@@ -76,7 +76,7 @@ export function VolumeSlider() {
           onValueChange={handleVolumeChange}
           max={100}
           step={1}
-          size="2"
+          size="1"
           className={styles.slider}
           aria-label="Volume"
         />

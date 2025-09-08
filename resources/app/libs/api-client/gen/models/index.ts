@@ -474,6 +474,7 @@ export * from "./release";
 export * from "./resetPasswordRequest";
 export * from "./retryJobRequest";
 export * from "./searchResults";
+export * from "./showByPublicIdSongParams";
 export * from "./songResource";
 export * from "./songResourceComment";
 export * from "./songResourceCreatedAt";

@@ -96,7 +96,7 @@ const ChannelMeter = React.memo(({ label, level }: { label: string; level: numbe
 export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
   const dispatch = useAppDispatch();
 
-  // NO requestAnimationFrame - only use processor's internal timing
+  // Keep existing timing behavior
   const updateIntervalRef = useRef<number | null>(null);
   const lastDispatchTimeRef = useRef<number>(0);
   const knobRef = useRef<HTMLDivElement>(null);
@@ -133,6 +133,9 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
     frequencyBars: new Array(64).fill(0),
   });
 
+  // Smoothing buffer for spectrum bars (keeps original 40ms loop; only smooths values)
+  const smoothedBarsRef = useRef<Float32Array>(new Float32Array(64));
+
   // SINGLE update loop - uses setInterval to match processor frequency exactly
   useEffect(() => {
     const processor = globalAudioProcessor.getProcessor();
@@ -160,20 +163,30 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
         }));
 
         if (data) {
-          // Pre-compute spectrum bars to avoid doing it in render
-          const bars = [];
+          // Compute spectrum bars with smoothing
+          const bars: number[] = [];
           const barCount = 64;
+          const alpha = 0.35; // smoothing factor (0..1)
+          const decay = 0.92; // decay when no data frame arrives
+
           if (data.frequencyData && data.frequencyData.length > 0) {
             for (let i = 0; i < barCount; i++) {
               const dataIndex = Math.floor((i / barCount) * data.frequencyData.length);
-              const height = (data.frequencyData[dataIndex] / 255) * 100;
-              bars.push(height);
+              const target = (data.frequencyData[dataIndex] / 255) * 100; // 0..100%
+              const prev = smoothedBarsRef.current[i] || 0;
+              const smoothed = prev * (1 - alpha) + target * alpha;
+              smoothedBarsRef.current[i] = smoothed;
+              bars.push(smoothed);
             }
           } else {
-            bars.push(...new Array(barCount).fill(0));
+            // No fresh data: gently decay previous bars to avoid flicker
+            for (let i = 0; i < barCount; i++) {
+              smoothedBarsRef.current[i] = (smoothedBarsRef.current[i] || 0) * decay;
+              bars.push(smoothedBarsRef.current[i]);
+            }
           }
 
-          // Update display data
+          // Update display data from processor outputs
           setDisplayData({
             leftChannel: data.leftChannel,
             rightChannel: data.rightChannel,
@@ -345,15 +358,13 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
 
   // Memoized computed values
   const knobRotation = useMemo(() => volumePercent * 300 + 30, [volumePercent]);
-  const totalGain = useMemo(() =>
-      (eqState.masterGain + (normalization.currentGain || 0)).toFixed(1),
+  const totalGain = useMemo(
+    () => (eqState.masterGain + (normalization.currentGain || 0)).toFixed(1),
     [eqState.masterGain, normalization.currentGain]
   );
   const formattedPeakFrequency = useMemo(() => {
     const freq = displayData.peakFrequency;
-    return freq > 1000
-           ? `${(freq / 1000).toFixed(1)}K`
-           : `${Math.round(freq)}`;
+    return freq > 1000 ? `${(freq / 1000).toFixed(1)}K` : `${Math.round(freq)}`;
   }, [displayData.peakFrequency]);
 
   const phasePath = useMemo(() => {

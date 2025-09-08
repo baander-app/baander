@@ -7,7 +7,7 @@ const COOLDOWN_MS = 15_000; // prevent tight loops if backend rejects temporaril
 
 // Call this where you build stream URLs (player, media loader, etc.)
 export async function ensureStreamToken(): Promise<string | undefined> {
-  const current = Token.getStreamToken?.();
+  const current = Token.getStreamToken();
   if (current && !Token.isExpired(current.expiresAt)) {
     return current.token;
   }
@@ -35,5 +35,5 @@ export async function ensureStreamToken(): Promise<string | undefined> {
     // leave token as-is; caller can decide what to do
   }
 
-  return Token.getStreamToken?.()?.token;
+  return Token.getStreamToken()?.token;
 }

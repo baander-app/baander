@@ -5,6 +5,7 @@ interface ImportMetaEnv {
   readonly VITE_APP_NAME: string;
   readonly VITE_APP_URL: string;
   readonly VITE_APP_ENV: string;
+  readonly VITE_APP_RUNTIME: string;
 }
 
 interface ImportMeta {
@@ -27,5 +28,15 @@ declare interface Window {
     locale: string;
     version: string;
     tracing: TracingConfigData;
-  }
+  };
+
+  BaanderElectron: {
+    config: {
+      getServerUrl(): Promise<string>;
+      setServerUrl(url: string): Promise<boolean>;
+      getUser(username: string): Promise<string | undefined>;
+      setUser(username: string, password: string): Promise<void>;
+      finishSetup(): Promise<boolean>;
+    };
+  };
 }

@@ -1,8 +1,13 @@
 import type { SectionFactory } from '../types';
 import { accel } from '../accelerators';
 import { MenuActionId } from '../ids';
+import { app } from 'electron';
 
 export const developerSection: SectionFactory = ({ t, platform }) => {
+  if(app.isPackaged) return (
+    []
+  )
+
   const isMac = platform === 'darwin';
   return [
     {

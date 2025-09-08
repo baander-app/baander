@@ -20,6 +20,16 @@ class AppConfigService
         return $this->buildConfigData();
     }
 
+    public function getOAuthConfig()
+    {
+        return [
+            'client_id'              => 'spa-client-' . config('app.name', 'baander'),
+            'authorization_endpoint' => config('app.url') . '/api/oauth/spa/authorize',
+            'token_endpoint'         => config('app.url') . '/api/oauth/token',
+            'scopes'                 => ['read', 'write', 'stream'],
+        ];
+    }
+
     private function buildConfigData(): AppConfigData
     {
         return new AppConfigData(

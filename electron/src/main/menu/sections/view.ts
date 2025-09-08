@@ -2,7 +2,7 @@ import type { SectionFactory } from '../types';
 import { accel } from '../accelerators';
 import { MenuActionId } from '../ids';
 
-export const viewSection: SectionFactory = ({ t, platform, state }) => {
+export const viewSection: SectionFactory = ({ t, platform }) => {
   const isMac = platform === 'darwin';
   return [
     {

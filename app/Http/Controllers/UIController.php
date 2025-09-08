@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Baander;
 use App\Services\AppConfigService;
+use Illuminate\Support\Facades\Auth;
 
 class UIController
 {
@@ -16,6 +17,7 @@ class UIController
     {
         return view('app', [
             'appConfigData' => $this->appConfigService->getAppConfig()->toArray(),
+            'oAuthConfig' => Auth::check() ? $this->appConfigService->getOAuthConfig() : [],
         ]);
     }
 }

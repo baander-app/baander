@@ -1,26 +1,21 @@
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, HashRouter } from 'react-router-dom';
 import { AppRoutes } from '@/routes';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { MusicSourceProvider } from '@/providers/music-source-provider';
 import { HelmetProvider } from 'react-helmet-async';
 import { Button, Text, Theme } from '@radix-ui/themes';
 import { Toast } from 'radix-ui';
 import { useAppDispatch, useAppSelector } from '@/store/hooks.ts';
 import styles from './app.module.scss';
 import { removeToast } from '@/store/notifications/notifications-slice.ts';
-import { Iconify } from './ui/icons/iconify';
 import { useEffect } from 'react';
-import { useUsersMe } from '@/libs/api-client/gen/endpoints/user/user.ts';
-import { ROOT_SESSION_SPAN } from '@/libs/tracing/start-session-span.ts';
-import { useAuthStatus } from '@/modules/auth/store';
+import CloseIcon from '~icons/ion/close';
+import { initializeGlobalAudioProcessor } from '@/modules/library-music-player/store';
+import { isWeb } from '@/utils/platform.ts';
+
+const isFileProtocol = window.location.protocol === 'file:';
+const Router = isFileProtocol ? HashRouter : BrowserRouter;
 
 const App = () => {
-  const authStatus = useAuthStatus();
-  const { data: me } = useUsersMe({
-    query: {
-      enabled: authStatus === 'authenticated',
-    },
-  });
   const { toasts } = useAppSelector(state => state.notifications);
   const { theme } = useAppSelector(state => state.ui);
   const dispatch = useAppDispatch();
@@ -30,19 +25,12 @@ const App = () => {
   };
 
   useEffect(() => {
-    Notification.requestPermission();
-  }, []);
-
-  useEffect(() => {
-    if (me) {
-      ROOT_SESSION_SPAN()?.setAttributes({
-        'user.publicId': me.publicId,
-        'user.name': me.name,
-        'user.email': me.email,
-        'user.isAdmin': me.isAdmin,
-      });
+    if (isWeb()) {
+      Notification.requestPermission();
     }
-  }, [me]);
+
+    initializeGlobalAudioProcessor().catch(console.error);
+  }, []);
 
   return (
     <HelmetProvider>
@@ -52,15 +40,13 @@ const App = () => {
         radius="full"
         appearance={theme}
       >
-        <MusicSourceProvider>
-          <BrowserRouter>
-            <AppRoutes/>
-          </BrowserRouter>
+        <Router>
+          <AppRoutes/>
+        </Router>
 
-          <ReactQueryDevtools/>
+        <ReactQueryDevtools/>
 
-          {/*<Toast.Root style={{ pointerEvents: 'none' }} />*/}
-        </MusicSourceProvider>
+        {/*<Toast.Root style={{ pointerEvents: 'none' }} />*/}
 
         {toasts.map((toast) => (
           <Toast.Root
@@ -83,7 +69,7 @@ const App = () => {
               asChild
             >
               <Button variant="ghost">
-                <Iconify icon="ion:close"/>
+                <CloseIcon/>
               </Button>
             </Toast.Action>
           </Toast.Root>

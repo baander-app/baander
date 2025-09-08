@@ -2,12 +2,14 @@
 
 namespace App\Http;
 
+use App\Http\Middleware\CheckOAuthScopes;
 use App\Http\Middleware\ConvertQueryTokenToHeaderMiddleware;
 use App\Http\Middleware\EncryptCookies;
 use App\Http\Middleware\OpenTelemetryRootSpan;
 use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Http\Middleware\TrimStrings;
 use App\Http\Middleware\TrustProxies;
+use App\Http\Middleware\ValidateOAuthToken;
 use App\Http\Middleware\VerifyCsrfToken;
 use App\Modules\OpenTelemetry\Middleware\HttpInstrumentationMiddleware;
 use App\Modules\OpenTelemetry\Middleware\TracerIdMiddleware;
@@ -97,5 +99,8 @@ class Kernel extends HttpKernel
         'signed'           => \App\Http\Middleware\ValidateSignature::class,
         'throttle'         => ThrottleRequests::class,
         'verified'         => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
+        'oauth'            => ValidateOAuthToken::class,
+        'oauth.scopes'     => CheckOAuthScopes::class,
+
     ];
 }

@@ -6,37 +6,26 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('oauth_clients', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignId('user_id')->nullable()->index();
             $table->text('name');
             $table->text('secret')->nullable();
             $table->text('provider')->nullable();
-            $table->text('redirect_uris');
-            $table->text('grant_types');
-            $table->boolean('revoked');
+            $table->text('redirect');
+            $table->boolean('personal_access_client')->default(false);
+            $table->boolean('password_client')->default(false);
+            $table->boolean('device_client')->default(false);
+            $table->boolean('confidential')->default(true);
+            $table->boolean('first_party')->default(false);
+            $table->boolean('revoked')->default(false);
             $table->timestampsTz();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('oauth_clients');
-    }
-
-    /**
-     * Get the migration connection name.
-     */
-    public function getConnection(): ?string
-    {
-        return $this->connection ?? config('passport.connection');
     }
 };

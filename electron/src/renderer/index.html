@@ -1,23 +1,10 @@
 <!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta
-            http-equiv="Content-Security-Policy"
-            content="
-        default-src 'self' blob: data:;
-        script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:;
-        style-src 'self' 'unsafe-inline';
-        img-src * data: blob:;
-        font-src 'self' data: blob:;
-        connect-src 'self' http: https: ws: wss: blob:;
-        media-src * data: blob:;
-        frame-src 'self' https:;
-        worker-src 'self' blob:;
-      "
-    />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Bånder Desktop</title>
+    <meta charset="UTF-8"/>
+    <!-- CSP will be injected dynamically by index.tsx -->
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Bånder</title>
 </head>
 <body>
 <div id="baanderapproot"></div>

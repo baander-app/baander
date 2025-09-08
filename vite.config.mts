@@ -7,6 +7,7 @@ import manifestSRI from 'vite-plugin-manifest-sri';
 import react from '@vitejs/plugin-react';
 import Info from 'unplugin-info/vite';
 import laravelTranslations from 'vite-plugin-laravel-translations';
+import Icons from 'unplugin-icons/vite';
 
 const ReactCompilerConfig = {};
 
@@ -44,13 +45,16 @@ export default defineConfig(config => {
         },
       }),
       laravelTranslations({ namespace: 'translation' }),
-      // visualizer({ open: false, template: 'flamegraph', filename: 'bundle-visualization.html' }),
-      // optimizeCssModules(),
       Info(),
+      Icons({
+        compiler: 'jsx',
+        jsx: 'react',
+        autoInstall: false,
+        scale: 1,
+        defaultClass: 'icon',
+      }),
       richSvg(),
       manifestSRI(),
-      // workaround for a warning with lottie https://github.com/airbnb/lottie-web/issues/2927
-      // inspect(),
     ],
     resolve: {
       alias: {

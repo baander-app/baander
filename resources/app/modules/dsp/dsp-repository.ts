@@ -11,7 +11,7 @@ type DspType = 'dynamics' | 'loudness' | 'convolver' | 'resampler' | 'spectral';
 const fetchAndImport = async (url: string) => {
   const src = await fetch(url).then(res => res.text());
   const blob = new Blob([src], { type: 'application/javascript' });
-  return await import(URL.createObjectURL(blob));
+  return await import(/* @vite-ignore */URL.createObjectURL(blob));
 }
 
 const dspJsFetcher = (type: DspType) => {

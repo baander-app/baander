@@ -29,6 +29,9 @@
         "*"
       ]
     },
+    "types": [
+      "unplugin-icons/types/react"
+    ]
   },
   "include": [
     "resources/app"

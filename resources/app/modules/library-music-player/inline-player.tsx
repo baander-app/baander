@@ -1,7 +1,5 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Flex } from '@radix-ui/themes';
-import { useMusicSource } from '@/providers/music-source-provider.tsx';
-import { PlayerStateInput } from '@/services/libraries/player-state.ts';
 import { PlayerControls } from '@/modules/library-music-player/components/player-controls/player-controls.tsx';
 import PlayerFacePlate from '@/modules/library-music-player/components/player-face-plate/player-face-plate.tsx';
 import {
@@ -10,13 +8,17 @@ import {
 import { LyricsProvider } from '@/ui/lyrics-viewer/providers/lyrics-provider.tsx';
 import { selectSong } from '@/store/music/music-player-slice.ts';
 import { useAppSelector } from '@/store/hooks.ts';
-import { useSongsShow } from '@/libs/api-client/gen/endpoints/song/song.ts';
 import {
-  usePlayerActions, usePlayerAudioElement, usePlayerBuffered,
+  attachAudioElement,
+  usePlayerActions,
+  usePlayerBuffered,
   usePlayerCurrentTime,
   usePlayerDuration,
   usePlayerIsPlaying,
 } from '@/modules/library-music-player/store';
+import { useShowByPublicIdSong } from '@/libs/api-client/gen/endpoints/library-resource/library-resource.ts';
+import { ensureStreamToken } from '@/services/auth/ensure-stream-token.ts';
+import { isElectron } from '@/utils/platform.ts';
 
 export function InlinePlayer() {
   const sourceSong = useAppSelector(selectSong);
@@ -24,20 +26,58 @@ export function InlinePlayer() {
   const duration = usePlayerDuration();
   const isPlaying = usePlayerIsPlaying();
   const currentTime = usePlayerCurrentTime();
-  const audioElement = usePlayerAudioElement();
-
+  const audioElement = useRef<HTMLAudioElement | null>(null);
+  const currentSong = useAppSelector(selectSong);
+  const [currentStreamUrl, setCurrentStreamUrl] = useState<string | null>(null);
   const {
-    authenticatedSource,
-  } = useMusicSource();
-
+    setSong,
+    seekTo,
+    togglePlayPause,
+  } = usePlayerActions();
   const canQuery = Boolean(sourceSong?.publicId);
-  const { data: song } = useSongsShow('music', sourceSong?.publicId!, undefined, {
+  const { data: song } = useShowByPublicIdSong(sourceSong?.publicId!, {
+    relations: 'album.cover'
+  }, {
     query: {
       enabled: canQuery,
-    }
+    },
   });
 
-  const { setSong } = usePlayerActions();
+  useEffect(() => {
+    if (!audioElement.current) {
+      audioElement.current = new Audio();
+      if (isElectron()) {
+        audioElement.current.crossOrigin = 'anonymous';
+      }
+
+      attachAudioElement(audioElement.current);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentSong?.streamUrl) {
+      ensureStreamToken().then(token => {
+        if (token) {
+          const url = `${currentSong.streamUrl}?_token=${token}`;
+          setCurrentStreamUrl(url);
+        } else {
+          setCurrentStreamUrl(null);
+        }
+      });
+    } else {
+      setCurrentStreamUrl(null);
+    }
+  }, [currentSong?.streamUrl]);
+
+  useEffect(() => {
+    if (audioElement.current && currentStreamUrl) {
+      audioElement.current.src = currentStreamUrl;
+      audioElement.current.play();
+    } else if (audioElement.current && !currentStreamUrl) {
+      audioElement.current.src = '';
+      audioElement.current.pause();
+    }
+  }, [currentStreamUrl]);
 
   useEffect(() => {
     if (song) {
@@ -47,34 +87,11 @@ export function InlinePlayer() {
     }
   }, [song]);
 
-  const {
-    seekTo,
-    togglePlayPause
-  } = usePlayerActions();
-
-  useEffect(() => {
-    let timerId = setInterval(() => {
-      if (!authenticatedSource) {
-        return;
-      }
-// @ts-expect-error
-      const data: PlayerStateInput = {
-        isPlaying,
-        volumePercent: 100,
-        progressMs: currentTime * 1000,
-      };
-    }, 5000);
-
-    return () => {
-      clearInterval(timerId);
-    };
-  }, []);
 
   const setProgress = (e: number) => {
-    if (!audioElement) return;
+    if (!audioElement.current) return;
 
-    audioElement.currentTime = e;
-
+    audioElement.current.currentTime = e;
     seekTo(e);
   };
 
@@ -114,8 +131,6 @@ export function InlinePlayer() {
           <PlayerMetaControls song={song}/>
         </Flex>
       </LyricsProvider>
-
     </>
   );
 }
-

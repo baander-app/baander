@@ -1,28 +1,23 @@
 import { SyntheticEvent } from 'react';
-import { Box, Button, Flex, Text, TextField } from '@radix-ui/themes';
+import { Button, Flex, Text, TextField } from '@radix-ui/themes';
 import styles from './login.module.scss';
 import { Form } from 'radix-ui';
 import { Link } from 'react-router-dom';
-import { useAuthStore } from '@/modules/auth/store';
+import * as Checkbox from '@radix-ui/react-checkbox';
+import { useRemember } from '@/modules/auth/remember/use-remember';
 
 export default function Login() {
-  const {login} = useAuthStore();
+  const { remember, setRemember, email, setEmail, handleSubmit } = useRemember();
 
   const onSubmit = async (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const formData = event.target;
-    // @ts-expect-error
-    const email = formData.email.value;
-    // @ts-expect-error
-    const password = formData.password.value;
+    const fd = new FormData(event.currentTarget);
+    const email = String(fd.get('email') ?? '');
+    const password = String(fd.get('password') ?? '');
+    const rememberMe = fd.get('remember') === '1';
 
-    login({
-      email,
-      password
-    }).then(res => {
-      console.log('res', res);
-    })
+    await handleSubmit({ email, password }, rememberMe);
   };
 
   return (
@@ -36,15 +31,18 @@ export default function Login() {
         </Text>
 
         <Form.Root className={styles.form} onSubmit={onSubmit}>
-          <Box className={styles.animationSection}>
-            {/*<VinylSpinAnimation className={styles.animation}/>*/}
-          </Box>
-
           <Flex direction="column" gap="3">
             <Form.Field className={styles.Field} name="email">
               <Form.Label className={styles.Label}>Email</Form.Label>
               <Form.Control asChild>
-                <TextField.Root type="email" radius="large" size="3" required>
+                <TextField.Root
+                  type="email"
+                  radius="large"
+                  size="3"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail((e.target as HTMLInputElement).value)}
+                >
                   <TextField.Slot></TextField.Slot>
                 </TextField.Root>
               </Form.Control>
@@ -59,6 +57,24 @@ export default function Login() {
               </Form.Control>
             </Form.Field>
 
+            <Form.Field name="remember" className={styles.Field}>
+              <Flex align="center" gap="2" className={styles.rememberRow}>
+                <Checkbox.Root
+                  id="remember"
+                  checked={remember}
+                  onCheckedChange={(v) => setRemember(!!v)}
+                  className={styles.CheckboxRoot}
+                  aria-label="Remember me"
+                >
+                  <Checkbox.Indicator className={styles.CheckboxIndicator} />
+                </Checkbox.Root>
+                <Form.Label className={styles.rememberLabel} htmlFor="remember">
+                  Remember me
+                </Form.Label>
+                <input type="hidden" name="remember" value={remember ? '1' : '0'} />
+              </Flex>
+            </Form.Field>
+
             <Form.Submit asChild>
               <Button variant="solid" size="3" className={styles.Button}>
                 Login
@@ -69,15 +85,11 @@ export default function Login() {
 
         <Flex direction="row" justify="between" className={styles.links}>
           <Link to="/auth/forgot-password">
-            <Text size="3">
-              Forgot Password?
-            </Text>
+            <Text size="3">Forgot Password?</Text>
           </Link>
 
           <Link to="/auth/create-account">
-            <Text size="3">
-              Create an Account
-            </Text>
+            <Text size="3">Create an Account</Text>
           </Link>
         </Flex>
       </Flex>

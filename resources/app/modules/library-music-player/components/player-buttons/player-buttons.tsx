@@ -1,8 +1,8 @@
 import React from 'react';
-import { Icon } from '@iconify/react';
 
 import styles from './player-controls.module.scss';
 import { MUSIC_CONTROL_ICON_SIZE } from '@/modules/library-music-player/constants.ts';
+import { Iconify } from '@/ui/icons/iconify.tsx';
 
 interface BaseControlProps extends React.HTMLAttributes<HTMLButtonElement> {
   iconName: string;
@@ -12,7 +12,7 @@ interface BaseControlProps extends React.HTMLAttributes<HTMLButtonElement> {
 function BaseControl({ iconName, iconSize = MUSIC_CONTROL_ICON_SIZE, ...props }: BaseControlProps) {
   return (
     <button className={styles.playerControl} {...props}>
-      <Icon icon={iconName} fontSize={iconSize} className={styles.icon}  />
+      <Iconify icon={iconName} fontSize={iconSize} className={styles.icon}  />
     </button>
   );
 }

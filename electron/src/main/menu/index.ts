@@ -1,4 +1,4 @@
-import { Menu, BrowserWindow, app, ipcMain, shell, session, dialog } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, session, shell } from 'electron';
 import { buildMenu } from './build-menu';
 import type { AppMenuContext } from './types';
 import { MenuActionId } from './ids';
@@ -114,40 +114,47 @@ function wireMenuActions(menu: Menu) {
   byId(MenuActionId.HelpReportIssue)!.click = () => shell.openExternal(issuesUrl);
 
   // Developer tools
-  const open = async (p: string) => { await shell.openPath(app.getPath(p as any)); };
+  if (!app.isPackaged) {
+    const open = async (p: string) => {
+      await shell.openPath(app.getPath(p as any));
+    };
 
-  byId(MenuActionId.DevOpenUserData)!.click = () => open('userData');
-  const openCache = byId(MenuActionId.DevOpenCache);
-  if (openCache) openCache.click = () => open('cache');
+    byId(MenuActionId.DevOpenUserData)!.click = () => open('userData');
+    const openCache = byId(MenuActionId.DevOpenCache);
+    if (openCache) openCache.click = () => open('cache');
 
-  const openLogs = byId(MenuActionId.DevOpenLogs);
-  if (openLogs) openLogs.click = () => open('logs');
+    const openLogs = byId(MenuActionId.DevOpenLogs);
+    if (openLogs) openLogs.click = () => open('logs');
 
-  const clearStore = byId(MenuActionId.DevClearStore);
-  if (clearStore) clearStore.click = async () => {
-    const ses = session.defaultSession;
-    if (ses) {
-      await ses.clearCache();
-      await ses.clearStorageData({
-        storages: ['cookies', 'localstorage', 'serviceworkers', 'websql', 'indexdb'],
+    const clearStore = byId(MenuActionId.DevClearStore);
+    if (clearStore) clearStore.click = async () => {
+      const ses = session.defaultSession;
+      if (ses) {
+        await ses.clearCache();
+        await ses.clearStorageData({
+          storages: ['cookies', 'localstorage', 'serviceworkers', 'websql', 'indexdb'],
+        });
+      }
+      BrowserWindow.getFocusedWindow()?.reload();
+    };
+
+    const showConfig = byId(MenuActionId.DevShowConfigWindow);
+    if (showConfig) showConfig.click = () => {
+      createConfigWindow();
+    };
+
+    const resetServer = byId(MenuActionId.DevResetServerUrl);
+    if (resetServer) resetServer.click = () => {
+      getServerUrl().then(url => {
+        if (url) {
+          setServerUrl('').then(() => {
+            app.relaunch();
+            app.exit(0);
+          });
+        }
       });
-    }
-    BrowserWindow.getFocusedWindow()?.reload();
-  };
-
-  const showConfig = byId(MenuActionId.DevShowConfigWindow);
-  if (showConfig) showConfig.click = () => {
-    createConfigWindow();
-  };
-
-  const resetServer = byId(MenuActionId.DevResetServerUrl);
-  if (resetServer) resetServer.click = () => {
-    if (getServerUrl()) {
-      setServerUrl('');
-    }
-    app.relaunch();
-    app.exit(0);
-  };
+    };
+  }
 }
 
 function handleMenuAction(actionId: string) {
@@ -226,9 +233,14 @@ function handleMenuAction(actionId: string) {
     case MenuActionId.DevShowConfigWindow:
       return createConfigWindow();
     case MenuActionId.DevResetServerUrl:
-      if (getServerUrl()) setServerUrl('');
-      app.relaunch();
-      app.exit(0);
+      getServerUrl().then(url => {
+        if (url) {
+          setServerUrl('').then(() => {
+            app.relaunch();
+            app.exit(0);
+          });
+        }
+      });
       return;
 
     default:
@@ -243,4 +255,8 @@ export function refreshApplicationMenu(nextState: Partial<AppMenuContext['state'
   const menu = buildMenu(currentCtx);
   Menu.setApplicationMenu(menu);
   wireMenuActions(menu);
+}
+
+export function dispatchMenuAction(actionId: string) {
+  return handleMenuAction(actionId);
 }

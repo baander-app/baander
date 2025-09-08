@@ -13,7 +13,7 @@ i18n
       escapeValue: false, // not needed for react as it escapes by default
     },
     // @ts-ignore
-    resources: LARAVEL_TRANSLATIONS
+    resources: window?.['LARAVEL_TRANSLATIONS'] ?? undefined
   });
 
 export default i18n;

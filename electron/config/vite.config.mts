@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import electron from 'vite-plugin-electron/simple';
 import Info from 'unplugin-info/vite';
 import richSvg from 'vite-plugin-react-rich-svg';
+import Icons from 'unplugin-icons/vite';
 
 const ReactCompilerConfig = {};
 const mainEntry = resolve(process.cwd(), 'electron/src/main/index.ts');
@@ -24,6 +25,9 @@ export default defineConfig(({ mode }) => {
   return {
     envDir: process.cwd(),
     root: resolve(process.cwd(), 'electron/src/renderer'),
+    // Use absolute base in dev (Vite server), relative base in production (file://)
+    base: mode === 'development' ? '/' : './',
+    publicDir: resolve(process.cwd(), 'electron/public'),
     server: {
       port: 5175,
       fs: {
@@ -37,8 +41,9 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: resolve(process.cwd(), 'electron/dist'),
       emptyOutDir: true,
-      sourcemap: true,
+      sourcemap: false,
       target: ['chrome128', 'esnext'],
+      minify: 'esbuild',
       rollupOptions: {
         input: {
           main: resolve(process.cwd(), 'electron/src/renderer/index.html'),
@@ -46,7 +51,9 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
-
+    esbuild: {
+      // drop: ['console', 'debugger'],
+    },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('../../resources/app', import.meta.url)),
@@ -61,6 +68,15 @@ export default defineConfig(({ mode }) => {
       }),
       richSvg(),
       Info(),
+      Icons({
+        compiler: 'jsx',
+        jsx: 'react',
+        autoInstall: false,            // set true if you want it to auto-add @iconify-json/* on demand
+        // Optional niceties:
+        scale: 1,                      // 1 = 1em; can be number or string like '1.2em'
+        defaultClass: 'icon',
+        // defaultStyle: 'vertical-align: -0.125em;', // handy for baseline alignment
+      }),
       electron({
         main: {
           entry: mainEntry,
@@ -69,7 +85,10 @@ export default defineConfig(({ mode }) => {
             build: {
               outDir: resolve(process.cwd(), 'electron/dist-electron/main'),
               emptyOutDir: true,
-              sourcemap: true,
+              sourcemap: false,
+              rollupOptions: {
+                external: ['@napi-rs/keyring'],
+              },
             },
             define: {
               ...defineForNode,
@@ -77,7 +96,7 @@ export default defineConfig(({ mode }) => {
             },
           },
           onstart({ startup }) {
-            startup();
+            startup(['.', '--remote-debugging-port=9222'])
           },
         },
         preload: {
@@ -87,9 +106,10 @@ export default defineConfig(({ mode }) => {
             build: {
               outDir: resolve(process.cwd(), 'electron/dist-electron'),
               emptyOutDir: false,
-              sourcemap: true,
+              sourcemap: false,
               // Build preload as CommonJS and name it preload.cjs
               rollupOptions: {
+                external: ['@napi-rs/keyring'],
                 output: {
                   format: 'cjs',
                   entryFileNames: 'preload.cjs',

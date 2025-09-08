@@ -216,7 +216,7 @@ export class AudioProcessor {
   private initializeSharedBuffers() {
     try {
       if (typeof SharedArrayBuffer !== 'undefined') {
-        this.sharedFrequencyBuffer = new SharedArrayBuffer(this.FFT_SIZE);
+        this.sharedFrequencyBuffer = new SharedArrayBuffer(this.FFT_SIZE / 2);
         this.sharedTimeDomainBuffer = new SharedArrayBuffer(this.TIME_SIZE);
         this.frequencyData = new Uint8Array(this.sharedFrequencyBuffer);
         this.timeDomainData = new Uint8Array(this.sharedTimeDomainBuffer);
@@ -228,7 +228,7 @@ export class AudioProcessor {
     } catch {
       this.sharedFrequencyBuffer = null;
       this.sharedTimeDomainBuffer = null;
-      this.frequencyData = new Uint8Array(this.FFT_SIZE);
+      this.frequencyData = new Uint8Array(this.FFT_SIZE / 2);
       this.timeDomainData = new Uint8Array(this.TIME_SIZE);
       this.frequencyData.fill(20);
       this.timeDomainData.fill(128);
@@ -311,11 +311,10 @@ export class AudioProcessor {
       } else {
         this.analysisWorker.postMessage({
           type: 'init',
-          length: { freq: this.FFT_SIZE, time: this.TIME_SIZE },
+          length: { freq: this.FFT_SIZE / 2, time: this.TIME_SIZE },
         });
       }
 
-      // Send spectral features WASM to worker
       this.sendSpectralWasmToWorker();
 
       this.workerReady = true;

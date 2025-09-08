@@ -4,6 +4,8 @@ import { useForm } from 'react-hook-form';
 import { Iconify } from '@/ui/icons/iconify.tsx';
 import { useEffect } from 'react';
 import { authPasskeyRegister, authPasskeyRegisterOption } from '@/libs/api-client/gen/endpoints/auth/auth.ts';
+import KeyOutline from '~icons/ion/key-outline';
+
 
 type FormValues = {
   name: string,
@@ -42,7 +44,7 @@ export function CreatePasskey() {
           {...form.register('name')}
         >
           <TextField.Slot>
-            <Iconify icon="ion:key-outline" />
+            <KeyOutline />
           </TextField.Slot>
         </TextField.Root>
 
