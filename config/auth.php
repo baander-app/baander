@@ -188,7 +188,7 @@ return [
         | before it is considered suspicious and additional verification
         | may be required.
         */
-        'max_ip_changes' => 10,
+        'max_ip_changes' => env('TOKEN_BINDING_MAX_IP_CHANGES', 10),
 
         /*
         | Geographic Change Cooldown
@@ -197,7 +197,7 @@ return [
         | change before they can authenticate from another location. This
         | helps prevent rapid geographic token abuse.
         */
-        'geo_change_cooldown_seconds' => 3600, // 1 hour
+        'geo_change_cooldown_seconds' => (int)env('TOKEN_BINDING_GEO_CHANGE_COOLDOWN_SECONDS', 3600), // 1 hour
 
         /*
         | Concurrent IP Time Window
@@ -205,7 +205,7 @@ return [
         | The time window in seconds during which concurrent IP usage is
         | monitored. IPs used within this window are considered concurrent.
         */
-        'concurrent_ip_window_seconds' => 300, // 5 minutes
+        'concurrent_ip_window_seconds' => (int)env('TOKEN_BINDING_CONCURRENT_IP_WINDOWS_SECONDS', 300), // 5 minutes
 
         /*
         | Maximum Concurrent IPs
@@ -214,7 +214,7 @@ return [
         | with the same token. Setting this to 1 enforces strict single-IP
         | usage, which provides maximum security but may impact user experience.
         */
-        'max_concurrent_ips' => 1, // Only allow 1 concurrent IP (strict)
+        'max_concurrent_ips' => (int)env('TOKEN_BINDING_MAX_CONCURRENT_IPS', 1), // Only allow 1 concurrent IP (strict)
 
         /*
         | Minimum IP Change Interval
@@ -222,7 +222,7 @@ return [
         | The minimum number of minutes that must pass between IP address
         | changes for the same token. This prevents rapid IP switching.
         */
-        'min_ip_change_interval_minutes' => 5, // Minimum 5 minutes between IP changes
+        'min_ip_change_interval_minutes' => (int)env('TOKEN_BINDING_MIN_IP_CHANGE_INTERVAL_MINUTES', 5), // Minimum 5 minutes between IP changes
 
         /*
         | Suspicious Geographic Jump Detection
@@ -231,6 +231,6 @@ return [
         | suspicious. Geographic changes within this timeframe will trigger
         | additional security measures.
         */
-        'suspicious_geo_jump_hours' => 2, // Country changes within 2 hours are suspicious
+        'suspicious_geo_jump_hours' => (int)env('TOKEN_BINDING_SUSPICIOUS_GEO_JUMP_HOURS', 2), // Country changes within 2 hours are suspicious
     ],
 ];
