@@ -31,7 +31,7 @@ return [
     | users are actually retrieved out of your database or other storage
     | mechanisms used by this application to persist your user's data.
     |
-    | Supported: "session"
+    | Supported: "session", "oauth", "sanctum"
     |
     */
 
@@ -65,6 +65,9 @@ return [
     | If you have multiple user tables or models you may configure multiple
     | sources which represent each model / table. These sources may then
     | be assigned to any extra authentication guards you have defined.
+    |
+    | The 'password_fallback' option allows the authentication system to
+    | fall back to password-based authentication when other methods fail.
     |
     | Supported: "database", "eloquent"
     |
@@ -122,43 +125,112 @@ return [
     |
     */
 
-    'password_timeout'                  => 10800,
-
+    'password_timeout' => 10800,
 
     /*
     |--------------------------------------------------------------------------
-    | Use signed email verification URL
+    | Email Verification Settings
     |--------------------------------------------------------------------------
     |
-    | Whether or not to sign the email verification URL
-    | like the standard Laravel implementation does.
-    | If set to `true`, additional `expires` and `signature` parameters
-    | will be added to the URL. When verifying the email through the API
-    | both those fields are required as well.
-    | It defaults to `false` for backwards compatibility.
+    | Configure email verification behavior for your application.
     |
+    */
+
+    /*
+    | Use Signed Email Verification URL
+    |
+    | Whether or not to sign the email verification URL like the standard
+    | Laravel implementation does. If set to `true`, additional `expires`
+    | and `signature` parameters will be added to the URL. When verifying
+    | the email through the API both those fields are required as well.
+    | It defaults to `false` for backwards compatibility.
     */
     'use_signed_email_verification_url' => true,
 
     /*
+    | Email Verification Link Expiration
+    |
+    | The number of minutes that email verification links remain valid.
+    | After this time expires, users will need to request a new verification link.
+    */
+    'email_verification_link_expires_in_minutes' => 60,
+
+    /*
     |--------------------------------------------------------------------------
-    | Identification
+    | User Identification
     |--------------------------------------------------------------------------
     |
-    | Configure the credential fields by which the user will be identified.
+    | Configure the credential field by which users will be identified during
+    | authentication. This field is used for login and user lookup operations.
+    |
     | Default: email
+    |
     */
 
     'user_identifier_field_name' => 'email',
 
-    'email_verification_link_expires_in_minutes' => 60,
+    /*
+    |--------------------------------------------------------------------------
+    | Token Binding Security
+    |--------------------------------------------------------------------------
+    |
+    | These settings control token binding security measures to prevent
+    | token abuse and detect suspicious authentication patterns. These
+    | settings help protect against account takeovers and token theft.
+    |
+    */
 
     'token_binding' => [
-        'max_ip_changes'                 => 10,
-        'geo_change_cooldown_seconds'    => 3600, // 1 hour
-        'concurrent_ip_window_seconds'   => 300, // 5 minutes
-        'max_concurrent_ips'             => 1, // Only allow 1 concurrent IP (strict)
+        /*
+        | Maximum IP Address Changes
+        |
+        | The maximum number of IP address changes allowed for a token
+        | before it is considered suspicious and additional verification
+        | may be required.
+        */
+        'max_ip_changes' => 10,
+
+        /*
+        | Geographic Change Cooldown
+        |
+        | The number of seconds a user must wait after a geographic location
+        | change before they can authenticate from another location. This
+        | helps prevent rapid geographic token abuse.
+        */
+        'geo_change_cooldown_seconds' => 3600, // 1 hour
+
+        /*
+        | Concurrent IP Time Window
+        |
+        | The time window in seconds during which concurrent IP usage is
+        | monitored. IPs used within this window are considered concurrent.
+        */
+        'concurrent_ip_window_seconds' => 300, // 5 minutes
+
+        /*
+        | Maximum Concurrent IPs
+        |
+        | The maximum number of IP addresses that can be used concurrently
+        | with the same token. Setting this to 1 enforces strict single-IP
+        | usage, which provides maximum security but may impact user experience.
+        */
+        'max_concurrent_ips' => 1, // Only allow 1 concurrent IP (strict)
+
+        /*
+        | Minimum IP Change Interval
+        |
+        | The minimum number of minutes that must pass between IP address
+        | changes for the same token. This prevents rapid IP switching.
+        */
         'min_ip_change_interval_minutes' => 5, // Minimum 5 minutes between IP changes
-        'suspicious_geo_jump_hours'      => 2, // Country changes within 2 hours are suspicious
+
+        /*
+        | Suspicious Geographic Jump Detection
+        |
+        | The number of hours within which country changes are considered
+        | suspicious. Geographic changes within this timeframe will trigger
+        | additional security measures.
+        */
+        'suspicious_geo_jump_hours' => 2, // Country changes within 2 hours are suspicious
     ],
 ];
