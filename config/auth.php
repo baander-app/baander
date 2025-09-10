@@ -109,8 +109,8 @@ return [
         'users' => [
             'provider' => 'users',
             'table'    => 'password_reset_tokens',
-            'expire'   => 60,
-            'throttle' => 60,
+            'expire'   => env('PASSWORD_RESET_EXPIRE', 60),
+            'throttle' => env('PASSWORD_RESET_THROTTLE', 60),
         ],
     ],
 
@@ -125,7 +125,7 @@ return [
     |
     */
 
-    'password_timeout' => 10800,
+    'password_timeout' => env('PASSWORD_TIMEOUT', 10800),
 
     /*
     |--------------------------------------------------------------------------
