@@ -1,4 +1,4 @@
-FROM debian:bookworm AS builder
+FROM debian:bookworm-slim AS builder
 
 RUN set -xe \
     && DEBIAN_FRONTEND=noninteractive apt-get update -qq \
@@ -11,12 +11,14 @@ RUN set -xe \
       python-is-python3 \
       ninja-build \
       meson \
-      git
+      git \
+    && update-ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 WORKDIR /usr/src
 
 RUN set -xe \
-    && update-ca-certificates \
     && git clone --depth 1 https://github.com/markus-perl/ffmpeg-build-script.git \
     && cd ffmpeg-build-script \
     && ./build-ffmpeg --enable-gpl-and-non-free --build --full-static
