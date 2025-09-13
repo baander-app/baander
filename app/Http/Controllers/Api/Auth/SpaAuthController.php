@@ -98,7 +98,7 @@ class SpaAuthController extends Controller
      * }
      */
     #[Get('authorize', 'oauth.spa.authorize')]
-    public function authorize(Request $request): JsonResponse
+    public function authorizeRequest(Request $request)
     {
         $psrRequest = $this->psrFactory->createRequest($request);
         $psrResponse = $this->psrFactory->createResponse(new HttpFoundationResponse());
