@@ -14,7 +14,6 @@ class AppConfigData extends Data
         public bool $debug,
         public string $locale,
         public string $version,
-        public TracingConfigData $tracing,
     ) {
     }
 }

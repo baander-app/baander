@@ -1,9 +1,8 @@
-# Multi-stage build for better maintainability
-FROM postgres:17-bookworm AS base
+FROM postgres:18-bookworm AS base
 
 # Set versions as build args for easy updates
-ARG PGROONGA_VERSION=4.0.1-1
-ARG POSTGRESQL_VERSION=17
+ARG PGROONGA_VERSION=4.0.5-1
+ARG POSTGRESQL_VERSION=18
 
 ENV PGROONGA_VERSION=${PGROONGA_VERSION}
 ENV POSTGRESQL_VERSION=${POSTGRESQL_VERSION}

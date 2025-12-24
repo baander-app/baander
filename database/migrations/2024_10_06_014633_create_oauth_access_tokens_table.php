@@ -9,10 +9,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('oauth_access_tokens', function (Blueprint $table) {
-            $table->uuid('id')->primary();
+            $table->id()->primary();
             $table->text('token_id')->unique()->index();
-            $table->uuid('user_id')->nullable()->index();
-            $table->uuid('client_id');
+            $table->bigInteger('user_id')->nullable()->index();
+            $table->bigInteger('client_id');
             $table->text('name')->nullable();
             $table->json('scopes')->nullable();
             $table->boolean('revoked')->default(false);

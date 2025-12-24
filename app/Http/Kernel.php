@@ -5,14 +5,11 @@ namespace App\Http;
 use App\Http\Middleware\CheckOAuthScopes;
 use App\Http\Middleware\ConvertQueryTokenToHeaderMiddleware;
 use App\Http\Middleware\EncryptCookies;
-use App\Http\Middleware\OpenTelemetryRootSpan;
 use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Http\Middleware\TrimStrings;
 use App\Http\Middleware\TrustProxies;
 use App\Http\Middleware\ValidateOAuthToken;
 use App\Http\Middleware\VerifyCsrfToken;
-use App\Modules\OpenTelemetry\Middleware\HttpInstrumentationMiddleware;
-use App\Modules\OpenTelemetry\Middleware\TracerIdMiddleware;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull;
@@ -40,10 +37,7 @@ class Kernel extends HttpKernel
         PreventRequestsDuringMaintenance::class,
         ValidatePostSize::class,
         TrimStrings::class,
-        OpenTelemetryRootSpan::class,
         ConvertEmptyStringsToNull::class,
-        HttpInstrumentationMiddleware::class,
-        TracerIdMiddleware::class,
         //        \App\Http\Middleware\SecurityHeadersMiddleware::class,
     ];
 

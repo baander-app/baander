@@ -2,8 +2,6 @@
 
 use App\Modules\Logging\LoggerServiceProvider;
 use App\Modules\Metadata\MetadataServiceProvider;
-use App\Modules\OpenTelemetry\Instrumentation\LaravelInstrumentation;
-use App\Modules\OpenTelemetry\OpenTelemetryServiceProvider;
 use App\Modules\Queue\QueueMonitorProvider;
 use App\Modules\Recommendation\RecommendationServiceProvider;
 use Illuminate\Support\Facades\Facade;
@@ -182,8 +180,6 @@ return [
         App\Modules\BlurHash\BlurHashServiceProvider::class,
         LoggerServiceProvider::class,
         RecommendationServiceProvider::class,
-        OpenTelemetryServiceProvider::class,
-        LaravelInstrumentation::class,
         App\Providers\FortifyServiceProvider::class,
         App\Modules\TextSimilarity\TextSimilarityServiceProvider::class,
 
@@ -215,6 +211,4 @@ return [
 
     'aliases' => Facade::defaultAliases()->merge([
     ])->toArray(),
-
-    'otel_enabled' => env('OTEL_ENABLED', true),
 ];

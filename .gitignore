@@ -18,6 +18,8 @@ yarn-error.log
 /.idea
 /.vscode
 bundle-visualization.html
+*.cer
+*.pem*.Identifier
 
 # Project exclude paths
 /storage/testlibrary/

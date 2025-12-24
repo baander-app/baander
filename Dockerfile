@@ -1,10 +1,5 @@
 # Base stage with common dependencies
-FROM php:8-zts AS base
-
-# Copy FFmpeg binaries from static build
-COPY --from=martinjuul/ffmpeg-baander-static /usr/src/ffmpeg-build-script/workspace/bin/ffmpeg /bin/ffmpeg
-COPY --from=martinjuul/ffmpeg-baander-static /usr/src/ffmpeg-build-script/workspace/bin/ffprobe /bin/ffprobe
-COPY --from=martinjuul/ffmpeg-baander-static /usr/src/ffmpeg-build-script/workspace/bin/ffplay /bin/ffplay
+FROM php:8.4.16-zts-bookworm AS base
 
 # Build arguments and environment variables
 ARG BUILD_ARGUMENT_ENV=dev
@@ -14,7 +9,7 @@ ARG INSIDE_DOCKER_CONTAINER=1
 ARG ESSENTIA_VERSION=2.1_beta5
 
 ARG XDEBUG_CONFIG=main
-ARG XDEBUG_VERSION=3.4.4
+ARG XDEBUG_VERSION=3.5.0
 
 ENV XDEBUG_CONFIG=$XDEBUG_CONFIG \
     XDEBUG_VERSION=$XDEBUG_VERSION
@@ -47,6 +42,7 @@ RUN set -xe && \
         libchromaprint-dev \
         ca-certificates \
         cron \
+        ffmpeg \
         curl \
         wget \
         nano \
@@ -172,10 +168,6 @@ RUN set -xe \
     && pecl bundle -d /usr/local/src/pecl swoole \
     && docker-php-ext-configure /usr/local/src/pecl/swoole --enable-swoole-thread --enable-sockets --enable-swoole-curl --enable-cares --enable-swoole-pgsql \
     && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/swoole \
-    # opentelemetry
-    && pecl bundle -d /usr/local/src/pecl opentelemetry \
-    && docker-php-ext-configure /usr/local/src/pecl/opentelemetry \
-    && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/opentelemetry \
     && rm -rf /usr/local/src/pecl \
     && rm -rf /tmp/* \
     && rm -rf /var/list/apt/* \

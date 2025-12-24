@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Baander;
 use App\Http\Data\AppConfig\AppConfigData;
-use App\Http\Data\AppConfig\TracingConfigData;
 use Illuminate\Support\Facades\Cache;
 
 class AppConfigService
@@ -40,19 +39,6 @@ class AppConfigService
             debug: config('app.debug'),
             locale: config('app.locale'),
             version: Baander::VERSION,
-            tracing: $this->getTracingConfig(),
-        );
-    }
-
-    /**
-     * Get tracing configuration
-     */
-    private function getTracingConfig(): TracingConfigData
-    {
-        return new TracingConfigData(
-            enabled: config('otel.frontend.enabled', false),
-            url: config('otel.frontend.url', null),
-            token: config('otel.frontend.token', null),
         );
     }
 

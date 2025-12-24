@@ -12,12 +12,6 @@ interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
-interface TracingConfigData {
-  enabled: boolean;
-  url: string;
-  token: string;
-}
-
 declare interface Window {
   BaanderAppConfig: {
     name: string;
@@ -27,7 +21,6 @@ declare interface Window {
     debug: boolean;
     locale: string;
     version: string;
-    tracing: TracingConfigData;
   };
 
   BaanderElectron: {

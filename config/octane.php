@@ -1,8 +1,5 @@
 <?php
 
-use App\Octane\Listeners\TelemetryFlushListener;
-use App\Octane\Listeners\TelemetryShutdownListener;
-use App\Octane\TelemetryTaskHandler;
 use Laravel\Octane\Contracts\OperationTerminated;
 use Laravel\Octane\Events\RequestHandled;
 use Laravel\Octane\Events\RequestReceived;
@@ -108,12 +105,10 @@ return [
 
         RequestTerminated::class => [
             FlushUploadedFiles::class,
-            TelemetryFlushListener::class,
         ],
 
         TaskReceived::class => [
             ...Octane::prepareApplicationForNextOperation(),
-            TelemetryTaskHandler::class,
         ],
 
         TaskTerminated::class => [
@@ -143,7 +138,6 @@ return [
 
         WorkerStopping::class => [
             CloseMonologHandlers::class,
-            TelemetryShutdownListener::class,
         ],
     ],
 

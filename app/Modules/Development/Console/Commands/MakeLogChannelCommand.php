@@ -7,11 +7,11 @@ use Illuminate\Support\Str;
 
 class MakeLogChannelCommand extends Command
 {
-    protected $signature = 'make:log-channel {name} {--types=* : The channel types to create (file, otel, daily)}';
+    protected $signature = 'make:log-channel {name} {--types=* : The channel types to create (file, daily)}';
 
     protected $description = 'Create logging channels with specified types and a stack channel that combines them all';
 
-    private array $availableTypes = ['file', 'otel', 'daily'];
+    private array $availableTypes = ['file', 'daily'];
 
     public function handle(): int
     {
@@ -111,7 +111,6 @@ class MakeLogChannelCommand extends Command
     {
         return match ($type) {
             'file' => $this->generateFileChannel($channelName, $baseName),
-            'otel' => $this->generateOtelChannel($channelName),
             'daily' => $this->generateDailyChannel($channelName, $baseName),
         };
     }
@@ -124,19 +123,6 @@ class MakeLogChannelCommand extends Command
             'path'                 => storage_path('logs/{$baseName}.log'),
             'level'                => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
-        ],
-PHP;
-    }
-
-    private function generateOtelChannel(string $channelName): string
-    {
-        return <<<PHP
-        '{$channelName}' => [
-            'driver' => 'custom',
-            'via'    => OpenTelemetryMonolog::class,
-            'name'   => '{$channelName}',
-            'level'  => LogLevel::DEBUG,
-            'bubble' => true,
         ],
 PHP;
     }

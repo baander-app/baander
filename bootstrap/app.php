@@ -1,7 +1,5 @@
 <?php
 
-$otel = require_once __DIR__ . '/otel_provider.php';
-
 /*
 |--------------------------------------------------------------------------
 | Create The Application
