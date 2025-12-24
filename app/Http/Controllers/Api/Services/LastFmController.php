@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Integrations\LastFm\LastFmClient;
 use App\Models\ThirdPartyCredential;
 use App\Models\TokenAbility;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -14,6 +15,7 @@ use Spatie\RouteAttributes\Attributes\{Get, Post, Prefix};
 
 
 #[Prefix('services/lastfm')]
+#[Group('Connections')]
 class LastFmController extends Controller
 {
     public function __construct(

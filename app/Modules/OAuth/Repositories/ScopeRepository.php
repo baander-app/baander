@@ -29,8 +29,15 @@ class ScopeRepository implements ScopeRepositoryInterface
 
     public function finalizeScopes(array $scopes, $grantType, ClientEntityInterface $clientEntity, $userIdentifier = null, ?string $authCodeId = null): array
     {
-        // Here you can implement scope finalization logic
-        // For now, we'll just return the requested scopes
-        return $scopes;
+        // Validate that all requested scopes exist
+        $validScopes = [];
+        foreach ($scopes as $scope) {
+            $scopeEntity = $this->getScopeEntityByIdentifier($scope->getIdentifier());
+            if ($scopeEntity) {
+                $validScopes[] = $scopeEntity;
+            }
+        }
+
+        return $validScopes;
     }
 }

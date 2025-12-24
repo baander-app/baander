@@ -40,7 +40,7 @@ return [
 
     'device_code_ttl' => env('OAUTH_DEVICE_CODE_TTL', 600), // 10 minutes in seconds
     'device_code_interval' => env('OAUTH_DEVICE_CODE_INTERVAL', 5), // 5 seconds
-    'device_verification_uri' => env('OAUTH_DEVICE_VERIFICATION_URI', env('APP_URL') . '/device'),
+    'device_verification_uri' => env('OAUTH_DEVICE_VERIFICATION_URI', env('APP_URL') . '/oauth/device/verify'),
 
     /*
     |--------------------------------------------------------------------------

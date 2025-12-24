@@ -25,7 +25,8 @@ class ClientRepository implements ClientRepositoryInterface
         $clientEntity->setIdentifier($client->public_id);
         $clientEntity->setName($client->name);
         $clientEntity->setRedirectUri($client->redirect);
-        $clientEntity->setConfidential($client->first_party);
+        $clientEntity->setConfidential($client->confidential);
+        $clientEntity->setFirstParty($client->first_party);
 
         return $clientEntity;
     }
@@ -40,16 +41,17 @@ class ClientRepository implements ClientRepositoryInterface
             return false;
         }
 
-        // For device code flow, we don't validate client secret for public clients
+        // Device code flow clients are always public (no secret)
         if ($grantType === 'urn:ietf:params:oauth:grant-type:device_code') {
-            return !$client->first_party || hash_equals($client->secret, $clientSecret ?? '');
+            return true;
         }
 
-        // For confidential clients, always validate secret
-        if ($client->first_party) {
-            return hash_equals($client->secret, $clientSecret ?? '');
+        // For confidential clients, validate secret
+        if ($client->confidential) {
+            return $clientSecret && hash_equals($client->secret, $clientSecret);
         }
 
+        // Public clients don't require secret
         return true;
     }
 }

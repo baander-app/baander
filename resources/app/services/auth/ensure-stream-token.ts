@@ -1,5 +1,5 @@
-import { Token } from '@/services/auth/token.ts';
-import { refreshToken } from '@/services/auth/refresh-token.service.ts';
+import { Token } from '@app/services/auth/token.ts';
+import { refreshToken } from '@app/services/auth/refresh-token.service.ts';
 
 let inFlightStream: Promise<void> | undefined;
 let lastStreamRefreshAt = 0;

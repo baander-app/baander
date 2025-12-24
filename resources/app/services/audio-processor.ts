@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { getDynamics, getLoudness, getSpectralFeatures } from '@/modules/dsp/dsp-repository.ts';
+import { getDynamics, getLoudness, getSpectralFeatures } from '@app/modules/dsp/dsp-repository.ts';
 
 interface WorkletAnalysisData {
   type: 'analysis';

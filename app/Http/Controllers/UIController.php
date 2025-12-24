@@ -20,4 +20,12 @@ class UIController
             'oAuthConfig' => Auth::check() ? $this->appConfigService->getOAuthConfig() : [],
         ]);
     }
+
+    public function getDocs()
+    {
+        return view('docs', [
+            'appConfigData' => $this->appConfigService->getAppConfig()->toArray(),
+            'oAuthConfig' => Auth::check() ? $this->appConfigService->getOAuthConfig() : [],
+        ]);
+    }
 }

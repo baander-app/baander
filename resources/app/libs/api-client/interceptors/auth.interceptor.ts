@@ -1,8 +1,8 @@
 import { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
-import { Token } from '@/services/auth/token.ts';
-import { refreshToken } from '@/services/auth/refresh-token.service.ts';
-import { tokenBindingService } from '@/services/auth/token-binding.service.ts';
-import { HeaderExt } from '@/models/header-ext.ts';
+import { Token } from '@app/services/auth/token.ts';
+import { refreshToken } from '@app/services/auth/refresh-token.service.ts';
+import { tokenBindingService } from '@app/services/auth/token-binding.service.ts';
+import { HeaderExt } from '@app/models/header-ext.ts';
 
 interface AuthRequest extends InternalAxiosRequestConfig {
   _didRetry?: boolean;

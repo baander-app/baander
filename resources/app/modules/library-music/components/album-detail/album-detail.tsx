@@ -1,17 +1,17 @@
-import { Cover } from '@/modules/library-music/components/artwork/cover';
+import { Cover } from '@app/modules/library-music/components/artwork/cover';
 import { Box, Card, Flex, ScrollArea, Skeleton, Text } from '@radix-ui/themes';
-import { AlertLoadingError } from '@/ui/alerts/alert-loading-error.tsx';
-import { useAppDispatch } from '@/store/hooks.ts';
-import { setQueueAndSong } from '@/store/music/music-player-slice.ts';
-import { TrackRow } from '@/ui/music/track-row/track-row.tsx';
+import { AlertLoadingError } from '@app/ui/alerts/alert-loading-error.tsx';
+import { useAppDispatch } from '@app/store/hooks.ts';
+import { setQueueAndSong } from '@app/store/music/music-player-slice.ts';
+import { TrackRow } from '@app/ui/music/track-row/track-row.tsx';
 
 import styles from './album-detail.module.scss';
-import { usePathParam } from '@/hooks/use-path-param.ts';
-import { LibraryParams } from '@/modules/library-music/routes/_routes.tsx';
-import { generateBlurhashBackgroundImage } from '@/libs/blurhash/generate-bg-image.ts';
+import { usePathParam } from '@app/hooks/use-path-param.ts';
+import { LibraryParams } from '@app/modules/library-music/routes/_routes.tsx';
+import { generateBlurhashBackgroundImage } from '@app/libs/blurhash/generate-bg-image.ts';
 import { useCallback } from 'react';
-import { useAlbumShow } from '@/libs/api-client/gen/endpoints/album/album.ts';
-import { SongResource } from '@/libs/api-client/gen/models';
+import { useAlbumShow } from '@app/libs/api-client/gen/endpoints/album/album.ts';
+import { SongResource } from '@app/libs/api-client/gen/models';
 
 interface AlbumDetailProps extends React.HTMLAttributes<HTMLDivElement> {
   albumSlug: string;

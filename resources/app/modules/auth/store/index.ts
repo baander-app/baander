@@ -4,9 +4,9 @@ import {
   login as loginFn,
   logout as logoutFn,
   revokeAllTokensExceptCurrent as revokeOthersFn,
-} from '@/services/auth/auth.service.ts';
-import { Token } from '@/services/auth/token.ts';
-import { tokenBindingService } from '@/services/auth/token-binding.service.ts';
+} from '@app/services/auth/auth.service.ts';
+import { Token } from '@app/services/auth/token.ts';
+import { tokenBindingService } from '@app/services/auth/token-binding.service.ts';
 
 type AuthStatus = 'idle' | 'loading' | 'authenticated' | 'unauthenticated';
 

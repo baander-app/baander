@@ -1,8 +1,8 @@
 import React, { RefObject, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { noop } from '@/utils/noop.ts';
-import { useAppDispatch, useAppSelector } from '@/store/hooks.ts';
-import { playNextSong, selectSong } from '@/store/music/music-player-slice.ts';
-import { Token } from '@/services/auth/token.ts';
+import { noop } from '@app/utils/noop.ts';
+import { useAppDispatch, useAppSelector } from '@app/store/hooks.ts';
+import { playNextSong, selectSong } from '@app/store/music/music-player-slice.ts';
+import { Token } from '@app/services/auth/token.ts';
 
 interface MusicSourceContextType {
   authenticatedSource: string | undefined;

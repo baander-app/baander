@@ -25,7 +25,7 @@ import ArcticonsQuicklyric from '~icons/arcticons/quicklyric';
 import AkarMusicAlbumFill from '~icons/akar-icons/music-album-fill';
 import EntypoControllerPaus from '~icons/entypo/controller-paus';
 
-import { Env } from '@/common/env.ts';
+import { Env } from '@app/common/env.ts';
 
 // If you use more icons, add them above and wire them here.
 const ICONS: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {

@@ -1,5 +1,5 @@
-import { useAppDispatch, useAppSelector } from '@/store/hooks.ts';
-import { setTargetLufs, setVolumeNormalization } from '@/store/music/music-player-slice.ts';
+import { useAppDispatch, useAppSelector } from '@app/store/hooks.ts';
+import { setTargetLufs, setVolumeNormalization } from '@app/store/music/music-player-slice.ts';
 
 
 export function VolumeNormalization() {

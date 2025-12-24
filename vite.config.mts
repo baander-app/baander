@@ -9,6 +9,7 @@ import Info from 'unplugin-info/vite';
 import laravelTranslations from 'vite-plugin-laravel-translations';
 import Icons from 'unplugin-icons/vite';
 
+
 const ReactCompilerConfig = {};
 
 // https://vitejs.dev/config/
@@ -36,6 +37,7 @@ export default defineConfig(config => {
       laravel({
         input: [
           'resources/app/index.tsx',
+          'resources/docs/index.tsx',
         ],
         refresh: true,
       }),
@@ -58,8 +60,11 @@ export default defineConfig(config => {
     ],
     resolve: {
       alias: {
-        // for TypeScript path alias import like : @/x/y/z
-        '@': fileURLToPath(new URL('./resources/app', import.meta.url)),
+        // Main app
+        '@app': fileURLToPath(new URL('./resources/app', import.meta.url)),
+        // Admin panel
+        '@docs': fileURLToPath(new URL('./resources/docs', import.meta.url)),
+        // Ziggy
         'ziggy-js': resolve('vendor/tightenco/ziggy'),
       },
     },

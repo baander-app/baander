@@ -14,6 +14,7 @@ class ClientEntity implements ClientEntityInterface
     use EntityTrait;
 
     protected bool $isConfidential = false;
+    protected bool $isFirstParty = false;
 
     public function setName(string $name): void
     {
@@ -30,8 +31,18 @@ class ClientEntity implements ClientEntityInterface
         $this->isConfidential = $isConfidential;
     }
 
+    public function setFirstParty(bool $isFirstParty): void
+    {
+        $this->isFirstParty = $isFirstParty;
+    }
+
     public function isConfidential(): bool
     {
         return $this->isConfidential;
+    }
+
+    public function isFirstParty(): bool
+    {
+        return $this->isFirstParty;
     }
 }

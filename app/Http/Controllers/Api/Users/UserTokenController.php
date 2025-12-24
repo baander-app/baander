@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Users;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UserToken\UserTokenIndexRequest;
 use App\Http\Resources\UserToken\PersonalAccessTokenViewResource;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use App\Models\{PersonalAccessToken, TokenAbility, User};
@@ -18,6 +19,7 @@ use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Prefix};
  * viewing token details with security information, and revoking tokens for security management.
  */
 #[Prefix('users/tokens')]
+#[Group('Users')]
 #[Middleware([
     'auth:sanctum',
     'ability:' . TokenAbility::ACCESS_API->value,

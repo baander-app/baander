@@ -44,12 +44,12 @@ class AccessTokenRepository implements AccessTokenRepositoryInterface
 
     public function revokeAccessToken($tokenId): void
     {
-        Token::whereId($tokenId)->update(['revoked' => true]);
+        Token::whereTokenId($tokenId)->update(['revoked' => true]);
     }
 
     public function isAccessTokenRevoked($tokenId): bool
     {
-        $token = Token::whereId($tokenId)->first();
+        $token = Token::whereTokenId($tokenId)->first();
 
         return $token === null || $token->isRevoked();
     }

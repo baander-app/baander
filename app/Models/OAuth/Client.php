@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\Models\OAuth;
 
 use App\Models\BaseModel;
+use App\Modules\Nanoid\Concerns\HasNanoPublicId;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use League\OAuth2\Server\Entities\ClientEntityInterface;
 
 class Client extends BaseModel implements ClientEntityInterface
 {
+    use HasNanoPublicId;
+
     protected $table = 'oauth_clients';
 
     protected $fillable = [

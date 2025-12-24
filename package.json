@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@napi-rs/keyring": "^1.1.10",
+    "@stoplight/elements": "^9.0.13",
     "axios": "^1.7.9",
     "electron-log": "^5.4.3",
     "v8-compile-cache": "^2.4.0"
@@ -125,6 +126,7 @@
     "vite-plugin-electron-renderer": "^0.14.6",
     "vite-plugin-laravel-translations": "^0.2.2",
     "vite-plugin-manifest-sri": "^0.2.0",
+    "vite-plugin-node-polyfills": "^0.24.0",
     "vite-plugin-optimize-css-modules": "^1.2.0",
     "vite-plugin-react-rich-svg": "^1.2.0",
     "vite-plugin-watch-and-run": "^1.7.3",

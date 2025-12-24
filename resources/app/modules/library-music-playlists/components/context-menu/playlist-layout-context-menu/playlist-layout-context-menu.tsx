@@ -1,5 +1,5 @@
 import { ContextMenu } from '@radix-ui/themes';
-import { usePlaylistDestroy } from '@/libs/api-client/gen/endpoints/playlist/playlist.ts';
+import { usePlaylistDestroy } from '@app/libs/api-client/gen/endpoints/playlist/playlist.ts';
 
 export interface PlaylistLayoutContextMenuProps {
   id: string;

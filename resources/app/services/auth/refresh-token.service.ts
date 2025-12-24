@@ -1,8 +1,8 @@
-import { Token } from '@/services/auth/token.ts';
-import { NotificationFacade } from '@/modules/notifications/notification-facade.ts';
-import { authRefreshToken, authStreamToken } from '@/libs/api-client/gen/endpoints/auth/auth.ts';
-import { tokenBindingService } from '@/services/auth/token-binding.service.ts';
-import { HeaderExt } from '@/models/header-ext.ts';
+import { Token } from '@app/services/auth/token.ts';
+import { NotificationFacade } from '@app/modules/notifications/notification-facade.ts';
+import { authRefreshToken, authStreamToken } from '@app/libs/api-client/gen/endpoints/auth/auth.ts';
+import { tokenBindingService } from '@app/services/auth/token-binding.service.ts';
+import { HeaderExt } from '@app/models/header-ext.ts';
 
 type TokenType = 'access' | 'stream';
 

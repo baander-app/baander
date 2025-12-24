@@ -8,7 +8,6 @@ namespace App\Console\Commands\OAuth;
 use App\Models\OAuth\Client;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\DB;
 
 class CreateClientCommand extends Command
 {
@@ -49,7 +48,7 @@ class CreateClientCommand extends Command
             $isPersonal = $type === 'personal';
         }
 
-        $confidential = !$isPublic && !$isDevice;
+        $confidential = (!$isPublic && !$isDevice) || $isPersonal || $isFirstParty;
 
         $client = Client::create([
             'name'                   => $name,
@@ -60,6 +59,7 @@ class CreateClientCommand extends Command
             'device_client'          => $isDevice,
             'confidential'           => $confidential,
             'first_party'            => $isFirstParty,
+            'provider'               => $isFirstParty === true ? 'baander' : null,
         ]);
 
         $this->info('Client created successfully.');

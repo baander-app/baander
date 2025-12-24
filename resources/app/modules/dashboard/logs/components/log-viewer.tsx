@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { VirtualLogViewer } from './virtual-log-viewer.tsx';
 import { JsonLogLine } from './json-log-line.tsx';
 import { LineJumpNavigation } from './line-jump-navigation.tsx';
-import { LoadingSpinner } from '@/modules/common/LoadingSpinner.tsx';
-import { ErrorDisplay } from '@/modules/common/ErrorDisplay.tsx';
+import { LoadingSpinner } from '@app/modules/common/LoadingSpinner.tsx';
+import { ErrorDisplay } from '@app/modules/common/ErrorDisplay.tsx';
 import { Box, Em, Flex, ScrollArea, Text } from '@radix-ui/themes';
 import { MagnifyingGlassIcon } from '@radix-ui/react-icons';
 import { useDebounce } from 'ahooks';
@@ -13,7 +13,7 @@ import {
   useLogsSearch,
   useLogsShow,
   useLogsTail,
-} from '@/libs/api-client/gen/endpoints/logs/logs.ts';
+} from '@app/libs/api-client/gen/endpoints/logs/logs.ts';
 
 interface LogViewerProps {
   logFileId: string;

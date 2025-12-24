@@ -11,6 +11,7 @@ use Ergebnis\Clock\SystemClock;
 use GuzzleHttp\Client;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Intervention\Image\Drivers\Gd\Driver;
@@ -74,5 +75,11 @@ class AppServiceProvider extends ServiceProvider
         });
 
         URL::forceScheme('https');
+
+        // Define OAuth token rate limiter - 60 requests per minute per IP
+        RateLimiter::for('oauth-token', function (object $request) {
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(60)
+                ->by($request->ip()?->toString() ?: $request->ip());
+        });
     }
 }

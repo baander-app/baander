@@ -3,7 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { useState } from 'react';
 import { SmartPlaylistRuleEditor } from '../smart-playlist-rule-editor/smart-playlist-rule-editor';
 import styles from './create-smart-playlist.module.scss';
-import { usePlaylistSmartCreate } from '@/libs/api-client/gen/endpoints/playlist/playlist.ts';
+import { usePlaylistSmartCreate } from '@app/libs/api-client/gen/endpoints/playlist/playlist.ts';
 
 interface SmartPlaylistForm {
   name: string;

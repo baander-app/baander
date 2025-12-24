@@ -1,9 +1,9 @@
 import { Flex, Text } from '@radix-ui/themes';
-import { ProgressBar } from '@/modules/library-music-player/components/progress-bar/progress-bar.tsx';
-import { formatDuration } from '@/utils/time/format-duration.ts';
-import { Cover } from '@/modules/library-music/components/artwork/cover';
+import { ProgressBar } from '@app/modules/library-music-player/components/progress-bar/progress-bar.tsx';
+import { formatDuration } from '@app/utils/time/format-duration.ts';
+import { Cover } from '@app/modules/library-music/components/artwork/cover';
 import styles from './player-face-plate.module.scss';
-import { withTestMode } from '@/providers/test-mode-provider.tsx';
+import { withTestMode } from '@app/providers/test-mode-provider.tsx';
 
 export interface PlayerFacePlateViewModel {
   coverUrl: string;

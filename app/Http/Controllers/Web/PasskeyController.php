@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Passkey;
 use App\Http\Requests\Auth\{AuthenticateUsingPasskeyRequest, StorePasskeyRequest};
 use App\Models\User;
+use Dedoc\Scramble\Attributes\Group;
 use App\Modules\Auth\Webauthn\Actions\{FindPasskeyToAuthenticateAction,
     GeneratePasskeyAuthenticationOptionsAction,
     GeneratePasskeyRegisterOptionsAction,
@@ -30,6 +31,7 @@ use Throwable;
  * @tags Auth
  */
 #[Prefix('/webauthn/passkey')]
+#[Group('Auth')]
 class PasskeyController extends Controller
 {
     use HandlesUserTokens;

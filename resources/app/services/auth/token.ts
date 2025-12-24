@@ -1,5 +1,5 @@
 
-import { AuthLogin200, NewAccessTokenResource } from '@/libs/api-client/gen/models';
+import { AuthLogin200, NewAccessTokenResource } from '@app/libs/api-client/gen/models';
 
 const LOCAL_STORAGE_KEY = 'baander_token';
 const LOCAL_STORAGE_KEY_STREAM = 'baander_stream_token';

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Modules\Logging\Attributes\LogChannel;
 use App\Modules\Logging\Channel;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Collection;
@@ -32,6 +33,7 @@ use Throwable;
  * queue health monitoring for system maintenance.
  */
 #[Prefix('/queue-metrics')]
+#[Group('System')]
 #[Middleware([
     'auth:sanctum',
     'ability:' . TokenAbility::ACCESS_API->value,

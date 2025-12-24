@@ -17,6 +17,7 @@ declare interface Window {
     name: string;
     url: string;
     apiUrl: string;
+    apiDocsUrl: string;
     environment: 'local' | 'production' | 'testing';
     debug: boolean;
     locale: string;

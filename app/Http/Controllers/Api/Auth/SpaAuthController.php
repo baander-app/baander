@@ -9,14 +9,13 @@ use App\Models\OAuth\Client;
 use App\Models\User;
 use App\Modules\OAuth\Entities\UserEntity;
 use App\Services\AppConfigService;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use League\OAuth2\Server\AuthorizationServer;
 use League\OAuth2\Server\Exception\OAuthServerException;
-use Psr\Http\Message\ResponseInterface;
 use Spatie\RouteAttributes\Attributes\Get;
-use Spatie\RouteAttributes\Attributes\Post;
 use Spatie\RouteAttributes\Attributes\Prefix;
 use Symfony\Bridge\PsrHttpMessage\Factory\PsrHttpFactory;
 use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
@@ -30,13 +29,15 @@ use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
  * @tags OAuth
  */
 #[Prefix('oauth/spa')]
+#[Group('Auth')]
 class SpaAuthController extends Controller
 {
     public function __construct(
         private readonly AuthorizationServer $authorizationServer,
-        private readonly PsrHttpFactory $psrFactory,
-        private readonly AppConfigService $appConfigService,
-    ) {
+        private readonly PsrHttpFactory      $psrFactory,
+        private readonly AppConfigService    $appConfigService,
+    )
+    {
     }
 
     /**
@@ -61,25 +62,17 @@ class SpaAuthController extends Controller
             ->first();
 
         if (!$spaClient) {
-            // Create default SPA client if it doesn't exist
-            $spaClient = Client::create([
-                'id' => 'spa-client-' . now()->timestamp,
-                'name' => 'Bånder SPA Client',
-                'secret' => null, // Public client
-                'redirect' => config('app.url'),
-                'personal_access_client' => false,
-                'password_client' => false,
-                'device_client' => false,
-                'confidential' => false,
-                'first_party' => true,
-            ]);
+            return response()->json([
+                'error'   => 'spa_client_not_configured',
+                'message' => 'SPA OAuth client not found. Please create it using: php artisan oauth:client:create --device --name "Bånder SPA Client"',
+            ], 500);
         }
 
         return response()->json([
-            'client_id' => $spaClient->id,
+            'client_id'              => $spaClient->public_id,
             'authorization_endpoint' => config('app.url') . '/api/oauth/spa/authorize',
-            'token_endpoint' => config('app.url') . '/api/oauth/token',
-            'scopes' => ['read', 'write', 'stream'],
+            'token_endpoint'         => config('app.url') . '/api/oauth/token',
+            'scopes'                 => ['read', 'write', 'stream'],
         ]);
     }
 
@@ -110,11 +103,11 @@ class SpaAuthController extends Controller
 
             if (!$user) {
                 return response()->json([
-                    'error' => 'login_required',
-                    'message' => 'User must be logged in to authorize',
+                    'error'     => 'login_required',
+                    'message'   => 'User must be logged in to authorize',
                     'login_url' => '/login?' . http_build_query([
-                            'redirect' => $request->fullUrl()
-                        ])
+                            'redirect' => $request->fullUrl(),
+                        ]),
                 ], 401);
             }
 
@@ -124,18 +117,22 @@ class SpaAuthController extends Controller
 
             $authRequest->setUser($userEntity);
 
-            // Auto-approve for first-party SPA clients
-            $client = Client::find($authRequest->getClient()->getIdentifier());
+            // Auto-approve only for first-party SPA clients
+            $client = Client::wherePublicId($authRequest->getClient()->getIdentifier())->first();
             if ($client && $client->first_party) {
                 $authRequest->setAuthorizationApproved(true);
             } else {
-                // For third-party clients, you might want to show consent screen
-                $authRequest->setAuthorizationApproved(true);
+                // Third-party clients require explicit user consent
+                // For now, we'll deny - this should be implemented with a consent screen
+                return response()->json([
+                    'error'   => 'consent_required',
+                    'message' => 'Third-party client authorization requires explicit user consent',
+                ], 403);
             }
 
             $response = $this->authorizationServer->completeAuthorizationRequest($authRequest, $psrResponse);
 
-            // For SPAs, we want to return the redirect URL instead of redirecting
+            // For SPAs, we want to return the authorization code instead of redirecting
             $location = $response->getHeader('Location')[0] ?? null;
 
             if ($location) {
@@ -144,7 +141,7 @@ class SpaAuthController extends Controller
 
                 return response()->json([
                     'authorization_code' => $params['code'] ?? null,
-                    'state' => $params['state'] ?? null,
+                    'state'              => $params['state'] ?? null,
                 ]);
             }
 
@@ -152,69 +149,12 @@ class SpaAuthController extends Controller
 
         } catch (OAuthServerException $exception) {
             return response()->json([
-                'error' => $exception->getErrorType(),
+                'error'   => $exception->getErrorType(),
                 'message' => $exception->getMessage(),
             ], $exception->getHttpStatusCode());
+        } catch (\Exception $exception) {
+            return response()->json(['error' => 'server_error'], 500);
         }
-    }
-
-    /**
-     * SPA Login and Authorize
-     *
-     * Combines login and authorization into a single step for SPAs.
-     * Authenticates the user and immediately returns an authorization code.
-     *
-     * @param Request $request Request with login credentials and OAuth parameters
-     *
-     * @unauthenticated
-     * @response array{
-     *   authorization_code: string,
-     *   state?: string,
-     *   user: array
-     * }
-     */
-    #[Post('login-authorize', 'oauth.spa.login-authorize')]
-    public function loginAndAuthorize(Request $request): JsonResponse
-    {
-        $credentials = $request->validate([
-            'email' => 'required|email',
-            'password' => 'required|string',
-            'client_id' => 'required|string',
-            'code_challenge' => 'required|string',
-            'code_challenge_method' => 'required|string|in:S256',
-            'state' => 'nullable|string',
-            'scope' => 'nullable|string',
-        ]);
-
-        // Attempt login
-        if (!Auth::attempt($request->only('email', 'password'))) {
-            return response()->json([
-                'error' => 'invalid_credentials',
-                'message' => 'Invalid email or password',
-            ], 401);
-        }
-
-        $user = Auth::user();
-
-        // Create OAuth authorization request
-        $authParams = [
-            'response_type' => 'code',
-            'client_id' => $credentials['client_id'],
-            'code_challenge' => $credentials['code_challenge'],
-            'code_challenge_method' => $credentials['code_challenge_method'],
-            'scope' => $credentials['scope'] ?? 'read write stream',
-        ];
-
-        if (isset($credentials['state'])) {
-            $authParams['state'] = $credentials['state'];
-        }
-
-        // Create a new request with OAuth parameters
-        $oauthRequest = Request::create('/api/oauth/spa/authorize', 'GET', $authParams);
-        $oauthRequest->setSession($request->getSession());
-
-        // Process authorization
-        return $this->authorize($oauthRequest);
     }
 
     /**
@@ -244,12 +184,12 @@ class SpaAuthController extends Controller
         }
 
         return response()->json([
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
+            'id'                => $user->id,
+            'name'              => $user->name,
+            'email'             => $user->email,
             'email_verified_at' => $user->email_verified_at,
-            'created_at' => $user->created_at,
-            'updated_at' => $user->updated_at,
+            'created_at'        => $user->created_at,
+            'updated_at'        => $user->updated_at,
         ]);
     }
 
@@ -276,7 +216,7 @@ class SpaAuthController extends Controller
         Auth::setUser($user);
 
         return response()->json(
-            $this->appConfigService->getAppConfig()->toArray()
+            $this->appConfigService->getAppConfig()->toArray(),
         );
     }
 }

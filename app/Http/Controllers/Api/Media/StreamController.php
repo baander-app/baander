@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Api\Media;
 
+use Dedoc\Scramble\Attributes\Group;
 use App\Models\{Song, TokenAbility};
 use Spatie\RouteAttributes\Attributes\{Get, Prefix};
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 #[Prefix('/stream')]
+#[Group('Media')]
 class StreamController
 {
     /**

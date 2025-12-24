@@ -1,5 +1,5 @@
-import { NewAccessTokenResource } from '@/libs/api-client/gen/models';
-import { CreateNotification } from '@/modules/notifications/models.ts';
+import { NewAccessTokenResource } from '@app/libs/api-client/gen/models';
+import { CreateNotification } from '@app/modules/notifications/models.ts';
 
 export interface AuthEvents {
   'auth:login': {

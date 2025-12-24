@@ -1,7 +1,7 @@
 import { Box, Button, Text } from '@radix-ui/themes';
 import { SubmitHandler, useForm } from 'react-hook-form';
-import { useAppDispatch, useAppSelector } from '@/store/hooks.ts';
-import { setLyricsOffset } from '@/store/music/music-player-slice.ts';
+import { useAppDispatch, useAppSelector } from '@app/store/hooks.ts';
+import { setLyricsOffset } from '@app/store/music/music-player-slice.ts';
 import styles from './lyrics-settings.module.scss';
 
 interface LyricsSettingsForm {

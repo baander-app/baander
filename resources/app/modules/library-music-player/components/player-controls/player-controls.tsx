@@ -2,9 +2,9 @@ import {
   NextButton,
   PlayPauseButton,
   PreviousButton,
-} from '@/modules/library-music-player/components/player-buttons/player-buttons.tsx';
-import { useAppDispatch } from '@/store/hooks.ts';
-import { playNextSong, playPreviousSong } from '@/store/music/music-player-slice.ts';
+} from '@app/modules/library-music-player/components/player-buttons/player-buttons.tsx';
+import { useAppDispatch } from '@app/store/hooks.ts';
+import { playNextSong, playPreviousSong } from '@app/store/music/music-player-slice.ts';
 
 import styles from './player-controls.module.scss';
 

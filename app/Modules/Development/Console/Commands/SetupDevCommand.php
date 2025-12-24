@@ -7,7 +7,6 @@ use App\Modules\Development\Console\RequiresLocalEnvironment;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\UsersSeed;
 use File;
-use Illuminate\Support\Facades\Artisan;
 use Symfony\Component\Console\Command\Command;
 
 class SetupDevCommand extends DevelopmentCommand
@@ -70,9 +69,10 @@ class SetupDevCommand extends DevelopmentCommand
             '--class' => UsersSeed::class,
         ]);
 
-        Artisan::call('oauth:client:create', [
+        $this->call('oauth:client:create', [
             '--name'        => config('app.name'),
-            '--redirect'    => config('oauth.redirect_uri'),
+            '--redirect'    => '/api/oauth/device/verify',
+            '--personal'    => true,
             '--password'    => true,
             '--device'      => true,
             '--first-party' => true,

@@ -3,7 +3,7 @@ import { DevTool } from '@hookform/devtools';
 import { Box, Button, Flex, Text, TextField } from '@radix-ui/themes';
 import { Label } from 'radix-ui';
 import styles from './create-account-form.module.scss';
-import { authRegister } from '@/libs/api-client/gen/endpoints/auth/auth.ts';
+import { authRegister } from '@app/libs/api-client/gen/endpoints/auth/auth.ts';
 
 interface AccountForm {
   name: string;

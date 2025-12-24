@@ -3,8 +3,8 @@ import { Button, TextField, Flex, Box, Select, Badge } from '@radix-ui/themes';
 import { useForm, Controller } from 'react-hook-form';
 import styles from './album-editor.module.scss';
 import { Form } from 'radix-ui';
-import { useGenresIndex } from '@/libs/api-client/gen/endpoints/genre/genre.ts';
-import { AlbumResource } from '@/libs/api-client/gen/models';
+import { useGenresIndex } from '@app/libs/api-client/gen/endpoints/genre/genre.ts';
+import { AlbumResource } from '@app/libs/api-client/gen/models';
 
 interface AlbumEditorProps {
   album?: AlbumResource;

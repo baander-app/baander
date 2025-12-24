@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Auth;
 
+use Dedoc\Scramble\Attributes\Group;
 use Exception;
 use App\Http\Controllers\Api\Auth\Concerns\HandlesUserTokens;
 use App\Http\Controllers\Controller;
@@ -32,6 +33,7 @@ use Symfony\Component\HttpFoundation\Response as ResponseAlias;
  * @tags Auth
  */
 #[Prefix('auth')]
+#[Group('Auth')]
 class AuthController extends Controller
 {
     use HandlesUserTokens;

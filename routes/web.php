@@ -3,7 +3,9 @@
 use App\Http\Controllers\UIController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/dbg', [UIController::class, 'dbg'])->name('dbg');
+Route::get('/help', [UIController::class, 'getDocs'])
+    ->name('ui.docs-get')
+    ->middleware('cors.policy');
 
 Route::get('/{any}', [UIController::class, 'getUI'])
     ->name('webui')

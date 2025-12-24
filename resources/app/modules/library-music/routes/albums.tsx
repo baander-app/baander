@@ -1,16 +1,16 @@
 import { useState } from 'react';
 import styles from './albums.module.scss';
-import { AlbumDetail } from '@/modules/library-music/components/album-detail/album-detail.tsx';
-import { CoverGrid } from '@/modules/library-music/components/cover-grid';
-import { Album } from '@/modules/library-music/components/album';
+import { AlbumDetail } from '@app/modules/library-music/components/album-detail/album-detail.tsx';
+import { CoverGrid } from '@app/modules/library-music/components/cover-grid';
+import { Album } from '@app/modules/library-music/components/album';
 import { Box, ContextMenu, Dialog, Flex, Skeleton } from '@radix-ui/themes';
-import { usePathParam } from '@/hooks/use-path-param.ts';
-import { LibraryParams } from '@/modules/library-music/routes/_routes.tsx';
+import { usePathParam } from '@app/hooks/use-path-param.ts';
+import { LibraryParams } from '@app/modules/library-music/routes/_routes.tsx';
 import { motion } from 'motion/react';
-import { useDisclosure } from '@/hooks/use-disclosure.ts';
-import { AlbumEditor } from '@/modules/library-music/components/album-editor/album-editor.tsx';
-import { AlbumResource } from '@/libs/api-client/gen/models';
-import { useAlbumsIndex } from '@/libs/api-client/gen/endpoints/album/album.ts';
+import { useDisclosure } from '@app/hooks/use-disclosure.ts';
+import { AlbumEditor } from '@app/modules/library-music/components/album-editor/album-editor.tsx';
+import { AlbumResource } from '@app/libs/api-client/gen/models';
+import { useAlbumsIndex } from '@app/libs/api-client/gen/endpoints/album/album.ts';
 
 function AlbumContextMenu({ album, librarySlug }: { album: AlbumResource, librarySlug: string }) {
   const [showEditor, editorHandlers] = useDisclosure(false);

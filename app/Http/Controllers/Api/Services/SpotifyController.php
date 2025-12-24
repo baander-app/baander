@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Integrations\Spotify\SpotifyClient;
 use App\Models\ThirdPartyCredential;
 use App\Models\TokenAbility;
+use Dedoc\Scramble\Attributes\Group;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -14,6 +15,7 @@ use Illuminate\Support\Str;
 use Spatie\RouteAttributes\Attributes\{Get, Post, Prefix};
 
 #[Prefix('services/spotify')]
+#[Group('Connections')]
 class SpotifyController extends Controller
 {
     public function __construct(

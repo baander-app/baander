@@ -10,6 +10,7 @@ class AppConfigData extends Data
         public string $name,
         public string $url,
         public string $apiUrl,
+        public string $apiDocsUrl,
         public string $environment,
         public bool $debug,
         public string $locale,

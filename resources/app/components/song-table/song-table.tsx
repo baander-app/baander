@@ -1,7 +1,7 @@
 import { memo, RefObject, useCallback, useEffect, useRef, useState } from 'react';
-import { Iconify } from '@/ui/icons/iconify';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { setQueueAndSong } from '@/store/music/music-player-slice';
+import { Iconify } from '@app/ui/icons/iconify';
+import { useAppDispatch, useAppSelector } from '@app/store/hooks';
+import { setQueueAndSong } from '@app/store/music/music-player-slice';
 import {
   ColumnDef,
   flexRender,
@@ -16,7 +16,7 @@ import {
 import { useVirtualizer, VirtualItem, Virtualizer } from '@tanstack/react-virtual';
 import { SpeakerLoudIcon } from '@radix-ui/react-icons';
 import styles from './song-table.module.scss';
-import { SongResource } from '@/libs/api-client/gen/models';
+import { SongResource } from '@app/libs/api-client/gen/models';
 
 export interface SongTableProps {
   songs: SongResource[];

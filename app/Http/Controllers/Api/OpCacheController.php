@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\TokenAbility;
 use App\Services\OpCacheService;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\Request;
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Post, Prefix};
 
 #[Prefix('opcache')]
+#[Group('System')]
 #[Middleware([
     'auth:sanctum',
     'ability:' . TokenAbility::ACCESS_API->value,

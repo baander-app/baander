@@ -4,24 +4,19 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\Auth;
 
-use App\Http\Controllers\Controller;
-use App\Models\OAuth\Client;
-use App\Models\OAuth\DeviceCode as DeviceCodeModel;
-use App\Models\OAuth\Token;
-use App\Modules\OAuth\Contracts\DeviceCodeRepositoryInterface;
-use App\Modules\OAuth\Contracts\ScopeRepositoryInterface;
+use Dedoc\Scramble\Attributes\Group;
 use Exception;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Http\Response;
+use App\Http\Controllers\Controller;
+use App\Models\OAuth\{Client, DeviceCode as DeviceCodeModel, Token};
+use App\Modules\OAuth\Contracts\{DeviceCodeRepositoryInterface, ScopeRepositoryInterface};
+use Illuminate\Support\Facades\Log;
+use Illuminate\Http\{Request, Response};
 use League\OAuth2\Server\AuthorizationServer;
 use League\OAuth2\Server\Entities\DeviceCodeEntityInterface;
 use League\OAuth2\Server\Exception\OAuthServerException;
 use League\OAuth2\Server\ResourceServer;
 use Psr\Http\Message\ResponseInterface;
-use Spatie\RouteAttributes\Attributes\Get;
-use Spatie\RouteAttributes\Attributes\Post;
-use Spatie\RouteAttributes\Attributes\Prefix;
+use Spatie\RouteAttributes\Attributes\{Get, Post, Prefix};
 use Symfony\Bridge\PsrHttpMessage\Factory\PsrHttpFactory;
 use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
 
@@ -34,6 +29,7 @@ use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
  * @tags OAuth
  */
 #[Prefix('oauth')]
+#[Group('Auth')]
 class OAuthController extends Controller
 {
     public function __construct(
@@ -53,7 +49,6 @@ class OAuthController extends Controller
      *
      * @param Request $request Request with client_id, redirect_uri, response_type, scope, and state
      *
-     * @throws OAuthServerException When request is invalid
      * @unauthenticated
      * @response 302
      */
@@ -83,6 +78,10 @@ class OAuthController extends Controller
         } catch (OAuthServerException $exception) {
             return $this->convertResponse($exception->generateHttpResponse($psrResponse));
         } catch (Exception $exception) {
+            Log::error('OAuthController::authorizeCodeFlow failed', [
+                'e.message' => $exception->getMessage(),
+            ]);
+
             return response()->json(['error' => 'server_error'], 500);
         }
     }
@@ -109,7 +108,7 @@ class OAuthController extends Controller
      *   scope?: string
      * }
      */
-    #[Post('token', 'oauth.token')]
+    #[Post('token', 'oauth.token', ['throttle:oauth-token'])]
     public function token(Request $request)
     {
         $psrRequest = $this->psrFactory->createRequest($request);
@@ -123,6 +122,10 @@ class OAuthController extends Controller
         } catch (OAuthServerException $exception) {
             return $this->convertResponse($exception->generateHttpResponse($psrResponse));
         } catch (Exception $exception) {
+            Log::error('OAuthController::token failed', [
+                'e.message' => $exception->getMessage(),
+            ]);
+
             return response()->json(['error' => 'server_error'], 500);
         }
     }
@@ -287,8 +290,6 @@ class OAuthController extends Controller
      * @throws OAuthServerException When request is invalid
      * @response array{
      *   active: boolean,
-     *   client_id?: string,
-     *   username?: string,
      *   scope?: string,
      *   exp?: int
      * }
@@ -301,20 +302,22 @@ class OAuthController extends Controller
         try {
             $this->resourceServer->validateAuthenticatedRequest($psrRequest);
 
-            $token = Token::whereId($request->input('token'))->first();
+            $token = Token::whereTokenId($request->input('token'))->first();
 
             if (!$token || $token->isRevoked()) {
                 return response()->json(['active' => false]);
             }
 
             return response()->json([
-                'active'    => true,
-                'client_id' => $token->client_id,
-                'username'  => $token->user?->email,
-                'scope'     => implode(' ', $token->scopes ?? []),
-                'exp'       => $token->expires_at->timestamp,
+                'active' => true,
+                'scope'  => implode(' ', $token->scopes ?? []),
+                'exp'    => $token->expires_at->timestamp,
             ]);
         } catch (OAuthServerException $exception) {
+            Log::error('OAuthController::introspect failed', [
+                'e.message' => $exception->getMessage(),
+            ]);
+
             return response()->json(['active' => false]);
         }
     }

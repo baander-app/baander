@@ -23,6 +23,6 @@ dayjs.extend(localizedFormat);
 
 import '@fontsource-variable/inter';
 import '@fontsource-variable/source-code-pro';
-import { initAuthStore } from '@/modules/auth/store';
+import { initAuthStore } from '@app/modules/auth/store';
 
 initAuthStore();
