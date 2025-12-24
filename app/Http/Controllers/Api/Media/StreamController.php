@@ -13,14 +13,14 @@ class StreamController
 {
     /**
      * Direct stream the song.
-     * Requires token with "access-stream"
+     * Requires token with "access-api"
      *
      * @param Song $song
      * @return BinaryFileResponse
      */
     #[Get('/song/{song}/direct', 'api.stream.song-direct', [
         'auth:oauth',
-        'scope:access-stream',
+        'scope:access-api',
     ])]
     public function songDirect(Song $song)
     {

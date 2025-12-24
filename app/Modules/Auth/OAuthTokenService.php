@@ -75,42 +75,6 @@ class OAuthTokenService
     }
 
     /**
-     * Create a stream token for a user
-     */
-    public function createStreamToken(
-        Request $request,
-        User    $user,
-        string  $sessionId,
-        string  $fingerprint,
-    ): array
-    {
-        $client = Client::where('first_party', true)->firstOrFail();
-
-        $psrRequest = $this->psr->createRequestWithBody($request, [
-            'grant_type'    => 'pre_authenticated',
-            'client_id'     => $client->public_id,
-            'client_secret' => $client->secret,
-            'user_id'       => (string)$user->id,
-            'scope'         => 'access-stream',
-        ]);
-
-        $psrResponse = $this->psr->createResponse();
-        $response = $this->authorizationServer->respondToAccessTokenRequest($psrRequest, $psrResponse);
-        $responseBody = json_decode((string)$response->getBody(), true);
-
-        $tokenJti = $this->extractJtiFromToken($responseBody['access_token']);
-        $accessToken = Token::where('token_id', $tokenJti)->first();
-
-        if (!$accessToken) {
-            throw new \RuntimeException('Failed to create stream token');
-        }
-
-        $this->createTokenMetadata($request, $accessToken, $sessionId, $fingerprint);
-
-        return $responseBody;
-    }
-
-    /**
      * Refresh an access token
      */
     public function refreshToken(Request $request, string $refreshToken): array

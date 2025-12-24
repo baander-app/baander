@@ -58,7 +58,7 @@ const menu: Menu = [
     label: 'Documentation',
     iconName: 'heroicons:book-open-20-solid',
     links: [
-      {label: 'Api', href: route('scramble.docs.ui')},
+      {label: 'Api', href: route('ui.docs-get')},
     ],
   },
 ];

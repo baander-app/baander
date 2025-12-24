@@ -40,7 +40,6 @@ class AuthController extends Controller
     // Scopes for tokens
     private const SCOPE_ACCESS_API = 'access-api';
     private const SCOPE_ACCESS_BROADCASTING = 'access-broadcasting';
-    private const SCOPE_ACCESS_STREAM = 'access-stream';
     private const SCOPE_ISSUE_ACCESS_TOKEN = 'issue-access-token';
 
     /**
@@ -112,31 +111,6 @@ class AuthController extends Controller
         }
 
         $tokens = $this->oauthTokenService->refreshToken($request, $refreshToken);
-
-        return response()->json($tokens);
-    }
-
-    /**
-     * Create a stream-specific access token
-     *
-     * Generates a short-lived token specifically for media streaming operations.
-     *
-     * @param Request $request Authenticated request
-     *
-     * @response array{streamToken: array{token_id: string, token_type: string, expires_in: int, scopes: array}}
-     */
-    #[Post('streamToken', 'auth.streamToken', ['auth:oauth', 'scope:' . self::SCOPE_ISSUE_ACCESS_TOKEN])]
-    public function getStreamToken(Request $request): JsonResponse
-    {
-        $sessionId = $request->header('X-Session-Id') ?? $this->tokenBindingService->generateSessionId();
-        $fingerprint = $this->tokenBindingService->generateClientFingerprint($request);
-
-        $tokens = $this->oauthTokenService->createStreamToken(
-            $request,
-            $request->user(),
-            $sessionId,
-            $fingerprint,
-        );
 
         return response()->json($tokens);
     }

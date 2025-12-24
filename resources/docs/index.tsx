@@ -6,10 +6,14 @@ import App from './app';
 const originalFetch = window.fetch;
 
 const getToken = () => {
-  const token = localStorage.getItem('baander_token');
+  try {
+    const token = localStorage.getItem('baander_token');
 
-  if (token) {
-    return JSON.parse(token).accessToken.token;
+    if (token) {
+      return JSON.parse(token).accessToken;
+    }
+  } catch (error) {
+    console.error(error)
   }
 };
 

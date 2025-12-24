@@ -12,15 +12,15 @@ export function DevPanel() {
 
   const copyAccessToken = useCallback(() => {
     const token = Token.get();
-    if (token) {
-      navigator.clipboard.writeText(token.accessToken.token);
+    if (token?.access_token) {
+      navigator.clipboard.writeText(token.access_token);
     }
   }, []);
 
   const copyRefreshToken = useCallback(() => {
     const token = Token.get();
-    if (token) {
-      navigator.clipboard.writeText(token.refreshToken.token);
+    if (token?.refresh_token) {
+      navigator.clipboard.writeText(token.refresh_token);
     }
   }, []);
 

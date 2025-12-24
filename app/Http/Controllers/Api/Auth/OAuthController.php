@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\Auth;
 
-use Dedoc\Scramble\Attributes\Group;
-use Exception;
 use App\Http\Controllers\Controller;
+use App\Modules\OAuth\Entities\UserEntity;
 use App\Models\OAuth\{Client, DeviceCode as DeviceCodeModel, Token};
 use App\Modules\OAuth\Contracts\{DeviceCodeRepositoryInterface, ScopeRepositoryInterface};
 use App\Modules\OAuth\Psr7Factory;
-use Illuminate\Support\Facades\Log;
+use Dedoc\Scramble\Attributes\Group;
+use Exception;
 use Illuminate\Http\{Request, Response};
+use Illuminate\Support\Facades\Log;
 use League\OAuth2\Server\AuthorizationServer;
 use League\OAuth2\Server\Entities\DeviceCodeEntityInterface;
 use League\OAuth2\Server\Exception\OAuthServerException;
 use League\OAuth2\Server\ResourceServer;
-use Psr\Http\Message\ResponseInterface;
 use Spatie\RouteAttributes\Attributes\{Get, Post, Prefix};
 
 /**
@@ -33,10 +33,12 @@ class OAuthController extends Controller
 {
     public function __construct(
         private readonly ResourceServer                $resourceServer,
-        private readonly Psr7Factory                 $psr,
+        private readonly Psr7Factory                   $psr,
         private readonly DeviceCodeRepositoryInterface $deviceCodeRepository,
         private readonly ScopeRepositoryInterface      $scopeRepository,
-    ) {}
+    )
+    {
+    }
 
     /**
      * OAuth 2.0 Authorization Endpoint
@@ -64,7 +66,7 @@ class OAuthController extends Controller
                 return redirect('/login?' . http_build_query(['redirect' => $request->fullUrl()]));
             }
 
-            $userEntity = new \App\Modules\OAuth\Entities\UserEntity();
+            $userEntity = new UserEntity();
             $userEntity->setIdentifier($user->id);
             $authRequest->setUser($userEntity);
             $authRequest->setAuthorizationApproved(true);
@@ -95,7 +97,6 @@ class OAuthController extends Controller
      *
      * @param Request $request Request with grant type specific parameters
      *
-     * @throws OAuthServerException When request is invalid
      * @unauthenticated
      * @response array{
      *   access_token: string,
@@ -335,7 +336,8 @@ class OAuthController extends Controller
     private function addScopesToEntity(
         DeviceCodeEntityInterface $entity,
         string                    $scopeString,
-    ): void {
+    ): void
+    {
         if (empty($scopeString)) {
             return;
         }
