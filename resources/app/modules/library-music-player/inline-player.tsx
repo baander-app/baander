@@ -17,9 +17,9 @@ import {
   usePlayerIsPlaying,
   usePlayerAudioElement,
 } from '@app/modules/library-music-player/store';
-import { useShowByPublicIdSong } from '@app/libs/api-client/gen/endpoints/library-resource/library-resource.ts';
 import { isElectron } from '@app/utils/platform.ts';
 import { Token } from '@app/services/auth/token.ts';
+import { useSongsShow } from '@app/libs/api-client/gen/endpoints/song/song.ts';
 
 export function InlinePlayer() {
   const sourceSong = useAppSelector(selectSong);
@@ -38,7 +38,7 @@ export function InlinePlayer() {
     togglePlayPause,
   } = usePlayerActions();
   const canQuery = Boolean(sourceSong?.publicId);
-  const { data: song } = useShowByPublicIdSong(sourceSong?.publicId!, {
+  const { data: song } = useSongsShow(sourceSong!.librarySlug, sourceSong?.publicId!, {
     relations: 'album.cover'
   }, {
     query: {
@@ -110,7 +110,7 @@ export function InlinePlayer() {
 
   const coverUrl = useMemo(() => {
     return song?.album?.cover?.url ?? '';
-  }, [song]);
+  }, [song?.album?.cover?.url]);
 
   const artistNames = useMemo(() => {
     return song && song?.artists?.map(artist => artist.name);

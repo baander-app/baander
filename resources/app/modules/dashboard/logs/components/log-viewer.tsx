@@ -9,11 +9,10 @@ import { MagnifyingGlassIcon } from '@radix-ui/react-icons';
 import { useDebounce } from 'ahooks';
 import {
   useLogsContent,
-  useLogsHead,
-  useLogsSearch,
+  useLogsHead, useLogsSearch,
   useLogsShow,
   useLogsTail,
-} from '@app/libs/api-client/gen/endpoints/logs/logs.ts';
+} from '@app/libs/api-client/gen/endpoints/system/system.ts';
 
 interface LogViewerProps {
   logFileId: string;

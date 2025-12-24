@@ -3,10 +3,9 @@ import { Table } from '@radix-ui/themes';
 import { JobStatus } from '@app/modules/dashboard/queue-monitor/components/job-status.tsx';
 import { ErrorBoundary } from 'react-error-boundary';
 import ReactJson from '@microlink/react-json-view';
-import { QueueMonitorResource } from '@app/libs/api-client/gen/models';
 
 interface ExceptionDetailsProps {
-  job: QueueMonitorResource;
+  job: any;
 }
 
 const ExceptionDetails = ({ job }: ExceptionDetailsProps) => {
@@ -30,7 +29,7 @@ const ExceptionDetails = ({ job }: ExceptionDetailsProps) => {
 };
 
 export interface JobDetailsProps {
-  job: QueueMonitorResource;
+  job: any;
 }
 
 export function JobDetails({ job }: JobDetailsProps) {

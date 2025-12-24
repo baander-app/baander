@@ -69,6 +69,7 @@ class ArtistController extends Controller
     #[Get('{artist}', 'api.artists.show')]
     public function show(Library $library, Artist $artist): ArtistResource
     {
+        $artist->loadMissing(['albums', 'songs']);
         return new ArtistResource($artist);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Http\Pagination\JsonPaginator;
 use App\Modules\Logging\Attributes\LogChannel;
 use App\Modules\Logging\Channel;
 use Dedoc\Scramble\Attributes\Group;
@@ -14,7 +15,6 @@ use App\Http\Requests\QueueMetrics\{MetricsRequest, ShowQueueMetricsRequest};
 use App\Http\Requests\QueueMonitor\RetryJobRequest;
 use App\Http\Resources\QueueMonitor\QueueMonitorResource;
 use App\Models\QueueMonitor;
-
 use App\Modules\Eloquent\BaseBuilder;
 use App\Modules\Http\Resources\Json\JsonAnonymousResourceCollection;
 use App\Modules\Queue\QueueMetrics\QueueMetricsService;

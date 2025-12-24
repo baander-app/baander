@@ -49,6 +49,7 @@ class SongResource extends JsonResource
             'updatedAt'     => $this->updated_at,
             'album'         => AlbumWithoutSongsResource::make($this->whenLoaded('album')),
             'artists'       => ArtistResource::collection($this->whenLoaded('artists')),
+            'librarySlug'   => $this->librarySlug,
         ];
     }
 }

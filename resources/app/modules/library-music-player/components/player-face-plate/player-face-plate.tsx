@@ -22,10 +22,8 @@ export interface PlayerFacePlateProps {
 }
 
 export function PlayerFacePlate({
-                                  buffered,
                                   duration,
                                   currentProgress,
-                                  setProgress,
                                   viewModel,
                                 }: PlayerFacePlateProps) {
   const durationDisplay = formatDuration(duration);
@@ -66,12 +64,7 @@ export function PlayerFacePlate({
             {elapsedDisplay}
           </Text>
 
-          <ProgressBar
-            duration={duration}
-            currentProgress={currentProgress}
-            buffered={buffered}
-            setProgress={setProgress}
-          />
+          <ProgressBar />
 
           <Text size="2" ml="2">
             {durationDisplay}

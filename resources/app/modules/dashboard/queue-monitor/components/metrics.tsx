@@ -1,6 +1,6 @@
 import { Flex } from '@radix-ui/themes';
 import { MetricCard } from '@app/modules/dashboard/queue-monitor/components/metric-card.tsx';
-import { useQueueMetricsMetrics } from '@app/libs/api-client/gen/endpoints/queue/queue.ts';
+import { useQueueMetricsMetrics } from '@app/libs/api-client/gen/endpoints/system/system.ts';
 
 export function Metrics() {
   const { data } = useQueueMetricsMetrics();

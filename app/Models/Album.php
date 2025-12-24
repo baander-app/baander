@@ -85,6 +85,12 @@ class Album extends BaseModel implements HasMedia
 
     protected $perPage = 60;
 
+    /**
+     * Default relationships to eager load.
+     * Cover is almost always needed when displaying albums.
+     */
+    protected $with = ['cover'];
+
 
     public function registerMediaConversions(?Media $media = null): void
     {

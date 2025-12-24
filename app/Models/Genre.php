@@ -41,7 +41,7 @@ class Genre extends BaseModel
 
     public function songs()
     {
-        return $this->belongsTo(Song::class)
+        return $this->belongsToMany(Song::class)
             ->using(GenreSong::class);
     }
 }

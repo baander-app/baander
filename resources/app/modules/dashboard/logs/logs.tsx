@@ -10,7 +10,7 @@ import {
   Container,
 } from '@radix-ui/themes';
 import './logs.css';
-import { useLogsIndex } from '@app/libs/api-client/gen/endpoints/logs/logs.ts';
+import { useLogsIndex } from '@app/libs/api-client/gen/endpoints/system/system.ts';
 
 export const LogsPage: React.FC = () => {
   const [selectedLogFile, setSelectedLogFile] = useState<string | null>(null);

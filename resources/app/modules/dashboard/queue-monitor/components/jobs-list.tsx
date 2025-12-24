@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 
 import styles from './jobs-list.module.scss';
 import { JobDetails } from '@app/modules/dashboard/queue-monitor/components/job-details.tsx';
-import { useQueueMetricsShowInfinite } from '@app/libs/api-client/gen/endpoints/queue/queue.ts';
+import { useQueueMetricsShowInfinite } from '@app/libs/api-client/gen/endpoints/system/system.ts';
 import { QueueMonitorResource } from '@app/libs/api-client/gen/models';
 
 export interface JobsList extends React.ComponentPropsWithoutRef<'div'> {
