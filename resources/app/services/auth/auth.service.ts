@@ -54,7 +54,7 @@ export function revokeAllTokensExceptCurrent() {
 }
 
 function clearAuthData() {
-  window.BaanderElectron.config.clearUser(LOCAL_STORAGE_KEY.USER_NAME);
+  window.BaanderElectron?.config.clearUser(LOCAL_STORAGE_KEY.USER_NAME);
   localStorage.clear();
   Token.clear();
   tokenBindingService.clear();

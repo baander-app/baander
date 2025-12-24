@@ -23,7 +23,7 @@ declare interface Window {
     version: string;
   };
 
-  BaanderElectron: {
+  BaanderElectron?: {
     config: {
       getServerUrl(): Promise<string>;
       setServerUrl(url: string): Promise<boolean>;
