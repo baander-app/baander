@@ -48,11 +48,15 @@ DESC;
 
         Scramble::routes(function (Route $route) {
             $whitelist = ['api/', 'webauthn'];
+            $blacklist = ['sanctum', '-'];
 
-
-            if (array_any($whitelist, fn($str) => Str::contains($route->uri, $str))) {
-                return true;
+            // Exclude OAuth and Sanctum routes from documentation
+            if (array_any($blacklist, fn($str) => Str::contains($route->uri, $str))) {
+                return false;
             }
+
+            // Include only whitelisted routes
+            return array_any($whitelist, fn($str) => Str::contains($route->uri, $str));
         });
     }
 }

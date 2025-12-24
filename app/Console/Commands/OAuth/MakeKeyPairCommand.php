@@ -1,9 +1,8 @@
 <?php
 
-namespace App\Console\Commands\Auth;
+namespace App\Console\Commands\OAuth;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Storage;
 
 class MakeKeyPairCommand extends Command
 {
@@ -12,7 +11,7 @@ class MakeKeyPairCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'auth:keypair';
+    protected $signature = 'oauth:keypair';
 
     /**
      * The console command description.
@@ -39,11 +38,13 @@ class MakeKeyPairCommand extends Command
         if (!$res) throw new \RuntimeException(openssl_error_string());
 
 
-        openssl_pkey_export($res, $privatePem, config('app.key'), $config);
+        openssl_pkey_export($res, $privatePem, config('oauth.encryption_key'), $config);
         $publicPem = openssl_pkey_get_details($res)['key'];
 
         \File::put(storage_path('oauth-private.key'), $privatePem);
         \File::put(storage_path('oauth-public.key'), $publicPem);
+        chmod(storage_path('oauth-private.key'), 0660);
+        chmod(storage_path('oauth-public.key'), 0660);
 
         $this->info('Wrote public and private keys to storage.');
     }

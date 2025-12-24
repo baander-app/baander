@@ -56,6 +56,7 @@ class User extends Authenticatable implements HasPasskeys
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password'          => 'hashed',
+        'oauth'             => 'array',
     ];
 
     public function getRouteKeyName(): string

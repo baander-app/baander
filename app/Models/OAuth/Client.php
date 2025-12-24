@@ -5,16 +5,15 @@ declare(strict_types=1);
 namespace App\Models\OAuth;
 
 use App\Models\BaseModel;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use League\OAuth2\Server\Entities\ClientEntityInterface;
 
-class Client extends BaseModel
+class Client extends BaseModel implements ClientEntityInterface
 {
-    use HasUuids;
-
     protected $table = 'oauth_clients';
 
     protected $fillable = [
+        'public_id',
         'name',
         'secret',
         'provider',
@@ -29,11 +28,11 @@ class Client extends BaseModel
 
     protected $casts = [
         'personal_access_client' => 'boolean',
-        'password_client' => 'boolean',
-        'device_client' => 'boolean',
-        'revoked' => 'boolean',
-        'confidential' => 'boolean',
-        'first_party' => 'boolean',
+        'password_client'        => 'boolean',
+        'device_client'          => 'boolean',
+        'revoked'                => 'boolean',
+        'confidential'           => 'boolean',
+        'first_party'            => 'boolean',
     ];
 
     protected $hidden = [
@@ -58,6 +57,21 @@ class Client extends BaseModel
     public function deviceCodes(): HasMany
     {
         return $this->hasMany(DeviceCode::class);
+    }
+
+    public function getIdentifier(): string
+    {
+        return $this->public_id;
+    }
+
+    public function getName(): string
+    {
+        return $this->name;
+    }
+
+    public function getRedirectUri(): string|array
+    {
+        return $this->redirect;
     }
 
     public function isConfidential(): bool

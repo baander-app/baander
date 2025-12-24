@@ -27,7 +27,7 @@ class ScopeRepository implements ScopeRepositoryInterface
         return $scopeEntity;
     }
 
-    public function finalizeScopes(array $scopes, $grantType, ClientEntityInterface $clientEntity, $userIdentifier = null): array
+    public function finalizeScopes(array $scopes, $grantType, ClientEntityInterface $clientEntity, $userIdentifier = null, ?string $authCodeId = null): array
     {
         // Here you can implement scope finalization logic
         // For now, we'll just return the requested scopes

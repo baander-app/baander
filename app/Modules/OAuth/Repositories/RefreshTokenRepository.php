@@ -20,24 +20,24 @@ class RefreshTokenRepository implements RefreshTokenRepositoryInterface
     public function persistNewRefreshToken(RefreshTokenEntityInterface $refreshTokenEntity): void
     {
         // Find the access token by its OAuth server identifier
-        $accessToken = Token::where('token_id', $refreshTokenEntity->getAccessToken()->getIdentifier())->first();
+        $accessToken = Token::whereId($refreshTokenEntity->getAccessToken()->getIdentifier())->first();
 
         RefreshToken::create([
-            'token_id' => $refreshTokenEntity->getIdentifier(), // OAuth server ID
+            'token_id'        => $refreshTokenEntity->getIdentifier(), // OAuth server ID
             'access_token_id' => $accessToken?->id, // Database ID
-            'revoked' => false,
-            'expires_at' => $refreshTokenEntity->getExpiryDateTime(),
+            'revoked'         => false,
+            'expires_at'      => $refreshTokenEntity->getExpiryDateTime(),
         ]);
     }
 
     public function revokeRefreshToken($tokenId): void
     {
-        RefreshToken::where('token_id', $tokenId)->update(['revoked' => true]);
+        RefreshToken::whereId($tokenId)->update(['revoked' => true]);
     }
 
     public function isRefreshTokenRevoked($tokenId): bool
     {
-        $refreshToken = RefreshToken::where('token_id', $tokenId)->first();
+        $refreshToken = RefreshToken::whereId($tokenId)->first();
 
         return $refreshToken === null || $refreshToken->isRevoked();
     }

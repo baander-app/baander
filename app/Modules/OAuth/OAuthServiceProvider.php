@@ -7,27 +7,30 @@ namespace App\Modules\OAuth;
 use App\Modules\OAuth\Contracts\AccessTokenRepositoryInterface;
 use App\Modules\OAuth\Contracts\AuthCodeRepositoryInterface;
 use App\Modules\OAuth\Contracts\ClientRepositoryInterface;
+use App\Modules\OAuth\Contracts\DeviceCodeRepositoryInterface;
 use App\Modules\OAuth\Contracts\RefreshTokenRepositoryInterface;
 use App\Modules\OAuth\Contracts\ScopeRepositoryInterface;
 use App\Modules\OAuth\Contracts\UserRepositoryInterface;
-use App\Modules\OAuth\Grants\DeviceCodeGrant;
 use App\Modules\OAuth\Repositories\AccessTokenRepository;
 use App\Modules\OAuth\Repositories\AuthCodeRepository;
 use App\Modules\OAuth\Repositories\ClientRepository;
+use App\Modules\OAuth\Repositories\DeviceCodeRepository;
 use App\Modules\OAuth\Repositories\RefreshTokenRepository;
 use App\Modules\OAuth\Repositories\ScopeRepository;
 use App\Modules\OAuth\Repositories\UserRepository;
 use DateInterval;
+use DateMalformedIntervalStringException;
+use Exception;
+use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Support\ServiceProvider;
 use League\OAuth2\Server\AuthorizationServer;
+use League\OAuth2\Server\CryptKey;
 use League\OAuth2\Server\Grant\AuthCodeGrant;
 use League\OAuth2\Server\Grant\ClientCredentialsGrant;
+use League\OAuth2\Server\Grant\DeviceCodeGrant;
 use League\OAuth2\Server\Grant\PasswordGrant;
 use League\OAuth2\Server\Grant\RefreshTokenGrant;
 use League\OAuth2\Server\ResourceServer;
-use Lcobucci\JWT\Configuration;
-use Lcobucci\JWT\Signer\Hmac\Sha256;
-use Lcobucci\JWT\Signer\Key\InMemory;
 
 class OAuthServiceProvider extends ServiceProvider
 {
@@ -39,25 +42,29 @@ class OAuthServiceProvider extends ServiceProvider
 
     private function registerRepositories(): void
     {
-        $this->app->bind(ClientRepositoryInterface::class, ClientRepository::class);
-        $this->app->bind(AccessTokenRepositoryInterface::class, AccessTokenRepository::class);
-        $this->app->bind(ScopeRepositoryInterface::class, ScopeRepository::class);
-        $this->app->bind(UserRepositoryInterface::class, UserRepository::class);
-        $this->app->bind(RefreshTokenRepositoryInterface::class, RefreshTokenRepository::class);
-        $this->app->bind(AuthCodeRepositoryInterface::class, AuthCodeRepository::class);
+        $this->app->scoped(AccessTokenRepositoryInterface::class, AccessTokenRepository::class);
+        $this->app->scoped(AuthCodeRepositoryInterface::class, AuthCodeRepository::class);
+        $this->app->scoped(ClientRepositoryInterface::class, ClientRepository::class);
+        $this->app->scoped(DeviceCodeRepositoryInterface::class, DeviceCodeRepository::class);
+        $this->app->scoped(RefreshTokenRepositoryInterface::class, RefreshTokenRepository::class);
+        $this->app->scoped(ScopeRepositoryInterface::class, ScopeRepository::class);
+        $this->app->scoped(UserRepositoryInterface::class, UserRepository::class);
     }
 
     private function registerOAuthServer(): void
     {
-        $this->app->singleton(AuthorizationServer::class, function () {
-            $privateKey = config('oauth.private_key', storage_path('oauth-private.key'));
+        $this->app->bind(AuthorizationServer::class, function () {
+            $privateKeyPath = config('oauth.private_key');
+            $passphrase = config('oauth.encryption_key');
+
+            $privateKey = new CryptKey($privateKeyPath, $passphrase);
 
             $server = new AuthorizationServer(
                 $this->app->make(ClientRepositoryInterface::class),
                 $this->app->make(AccessTokenRepositoryInterface::class),
                 $this->app->make(ScopeRepositoryInterface::class),
                 $privateKey,
-                config('oauth.encryption_key', config('app.key'))
+                $passphrase,
             );
 
             // Enable grants
@@ -66,16 +73,21 @@ class OAuthServiceProvider extends ServiceProvider
             return $server;
         });
 
-        $this->app->singleton(ResourceServer::class, function () {
-            $publicKey = config('oauth.public_key', storage_path('oauth-public.key'));
+        $this->app->bind(ResourceServer::class, function () {
+            $publicKey = config('oauth.public_key');
 
             return new ResourceServer(
                 $this->app->make(AccessTokenRepositoryInterface::class),
-                $publicKey
+                $publicKey,
             );
         });
     }
 
+    /**
+     * @throws BindingResolutionException
+     * @throws DateMalformedIntervalStringException
+     * @throws Exception
+     */
     private function enableGrants(AuthorizationServer $server): void
     {
         $accessTokenTTL = new DateInterval(config('oauth.access_token_ttl', 'PT1H'));
@@ -86,7 +98,7 @@ class OAuthServiceProvider extends ServiceProvider
         $authCodeGrant = new AuthCodeGrant(
             $this->app->make(AuthCodeRepositoryInterface::class),
             $this->app->make(RefreshTokenRepositoryInterface::class),
-            $authCodeTTL
+            $authCodeTTL,
         );
         $authCodeGrant->setRefreshTokenTTL($refreshTokenTTL);
         $server->enableGrantType($authCodeGrant, $accessTokenTTL);
@@ -94,7 +106,7 @@ class OAuthServiceProvider extends ServiceProvider
         // Password Grant
         $passwordGrant = new PasswordGrant(
             $this->app->make(UserRepositoryInterface::class),
-            $this->app->make(RefreshTokenRepositoryInterface::class)
+            $this->app->make(RefreshTokenRepositoryInterface::class),
         );
         $passwordGrant->setRefreshTokenTTL($refreshTokenTTL);
         $server->enableGrantType($passwordGrant, $accessTokenTTL);
@@ -108,7 +120,13 @@ class OAuthServiceProvider extends ServiceProvider
         $server->enableGrantType($refreshTokenGrant, $accessTokenTTL);
 
         // Device Code Grant
-        $deviceCodeGrant = new DeviceCodeGrant($this->app->make(RefreshTokenRepositoryInterface::class));
+        $deviceCodeGrant = new DeviceCodeGrant(
+            $this->app->make(DeviceCodeRepositoryInterface::class),
+            $this->app->make(RefreshTokenRepositoryInterface::class),
+            new DateInterval('PT' . config('oauth.device_code_ttl', 600) . 'S'),
+            route('oauth.device.verify'),
+            config('oauth.device_code_interval', 5),
+        );
         $server->enableGrantType($deviceCodeGrant, $accessTokenTTL);
     }
 }

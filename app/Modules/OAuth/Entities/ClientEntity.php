@@ -13,7 +13,7 @@ class ClientEntity implements ClientEntityInterface
     use ClientTrait;
     use EntityTrait;
 
-    protected $isConfidential = false;
+    protected bool $isConfidential = false;
 
     public function setName(string $name): void
     {

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\OAuth\Entities;
 
-use League\OAuth2\Server\Entities\UserEntityInterface;
 use League\OAuth2\Server\Entities\Traits\EntityTrait;
+use League\OAuth2\Server\Entities\UserEntityInterface;
 
 class UserEntity implements UserEntityInterface
 {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\OAuth\Repositories;
 
+use App\Models\OAuth\Client;
 use App\Models\OAuth\Token;
 use App\Modules\OAuth\Contracts\AccessTokenRepositoryInterface;
 use App\Modules\OAuth\Entities\AccessTokenEntity;
@@ -28,24 +29,27 @@ class AccessTokenRepository implements AccessTokenRepositoryInterface
 
     public function persistNewAccessToken(AccessTokenEntityInterface $accessTokenEntity): void
     {
+        // Look up client by public_id and get the internal ID for the foreign key
+        $client = Client::wherePublicId($accessTokenEntity->getClient()->getIdentifier())->firstOrFail();
+
         Token::create([
-            'token_id' => $accessTokenEntity->getIdentifier(), // OAuth server ID
-            'user_id' => $accessTokenEntity->getUserIdentifier(),
-            'client_id' => $accessTokenEntity->getClient()->getIdentifier(),
-            'scopes' => array_map(fn(ScopeEntityInterface $scope) => $scope->getIdentifier(), $accessTokenEntity->getScopes()),
-            'revoked' => false,
+            'token_id'   => $accessTokenEntity->getIdentifier(), // OAuth server ID
+            'user_id'    => $accessTokenEntity->getUserIdentifier(),
+            'client_id'  => $client->id,
+            'scopes'     => array_map(fn(ScopeEntityInterface $scope) => $scope->getIdentifier(), $accessTokenEntity->getScopes()),
+            'revoked'    => false,
             'expires_at' => $accessTokenEntity->getExpiryDateTime(),
         ]);
     }
 
     public function revokeAccessToken($tokenId): void
     {
-        Token::where('token_id', $tokenId)->update(['revoked' => true]);
+        Token::whereId($tokenId)->update(['revoked' => true]);
     }
 
     public function isAccessTokenRevoked($tokenId): bool
     {
-        $token = Token::where('token_id', $tokenId)->first();
+        $token = Token::whereId($tokenId)->first();
 
         return $token === null || $token->isRevoked();
     }

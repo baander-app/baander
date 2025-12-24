@@ -5,16 +5,20 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\OAuth\DeviceCode;
+use App\Models\OAuth\Client;
+use App\Models\OAuth\DeviceCode as DeviceCodeModel;
+use App\Models\OAuth\Token;
+use App\Modules\OAuth\Contracts\DeviceCodeRepositoryInterface;
+use App\Modules\OAuth\Contracts\ScopeRepositoryInterface;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use League\OAuth2\Server\AuthorizationServer;
+use League\OAuth2\Server\Entities\DeviceCodeEntityInterface;
 use League\OAuth2\Server\Exception\OAuthServerException;
 use League\OAuth2\Server\ResourceServer;
 use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\ServerRequestInterface;
 use Spatie\RouteAttributes\Attributes\Get;
 use Spatie\RouteAttributes\Attributes\Post;
 use Spatie\RouteAttributes\Attributes\Prefix;
@@ -33,10 +37,12 @@ use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
 class OAuthController extends Controller
 {
     public function __construct(
-        private readonly AuthorizationServer $authorizationServer,
-        private readonly ResourceServer $resourceServer,
-        private readonly PsrHttpFactory $psrFactory,
-    ) {
+        private readonly ResourceServer                $resourceServer,
+        private readonly PsrHttpFactory                $psrFactory,
+        private readonly DeviceCodeRepositoryInterface $deviceCodeRepository,
+        private readonly ScopeRepositoryInterface      $scopeRepository,
+    )
+    {
     }
 
     /**
@@ -52,37 +58,30 @@ class OAuthController extends Controller
      * @response 302
      */
     #[Get('authorize', 'oauth.authorize')]
-    public function authorizeCodeFlow(Request $request): Response
+    public function authorizeCodeFlow(Request $request)
     {
         $psrRequest = $this->psrFactory->createRequest($request);
         $psrResponse = $this->psrFactory->createResponse(new HttpFoundationResponse());
+        $authorizationServer = app(AuthorizationServer::class);
 
         try {
-            $authRequest = $this->authorizationServer->validateAuthorizationRequest($psrRequest);
-
-            // In a real implementation, you'd show a consent screen here
-            // For now, we'll auto-approve for first-party clients
+            $authRequest = $authorizationServer->validateAuthorizationRequest($psrRequest);
 
             $user = $request->user();
-            if ($user) {
-                $authRequest->setUser(new \App\Modules\OAuth\Entities\UserEntity());
-                $authRequest->getUser()->setIdentifier($user->id);
-                $authRequest->setAuthorizationApproved(true);
-
-                return $this->convertResponse(
-                    $this->authorizationServer->completeAuthorizationRequest($authRequest, $psrResponse)
-                );
+            if (!$user) {
+                return redirect('/login?' . http_build_query(['redirect' => $request->fullUrl()]));
             }
 
-            // Redirect to login if not authenticated
-            return redirect('/login?' . http_build_query([
-                    'redirect' => $request->fullUrl()
-                ]));
+            $userEntity = new \App\Modules\OAuth\Entities\UserEntity();
+            $userEntity->setIdentifier($user->id);
+            $authRequest->setUser($userEntity);
+            $authRequest->setAuthorizationApproved(true);
 
-        } catch (OAuthServerException $exception) {
             return $this->convertResponse(
-                $exception->generateHttpResponse($psrResponse)
+                $authorizationServer->completeAuthorizationRequest($authRequest, $psrResponse),
             );
+        } catch (OAuthServerException $exception) {
+            return $this->convertResponse($exception->generateHttpResponse($psrResponse));
         } catch (Exception $exception) {
             return response()->json(['error' => 'server_error'], 500);
         }
@@ -111,19 +110,18 @@ class OAuthController extends Controller
      * }
      */
     #[Post('token', 'oauth.token')]
-    public function token(Request $request): Response
+    public function token(Request $request)
     {
         $psrRequest = $this->psrFactory->createRequest($request);
         $psrResponse = $this->psrFactory->createResponse(new HttpFoundationResponse());
 
         try {
+            $authorizationServer = app(AuthorizationServer::class);
             return $this->convertResponse(
-                $this->authorizationServer->respondToAccessTokenRequest($psrRequest, $psrResponse)
+                $authorizationServer->respondToAccessTokenRequest($psrRequest, $psrResponse),
             );
         } catch (OAuthServerException $exception) {
-            return $this->convertResponse(
-                $exception->generateHttpResponse($psrResponse)
-            );
+            return $this->convertResponse($exception->generateHttpResponse($psrResponse));
         } catch (Exception $exception) {
             return response()->json(['error' => 'server_error'], 500);
         }
@@ -149,48 +147,43 @@ class OAuthController extends Controller
      * }
      */
     #[Post('device/authorize', 'oauth.device.authorize')]
-    public function deviceAuthorize(Request $request): JsonResponse
+    public function deviceAuthorize(Request $request)
     {
         $request->validate([
             'client_id' => 'required|string',
-            'scope' => 'nullable|string',
+            'scope'     => 'nullable|string',
         ]);
 
-        $client = \App\Models\OAuth\Client::where('id', $request->input('client_id'))
-            ->where('device_client', true)
-            ->where('revoked', false)
-            ->first();
-
+        $client = $this->getValidDeviceClient($request->input('client_id'));
         if (!$client) {
             throw OAuthServerException::invalidClient($this->psrFactory->createRequest($request));
         }
 
-        $deviceCode = $this->generateDeviceCode();
+        $deviceCodeEntity = $this->deviceCodeRepository->getNewDeviceCode();
+        $deviceCodeString = $this->generateDeviceCode();
         $userCode = $this->generateUserCode();
-        $expiresIn = config('oauth.device_code_ttl', 600); // 10 minutes
-        $interval = config('oauth.device_code_interval', 5); // 5 seconds
+        $expiresIn = config('oauth.device_code_ttl', 600);
+        $interval = config('oauth.device_code_interval', 5);
+        $verificationUri = route('oauth.device.verify');
 
-        $verificationUri = config('oauth.device_verification_uri', config('app.url') . '/device');
-        $verificationUriComplete = $verificationUri . '?user_code=' . $userCode;
+        $deviceCodeEntity->setIdentifier($deviceCodeString);
+        $deviceCodeEntity->setUserCode($userCode);
+        $deviceCodeEntity->setVerificationUri($verificationUri);
+        $deviceCodeEntity->setInterval($interval);
+        $deviceCodeEntity->setExpiryDateTime(new \DateTimeImmutable("+$expiresIn seconds"));
+        $deviceCodeEntity->setClient($client);
+        $deviceCodeEntity->setUserApproved(false);
 
-        DeviceCode::create([
-            'device_code' => $deviceCode,
-            'user_code' => $userCode,
-            'client_id' => $client->id,
-            'scopes' => $request->filled('scope') ? explode(' ', $request->input('scope')) : [],
-            'verification_uri' => $verificationUri,
-            'verification_uri_complete' => $verificationUriComplete,
-            'expires_at' => now()->addSeconds($expiresIn),
-            'interval' => $interval,
-        ]);
+        $this->addScopesToEntity($deviceCodeEntity, $request->input('scope', ''));
+        $this->deviceCodeRepository->persistDeviceCode($deviceCodeEntity);
 
         return response()->json([
-            'device_code' => $deviceCode,
-            'user_code' => $userCode,
-            'verification_uri' => $verificationUri,
-            'verification_uri_complete' => $verificationUriComplete,
-            'expires_in' => $expiresIn,
-            'interval' => $interval,
+            'device_code'               => $deviceCodeString,
+            'user_code'                 => $userCode,
+            'verification_uri'          => $verificationUri,
+            'verification_uri_complete' => $verificationUri . '?user_code=' . $userCode,
+            'expires_in'                => $expiresIn,
+            'interval'                  => $interval,
         ]);
     }
 
@@ -209,40 +202,31 @@ class OAuthController extends Controller
      * }
      */
     #[Get('device/verify', 'oauth.device.verify')]
-    public function deviceVerify(Request $request): JsonResponse
+    public function deviceVerify(Request $request)
     {
         $userCode = $request->input('user_code');
 
         if (!$userCode) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User code is required'
-            ], 400);
+            return $this->errorResponse('User code is required', 400);
         }
 
-        $deviceCode = DeviceCode::where('user_code', $userCode)
+        $deviceCode = DeviceCodeModel::whereUserCode($userCode)
             ->where('expires_at', '>', now())
             ->first();
 
         if (!$deviceCode) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid or expired user code'
-            ], 400);
+            return $this->errorResponse('Invalid or expired user code', 400);
         }
 
         if ($deviceCode->approved || $deviceCode->denied) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Device code already processed'
-            ], 400);
+            return $this->errorResponse('Device code already processed', 400);
         }
 
         return response()->json([
-            'success' => true,
+            'success'     => true,
             'device_code' => $deviceCode,
-            'client' => $deviceCode->client,
-            'scopes' => $deviceCode->scopes,
+            'client'      => $deviceCode->client,
+            'scopes'      => $deviceCode->scopes,
         ]);
     }
 
@@ -259,29 +243,23 @@ class OAuthController extends Controller
      * }
      */
     #[Post('device/approve', 'oauth.device.approve', ['auth:sanctum'])]
-    public function deviceApprove(Request $request): JsonResponse
+    public function deviceApprove(Request $request)
     {
         $request->validate([
             'user_code' => 'required|string',
-            'action' => 'required|in:approve,deny',
+            'action'    => 'required|in:approve,deny',
         ]);
 
-        $deviceCode = DeviceCode::where('user_code', $request->input('user_code'))
+        $deviceCode = DeviceCodeModel::where('user_code', $request->input('user_code'))
             ->where('expires_at', '>', now())
             ->first();
 
         if (!$deviceCode) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid or expired user code'
-            ], 400);
+            return $this->errorResponse('Invalid or expired user code', 400);
         }
 
         if ($deviceCode->approved || $deviceCode->denied) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Device code already processed'
-            ], 400);
+            return $this->errorResponse('Device code already processed', 400);
         }
 
         if ($request->input('action') === 'approve') {
@@ -316,39 +294,68 @@ class OAuthController extends Controller
      * }
      */
     #[Post('introspect', 'oauth.introspect')]
-    public function introspect(Request $request): JsonResponse
+    public function introspect(Request $request)
     {
         $psrRequest = $this->psrFactory->createRequest($request);
 
         try {
             $this->resourceServer->validateAuthenticatedRequest($psrRequest);
 
-            $token = \App\Models\OAuth\Token::where('token_id', $request->input('token'))->first();
+            $token = Token::whereId($request->input('token'))->first();
 
             if (!$token || $token->isRevoked()) {
                 return response()->json(['active' => false]);
             }
 
             return response()->json([
-                'active' => true,
+                'active'    => true,
                 'client_id' => $token->client_id,
-                'username' => $token->user?->email,
-                'scope' => implode(' ', $token->scopes ?? []),
-                'exp' => $token->expires_at->timestamp,
+                'username'  => $token->user?->email,
+                'scope'     => implode(' ', $token->scopes ?? []),
+                'exp'       => $token->expires_at->timestamp,
             ]);
-
         } catch (OAuthServerException $exception) {
             return response()->json(['active' => false]);
         }
     }
 
-    private function convertResponse(ResponseInterface $psrResponse): Response
+    private function convertResponse(ResponseInterface $psrResponse)
     {
         return new Response(
             $psrResponse->getBody()->getContents(),
             $psrResponse->getStatusCode(),
-            $psrResponse->getHeaders()
+            $psrResponse->getHeaders(),
         );
+    }
+
+    private function errorResponse(string $message, int $status = 400)
+    {
+        return response()->json(['success' => false, 'message' => $message], $status);
+    }
+
+    private function getValidDeviceClient(string $clientId): ?Client
+    {
+        return Client::wherePublicId($clientId)
+            ->whereDeviceClient(true)
+            ->whereRevoked(false)
+            ->first();
+    }
+
+    private function addScopesToEntity(
+        DeviceCodeEntityInterface $entity,
+        string                    $scopeString,
+    ): void
+    {
+        if (empty($scopeString)) {
+            return;
+        }
+
+        foreach (explode(' ', $scopeString) as $scopeIdentifier) {
+            $scope = $this->scopeRepository->getScopeEntityByIdentifier($scopeIdentifier);
+            if ($scope) {
+                $entity->addScope($scope);
+            }
+        }
     }
 
     private function generateDeviceCode(): string
@@ -358,15 +365,16 @@ class OAuthController extends Controller
 
     private function generateUserCode(): string
     {
-        // Generate a readable user code (e.g., ABCD-EFGH)
         $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         $code = '';
+
         for ($i = 0; $i < 8; $i++) {
             if ($i === 4) {
                 $code .= '-';
             }
             $code .= $chars[random_int(0, strlen($chars) - 1)];
         }
+
         return $code;
     }
 }

@@ -8,6 +8,7 @@ namespace App\Console\Commands\OAuth;
 use App\Models\OAuth\Client;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 
 class CreateClientCommand extends Command
 {
@@ -51,7 +52,6 @@ class CreateClientCommand extends Command
         $confidential = !$isPublic && !$isDevice;
 
         $client = Client::create([
-            'id'                     => Str::uuid(),
             'name'                   => $name,
             'secret'                 => $confidential ? Str::random(40) : null,
             'redirect'               => $redirect,
@@ -84,11 +84,11 @@ class CreateClientCommand extends Command
 
     private function getClientType(Client $client): string
     {
+        if ($client->confidential) return 'Confidential (Web Application)';
+
         if ($client->device_client) return 'Device Code';
         if ($client->password_client) return 'Password Grant';
         if ($client->personal_access_client) return 'Personal Access';
         if (!$client->confidential) return 'Public (SPA/Mobile)';
-
-        return 'Confidential (Web Application)';
     }
 }

@@ -13,8 +13,8 @@ class ClientRepository implements ClientRepositoryInterface
 {
     public function getClientEntity($clientIdentifier): ?ClientEntityInterface
     {
-        $client = Client::where('id', $clientIdentifier)
-            ->where('revoked', false)
+        $client = Client::wherePublicId($clientIdentifier)
+            ->whereRevoked(false)
             ->first();
 
         if (!$client) {
@@ -22,18 +22,18 @@ class ClientRepository implements ClientRepositoryInterface
         }
 
         $clientEntity = new ClientEntity();
-        $clientEntity->setIdentifier($client->id);
+        $clientEntity->setIdentifier($client->public_id);
         $clientEntity->setName($client->name);
         $clientEntity->setRedirectUri($client->redirect);
-        $clientEntity->setConfidential($client->isConfidential());
+        $clientEntity->setConfidential($client->first_party);
 
         return $clientEntity;
     }
 
     public function validateClient($clientIdentifier, $clientSecret, $grantType): bool
     {
-        $client = Client::where('id', $clientIdentifier)
-            ->where('revoked', false)
+        $client = Client::wherePublicId($clientIdentifier)
+            ->whereRevoked(false)
             ->first();
 
         if (!$client) {
@@ -42,11 +42,11 @@ class ClientRepository implements ClientRepositoryInterface
 
         // For device code flow, we don't validate client secret for public clients
         if ($grantType === 'urn:ietf:params:oauth:grant-type:device_code') {
-            return !$client->isConfidential() || hash_equals($client->secret, $clientSecret ?? '');
+            return !$client->first_party || hash_equals($client->secret, $clientSecret ?? '');
         }
 
         // For confidential clients, always validate secret
-        if ($client->isConfidential()) {
+        if ($client->first_party) {
             return hash_equals($client->secret, $clientSecret ?? '');
         }
 

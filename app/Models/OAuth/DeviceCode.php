@@ -31,11 +31,11 @@ class DeviceCode extends BaseModel
     ];
 
     protected $casts = [
-        'scopes' => 'array',
-        'expires_at' => 'datetime',
+        'scopes'         => 'array',
+        'expires_at'     => 'datetime',
         'last_polled_at' => 'datetime',
-        'approved' => 'boolean',
-        'denied' => 'boolean',
+        'approved'       => 'boolean',
+        'denied'         => 'boolean',
     ];
 
     public function user(): BelongsTo
@@ -56,9 +56,9 @@ class DeviceCode extends BaseModel
     public function approve(User $user): void
     {
         $this->update([
-            'user_id' => $user->id,
+            'user_id'  => $user->id,
             'approved' => true,
-            'denied' => false,
+            'denied'   => false,
         ]);
     }
 
@@ -66,7 +66,7 @@ class DeviceCode extends BaseModel
     {
         $this->update([
             'approved' => false,
-            'denied' => true,
+            'denied'   => true,
         ]);
     }
 

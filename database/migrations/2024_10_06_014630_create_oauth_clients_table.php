@@ -10,6 +10,7 @@ return new class extends Migration
     {
         Schema::create('oauth_clients', function (Blueprint $table) {
             $table->id()->primary();
+            $table->text('public_id')->unique();
             $table->text('name');
             $table->text('secret')->nullable();
             $table->text('provider')->nullable();

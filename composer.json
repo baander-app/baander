@@ -44,7 +44,7 @@
         "league/csv": "^9.24",
         "league/flysystem-read-only": "^3.28.0",
         "league/mime-type-detection": "^1.16.0",
-        "league/oauth2-server": "^8.5",
+        "league/oauth2-server": "^9.3.0",
         "nyholm/psr7": "*",
         "overtrue/laravel-versionable": "^5.4.0",
         "php-ffmpeg/php-ffmpeg": "^1.3",
