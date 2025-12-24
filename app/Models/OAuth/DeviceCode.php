@@ -6,13 +6,10 @@ namespace App\Models\OAuth;
 
 use App\Models\BaseModel;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DeviceCode extends BaseModel
 {
-    use HasUuids;
-
     protected $table = 'oauth_device_codes';
 
     protected $fillable = [

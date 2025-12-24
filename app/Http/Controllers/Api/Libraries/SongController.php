@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\ValidationException;
 use App\Http\Requests\Song\{SongIndexRequest, SongShowRequest};
 use App\Http\Resources\Song\SongResource;
-use App\Models\{Album, Library, Song, TokenAbility};
+use App\Models\{Album, Library, Song};
 use App\Modules\Eloquent\BaseBuilder;
 use App\Modules\Http\Resources\Json\JsonAnonymousResourceCollection;
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
@@ -28,7 +28,7 @@ class SongController extends Controller
      *
      * @throws ValidationException When both genreNames and genreSlugs are provided
      */
-    #[Get('', 'api.songs.index', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
+    #[Get('', 'api.songs.index', ['auth:oauth', 'scope:access-api'])]
     public function index(SongIndexRequest $request, Library $library): JsonAnonymousResourceCollection
     {
         $relations = $request->query('relations');
@@ -74,7 +74,7 @@ class SongController extends Controller
      * @throws ModelNotFoundException When song is not found
      * @response SongResource
      */
-    #[Get('{publicId}', 'api.songs.show', ['auth:sanctum', 'ability:' . TokenAbility::ACCESS_API->value])]
+    #[Get('{publicId}', 'api.songs.show', ['auth:oauth', 'scope:access-api'])]
     public function show(SongShowRequest $request, Library $library, string $publicId): SongResource
     {
         /** @var string|null $relations Comma-separated list of relations to include */

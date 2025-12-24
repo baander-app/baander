@@ -126,7 +126,6 @@
     "vite-plugin-electron-renderer": "^0.14.6",
     "vite-plugin-laravel-translations": "^0.2.2",
     "vite-plugin-manifest-sri": "^0.2.0",
-    "vite-plugin-node-polyfills": "^0.24.0",
     "vite-plugin-optimize-css-modules": "^1.2.0",
     "vite-plugin-react-rich-svg": "^1.2.0",
     "vite-plugin-watch-and-run": "^1.7.3",

@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Movie\MovieResource;
 use App\Models\Library;
 use App\Models\Movie;
-use App\Models\TokenAbility;
+
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Response;
 use Spatie\RouteAttributes\Attributes\Get;
@@ -15,8 +15,8 @@ use Spatie\RouteAttributes\Attributes\Prefix;
 
 #[Prefix('/libraries/{library}/movies')]
 #[Middleware([
-    'auth:sanctum',
-    'ability:' . TokenAbility::ACCESS_API->value,
+    'auth:oauth',
+    'scope:access-api',
     'force.json',
 ])]
 class MovieController extends Controller

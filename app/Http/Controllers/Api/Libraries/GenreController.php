@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api\Libraries;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Genre\{GenreIndexRequest, UpdateGenreRequest};
 use App\Http\Resources\Genre\GenreResource;
-use App\Models\{Genre, TokenAbility};
+use App\Models\Genre;
 use App\Modules\Eloquent\BaseBuilder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Response;
@@ -13,8 +13,8 @@ use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Patch, Prefix};
 
 #[Prefix('/genres')]
 #[Middleware([
-    'auth:sanctum',
-    'ability:' . TokenAbility::ACCESS_API->value,
+    'auth:oauth',
+    'scope:access-api',
     'force.json',
 ])]
 class GenreController extends Controller

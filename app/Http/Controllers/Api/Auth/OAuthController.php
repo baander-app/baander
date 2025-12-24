@@ -9,6 +9,7 @@ use Exception;
 use App\Http\Controllers\Controller;
 use App\Models\OAuth\{Client, DeviceCode as DeviceCodeModel, Token};
 use App\Modules\OAuth\Contracts\{DeviceCodeRepositoryInterface, ScopeRepositoryInterface};
+use App\Modules\OAuth\Psr7Factory;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\{Request, Response};
 use League\OAuth2\Server\AuthorizationServer;
@@ -17,8 +18,6 @@ use League\OAuth2\Server\Exception\OAuthServerException;
 use League\OAuth2\Server\ResourceServer;
 use Psr\Http\Message\ResponseInterface;
 use Spatie\RouteAttributes\Attributes\{Get, Post, Prefix};
-use Symfony\Bridge\PsrHttpMessage\Factory\PsrHttpFactory;
-use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
 
 /**
  * OAuth 2.0 Server Controller
@@ -34,12 +33,10 @@ class OAuthController extends Controller
 {
     public function __construct(
         private readonly ResourceServer                $resourceServer,
-        private readonly PsrHttpFactory                $psrFactory,
+        private readonly Psr7Factory                 $psr,
         private readonly DeviceCodeRepositoryInterface $deviceCodeRepository,
         private readonly ScopeRepositoryInterface      $scopeRepository,
-    )
-    {
-    }
+    ) {}
 
     /**
      * OAuth 2.0 Authorization Endpoint
@@ -55,8 +52,8 @@ class OAuthController extends Controller
     #[Get('authorize', 'oauth.authorize')]
     public function authorizeCodeFlow(Request $request)
     {
-        $psrRequest = $this->psrFactory->createRequest($request);
-        $psrResponse = $this->psrFactory->createResponse(new HttpFoundationResponse());
+        $psrRequest = $this->psr->createRequest($request);
+        $psrResponse = $this->psr->createResponse();
         $authorizationServer = app(AuthorizationServer::class);
 
         try {
@@ -72,11 +69,11 @@ class OAuthController extends Controller
             $authRequest->setUser($userEntity);
             $authRequest->setAuthorizationApproved(true);
 
-            return $this->convertResponse(
+            return $this->psr->toLaravelResponse(
                 $authorizationServer->completeAuthorizationRequest($authRequest, $psrResponse),
             );
         } catch (OAuthServerException $exception) {
-            return $this->convertResponse($exception->generateHttpResponse($psrResponse));
+            return $this->psr->toLaravelResponse($exception->generateHttpResponse($psrResponse));
         } catch (Exception $exception) {
             Log::error('OAuthController::authorizeCodeFlow failed', [
                 'e.message' => $exception->getMessage(),
@@ -111,16 +108,16 @@ class OAuthController extends Controller
     #[Post('token', 'oauth.token', ['throttle:oauth-token'])]
     public function token(Request $request)
     {
-        $psrRequest = $this->psrFactory->createRequest($request);
-        $psrResponse = $this->psrFactory->createResponse(new HttpFoundationResponse());
+        $psrRequest = $this->psr->createRequest($request);
+        $psrResponse = $this->psr->createResponse();
 
         try {
             $authorizationServer = app(AuthorizationServer::class);
-            return $this->convertResponse(
+            return $this->psr->toLaravelResponse(
                 $authorizationServer->respondToAccessTokenRequest($psrRequest, $psrResponse),
             );
         } catch (OAuthServerException $exception) {
-            return $this->convertResponse($exception->generateHttpResponse($psrResponse));
+            return $this->psr->toLaravelResponse($exception->generateHttpResponse($psrResponse));
         } catch (Exception $exception) {
             Log::error('OAuthController::token failed', [
                 'e.message' => $exception->getMessage(),
@@ -159,7 +156,7 @@ class OAuthController extends Controller
 
         $client = $this->getValidDeviceClient($request->input('client_id'));
         if (!$client) {
-            throw OAuthServerException::invalidClient($this->psrFactory->createRequest($request));
+            throw OAuthServerException::invalidClient($this->psr->createRequest($request));
         }
 
         $deviceCodeEntity = $this->deviceCodeRepository->getNewDeviceCode();
@@ -245,7 +242,7 @@ class OAuthController extends Controller
      *   message: string
      * }
      */
-    #[Post('device/approve', 'oauth.device.approve', ['auth:sanctum'])]
+    #[Post('device/approve', 'oauth.device.approve', ['auth:oauth'])]
     public function deviceApprove(Request $request)
     {
         $request->validate([
@@ -297,7 +294,7 @@ class OAuthController extends Controller
     #[Post('introspect', 'oauth.introspect')]
     public function introspect(Request $request)
     {
-        $psrRequest = $this->psrFactory->createRequest($request);
+        $psrRequest = $this->psr->createRequest($request);
 
         try {
             $this->resourceServer->validateAuthenticatedRequest($psrRequest);
@@ -322,15 +319,6 @@ class OAuthController extends Controller
         }
     }
 
-    private function convertResponse(ResponseInterface $psrResponse)
-    {
-        return new Response(
-            $psrResponse->getBody()->getContents(),
-            $psrResponse->getStatusCode(),
-            $psrResponse->getHeaders(),
-        );
-    }
-
     private function errorResponse(string $message, int $status = 400)
     {
         return response()->json(['success' => false, 'message' => $message], $status);
@@ -347,8 +335,7 @@ class OAuthController extends Controller
     private function addScopesToEntity(
         DeviceCodeEntityInterface $entity,
         string                    $scopeString,
-    ): void
-    {
+    ): void {
         if (empty($scopeString)) {
             return;
         }

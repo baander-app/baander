@@ -7,6 +7,7 @@ namespace App\Modules\OAuth\Repositories;
 use App\Models\User;
 use App\Modules\OAuth\Contracts\UserRepositoryInterface;
 use App\Modules\OAuth\Entities\UserEntity;
+use Illuminate\Support\Facades\Hash;
 use League\OAuth2\Server\Entities\ClientEntityInterface;
 use League\OAuth2\Server\Entities\UserEntityInterface;
 
@@ -16,8 +17,13 @@ class UserRepository implements UserRepositoryInterface
     {
         $user = User::whereEmail($username)->first();
 
-        if (!$user || !password_verify($password, $user->password)) {
+        if (!$user || !Hash::check($password, $user->password)) {
             return null;
+        }
+
+        if (Hash::needsRehash($user->password)) {
+            $user->password = Hash::make($password);
+            $user->save();
         }
 
         $userEntity = new UserEntity();

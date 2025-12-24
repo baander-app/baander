@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\TokenAbility;
+
 use App\Modules\Logging\Attributes\LogChannel;
 use App\Modules\Logging\Channel;
 use Dedoc\Scramble\Attributes\Group;
@@ -30,8 +30,8 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 #[Prefix('/logs')]
 #[Group('System')]
 #[Middleware([
-    'auth:sanctum',
-    'ability:' . TokenAbility::ACCESS_API->value,
+    'auth:oauth',
+    'scope:access-api',
     'force.json',
 ])]
 class LogsController extends Controller

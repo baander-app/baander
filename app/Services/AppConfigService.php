@@ -35,7 +35,7 @@ class AppConfigService
             name: config('app.name'),
             url: config('app.url'),
             apiUrl: config('app.url') . '/api',
-            apiDocsUrl: route('scramble.docs.document'),
+            apiDocsUrl: secure_url('/docs/api.json'),
             environment: config('app.env'),
             debug: config('app.debug'),
             locale: config('app.locale'),

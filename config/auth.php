@@ -31,7 +31,7 @@ return [
     | users are actually retrieved out of your database or other storage
     | mechanisms used by this application to persist your user's data.
     |
-    | Supported: "session", "oauth", "sanctum"
+    | Supported: "session", "oauth"
     |
     */
 
@@ -47,9 +47,8 @@ return [
         ],
 
         'api' => [
-            'driver'   => 'sanctum',
+            'driver'   => 'oauth',
             'provider' => 'users',
-            'hash'     => false,
         ],
     ],
 

@@ -10,24 +10,26 @@ export async function login(credentials: { email: string; password: string }) {
       _skipAuth: true,
     });
 
-    const { accessToken, refreshToken, sessionId } = response;
+    const { access_token, refresh_token, expires_in, session_id } = response;
 
     // Store session ID for request headers
-    if (sessionId) {
-      tokenBindingService.setSessionId(sessionId);
+    if (session_id) {
+      tokenBindingService.setSessionId(session_id);
     }
 
     // Store tokens
     Token.set({
-      accessToken,
-      refreshToken,
-      sessionId,
+      access_token,
+      refresh_token,
+      session_id,
+      expires_in,
     });
 
     // Notify other parts of the app
     eventBridge.emit('auth:login', {
-      tokens: { accessToken, refreshToken },
-      sessionId,
+      tokens: { accessToken: access_token, refreshToken: refresh_token },
+      session_id,
+      expires_in
     });
 
     return response;

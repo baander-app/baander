@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Library\{CreateLibraryRequest, LibraryIndexRequest, UpdateLibraryRequest};
 use App\Http\Resources\Library\LibraryResource;
 use App\Http\Resources\Library\LibraryStatsResource;
-use App\Models\{Enums\MetaKey, Library, TokenAbility};
+use App\Models\{Enums\MetaKey, Library};
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Response;
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Patch, Post, Prefix};
@@ -14,8 +14,8 @@ use Symfony\Component\HttpFoundation\Response as ResponseAlias;
 
 #[Prefix('/libraries')]
 #[Middleware([
-    'auth:sanctum',
-    'ability:' . TokenAbility::ACCESS_API->value,
+    'auth:oauth',
+    'scope:access-api',
     'force.json',
 ])]
 class LibraryController extends Controller

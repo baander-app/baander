@@ -196,6 +196,9 @@ class DevServerCommand extends Command
         $command = [
             self::PHP_PATH,
             self::PHP_ARGS,
+//            '-dxdebug.start_with_request=1',
+//            '-dxdebug.mode=debug',
+//            '-dxdebug.idekey=PHPSTORM',
             self::ARTISAN_PATH,
             'octane:start',
             '--watch',

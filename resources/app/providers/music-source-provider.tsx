@@ -29,7 +29,7 @@ export function MusicSourceProvider({ children }: { children: React.ReactNode })
       return `${currentSong.streamUrl}?_token=${streamToken.token}`;
     }
     return undefined;
-  }, [currentSong]);
+  }, [currentSong?.streamUrl]);
 
   const onSongEnd = useCallback(() => {
     dispatch(playNextSong());

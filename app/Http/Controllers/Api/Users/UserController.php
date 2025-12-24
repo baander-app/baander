@@ -11,7 +11,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\ValidationException;
-use App\Models\{TokenAbility, User};
+use App\Models\User;
 use Illuminate\Http\{Request, Response};
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Patch, Post, Prefix};
 
@@ -24,8 +24,8 @@ use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Patch, Post, Pre
 #[Prefix('users')]
 #[Group('Users')]
 #[Middleware([
-    'auth:sanctum',
-    'ability:' . TokenAbility::ACCESS_API->value,
+    'auth:oauth',
+    'scope:access-api',
     'force.json',
 ])]
 class UserController extends Controller

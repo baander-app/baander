@@ -5,13 +5,10 @@ declare(strict_types=1);
 namespace App\Models\OAuth;
 
 use App\Models\BaseModel;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class RefreshToken extends BaseModel
 {
-    use HasUuids;
-
     protected $table = 'oauth_refresh_tokens';
 
     protected $fillable = [

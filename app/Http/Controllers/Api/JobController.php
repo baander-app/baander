@@ -9,7 +9,7 @@ use App\Jobs\Movies\ScanMovieLibraryJob;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Auth\Access\AuthorizationException;
 use InvalidArgumentException;
-use App\Models\{Library, TokenAbility};
+use App\Models\Library;
 use App\Services\JobCleanupService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Bus\DispatchesJobs;
@@ -26,8 +26,8 @@ use Spatie\RouteAttributes\Attributes\{Delete, Get, Middleware, Post, Prefix};
 #[Prefix('jobs')]
 #[Group('System')]
 #[Middleware([
-    'auth:sanctum',
-    'ability:' . TokenAbility::ACCESS_API->value,
+    'auth:oauth',
+    'scope:access-api',
     'force.json',
 ])]
 class JobController extends Controller

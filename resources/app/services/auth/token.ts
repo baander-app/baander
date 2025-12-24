@@ -1,5 +1,9 @@
 
-import { AuthLogin200, NewAccessTokenResource } from '@app/libs/api-client/gen/models';
+import {
+  AuthLogin200,
+  type AuthStreamToken200StreamToken,
+  NewAccessTokenResource,
+} from '@app/libs/api-client/gen/models';
 
 const LOCAL_STORAGE_KEY = 'baander_token';
 const LOCAL_STORAGE_KEY_STREAM = 'baander_stream_token';
@@ -31,7 +35,7 @@ export const Token = {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(token));
   },
 
-  setStreamToken(token: NewAccessTokenResource): void {
+  setStreamToken(token: AuthStreamToken200StreamToken): void {
     localStorage.setItem(LOCAL_STORAGE_KEY_STREAM, JSON.stringify(token));
   },
 

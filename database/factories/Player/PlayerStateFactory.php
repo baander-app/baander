@@ -1,6 +1,6 @@
 <?php
 
-namespace Database\Factories\Player;
+namespace database\factories\Player;
 
 use App\Models\Player\PlayerState;
 use Illuminate\Database\Eloquent\Factories\Factory;

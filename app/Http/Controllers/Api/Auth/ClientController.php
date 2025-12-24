@@ -6,7 +6,7 @@ namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\OAuth\Client;
-use App\Models\TokenAbility;
+
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -29,8 +29,8 @@ use Spatie\RouteAttributes\Attributes\Middleware;
 #[Prefix('oauth/clients')]
 #[Group('Auth')]
 #[Middleware([
-    'auth:sanctum',
-    'ability:' . TokenAbility::ACCESS_API->value,
+    'auth:oauth',
+    'scope:access-api',
 ])]
 class ClientController extends Controller
 {

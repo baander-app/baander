@@ -25,4 +25,7 @@ return [
         'client_id' => env('SPOTIFY_CLIENT_ID'),
         'secret'    => env('SPOTIFY_SECRET'),
     ],
+    'transcoder' => [
+        'socket_path' => env('TRANSCODER_SOCKET', storage_path('transcoder.sock'))
+    ]
 ];

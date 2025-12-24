@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api\Libraries;
 
 use App\Http\Controllers\Controller;
-use App\Models\TokenAbility;
+
 use App\Modules\Metadata\MetadataJobDispatcher;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,8 +14,8 @@ use Symfony\Component\Routing\Attribute\Route;
 
 #[Prefix('/metadata')]
 #[Middleware([
-    'auth:sanctum',
-    'ability:' . TokenAbility::ACCESS_API->value,
+    'auth:oauth',
+    'scope:access-api',
     'force.json',
 ])]
 class MetadataSyncController extends Controller

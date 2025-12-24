@@ -6,15 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Album\AlbumIndexRequest;
 use App\Http\Requests\Album\AlbumUpdateRequest;
 use App\Http\Resources\Album\AlbumResource;
-use App\Models\{Album, Library, TokenAbility};
+use App\Models\{Album, Library};
 use App\Modules\Eloquent\BaseBuilder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix, Put};
 
 #[Prefix('/libraries/{library}/albums')]
 #[Middleware([
-    'auth:sanctum',
-    'ability:' . TokenAbility::ACCESS_API->value,
+    'auth:oauth',
+    'scope:access-api',
     'force.json',
 ])]
 class AlbumController extends Controller

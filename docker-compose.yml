@@ -90,17 +90,17 @@ services:
     ports:
       - "127.0.0.1:6379:6379"
 
-#  buggregator:
-#    image: ghcr.io/buggregator/server:latest
-#    container_name: baander-buggregator
-#    restart: unless-stopped
-#    networks:
-#      - baander-backtier
-#    ports:
-#      - "127.0.0.1:8000:8000"
-#      - "127.0.0.1:1025:1025"
-#      - "127.0.0.1:9912:9912"
-#      - "127.0.0.1:9913:9913"
+  buggregator:
+    image: ghcr.io/buggregator/server:latest
+    container_name: baander-buggregator
+    restart: unless-stopped
+    networks:
+      - baander-backtier
+    ports:
+      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:9912:9912"
+      - "127.0.0.1:9913:9913"
 
 volumes:
   postgres_data:

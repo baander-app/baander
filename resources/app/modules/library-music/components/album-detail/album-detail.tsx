@@ -10,7 +10,7 @@ import { usePathParam } from '@app/hooks/use-path-param.ts';
 import { LibraryParams } from '@app/modules/library-music/routes/_routes.tsx';
 import { generateBlurhashBackgroundImage } from '@app/libs/blurhash/generate-bg-image.ts';
 import { useCallback } from 'react';
-import { useAlbumShow } from '@app/libs/api-client/gen/endpoints/album/album.ts';
+import { useAlbumsShow } from '@app/libs/api-client/gen/endpoints/album/album.ts';
 import { SongResource } from '@app/libs/api-client/gen/models';
 
 interface AlbumDetailProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -19,7 +19,7 @@ interface AlbumDetailProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export function AlbumDetail({ albumSlug, ...rest }: AlbumDetailProps) {
   const { library } = usePathParam<LibraryParams>();
-  const { data, isLoadingError, refetch } = useAlbumShow(library, albumSlug);
+  const { data, isLoadingError, refetch } = useAlbumsShow(library, albumSlug);
 
   const genres = data?.genres?.map((genre) => genre.name).join(', ');
   const blurhash = data?.cover && generateBlurhashBackgroundImage(data.cover.blurhash, 128, 128);

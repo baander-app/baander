@@ -5,15 +5,15 @@ namespace App\Http\Controllers\Api\Libraries;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Artist\ArtistIndexRequest;
 use App\Http\Resources\Artist\ArtistResource;
-use App\Models\{Album, Artist, Library, TokenAbility};
+use App\Models\{Album, Artist, Library};
 use App\Modules\Eloquent\BaseBuilder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
 
 #[Prefix('/libraries/{library}/artists')]
 #[Middleware([
-    'auth:sanctum',
-    'ability:' . TokenAbility::ACCESS_API->value,
+    'auth:oauth',
+    'scope:access-api',
     'force.json',
 ])]
 class ArtistController extends Controller

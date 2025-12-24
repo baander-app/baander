@@ -27,8 +27,8 @@ export function authInterceptor(instance: AxiosInstance) {
       // Add access token if not already present
       if (!config.headers.Authorization) {
         const authToken = Token.get();
-        if (authToken?.accessToken?.token) {
-          config.headers.Authorization = `Bearer ${authToken.accessToken.token}`;
+        if (authToken?.access_token) {
+          config.headers.Authorization = `Bearer ${authToken.access_token}`;
         }
       }
 
@@ -93,16 +93,11 @@ async function handleTokenRefresh(originalRequest: AuthRequest, instance: AxiosI
     return Promise.reject(new Error('Refresh token expired'));
   }
 
-  const tokenType = getTokenType(authHeader.replace('Bearer ', ''));
-  if (!tokenType) {
-    return Promise.reject(new Error('Unknown token type'));
-  }
-
   originalRequest._didRetry = true;
 
   try {
-    await refreshToken(tokenType);
-    updateRequestToken(originalRequest, tokenType);
+    await refreshToken();
+    updateRequestToken(originalRequest);
 
     // Update session ID if changed
     const sessionId = tokenBindingService.getSessionId();
@@ -123,40 +118,24 @@ function isRefreshRequest(request: AuthRequest): boolean {
   return !!(request.url?.includes('/refreshToken') || request.url?.includes('/streamToken'));
 }
 
-function getTokenType(requestToken: string): 'access' | 'stream' | undefined {
-  const authTokens = Token.get();
-  const streamToken = Token.getStreamToken();
-
-  if (authTokens?.accessToken?.token === requestToken) return 'access';
-  if (streamToken?.token === requestToken) return 'stream';
-  return undefined;
-}
-
-function updateRequestToken(request: AuthRequest, tokenType: 'access' | 'stream') {
+function updateRequestToken(request: AuthRequest) {
   request.headers = request.headers || {};
 
-  if (tokenType === 'access') {
-    const newTokens = Token.get();
-    if (newTokens?.accessToken?.token) {
-      request.headers.Authorization = `Bearer ${newTokens.accessToken.token}`;
-    }
-  } else {
-    const newStreamToken = Token.getStreamToken();
-    if (newStreamToken?.token) {
-      request.headers.Authorization = `Bearer ${newStreamToken.token}`;
-    }
+  const newTokens = Token.get();
+  if (newTokens?.access_token) {
+    request.headers.Authorization = `Bearer ${newTokens.access_token}`;
   }
 }
 
 function clearAuthAndRedirect() {
-  Token.clear();
-  tokenBindingService.clear();
-
-  setTimeout(() => {
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login';
-    }
-  }, 100);
+  // Token.clear();
+  // tokenBindingService.clear();
+  //
+  // setTimeout(() => {
+  //   if (typeof window !== 'undefined') {
+  //     window.location.href = '/login';
+  //   }
+  // }, 100);
 }
 
 function showSecurityNotification(reason: string) {

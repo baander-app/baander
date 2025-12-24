@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use App\Modules\Auth\Webauthn\WebauthnService;
-use Database\Factories\PasskeyFactory;
+use database\factories\PasskeyFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\{Factory, HasFactory};
 use ParagonIE\ConstantTime\Base64UrlSafe;

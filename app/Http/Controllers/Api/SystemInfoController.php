@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\TokenAbility;
+
 use App\Modules\PhpInfoParser\Info;
 use App\Services\SystemMetricsCollectorService;
 use Dedoc\Scramble\Attributes\Group;
@@ -12,8 +12,8 @@ use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
 #[Prefix('/system-info')]
 #[Group('System')]
 #[Middleware([
-    'auth:sanctum',
-    'ability:' . TokenAbility::ACCESS_API->value,
+    'auth:oauth',
+    'scope:access-api',
     'force.json',
 ])]
 class SystemInfoController extends Controller

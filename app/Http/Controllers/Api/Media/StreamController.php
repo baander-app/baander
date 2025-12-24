@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api\Media;
 
 use Dedoc\Scramble\Attributes\Group;
-use App\Models\{Song, TokenAbility};
+use App\Models\Song;
 use Spatie\RouteAttributes\Attributes\{Get, Prefix};
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -19,8 +19,8 @@ class StreamController
      * @return BinaryFileResponse
      */
     #[Get('/song/{song}/direct', 'api.stream.song-direct', [
-        'auth:sanctum',
-        'ability:' . TokenAbility::ACCESS_STREAM->value,
+        'auth:oauth',
+        'scope:access-stream',
     ])]
     public function songDirect(Song $song)
     {

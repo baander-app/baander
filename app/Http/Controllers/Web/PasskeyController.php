@@ -237,7 +237,7 @@ class PasskeyController extends Controller
      *   }
      * }
      */
-    #[Get('/register', 'auth.passkey.register-option', ['auth:sanctum'])]
+    #[Get('/register', 'auth.passkey.register-option', ['auth:oauth'])]
     public function getRegisterOptions(Request $request): array
     {
         /** @var User|null $user */
@@ -273,7 +273,7 @@ class PasskeyController extends Controller
      * @response array{message: string}|array{error: string}
      * @status 201
      */
-    #[Post('/register', 'auth.passkey.register', ['auth:sanctum'])]
+    #[Post('/register', 'auth.passkey.register', ['auth:oauth'])]
     public function registerPasskey(StorePasskeyRequest $request): JsonResponse
     {
         /** @var User $user */

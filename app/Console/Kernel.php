@@ -13,8 +13,7 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         $schedule->command('horizon:snapshot')->everyFiveMinutes()->onOneServer();
-        $schedule->command('sanctum:tokens clean')->daily();
-        $schedule->command('sanctum:tokens cache')->weekly();
+        $schedule->command('oauth:prune')->daily();
         // Clear stuck job locks every hour
         $schedule->command('jobs:clear-stuck')->hourly();
 

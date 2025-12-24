@@ -18,8 +18,8 @@ import {
   usePlayerAudioElement,
 } from '@app/modules/library-music-player/store';
 import { useShowByPublicIdSong } from '@app/libs/api-client/gen/endpoints/library-resource/library-resource.ts';
-import { ensureStreamToken } from '@app/services/auth/ensure-stream-token.ts';
 import { isElectron } from '@app/utils/platform.ts';
+import { Token } from '@app/services/auth/token.ts';
 
 export function InlinePlayer() {
   const sourceSong = useAppSelector(selectSong);
@@ -69,14 +69,13 @@ export function InlinePlayer() {
 
   useEffect(() => {
     if (currentSong?.streamUrl) {
-      ensureStreamToken().then(token => {
-        if (token) {
-          const url = `${currentSong.streamUrl}?_token=${token}`;
-          setCurrentStreamUrl(url);
-        } else {
-          setCurrentStreamUrl(null);
-        }
-      });
+      const token = Token.get()?.access_token;
+      if (token) {
+        const url = `${currentSong.streamUrl}?_token=${token}`;
+        setCurrentStreamUrl(url);
+      } else {
+        setCurrentStreamUrl(null);
+      }
     } else {
       setCurrentStreamUrl(null);
     }

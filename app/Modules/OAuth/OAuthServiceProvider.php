@@ -4,33 +4,37 @@ declare(strict_types=1);
 
 namespace App\Modules\OAuth;
 
-use App\Modules\OAuth\Contracts\AccessTokenRepositoryInterface;
-use App\Modules\OAuth\Contracts\AuthCodeRepositoryInterface;
-use App\Modules\OAuth\Contracts\ClientRepositoryInterface;
-use App\Modules\OAuth\Contracts\DeviceCodeRepositoryInterface;
-use App\Modules\OAuth\Contracts\RefreshTokenRepositoryInterface;
-use App\Modules\OAuth\Contracts\ScopeRepositoryInterface;
-use App\Modules\OAuth\Contracts\UserRepositoryInterface;
-use App\Modules\OAuth\Repositories\AccessTokenRepository;
-use App\Modules\OAuth\Repositories\AuthCodeRepository;
-use App\Modules\OAuth\Repositories\ClientRepository;
-use App\Modules\OAuth\Repositories\DeviceCodeRepository;
-use App\Modules\OAuth\Repositories\RefreshTokenRepository;
-use App\Modules\OAuth\Repositories\ScopeRepository;
-use App\Modules\OAuth\Repositories\UserRepository;
+use App\Modules\OAuth\Contracts\{
+    AccessTokenRepositoryInterface,
+    AuthCodeRepositoryInterface,
+    ClientRepositoryInterface,
+    DeviceCodeRepositoryInterface,
+    RefreshTokenRepositoryInterface,
+    ScopeRepositoryInterface,
+    UserRepositoryInterface};
+use App\Modules\OAuth\Repositories\{
+    AccessTokenRepository,
+    AuthCodeRepository,
+    ClientRepository,
+    DeviceCodeRepository,
+    RefreshTokenRepository,
+    ScopeRepository,
+    UserRepository};
 use DateInterval;
 use DateMalformedIntervalStringException;
 use Exception;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Support\ServiceProvider;
-use League\OAuth2\Server\AuthorizationServer;
-use League\OAuth2\Server\CryptKey;
-use League\OAuth2\Server\Grant\AuthCodeGrant;
-use League\OAuth2\Server\Grant\ClientCredentialsGrant;
-use League\OAuth2\Server\Grant\DeviceCodeGrant;
-use League\OAuth2\Server\Grant\PasswordGrant;
-use League\OAuth2\Server\Grant\RefreshTokenGrant;
-use League\OAuth2\Server\ResourceServer;
+use League\OAuth2\Server\{
+    AuthorizationServer,
+    CryptKey,
+    Grant\AuthCodeGrant,
+    Grant\ClientCredentialsGrant,
+    Grant\DeviceCodeGrant,
+    Grant\PasswordGrant,
+    Grant\RefreshTokenGrant,
+    ResourceServer};
+use App\Modules\OAuth\Grants\PreAuthenticatedGrant;
 
 class OAuthServiceProvider extends ServiceProvider
 {
@@ -113,6 +117,14 @@ class OAuthServiceProvider extends ServiceProvider
         );
         $passwordGrant->setRefreshTokenTTL($refreshTokenTTL);
         $server->enableGrantType($passwordGrant, $accessTokenTTL);
+
+        // Pre-Authenticated Grant (for already authenticated users)
+        $preAuthenticatedGrant = new PreAuthenticatedGrant(
+            $this->app->make(UserRepositoryInterface::class),
+            $this->app->make(RefreshTokenRepositoryInterface::class),
+        );
+        $preAuthenticatedGrant->setRefreshTokenTTL($refreshTokenTTL);
+        $server->enableGrantType($preAuthenticatedGrant, $accessTokenTTL);
 
         // Client Credentials Grant
         $server->enableGrantType(new ClientCredentialsGrant(), $accessTokenTTL);

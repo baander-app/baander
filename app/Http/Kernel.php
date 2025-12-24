@@ -8,6 +8,7 @@ use App\Http\Middleware\EncryptCookies;
 use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Http\Middleware\TrimStrings;
 use App\Http\Middleware\TrustProxies;
+use App\Http\Middleware\ValidateAuthToken;
 use App\Http\Middleware\ValidateOAuthToken;
 use App\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -19,7 +20,6 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
-use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 
 class Kernel extends HttpKernel
 {
@@ -55,13 +55,14 @@ class Kernel extends HttpKernel
             VerifyCsrfToken::class,
             //            \App\Http\Middleware\AddContentSecurityPolicyHeaders::class,
             SubstituteBindings::class,
+            \Inspector\Laravel\Middleware\InspectorOctaneMiddleware::class,
         ],
 
         'api' => [
-            EnsureFrontendRequestsAreStateful::class,
             ConvertQueryTokenToHeaderMiddleware::class,
             ThrottleRequests::class . ':api',
             SubstituteBindings::class,
+            \Inspector\Laravel\Middleware\InspectorOctaneMiddleware::class,
         ],
 
         'public-api' => [
@@ -78,8 +79,6 @@ class Kernel extends HttpKernel
      * @var array<string, class-string|string>
      */
     protected $middlewareAliases = [
-        'abilities'        => \Laravel\Sanctum\Http\Middleware\CheckAbilities::class,
-        'ability'          => \Laravel\Sanctum\Http\Middleware\CheckForAnyAbility::class,
         'auth'             => \App\Http\Middleware\Authenticate::class,
         'auth.basic'       => \Illuminate\Auth\Middleware\AuthenticateWithBasicAuth::class,
         'auth.session'     => \Illuminate\Session\Middleware\AuthenticateSession::class,
@@ -95,6 +94,7 @@ class Kernel extends HttpKernel
         'verified'         => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         'oauth'            => ValidateOAuthToken::class,
         'oauth.scopes'     => CheckOAuthScopes::class,
-
+        'scope'            => CheckOAuthScopes::class,
+        'token.binding'    => ValidateAuthToken::class,
     ];
 }

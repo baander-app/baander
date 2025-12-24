@@ -5,15 +5,14 @@ declare(strict_types=1);
 namespace App\Models\OAuth;
 
 use App\Models\BaseModel;
+use App\Models\TokenMetadata;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Token extends BaseModel
 {
-    use HasUuids;
-
     protected $table = 'oauth_access_tokens';
 
     protected $fillable = [
@@ -47,6 +46,11 @@ class Token extends BaseModel
         return $this->hasMany(RefreshToken::class, 'access_token_id');
     }
 
+    public function metadata(): HasOne
+    {
+        return $this->hasOne(TokenMetadata::class, 'token_id', 'token_id');
+    }
+
     public function revoke(): void
     {
         $this->update(['revoked' => true]);
@@ -60,5 +64,21 @@ class Token extends BaseModel
     public function hasScope(string $scope): bool
     {
         return in_array($scope, $this->scopes ?? [], true);
+    }
+
+    /**
+     * Compatibility method from Sanctum - check if token has ability (scope)
+     */
+    public function can(string $ability): bool
+    {
+        return $this->hasScope($ability);
+    }
+
+    /**
+     * Check if token has device binding (first-party token with security)
+     */
+    public function hasDeviceBinding(): bool
+    {
+        return $this->metadata && $this->metadata->client_fingerprint !== null;
     }
 }
