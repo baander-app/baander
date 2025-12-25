@@ -66,7 +66,6 @@ class Kernel extends HttpKernel
         ],
 
         'public-api' => [
-            \Inspector\Laravel\Middleware\InspectorOctaneMiddleware::class,
             // \Illuminate\Routing\Middleware\ThrottleRequests::class . ':publicApi',
             SubstituteBindings::class,
         ],
