@@ -4,12 +4,18 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\Auth;
 
+use App\Events\OAuth\{
+    DeviceCodeApprovedEvent,
+    DeviceCodeDeniedEvent,
+    DeviceCodeRequestedEvent,
+};
 use App\Http\Controllers\Controller;
 use App\Models\OAuth\{Client, DeviceCode as DeviceCodeModel, Token};
 use App\Modules\Auth\OAuth\Contracts\{ScopeRepositoryInterface};
 use App\Modules\Auth\OAuth\Contracts\DeviceCodeRepositoryInterface;
 use App\Modules\Auth\OAuth\Entities\UserEntity;
 use App\Modules\Auth\OAuth\Psr7Factory;
+use Illuminate\Support\Facades\Event;
 use Dedoc\Scramble\Attributes\Group;
 use Exception;
 use Illuminate\Http\{Request, Response};
@@ -179,6 +185,20 @@ class OAuthController extends Controller
         $this->addScopesToEntity($deviceCodeEntity, $request->input('scope', ''));
         $this->deviceCodeRepository->persistDeviceCode($deviceCodeEntity);
 
+        // Store in DB for event dispatch
+        $storedDeviceCode = DeviceCodeModel::whereDeviceCode($deviceCodeString)->first();
+
+        // Fire device code requested event
+        if ($storedDeviceCode) {
+            Event::dispatch(new DeviceCodeRequestedEvent(
+                $storedDeviceCode,
+                $client,
+                $deviceCodeString,
+                $userCode,
+                $storedDeviceCode->scopes ?? [],
+            ));
+        }
+
         return response()->json([
             'device_code'               => $deviceCodeString,
             'user_code'                 => $userCode,
@@ -266,9 +286,26 @@ class OAuthController extends Controller
 
         if ($request->input('action') === 'approve') {
             $deviceCode->approve($request->user());
+
+            // Fire device approved event
+            Event::dispatch(new DeviceCodeApprovedEvent(
+                $deviceCode,
+                $request->user(),
+                $deviceCode->client,
+                $deviceCode->scopes ?? [],
+            ));
+
             $message = 'Device approved successfully';
         } else {
             $deviceCode->deny();
+
+            // Fire device denied event
+            Event::dispatch(new DeviceCodeDeniedEvent(
+                $deviceCode,
+                $request->user(),
+                $deviceCode->client,
+            ));
+
             $message = 'Device access denied';
         }
 

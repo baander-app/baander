@@ -96,10 +96,7 @@
             "Baander\\RedisStack\\": "packages/redis-stack/src/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
-        },
-        "files": [
-            "app/Modules/Humanize/bytes.php"
-        ]
+        }
     },
     "autoload-dev": {
         "psr-4": {

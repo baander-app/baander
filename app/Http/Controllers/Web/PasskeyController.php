@@ -2,7 +2,11 @@
 
 namespace App\Http\Controllers\Web;
 
-use App\Events\Auth\PasskeyUsedToAuthenticateEvent;
+use App\Events\Auth\{
+    PasskeyAuthenticationFailedEvent,
+    PasskeyRegisteredEvent,
+    PasskeyUsedToAuthenticateEvent,
+};
 use App\Http\Controllers\Api\Auth\Concerns\HandlesUserTokens;
 use App\Http\Controllers\Controller;
 use App\Models\Passkey;
@@ -17,7 +21,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
-use Illuminate\Support\Facades\{Auth, Cache, Log, Session};
+use Illuminate\Support\Facades\{Auth, Cache, Event, Log, Session};
 use Illuminate\Support\Str;
 use Spatie\RouteAttributes\Attributes\{Get, Post, Prefix};
 use Throwable;
@@ -157,6 +161,9 @@ class PasskeyController extends Controller
             'user_agent' => request()->userAgent(),
             'timestamp'  => now(),
         ]);
+
+        // Fire failed authentication event
+        Event::dispatch(new PasskeyAuthenticationFailedEvent(request(), 'invalid_credential'));
 
         // Invalid passkey authentication error.
         return response()->json([
@@ -307,6 +314,9 @@ class PasskeyController extends Controller
                 'ip_address'   => $request->ip(),
                 'user_agent'   => $request->userAgent(),
             ]);
+
+            // Fire passkey registration event
+            Event::dispatch(new PasskeyRegisteredEvent($passkey, $user, $request->get('name'), $request));
 
             return response()->json([
                 'message' => 'Passkey successfully stored',

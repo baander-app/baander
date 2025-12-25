@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Auth\OAuth\Services;
 
+use App\Events\Auth\TokenIssuedEvent;
+use App\Events\Auth\TokenRefreshedEvent;
 use App\Models\OAuth\Client;
 use App\Models\OAuth\RefreshToken;
 use App\Models\OAuth\Token;
@@ -12,6 +14,7 @@ use App\Models\User;
 use App\Modules\Auth\GeoLocationService;
 use App\Modules\Auth\TokenChainService;
 use App\Modules\Auth\OAuth\Psr7Factory;
+use Illuminate\Support\Facades\Event;
 use Defuse\Crypto\Crypto;
 use Illuminate\Http\Request;
 use League\OAuth2\Server\AuthorizationServer;
@@ -88,6 +91,9 @@ class OAuthTokenService
 
         $this->createTokenMetadata($request, $accessToken, $sessionId, $fingerprint);
 
+        // Fire token issued event
+        Event::dispatch(new TokenIssuedEvent($user, $accessToken, $sessionId, $scopes));
+
         return $responseBody;
     }
 
@@ -150,6 +156,14 @@ class OAuthTokenService
 
         // Update the access token's last refreshed timestamp
         $newAccessToken->update(['last_refreshed_at' => now()]);
+
+        // Fire token refreshed event
+        Event::dispatch(new TokenRefreshedEvent(
+            $previousRefreshToken->user,
+            $newAccessToken,
+            $newRefreshToken,
+            $previousRefreshToken,
+        ));
 
         return $responseBody;
     }

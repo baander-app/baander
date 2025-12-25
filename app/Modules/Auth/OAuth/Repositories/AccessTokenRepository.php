@@ -4,16 +4,26 @@ declare(strict_types=1);
 
 namespace App\Modules\Auth\OAuth\Repositories;
 
+use App\Events\OAuth\AccessTokenCreatedEvent;
 use App\Models\OAuth\Client;
 use App\Models\OAuth\Token;
+use App\Models\User;
 use App\Modules\Auth\OAuth\Contracts\AccessTokenRepositoryInterface;
 use App\Modules\Auth\OAuth\Entities\AccessTokenEntity;
+use Illuminate\Support\Facades\Event;
 use League\OAuth2\Server\Entities\AccessTokenEntityInterface;
 use League\OAuth2\Server\Entities\ClientEntityInterface;
 use League\OAuth2\Server\Entities\ScopeEntityInterface;
 
 class AccessTokenRepository implements AccessTokenRepositoryInterface
 {
+    private ?string $grantType = null;
+
+    public function setGrantType(string $grantType): void
+    {
+        $this->grantType = $grantType;
+    }
+
     public function getNewToken(ClientEntityInterface $clientEntity, array $scopes, $userIdentifier = null): AccessTokenEntityInterface
     {
         $accessToken = new AccessTokenEntity();
@@ -32,7 +42,7 @@ class AccessTokenRepository implements AccessTokenRepositoryInterface
         // Look up client by public_id and get the internal ID for the foreign key
         $client = Client::wherePublicId($accessTokenEntity->getClient()->getIdentifier())->firstOrFail();
 
-        Token::create([
+        $token = Token::create([
             'token_id'   => $accessTokenEntity->getIdentifier(), // OAuth server ID
             'user_id'    => $accessTokenEntity->getUserIdentifier(),
             'client_id'  => $client->id,
@@ -40,6 +50,17 @@ class AccessTokenRepository implements AccessTokenRepositoryInterface
             'revoked'    => false,
             'expires_at' => $accessTokenEntity->getExpiryDateTime(),
         ]);
+
+        // Fire access token created event
+        if ($token->user) {
+            Event::dispatch(new AccessTokenCreatedEvent(
+                $token,
+                $token->user,
+                $client,
+                $this->grantType,
+                $token->scopes ?? [],
+            ));
+        }
     }
 
     public function revokeAccessToken($tokenId): void

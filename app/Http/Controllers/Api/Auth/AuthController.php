@@ -2,6 +2,17 @@
 
 namespace App\Http\Controllers\Api\Auth;
 
+use App\Events\Auth\{
+    LoginFailedEvent,
+    PasswordResetEvent,
+    PasswordResetRequestedEvent,
+    TokenIssuedEvent,
+    TokenRefreshedEvent,
+    TokenRevokedEvent,
+    UserLoginEvent,
+    UserLogoutEvent,
+    UserRegisteredEvent,
+};
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\{ForgotPasswordRequest, LoginRequest, LogoutRequest, RegisterRequest, ResetPasswordRequest};
 use App\Http\Resources\User\UserResource;
@@ -13,7 +24,7 @@ use Illuminate\Auth\Events\Verified;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\{JsonResponse, Request, Response};
 use Illuminate\Notifications\AnonymousNotifiable;
-use Illuminate\Support\Facades\{Auth, Hash, Password};
+use Illuminate\Support\Facades\{Auth, Event, Hash, Password};
 use Spatie\RouteAttributes\Attributes\{Delete, Get, Post, Prefix};
 use Symfony\Component\HttpFoundation\Response as ResponseAlias;
 
@@ -64,6 +75,7 @@ class AuthController extends Controller
         $user = User::whereEmail($request->input('email'))->first();
 
         if (!$user || !Hash::check($request->input('password'), $user->password)) {
+            Event::dispatch(new LoginFailedEvent($request->input('email'), $request));
             abort(401, 'Invalid credentials.');
         }
 
@@ -79,6 +91,9 @@ class AuthController extends Controller
             $sessionId,
             $fingerprint,
         );
+
+        // Fire login event
+        Event::dispatch(new UserLoginEvent($user, $request, $sessionId));
 
         return response()->json([
             'access_token'  => $tokens['access_token'],
@@ -168,6 +183,9 @@ class AuthController extends Controller
             $fingerprint,
         );
 
+        // Fire registration event
+        Event::dispatch(new UserRegisteredEvent($user, $request, $sessionId));
+
         return response()->json([
             'accessToken'  => $tokens['access_token'],
             'refreshToken' => $tokens['refresh_token'],
@@ -238,6 +256,8 @@ class AuthController extends Controller
         $token = $request->user()->tokens()->findOrFail($tokenId);
         $token->revoke();
 
+        Event::dispatch(new TokenRevokedEvent($request->user(), $token, 'user_requested'));
+
         return response()->json(['message' => 'Token revoked successfully']);
     }
 
@@ -290,6 +310,8 @@ class AuthController extends Controller
             ->route('mail', $user->email)
             ->notify(new ForgotPasswordNotification($url));
 
+        Event::dispatch(new PasswordResetRequestedEvent($user, $token, $request));
+
         return response()->json(['message' => __('Reset password link sent to your email.')]);
     }
 
@@ -320,6 +342,8 @@ class AuthController extends Controller
 
         // Revoke all existing tokens when password is reset for security
         $user->tokens()->update(['revoked' => true]);
+
+        Event::dispatch(new PasswordResetEvent($user, $request));
 
         return response()->json(['message' => 'Password reset successfully.']);
     }
@@ -368,6 +392,7 @@ class AuthController extends Controller
 
         if ($token) {
             $token->revoke();
+            Event::dispatch(new UserLogoutEvent($request->user(), $token));
         }
 
         return response(null, ResponseAlias::HTTP_NO_CONTENT);
