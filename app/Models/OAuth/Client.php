@@ -86,4 +86,9 @@ class Client extends BaseModel implements ClientEntityInterface
     {
         return $this->first_party;
     }
+
+    protected function scopeWhereFirstParty()
+    {
+        return $this->where('first_party', true);
+    }
 }

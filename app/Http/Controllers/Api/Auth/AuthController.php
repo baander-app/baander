@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\{ForgotPasswordRequest, LoginRequest, LogoutRequest, RegisterRequest, ResetPasswordRequest};
 use App\Http\Resources\User\UserResource;
 use App\Models\User;
-use App\Modules\Auth\{GeoLocationService, OAuthTokenService, TokenBindingService};
+use App\Modules\Auth\{OAuthTokenService, TokenBindingService};
 use App\Notifications\ForgotPasswordNotification;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Auth\Events\Verified;
@@ -32,7 +32,6 @@ class AuthController extends Controller
     public function __construct(
         private readonly OAuthTokenService   $oauthTokenService,
         private readonly TokenBindingService $tokenBindingService,
-        private readonly GeoLocationService  $geoLocationService,
     )
     {
     }
@@ -110,7 +109,18 @@ class AuthController extends Controller
             abort(400, 'Refresh token is required.');
         }
 
-        $tokens = $this->oauthTokenService->refreshToken($request, $refreshToken);
+        try {
+            $tokens = $this->oauthTokenService->refreshToken($request, $refreshToken);
+        } catch (\RuntimeException $e) {
+            // Handle token reuse detection and other token errors
+            if (str_contains($e->getMessage(), 'already been used')) {
+                // Token reuse detected - return 401 to force re-login
+                abort(401, 'Refresh token was reused. For security, please log in again.');
+            }
+
+            // Other token errors
+            abort(401, $e->getMessage());
+        }
 
         return response()->json($tokens);
     }

@@ -59,16 +59,16 @@ class OAuthServiceProvider extends ServiceProvider
     {
         $this->app->bind(AuthorizationServer::class, function () {
             $privateKeyPath = config('oauth.private_key');
-            $passphrase = config('oauth.encryption_key');
+            $keyPassphrase = config('oauth.encryption_key');
 
-            $privateKey = new CryptKey($privateKeyPath, $passphrase);
+            $privateKey = new CryptKey($privateKeyPath, $keyPassphrase);
 
             $server = new AuthorizationServer(
                 $this->app->make(ClientRepositoryInterface::class),
                 $this->app->make(AccessTokenRepositoryInterface::class),
                 $this->app->make(ScopeRepositoryInterface::class),
                 $privateKey,
-                $passphrase,
+                $keyPassphrase,
             );
 
             // Enable grants

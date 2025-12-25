@@ -7,7 +7,6 @@ use App\Modules\OAuth\OAuthServiceProvider;
 use App\Repositories\Cache\CacheRepositoryInterface;
 use App\Repositories\Cache\LaravelCacheRepository;
 use DateTimeZone;
-use Dedoc\Scramble\Scramble;
 use Ergebnis\Clock\SystemClock;
 use GuzzleHttp\Client;
 use Illuminate\Foundation\Application;
@@ -61,9 +60,6 @@ class AppServiceProvider extends ServiceProvider
                 baseUrl: 'http://' . config('transcoder.host') . ':' . config('transcoder.port'),
             );
         });
-
-        Scramble::ignoreDefaultRoutes();
-        Scramble::registerJsonSpecificationRoute('/docs/api.json');
     }
 
     /**

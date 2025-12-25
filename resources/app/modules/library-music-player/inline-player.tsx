@@ -37,8 +37,8 @@ export function InlinePlayer() {
     seekTo,
     togglePlayPause,
   } = usePlayerActions();
-  const canQuery = Boolean(sourceSong?.publicId);
-  const { data: song } = useSongsShow(sourceSong!.librarySlug, sourceSong?.publicId!, {
+  const canQuery = Boolean(sourceSong?.publicId && sourceSong?.librarySlug);
+  const { data: song } = useSongsShow(sourceSong?.librarySlug!, sourceSong?.publicId!, {
     relations: 'album.cover'
   }, {
     query: {

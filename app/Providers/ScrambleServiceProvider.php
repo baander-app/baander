@@ -58,5 +58,8 @@ DESC;
             // Include only whitelisted routes
             return array_any($whitelist, fn($str) => Str::contains($route->uri, $str));
         });
+
+        Scramble::ignoreDefaultRoutes();
+        Scramble::registerJsonSpecificationRoute('/docs/api.json');
     }
 }

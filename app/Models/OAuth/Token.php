@@ -23,12 +23,15 @@ class Token extends BaseModel
         'scopes',
         'revoked',
         'expires_at',
+        'chain_id',
+        'last_refreshed_at',
     ];
 
     protected $casts = [
         'scopes' => 'array',
         'revoked' => 'boolean',
         'expires_at' => 'datetime',
+        'last_refreshed_at' => 'datetime',
     ];
 
     public function user(): BelongsTo
@@ -80,5 +83,21 @@ class Token extends BaseModel
     public function hasDeviceBinding(): bool
     {
         return $this->metadata && $this->metadata->client_fingerprint !== null;
+    }
+
+    /**
+     * Revoke all tokens in this chain (security measure for token reuse detection)
+     */
+    public function revokeChain(): void
+    {
+        if (!$this->chain_id) {
+            return;
+        }
+
+        // Revoke all access tokens in the chain
+        Token::where('chain_id', $this->chain_id)->update(['revoked' => true]);
+
+        // Revoke all refresh tokens in the chain
+        RefreshToken::where('chain_id', $this->chain_id)->update(['revoked' => true]);
     }
 }
