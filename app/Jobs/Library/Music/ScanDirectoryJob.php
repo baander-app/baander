@@ -67,8 +67,6 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
             $files = LazyCollection::make(File::files($this->directory));
             $this->processFiles($files);
         });
-
-        unset($this->directory, $this->library, $this->tagger);
     }
 
     private function processFiles(LazyCollection $files): void
@@ -102,7 +100,6 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
 
         $this->queueProgress(100);
         $this->queueData(['processedFiles' => $processedFiles, 'fileCount' => $fileCount]);
-        $this->delete();
     }
 
 
