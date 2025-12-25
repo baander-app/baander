@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use App\Modules\Nanoid\Concerns\HasNanoPublicId;
-use App\Modules\Translation\LocaleString;
+use App\Format\LocaleString;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 

@@ -1,8 +1,8 @@
 <?php
 
 use App\Extensions\ArrExt;
-use App\Modules\Humanize\HumanDuration;
-use function App\Modules\Humanize\humanize_bytes;
+use App\Format\Bytes;
+use App\Format\Duration;
 
 return [
     'any_to_string' => function ($value) {
@@ -18,10 +18,10 @@ return [
     },
 
     'humanize_duration' => function ($duration, $hoursPerDay = 24) {
-        return new HumanDuration($duration, $hoursPerDay)->humanize();
+        return new Duration($duration, $hoursPerDay)->humanize();
     },
 
     'humanize_bytes' => function ($bytes, $decimals = 2) {
-        return humanize_bytes($bytes, $decimals);
+        return Bytes::format($bytes, $decimals);
     },
 ];

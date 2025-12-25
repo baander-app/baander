@@ -2,7 +2,7 @@
 
 namespace App\Providers;
 
-use App\Modules\Humanize\HumanDuration;
+use App\Format\Duration;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecurityScheme;
@@ -17,7 +17,7 @@ class ScrambleServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        $humanDuration = new HumanDuration();
+        $humanDuration = new Duration();
 
         $accessTokenLifeTime = $humanDuration->humanize(config('sanctum.access_token_expiration') * 60);
         $refreshTokenLifeTime = $humanDuration->humanize(config('sanctum.refresh_token_expiration') * 60);

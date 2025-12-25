@@ -2,14 +2,14 @@
 
 namespace App\Modules\Metadata\Matching\Validators;
 
+use App\Format\TextSimilarity;
 use App\Models\BaseModel;
-use App\Modules\TextSimilarity\TextSimilarityService;
 
 abstract class BaseQualityValidator
 {
-    protected TextSimilarityService $textSimilarity;
+    protected TextSimilarity $textSimilarity;
 
-    public function __construct(TextSimilarityService $textSimilarity)
+    public function __construct(TextSimilarity $textSimilarity)
     {
         $this->textSimilarity = $textSimilarity;
     }

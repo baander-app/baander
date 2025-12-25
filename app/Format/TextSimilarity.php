@@ -1,11 +1,21 @@
 <?php
 
-namespace App\Modules\TextSimilarity;
+namespace App\Format;
 
 use InvalidArgumentException;
 use Normalizer;
 
-class TextSimilarityService
+/**
+ * Calculate similarity between texts with support for international characters and scripts.
+ *
+ * Provides multiple algorithms for text comparison including Levenshtein distance,
+ * n-gram similarity, and international text normalization.
+ *
+ * @example
+ * TextSimilarity::calculate('hello', 'hello world') // 71.43
+ * TextSimilarity::forInternationalNames('José', 'Jose') // ['direct' => 95.0, ...]
+ */
+class TextSimilarity
 {
     private array $transliterationCache = [];
     private array $scriptCache = [];
@@ -23,6 +33,10 @@ class TextSimilarityService
 
     /**
      * Calculate the best similarity score between two texts using multiple algorithms.
+     *
+     * @param string $text1 First text to compare
+     * @param string $text2 Second text to compare
+     * @return float Similarity score (0-100)
      */
     public function calculateSimilarity(string $text1, string $text2): float
     {
@@ -62,7 +76,15 @@ class TextSimilarityService
         return $this->cacheResult($cacheKey, round(max(0, min(100, $bestScore)), 2));
     }
 
-    public function calculateInternationalNameSimilarity(string $name1, string $name2): array
+    /**
+     * Calculate similarity specifically for international names.
+     *
+     * Uses multiple strategies including transliteration, token comparison,
+     * and Unicode script analysis to handle names from different languages.
+     *
+     * @return array<string, float> Scores for different comparison methods
+     */
+    public function forInternationalNames(string $name1, string $name2): array
     {
         $cacheKey = 'intl_' . $this->makeCacheKey($name1, $name2);
         if (isset($this->ngramCache[$cacheKey])) {
@@ -95,7 +117,9 @@ class TextSimilarityService
     }
 
     /**
-     * Get similarity confidence level
+     * Get similarity confidence level.
+     *
+     * @return 'EXACT'|'VERY_HIGH'|'HIGH'|'MEDIUM'|'LOW'|'VERY_LOW'
      */
     public function getSimilarityLevel(float $score): string
     {
@@ -110,7 +134,11 @@ class TextSimilarityService
     }
 
     /**
-     * Batch similarity calculation for multiple comparisons
+     * Batch similarity calculation for multiple comparisons.
+     *
+     * @param string $target The text to compare against
+     * @param array<string> $candidates Array of candidate texts
+     * @return array<array{text: string, similarity: float}> Sorted by similarity descending
      */
     public function calculateBatchSimilarity(string $target, array $candidates): array
     {
@@ -128,7 +156,13 @@ class TextSimilarityService
     }
 
     /**
-     * Find the best matches above a threshold
+     * Find the best matches above a threshold.
+     *
+     * @param string $target The text to compare against
+     * @param array<string> $candidates Array of candidate texts
+     * @param float $threshold Minimum similarity score (0-100)
+     * @param int $limit Maximum number of results to return
+     * @return array<array{text: string, similarity: float}>
      */
     public function findBestMatches(string $target, array $candidates, float $threshold = 70.0, int $limit = 5): array
     {
@@ -141,9 +175,12 @@ class TextSimilarityService
         );
     }
 
+    /**
+     * Get the best international similarity score.
+     */
     public function getBestInternationalSimilarity(string $name1, string $name2): float
     {
-        $scores = $this->calculateInternationalNameSimilarity($name1, $name2);
+        $scores = $this->forInternationalNames($name1, $name2);
 
         if ($scores['direct'] >= 85) {
             return $scores['direct'];
@@ -152,6 +189,11 @@ class TextSimilarityService
         return max($scores);
     }
 
+    /**
+     * Normalize international text for comparison.
+     *
+     * Removes diacritics, punctuation, and normalizes Unicode.
+     */
     public function normalizeInternationalText(string $text): string
     {
         $cacheKey = 'normalize_' . hash('xxh3', $text);
@@ -172,6 +214,14 @@ class TextSimilarityService
         return $this->cacheTransliteration($cacheKey, $normalized);
     }
 
+    /**
+     * Extract tokens from international text.
+     *
+     * Handles tokenization for various writing systems including
+     * Chinese, Japanese, and other script-based languages.
+     *
+     * @return array<string> Array of tokens
+     */
     public function extractInternationalTokens(string $text): array
     {
         $tokens = preg_split('/[\p{Z}\p{P}\p{S}]+/u', $text, -1, PREG_SPLIT_NO_EMPTY);
@@ -190,6 +240,12 @@ class TextSimilarityService
         });
     }
 
+    /**
+     * Transliterate text to Latin script.
+     *
+     * Converts text from various scripts (Cyrillic, Greek, Arabic, etc.)
+     * to Latin characters for comparison purposes.
+     */
     public function transliterateToLatin(string $text): string
     {
         $cacheKey = 'transliterate_' . hash('xxh3', $text);
@@ -202,6 +258,11 @@ class TextSimilarityService
         return $this->cacheTransliteration($cacheKey, $result);
     }
 
+    /**
+     * Detect Unicode scripts used in the text.
+     *
+     * @return array<string> List of script names (e.g., ['Latin', 'Han', 'Hiragana'])
+     */
     public function getUnicodeScripts(string $text): array
     {
         $cacheKey = 'scripts_' . hash('xxh3', $text);
@@ -241,11 +302,20 @@ class TextSimilarityService
         return $this->cacheScript($cacheKey, $result);
     }
 
+    /**
+     * Check if text contains non-Latin scripts.
+     */
     public function hasNonLatinScript(string $text): bool
     {
         return preg_match('/[\p{Han}\p{Hiragana}\p{Katakana}\p{Arabic}\p{Hebrew}\p{Cyrillic}]/u', $text);
     }
 
+    /**
+     * Calculate n-gram similarity between two strings.
+     *
+     * @param int $n Size of n-grams (default: 2 for bigrams)
+     * @return float Similarity percentage (0-100)
+     */
     public function calculateNGramSimilarity(string $str1, string $str2, int $n = self::DEFAULT_NGRAM_SIZE): float
     {
         $ngrams1 = $this->extractNGrams($str1, $n);
@@ -261,6 +331,14 @@ class TextSimilarityService
         return $union > 0 ? ($intersection / $union) * 100 : 0.0;
     }
 
+    /**
+     * Calculate weighted average of multiple similarity scores.
+     *
+     * @param array<float> $scores Array of similarity scores
+     * @param array<float> $weights Array of weights for each score
+     * @return float Weighted average score
+     * @throws InvalidArgumentException if arrays have different lengths
+     */
     public function calculateWeightedAverage(array $scores, array $weights): float
     {
         if (count($scores) !== count($weights)) {
@@ -279,6 +357,9 @@ class TextSimilarityService
         return $totalWeight > 0 ? $weightedSum / $totalWeight : 0;
     }
 
+    /**
+     * Clear all internal caches.
+     */
     public function clearCaches(): void
     {
         $this->transliterationCache = [];
@@ -524,93 +605,27 @@ class TextSimilarityService
     {
         $replacements = [
             // Cyrillic
-            'а' => 'a',
-            'б' => 'b',
-            'в' => 'v',
-            'г' => 'g',
-            'д' => 'd',
-            'е' => 'e',
-            'ё' => 'yo',
-            'ж' => 'zh',
-            'з' => 'z',
-            'и' => 'i',
-            'й' => 'y',
-            'к' => 'k',
-            'л' => 'l',
-            'м' => 'm',
-            'н' => 'n',
-            'о' => 'o',
-            'п' => 'p',
-            'р' => 'r',
-            'с' => 's',
-            'т' => 't',
-            'у' => 'u',
-            'ф' => 'f',
-            'х' => 'h',
-            'ц' => 'ts',
-            'ч' => 'ch',
-            'ш' => 'sh',
-            'щ' => 'sch',
-            'ъ' => '',
-            'ы' => 'y',
-            'ь' => '',
-            'э' => 'e',
-            'ю' => 'yu',
-            'я' => 'ya',
+            'а' => 'a', 'б' => 'b', 'в' => 'v', 'г' => 'g', 'д' => 'd',
+            'е' => 'e', 'ё' => 'yo', 'ж' => 'zh', 'з' => 'z', 'и' => 'i',
+            'й' => 'y', 'к' => 'k', 'л' => 'l', 'м' => 'm', 'н' => 'n',
+            'о' => 'o', 'п' => 'p', 'р' => 'r', 'с' => 's', 'т' => 't',
+            'у' => 'u', 'ф' => 'f', 'х' => 'h', 'ц' => 'ts', 'ч' => 'ch',
+            'ш' => 'sh', 'щ' => 'sch', 'ъ' => '', 'ы' => 'y', 'ь' => '',
+            'э' => 'e', 'ю' => 'yu', 'я' => 'ya',
 
             // Greek
-            'α' => 'a',
-            'β' => 'b',
-            'γ' => 'g',
-            'δ' => 'd',
-            'ε' => 'e',
-            'ζ' => 'z',
-            'η' => 'i',
-            'θ' => 'th',
-            'ι' => 'i',
-            'κ' => 'k',
-            'λ' => 'l',
-            'μ' => 'm',
-            'ν' => 'n',
-            'ξ' => 'x',
-            'ο' => 'o',
-            'π' => 'p',
-            'ρ' => 'r',
-            'σ' => 's',
-            'ς' => 's',
-            'τ' => 't',
-            'υ' => 'y',
-            'φ' => 'f',
-            'χ' => 'ch',
-            'ψ' => 'ps',
-            'ω' => 'o',
+            'α' => 'a', 'β' => 'b', 'γ' => 'g', 'δ' => 'd', 'ε' => 'e',
+            'ζ' => 'z', 'η' => 'i', 'θ' => 'th', 'ι' => 'i', 'κ' => 'k',
+            'λ' => 'l', 'μ' => 'm', 'ν' => 'n', 'ξ' => 'x', 'ο' => 'o',
+            'π' => 'p', 'ρ' => 'r', 'σ' => 's', 'ς' => 's', 'τ' => 't',
+            'υ' => 'y', 'φ' => 'f', 'χ' => 'ch', 'ψ' => 'ps', 'ω' => 'o',
 
             // Common diacritics
-            'à' => 'a',
-            'á' => 'a',
-            'â' => 'a',
-            'ã' => 'a',
-            'ä' => 'a',
-            'å' => 'a',
-            'è' => 'e',
-            'é' => 'e',
-            'ê' => 'e',
-            'ë' => 'e',
-            'ì' => 'i',
-            'í' => 'i',
-            'î' => 'i',
-            'ï' => 'i',
-            'ò' => 'o',
-            'ó' => 'o',
-            'ô' => 'o',
-            'õ' => 'o',
-            'ö' => 'o',
-            'ù' => 'u',
-            'ú' => 'u',
-            'û' => 'u',
-            'ü' => 'u',
-            'ñ' => 'n',
-            'ç' => 'c',
+            'à' => 'a', 'á' => 'a', 'â' => 'a', 'ã' => 'a', 'ä' => 'a',
+            'å' => 'a', 'è' => 'e', 'é' => 'e', 'ê' => 'e', 'ë' => 'e',
+            'ì' => 'i', 'í' => 'i', 'î' => 'i', 'ï' => 'i', 'ò' => 'o',
+            'ó' => 'o', 'ô' => 'o', 'õ' => 'o', 'ö' => 'o', 'ù' => 'u',
+            'ú' => 'u', 'û' => 'u', 'ü' => 'u', 'ñ' => 'n', 'ç' => 'c',
         ];
 
         return strtr(mb_strtolower($text, 'UTF-8'), $replacements);

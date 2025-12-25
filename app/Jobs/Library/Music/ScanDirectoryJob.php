@@ -9,7 +9,7 @@ use App\Modules\Logging\Attributes\LogChannel;
 use App\Modules\Logging\Channel;
 use App\Modules\Lyrics\Lrc;
 use App\Modules\Metadata\MediaMeta\MediaMeta;
-use App\Modules\Translation\LocaleString;
+use App\Format\LocaleString;
 use Arr;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;

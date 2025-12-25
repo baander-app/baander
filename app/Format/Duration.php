@@ -1,8 +1,16 @@
 <?php
 
-namespace App\Modules\Humanize;
+namespace App\Format;
 
-class HumanDuration
+/**
+ * Format and parse time durations in various formats (seconds, colon-separated, human-readable).
+ *
+ * @example
+ * Duration::humanize(3600) // "1h 0s"
+ * Duration::fromSeconds(3600)->toMinutes() // 60.0
+ * Duration::parse('2h 30m')->toSeconds() // 9000
+ */
+class Duration
 {
     private const int SECONDS_IN_MINUTE = 60;
     private const int MINUTES_IN_HOUR = 60;
@@ -27,6 +35,41 @@ class HumanDuration
         }
     }
 
+    /**
+     * Create a Duration instance from seconds.
+     */
+    public static function fromSeconds(float|int $seconds, int $hoursPerDay = self::HOURS_IN_DAY): self
+    {
+        return new self($seconds, $hoursPerDay);
+    }
+
+    /**
+     * Create a Duration instance from minutes.
+     */
+    public static function fromMinutes(float|int $minutes, int $hoursPerDay = self::HOURS_IN_DAY): self
+    {
+        return new self($minutes * self::SECONDS_IN_MINUTE, $hoursPerDay);
+    }
+
+    /**
+     * Create a Duration instance from hours.
+     */
+    public static function fromHours(float|int $hours, int $hoursPerDay = self::HOURS_IN_DAY): self
+    {
+        return new self($hours * self::MINUTES_IN_HOUR * self::SECONDS_IN_MINUTE, $hoursPerDay);
+    }
+
+    /**
+     * Create a Duration instance from days.
+     */
+    public static function fromDays(float|int $days, int $hoursPerDay = self::HOURS_IN_DAY): self
+    {
+        return new self($days * $hoursPerDay * self::MINUTES_IN_HOUR * self::SECONDS_IN_MINUTE, $hoursPerDay);
+    }
+
+    /**
+     * Parse a duration from a string or number.
+     */
     public function parse(string|float|int|null $duration): self|false
     {
         $this->reset();
@@ -45,6 +88,9 @@ class HumanDuration
         return $this->parseRegexFormattedDuration($duration);
     }
 
+    /**
+     * Convert the duration to total seconds.
+     */
     public function toSeconds(string|float|int|null $duration = null, int|false $precision = false): float|int
     {
         if ($duration !== null) {
@@ -59,6 +105,9 @@ class HumanDuration
         return $precision !== false ? round($totalSeconds, $precision) : $totalSeconds;
     }
 
+    /**
+     * Convert the duration to total minutes.
+     */
     public function toMinutes(string|float|int|null $duration = null, int|false $precision = false): float|int
     {
         if ($duration !== null) {
@@ -70,6 +119,39 @@ class HumanDuration
         return $precision !== false ? round($totalMinutes, $precision) : $totalMinutes;
     }
 
+    /**
+     * Convert the duration to total hours.
+     */
+    public function toHours(string|float|int|null $duration = null, int|false $precision = false): float|int
+    {
+        if ($duration !== null) {
+            $this->parse($duration);
+        }
+
+        $totalHours = $this->toMinutes() / self::MINUTES_IN_HOUR;
+
+        return $precision !== false ? round($totalHours, $precision) : $totalHours;
+    }
+
+    /**
+     * Convert the duration to total days.
+     */
+    public function toDays(string|float|int|null $duration = null, int|false $precision = false): float|int
+    {
+        if ($duration !== null) {
+            $this->parse($duration);
+        }
+
+        $totalDays = $this->toHours() / $this->hoursPerDay;
+
+        return $precision !== false ? round($totalDays, $precision) : $totalDays;
+    }
+
+    /**
+     * Format the duration in a human-readable format.
+     *
+     * @example Duration::humanize(3600) // "1h 0s"
+     */
     public function humanize(string|float|int|null $duration = null): string
     {
         if ($duration !== null) {
@@ -95,6 +177,82 @@ class HumanDuration
         }
 
         return trim($output);
+    }
+
+    /**
+     * Format as ISO 8601 duration (e.g., PT1H30M).
+     */
+    public function toIso8601(string|float|int|null $duration = null): string
+    {
+        if ($duration !== null) {
+            $this->parse($duration);
+        }
+
+        $parts = ['P'];
+
+        if ($this->days > 0) {
+            $parts[] = $this->days . 'D';
+        }
+
+        $timeParts = ['T'];
+
+        if ($this->hours > 0) {
+            $timeParts[] = $this->hours . 'H';
+        }
+
+        if ($this->minutes > 0) {
+            $timeParts[] = $this->minutes . 'M';
+        }
+
+        if ($this->seconds > 0 || ($this->seconds === 0.0 && $this->hours === 0 && $this->days === 0)) {
+            $timeParts[] = number_format($this->seconds, 1, '.', '') . 'S';
+        }
+
+        if (count($timeParts) > 1) {
+            $parts[] = implode('', $timeParts);
+        }
+
+        return implode('', $parts) ?: 'PT0S';
+    }
+
+    /**
+     * Format in colon notation (e.g., "1:30:00").
+     */
+    public function toColonFormat(string|float|int|null $duration = null, bool $showSeconds = true): string
+    {
+        if ($duration !== null) {
+            $this->parse($duration);
+        }
+
+        $parts = [];
+
+        if ($this->days > 0) {
+            $parts[] = $this->days + $this->hours;
+        } else if ($this->hours > 0 || $this->minutes > 0) {
+            $parts[] = $this->hours ?: '0';
+        }
+
+        $parts[] = str_pad((string)$this->minutes, 2, '0', STR_PAD_LEFT);
+
+        if ($showSeconds) {
+            $parts[] = str_pad(number_format($this->seconds, 0, '', ''), 2, '0', STR_PAD_LEFT);
+        }
+
+        return implode(':', $parts);
+    }
+
+    /**
+     * Create a copy of this Duration instance.
+     */
+    public function copy(): self
+    {
+        $copy = new self(null, $this->hoursPerDay);
+        $copy->days = $this->days;
+        $copy->hours = $this->hours;
+        $copy->minutes = $this->minutes;
+        $copy->seconds = $this->seconds;
+
+        return $copy;
     }
 
     private function reset(): void

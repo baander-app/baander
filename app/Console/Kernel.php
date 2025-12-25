@@ -26,8 +26,10 @@ class Kernel extends ConsoleKernel
      */
     protected function commands(): void
     {
+        // TODO: this can probably be done in a smarter way
         $this->load(__DIR__ . '/Commands');
         $this->load(__DIR__ . '/../Modules/EveryNoise/Commands');
+        $this->load(__DIR__ . '/../Modules/Auth/OAuth/Commands');
 
         if ($this->app->environment('local')) {
             $this->load(__DIR__ . '/../Modules/Development/Console/Commands');

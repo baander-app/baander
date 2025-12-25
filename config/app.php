@@ -181,7 +181,7 @@ return [
         LoggerServiceProvider::class,
         RecommendationServiceProvider::class,
         App\Providers\FortifyServiceProvider::class,
-        App\Modules\TextSimilarity\TextSimilarityServiceProvider::class,
+        App\Providers\FormatServiceProvider::class,
 
         /*
          * Application Service Providers...

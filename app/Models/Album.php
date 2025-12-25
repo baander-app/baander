@@ -5,7 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\HasLibraryAccess;
 use App\Modules\Eloquent\BaseBuilder;
 use App\Modules\Nanoid\Concerns\HasNanoPublicId;
-use App\Modules\Translation\LocaleString;
+use App\Format\LocaleString;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Overtrue\LaravelVersionable\Versionable;
