@@ -11,8 +11,8 @@ return [
     |
     */
 
-    'private_key'    => storage_path('oauth-private.key'),
-    'public_key'     => storage_path('oauth-public.key'),
+    'private_key'    => env('OAUTH_PRIVATE_KEY', storage_path('oauth-private.key')),
+    'public_key'     => env('OAUTH_PUBLIC_KEY', storage_path('oauth-public.key')),
     'encryption_key' => env('OAUTH_ENCRYPTION_KEY'),
 
     /*

@@ -37,6 +37,9 @@
         <env name="DB_CONNECTION" value="pgsql"/>
         <env name="DB_DATABASE" value="baander_test"/>
         <env name="MAIL_MAILER" value="array"/>
+        <env name="OAUTH_ENCRYPTION_KEY" value="V9jSj0PPnIaD1sTorO9do45e50M7tHjuThLZ+xx2mu8="/>
+        <env name="OAUTH_PRIVATE_KEY" value="/var/www/html/storage/test/oauth-private.key"/>
+        <env name="OAUTH_PUBLIC_KEY" value="/var/www/html/storage/test/oauth-public.key"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>

@@ -31,6 +31,7 @@
         "bacon/bacon-qr-code": "^v3.0.1",
         "dedoc/scramble": "^v0.12.9",
         "defuse/php-encryption": "^2.4",
+        "eliashaeussler/sse": "^2.0",
         "ergebnis/clock": "^2.10.0",
         "guzzlehttp/guzzle": "^7.9.2",
         "hidehalo/nanoid-php": "^2.0",

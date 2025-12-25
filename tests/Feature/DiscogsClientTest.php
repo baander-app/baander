@@ -8,6 +8,8 @@ use App\Http\Integrations\Discogs\Filters\ArtistFilter;
 use App\Http\Integrations\Discogs\Filters\ReleaseFilter;
 use App\Http\Integrations\Discogs\Models\Artist;
 use App\Http\Integrations\Discogs\Models\Release;
+use Illuminate\Support\Collection;
+use PHPUnit\Framework\Attributes\Test;
 
 class DiscogsClientTest extends TestCase
 {
@@ -19,6 +21,7 @@ class DiscogsClientTest extends TestCase
         $this->discogsClient = app(DiscogsClient::class);
     }
 
+    #[Test]
     public function testSearchArtists()
     {
         $filter = new ArtistFilter(
@@ -30,13 +33,13 @@ class DiscogsClientTest extends TestCase
         $results = $this->discogsClient->search->artist($filter);
 
         $this->assertNotNull($results);
-        $this->assertIsArray($results);
+        $this->assertInstanceOf(Collection::class, $results);
 
         // Check that the results are Artist models
-        if (count($results) > 0) {
-            $this->assertInstanceOf(Artist::class, $results[0]);
-            $this->assertNotNull($results[0]->id);
-            $this->assertNotNull($results[0]->title);
+        if ($results->count() > 0) {
+            $this->assertInstanceOf(Artist::class, $results->first());
+            $this->assertNotNull($results->first()->id);
+            $this->assertNotNull($results->first()->title);
         }
 
         // Get pagination info
@@ -48,6 +51,7 @@ class DiscogsClientTest extends TestCase
         $this->assertArrayHasKey('per_page', $pagination);
     }
 
+    #[Test]
     public function testLookupArtist()
     {
         // Radiohead's Discogs ID
@@ -61,6 +65,7 @@ class DiscogsClientTest extends TestCase
         $this->assertEquals($artistId, $artist->id);
     }
 
+    #[Test]
     public function testArtistReleases()
     {
         // Radiohead's Discogs ID
@@ -79,11 +84,12 @@ class DiscogsClientTest extends TestCase
         $this->assertEquals(5, $releases['pagination']['per_page']);
     }
 
+    #[Test]
     public function testSearchReleases()
     {
         $filter = new ReleaseFilter(
-            artist: 'Radiohead',
             title: 'OK Computer',
+            artist: 'Radiohead',
             page: 1,
             per_page: 5
         );
@@ -91,13 +97,13 @@ class DiscogsClientTest extends TestCase
         $results = $this->discogsClient->search->release($filter);
 
         $this->assertNotNull($results);
-        $this->assertIsArray($results);
+        $this->assertInstanceOf(Collection::class, $results);
 
         // Check that the results are Release models
-        if (count($results) > 0) {
-            $this->assertInstanceOf(Release::class, $results[0]);
-            $this->assertNotNull($results[0]->id);
-            $this->assertNotNull($results[0]->title);
+        if ($results->count() > 0) {
+            $this->assertInstanceOf(Release::class, $results->first());
+            $this->assertNotNull($results->first()->id);
+            $this->assertNotNull($results->first()->title);
         }
     }
 }

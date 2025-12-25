@@ -6,12 +6,13 @@ namespace App\Models\Auth\OAuth;
 
 use App\Models\BaseModel;
 use App\Modules\Nanoid\Concerns\HasNanoPublicId;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use League\OAuth2\Server\Entities\ClientEntityInterface;
 
 class Client extends BaseModel implements ClientEntityInterface
 {
-    use HasNanoPublicId;
+    use HasFactory, HasNanoPublicId;
 
     protected $table = 'oauth_clients';
 

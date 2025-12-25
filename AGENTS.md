@@ -6,6 +6,33 @@
 2. **React SPA** - TypeScript/React web application
 3. **Electron Desktop** - Electron wrapper for native desktop experience
 
+## Development Environment
+
+**IMPORTANT:** This project uses Docker directly via `docker-compose` and **NOT** Laravel Sail. Laravel Sail is not installed and will never be installed.
+
+### Running Commands
+
+Use `docker exec baander-app` to run commands in the Laravel container:
+
+```bash
+# Run tests
+docker exec baander-app php artisan test
+
+# Run migrations
+docker exec baander-app php artisan migrate
+
+# Clear cache
+docker exec baander-app php artisan cache:clear
+
+# Generate openapi schema
+docker exec baander-app php artisan scramble:export && yarn generate-api-client
+```
+
+### Docker Services
+
+- **baander-app** - Main Laravel/PHP application container
+- Other services defined in `docker-compose.yml`
+
 ---
 
 ## Architecture Overview
@@ -415,7 +442,7 @@ axios.get('/api/albums');
 - Located in `resources/app/libs/api-client/gen/`
 
 **Regeneration Workflow:**
-1. Export OpenAPI spec from Laravel: `docker exec -it baander-app php artisan scramble:export`
+1. Export OpenAPI spec from Laravel: `docker exec baander-app php artisan scramble:export`
 2. Generate React Query hooks: `yarn run generate-api-client`
 3. Commit generated files
 
