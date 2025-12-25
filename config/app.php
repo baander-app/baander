@@ -180,7 +180,6 @@ return [
         App\Modules\BlurHash\BlurHashServiceProvider::class,
         LoggerServiceProvider::class,
         RecommendationServiceProvider::class,
-        App\Providers\FortifyServiceProvider::class,
         App\Providers\FormatServiceProvider::class,
 
         /*

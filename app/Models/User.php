@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Fortify\TwoFactorAuthenticatable;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements HasPasskeys
@@ -18,8 +17,7 @@ class User extends Authenticatable implements HasPasskeys
     use HasFactory,
         HasNanoPublicId,
         HasRoles,
-        Notifiable,
-        TwoFactorAuthenticatable;
+        Notifiable;
 
     protected $dateFormat = 'Y-m-d H:i:sO';
 
