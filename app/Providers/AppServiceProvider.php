@@ -3,7 +3,7 @@
 namespace App\Providers;
 
 use App\Http\Integrations\Transcoder\TranscoderClient;
-use App\Modules\OAuth\OAuthServiceProvider;
+use App\Modules\Auth\OAuth\OAuthServiceProvider;
 use App\Repositories\Cache\CacheRepositoryInterface;
 use App\Repositories\Cache\LaravelCacheRepository;
 use DateTimeZone;

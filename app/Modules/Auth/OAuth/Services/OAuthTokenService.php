@@ -2,13 +2,15 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Auth;
+namespace App\Modules\Auth\OAuth\Services;
 
 use App\Models\OAuth\Client;
 use App\Models\OAuth\RefreshToken;
 use App\Models\OAuth\Token;
 use App\Models\TokenMetadata;
 use App\Models\User;
+use App\Modules\Auth\GeoLocationService;
+use App\Modules\Auth\TokenChainService;
 use App\Modules\Auth\OAuth\Psr7Factory;
 use Defuse\Crypto\Crypto;
 use Illuminate\Http\Request;

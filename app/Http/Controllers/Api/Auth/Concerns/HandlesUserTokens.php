@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api\Auth\Concerns;
 
-use App\Modules\Auth\OAuthTokenService;
+use App\Modules\Auth\OAuth\Services\OAuthTokenService;
 use App\Modules\Auth\TokenBindingService;
 use App\Models\User;
 use Illuminate\Http\{JsonResponse, Request};

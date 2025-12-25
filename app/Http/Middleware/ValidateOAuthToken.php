@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
-use App\Modules\OAuth\Psr7Factory;
+use App\Modules\Auth\OAuth\Psr7Factory;
 use Closure;
 use Illuminate\Http\Request;
 use League\OAuth2\Server\Exception\OAuthServerException;

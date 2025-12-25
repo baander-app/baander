@@ -48,7 +48,6 @@ class Kernel extends HttpKernel
      */
     protected $middlewareGroups = [
         'web' => [
-            \Inspector\Laravel\Middleware\InspectorOctaneMiddleware::class,
             EncryptCookies::class,
             AddQueuedCookiesToResponse::class,
             StartSession::class,
@@ -59,7 +58,6 @@ class Kernel extends HttpKernel
         ],
 
         'api' => [
-            \Inspector\Laravel\Middleware\InspectorOctaneMiddleware::class,
             ConvertQueryTokenToHeaderMiddleware::class,
             ThrottleRequests::class . ':api',
             SubstituteBindings::class,

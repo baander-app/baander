@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Modules\OAuth\Entities\UserEntity;
 use App\Models\OAuth\{Client, DeviceCode as DeviceCodeModel, Token};
-use App\Modules\OAuth\Contracts\{DeviceCodeRepositoryInterface, ScopeRepositoryInterface};
-use App\Modules\OAuth\Psr7Factory;
+use App\Modules\Auth\OAuth\Contracts\{ScopeRepositoryInterface};
+use App\Modules\Auth\OAuth\Contracts\DeviceCodeRepositoryInterface;
+use App\Modules\Auth\OAuth\Entities\UserEntity;
+use App\Modules\Auth\OAuth\Psr7Factory;
 use Dedoc\Scramble\Attributes\Group;
 use Exception;
 use Illuminate\Http\{Request, Response};

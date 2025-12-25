@@ -2,11 +2,11 @@
 
 namespace App\Providers;
 
-use App\Guards\OAuthGuard;
+use App\Modules\Auth\OAuth\Guards\OAuthGuard;
 use App\Models\User;
+use App\Modules\Auth\OAuth\Psr7Factory;
 use App\Modules\Auth\Webauthn\CounterChecker;
 use App\Modules\Auth\Webauthn\WebauthnService;
-use App\Modules\OAuth\Psr7Factory;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
