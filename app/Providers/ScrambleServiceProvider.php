@@ -19,16 +19,12 @@ class ScrambleServiceProvider extends ServiceProvider
     {
         $humanDuration = new Duration();
 
-        $accessTokenLifeTime = $humanDuration->humanize(config('sanctum.access_token_expiration') * 60);
-        $refreshTokenLifeTime = $humanDuration->humanize(config('sanctum.refresh_token_expiration') * 60);
-        $streamTokenLifeTime = $humanDuration->humanize(config('sanctum.stream_token_expiration') * 60);
+        $accessTokenLifeTime = $humanDuration->humanize(config('oauth.access_token_ttl'));
+        $refreshTokenLifeTime = $humanDuration->humanize(config('oauth.refresh_token_ttl'));
 
         $desc = <<<DESC
 ### Access token
 Only tokens with the ability 'access-api' will have access to the endpoints. Access tokens have a lifetime of $accessTokenLifeTime.
-
-### Stream token
-Stream tokens can only be used for accessing media streams. Stream tokens have a lifetime of $streamTokenLifeTime.
 
 ### Refresh token
 The refresh token has the 'issue-access-token' ability. Refresh tokens have a lifetime of $refreshTokenLifeTime.

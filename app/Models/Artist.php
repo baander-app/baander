@@ -118,7 +118,7 @@ class Artist extends BaseModel
     public static function createUnknown(array $attributes = []): static
     {
         return static::create(array_merge([
-            'name' => LocaleString::delimitString('media.unknown_artist'),
+            'name' => LocaleString::delimit('media.unknown_artist'),
         ], $attributes));
     }
 

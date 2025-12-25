@@ -9,6 +9,7 @@ use App\Modules\Logging\Attributes\LogChannel;
 use App\Modules\Logging\Channel;
 use App\Modules\Lyrics\Lrc;
 use App\Modules\Metadata\MediaMeta\MediaMeta;
+use App\Services\Metadata\MetadataDelimiterService;
 use App\Format\LocaleString;
 use Arr;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -21,8 +22,6 @@ use Throwable;
 
 class ScanDirectoryJob extends BaseJob implements ShouldQueue
 {
-    public const string ARTIST_SEPARATOR = ';';
-    public const string GENRE_SEPARATOR = ';';
     private const int BATCH_SIZE = 50;
 
     #[LogChannel(
@@ -30,11 +29,20 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
     )]
     private LoggerInterface $logger;
 
+    /**
+     * Default options for delimiter detection.
+     */
+    private const array DEFAULT_OPTIONS = [
+        'smart_detection' => true,
+        'artist_delimiters' => [';', '/', '&'],
+        'genre_delimiters' => [';', '/'],
+    ];
+
     public function __construct(
-        private string  $directory,
+        private string $directory,
         private Library $library,
-    )
-    {
+        private array $options = self::DEFAULT_OPTIONS,
+    ) {
     }
 
     /**
@@ -157,18 +165,21 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
             if ($songAttributes) {
                 $this->queueCoverJob($album, $coverJobs);
 
-                $cleanBadNames = static fn($v) => trim($v) !== '' && $v !== null;
+                $delimiterService = new MetadataDelimiterService($this->options);
 
-                $artists = $mediaMeta->getArtist();
-                $artists = is_array($artists) ? array_filter($mediaMeta->getArtist(), $cleanBadNames) : array_filter(explode(self::ARTIST_SEPARATOR, $artists ?? ''), $cleanBadNames);
+                // Split artists with smart detection
+                $artists = $delimiterService->splitArtists($mediaMeta->getArtist());
                 $artistIds = $this->getArtistIds($artists);
                 $album->artists()->sync($artistIds);
+
+                // Split genres with smart detection
+                $genres = $delimiterService->splitGenres($mediaMeta->getGenre());
 
                 return [
                     'attributes' => $songAttributes,
                     'album'      => $album,
                     'artists'    => $artists,
-                    'genres'     => array_filter(explode(self::GENRE_SEPARATOR, $mediaMeta->getGenre() ?? ''), $cleanBadNames),
+                    'genres'     => $genres,
                 ];
             }
 
@@ -198,7 +209,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
     {
         $title = $albumTitle;
         $album = Album::whereTitle($title)->whereLibraryId($this->library->id)->first();
-        $fallback = $this->isSongInBaseDirectory($directoryName) ? LocaleString::delimitString('library.album.unknown') : $directoryName;
+        $fallback = $this->isSongInBaseDirectory($directoryName) ? LocaleString::delimit('library.album.unknown') : $directoryName;
 
         if (!$album) {
             $album = new Album([
@@ -231,7 +242,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         }
 
         return [
-            'title'     => $mediaMeta->getTitle() ?? $file->getBasename() ?? LocaleString::delimitString('library.song.unknown'),
+            'title'     => $mediaMeta->getTitle() ?? $file->getBasename() ?? LocaleString::delimit('library.song.unknown'),
             'track'     => $mediaMeta->getTrackNumber(),
             'length'    => $mediaMeta->probeLength(),
             'lyrics'    => $lyric ? StrExt::convertToUtf8($lyric) : null,
