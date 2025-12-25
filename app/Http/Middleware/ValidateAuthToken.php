@@ -19,8 +19,15 @@ class ValidateAuthToken
             return $next($request);
         }
 
+        $guard = Auth::guard('oauth');
+
+        // Skip token validation if authenticated via passkey
+        if ($guard->authMethod() === 'passkey') {
+            return $next($request);
+        }
+
         // Get the current OAuth token from the guard
-        $token = Auth::guard('oauth')->token();
+        $token = $guard->token();
 
         if (!$token) {
             return $next($request);
@@ -33,7 +40,7 @@ class ValidateAuthToken
 
             if (!$validation['valid']) {
                 $token->revoke();
-                Auth::guard('oauth')->forgetUser();
+                $guard->forgetUser();
 
                 $message = match($validation['reason']) {
                     'fingerprint_mismatch' => 'Device fingerprint validation failed',

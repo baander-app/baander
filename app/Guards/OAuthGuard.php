@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Guards;
 
 use App\Models\OAuth\Token;
+use App\Models\Passkey;
 use App\Models\User;
 use App\Modules\OAuth\Psr7Factory;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\Guard;
 use Illuminate\Http\Request;
-use League\OAuth2\Server\Exception\OAuthServerException;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use League\OAuth2\Server\ResourceServer;
 
 class OAuthGuard implements Guard
@@ -26,15 +28,27 @@ class OAuthGuard implements Guard
     protected ?Token $token = null;
 
     /**
-     * Whether OAuth validation has been attempted.
+     * Cache for loaded passkey model (when authenticated via passkey).
+     */
+    protected ?Passkey $passkey = null;
+
+    /**
+     * Whether validation has been attempted.
      */
     protected bool $validated = false;
 
+    /**
+     * The authentication method used ('oauth' or 'passkey').
+     */
+    protected ?string $authMethod = null;
+
     public function __construct(
-        private readonly Request $request,
+        private readonly Request        $request,
         private readonly ResourceServer $resourceServer,
-        private readonly Psr7Factory $psrFactory,
-    ) {}
+        private readonly Psr7Factory    $psrFactory,
+    )
+    {
+    }
 
     public function check(): bool
     {
@@ -54,13 +68,35 @@ class OAuthGuard implements Guard
     /**
      * Get the authenticated OAuth token.
      *
-     * Returns null if no token is present or if token is not found in database.
+     * Returns null if authenticated via passkey or if token is not found in database.
      */
     public function token(): ?Token
     {
         $this->authenticate();
 
         return $this->token;
+    }
+
+    /**
+     * Get the authenticated passkey.
+     *
+     * Returns null if authenticated via OAuth token or if passkey is not found.
+     */
+    public function passkey(): ?Passkey
+    {
+        $this->authenticate();
+
+        return $this->passkey;
+    }
+
+    /**
+     * Get the authentication method used ('oauth' or 'passkey').
+     */
+    public function authMethod(): ?string
+    {
+        $this->authenticate();
+
+        return $this->authMethod;
     }
 
     /**
@@ -75,12 +111,12 @@ class OAuthGuard implements Guard
             $userId = $this->request->attributes->get('oauth_user_id');
         }
 
-        return $userId ? (string) $userId : null;
+        return $userId ? (string)$userId : null;
     }
 
     public function validate(array $credentials = []): bool
     {
-        return false; // OAuth validation is handled by the resource server
+        return false; // OAuth/passkey validation is handled by the guard
     }
 
     public function hasUser(): bool
@@ -94,24 +130,23 @@ class OAuthGuard implements Guard
     }
 
     /**
-     * Forget the current user and token, allowing re-authentication.
+     * Forget the current user, token, and passkey, allowing re-authentication.
      */
     public function forgetUser(): void
     {
         $this->user = null;
         $this->token = null;
+        $this->passkey = null;
         $this->validated = false;
+        $this->authMethod = null;
     }
 
     /**
-     * Perform OAuth authentication and load models.
+     * Perform authentication using OAuth token or passkey assertion.
      *
-     * This method:
-     * 1. Validates the OAuth access token via the resource server
-     * 2. Extracts OAuth attributes (user_id, scopes, etc.)
-     * 3. Loads the User model from database
-     * 4. Loads the Token model from database (if available)
-     * 5. Stores OAuth attributes in request for middleware use
+     * This method tries to authenticate using:
+     * 1. OAuth bearer token (Authorization: Bearer <token>)
+     * 2. Passkey assertion (X-Passkey-Assertion header with X-Passkey-Challenge)
      *
      * @return self Returns fluent interface for chaining
      */
@@ -124,22 +159,100 @@ class OAuthGuard implements Guard
 
         $this->validated = true;
 
+        // Try OAuth token authentication first
+        if ($this->hasOAuthToken()) {
+            return $this->authenticateViaOAuth();
+        }
+
+        // Try passkey authentication
+        if ($this->hasPasskeyAssertion()) {
+            return $this->authenticateViaPasskey();
+        }
+
+        return $this;
+    }
+
+    /**
+     * Check if the request has an OAuth bearer token.
+     */
+    protected function hasOAuthToken(): bool
+    {
+        return $this->request->bearerToken() !== null;
+    }
+
+    /**
+     * Check if the request has passkey assertion headers.
+     */
+    protected function hasPasskeyAssertion(): bool
+    {
+        return $this->request->hasHeader('X-Passkey-Assertion')
+            && $this->request->hasHeader('X-Passkey-Challenge');
+    }
+
+    /**
+     * Authenticate using OAuth bearer token.
+     */
+    protected function authenticateViaOAuth(): self
+    {
         try {
-            // Validate OAuth token and extract attributes
             $attributes = $this->validateOAuthRequest();
 
             if ($attributes === null) {
                 return $this;
             }
 
-            // Store OAuth attributes in request for middleware use
             $this->storeOAuthAttributes($attributes);
+            $this->loadModelsFromOAuth($attributes);
+            $this->authMethod = 'oauth';
 
-            // Load models from database
-            $this->loadModels($attributes);
+        } catch (\Exception $e) {
+            Log::alert('[OAuthGuard]: failed oauth authentication attempt', [
+                'exception' => $e->getMessage(),
+            ]);
+        }
 
-        } catch (OAuthServerException $exception) {
-            // Invalid token - leave user and token as null
+        return $this;
+    }
+
+    /**
+     * Authenticate using passkey assertion.
+     */
+    protected function authenticateViaPasskey(): self
+    {
+        try {
+            $assertionJson = $this->request->header('X-Passkey-Assertion');
+            $challengeId = $this->request->header('X-Passkey-Challenge');
+
+            // Retrieve the challenge options from cache
+            $challengeOptions = Cache::get("passkey_challenge:{$challengeId}");
+
+            if (!$challengeOptions) {
+                return $this;
+            }
+
+            $passkey = $this->validatePasskeyAssertion($assertionJson, $challengeOptions);
+
+            if (!$passkey) {
+                return $this;
+            }
+
+            // Load the user from the passkey
+            $this->user = $passkey->user;
+            $this->passkey = $passkey;
+            $this->authMethod = 'passkey';
+
+            // Store passkey info in request for middleware
+            $this->request->attributes->set('passkey_id', $passkey->id);
+            $this->request->attributes->set('oauth_scopes', ['access-api',
+                                                             'access-broadcasting']); // Default scopes for passkey auth
+
+            // Delete the challenge after successful authentication
+            Cache::forget("passkey_challenge:{$challengeId}");
+
+        } catch (\Exception $e) {
+            Log::alert('[OAuthGuard]: failed passkey authentication attempt', [
+                'exception' => $e->getMessage(),
+            ]);
         }
 
         return $this;
@@ -147,8 +260,6 @@ class OAuthGuard implements Guard
 
     /**
      * Validate the OAuth request and extract attributes.
-     *
-     * @return array|null OAuth attributes or null if validation fails
      */
     protected function validateOAuthRequest(): ?array
     {
@@ -174,9 +285,106 @@ class OAuthGuard implements Guard
     }
 
     /**
+     * Validate passkey assertion and return the passkey.
+     */
+    protected function validatePasskeyAssertion(string $assertionJson, string $challengeOptionsJson): ?Passkey
+    {
+        $publicKeyCredential = $this->deserializePublicKeyCredential($assertionJson);
+
+        if (!$publicKeyCredential) {
+            return null;
+        }
+
+        $passkey = Passkey::where('credential_id', Passkey::encodeBase64($publicKeyCredential->rawId))->first();
+
+        if (!$passkey) {
+            return null;
+        }
+
+        $challengeOptions = $this->deserializeChallengeOptions($challengeOptionsJson);
+
+        if (!$this->verifyPasskeyAssertion($publicKeyCredential, $challengeOptions, $passkey)) {
+            return null;
+        }
+
+        return $passkey;
+    }
+
+    /**
+     * Deserialize the public key credential from JSON.
+     */
+    protected function deserializePublicKeyCredential(string $json): ?\Webauthn\PublicKeyCredential
+    {
+        try {
+            $webauthnService = app(\App\Modules\Auth\Webauthn\WebauthnService::class);
+            $credential = $webauthnService->deserialize($json, \Webauthn\PublicKeyCredential::class);
+
+            if (!$credential->response instanceof \Webauthn\AuthenticatorAssertionResponse) {
+                return null;
+            }
+
+            return $credential;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Deserialize the challenge options from JSON.
+     */
+    protected function deserializeChallengeOptions(string $json): ?\Webauthn\PublicKeyCredentialRequestOptions
+    {
+        try {
+            $webauthnService = app(\App\Modules\Auth\Webauthn\WebauthnService::class);
+            return $webauthnService->deserialize($json, \Webauthn\PublicKeyCredentialRequestOptions::class);
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Verify the passkey assertion signature.
+     */
+    protected function verifyPasskeyAssertion(
+        \Webauthn\PublicKeyCredential               $credential,
+        \Webauthn\PublicKeyCredentialRequestOptions $options,
+        Passkey                                     $passkey,
+    ): bool
+    {
+        try {
+            $csmFactory = new \Webauthn\CeremonyStep\CeremonyStepManagerFactory();
+            $requestCsm = $csmFactory->requestCeremony();
+
+            $validator = \Webauthn\AuthenticatorAssertionResponseValidator::create($requestCsm);
+
+            $publicKeyCredentialSource = $validator->check(
+                publicKeyCredentialSource: $passkey->data,
+                authenticatorAssertionResponse: $validator->response,
+                publicKeyCredentialRequestOptions: $options,
+                host: parse_url(config('app.url'), PHP_URL_HOST),
+                userHandle: null,
+            );
+
+            // Update passkey with new counter and last used time
+            $passkey->update([
+                'data'         => $publicKeyCredentialSource,
+                'last_used_at' => now(),
+            ]);
+
+            return true;
+        } catch (\Exception $e) {
+            Log::alert('[OAuthGuard]: failed passkey assertion validation attempt', [
+                'exception' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
      * Load User and Token models from database using OAuth attributes.
      */
-    protected function loadModels(array $attributes): void
+    protected function loadModelsFromOAuth(array $attributes): void
     {
         $userId = $attributes['user_id'];
         $tokenId = $attributes['token_id'];

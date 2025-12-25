@@ -87,7 +87,7 @@ class PlaylistController extends Controller
     #[Get('{playlist}', 'api.playlist.show', ['auth:oauth', 'scope:access-api'])]
     public function show(PlaylistShowRequest $request, Playlist $playlist)
     {
-        $this->authorize('view', $playlist);
+//        $this->authorize('view', $playlist);
 
         $playlist->loadMissing('cover', 'songs', 'songs.artists', 'songs.album');
 

@@ -11,6 +11,7 @@ use League\OAuth2\Server\Exception\OAuthServerException;
 use League\OAuth2\Server\Grant\AbstractGrant;
 use League\OAuth2\Server\Repositories\RefreshTokenRepositoryInterface;
 use League\OAuth2\Server\Repositories\UserRepositoryInterface;
+use League\OAuth2\Server\RequestEvent;
 use League\OAuth2\Server\ResponseTypes\ResponseTypeInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
@@ -58,7 +59,7 @@ class PreAuthenticatedGrant extends AbstractGrant
         $client = $this->clientRepository->getClientEntity($clientId, $this->getIdentifier(), $clientSecret, false);
 
         if (!$client instanceof ClientEntityInterface) {
-            $this->getEmitter()->emit(new \League\OAuth2\Server\RequestEvent(\League\OAuth2\Server\RequestEvent::CLIENT_AUTHENTICATION_FAILED, $request));
+            $this->getEmitter()->emit(new RequestEvent(RequestEvent::CLIENT_AUTHENTICATION_FAILED, $request));
 
             throw OAuthServerException::invalidClient($request);
         }

@@ -10,6 +10,7 @@ use App\Models\OAuth\Token;
 use App\Models\TokenMetadata;
 use App\Models\User;
 use App\Modules\OAuth\Psr7Factory;
+use Defuse\Crypto\Crypto;
 use Illuminate\Http\Request;
 use League\OAuth2\Server\AuthorizationServer;
 
@@ -18,8 +19,6 @@ use League\OAuth2\Server\AuthorizationServer;
  */
 class OAuthTokenService
 {
-    private string $encryptionKey;
-
     public function __construct(
         private readonly AuthorizationServer $authorizationServer,
         private readonly GeoLocationService  $geoLocationService,
@@ -27,7 +26,6 @@ class OAuthTokenService
         private readonly Psr7Factory         $psr,
     )
     {
-        $this->encryptionKey = config('oauth.encryption_key');
     }
 
     /**
@@ -66,24 +64,19 @@ class OAuthTokenService
         $response = $this->authorizationServer->respondToAccessTokenRequest($psrRequest, $psrResponse);
         $responseBody = json_decode((string)$response->getBody(), true);
 
-        // Get the access token that was just created (time-bounded query)
-        $accessToken = Token::where('user_id', $user->id)
-            ->where('created_at', '>=', now()->subSeconds(5))
-            ->orderBy('created_at', 'desc')
-            ->first();
+        // Extract JTI from access token (JWT)
+        $accessTokenJti = $this->extractJtiFromToken($responseBody['access_token']);
+        $accessToken = Token::where('token_id', $accessTokenJti)->first();
 
         if (!$accessToken) {
             throw new \RuntimeException('Failed to retrieve newly created access token');
         }
 
-        // Get the refresh token (if any) and update with encrypted token string
+        // Get the refresh token and store by extracting JTI from decrypted value
         $refreshToken = null;
         if (isset($responseBody['refresh_token'])) {
-            $refreshToken = RefreshToken::where('access_token_id', $accessToken->id)
-                ->orderBy('created_at', 'desc')
-                ->first();
-
-            $refreshToken?->update(['encrypted_token' => $responseBody['refresh_token']]);
+            $refreshTokenJti = $this->extractJtiFromEncryptedToken($responseBody['refresh_token']);
+            $refreshToken = RefreshToken::where('token_id', $refreshTokenJti)->first();
         }
 
         // Link tokens in a new chain
@@ -110,7 +103,8 @@ class OAuthTokenService
      */
     public function refreshToken(Request $request, string $refreshTokenString): array
     {
-        $previousRefreshToken = RefreshToken::where('encrypted_token', $refreshTokenString)->first();
+        $refreshTokenJti = $this->extractJtiFromEncryptedToken($refreshTokenString);
+        $previousRefreshToken = RefreshToken::where('token_id', $refreshTokenJti)->first();
 
         if (!$previousRefreshToken) {
             throw new \RuntimeException('Refresh token not found');
@@ -133,25 +127,15 @@ class OAuthTokenService
         $response = $this->authorizationServer->respondToAccessTokenRequest($psrRequest, $psrResponse);
         $responseBody = json_decode((string)$response->getBody(), true);
 
-        // Get new access token (time-bounded query)
-        $user = $request->user();
-        $newAccessToken = Token::where('user_id', $user->id)
-            ->where('created_at', '>=', now()->subSeconds(5))
-            ->orderBy('created_at', 'desc')
-            ->first();
+        // Get new access token by extracting JTI from JWT
+        $newAccessTokenJti = $this->extractJtiFromToken($responseBody['access_token']);
+        $newAccessToken = Token::where('token_id', $newAccessTokenJti)->first();
 
-        if (!$newAccessToken) {
-            throw new \RuntimeException('Failed to create refreshed access token');
-        }
+        // Get new refresh token by extracting JTI from decrypted value
+        $newRefreshTokenJti = $this->extractJtiFromEncryptedToken($responseBody['refresh_token']);
+        $newRefreshToken = RefreshToken::where('token_id', $newRefreshTokenJti)->first();
 
-        // Get new refresh token and store encrypted string
-        $newRefreshToken = RefreshToken::where('access_token_id', $newAccessToken->id)
-            ->orderBy('created_at', 'desc')
-            ->first();
-
-        $newRefreshToken?->update(['encrypted_token' => $responseBody['refresh_token']]);
-
-        if (!$newRefreshToken) {
+        if (!$newAccessToken || !$newRefreshToken) {
             throw new \RuntimeException('Failed to create refreshed tokens');
         }
 
@@ -169,16 +153,10 @@ class OAuthTokenService
     }
 
     /**
-     * Extract JTI (JWT ID) from a JWT token or encrypted token
+     * Extract JTI (JWT ID) from a JWT token
      */
     private function extractJtiFromToken(string $token): string
     {
-        // Check if it's an encrypted token (starts with specific prefix)
-        if (str_starts_with($token, 'def')) {
-            throw new \RuntimeException('Cannot extract JTI from encrypted tokens');
-        }
-
-        // Otherwise, treat as JWT and extract JTI from payload
         $lastDotPos = strrpos($token, '.');
         if ($lastDotPos === false) {
             throw new \RuntimeException('Invalid JWT format: no dots found');
@@ -202,6 +180,28 @@ class OAuthTokenService
         }
 
         return $payload['jti'];
+    }
+
+    /**
+     * Extract JTI from an encrypted refresh token
+     */
+    private function extractJtiFromEncryptedToken(string $encryptedToken): string
+    {
+        $encryptionKey = config('oauth.encryption_key');
+
+        try {
+            $decrypted = Crypto::decryptWithPassword($encryptedToken, $encryptionKey);
+        } catch (\Exception $e) {
+            throw new \RuntimeException('Failed to decrypt refresh token: ' . $e->getMessage(), 0, $e);
+        }
+
+        $data = json_decode($decrypted, true);
+
+        if (!isset($data['refresh_token_id'])) {
+            throw new \RuntimeException('Decrypted token missing refresh_token_id');
+        }
+
+        return $data['refresh_token_id'];
     }
 
     /**

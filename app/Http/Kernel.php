@@ -48,6 +48,7 @@ class Kernel extends HttpKernel
      */
     protected $middlewareGroups = [
         'web' => [
+            \Inspector\Laravel\Middleware\InspectorOctaneMiddleware::class,
             EncryptCookies::class,
             AddQueuedCookiesToResponse::class,
             StartSession::class,
@@ -55,17 +56,17 @@ class Kernel extends HttpKernel
             VerifyCsrfToken::class,
             //            \App\Http\Middleware\AddContentSecurityPolicyHeaders::class,
             SubstituteBindings::class,
-            \Inspector\Laravel\Middleware\InspectorOctaneMiddleware::class,
         ],
 
         'api' => [
+            \Inspector\Laravel\Middleware\InspectorOctaneMiddleware::class,
             ConvertQueryTokenToHeaderMiddleware::class,
             ThrottleRequests::class . ':api',
             SubstituteBindings::class,
-            \Inspector\Laravel\Middleware\InspectorOctaneMiddleware::class,
         ],
 
         'public-api' => [
+            \Inspector\Laravel\Middleware\InspectorOctaneMiddleware::class,
             // \Illuminate\Routing\Middleware\ThrottleRequests::class . ':publicApi',
             SubstituteBindings::class,
         ],

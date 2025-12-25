@@ -42,9 +42,9 @@ class Playlist extends BaseModel
 
     protected static function booted()
     {
-        static::created(function (Playlist $playlist) {
-            $playlist->statistics()->exists() || $playlist->statistics()->create();
-        });
+//        static::created(function (Playlist $playlist) {
+//            $playlist->statistics()->exists() || $playlist->statistics()->create();
+//        });
     }
 
     public function syncSmartPlaylist()

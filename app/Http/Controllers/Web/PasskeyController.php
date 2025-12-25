@@ -17,7 +17,8 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
-use Illuminate\Support\Facades\{Auth, Log, Session};
+use Illuminate\Support\Facades\{Auth, Cache, Log, Session};
+use Illuminate\Support\Str;
 use Spatie\RouteAttributes\Attributes\{Get, Post, Prefix};
 use Throwable;
 
@@ -57,7 +58,8 @@ class PasskeyController extends Controller
      *     transports: array<string>
      *   }>,
      *   userVerification: string,
-     *   timeout: int
+     *   timeout: int,
+     *   challengeId: string
      * }
      */
     #[Get('/', 'auth.passkey.options')]
@@ -68,11 +70,17 @@ class PasskeyController extends Controller
         /** @var array $options WebAuthn authentication challenge options */
         $options = $action->execute($request->user());
 
-        // Store options in session for later verification
+        // Generate a unique challenge ID and store options in cache
+        $challengeId = Str::random(40);
+        Cache::put("passkey_challenge:{$challengeId}", json_encode($options), now()->addMinutes(5));
+
+        // Store options in session for backward compatibility with web flow
         Session::put('passkey-authentication-options', $options);
 
         // WebAuthn authentication challenge for passkey login.
-        return response()->json($options);
+        return response()->json(array_merge($options, [
+            'challengeId' => $challengeId,
+        ]));
     }
 
     /**

@@ -13,7 +13,6 @@ class RefreshToken extends BaseModel
 
     protected $fillable = [
         'token_id', // OAuth server identifier
-        'encrypted_token', // The encrypted token string from OAuth server
         'access_token_id',
         'revoked',
         'expires_at',
