@@ -1,5 +1,5 @@
 import Axios, { AxiosError, AxiosRequestConfig } from 'axios';
-import { applyInterceptors } from '@app/libs/api-client/interceptors';
+import { applyInterceptors } from '@/app/libs/api-client/interceptors';
 
 export interface CustomAxiosRequestConfig extends AxiosRequestConfig {
   _skipAuth?: boolean;

@@ -55,7 +55,7 @@ class LogsController extends Controller
      * @response array<LogFile>
      */
     #[Get('/', 'api.logs.index')]
-    public function index(): array
+    public function index()
     {
         /** @var array<LogFile> $files Sorted array of available log files */
         $files = $this->logFileService->getSortedFiles();

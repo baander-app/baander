@@ -1,10 +1,10 @@
-import { usePathParam } from '@app/hooks/use-path-param';
-import { LibraryParams } from '@app/modules/library-music/routes/_routes';
-import { SongTable } from '@app/components/song-table/song-table';
+import { usePathParam } from '@/app/hooks/use-path-param';
+import { LibraryParams } from '@/app/modules/library-music/routes/_routes';
+import { SongTable } from '@/app/components/song-table/song-table';
 import { useCallback, useRef, useMemo } from 'react';
 import styles from './song-list.module.scss';
-import { useSongsIndexInfinite } from '@app/libs/api-client/gen/endpoints/song/song.ts';
-import { addPagination } from '@app/hooks/use-paginated-infinite-query.ts';
+import { useSongsIndexInfinite } from '@/app/libs/api-client/gen/endpoints/song/song.ts';
+import { addPagination } from '@/app/hooks/use-paginated-infinite-query.ts';
 
 export function SongList() {
   const { library: libraryParam } = usePathParam<LibraryParams>();

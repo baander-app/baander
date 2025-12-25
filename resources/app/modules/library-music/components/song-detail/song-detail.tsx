@@ -7,9 +7,9 @@ import {
   TextArea,
   TextField,
 } from '@radix-ui/themes';
-import { DateTime } from '@app/ui/dates/date-time.tsx';
+import { DateTime } from '@/app/ui/dates/date-time.tsx';
 import { useEffect, useState } from 'react';
-import { useSongsShow } from '@app/libs/api-client/gen/endpoints/song/song.ts';
+import { useSongsShow } from '@/app/libs/api-client/gen/endpoints/song/song.ts';
 
 export interface SongDetailProps {
   publicId: string;

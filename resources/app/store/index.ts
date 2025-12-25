@@ -1,11 +1,11 @@
 import { Action, combineSlices, configureStore, ThunkAction } from '@reduxjs/toolkit';
 import { persistReducer, persistStore } from 'redux-persist';
 import storage from 'redux-persist/lib/storage';
-import { equalizerSlice } from '@app/store/audio/equalizer.ts';
-import { musicPlayerSlice } from '@app/store/music/music-player-slice.ts';
-import { notificationsSlice } from '@app/store/notifications/notifications-slice.ts';
-import { uiSlice } from '@app/store/users/ui-slice.ts';
-import { eventBridgeMiddleware } from '@app/store/middleware/event-bridge.middleware.ts';
+import { equalizerSlice } from '@/app/store/audio/equalizer.ts';
+import { musicPlayerSlice } from '@/app/store/music/music-player-slice.ts';
+import { notificationsSlice } from '@/app/store/notifications/notifications-slice.ts';
+import { uiSlice } from '@/app/store/users/ui-slice.ts';
+import { eventBridgeMiddleware } from '@/app/store/middleware/event-bridge.middleware.ts';
 
 const rootReducer = combineSlices(
   equalizerSlice,

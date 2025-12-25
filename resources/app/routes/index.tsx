@@ -1,7 +1,7 @@
-import { publicRoutes } from '@app/routes/public';
+import { publicRoutes } from '@/app/routes/public';
 import { useRoutes } from 'react-router-dom';
-import { protectedRoutes } from '@app/routes/protected';
-import { useIsAuthenticated } from '@app/modules/auth/store';
+import { protectedRoutes } from '@/app/routes/protected';
+import { useIsAuthenticated } from '@/app/modules/auth/store';
 
 export function AppRoutes() {
   const isAuthenticated = useIsAuthenticated();

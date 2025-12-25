@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Flex } from '@radix-ui/themes';
-import { PlayerControls } from '@app/modules/library-music-player/components/player-controls/player-controls.tsx';
-import PlayerFacePlate from '@app/modules/library-music-player/components/player-face-plate/player-face-plate.tsx';
+import { PlayerControls } from '@/app/modules/library-music-player/components/player-controls/player-controls.tsx';
+import PlayerFacePlate from '@/app/modules/library-music-player/components/player-face-plate/player-face-plate.tsx';
 import {
   PlayerMetaControls,
-} from '@app/modules/library-music-player/components/player-meta-controls/player-meta-controls.tsx';
-import { LyricsProvider } from '@app/ui/lyrics-viewer/providers/lyrics-provider.tsx';
-import { selectSong } from '@app/store/music/music-player-slice.ts';
-import { useAppSelector } from '@app/store/hooks.ts';
+} from '@/app/modules/library-music-player/components/player-meta-controls/player-meta-controls.tsx';
+import { LyricsProvider } from '@/app/ui/lyrics-viewer/providers/lyrics-provider.tsx';
+import { selectSong } from '@/app/store/music/music-player-slice.ts';
+import { useAppSelector } from '@/app/store/hooks.ts';
 import {
   attachAudioElement,
   usePlayerActions,
@@ -16,10 +16,10 @@ import {
   usePlayerDuration,
   usePlayerIsPlaying,
   usePlayerAudioElement,
-} from '@app/modules/library-music-player/store';
-import { isElectron } from '@app/utils/platform.ts';
-import { Token } from '@app/services/auth/token.ts';
-import { useSongsShow } from '@app/libs/api-client/gen/endpoints/song/song.ts';
+} from '@/app/modules/library-music-player/store';
+import { isElectron } from '@/app/utils/platform.ts';
+import { Token } from '@/app/services/auth/token.ts';
+import { useSongsShow } from '@/app/libs/api-client/gen/endpoints/song/song.ts';
 
 export function InlinePlayer() {
   const sourceSong = useAppSelector(selectSong);

@@ -53,7 +53,9 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
     public function middleware(): array
     {
         $hash = hash('xxh3', $this->directory);
-        return [new WithoutOverlapping("scan_music_directory_$hash")];
+        return [
+            new WithoutOverlapping("scan_music_directory_$hash"),
+        ];
     }
 
     /**

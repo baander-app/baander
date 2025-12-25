@@ -25,12 +25,15 @@
     "noFallthroughCasesInSwitch": true,
     "types": [
       "unplugin-icons/types/react"
-    ]
+    ],
+    "paths": {
+      "@/app/*": ["./resources/app/*"],
+      "@/docs/*": ["./resources/docs/*"]
+    }
   },
   "references": [
     {
       "path": "./tsconfig.node.json"
     }
-  ],
-  "extends": "./tsconfig.paths.json"
+  ]
 }

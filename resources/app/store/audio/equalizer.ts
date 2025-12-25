@@ -1,6 +1,6 @@
-import { ThreeBandEq } from '@app/modules/dsp/equalizer/models/three-band-eq.ts';
+import { ThreeBandEq } from '@/app/modules/dsp/equalizer/models/three-band-eq.ts';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { BarsMode } from '@app/modules/dsp/equalizer/models/bars-mode.ts';
+import { BarsMode } from '@/app/modules/dsp/equalizer/models/bars-mode.ts';
 
 export interface EqualizerState {
   isEnabled: boolean;

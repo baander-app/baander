@@ -47,10 +47,9 @@ class AuthController extends Controller
     {
     }
 
-    // Scopes for tokens
-    private const SCOPE_ACCESS_API = 'access-api';
-    private const SCOPE_ACCESS_BROADCASTING = 'access-broadcasting';
-    private const SCOPE_ISSUE_ACCESS_TOKEN = 'issue-access-token';
+    private const string SCOPE_ACCESS_API = 'access-api';
+    private const string SCOPE_ACCESS_BROADCASTING = 'access-broadcasting';
+    private const string SCOPE_ISSUE_ACCESS_TOKEN = 'issue-access-token';
 
     /**
      * Authenticate user and create session
@@ -76,7 +75,7 @@ class AuthController extends Controller
 
         if (!$user || !Hash::check($request->input('password'), $user->password)) {
             Event::dispatch(new LoginFailedEvent($request->input('email'), $request));
-            abort(401, 'Invalid credentials.');
+            Event::dispatch(401, 'Invalid credentials.');
         }
 
         // Generate session and fingerprint for security bindings
@@ -150,12 +149,7 @@ class AuthController extends Controller
      *
      * @unauthenticated
      * @response array{
-     *  access_token: array{
-     *    token_id: string,
-     *    token_type: string,
-     *    expires_in: number,
-     *    scopes: string[]
-     *  },
+     *  access_token: string,
      *  refresh_token: string|null,
      *  session_id: string
      *  }
@@ -187,9 +181,9 @@ class AuthController extends Controller
         Event::dispatch(new UserRegisteredEvent($user, $request, $sessionId));
 
         return response()->json([
-            'accessToken'  => $tokens['access_token'],
-            'refreshToken' => $tokens['refresh_token'],
-            'sessionId'    => $sessionId,
+            'access_token'  => $tokens['access_token'],
+            'refresh_token' => $tokens['refresh_token'],
+            'session_id'    => $sessionId,
         ], 201);
     }
 

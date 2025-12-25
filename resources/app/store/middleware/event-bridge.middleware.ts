@@ -1,4 +1,4 @@
-import { eventBridge } from '@app/services/event-bridge/bridge';
+import { eventBridge } from '@/app/services/event-bridge/bridge';
 import { Action, Middleware } from '@reduxjs/toolkit';
 
 // Define the shape of your Redux actions

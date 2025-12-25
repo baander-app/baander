@@ -1,8 +1,8 @@
-import { authLogin, authLogout, authTokensRevokeAll } from '@app/libs/api-client/gen/endpoints/auth/auth.ts';
-import { Token } from '@app/services/auth/token.ts';
-import { tokenBindingService } from '@app/services/auth/token-binding.service.ts';
+import { authLogin, authLogout, authTokensRevokeAll } from '@/app/libs/api-client/gen/endpoints/auth/auth.ts';
+import { Token } from '@/app/services/auth/token.ts';
+import { tokenBindingService } from '@/app/services/auth/token-binding.service.ts';
 import { eventBridge } from '../event-bridge/bridge';
-import { LOCAL_STORAGE_KEY } from '@app/common/constants.ts';
+import { LOCAL_STORAGE_KEY } from '@/app/common/constants.ts';
 
 export async function login(credentials: { email: string; password: string }) {
   try {

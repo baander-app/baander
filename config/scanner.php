@@ -4,6 +4,11 @@ return [
     'music' => [
         'directory_chunk_size' => env('MUSIC_SCANNER_DIRECTORY_CHUNK_SIZE', 10),
 
+        'rate_limiting' => [
+            // Jobs per second limit for external API sync jobs (MusicBrainz, Discogs, etc.)
+            'sync_jobs_per_second' => env('METADATA_SYNC_RATE_LIMIT', 1),
+        ],
+
         'delimiter_rules' => [
             'problematic' => [
                 'skip_slash' => ['AC/DC', 'M/F', 'R.E.M./Live']

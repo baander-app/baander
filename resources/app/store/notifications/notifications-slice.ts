@@ -4,7 +4,7 @@ import {
   isToastOptions,
   Notification,
   ToastModel,
-} from '@app/modules/notifications/models.ts';
+} from '@/app/modules/notifications/models.ts';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 

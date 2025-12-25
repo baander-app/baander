@@ -13,6 +13,7 @@
   "type": "module",
   "main": "electron/dist-electron/main/index.js",
   "scripts": {
+    "tsc": "tsc --noEmit --skipLibCheck",
     "clean": "rimraf public/build",
     "build": "yarn clean && tsc --noEmit --skipLibCheck || true && vite build",
     "dev": "yarn clean && vite",

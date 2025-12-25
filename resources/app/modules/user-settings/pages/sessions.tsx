@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Button, Container, Dialog, Flex, Heading, Inset } from '@radix-ui/themes';
-import { useDateFormatter } from '@app/providers/dayjs-provider.tsx';
-import { TokenDetail } from '@app/modules/user-settings/features/tokens/token-detail.tsx';
-import { PersonalAccessTokenViewResource } from '@app/libs/api-client/gen/models';
-import { revokeAllTokensExceptCurrent } from '@app/services/auth/auth.service.ts';
-import { useAppDispatch } from '@app/store/hooks';
-import { createNotification } from '@app/store/notifications/notifications-slice.ts';
-import { useUserTokensIndex } from '@app/libs/api-client/gen/endpoints/user-token/user-token.ts';
+import { useDateFormatter } from '@/app/providers/dayjs-provider.tsx';
+import { TokenDetail } from '@/app/modules/user-settings/features/tokens/token-detail.tsx';
+import { PersonalAccessTokenViewResource } from '@/app/libs/api-client/gen/models';
+import { revokeAllTokensExceptCurrent } from '@/app/services/auth/auth.service.ts';
+import { useAppDispatch } from '@/app/store/hooks';
+import { createNotification } from '@/app/store/notifications/notifications-slice.ts';
+import { useUserTokensIndex } from '@/app/libs/api-client/gen/endpoints/user-token/user-token.ts';
 
 export function Sessions() {
   const { data, isLoading, refetch } = useUserTokensIndex('1');

@@ -1,6 +1,6 @@
 import styles from './user-button.module.scss';
 import { Button, Text } from '@radix-ui/themes';
-import { useUserServiceGetApiUsersMe } from '@app/api-client/queries';
+import { useUserServiceGetApiUsersMe } from '@/app/api-client/queries';
 
 export function UserButton() {
   const {data} = useUserServiceGetApiUsersMe();

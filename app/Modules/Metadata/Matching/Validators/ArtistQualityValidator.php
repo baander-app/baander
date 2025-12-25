@@ -73,15 +73,14 @@ class ArtistQualityValidator extends BaseQualityValidator
         $artistName = $artist->name;
 
         // Use the TextSimilarityService for international name comparison
-        $scores = $this->textSimilarity->calculateInternationalNameSimilarity($metadataName, $artistName);
+        $bestScore = $this->textSimilarity->getBestInternationalSimilarity($metadataName, $artistName);
 
         // Enhanced scoring logic with bonuses
-        $bestScore = max($scores);
 
         // Bonus for exact matches
-        if ($scores['direct'] >= 95) {
+        if ($bestScore >= 95) {
             $bestScore = min(100, $bestScore + 5); // 5% bonus for near-perfect matches
-        } elseif ($scores['direct'] >= 85) {
+        } elseif ($bestScore >= 85) {
             $bestScore = min(100, $bestScore + 3); // 3% bonus for high direct matches
         }
 
@@ -94,7 +93,6 @@ class ArtistQualityValidator extends BaseQualityValidator
         $this->logger->debug('Enhanced international name similarity breakdown', [
             'metadata_name' => $metadataName,
             'artist_name'   => $artistName,
-            'scores'        => $scores,
             'best_score'    => $bestScore,
             'final_score'   => $finalScore,
         ]);

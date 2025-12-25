@@ -1,19 +1,19 @@
 import { Box, Button, ContextMenu, Dialog, Flex, ScrollArea, Text } from '@radix-ui/themes';
-import { NavLink } from '@app/ui/nav-link';
-import { lazyImport } from '@app/utils/lazy-import';
-import { Iconify } from '@app/ui/icons/iconify';
+import { NavLink } from '@/app/ui/nav-link';
+import { lazyImport } from '@/app/utils/lazy-import';
+import { Iconify } from '@/app/ui/icons/iconify';
 import styles from './root-menu.module.scss';
 import { ReactNode, useMemo } from 'react';
-import { CreatePlaylist } from '@app/modules/library-music-playlists/components/create-playlist/create-playlist.tsx';
-import { CreateSmartPlaylist } from '@app/modules/library-music-playlists/components/create-smart-playlist/create-smart-playlist.tsx';
+import { CreatePlaylist } from '@/app/modules/library-music-playlists/components/create-playlist/create-playlist.tsx';
+import { CreateSmartPlaylist } from '@/app/modules/library-music-playlists/components/create-smart-playlist/create-smart-playlist.tsx';
 import {
   PlaylistLayoutContextMenu
-} from '@app/modules/library-music-playlists/components/context-menu/playlist-layout-context-menu/playlist-layout-context-menu.tsx';
-import { useLibrariesIndex } from '@app/libs/api-client/gen/endpoints/library/library.ts';
-import { usePlaylistIndex } from '@app/libs/api-client/gen/endpoints/playlist/playlist.ts';
-import { LibraryResource, PlaylistResource } from '@app/libs/api-client/gen/models';
+} from '@/app/modules/library-music-playlists/components/context-menu/playlist-layout-context-menu/playlist-layout-context-menu.tsx';
+import { useLibrariesIndex } from '@/app/libs/api-client/gen/endpoints/library/library.ts';
+import { usePlaylistIndex } from '@/app/libs/api-client/gen/endpoints/playlist/playlist.ts';
+import { LibraryResource, PlaylistResource } from '@/app/libs/api-client/gen/models';
 
-const { Brand } = lazyImport(() => import('@app/ui/brand/Brand'), 'Brand');
+const { Brand } = lazyImport(() => import('@/app/ui/brand/Brand'), 'Brand');
 
 interface MenuLink {
   label: string;

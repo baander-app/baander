@@ -1,4 +1,4 @@
-import { createAppSlice } from '@app/store/create-app-slice.ts';
+import { createAppSlice } from '@/app/store/create-app-slice.ts';
 import { PayloadAction } from '@reduxjs/toolkit';
 
 export type Theme = 'light' | 'dark';

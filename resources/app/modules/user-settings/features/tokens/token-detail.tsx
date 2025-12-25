@@ -1,6 +1,6 @@
 import { Code, Badge, Card, DataList } from '@radix-ui/themes';
-import { useDateFormatter } from '@app/providers/dayjs-provider.tsx';
-import { DateTime } from '@app/ui/dates/date-time.tsx';
+import { useDateFormatter } from '@/app/providers/dayjs-provider.tsx';
+import { DateTime } from '@/app/ui/dates/date-time.tsx';
 
 export interface TokenDetailProps {
   item: any;

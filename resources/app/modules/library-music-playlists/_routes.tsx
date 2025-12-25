@@ -1,5 +1,5 @@
 import { Route, Routes } from 'react-router-dom';
-import { PlayList } from '@app/modules/library-music-playlists/playlist/playlist.tsx';
+import { PlayList } from '@/app/modules/library-music-playlists/playlist/playlist.tsx';
 
 
 export const LibraryMusicPlaylistsRoutes = () => {

@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { PlaybackSource } from '@app/models/playback-source.ts';
-import { SongResource } from '@app/libs/api-client/gen/models';
+import { PlaybackSource } from '@/app/models/playback-source.ts';
+import { SongResource } from '@/app/libs/api-client/gen/models';
 
 interface MusicPlayerSlice {
   queue: SongResource[];

@@ -1,17 +1,17 @@
 import { BrowserRouter, HashRouter } from 'react-router-dom';
-import { AppRoutes } from '@app/routes';
+import { AppRoutes } from '@/app/routes';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { HelmetProvider } from 'react-helmet-async';
 import { Button, Text, Theme } from '@radix-ui/themes';
 import { Toast } from 'radix-ui';
-import { useAppDispatch, useAppSelector } from '@app/store/hooks.ts';
+import { useAppDispatch, useAppSelector } from '@/app/store/hooks.ts';
 import styles from './app.module.scss';
-import { removeToast } from '@app/store/notifications/notifications-slice.ts';
+import { removeToast } from '@/app/store/notifications/notifications-slice.ts';
 import { useEffect } from 'react';
 import CloseIcon from '~icons/ion/close';
-import { initializeGlobalAudioProcessor } from '@app/modules/library-music-player/store';
-import { isWeb } from '@app/utils/platform.ts';
-import { DeepLinkProvider } from '@app/providers/deep-link-provider.tsx';
+import { initializeGlobalAudioProcessor } from '@/app/modules/library-music-player/store';
+import { isWeb } from '@/app/utils/platform.ts';
+import { DeepLinkProvider } from '@/app/providers/deep-link-provider.tsx';
 
 const isFileProtocol = window.location.protocol === 'file:';
 const Router = isFileProtocol ? HashRouter : BrowserRouter;

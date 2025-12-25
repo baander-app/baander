@@ -1,4 +1,4 @@
-import { CreateNotification } from '@app/modules/notifications/models.ts';
+import { CreateNotification } from '@/app/modules/notifications/models.ts';
 
 export interface AuthEvents {
   'auth:login': {

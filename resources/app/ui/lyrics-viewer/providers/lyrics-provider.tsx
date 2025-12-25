@@ -1,9 +1,9 @@
 import React, { createContext, ReactEventHandler, ReactNode, useContext, useEffect, useState } from 'react';
-import { Lrc } from '@app/libs/lyrics/lrc.ts';
-import { AudioLyricSynchronizer } from '@app/libs/lyrics/audio-lyric-synchronizer.ts';
-import { useAppSelector } from '@app/store/hooks.ts';
-import { usePlayerAudioElement, usePlayerSong } from '@app/modules/library-music-player/store';
-import { useSongsShow } from '@app/libs/api-client/gen/endpoints/song/song.ts';
+import { Lrc } from '@/app/libs/lyrics/lrc.ts';
+import { AudioLyricSynchronizer } from '@/app/libs/lyrics/audio-lyric-synchronizer.ts';
+import { useAppSelector } from '@/app/store/hooks.ts';
+import { usePlayerAudioElement, usePlayerSong } from '@/app/modules/library-music-player/store';
+import { useSongsShow } from '@/app/libs/api-client/gen/endpoints/song/song.ts';
 
 interface LyricsProviderContextProps {
   lyrics: Lrc | undefined;

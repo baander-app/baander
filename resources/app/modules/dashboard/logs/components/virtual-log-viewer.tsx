@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useEffect, useState } from 'react';
+import React, { useCallback, useRef, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { JsonLogLine } from './json-log-line.tsx';
 
@@ -22,67 +22,67 @@ const getLogLevelStyle = (content: string) => {
   const upperContent = content.toUpperCase();
   if (upperContent.includes('ERROR') || upperContent.includes('FATAL')) {
     return {
-      color: '#ff6b6b',
-      borderLeft: '3px solid #ff6b6b20',
-      backgroundColor: '#ff6b6b08',
+      color: '#f87171',
+      borderLeft: '3px solid #f87171',
+      backgroundColor: '#f8717112',
     };
   }
   if (upperContent.includes('WARN')) {
     return {
-      color: '#ffa726',
-      borderLeft: '3px solid #ffa72620',
-      backgroundColor: '#ffa72608',
+      color: '#fbbf24',
+      borderLeft: '3px solid #fbbf24',
+      backgroundColor: '#fbbf2412',
     };
   }
   if (upperContent.includes('INFO')) {
     return {
-      color: '#42a5f5',
-      borderLeft: '3px solid #42a5f520',
-      backgroundColor: '#42a5f508',
+      color: '#60a5fa',
+      borderLeft: '3px solid #60a5fa',
+      backgroundColor: '#60a5fa0a',
     };
   }
   if (upperContent.includes('DEBUG')) {
     return {
-      color: '#9e9e9e',
+      color: '#9ca3af',
       borderLeft: '3px solid transparent',
+      backgroundColor: 'transparent',
     };
   }
   if (upperContent.includes('TRACE')) {
     return {
-      color: '#ab47bc',
-      borderLeft: '3px solid #ab47bc20',
-      backgroundColor: '#ab47bc08',
+      color: '#c084fc',
+      borderLeft: '3px solid #c084fc',
+      backgroundColor: '#c084fc0a',
     };
   }
   return {
-    color: '#e0e0e0',
+    color: '#d1d5db',
     borderLeft: '3px solid transparent',
+    backgroundColor: 'transparent',
   };
 };
 
 export const VirtualLogViewer: React.FC<VirtualLogViewerProps> = ({
-                                                                    logLines,
-                                                                    height,
-                                                                    onLoadMore,
-                                                                    hasMoreBefore = false,
-                                                                    hasMoreAfter = false,
-                                                                    isLoading = false,
-                                                                  }) => {
+  logLines,
+  height,
+  onLoadMore,
+  hasMoreBefore = false,
+  hasMoreAfter = false,
+  isLoading = false,
+}) => {
   const parentRef = useRef<HTMLDivElement>(null);
   const isLoadingRef = useRef(false);
-  const [debugInfo, setDebugInfo] = useState<any>({});
 
   const virtualizer = useVirtualizer({
     count: logLines.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 24,
-    overscan: 5,
+    estimateSize: () => 32,
+    overscan: 10,
   });
 
   // Reset loading ref when isLoading prop becomes false
   useEffect(() => {
     if (!isLoading && isLoadingRef.current) {
-      console.log('🔄 Resetting isLoadingRef: isLoading became false');
       isLoadingRef.current = false;
     }
   }, [isLoading]);
@@ -96,21 +96,17 @@ export const VirtualLogViewer: React.FC<VirtualLogViewerProps> = ({
       const { scrollTop, scrollHeight, clientHeight } = scrollElement;
       const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
 
-      setDebugInfo({ scrollTop, scrollHeight, clientHeight, distanceFromBottom });
-
       if (isLoadingRef.current || isLoading) return;
 
       // Load more before (top)
-      if (scrollTop < 100 && hasMoreBefore) {
-        console.log('🔥 SCROLL TRIGGER - loading before');
+      if (scrollTop < 50 && hasMoreBefore) {
         isLoadingRef.current = true;
         onLoadMore('before');
         return;
       }
 
       // Load more after (bottom)
-      if (distanceFromBottom < 100 && hasMoreAfter) {
-        console.log('🔥 SCROLL TRIGGER - loading after');
+      if (distanceFromBottom < 50 && hasMoreAfter) {
         isLoadingRef.current = true;
         onLoadMore('after');
         return;
@@ -123,7 +119,7 @@ export const VirtualLogViewer: React.FC<VirtualLogViewerProps> = ({
 
   // Handle virtual items-based infinite loading
   useEffect(() => {
-    if (isLoadingRef.current || isLoading || !onLoadMore || logLines.length < 10) return;
+    if (isLoadingRef.current || isLoading || !onLoadMore) return;
 
     const virtualItems = virtualizer.getVirtualItems();
     if (virtualItems.length === 0) return;
@@ -131,17 +127,15 @@ export const VirtualLogViewer: React.FC<VirtualLogViewerProps> = ({
     const firstItem = virtualItems[0];
     const lastItem = virtualItems[virtualItems.length - 1];
 
-    // Load more before when first visible item is within first 3 items
-    if (firstItem.index <= 2 && hasMoreBefore) {
-      console.log('🔥 VIRTUAL TRIGGER - loading before, first index:', firstItem.index);
+    // Load more before when first visible item is near the top
+    if (firstItem.index <= 3 && hasMoreBefore) {
       isLoadingRef.current = true;
       onLoadMore('before');
       return;
     }
 
-    // Load more after when last visible item is within last 3 items
-    if (lastItem.index >= logLines.length - 3 && hasMoreAfter) {
-      console.log('🔥 VIRTUAL TRIGGER - loading after, last index:', lastItem.index);
+    // Load more after when last visible item is near the bottom
+    if (lastItem.index >= logLines.length - 4 && hasMoreAfter) {
       isLoadingRef.current = true;
       onLoadMore('after');
       return;
@@ -169,13 +163,14 @@ export const VirtualLogViewer: React.FC<VirtualLogViewerProps> = ({
       >
         <div
           style={{
-            minHeight: '24px',
             borderRadius: '4px',
-            transition: 'background-color 0.15s ease',
-            ...logStyle,
+            transition: 'all 0.15s ease',
+            borderLeft: logStyle.borderLeft,
+            paddingLeft: '8px',
+            backgroundColor: logStyle.backgroundColor || 'transparent',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#ffffff06';
+            e.currentTarget.style.backgroundColor = '#ffffff0f';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = logStyle.backgroundColor || 'transparent';
@@ -184,7 +179,10 @@ export const VirtualLogViewer: React.FC<VirtualLogViewerProps> = ({
           <JsonLogLine
             line={line.line}
             content={line.content}
-            logStyle={logStyle}
+            logStyle={{
+              ...logStyle,
+              borderLeft: 'none',
+            }}
           />
         </div>
       </div>
@@ -196,114 +194,15 @@ export const VirtualLogViewer: React.FC<VirtualLogViewerProps> = ({
       style={{
         height: height,
         width: '100%',
-        backgroundColor: '#0f172a',
-        borderRadius: '12px',
-        border: '1px solid #1e293b',
+        backgroundColor: '#0a0a0a',
+        borderRadius: '8px',
+        border: '1px solid #27272a',
         boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
         overflow: 'hidden',
         position: 'relative',
       }}
     >
-      {/* Debug info */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '8px',
-          right: '8px',
-          backgroundColor: '#1e293b',
-          border: '1px solid #334155',
-          borderRadius: '4px',
-          padding: '6px 8px',
-          fontSize: '9px',
-          color: '#64748b',
-          zIndex: 10,
-          opacity: 0.9,
-          fontFamily: 'monospace',
-          lineHeight: '1.2',
-        }}
-      >
-        <div>Lines: {logLines.length}</div>
-        <div>More: {hasMoreBefore ? '↑' : ''}{hasMoreAfter ? '↓' : ''}</div>
-        <div>Loading: {isLoading ? 'Y' : 'N'}</div>
-        <div>LoadRef: {isLoadingRef.current ? 'Y' : 'N'}</div>
-        {debugInfo.scrollTop !== undefined && (
-          <>
-            <div>Top: {Math.round(debugInfo.scrollTop)}</div>
-            <div>Bot: {Math.round(debugInfo.distanceFromBottom || 0)}</div>
-          </>
-        )}
-      </div>
-
-      {/* Test buttons */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '8px',
-          left: '8px',
-          zIndex: 10,
-          display: 'flex',
-          gap: '4px',
-        }}
-      >
-        <button
-          onClick={() => {
-            if (onLoadMore && hasMoreBefore) {
-              isLoadingRef.current = true;
-              onLoadMore('before');
-            }
-          }}
-          style={{
-            padding: '4px 8px',
-            fontSize: '10px',
-            backgroundColor: hasMoreBefore ? '#dc2626' : '#374151',
-            color: '#e5e7eb',
-            border: '1px solid #6b7280',
-            borderRadius: '4px',
-            cursor: 'pointer',
-          }}
-          disabled={!hasMoreBefore || !onLoadMore}
-        >
-          ↑ Before
-        </button>
-        <button
-          onClick={() => {
-            if (onLoadMore && hasMoreAfter) {
-              isLoadingRef.current = true;
-              onLoadMore('after');
-            }
-          }}
-          style={{
-            padding: '4px 8px',
-            fontSize: '10px',
-            backgroundColor: hasMoreAfter ? '#dc2626' : '#374151',
-            color: '#e5e7eb',
-            border: '1px solid #6b7280',
-            borderRadius: '4px',
-            cursor: 'pointer',
-          }}
-          disabled={!hasMoreAfter || !onLoadMore}
-        >
-          ↓ After
-        </button>
-        <button
-          onClick={() => {
-            isLoadingRef.current = false;
-          }}
-          style={{
-            padding: '4px 8px',
-            fontSize: '10px',
-            backgroundColor: '#059669',
-            color: '#e5e7eb',
-            border: '1px solid #6b7280',
-            borderRadius: '4px',
-            cursor: 'pointer',
-          }}
-        >
-          Reset
-        </button>
-      </div>
-
-      {/* Loading indicators */}
+      {/* Loading indicator */}
       {isLoading && (
         <div
           style={{
@@ -311,16 +210,44 @@ export const VirtualLogViewer: React.FC<VirtualLogViewerProps> = ({
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            backgroundColor: '#1e293b',
-            border: '1px solid #334155',
-            borderRadius: '6px',
-            padding: '8px 12px',
-            fontSize: '12px',
-            color: '#64748b',
+            backgroundColor: '#18181b',
+            border: '1px solid #27272a',
+            borderRadius: '8px',
+            padding: '12px 16px',
+            fontSize: '13px',
+            color: '#a1a1aa',
             zIndex: 10,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 4px 12px rgb(0 0 0 / 0.3)',
           }}
         >
-          Loading...
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            style={{ animation: 'spin 1s linear infinite' }}
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeOpacity="0.3"
+            />
+            <path
+              d="M12 2C17.5228 2 22 6.47715 22 12"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+          </svg>
+          <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+          Loading logs...
         </div>
       )}
 
@@ -331,7 +258,7 @@ export const VirtualLogViewer: React.FC<VirtualLogViewerProps> = ({
           height: '100%',
           width: '100%',
           overflow: 'auto',
-          padding: '8px',
+          padding: '12px',
         }}
       >
         <div

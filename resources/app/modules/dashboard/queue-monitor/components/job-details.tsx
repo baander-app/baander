@@ -1,6 +1,6 @@
 import { Box, Container, Flex, Separator, Text } from '@radix-ui/themes';
 import { Table } from '@radix-ui/themes';
-import { JobStatus } from '@app/modules/dashboard/queue-monitor/components/job-status.tsx';
+import { JobStatus } from '@/app/modules/dashboard/queue-monitor/components/job-status.tsx';
 import { ErrorBoundary } from 'react-error-boundary';
 import ReactJson from '@microlink/react-json-view';
 

@@ -1,7 +1,7 @@
-import { Token } from '@app/services/auth/token.ts';
-import { NotificationFacade } from '@app/modules/notifications/notification-facade.ts';
-import { authRefreshToken } from '@app/libs/api-client/gen/endpoints/auth/auth.ts';
-import { tokenBindingService } from '@app/services/auth/token-binding.service.ts';
+import { Token } from '@/app/services/auth/token.ts';
+import { NotificationFacade } from '@/app/modules/notifications/notification-facade.ts';
+import { authRefreshToken } from '@/app/libs/api-client/gen/endpoints/auth/auth.ts';
+import { tokenBindingService } from '@/app/services/auth/token-binding.service.ts';
 
 export async function refreshToken() {
   const authTokens = Token.get();

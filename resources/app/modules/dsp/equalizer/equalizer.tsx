@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useAppDispatch, useAppSelector } from '@app/store/hooks.ts';
-import { globalAudioProcessor } from '@app/services/global-audio-processor-service.ts';
-import { setLufs, setNormalizationGain, setVolumeNormalization } from '@app/store/music/music-player-slice.ts';
+import { useAppDispatch, useAppSelector } from '@/app/store/hooks.ts';
+import { globalAudioProcessor } from '@/app/services/global-audio-processor-service.ts';
+import { setLufs, setNormalizationGain, setVolumeNormalization } from '@/app/store/music/music-player-slice.ts';
 import styles from './equalizer.module.scss';
 import {
   usePlayerActions,
   usePlayerIsMuted,
   usePlayerIsPlaying,
   usePlayerVolumePercent,
-} from '@app/modules/library-music-player/store';
+} from '@/app/modules/library-music-player/store';
 
 interface EqualizerProps {
   className?: string;

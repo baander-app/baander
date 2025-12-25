@@ -1,8 +1,8 @@
 import { Route, Routes } from 'react-router-dom';
-import { EqualizerSettings } from '@app/modules/user-settings/pages/equalizer-settings.tsx';
-import { SettingsOverview } from '@app/modules/user-settings/pages/settings-overview.tsx';
-import { Sessions } from '@app/modules/user-settings/pages/sessions.tsx';
-import { Passkeys } from '@app/modules/user-settings/pages/passkeys.tsx';
+import { EqualizerSettings } from '@/app/modules/user-settings/pages/equalizer-settings.tsx';
+import { SettingsOverview } from '@/app/modules/user-settings/pages/settings-overview.tsx';
+import { Sessions } from '@/app/modules/user-settings/pages/sessions.tsx';
+import { Passkeys } from '@/app/modules/user-settings/pages/passkeys.tsx';
 
 export const UserSettingsRoutes = () => {
   return (

@@ -1,16 +1,16 @@
 import {
   EqButton,
   LyricsButton,
-} from '@app/modules/library-music-player/components/player-buttons/player-buttons.tsx';
+} from '@/app/modules/library-music-player/components/player-buttons/player-buttons.tsx';
 import styles from './player-meta-controls.module.scss';
-import { VolumeSlider } from '@app/modules/library-music-player/components/volume-slider/volume-slider.tsx';
-import { useLyrics } from '@app/ui/lyrics-viewer/providers/lyrics-provider.tsx';
-import { LyricsViewer } from '@app/ui/lyrics-viewer/lyrics-viewer.tsx';
+import { VolumeSlider } from '@/app/modules/library-music-player/components/volume-slider/volume-slider.tsx';
+import { useLyrics } from '@/app/ui/lyrics-viewer/providers/lyrics-provider.tsx';
+import { LyricsViewer } from '@/app/ui/lyrics-viewer/lyrics-viewer.tsx';
 import { useEffect } from 'react';
-import { useDisclosure } from '@app/hooks/use-disclosure';
+import { useDisclosure } from '@/app/hooks/use-disclosure';
 import { Box } from '@radix-ui/themes';
-import { Equalizer } from '@app/modules/dsp/equalizer/equalizer.tsx';
-import { SongResource } from '@app/libs/api-client/gen/models';
+import { Equalizer } from '@/app/modules/dsp/equalizer/equalizer.tsx';
+import { SongResource } from '@/app/libs/api-client/gen/models';
 
 export interface PlayerMetaControlsProps {
   song?: SongResource;

@@ -61,9 +61,9 @@ export default defineConfig(config => {
     resolve: {
       alias: {
         // Main app
-        '@app': fileURLToPath(new URL('./resources/app', import.meta.url)),
+        '@/app': fileURLToPath(new URL('./resources/app', import.meta.url)),
         // Admin panel
-        '@docs': fileURLToPath(new URL('./resources/docs', import.meta.url)),
+        '@/docs': fileURLToPath(new URL('./resources/docs', import.meta.url)),
         // Ziggy
         'ziggy-js': resolve('vendor/tightenco/ziggy'),
       },

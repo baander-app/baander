@@ -1,10 +1,10 @@
 import { Box, Flex, ScrollArea, Text } from '@radix-ui/themes';
-import { NavLink } from '@app/ui/nav-link.tsx';
-import { lazyImport } from '@app/utils/lazy-import.ts';
-import { Iconify } from '@app/ui/icons/iconify.tsx';
+import { NavLink } from '@/app/ui/nav-link.tsx';
+import { lazyImport } from '@/app/utils/lazy-import.ts';
+import { Iconify } from '@/app/ui/icons/iconify.tsx';
 import styles from './dashboard-menu.module.scss';
 
-const {BaanderLogo} = lazyImport(() => import('@app/ui/branding/baander-logo/baander-logo.tsx'), 'BaanderLogo');
+const {BaanderLogo} = lazyImport(() => import('@/app/ui/branding/baander-logo/baander-logo.tsx'), 'BaanderLogo');
 
 interface MenuLink {
   label: string;
