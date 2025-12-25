@@ -15,6 +15,7 @@ import {
 } from '@tanstack/react-table';
 import { useVirtualizer, VirtualItem, Virtualizer } from '@tanstack/react-virtual';
 import { SpeakerLoudIcon } from '@radix-ui/react-icons';
+import { ContextMenu } from '@radix-ui/themes';
 import styles from './song-table.module.scss';
 import { SongResource } from '@/app/libs/api-client/gen/models';
 
@@ -25,6 +26,11 @@ export interface SongTableProps {
   onScrollToBottom?: () => void;
   estimatedTotalCount?: number;
   className?: string;
+  contextMenuActions?: {
+    onEdit: (song: SongResource) => void;
+    onBrowse?: (song: SongResource) => void;
+    onSync?: (song: SongResource) => void;
+  };
 }
 
 interface TableHeaderProps {
@@ -43,6 +49,7 @@ interface HeaderCellProps {
 interface VirtualizedRowsProps {
   visibleRows: VirtualizedRowData[];
   onSongClick: (id: string) => void;
+  contextMenuActions?: SongTableProps['contextMenuActions'];
 }
 
 interface SongTitleCellProps {
@@ -120,6 +127,7 @@ export function SongTable({
                             onScrollToBottom,
                             estimatedTotalCount,
                             className,
+                            contextMenuActions,
                           }: SongTableProps) {
   const dispatch = useAppDispatch();
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -169,6 +177,7 @@ export function SongTable({
             <VirtualizedRows
               visibleRows={visibleRows}
               onSongClick={handleSongClick}
+              contextMenuActions={contextMenuActions}
             />
           </div>
         </div>
@@ -222,29 +231,64 @@ function HeaderCell({ header }: HeaderCellProps) {
   );
 }
 
-function VirtualizedRows({ visibleRows, onSongClick }: VirtualizedRowsProps) {
+function VirtualizedRows({ visibleRows, onSongClick, contextMenuActions }: VirtualizedRowsProps) {
   return (
     <table>
       <tbody>
       {visibleRows.map(({ virtualRow, row }) => (
-        <tr
-          key={row.id}
-          onClick={() => onSongClick(row.original.publicId)}
-          className={`${styles.listItem} ${styles.virtualizedRow}`}
-          style={{
-            height: `${virtualRow.size}px`,
-            transform: `translateY(${virtualRow.start}px)`,
-          }}
-        >
-          {row.getVisibleCells().map((cell) => (
-            <td key={cell.id} style={{ width: cell.column.getSize() }}>
-              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-            </td>
-          ))}
-        </tr>
+        <ContextMenu.Root key={row.id}>
+          <ContextMenu.Trigger>
+            <tr
+              onClick={() => onSongClick(row.original.publicId)}
+              className={`${styles.listItem} ${styles.virtualizedRow}`}
+              style={{
+                height: `${virtualRow.size}px`,
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+            >
+              {row.getVisibleCells().map((cell) => (
+                <td key={cell.id} style={{ width: cell.column.getSize() }}>
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </td>
+              ))}
+            </tr>
+          </ContextMenu.Trigger>
+
+          {contextMenuActions && (
+            <SongContextMenu
+              song={row.original}
+              onEdit={contextMenuActions.onEdit}
+              onBrowse={contextMenuActions.onBrowse}
+              onSync={contextMenuActions.onSync}
+            />
+          )}
+        </ContextMenu.Root>
       ))}
       </tbody>
     </table>
+  );
+}
+
+interface SongContextMenuProps {
+  song: SongResource;
+  onEdit: (song: SongResource) => void;
+  onBrowse?: (song: SongResource) => void;
+  onSync?: (song: SongResource) => void;
+}
+
+function SongContextMenu({ song, onEdit, onBrowse, onSync }: SongContextMenuProps) {
+  return (
+    <ContextMenu.Content>
+      <ContextMenu.Item onClick={() => onEdit(song)}>Edit</ContextMenu.Item>
+      {onBrowse && (
+        <ContextMenu.Item onClick={() => onBrowse(song)}>Browse for Metadata</ContextMenu.Item>
+      )}
+      {onSync && (
+        <ContextMenu.Item onClick={() => onSync(song)}>Sync Metadata</ContextMenu.Item>
+      )}
+      <ContextMenu.Separator />
+      <ContextMenu.Item color="red">Delete</ContextMenu.Item>
+    </ContextMenu.Content>
   );
 }
 

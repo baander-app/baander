@@ -13,6 +13,7 @@ The media information is organized and easily searchable, ensuring users can alw
  */
 import {
   useInfiniteQuery,
+  useMutation,
   useQuery,
   useSuspenseInfiniteQuery,
   useSuspenseQuery,
@@ -23,12 +24,15 @@ import type {
   DefinedUseInfiniteQueryResult,
   DefinedUseQueryResult,
   InfiniteData,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
   UseInfiniteQueryOptions,
   UseInfiniteQueryResult,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
   UseSuspenseInfiniteQueryOptions,
@@ -39,6 +43,7 @@ import type {
 
 import type {
   ArtistResource,
+  ArtistUpdateRequest,
   ArtistsIndex200,
   ArtistsIndexParams,
   AuthenticationExceptionResponse,
@@ -47,7 +52,7 @@ import type {
 } from "../../models";
 
 import { customInstance } from "../../../axios-instance";
-import type { ErrorType } from "../../../axios-instance";
+import type { ErrorType, BodyType } from "../../../axios-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -1496,3 +1501,109 @@ export function useArtistsShowSuspenseInfinite<
 
   return query;
 }
+
+/**
+ * Updates artist metadata and information using the provided data.
+Only the fields included in the request will be modified.
+ * @summary Update an existing artist
+ */
+export const artistsUpdate = (
+  library: string,
+  artist: string,
+  artistUpdateRequest: BodyType<ArtistUpdateRequest>,
+  options?: SecondParameter<typeof customInstance>
+) => {
+  return customInstance<ArtistResource>(
+    {
+      url: `/api/libraries/${library}/artists/${artist}`,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      data: artistUpdateRequest,
+    },
+    options
+  );
+};
+
+export const getArtistsUpdateMutationOptions = <
+  TError = ErrorType<
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
+  >,
+  TContext = unknown
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof artistsUpdate>>,
+    TError,
+    { library: string; artist: string; data: BodyType<ArtistUpdateRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof artistsUpdate>>,
+  TError,
+  { library: string; artist: string; data: BodyType<ArtistUpdateRequest> },
+  TContext
+> => {
+  const mutationKey = ["artistsUpdate"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof artistsUpdate>>,
+    { library: string; artist: string; data: BodyType<ArtistUpdateRequest> }
+  > = (props) => {
+    const { library, artist, data } = props ?? {};
+
+    return artistsUpdate(library, artist, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArtistsUpdateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof artistsUpdate>>
+>;
+export type ArtistsUpdateMutationBody = BodyType<ArtistUpdateRequest>;
+export type ArtistsUpdateMutationError = ErrorType<
+  | AuthenticationExceptionResponse
+  | ModelNotFoundExceptionResponse
+  | ValidationExceptionResponse
+>;
+
+/**
+ * @summary Update an existing artist
+ */
+export const useArtistsUpdate = <
+  TError = ErrorType<
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
+  >,
+  TContext = unknown
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof artistsUpdate>>,
+      TError,
+      { library: string; artist: string; data: BodyType<ArtistUpdateRequest> },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof artistsUpdate>>,
+  TError,
+  { library: string; artist: string; data: BodyType<ArtistUpdateRequest> },
+  TContext
+> => {
+  const mutationOptions = getArtistsUpdateMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};

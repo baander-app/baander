@@ -24,9 +24,9 @@ export function MusicSourceProvider({ children }: { children: React.ReactNode })
   const [audioRef, setAudioRef] = useState<RefObject<HTMLAudioElement | null>>();
 
   const authenticatedSource = useMemo(() => {
-    const streamToken = Token.getStreamToken();
-    if (currentSong?.streamUrl && streamToken) {
-      return `${currentSong.streamUrl}?_token=${streamToken.token}`;
+    const token = Token.get()?.access_token;
+    if (currentSong?.streamUrl && token) {
+      return `${currentSong.streamUrl}?_token=${token}`;
     }
     return undefined;
   }, [currentSong?.streamUrl]);

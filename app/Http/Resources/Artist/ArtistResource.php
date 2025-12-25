@@ -40,6 +40,7 @@ class ArtistResource extends JsonResource
              * Portrait relation
              */
             'portrait'       => ImageResource::make($this->whenLoaded('portrait')),
+            'lockedFields'   => $this->locked_fields,
         ];
     }
 }

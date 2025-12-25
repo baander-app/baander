@@ -281,7 +281,7 @@ return [
 	|
 	*/
 
-	'collect_data_always' => env('CLOCKWORK_COLLECT_DATA_ALWAYS', false),
+	'collect_data_always' => env('CLOCKWORK_COLLECT_DATA_ALWAYS', true),
 
 	/*
 	|------------------------------------------------------------------------------------------------------------------
@@ -315,7 +315,7 @@ return [
 	'storage_redis_prefix' => env('CLOCKWORK_STORAGE_REDIS_PREFIX', 'clockwork'),
 
 	// Maximum lifetime of collected metadata in minutes, older requests will automatically be deleted, false to disable
-	'storage_expiration' => env('CLOCKWORK_STORAGE_EXPIRATION', 60 * 24 * 7),
+	'storage_expiration' => env('CLOCKWORK_STORAGE_EXPIRATION', 60 * 2),
 
 	/*
 	|------------------------------------------------------------------------------------------------------------------

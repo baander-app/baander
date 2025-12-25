@@ -26,6 +26,17 @@ export default defineConfig({
           useSuspenseInfiniteQuery: true,
           useInfinite: true,
           useInfiniteQueryParam: 'page',
+          infinite: {
+            useInfiniteQueryParam: 'page',
+            // Auto-generate getNextPageParam for all infinite queries
+            getNextPageParam: (lastPage) => {
+              const pagination = lastPage?.pagination;
+              if (!pagination) return undefined;
+              const currentPage = pagination.page;
+              const totalPages = Math.ceil(pagination.total / pagination.per_page);
+              return currentPage < totalPages ? currentPage + 1 : undefined;
+            },
+          },
         },
       },
     },

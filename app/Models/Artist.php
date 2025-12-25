@@ -33,11 +33,13 @@ class Artist extends BaseModel
         'mbid',
         'discogs_id',
         'spotify_id',
+        'locked_fields',
     ];
 
     protected $casts = [
         'life_span_begin' => 'date',
         'life_span_end' => 'date',
+        'locked_fields' => 'array',
     ];
 
     public function getRouteKeyName(): string

@@ -5,12 +5,12 @@ namespace App\Http\Controllers\Api\Libraries;
 use App\Http\Controllers\Controller;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\ValidationException;
-use App\Http\Requests\Song\{SongIndexRequest, SongShowRequest};
+use App\Http\Requests\Song\{SongIndexRequest, SongShowRequest, SongUpdateRequest};
 use App\Http\Resources\Song\SongResource;
 use App\Models\{Album, Library, Song};
 use App\Modules\Eloquent\BaseBuilder;
 use App\Modules\Http\Resources\Json\JsonAnonymousResourceCollection;
-use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
+use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix, Put};
 
 #[Middleware(['force.json'])]
 #[Prefix('/libraries/{library}/songs')]
@@ -85,6 +85,28 @@ class SongController extends Controller
             ->firstOrFail();
 
         $song->librarySlug = $library->slug;
+
+        return new SongResource($song);
+    }
+
+    /**
+     * Update an existing song
+     *
+     * Updates song metadata and information using the provided data.
+     * Only the fields included in the request will be modified.
+     *
+     * @param Library $library The library containing the song
+     * @param Song $song The song to update
+     * @param SongUpdateRequest $request Request containing validated update data
+     *
+     * @throws ModelNotFoundException When a song is not found in the library
+     * @response SongResource
+     */
+    #[Put('{song}', 'api.songs.update', ['auth:oauth', 'scope:access-api'])]
+    public function update(Library $library, Song $song, SongUpdateRequest $request): SongResource
+    {
+        $song->librarySlug = $library->slug;
+        $song->update($request->validated());
 
         return new SongResource($song);
     }

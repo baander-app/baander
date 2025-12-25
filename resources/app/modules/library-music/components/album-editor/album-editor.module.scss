@@ -26,3 +26,12 @@
   font-size: 14px;
   line-height: 1;
 }
+.lockedField {
+  opacity: 0.6;
+  cursor: pointer;
+  user-select: none;
+
+  &:hover {
+    opacity: 0.5;
+  }
+}

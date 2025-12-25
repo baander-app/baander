@@ -34,4 +34,5 @@ export interface AlbumUpdateRequest {
    */
   discogsId?: number;
   genres?: number[];
+  locked_fields?: string[];
 }

@@ -1,12 +1,39 @@
 .artistBigCircle {
-    cursor: pointer;
     text-align: center;
+    pointer-events: auto;
 
     .imageContainer {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        overflow: hidden;
+        background: var(--gray-5);
+
         .image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
             border-radius: 50%;
+            pointer-events: none;
 
             &:hover {
+                box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.3);
+            }
+        }
+
+        .placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--gray-6) 0%, var(--gray-5) 100%);
+            color: var(--gray-11);
+            transition: all 0.2s ease;
+            pointer-events: none;
+
+            &:hover {
+                background: linear-gradient(135deg, var(--gray-7) 0%, var(--gray-6) 100%);
                 box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.3);
             }
         }

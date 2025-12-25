@@ -19,4 +19,5 @@ export type AuthPasskeyOptions200 = {
   allowCredentials: AuthPasskeyOptions200AllowCredentialsItem[];
   userVerification: string;
   timeout: number;
+  challengeId: string;
 };

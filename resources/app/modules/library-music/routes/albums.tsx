@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import styles from './albums.module.scss';
 import { AlbumDetail } from '@/app/modules/library-music/components/album-detail/album-detail.tsx';
 import { CoverGrid } from '@/app/modules/library-music/components/cover-grid';
@@ -11,9 +11,80 @@ import { useDisclosure } from '@/app/hooks/use-disclosure.ts';
 import { AlbumEditor } from '@/app/modules/library-music/components/album-editor/album-editor.tsx';
 import { AlbumResource } from '@/app/libs/api-client/gen/models';
 import { useAlbumsIndex } from '@/app/libs/api-client/gen/endpoints/album/album.ts';
+import { useMetadataSync } from '@/app/libs/api-client/gen/endpoints/metadata-sync/metadata-sync.ts';
+import { useAppDispatch } from '@/app/store/hooks';
+import { createNotification } from '@/app/store/notifications/notifications-slice';
 
 function AlbumContextMenu({ album, librarySlug }: { album: AlbumResource, librarySlug: string }) {
   const [showEditor, editorHandlers] = useDisclosure(false);
+  const dispatch = useAppDispatch();
+
+  // Sync mutation
+  const syncMutation = useMetadataSync({
+    mutation: {
+      onSuccess: () => {
+        dispatch(createNotification({
+          title: 'Success',
+          message: 'Metadata synced successfully!',
+          type: 'success',
+          toast: true,
+        }));
+        // TODO: Refresh the albums list
+      },
+      onError: (error: any) => {
+        dispatch(createNotification({
+          title: 'Error',
+          message: error.response?.data?.message || 'Failed to sync metadata',
+          type: 'error',
+          toast: true,
+        }));
+      }
+    }
+  });
+
+  const handleSync = useCallback(() => {
+    syncMutation.mutate({
+      data: {
+        album_public_ids: [album.publicId],
+        force_update: true,
+      }
+    });
+  }, [syncMutation, album]);
+
+  const handleAlbumSubmit = useCallback(async (data: any) => {
+    try {
+      await fetch(`/api/libraries/${librarySlug}/albums/${album.publicId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      editorHandlers.close();
+      dispatch(createNotification({
+        title: 'Success',
+        message: 'Album updated successfully!',
+        type: 'success',
+        toast: true,
+      }));
+      // TODO: Refresh the albums list
+    } catch (error: any) {
+      dispatch(createNotification({
+        title: 'Error',
+        message: error.response?.data?.message || 'Failed to update album',
+        type: 'error',
+        toast: true,
+      }));
+    }
+  }, [album, librarySlug, dispatch, editorHandlers]);
+
+  const handleMetadataApplied = useCallback(() => {
+    dispatch(createNotification({
+      title: 'Success',
+      message: 'Metadata applied successfully!',
+      type: 'success',
+      toast: true,
+    }));
+    // TODO: Refresh the albums list
+  }, [dispatch]);
 
   return (
     <>
@@ -31,22 +102,26 @@ function AlbumContextMenu({ album, librarySlug }: { album: AlbumResource, librar
           border: '1px solid var(--gray-6)',
           borderRadius: '8px',
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-          padding: '60px',
+          padding: '0',
           maxWidth: '650px',
           width: '100%',
+          maxHeight: '80vh',
+          overflow: 'auto',
         }}>
-          <Dialog.Title>Edit Album</Dialog.Title>
-          <Dialog.Description>
+          <Dialog.Title style={{ padding: '24px 24px 0 24px' }}>Edit Album</Dialog.Title>
+          <Dialog.Description style={{ padding: '0 24px 24px 24px' }}>
             Make changes to the album information.
           </Dialog.Description>
 
-          <AlbumEditor
-            album={album}
-            onSubmit={() => {
-              editorHandlers.close();
-            }}
-            librarySlug={librarySlug}
-          />
+          <div style={{ padding: '0 24px 24px 24px' }}>
+            <AlbumEditor
+              album={album}
+              onSubmit={handleAlbumSubmit}
+              librarySlug={librarySlug}
+              onSync={handleSync}
+              onMetadataApplied={handleMetadataApplied}
+            />
+          </div>
         </Dialog.Content>
       </Dialog.Root>
 

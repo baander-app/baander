@@ -1,16 +1,20 @@
 import { useState, useEffect } from 'react';
-import { Button, TextField, Flex, Box, Select, Badge } from '@radix-ui/themes';
+import { Button, TextField, Flex, Box, Select, Badge, Dialog } from '@radix-ui/themes';
 import { useForm, Controller } from 'react-hook-form';
 import styles from './album-editor.module.scss';
 import { Form } from 'radix-ui';
 import { useGenresIndex } from '@/app/libs/api-client/gen/endpoints/genre/genre.ts';
 import { AlbumResource } from '@/app/libs/api-client/gen/models';
+import { LockClosedIcon } from '@radix-ui/react-icons';
+import { BrowseTab } from '@/app/modules/dashboard/music/components/browse-tab/browse-tab';
 
 interface AlbumEditorProps {
   album?: AlbumResource;
   librarySlug: string;
   onSubmit: (data: AlbumFormData) => void;
   onCancel?: () => void;
+  onSync?: () => void;
+  onMetadataApplied?: () => void;
 }
 
 interface AlbumFormData {
@@ -19,6 +23,7 @@ interface AlbumFormData {
   mbid?: string;
   discogsId?: number;
   genres: string[];
+  lockedFields?: string[];
 }
 
 // Simple multi-select for genres
@@ -27,9 +32,10 @@ type MultiSelectProps = {
   value: string[];
   onChange: (value: string[]) => void;
   options: { id: number; name: string }[];
+  disabled?: boolean;
 };
 
-function MultiSelect({ placeholder, value, onChange, options }: MultiSelectProps) {
+function MultiSelect({ placeholder, value, onChange, options, disabled }: MultiSelectProps) {
   const [selectedItems, setSelectedItems] = useState<{ id: number; name: string }[]>([]);
 
   // Initialize selected items from value prop
@@ -70,6 +76,7 @@ function MultiSelect({ placeholder, value, onChange, options }: MultiSelectProps
                   variant="ghost"
                   onClick={() => handleRemoveItem(item.id)}
                   className={styles.removeButton}
+                  disabled={disabled}
                 >
                   ×
                 </Button>
@@ -78,7 +85,7 @@ function MultiSelect({ placeholder, value, onChange, options }: MultiSelectProps
           </Flex>
         )}
 
-        <Select.Root onValueChange={handleSelectChange} value="">
+        <Select.Root onValueChange={handleSelectChange} value="" disabled={disabled}>
           <Select.Trigger placeholder={placeholder} />
           <Select.Content>
             {availableOptions.map(option => (
@@ -93,7 +100,11 @@ function MultiSelect({ placeholder, value, onChange, options }: MultiSelectProps
   );
 }
 
-export function AlbumEditor({ album, librarySlug, onSubmit, onCancel }: AlbumEditorProps) {
+export function AlbumEditor({ album, librarySlug, onSubmit, onCancel, onSync, onMetadataApplied }: AlbumEditorProps) {
+  const [lockMode, setLockMode] = useState(false);
+  const [lockedFields, setLockedFields] = useState<string[]>([]);
+  const [showBrowseDialog, setShowBrowseDialog] = useState(false);
+
   const { register, handleSubmit, control, formState: { errors } } = useForm<AlbumFormData>({
     defaultValues: {
       title: album?.title || '',
@@ -103,6 +114,13 @@ export function AlbumEditor({ album, librarySlug, onSubmit, onCancel }: AlbumEdi
       genres: album?.genres?.map(g => g.name) || [],
     }
   });
+
+  // Initialize locked fields from album
+  useEffect(() => {
+    if (album?.lockedFields) {
+      setLockedFields(album.lockedFields as string[]);
+    }
+  }, [album]);
 
   // Fetch genres
   const { data: genresData } = useGenresIndex({
@@ -116,100 +134,211 @@ export function AlbumEditor({ album, librarySlug, onSubmit, onCancel }: AlbumEdi
     name: genre.name,
   })) || [];
 
+  const handleFieldClick = (fieldName: string) => {
+    if (!lockMode) return;
+
+    setLockedFields(prev => {
+      if (prev.includes(fieldName)) {
+        return prev.filter(f => f !== fieldName);
+      } else {
+        return [...prev, fieldName];
+      }
+    });
+  };
+
+  const isFieldLocked = (fieldName: string) => {
+    return lockedFields.includes(fieldName);
+  };
+
   const handleFormSubmit = (data: AlbumFormData) => {
-    onSubmit(data);
+    onSubmit({ ...data, lockedFields });
   };
 
   return (
-    <Form.Root onSubmit={handleSubmit(handleFormSubmit)} className={styles.form}>
+    <Box>
       <Flex direction="column" gap="4">
-        <Form.Field name="title">
-          <Form.Label>Title</Form.Label>
-          <Form.Control asChild>
-            <TextField.Root
-              {...register('title', { required: 'Title is required' })}
-              placeholder="Album title"
-            />
-          </Form.Control>
-          {errors.title && (
-            <Form.Message>{errors.title.message}</Form.Message>
-          )}
-        </Form.Field>
-
-        <Form.Field name="year">
-          <Form.Label>Year</Form.Label>
-          <Form.Control asChild>
-            <TextField.Root
-              type="number"
-              {...register('year', {
-                min: { value: 0, message: 'Year must be positive' },
-                max: { value: 9999, message: 'Year must be less than 10000' }
-              })}
-              placeholder="Release year"
-            />
-          </Form.Control>
-          {errors.year && (
-            <Form.Message>{errors.year.message}</Form.Message>
-          )}
-        </Form.Field>
-
-        <Form.Field name="mbid">
-          <Form.Label>MusicBrainz ID</Form.Label>
-          <Form.Control asChild>
-            <TextField.Root
-              {...register('mbid')}
-              placeholder="MusicBrainz ID"
-            />
-          </Form.Control>
-          {errors.mbid && (
-            <Form.Message>{errors.mbid.message}</Form.Message>
-          )}
-        </Form.Field>
-
-        <Form.Field name="discogsId">
-          <Form.Label>Discogs ID</Form.Label>
-          <Form.Control asChild>
-            <TextField.Root
-              type="number"
-              {...register('discogsId', {
-                min: { value: 0, message: 'Discogs ID must be positive' },
-                max: { value: 999999999999, message: 'Discogs ID is too large' }
-              })}
-              placeholder="Discogs ID"
-            />
-          </Form.Control>
-          {errors.discogsId && (
-            <Form.Message>{errors.discogsId.message}</Form.Message>
-          )}
-        </Form.Field>
-
-        <Form.Field name="genres">
-          <Form.Label>Genres</Form.Label>
-          <Controller
-            name="genres"
-            control={control}
-            render={({ field }) => (
-              <MultiSelect
-                placeholder="Select genres"
-                value={field.value}
-                onChange={field.onChange}
-                options={genreOptions}
-              />
+        <Flex justify="between" align="center">
+          <Box />
+          <Flex gap="3" align="center">
+            {lockMode && (
+              <Badge color="amber" variant="soft">
+                Lock Mode
+              </Badge>
             )}
-          />
-        </Form.Field>
+            <Button
+              variant={lockMode ? "solid" : "soft"}
+              size="1"
+              onClick={() => setLockMode(!lockMode)}
+            >
+              <LockClosedIcon />
+              {lockMode ? 'Lock Mode ON' : 'Lock Mode OFF'}
+            </Button>
+          </Flex>
+        </Flex>
 
-        <Flex gap="3" mt="4" justify="end">
-          {onCancel && (
-            <Button type="button" variant="soft" onClick={onCancel}>
-              Cancel
+        {/* Browse and Sync buttons */}
+        <Flex gap="3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setShowBrowseDialog(true)}
+          >
+            Browse Metadata
+          </Button>
+          {onSync && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onSync}
+            >
+              Sync Metadata
             </Button>
           )}
-          <Button type="submit">
-            Save
-          </Button>
         </Flex>
+
+        <Form.Root onSubmit={handleSubmit(handleFormSubmit)} className={styles.form}>
+          <Flex direction="column" gap="4">
+            <Form.Field name="title">
+              <Form.Label>Title</Form.Label>
+              <Form.Control asChild>
+                <TextField.Root
+                  {...register('title', { required: 'Title is required' })}
+                  placeholder="Album title"
+                  disabled={lockMode && isFieldLocked('title')}
+                  className={lockMode && isFieldLocked('title') ? styles.lockedField : ''}
+                  onClick={() => handleFieldClick('title')}
+                />
+              </Form.Control>
+              {errors.title && (
+                <Form.Message>{errors.title.message}</Form.Message>
+              )}
+            </Form.Field>
+
+            <Form.Field name="year">
+              <Form.Label>Year</Form.Label>
+              <Form.Control asChild>
+                <TextField.Root
+                  type="number"
+                  {...register('year', {
+                    min: { value: 0, message: 'Year must be positive' },
+                    max: { value: 9999, message: 'Year must be less than 10000' }
+                  })}
+                  placeholder="Release year"
+                  disabled={lockMode && isFieldLocked('year')}
+                  className={lockMode && isFieldLocked('year') ? styles.lockedField : ''}
+                  onClick={() => handleFieldClick('year')}
+                />
+              </Form.Control>
+              {errors.year && (
+                <Form.Message>{errors.year.message}</Form.Message>
+              )}
+            </Form.Field>
+
+            <Form.Field name="mbid">
+              <Form.Label>MusicBrainz ID</Form.Label>
+              <Form.Control asChild>
+                <TextField.Root
+                  {...register('mbid')}
+                  placeholder="MusicBrainz ID"
+                  disabled={lockMode && isFieldLocked('mbid')}
+                  className={lockMode && isFieldLocked('mbid') ? styles.lockedField : ''}
+                  onClick={() => handleFieldClick('mbid')}
+                />
+              </Form.Control>
+              {errors.mbid && (
+                <Form.Message>{errors.mbid.message}</Form.Message>
+              )}
+            </Form.Field>
+
+            <Form.Field name="discogsId">
+              <Form.Label>Discogs ID</Form.Label>
+              <Form.Control asChild>
+                <TextField.Root
+                  type="number"
+                  {...register('discogsId', {
+                    min: { value: 0, message: 'Discogs ID must be positive' },
+                    max: { value: 999999999999, message: 'Discogs ID is too large' }
+                  })}
+                  placeholder="Discogs ID"
+                  disabled={lockMode && isFieldLocked('discogsId')}
+                  className={lockMode && isFieldLocked('discogsId') ? styles.lockedField : ''}
+                  onClick={() => handleFieldClick('discogsId')}
+                />
+              </Form.Control>
+              {errors.discogsId && (
+                <Form.Message>{errors.discogsId.message}</Form.Message>
+              )}
+            </Form.Field>
+
+            <Form.Field name="genres">
+              <Form.Label>Genres</Form.Label>
+              <Controller
+                name="genres"
+                control={control}
+                render={({ field }) => (
+                  <Box
+                    onClick={() => handleFieldClick('genres')}
+                    className={lockMode && isFieldLocked('genres') ? styles.lockedField : ''}
+                  >
+                    <MultiSelect
+                      placeholder="Select genres"
+                      value={field.value}
+                      onChange={field.onChange}
+                      options={genreOptions}
+                      disabled={lockMode && isFieldLocked('genres')}
+                    />
+                  </Box>
+                )}
+              />
+            </Form.Field>
+
+            <Flex gap="3" mt="4" justify="end">
+              {onCancel && (
+                <Button type="button" variant="soft" onClick={onCancel}>
+                  Cancel
+                </Button>
+              )}
+              <Button type="submit">
+                Save
+              </Button>
+            </Flex>
+          </Flex>
+        </Form.Root>
+
+        {/* Browse Metadata Dialog */}
+        <Dialog.Root open={showBrowseDialog} onOpenChange={setShowBrowseDialog}>
+          <Dialog.Content style={{
+            backgroundColor: 'var(--color-background)',
+            border: '1px solid var(--gray-6)',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            padding: '0',
+            maxWidth: '900px',
+            width: '100%',
+            maxHeight: '80vh',
+            overflow: 'auto',
+          }}>
+            <Dialog.Title style={{ padding: '24px 24px 0 24px' }}>
+              Browse Metadata for "{album?.title}"
+            </Dialog.Title>
+            <Dialog.Description style={{ padding: '0 24px 24px 24px' }}>
+              Search and apply metadata from MusicBrainz and Discogs
+            </Dialog.Description>
+
+            {album && librarySlug && (
+              <BrowseTab
+                entityType="album"
+                entityId={album.publicId}
+                entityName={album.title}
+                onMetadataApplied={() => {
+                  setShowBrowseDialog(false);
+                  onMetadataApplied?.();
+                }}
+              />
+            )}
+          </Dialog.Content>
+        </Dialog.Root>
       </Flex>
-    </Form.Root>
+    </Box>
   );
 }

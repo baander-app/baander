@@ -16,6 +16,7 @@ import type { LibraryResourceCreatedAt } from "./libraryResourceCreatedAt";
 import type { LibraryResourceUpdatedAt } from "./libraryResourceUpdatedAt";
 
 export interface LibraryResource {
+  id: number;
   name: string;
   slug: string;
   path: string;

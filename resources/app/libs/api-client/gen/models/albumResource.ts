@@ -29,6 +29,7 @@ import type { ImageResource } from "./imageResource";
 import type { ArtistResource } from "./artistResource";
 import type { SongResource } from "./songResource";
 import type { AlbumResourceGenresItem } from "./albumResourceGenresItem";
+import type { AlbumResourceLockedFields } from "./albumResourceLockedFields";
 
 export interface AlbumResource {
   publicId: string;
@@ -54,4 +55,5 @@ export interface AlbumResource {
   /** Songs relation */
   songs?: SongResource[];
   genres?: AlbumResourceGenresItem[];
+  lockedFields: AlbumResourceLockedFields;
 }

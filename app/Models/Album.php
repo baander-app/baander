@@ -56,12 +56,14 @@ class Album extends BaseModel implements HasMedia
         'language',
         'disambiguation',
         'annotation',
+        'locked_fields',
     ];
 
     protected function casts(): array
     {
         return [
             'type' => AlbumType::class,
+            'locked_fields' => 'array',
         ];
     }
 

@@ -35,6 +35,13 @@ class Song extends BaseModel implements DirectStreamableFile, Recommendable
 
     protected $with = ['album'];
 
+    protected function casts(): array
+    {
+        return [
+            'locked_fields' => 'array',
+        ];
+    }
+
     protected $fillable = [
         'album_id',
         'title',
@@ -53,6 +60,7 @@ class Song extends BaseModel implements DirectStreamableFile, Recommendable
         'mbid',
         'discogs_id',
         'position',
+        'locked_fields',
     ];
 
     public function getRouteKeyName(): string

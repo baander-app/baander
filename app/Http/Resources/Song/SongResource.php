@@ -50,6 +50,7 @@ class SongResource extends JsonResource
             'album'         => AlbumWithoutSongsResource::make($this->whenLoaded('album')),
             'artists'       => ArtistResource::collection($this->whenLoaded('artists')),
             'librarySlug'   => $this->librarySlug,
+            'lockedFields'  => $this->locked_fields,
         ];
     }
 }

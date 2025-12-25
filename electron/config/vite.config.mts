@@ -57,7 +57,7 @@ export default defineConfig(({ mode }) => {
     },
     resolve: {
       alias: {
-        '@': fileURLToPath(new URL('../../resources/app', import.meta.url)),
+        '@/app': fileURLToPath(new URL('../../resources/app', import.meta.url)),
       },
     },
     define: {

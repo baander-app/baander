@@ -64,6 +64,7 @@ class AlbumResource extends AlbumWithoutSongsResource
                     'name' => $genre->name,
                 ]);
             }),
+            'lockedFields'   => $this->locked_fields,
         ];
     }
 }

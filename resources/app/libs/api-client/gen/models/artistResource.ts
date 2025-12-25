@@ -23,6 +23,7 @@ import type { ArtistResourceSpotifyId } from "./artistResourceSpotifyId";
 import type { ArtistResourceCreatedAt } from "./artistResourceCreatedAt";
 import type { ArtistResourceUpdatedAt } from "./artistResourceUpdatedAt";
 import type { ImageResource } from "./imageResource";
+import type { ArtistResourceLockedFields } from "./artistResourceLockedFields";
 
 export interface ArtistResource {
   publicId: string;
@@ -40,4 +41,5 @@ export interface ArtistResource {
   updatedAt: ArtistResourceUpdatedAt;
   /** Portrait relation */
   portrait?: ImageResource;
+  lockedFields: ArtistResourceLockedFields;
 }

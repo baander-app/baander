@@ -11,11 +11,10 @@ Implemented queuing functionality through Redis offers efficient job management 
 The media information is organized and easily searchable, ensuring users can always find what they are looking for quickly and easily.
  * OpenAPI spec version: 0.0.1
  */
-import type { AuthRegister200AccessToken } from "./authRegister200AccessToken";
 import type { AuthRegister200RefreshToken } from "./authRegister200RefreshToken";
 
 export type AuthRegister200 = {
-  access_token: AuthRegister200AccessToken;
+  access_token: string;
   refresh_token: AuthRegister200RefreshToken;
   session_id: string;
 };

@@ -12,7 +12,7 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     /* Bundler mode */
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
@@ -24,16 +24,28 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "types": [
-      "unplugin-icons/types/react"
+      "unplugin-icons/types/react",
+      "vite/client"
     ],
+    "baseUrl": ".",
     "paths": {
       "@/app/*": ["./resources/app/*"],
       "@/docs/*": ["./resources/docs/*"]
     }
   },
-  "references": [
-    {
-      "path": "./tsconfig.node.json"
-    }
+  "include": [
+    "resources/app/**/*.ts",
+    "resources/app/**/*.tsx",
+    "resources/docs/**/*.ts",
+    "resources/docs/**/*.tsx",
+    "electron/**/*.ts",
+    "electron/**/*.tsx",
+    "vite.config.mts"
+  ],
+  "exclude": [
+    "node_modules",
+    "vendor",
+    "public",
+    "storage"
   ]
 }

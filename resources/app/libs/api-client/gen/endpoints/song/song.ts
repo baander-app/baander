@@ -13,6 +13,7 @@ The media information is organized and easily searchable, ensuring users can alw
  */
 import {
   useInfiniteQuery,
+  useMutation,
   useQuery,
   useSuspenseInfiniteQuery,
   useSuspenseQuery,
@@ -23,12 +24,15 @@ import type {
   DefinedUseInfiniteQueryResult,
   DefinedUseQueryResult,
   InfiniteData,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
   UseInfiniteQueryOptions,
   UseInfiniteQueryResult,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
   UseSuspenseInfiniteQueryOptions,
@@ -41,6 +45,7 @@ import type {
   AuthenticationExceptionResponse,
   ModelNotFoundExceptionResponse,
   SongResource,
+  SongUpdateRequest,
   SongsIndex200,
   SongsIndex400,
   SongsIndexParams,
@@ -49,7 +54,7 @@ import type {
 } from "../../models";
 
 import { customInstance } from "../../../axios-instance";
-import type { ErrorType } from "../../../axios-instance";
+import type { ErrorType, BodyType } from "../../../axios-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -1688,3 +1693,109 @@ export function useSongsShowSuspenseInfinite<
 
   return query;
 }
+
+/**
+ * Updates song metadata and information using the provided data.
+Only the fields included in the request will be modified.
+ * @summary Update an existing song
+ */
+export const songsUpdate = (
+  library: string,
+  song: string,
+  songUpdateRequest: BodyType<SongUpdateRequest>,
+  options?: SecondParameter<typeof customInstance>
+) => {
+  return customInstance<SongResource>(
+    {
+      url: `/api/libraries/${library}/songs/${song}`,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      data: songUpdateRequest,
+    },
+    options
+  );
+};
+
+export const getSongsUpdateMutationOptions = <
+  TError = ErrorType<
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
+  >,
+  TContext = unknown
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof songsUpdate>>,
+    TError,
+    { library: string; song: string; data: BodyType<SongUpdateRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof songsUpdate>>,
+  TError,
+  { library: string; song: string; data: BodyType<SongUpdateRequest> },
+  TContext
+> => {
+  const mutationKey = ["songsUpdate"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof songsUpdate>>,
+    { library: string; song: string; data: BodyType<SongUpdateRequest> }
+  > = (props) => {
+    const { library, song, data } = props ?? {};
+
+    return songsUpdate(library, song, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SongsUpdateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof songsUpdate>>
+>;
+export type SongsUpdateMutationBody = BodyType<SongUpdateRequest>;
+export type SongsUpdateMutationError = ErrorType<
+  | AuthenticationExceptionResponse
+  | ModelNotFoundExceptionResponse
+  | ValidationExceptionResponse
+>;
+
+/**
+ * @summary Update an existing song
+ */
+export const useSongsUpdate = <
+  TError = ErrorType<
+    | AuthenticationExceptionResponse
+    | ModelNotFoundExceptionResponse
+    | ValidationExceptionResponse
+  >,
+  TContext = unknown
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof songsUpdate>>,
+      TError,
+      { library: string; song: string; data: BodyType<SongUpdateRequest> },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof songsUpdate>>,
+  TError,
+  { library: string; song: string; data: BodyType<SongUpdateRequest> },
+  TContext
+> => {
+  const mutationOptions = getSongsUpdateMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};

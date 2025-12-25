@@ -3038,21 +3038,21 @@
   dependencies:
     "@tanstack/query-core" "5.90.12"
 
-"@tanstack/react-query-devtools@^5.65.1":
+"@tanstack/react-query-devtools@^5.91.1":
   version "5.91.1"
   resolved "https://registry.yarnpkg.com/@tanstack/react-query-devtools/-/react-query-devtools-5.91.1.tgz#48c7507ba57156fcd2060d1fdbd3dc6fd566bf16"
   integrity sha512-tRnJYwEbH0kAOuToy8Ew7bJw1lX3AjkkgSlf/vzb+NpnqmHPdWM+lA2DSdGQSLi1SU0PDRrrCI1vnZnci96CsQ==
   dependencies:
     "@tanstack/query-devtools" "5.91.1"
 
-"@tanstack/react-query-persist-client@^5.65.1":
+"@tanstack/react-query-persist-client@^5.90.14":
   version "5.90.14"
   resolved "https://registry.yarnpkg.com/@tanstack/react-query-persist-client/-/react-query-persist-client-5.90.14.tgz#aa99fbf6e34b4eab7854b1cbed1dcadf9817d94d"
   integrity sha512-jTGnr/DBlzV/UYqU+b8bZWECBuqh3Q3g7Ih50IktZkvmwTUsidQhhl2JyknNYVZkl5AgMfPAywNKZLTI82wmlA==
   dependencies:
     "@tanstack/query-persist-client-core" "5.91.11"
 
-"@tanstack/react-query@^5.84.1":
+"@tanstack/react-query@^5.90.12":
   version "5.90.12"
   resolved "https://registry.yarnpkg.com/@tanstack/react-query/-/react-query-5.90.12.tgz#49536842eff6487a9e645a453fea2642d8f4f209"
   integrity sha512-graRZspg7EoEaw0a8faiUASCyJrqjKPdqJ9EwuDRUF9mEYJ1YPczI9H+/agJ0mOJkPCJDk0lsz5QTrLZ/jQ2rg==
@@ -7620,7 +7620,7 @@ ora@^5.1.0:
     strip-ansi "^6.0.0"
     wcwidth "^1.0.1"
 
-orval@^7.11.2:
+orval@^7.17.2:
   version "7.17.2"
   resolved "https://registry.yarnpkg.com/orval/-/orval-7.17.2.tgz#55497f47006e8b51e099100a3a593a085ae916bf"
   integrity sha512-6+drCVVWNukdX+ytFPOC2UJ51gv0kGAPch7cTQYxO7VsGwdZ1DiZhYozdGehwu6QeVvAszPhPlh4uLq53k0x+w==

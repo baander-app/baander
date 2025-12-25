@@ -23,12 +23,14 @@ class AlbumUpdateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title'      => 'required|string|min:1|max:255',
-            'year'       => 'numeric|min:0|max:9999',
-            'mbid'       => 'string|min:1|max:255',
-            'discogsId' => 'numeric|min:0|max:999999999999',
-            'genres'     => 'array|distinct',
-            'genres.*'   => 'exists:genres,id',
+            'title'         => 'required|string|min:1|max:255',
+            'year'          => 'numeric|min:0|max:9999',
+            'mbid'          => 'string|min:1|max:255',
+            'discogsId'     => 'numeric|min:0|max:999999999999',
+            'genres'        => 'array|distinct',
+            'genres.*'      => 'exists:genres,id',
+            'locked_fields' => 'array',
+            'locked_fields.*' => 'string',
         ];
     }
 

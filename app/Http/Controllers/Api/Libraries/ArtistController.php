@@ -3,12 +3,12 @@
 namespace App\Http\Controllers\Api\Libraries;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Artist\ArtistIndexRequest;
+use App\Http\Requests\Artist\{ArtistIndexRequest, ArtistUpdateRequest};
 use App\Http\Resources\Artist\ArtistResource;
 use App\Models\{Album, Artist, Library};
 use App\Modules\Eloquent\BaseBuilder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
+use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix, Put};
 
 #[Prefix('/libraries/{library}/artists')]
 #[Middleware([
@@ -70,6 +70,28 @@ class ArtistController extends Controller
     public function show(Library $library, Artist $artist): ArtistResource
     {
         $artist->loadMissing(['albums', 'songs']);
+        return new ArtistResource($artist);
+    }
+
+    /**
+     * Update an existing artist
+     *
+     * Updates artist metadata and information using the provided data.
+     * Only the fields included in the request will be modified.
+     *
+     * @param Library $library The library containing the artist
+     * @param Artist $artist The artist to update
+     * @param ArtistUpdateRequest $request Request containing validated update data
+     *
+     * @throws ModelNotFoundException When an artist is not found in the library
+     * @response ArtistResource
+     */
+    #[Put('{artist}', 'api.artists.update', ['auth:oauth', 'scope:access-api'])]
+    public function update(Library $library, Artist $artist, ArtistUpdateRequest $request): ArtistResource
+    {
+        $artist->setRelation('library', $library);
+        $artist->update($request->validated());
+
         return new ArtistResource($artist);
     }
 }

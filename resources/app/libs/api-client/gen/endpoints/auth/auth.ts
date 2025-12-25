@@ -44,7 +44,6 @@ import type {
 import type {
   AuthForgotPassword200,
   AuthLogin200,
-  AuthLogin401,
   AuthPasskeyLogin200,
   AuthPasskeyOptions200,
   AuthPasskeyRegister200,
@@ -119,7 +118,7 @@ export const authLogin = (
 };
 
 export const getAuthLoginMutationOptions = <
-  TError = ErrorType<AuthLogin401 | ValidationExceptionResponse>,
+  TError = ErrorType<ValidationExceptionResponse>,
   TContext = unknown
 >(options?: {
   mutation?: UseMutationOptions<
@@ -160,15 +159,13 @@ export type AuthLoginMutationResult = NonNullable<
   Awaited<ReturnType<typeof authLogin>>
 >;
 export type AuthLoginMutationBody = BodyType<LoginRequest>;
-export type AuthLoginMutationError = ErrorType<
-  AuthLogin401 | ValidationExceptionResponse
->;
+export type AuthLoginMutationError = ErrorType<ValidationExceptionResponse>;
 
 /**
  * @summary Authenticate user and create session
  */
 export const useAuthLogin = <
-  TError = ErrorType<AuthLogin401 | ValidationExceptionResponse>,
+  TError = ErrorType<ValidationExceptionResponse>,
   TContext = unknown
 >(
   options?: {
