@@ -2,8 +2,8 @@
 
 namespace App\Events\OAuth;
 
-use App\Models\OAuth\AuthCode;
-use App\Models\OAuth\Client;
+use App\Models\Auth\OAuth\AuthCode;
+use App\Models\Auth\OAuth\Client;
 use App\Models\User;
 use Illuminate\Foundation\Events\Dispatchable;
 

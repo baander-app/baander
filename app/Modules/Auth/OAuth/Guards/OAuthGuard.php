@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Auth\OAuth\Guards;
 
-use App\Models\OAuth\Token;
-use App\Models\Passkey;
+use App\Models\Auth\OAuth\Token;
+use App\Models\Auth\Passkey;
 use App\Models\User;
 use App\Modules\Auth\OAuth\Psr7Factory;
 use Illuminate\Contracts\Auth\Authenticatable;

@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api\Users;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UserToken\UserTokenIndexRequest;
-use App\Models\OAuth\Token;
+use App\Models\Auth\OAuth\Token;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\{JsonResponse, Request, Response};

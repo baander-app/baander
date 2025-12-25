@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Auth\OAuth\Repositories;
 
-use App\Models\OAuth\Scope;
+use App\Models\Auth\OAuth\Scope;
 use App\Modules\Auth\OAuth\Contracts\ScopeRepositoryInterface;
 use App\Modules\Auth\OAuth\Entities\ScopeEntity;
 use League\OAuth2\Server\Entities\ClientEntityInterface;

@@ -89,7 +89,7 @@ class MetadataDelimiterService
     {
         // If already an array from metadata, process each element
         if (is_array($artists)) {
-            Log::channel('metadata')->channel('metadata')->debug('MetadataDelimiter: Artists already an array, processing each element', ['artists' => $artists]);
+            Log::channel('metadata')->debug('MetadataDelimiter: Artists already an array, processing each element', ['artists' => $artists]);
 
             $result = [];
             foreach ($artists as $artist) {

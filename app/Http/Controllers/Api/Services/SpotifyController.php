@@ -4,8 +4,7 @@ namespace App\Http\Controllers\Api\Services;
 
 use App\Http\Controllers\Controller;
 use App\Http\Integrations\Spotify\SpotifyClient;
-use App\Models\ThirdPartyCredential;
-
+use App\Models\Auth\ThirdPartyCredential;
 use Dedoc\Scramble\Attributes\Group;
 use Exception;
 use Illuminate\Http\Request;

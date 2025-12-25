@@ -3,17 +3,17 @@
 namespace App\Modules\Auth;
 
 use App\Http\HeaderExt;
-use App\Models\OAuth\Token;
-use App\Models\TokenMetadata;
+use App\Models\Auth\OAuth\Token;
+use App\Models\Auth\OAuth\TokenMetadata;
 use App\Modules\Logging\Attributes\LogChannel;
 use App\Modules\Logging\Channel;
-use App\Notifications\SuspiciousLocationNotification;
 use App\Notifications\ConcurrentAccessNotification;
+use App\Notifications\SuspiciousLocationNotification;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
-use Carbon\Carbon;
 use Psr\Log\LoggerInterface;
 
 class TokenBindingService

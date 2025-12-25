@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Auth;
 
-use App\Models\OAuth\Client;
-use App\Models\OAuth\RefreshToken;
-use App\Models\OAuth\Token;
-use App\Models\TokenMetadata;
+use App\Models\Auth\OAuth\Client;
+use App\Models\Auth\OAuth\RefreshToken;
+use App\Models\Auth\OAuth\Token;
+use App\Models\Auth\OAuth\TokenMetadata;
 use App\Models\User;
 use App\Modules\Auth\OAuth\Psr7Factory;
 use Defuse\Crypto\Crypto;

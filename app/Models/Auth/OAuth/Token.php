@@ -2,10 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Models\OAuth;
+namespace App\Models\Auth\OAuth;
 
 use App\Models\BaseModel;
-use App\Models\TokenMetadata;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;

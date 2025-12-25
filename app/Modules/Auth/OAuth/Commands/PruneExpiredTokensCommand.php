@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Auth\OAuth\Commands;
 
-use App\Models\OAuth\AuthCode;
-use App\Models\OAuth\DeviceCode;
-use App\Models\OAuth\RefreshToken;
-use App\Models\OAuth\Token;
+use App\Models\Auth\OAuth\AuthCode;
+use App\Models\Auth\OAuth\DeviceCode;
+use App\Models\Auth\OAuth\RefreshToken;
+use App\Models\Auth\OAuth\Token;
 use Illuminate\Console\Command;
 
 class PruneExpiredTokensCommand extends Command

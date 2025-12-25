@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Models;
+namespace App\Models\Auth;
 
+use App\Models\User;
 use App\Modules\Nanoid\Concerns\HasNanoPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;

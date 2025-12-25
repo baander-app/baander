@@ -2,7 +2,7 @@
 
 namespace App\Modules\Auth\Webauthn;
 
-use App\Models\Passkey;
+use App\Models\Auth\Passkey;
 use App\Modules\Auth\Webauthn\Exceptions\InvalidPasskey;
 use App\Modules\Auth\Webauthn\Exceptions\InvalidPasskeyOptions;
 use Webauthn\PublicKeyCredential;
@@ -35,7 +35,7 @@ class PasskeyService
 
     public function getAllowedCredentials(PublicKeyCredentialUserEntity $userEntity)
     {
-        $registered = (new \App\Models\Passkey)->whereId($userEntity->id)->get();
+        $registered = (new \App\Models\Auth\Passkey)->whereId($userEntity->id)->get();
 
         $allowedCredentials = $registered->map(function (Passkey $passkey) {
             return $passkey->data();

@@ -2,7 +2,7 @@
 
 namespace App\Events\Auth;
 
-use App\Models\Passkey;
+use App\Models\Auth\Passkey;
 
 class PasskeyUsedToAuthenticateEvent
 {

@@ -2,7 +2,7 @@
 
 namespace App\Modules\Auth;
 
-use App\Models\ThirdPartyCredential;
+use App\Models\Auth\ThirdPartyCredential;
 use App\Models\User;
 use Exception;
 use Illuminate\Support\Facades\Log;

@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Auth\Role;
-use App\Models\OAuth\Token as OAuthToken;
+use App\Models\Auth\OAuth\Token as OAuthToken;
+use App\Models\Auth\Passkey;
+use App\Models\Auth\ThirdPartyCredential;
 use App\Modules\Auth\Webauthn\Concerns\HasPasskeys;
 use App\Modules\Nanoid\Concerns\HasNanoPublicId;
 use Illuminate\Database\Eloquent\Factories\HasFactory;

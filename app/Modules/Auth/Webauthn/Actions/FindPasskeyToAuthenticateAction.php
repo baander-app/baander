@@ -2,7 +2,7 @@
 
 namespace App\Modules\Auth\Webauthn\Actions;
 
-use App\Models\Passkey;
+use App\Models\Auth\Passkey;
 use App\Modules\Auth\Webauthn\WebauthnService;
 use Throwable;
 use Webauthn\AuthenticatorAssertionResponse;
@@ -25,7 +25,7 @@ class FindPasskeyToAuthenticateAction
             return null;
         }
 
-        $passkey = (new \App\Models\Passkey)->firstWhere('credential_id', $publicKeyCredential->rawId);
+        $passkey = (new \App\Models\Auth\Passkey)->firstWhere('credential_id', $publicKeyCredential->rawId);
 
         if (!$passkey) {
             return null;

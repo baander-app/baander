@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Models;
+namespace App\Models\Auth\OAuth;
 
+use App\Models\BaseModel;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TokenMetadata extends BaseModel
@@ -33,6 +34,6 @@ class TokenMetadata extends BaseModel
 
     public function token(): BelongsTo
     {
-        return $this->belongsTo(OAuth\Token::class, 'token_id', 'token_id');
+        return $this->belongsTo(\App\Models\Auth\OAuth\Token::class, 'token_id', 'token_id');
     }
 }

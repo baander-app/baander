@@ -2,7 +2,7 @@
 
 namespace App\Events\OAuth;
 
-use App\Models\OAuth\Client;
+use App\Models\Auth\OAuth\Client;
 use Illuminate\Foundation\Events\Dispatchable;
 use League\OAuth2\Server\Exception\OAuthServerException;
 

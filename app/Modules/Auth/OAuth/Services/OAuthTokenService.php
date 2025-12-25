@@ -6,17 +6,17 @@ namespace App\Modules\Auth\OAuth\Services;
 
 use App\Events\Auth\TokenIssuedEvent;
 use App\Events\Auth\TokenRefreshedEvent;
-use App\Models\OAuth\Client;
-use App\Models\OAuth\RefreshToken;
-use App\Models\OAuth\Token;
-use App\Models\TokenMetadata;
+use App\Models\Auth\OAuth\Client;
+use App\Models\Auth\OAuth\RefreshToken;
+use App\Models\Auth\OAuth\Token;
+use App\Models\Auth\OAuth\TokenMetadata;
 use App\Models\User;
 use App\Modules\Auth\GeoLocationService;
-use App\Modules\Auth\TokenChainService;
 use App\Modules\Auth\OAuth\Psr7Factory;
-use Illuminate\Support\Facades\Event;
+use App\Modules\Auth\TokenChainService;
 use Defuse\Crypto\Crypto;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use League\OAuth2\Server\AuthorizationServer;
 
 /**

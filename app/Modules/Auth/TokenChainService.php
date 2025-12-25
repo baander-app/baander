@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Auth;
 
-use App\Models\OAuth\RefreshToken;
-use App\Models\OAuth\Token;
+use App\Models\Auth\OAuth\RefreshToken;
+use App\Models\Auth\OAuth\Token;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;

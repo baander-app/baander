@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Auth\OAuth\Commands;
 
-use App\Models\OAuth\Scope;
+use App\Models\Auth\OAuth\Scope;
 use Illuminate\Console\Command;
 
 class InstallScopesCommand extends Command

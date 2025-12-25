@@ -4,21 +4,19 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\Auth;
 
-use App\Events\OAuth\{
-    DeviceCodeApprovedEvent,
-    DeviceCodeDeniedEvent,
-    DeviceCodeRequestedEvent,
-};
+use App\Events\OAuth\{DeviceCodeApprovedEvent, DeviceCodeDeniedEvent, DeviceCodeRequestedEvent,};
 use App\Http\Controllers\Controller;
-use App\Models\OAuth\{Client, DeviceCode as DeviceCodeModel, Token};
+use App\Models\Auth\OAuth\{DeviceCode as DeviceCodeModel};
+use App\Models\Auth\OAuth\Client;
+use App\Models\Auth\OAuth\Token;
 use App\Modules\Auth\OAuth\Contracts\{ScopeRepositoryInterface};
 use App\Modules\Auth\OAuth\Contracts\DeviceCodeRepositoryInterface;
 use App\Modules\Auth\OAuth\Entities\UserEntity;
 use App\Modules\Auth\OAuth\Psr7Factory;
-use Illuminate\Support\Facades\Event;
 use Dedoc\Scramble\Attributes\Group;
 use Exception;
 use Illuminate\Http\{Request, Response};
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use League\OAuth2\Server\AuthorizationServer;
 use League\OAuth2\Server\Entities\DeviceCodeEntityInterface;

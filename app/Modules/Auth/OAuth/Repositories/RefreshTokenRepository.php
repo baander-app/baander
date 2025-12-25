@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Auth\OAuth\Repositories;
 
-use App\Models\OAuth\RefreshToken;
-use App\Models\OAuth\Token;
+use App\Models\Auth\OAuth\RefreshToken;
+use App\Models\Auth\OAuth\Token;
 use App\Modules\Auth\OAuth\Contracts\RefreshTokenRepositoryInterface;
 use App\Modules\Auth\OAuth\Entities\RefreshTokenEntity;
 use League\OAuth2\Server\Entities\RefreshTokenEntityInterface;

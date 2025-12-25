@@ -5,7 +5,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Auth\OAuth\Commands;
 
-use App\Models\OAuth\Client;
+use App\Models\Auth\OAuth\Client;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 

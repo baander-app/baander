@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
-use App\Models\OAuth\Client;
-use App\Models\OAuth\Scope;
+use App\Models\Auth\OAuth\Client;
+use App\Models\Auth\OAuth\Scope;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 

@@ -2,27 +2,23 @@
 
 namespace App\Http\Controllers\Web;
 
-use App\Events\Auth\{
-    PasskeyAuthenticationFailedEvent,
-    PasskeyRegisteredEvent,
-    PasskeyUsedToAuthenticateEvent,
-};
+use App\Events\Auth\{PasskeyAuthenticationFailedEvent, PasskeyRegisteredEvent, PasskeyUsedToAuthenticateEvent,};
 use App\Http\Controllers\Api\Auth\Concerns\HandlesUserTokens;
 use App\Http\Controllers\Controller;
-use App\Models\Passkey;
 use App\Http\Requests\Auth\{AuthenticateUsingPasskeyRequest, StorePasskeyRequest};
+use App\Models\Auth\Passkey;
 use App\Models\User;
-use Dedoc\Scramble\Attributes\Group;
 use App\Modules\Auth\Webauthn\Actions\{FindPasskeyToAuthenticateAction,
     GeneratePasskeyAuthenticationOptionsAction,
     GeneratePasskeyRegisterOptionsAction,
     StorePasskeyAction};
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Support\Facades\{Auth, Cache, Event, Log, Session};
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Spatie\RouteAttributes\Attributes\{Get, Post, Prefix};
 use Throwable;
 

@@ -2,9 +2,9 @@
 
 namespace App\Events\Auth;
 
+use App\Models\Auth\OAuth\RefreshToken;
+use App\Models\Auth\OAuth\Token;
 use App\Models\User;
-use App\Models\OAuth\Token;
-use App\Models\OAuth\RefreshToken;
 use Illuminate\Foundation\Events\Dispatchable;
 
 class TokenRefreshedEvent

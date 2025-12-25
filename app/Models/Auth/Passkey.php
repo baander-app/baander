@@ -1,7 +1,9 @@
 <?php
 
-namespace App\Models;
+namespace App\Models\Auth;
 
+use App\Models\BaseModel;
+use App\Models\User;
 use App\Modules\Auth\Webauthn\WebauthnService;
 use database\factories\PasskeyFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;

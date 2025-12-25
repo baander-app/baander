@@ -2,8 +2,8 @@
 
 namespace App\Events\Auth;
 
+use App\Models\Auth\OAuth\Token;
 use App\Models\User;
-use App\Models\OAuth\Token;
 use Illuminate\Foundation\Events\Dispatchable;
 
 class TokenRevokedEvent

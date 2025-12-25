@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Auth\OAuth\Repositories;
 
 use App\Events\OAuth\AccessTokenCreatedEvent;
-use App\Models\OAuth\Client;
-use App\Models\OAuth\Token;
-use App\Models\User;
+use App\Models\Auth\OAuth\Client;
+use App\Models\Auth\OAuth\Token;
 use App\Modules\Auth\OAuth\Contracts\AccessTokenRepositoryInterface;
 use App\Modules\Auth\OAuth\Entities\AccessTokenEntity;
 use Illuminate\Support\Facades\Event;

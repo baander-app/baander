@@ -2,8 +2,8 @@
 
 namespace App\Events\OAuth;
 
-use App\Models\OAuth\Client;
-use App\Models\OAuth\Token;
+use App\Models\Auth\OAuth\Client;
+use App\Models\Auth\OAuth\Token;
 use App\Models\User;
 use Illuminate\Foundation\Events\Dispatchable;
 use League\OAuth2\Server\RequestTypes\AuthorizationRequest;

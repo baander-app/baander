@@ -4,8 +4,7 @@ namespace App\Http\Controllers\Api\Services;
 
 use App\Http\Controllers\Controller;
 use App\Http\Integrations\LastFm\LastFmClient;
-use App\Models\ThirdPartyCredential;
-
+use App\Models\Auth\ThirdPartyCredential;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;

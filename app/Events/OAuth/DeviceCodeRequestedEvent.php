@@ -2,8 +2,8 @@
 
 namespace App\Events\OAuth;
 
-use App\Models\OAuth\Client;
-use App\Models\OAuth\DeviceCode;
+use App\Models\Auth\OAuth\Client;
+use App\Models\Auth\OAuth\DeviceCode;
 use Illuminate\Foundation\Events\Dispatchable;
 
 class DeviceCodeRequestedEvent
