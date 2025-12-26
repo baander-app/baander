@@ -8,7 +8,7 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   Header,
-  Row,
+  Row, RowData,
   SortingState,
   Table,
   useReactTable,
@@ -37,11 +37,12 @@ interface TableHeaderProps {
 }
 
 interface StickyHeaderProps {
-  table: Table<SongResource>;
+  table: Table<RowData>;
 }
 
 interface HeaderCellProps {
-  header: Header<SongResource, unknown>;
+  key: string;
+  header: Header<RowData, unknown>;
 }
 
 interface VirtualizedRowsProps {
@@ -60,7 +61,7 @@ interface VirtualizedRowData {
 }
 
 interface UseVirtualizedTableProps {
-  table: Table<SongResource>;
+  table: Table<RowData>;
   parentRef: RefObject<HTMLDivElement | null>;
   estimatedTotalCount?: number;
   onScrollToBottom?: () => void;
@@ -133,7 +134,7 @@ export function SongTable({
                           }: SongTableProps) {
   const dispatch = useAppDispatch();
   const [sorting, setSorting] = useState<SortingState>([]);
-  const parentRef = useRef<HTMLDivElement>(null);
+  const parentRef = useRef<HTMLDivElement | null>(null);
   const lastScrollTimeRef = useRef(0);
   const hasTriggeredRef = useRef(false);
 
@@ -147,7 +148,8 @@ export function SongTable({
     }));
   }, [dispatch, songs]);
 
-  const table = useReactTable({
+
+  const table = useReactTable<SongResource>({
     data: songs,
     columns: COLUMN_DEFINITIONS,
     state: { sorting },
@@ -207,7 +209,7 @@ function StickyHeader({ table }: StickyHeaderProps) {
         {table.getHeaderGroups().map((headerGroup) => (
           <tr key={headerGroup.id}>
             {headerGroup.headers.map((header) => (
-              <HeaderCell header={header}/>
+              <HeaderCell key={header.id} header={header}/>
             ))}
           </tr>
         ))}
@@ -355,7 +357,7 @@ function useVirtualizedTable({
       row: rows[virtualRow.index],
     }));
 
-  return { virtualizer, visibleRows };
+  return {virtualizer, visibleRows} as UseVirtualizedTableReturn;
 }
 
 function getSortIcon(sortDirection: string | false) {
