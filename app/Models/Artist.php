@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
-use App\Modules\Nanoid\Concerns\HasNanoPublicId;
 use App\Format\LocaleString;
+use App\Modules\Eloquent\Relations\BelongsToManyThrough;
+use App\Modules\Nanoid\Concerns\HasNanoPublicId;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Artist extends BaseModel
 {
@@ -39,8 +41,8 @@ class Artist extends BaseModel
 
     protected $casts = [
         'life_span_begin' => 'date',
-        'life_span_end' => 'date',
-        'locked_fields' => 'array',
+        'life_span_end'   => 'date',
+        'locked_fields'   => 'array',
     ];
 
     public function getRouteKeyName(): string
@@ -125,10 +127,42 @@ class Artist extends BaseModel
         ], $attributes));
     }
 
+    public function albums()
+    {
+        $instance = $this->newRelatedInstance(Album::class);
+
+        $query = $instance->newQuery();
+
+        return new BelongsToManyThrough(
+            $query,
+            $this,
+            'songs',
+            'artist_song',
+            'artist_id',
+            'song_id',
+            'id',
+            $instance->getKeyName(),
+            'albums',
+        )->setThroughKeys('album_id', 'id')
+         ->groupBy('albums.id');
+    }
+
     public function songs()
     {
-        return $this->belongsToMany(Song::class)
-            ->using(ArtistSong::class);
+        $instance = $this->newRelatedInstance(Song::class);
+
+        $query = $instance->newQuery();
+
+        return new BelongsToManyThrough(
+            $query,
+            $this,
+            'songs',
+            'artist_song',
+            'artist_id',
+            'song_id',
+            $instance->getKeyName(),
+            'songs',
+        )->withPivot('role');
     }
 
     public function portrait()

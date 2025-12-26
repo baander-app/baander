@@ -36,7 +36,7 @@ class BelongsToManyThrough extends BelongsToMany
         string $relatedPivotKey,
         string $parentKey,
         string $relatedKey,
-        string $relationName = null
+        null|string $relationName = null
     ) {
         $this->throughTable = $throughTable;
 
@@ -209,5 +209,20 @@ class BelongsToManyThrough extends BelongsToMany
     public function getThroughForeignKey(): string
     {
         return $this->throughForeignKey;
+    }
+
+    /**
+     * Get the query for existence check.
+     * This is used by whereHas, withCount, etc.
+     */
+    public function getRelationExistenceQuery(Builder $query, Builder $parentQuery, $columns = ['*'])
+    {
+        // Perform the necessary joins
+        $this->performJoin($query);
+
+        // Select the related table columns
+        $query->select($columns);
+
+        return $query;
     }
 }

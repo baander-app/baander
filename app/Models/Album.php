@@ -162,7 +162,7 @@ class Album extends BaseModel implements HasMedia
             'song_id',
             'id',
             $instance->getKeyName(),
-            'artists'
+            'artists',
         );
 
         return $relation
