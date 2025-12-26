@@ -1,4 +1,4 @@
-
+import * as React from 'react';
 import styles from './cover.module.scss';
 import { Iconify } from '@/app/ui/icons/iconify.tsx';
 

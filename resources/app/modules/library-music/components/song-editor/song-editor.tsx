@@ -1,5 +1,5 @@
-import { useState, useMemo, Fragment } from 'react';
-import { Button, Flex, Box, Badge, Dialog, IconButton, Tabs } from '@radix-ui/themes';
+import { Fragment, useMemo, useState } from 'react';
+import { Badge, Box, Button, Dialog, Flex, IconButton, Tabs } from '@radix-ui/themes';
 import { useGenresIndex } from '@/app/libs/api-client/gen/endpoints/genre/genre';
 import { LockClosedIcon, LockOpen1Icon } from '@radix-ui/react-icons';
 import { BrowseTab } from '@/app/modules/dashboard/music/components/browse-tab/browse-tab';
@@ -7,7 +7,7 @@ import { FormField, FormFieldConfig, useFormEditor } from '@/app/ui/form';
 import { songFieldConfig, songFormSections } from './song-editor.config';
 import { SongEditorProps, SongFormData } from './song-editor.types';
 import styles from './song-editor.module.scss';
-import { GenresIndex200 } from '@/app/libs/api-client/gen/models';
+import { useSongsShow } from '@/app/libs/api-client/gen/endpoints/song/song.ts';
 
 /**
  * Song Editor - Config-driven form with Precognition validation
@@ -20,49 +20,58 @@ import { GenresIndex200 } from '@/app/libs/api-client/gen/models';
  * - Config-driven for easy maintenance and reuse
  */
 export function SongEditor({
-  song,
-  librarySlug,
-  onSubmit,
-  onCancel,
-  onSync,
-  onMetadataApplied
-}: SongEditorProps) {
+                             song,
+                             librarySlug,
+                             onSubmit,
+                             onCancel,
+                             onSync,
+                             onMetadataApplied,
+                           }: SongEditorProps) {
   const [showBrowseDialog, setShowBrowseDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('details');
 
-  const { form, lockMode, setLockMode, toggleFieldLock, isFieldLocked, submit } =
+  const canQuery = Boolean(song?.librarySlug && song?.publicId);
+  const {data} = useSongsShow(song?.librarySlug!, song?.publicId!, {
+    relations: 'album.cover,genres',
+  }, {
+    query: {
+      enabled: canQuery,
+    },
+  });
+
+  const {form, lockMode, setLockMode, toggleFieldLock, isFieldLocked, submit} =
     useFormEditor<SongFormData>({
       method: 'put',
-      url: route('api.songs.update', { library: librarySlug, song: song?.publicId }),
+      url: route('api.songs.update', {library: librarySlug, song: song?.publicId}),
       initialData: {
-        title: song?.title || '',
-        track: song?.track || undefined,
-        disc: song?.disc || undefined,
-        year: song?.year || undefined,
-        explicit: (song as any)?.explicit || false,
-        lyrics: (song as any)?.lyrics || '',
+        title: data?.title || '',
+        track: data?.track || undefined,
+        disc: data?.disc || undefined,
+        year: data?.year || undefined,
+        explicit: data?.explicit || false,
+        lyrics: data?.lyrics || '',
         comment: song?.comment || '',
         path: song?.path || '',
         mbid: song?.mbid || '',
-        discogsId: song?.discogsId || undefined,
-        spotifyId: (song as any)?.spotifyId || '',
+        discogsId: data?.discogsId || undefined,
+        spotifyId: data?.spotifyId || '',
         genres: song?.genres?.map(g => g.name) || [],
       },
-      initialLockedFields: song?.lockedFields as (keyof SongFormData)[],
-      onSubmit: async (data) => {
-        await onSubmit(data);
+      initialLockedFields: data?.lockedFields as (keyof SongFormData)[],
+      onSubmit: async (submitted) => {
+        await onSubmit(submitted);
       },
     });
 
   // Fetch genres for multiselect
-  const { data: genresData } = useGenresIndex({
+  const {data: genresData, isSuccess} = useGenresIndex({
     librarySlug: librarySlug || '',
     limit: 100,
   });
 
   const genreOptions = useMemo(
-    () => (genresData as GenresIndex200)?.data?.map(g => ({ id: g.id, name: g.name })) || [],
-    [genresData]
+    () => isSuccess && genresData && genresData.data.map(g => ({id: g.id, name: g.name})) || [],
+    [isSuccess, genresData],
   );
 
   // Build field config with options at runtime
@@ -83,7 +92,7 @@ export function SongEditor({
       <Flex direction="column" gap="4">
         {/* Header with lock mode toggle */}
         <Flex justify="between" align="center">
-          <Box />
+          <Box/>
           <Flex gap="3" align="center">
             {lockMode && (
               <Badge color="amber" variant="soft">
@@ -91,12 +100,12 @@ export function SongEditor({
               </Badge>
             )}
             <IconButton
-              variant={lockMode ? "solid" : "outline"}
-              color={lockMode ? "blue" : "gray"}
+              variant={lockMode ? 'solid' : 'outline'}
+              color={lockMode ? 'blue' : 'gray'}
               onClick={() => setLockMode(!lockMode)}
-              title={lockMode ? "Disable lock mode" : "Enable lock mode"}
+              title={lockMode ? 'Disable lock mode' : 'Enable lock mode'}
             >
-              {lockMode ? <LockClosedIcon /> : <LockOpen1Icon />}
+              {lockMode ? <LockClosedIcon/> : <LockOpen1Icon/>}
             </IconButton>
           </Flex>
         </Flex>
@@ -206,18 +215,18 @@ export function SongEditor({
             maxHeight: '80vh',
             overflow: 'auto',
           }}>
-            <Dialog.Title style={{ padding: '24px 24px 0 24px' }}>
-              Browse Metadata for "{song?.title}"
+            <Dialog.Title style={{padding: '24px 24px 0 24px'}}>
+              Browse Metadata for "{data?.title}"
             </Dialog.Title>
-            <Dialog.Description style={{ padding: '0 24px 24px 24px' }}>
+            <Dialog.Description style={{padding: '0 24px 24px 24px'}}>
               Search and apply metadata from MusicBrainz and Discogs
             </Dialog.Description>
 
-            {song && librarySlug && (
+            {data && librarySlug && (
               <BrowseTab
                 entityType="song"
-                entityId={song.publicId}
-                entityName={song.title}
+                entityId={data.publicId}
+                entityName={data.title}
                 onMetadataApplied={() => {
                   setShowBrowseDialog(false);
                   onMetadataApplied?.();

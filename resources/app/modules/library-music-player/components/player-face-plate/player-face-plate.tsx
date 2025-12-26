@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { Flex, Text } from '@radix-ui/themes';
 import { ProgressBar } from '@/app/modules/library-music-player/components/progress-bar/progress-bar.tsx';
 import { formatDuration } from '@/app/utils/time/format-duration.ts';

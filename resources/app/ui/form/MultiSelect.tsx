@@ -86,13 +86,27 @@ export function MultiSelect({ placeholder, value, onChange, options, disabled }:
 
         <Popover.Root modal={false}>
           <Popover.Trigger>
-            <Button
-              variant="surface"
-              style={{ width: '100%', justifyContent: 'flex-start' }}
-              disabled={disabled}
+            <Box
+              style={{
+                width: '100%',
+                minHeight: 'var(--space-5)',
+                padding: '0 var(--space-3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: 'var(--color-surface)',
+                border: '1px solid var(--gray-7)',
+                borderRadius: 'var(--radius-3)',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                opacity: disabled ? 0.5 : 1,
+              }}
+              className="multiSelectTrigger"
             >
-              {selectedItems.length === 0 ? placeholder : `${selectedItems.length} selected`}
-            </Button>
+              <Text size="2" style={{ color: selectedItems.length === 0 ? 'var(--gray-9)' : 'inherit', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {selectedItems.length === 0 ? placeholder : selectedItems.map(item => item.name).join(', ')}
+              </Text>
+              <Text size="2" style={{ color: 'var(--gray-9)', flexShrink: 0, marginLeft: 'var(--space-2)' }}>▼</Text>
+            </Box>
           </Popover.Trigger>
 
           <Popover.Content
@@ -160,6 +174,13 @@ export function MultiSelect({ placeholder, value, onChange, options, disabled }:
       </Flex>
 
       <style>{`
+        .multiSelectTrigger:hover {
+          background-color: var(--gray-a3);
+        }
+        .multiSelectTrigger:focus-within {
+          outline: 2px solid var(--focus-outline);
+          outline-offset: 2px;
+        }
         .multiSelectOption:hover {
           background-color: var(--gray-4);
         }

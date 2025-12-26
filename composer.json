@@ -146,7 +146,7 @@
             "tbachert/spi": true
         }
     },
-    "minimum-stability": "dev",
+    "minimum-stability": "resources/app/dev",
     "prefer-stable": true,
     "repositories": [
         {
