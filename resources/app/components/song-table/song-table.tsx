@@ -8,7 +8,7 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   Header,
-  Row,
+  Row, RowData,
   SortingState,
   Table,
   useReactTable,
@@ -37,15 +37,24 @@ interface TableHeaderProps {
 }
 
 interface StickyHeaderProps {
-  table: Table<SongResource>;
+  table: Table<RowData>;
 }
 
 interface HeaderCellProps {
-  header: Header<SongResource, unknown>;
+  key: string;
+  header: Header<RowData, unknown>;
 }
 
 interface VirtualizedRowsProps {
   visibleRows: VirtualizedRowData[];
+  onSongClick: (id: string) => void;
+  contextMenuActions?: SongTableProps['contextMenuActions'];
+}
+
+interface VirtualizedRowProps {
+  key: string;
+  virtualRow: VirtualItem;
+  row: Row<SongResource>;
   onSongClick: (id: string) => void;
   contextMenuActions?: SongTableProps['contextMenuActions'];
 }
@@ -60,7 +69,7 @@ interface VirtualizedRowData {
 }
 
 interface UseVirtualizedTableProps {
-  table: Table<SongResource>;
+  table: Table<RowData>;
   parentRef: RefObject<HTMLDivElement | null>;
   estimatedTotalCount?: number;
   onScrollToBottom?: () => void;
@@ -231,7 +240,6 @@ const HeaderCell = memo(({ header }: HeaderCellProps) => {
           onClick={header.column.getToggleSortingHandler()}
         >
           {flexRender(header.column.columnDef.header, header.getContext())}
-          {getSortIcon(header.column.getIsSorted())}
         </div>
       )}
     </th>
@@ -240,43 +248,55 @@ const HeaderCell = memo(({ header }: HeaderCellProps) => {
 
 HeaderCell.displayName = 'HeaderCell';
 
+const VirtualizedRow = memo(({ virtualRow, row, onSongClick, contextMenuActions }: VirtualizedRowProps) => {
+  const handleRowClick = useCallback(() => {
+    onSongClick(row.original.publicId);
+  }, [row.original.publicId, onSongClick]);
+
+  return (
+    <ContextMenu.Root key={row.id}>
+      <ContextMenu.Trigger>
+        <tr
+          onClick={handleRowClick}
+          className={`${styles.listItem} ${styles.virtualizedRow}`}
+          style={{
+            height: `${virtualRow.size}px`,
+            transform: `translateY(${virtualRow.start}px)`,
+          }}
+        >
+          {row.getVisibleCells().map((cell) => (
+            <td key={cell.id} style={{ width: cell.column.getSize() }}>
+              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+            </td>
+          ))}
+        </tr>
+      </ContextMenu.Trigger>
+
+      {contextMenuActions && (
+        <SongContextMenu
+          song={row.original}
+          onEdit={contextMenuActions.onEdit}
+        />
+      )}
+    </ContextMenu.Root>
+  );
+});
+
+VirtualizedRow.displayName = 'VirtualizedRow';
+
 const VirtualizedRows = memo(({ visibleRows, onSongClick, contextMenuActions }: VirtualizedRowsProps) => {
   return (
     <table>
       <tbody>
-      {visibleRows.map(({ virtualRow, row }) => {
-        const handleRowClick = useCallback(() => {
-          onSongClick(row.original.publicId);
-        }, [row.original.publicId, onSongClick]);
-
-        return (
-          <ContextMenu.Root key={row.id}>
-            <ContextMenu.Trigger>
-              <tr
-                onClick={handleRowClick}
-                className={`${styles.listItem} ${styles.virtualizedRow}`}
-                style={{
-                  height: `${virtualRow.size}px`,
-                  transform: `translateY(${virtualRow.start}px)`,
-                }}
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} style={{ width: cell.column.getSize() }}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-            </ContextMenu.Trigger>
-
-            {contextMenuActions && (
-              <SongContextMenu
-                song={row.original}
-                onEdit={contextMenuActions.onEdit}
-              />
-            )}
-          </ContextMenu.Root>
-        );
-      })}
+      {visibleRows.map(({ virtualRow, row }) => (
+        <VirtualizedRow
+          key={row.id}
+          virtualRow={virtualRow}
+          row={row}
+          onSongClick={onSongClick}
+          contextMenuActions={contextMenuActions}
+        />
+      ))}
       </tbody>
     </table>
   );
@@ -380,10 +400,4 @@ function useVirtualizedTable({
   );
 
   return {virtualizer, visibleRows} as UseVirtualizedTableReturn;
-}
-
-function getSortIcon(sortDirection: string | false) {
-  const icons = { asc: ' 🔼', desc: ' 🔽' };
-
-  return icons[sortDirection as keyof typeof icons] ?? null;
 }
