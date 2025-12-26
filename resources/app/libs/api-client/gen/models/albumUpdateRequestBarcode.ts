@@ -12,9 +12,7 @@ The media information is organized and easily searchable, ensuring users can alw
  * OpenAPI spec version: 0.0.1
  */
 
-export type AuthStreamToken200StreamToken = {
-  token_id: string;
-  token_type: string;
-  expires_in: number;
-  scopes: unknown[];
-};
+/**
+ * @maxLength 60
+ */
+export type AlbumUpdateRequestBarcode = string | null;

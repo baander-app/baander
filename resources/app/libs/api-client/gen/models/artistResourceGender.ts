@@ -12,4 +12,4 @@ The media information is organized and easily searchable, ensuring users can alw
  * OpenAPI spec version: 0.0.1
  */
 
-export type AuthRegister200AccessTokenExpiresIn = { [key: string]: unknown };
+export type ArtistResourceGender = string | null;

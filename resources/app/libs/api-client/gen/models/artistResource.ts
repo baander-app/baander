@@ -13,10 +13,12 @@ The media information is organized and easily searchable, ensuring users can alw
  */
 import type { ArtistResourceSortName } from "./artistResourceSortName";
 import type { ArtistResourceCountry } from "./artistResourceCountry";
+import type { ArtistResourceGender } from "./artistResourceGender";
 import type { ArtistResourceType } from "./artistResourceType";
 import type { ArtistResourceLifeSpanBegin } from "./artistResourceLifeSpanBegin";
 import type { ArtistResourceLifeSpanEnd } from "./artistResourceLifeSpanEnd";
 import type { ArtistResourceDisambiguation } from "./artistResourceDisambiguation";
+import type { ArtistResourceBiography } from "./artistResourceBiography";
 import type { ArtistResourceMbid } from "./artistResourceMbid";
 import type { ArtistResourceDiscogsId } from "./artistResourceDiscogsId";
 import type { ArtistResourceSpotifyId } from "./artistResourceSpotifyId";
@@ -30,10 +32,12 @@ export interface ArtistResource {
   name: string;
   sortName: ArtistResourceSortName;
   country: ArtistResourceCountry;
+  gender: ArtistResourceGender;
   type: ArtistResourceType;
   lifeSpanBegin: ArtistResourceLifeSpanBegin;
   lifeSpanEnd: ArtistResourceLifeSpanEnd;
   disambiguation: ArtistResourceDisambiguation;
+  biography: ArtistResourceBiography;
   mbid: ArtistResourceMbid;
   discogsId: ArtistResourceDiscogsId;
   spotifyId: ArtistResourceSpotifyId;

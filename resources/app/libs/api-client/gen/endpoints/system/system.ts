@@ -115,11 +115,11 @@ export const getJobLocksQueryKey = () => {
 };
 
 export const getJobLocksInfiniteQueryOptions = <
-  TData = InfiniteData<Awaited<ReturnType<typeof jobLocks>>>,
+  TData = InfiniteData<JobLock200>,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(options?: {
   query?: Partial<
-    UseInfiniteQueryOptions<Awaited<ReturnType<typeof jobLocks>>, TError, TData>
+    UseInfiniteQueryOptions<JobLock200, TError, TData>
   >;
   request?: SecondParameter<typeof customInstance>;
 }) => {
@@ -127,40 +127,40 @@ export const getJobLocksInfiniteQueryOptions = <
 
   const queryKey = queryOptions?.queryKey ?? getJobLocksInfiniteQueryKey();
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof jobLocks>>> = ({
+  const queryFn: QueryFunction<JobLock200> = ({
     signal,
   }) => jobLocks(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof jobLocks>>,
+    JobLock200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type JobLocksInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof jobLocks>>
+  JobLock200
 >;
 export type JobLocksInfiniteQueryError =
   ErrorType<AuthenticationExceptionResponse>;
 
 export function useJobLocksInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof jobLocks>>>,
+  TData = InfiniteData<JobLock200>,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof jobLocks>>,
+        JobLock200,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobLocks>>,
+          JobLock200,
           TError,
-          Awaited<ReturnType<typeof jobLocks>>
+          JobLock200
         >,
         "initialData"
       >;
@@ -171,22 +171,22 @@ export function useJobLocksInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useJobLocksInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof jobLocks>>>,
+  TData = InfiniteData<JobLock200>,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof jobLocks>>,
+        JobLock200,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobLocks>>,
+          JobLock200,
           TError,
-          Awaited<ReturnType<typeof jobLocks>>
+          JobLock200
         >,
         "initialData"
       >;
@@ -197,13 +197,13 @@ export function useJobLocksInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useJobLocksInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof jobLocks>>>,
+  TData = InfiniteData<JobLock200>,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof jobLocks>>,
+        JobLock200,
         TError,
         TData
       >
@@ -219,13 +219,13 @@ export function useJobLocksInfinite<
  */
 
 export function useJobLocksInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof jobLocks>>>,
+  TData = InfiniteData<JobLock200>,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof jobLocks>>,
+        JobLock200,
         TError,
         TData
       >
@@ -251,11 +251,11 @@ export function useJobLocksInfinite<
 }
 
 export const getJobLocksQueryOptions = <
-  TData = Awaited<ReturnType<typeof jobLocks>>,
+  TData = JobLock200,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(options?: {
   query?: Partial<
-    UseQueryOptions<Awaited<ReturnType<typeof jobLocks>>, TError, TData>
+    UseQueryOptions<JobLock200, TError, TData>
   >;
   request?: SecondParameter<typeof customInstance>;
 }) => {
@@ -263,35 +263,35 @@ export const getJobLocksQueryOptions = <
 
   const queryKey = queryOptions?.queryKey ?? getJobLocksQueryKey();
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof jobLocks>>> = ({
+  const queryFn: QueryFunction<JobLock200> = ({
     signal,
   }) => jobLocks(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof jobLocks>>,
+    JobLock200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type JobLocksQueryResult = NonNullable<
-  Awaited<ReturnType<typeof jobLocks>>
+  JobLock200
 >;
 export type JobLocksQueryError = ErrorType<AuthenticationExceptionResponse>;
 
 export function useJobLocks<
-  TData = Awaited<ReturnType<typeof jobLocks>>,
+  TData = JobLock200,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options: {
     query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof jobLocks>>, TError, TData>
+      UseQueryOptions<JobLock200, TError, TData>
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobLocks>>,
+          JobLock200,
           TError,
-          Awaited<ReturnType<typeof jobLocks>>
+          JobLock200
         >,
         "initialData"
       >;
@@ -302,18 +302,18 @@ export function useJobLocks<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useJobLocks<
-  TData = Awaited<ReturnType<typeof jobLocks>>,
+  TData = JobLock200,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof jobLocks>>, TError, TData>
+      UseQueryOptions<JobLock200, TError, TData>
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobLocks>>,
+          JobLock200,
           TError,
-          Awaited<ReturnType<typeof jobLocks>>
+          JobLock200
         >,
         "initialData"
       >;
@@ -324,12 +324,12 @@ export function useJobLocks<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useJobLocks<
-  TData = Awaited<ReturnType<typeof jobLocks>>,
+  TData = JobLock200,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof jobLocks>>, TError, TData>
+      UseQueryOptions<JobLock200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -342,12 +342,12 @@ export function useJobLocks<
  */
 
 export function useJobLocks<
-  TData = Awaited<ReturnType<typeof jobLocks>>,
+  TData = JobLock200,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof jobLocks>>, TError, TData>
+      UseQueryOptions<JobLock200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -368,11 +368,11 @@ export function useJobLocks<
 }
 
 export const getJobLocksSuspenseQueryOptions = <
-  TData = Awaited<ReturnType<typeof jobLocks>>,
+  TData = JobLock200,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(options?: {
   query?: Partial<
-    UseSuspenseQueryOptions<Awaited<ReturnType<typeof jobLocks>>, TError, TData>
+    UseSuspenseQueryOptions<JobLock200, TError, TData>
   >;
   request?: SecondParameter<typeof customInstance>;
 }) => {
@@ -380,31 +380,31 @@ export const getJobLocksSuspenseQueryOptions = <
 
   const queryKey = queryOptions?.queryKey ?? getJobLocksQueryKey();
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof jobLocks>>> = ({
+  const queryFn: QueryFunction<JobLock200> = ({
     signal,
   }) => jobLocks(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
-    Awaited<ReturnType<typeof jobLocks>>,
+    JobLock200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type JobLocksSuspenseQueryResult = NonNullable<
-  Awaited<ReturnType<typeof jobLocks>>
+  JobLock200
 >;
 export type JobLocksSuspenseQueryError =
   ErrorType<AuthenticationExceptionResponse>;
 
 export function useJobLocksSuspense<
-  TData = Awaited<ReturnType<typeof jobLocks>>,
+  TData = JobLock200,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof jobLocks>>,
+        JobLock200,
         TError,
         TData
       >
@@ -416,13 +416,13 @@ export function useJobLocksSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useJobLocksSuspense<
-  TData = Awaited<ReturnType<typeof jobLocks>>,
+  TData = JobLock200,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof jobLocks>>,
+        JobLock200,
         TError,
         TData
       >
@@ -434,13 +434,13 @@ export function useJobLocksSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useJobLocksSuspense<
-  TData = Awaited<ReturnType<typeof jobLocks>>,
+  TData = JobLock200,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof jobLocks>>,
+        JobLock200,
         TError,
         TData
       >
@@ -456,13 +456,13 @@ export function useJobLocksSuspense<
  */
 
 export function useJobLocksSuspense<
-  TData = Awaited<ReturnType<typeof jobLocks>>,
+  TData = JobLock200,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof jobLocks>>,
+        JobLock200,
         TError,
         TData
       >
@@ -488,12 +488,12 @@ export function useJobLocksSuspense<
 }
 
 export const getJobLocksSuspenseInfiniteQueryOptions = <
-  TData = InfiniteData<Awaited<ReturnType<typeof jobLocks>>>,
+  TData = InfiniteData<JobLock200>,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(options?: {
   query?: Partial<
     UseSuspenseInfiniteQueryOptions<
-      Awaited<ReturnType<typeof jobLocks>>,
+      JobLock200,
       TError,
       TData
     >
@@ -504,7 +504,7 @@ export const getJobLocksSuspenseInfiniteQueryOptions = <
 
   const queryKey = queryOptions?.queryKey ?? getJobLocksInfiniteQueryKey();
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof jobLocks>>> = ({
+  const queryFn: QueryFunction<JobLock200> = ({
     signal,
   }) => jobLocks(requestOptions, signal);
 
@@ -513,26 +513,26 @@ export const getJobLocksSuspenseInfiniteQueryOptions = <
     queryFn,
     ...queryOptions,
   } as UseSuspenseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof jobLocks>>,
+    JobLock200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type JobLocksSuspenseInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof jobLocks>>
+  JobLock200
 >;
 export type JobLocksSuspenseInfiniteQueryError =
   ErrorType<AuthenticationExceptionResponse>;
 
 export function useJobLocksSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof jobLocks>>>,
+  TData = InfiniteData<JobLock200>,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof jobLocks>>,
+        JobLock200,
         TError,
         TData
       >
@@ -544,13 +544,13 @@ export function useJobLocksSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useJobLocksSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof jobLocks>>>,
+  TData = InfiniteData<JobLock200>,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof jobLocks>>,
+        JobLock200,
         TError,
         TData
       >
@@ -562,13 +562,13 @@ export function useJobLocksSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useJobLocksSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof jobLocks>>>,
+  TData = InfiniteData<JobLock200>,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof jobLocks>>,
+        JobLock200,
         TError,
         TData
       >
@@ -584,13 +584,13 @@ export function useJobLocksSuspenseInfinite<
  */
 
 export function useJobLocksSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof jobLocks>>>,
+  TData = InfiniteData<JobLock200>,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof jobLocks>>,
+        JobLock200,
         TError,
         TData
       >

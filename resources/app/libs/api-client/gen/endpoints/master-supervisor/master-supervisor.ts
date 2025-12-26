@@ -66,12 +66,12 @@ export const getHorizonMastersIndexQueryKey = () => {
 };
 
 export const getHorizonMastersIndexInfiniteQueryOptions = <
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonMastersIndex>>>,
+  TData = InfiniteData<HorizonMastersIndex200>,
   TError = ErrorType<unknown>
 >(options?: {
   query?: Partial<
     UseInfiniteQueryOptions<
-      Awaited<ReturnType<typeof horizonMastersIndex>>,
+      HorizonMastersIndex200,
       TError,
       TData
     >
@@ -84,38 +84,38 @@ export const getHorizonMastersIndexInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getHorizonMastersIndexInfiniteQueryKey();
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof horizonMastersIndex>>
+    HorizonMastersIndex200
   > = ({ signal }) => horizonMastersIndex(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof horizonMastersIndex>>,
+    HorizonMastersIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type HorizonMastersIndexInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof horizonMastersIndex>>
+  HorizonMastersIndex200
 >;
 export type HorizonMastersIndexInfiniteQueryError = ErrorType<unknown>;
 
 export function useHorizonMastersIndexInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonMastersIndex>>>,
+  TData = InfiniteData<HorizonMastersIndex200>,
   TError = ErrorType<unknown>
 >(
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonMastersIndex>>,
+        HorizonMastersIndex200,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof horizonMastersIndex>>,
+          HorizonMastersIndex200,
           TError,
-          Awaited<ReturnType<typeof horizonMastersIndex>>
+          HorizonMastersIndex200
         >,
         "initialData"
       >;
@@ -126,22 +126,22 @@ export function useHorizonMastersIndexInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonMastersIndexInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonMastersIndex>>>,
+  TData = InfiniteData<HorizonMastersIndex200>,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonMastersIndex>>,
+        HorizonMastersIndex200,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof horizonMastersIndex>>,
+          HorizonMastersIndex200,
           TError,
-          Awaited<ReturnType<typeof horizonMastersIndex>>
+          HorizonMastersIndex200
         >,
         "initialData"
       >;
@@ -152,13 +152,13 @@ export function useHorizonMastersIndexInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonMastersIndexInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonMastersIndex>>>,
+  TData = InfiniteData<HorizonMastersIndex200>,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonMastersIndex>>,
+        HorizonMastersIndex200,
         TError,
         TData
       >
@@ -174,13 +174,13 @@ export function useHorizonMastersIndexInfinite<
  */
 
 export function useHorizonMastersIndexInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonMastersIndex>>>,
+  TData = InfiniteData<HorizonMastersIndex200>,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonMastersIndex>>,
+        HorizonMastersIndex200,
         TError,
         TData
       >
@@ -206,12 +206,12 @@ export function useHorizonMastersIndexInfinite<
 }
 
 export const getHorizonMastersIndexQueryOptions = <
-  TData = Awaited<ReturnType<typeof horizonMastersIndex>>,
+  TData = HorizonMastersIndex200,
   TError = ErrorType<unknown>
 >(options?: {
   query?: Partial<
     UseQueryOptions<
-      Awaited<ReturnType<typeof horizonMastersIndex>>,
+      HorizonMastersIndex200,
       TError,
       TData
     >
@@ -223,38 +223,38 @@ export const getHorizonMastersIndexQueryOptions = <
   const queryKey = queryOptions?.queryKey ?? getHorizonMastersIndexQueryKey();
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof horizonMastersIndex>>
+    HorizonMastersIndex200
   > = ({ signal }) => horizonMastersIndex(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof horizonMastersIndex>>,
+    HorizonMastersIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type HorizonMastersIndexQueryResult = NonNullable<
-  Awaited<ReturnType<typeof horizonMastersIndex>>
+  HorizonMastersIndex200
 >;
 export type HorizonMastersIndexQueryError = ErrorType<unknown>;
 
 export function useHorizonMastersIndex<
-  TData = Awaited<ReturnType<typeof horizonMastersIndex>>,
+  TData = HorizonMastersIndex200,
   TError = ErrorType<unknown>
 >(
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof horizonMastersIndex>>,
+        HorizonMastersIndex200,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof horizonMastersIndex>>,
+          HorizonMastersIndex200,
           TError,
-          Awaited<ReturnType<typeof horizonMastersIndex>>
+          HorizonMastersIndex200
         >,
         "initialData"
       >;
@@ -265,22 +265,22 @@ export function useHorizonMastersIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonMastersIndex<
-  TData = Awaited<ReturnType<typeof horizonMastersIndex>>,
+  TData = HorizonMastersIndex200,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof horizonMastersIndex>>,
+        HorizonMastersIndex200,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof horizonMastersIndex>>,
+          HorizonMastersIndex200,
           TError,
-          Awaited<ReturnType<typeof horizonMastersIndex>>
+          HorizonMastersIndex200
         >,
         "initialData"
       >;
@@ -291,13 +291,13 @@ export function useHorizonMastersIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonMastersIndex<
-  TData = Awaited<ReturnType<typeof horizonMastersIndex>>,
+  TData = HorizonMastersIndex200,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof horizonMastersIndex>>,
+        HorizonMastersIndex200,
         TError,
         TData
       >
@@ -313,13 +313,13 @@ export function useHorizonMastersIndex<
  */
 
 export function useHorizonMastersIndex<
-  TData = Awaited<ReturnType<typeof horizonMastersIndex>>,
+  TData = HorizonMastersIndex200,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof horizonMastersIndex>>,
+        HorizonMastersIndex200,
         TError,
         TData
       >
@@ -343,12 +343,12 @@ export function useHorizonMastersIndex<
 }
 
 export const getHorizonMastersIndexSuspenseQueryOptions = <
-  TData = Awaited<ReturnType<typeof horizonMastersIndex>>,
+  TData = HorizonMastersIndex200,
   TError = ErrorType<unknown>
 >(options?: {
   query?: Partial<
     UseSuspenseQueryOptions<
-      Awaited<ReturnType<typeof horizonMastersIndex>>,
+      HorizonMastersIndex200,
       TError,
       TData
     >
@@ -360,29 +360,29 @@ export const getHorizonMastersIndexSuspenseQueryOptions = <
   const queryKey = queryOptions?.queryKey ?? getHorizonMastersIndexQueryKey();
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof horizonMastersIndex>>
+    HorizonMastersIndex200
   > = ({ signal }) => horizonMastersIndex(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
-    Awaited<ReturnType<typeof horizonMastersIndex>>,
+    HorizonMastersIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type HorizonMastersIndexSuspenseQueryResult = NonNullable<
-  Awaited<ReturnType<typeof horizonMastersIndex>>
+  HorizonMastersIndex200
 >;
 export type HorizonMastersIndexSuspenseQueryError = ErrorType<unknown>;
 
 export function useHorizonMastersIndexSuspense<
-  TData = Awaited<ReturnType<typeof horizonMastersIndex>>,
+  TData = HorizonMastersIndex200,
   TError = ErrorType<unknown>
 >(
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof horizonMastersIndex>>,
+        HorizonMastersIndex200,
         TError,
         TData
       >
@@ -394,13 +394,13 @@ export function useHorizonMastersIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonMastersIndexSuspense<
-  TData = Awaited<ReturnType<typeof horizonMastersIndex>>,
+  TData = HorizonMastersIndex200,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof horizonMastersIndex>>,
+        HorizonMastersIndex200,
         TError,
         TData
       >
@@ -412,13 +412,13 @@ export function useHorizonMastersIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonMastersIndexSuspense<
-  TData = Awaited<ReturnType<typeof horizonMastersIndex>>,
+  TData = HorizonMastersIndex200,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof horizonMastersIndex>>,
+        HorizonMastersIndex200,
         TError,
         TData
       >
@@ -434,13 +434,13 @@ export function useHorizonMastersIndexSuspense<
  */
 
 export function useHorizonMastersIndexSuspense<
-  TData = Awaited<ReturnType<typeof horizonMastersIndex>>,
+  TData = HorizonMastersIndex200,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof horizonMastersIndex>>,
+        HorizonMastersIndex200,
         TError,
         TData
       >
@@ -466,12 +466,12 @@ export function useHorizonMastersIndexSuspense<
 }
 
 export const getHorizonMastersIndexSuspenseInfiniteQueryOptions = <
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonMastersIndex>>>,
+  TData = InfiniteData<HorizonMastersIndex200>,
   TError = ErrorType<unknown>
 >(options?: {
   query?: Partial<
     UseSuspenseInfiniteQueryOptions<
-      Awaited<ReturnType<typeof horizonMastersIndex>>,
+      HorizonMastersIndex200,
       TError,
       TData
     >
@@ -484,7 +484,7 @@ export const getHorizonMastersIndexSuspenseInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getHorizonMastersIndexInfiniteQueryKey();
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof horizonMastersIndex>>
+    HorizonMastersIndex200
   > = ({ signal }) => horizonMastersIndex(requestOptions, signal);
 
   return {
@@ -492,25 +492,25 @@ export const getHorizonMastersIndexSuspenseInfiniteQueryOptions = <
     queryFn,
     ...queryOptions,
   } as UseSuspenseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof horizonMastersIndex>>,
+    HorizonMastersIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type HorizonMastersIndexSuspenseInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof horizonMastersIndex>>
+  HorizonMastersIndex200
 >;
 export type HorizonMastersIndexSuspenseInfiniteQueryError = ErrorType<unknown>;
 
 export function useHorizonMastersIndexSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonMastersIndex>>>,
+  TData = InfiniteData<HorizonMastersIndex200>,
   TError = ErrorType<unknown>
 >(
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonMastersIndex>>,
+        HorizonMastersIndex200,
         TError,
         TData
       >
@@ -522,13 +522,13 @@ export function useHorizonMastersIndexSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonMastersIndexSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonMastersIndex>>>,
+  TData = InfiniteData<HorizonMastersIndex200>,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonMastersIndex>>,
+        HorizonMastersIndex200,
         TError,
         TData
       >
@@ -540,13 +540,13 @@ export function useHorizonMastersIndexSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonMastersIndexSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonMastersIndex>>>,
+  TData = InfiniteData<HorizonMastersIndex200>,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonMastersIndex>>,
+        HorizonMastersIndex200,
         TError,
         TData
       >
@@ -562,13 +562,13 @@ export function useHorizonMastersIndexSuspenseInfinite<
  */
 
 export function useHorizonMastersIndexSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonMastersIndex>>>,
+  TData = InfiniteData<HorizonMastersIndex200>,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonMastersIndex>>,
+        HorizonMastersIndex200,
         TError,
         TData
       >

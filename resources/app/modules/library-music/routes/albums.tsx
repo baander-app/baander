@@ -9,8 +9,8 @@ import { LibraryParams } from '@/app/modules/library-music/routes/_routes.tsx';
 import { motion } from 'motion/react';
 import { useDisclosure } from '@/app/hooks/use-disclosure.ts';
 import { AlbumEditor } from '@/app/modules/library-music/components/album-editor/album-editor.tsx';
-import { AlbumResource } from '@/app/libs/api-client/gen/models';
-import { useAlbumsIndex } from '@/app/libs/api-client/gen/endpoints/album/album.ts';
+import { AlbumResource, AlbumUpdateRequest } from '@/app/libs/api-client/gen/models';
+import { useAlbumsIndex, useAlbumsUpdate } from '@/app/libs/api-client/gen/endpoints/album/album.ts';
 import { useMetadataSync } from '@/app/libs/api-client/gen/endpoints/metadata-sync/metadata-sync.ts';
 import { useAppDispatch } from '@/app/store/hooks';
 import { createNotification } from '@/app/store/notifications/notifications-slice';
@@ -18,6 +18,29 @@ import { createNotification } from '@/app/store/notifications/notifications-slic
 function AlbumContextMenu({ album, librarySlug }: { album: AlbumResource, librarySlug: string }) {
   const [showEditor, editorHandlers] = useDisclosure(false);
   const dispatch = useAppDispatch();
+
+  // Update mutation with default cache invalidation
+  const updateMutation = useAlbumsUpdate({
+    mutation: {
+      onSuccess: () => {
+        dispatch(createNotification({
+          title: 'Success',
+          message: 'Album updated successfully!',
+          type: 'success',
+          toast: true,
+        }));
+        editorHandlers.close();
+      },
+      onError: (error: any) => {
+        dispatch(createNotification({
+          title: 'Error',
+          message: error.response?.data?.message || 'Failed to update album',
+          type: 'error',
+          toast: true,
+        }));
+      },
+    },
+  });
 
   // Sync mutation
   const syncMutation = useMetadataSync({
@@ -51,30 +74,14 @@ function AlbumContextMenu({ album, librarySlug }: { album: AlbumResource, librar
     });
   }, [syncMutation, album]);
 
-  const handleAlbumSubmit = useCallback(async (data: any) => {
-    try {
-      await fetch(`/api/libraries/${librarySlug}/albums/${album.publicId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      editorHandlers.close();
-      dispatch(createNotification({
-        title: 'Success',
-        message: 'Album updated successfully!',
-        type: 'success',
-        toast: true,
-      }));
-      // TODO: Refresh the albums list
-    } catch (error: any) {
-      dispatch(createNotification({
-        title: 'Error',
-        message: error.response?.data?.message || 'Failed to update album',
-        type: 'error',
-        toast: true,
-      }));
-    }
-  }, [album, librarySlug, dispatch, editorHandlers]);
+  const handleAlbumSubmit = useCallback(async (data: AlbumUpdateRequest) => {
+    // Submit via React Query mutation (after Precognition validation passes)
+    updateMutation.mutate({
+      library: librarySlug,
+      album: album.publicId,
+      data: data,
+    });
+  }, [updateMutation, librarySlug, album.publicId]);
 
   const handleMetadataApplied = useCallback(() => {
     dispatch(createNotification({
@@ -116,7 +123,7 @@ function AlbumContextMenu({ album, librarySlug }: { album: AlbumResource, librar
           <div style={{ padding: '0 24px 24px 24px' }}>
             <AlbumEditor
               album={album}
-              onSubmit={handleAlbumSubmit}
+              onSubmit={(data) => handleAlbumSubmit(data)}
               librarySlug={librarySlug}
               onSync={handleSync}
               onMetadataApplied={handleMetadataApplied}

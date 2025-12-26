@@ -92,12 +92,12 @@ export const getLastfmAuthorizeQueryKey = () => {
 };
 
 export const getLastfmAuthorizeInfiniteQueryOptions = <
-  TData = InfiniteData<Awaited<ReturnType<typeof lastfmAuthorize>>>,
+  TData = InfiniteData<LastfmAuthorize200>,
   TError = ErrorType<AuthenticationExceptionResponse | LastfmAuthorize500>
 >(options?: {
   query?: Partial<
     UseInfiniteQueryOptions<
-      Awaited<ReturnType<typeof lastfmAuthorize>>,
+      LastfmAuthorize200,
       TError,
       TData
     >
@@ -109,41 +109,41 @@ export const getLastfmAuthorizeInfiniteQueryOptions = <
   const queryKey =
     queryOptions?.queryKey ?? getLastfmAuthorizeInfiniteQueryKey();
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof lastfmAuthorize>>> = ({
+  const queryFn: QueryFunction<LastfmAuthorize200> = ({
     signal,
   }) => lastfmAuthorize(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof lastfmAuthorize>>,
+    LastfmAuthorize200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type LastfmAuthorizeInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof lastfmAuthorize>>
+  LastfmAuthorize200
 >;
 export type LastfmAuthorizeInfiniteQueryError = ErrorType<
   AuthenticationExceptionResponse | LastfmAuthorize500
 >;
 
 export function useLastfmAuthorizeInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof lastfmAuthorize>>>,
+  TData = InfiniteData<LastfmAuthorize200>,
   TError = ErrorType<AuthenticationExceptionResponse | LastfmAuthorize500>
 >(
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof lastfmAuthorize>>,
+        LastfmAuthorize200,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof lastfmAuthorize>>,
+          LastfmAuthorize200,
           TError,
-          Awaited<ReturnType<typeof lastfmAuthorize>>
+          LastfmAuthorize200
         >,
         "initialData"
       >;
@@ -154,22 +154,22 @@ export function useLastfmAuthorizeInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useLastfmAuthorizeInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof lastfmAuthorize>>>,
+  TData = InfiniteData<LastfmAuthorize200>,
   TError = ErrorType<AuthenticationExceptionResponse | LastfmAuthorize500>
 >(
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof lastfmAuthorize>>,
+        LastfmAuthorize200,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof lastfmAuthorize>>,
+          LastfmAuthorize200,
           TError,
-          Awaited<ReturnType<typeof lastfmAuthorize>>
+          LastfmAuthorize200
         >,
         "initialData"
       >;
@@ -180,13 +180,13 @@ export function useLastfmAuthorizeInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useLastfmAuthorizeInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof lastfmAuthorize>>>,
+  TData = InfiniteData<LastfmAuthorize200>,
   TError = ErrorType<AuthenticationExceptionResponse | LastfmAuthorize500>
 >(
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof lastfmAuthorize>>,
+        LastfmAuthorize200,
         TError,
         TData
       >
@@ -199,13 +199,13 @@ export function useLastfmAuthorizeInfinite<
 };
 
 export function useLastfmAuthorizeInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof lastfmAuthorize>>>,
+  TData = InfiniteData<LastfmAuthorize200>,
   TError = ErrorType<AuthenticationExceptionResponse | LastfmAuthorize500>
 >(
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof lastfmAuthorize>>,
+        LastfmAuthorize200,
         TError,
         TData
       >
@@ -231,11 +231,11 @@ export function useLastfmAuthorizeInfinite<
 }
 
 export const getLastfmAuthorizeQueryOptions = <
-  TData = Awaited<ReturnType<typeof lastfmAuthorize>>,
+  TData = LastfmAuthorize200,
   TError = ErrorType<AuthenticationExceptionResponse | LastfmAuthorize500>
 >(options?: {
   query?: Partial<
-    UseQueryOptions<Awaited<ReturnType<typeof lastfmAuthorize>>, TError, TData>
+    UseQueryOptions<LastfmAuthorize200, TError, TData>
   >;
   request?: SecondParameter<typeof customInstance>;
 }) => {
@@ -243,41 +243,41 @@ export const getLastfmAuthorizeQueryOptions = <
 
   const queryKey = queryOptions?.queryKey ?? getLastfmAuthorizeQueryKey();
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof lastfmAuthorize>>> = ({
+  const queryFn: QueryFunction<LastfmAuthorize200> = ({
     signal,
   }) => lastfmAuthorize(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof lastfmAuthorize>>,
+    LastfmAuthorize200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type LastfmAuthorizeQueryResult = NonNullable<
-  Awaited<ReturnType<typeof lastfmAuthorize>>
+  LastfmAuthorize200
 >;
 export type LastfmAuthorizeQueryError = ErrorType<
   AuthenticationExceptionResponse | LastfmAuthorize500
 >;
 
 export function useLastfmAuthorize<
-  TData = Awaited<ReturnType<typeof lastfmAuthorize>>,
+  TData = LastfmAuthorize200,
   TError = ErrorType<AuthenticationExceptionResponse | LastfmAuthorize500>
 >(
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof lastfmAuthorize>>,
+        LastfmAuthorize200,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof lastfmAuthorize>>,
+          LastfmAuthorize200,
           TError,
-          Awaited<ReturnType<typeof lastfmAuthorize>>
+          LastfmAuthorize200
         >,
         "initialData"
       >;
@@ -288,22 +288,22 @@ export function useLastfmAuthorize<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useLastfmAuthorize<
-  TData = Awaited<ReturnType<typeof lastfmAuthorize>>,
+  TData = LastfmAuthorize200,
   TError = ErrorType<AuthenticationExceptionResponse | LastfmAuthorize500>
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof lastfmAuthorize>>,
+        LastfmAuthorize200,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof lastfmAuthorize>>,
+          LastfmAuthorize200,
           TError,
-          Awaited<ReturnType<typeof lastfmAuthorize>>
+          LastfmAuthorize200
         >,
         "initialData"
       >;
@@ -314,13 +314,13 @@ export function useLastfmAuthorize<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useLastfmAuthorize<
-  TData = Awaited<ReturnType<typeof lastfmAuthorize>>,
+  TData = LastfmAuthorize200,
   TError = ErrorType<AuthenticationExceptionResponse | LastfmAuthorize500>
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof lastfmAuthorize>>,
+        LastfmAuthorize200,
         TError,
         TData
       >
@@ -333,13 +333,13 @@ export function useLastfmAuthorize<
 };
 
 export function useLastfmAuthorize<
-  TData = Awaited<ReturnType<typeof lastfmAuthorize>>,
+  TData = LastfmAuthorize200,
   TError = ErrorType<AuthenticationExceptionResponse | LastfmAuthorize500>
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof lastfmAuthorize>>,
+        LastfmAuthorize200,
         TError,
         TData
       >
@@ -363,12 +363,12 @@ export function useLastfmAuthorize<
 }
 
 export const getLastfmAuthorizeSuspenseQueryOptions = <
-  TData = Awaited<ReturnType<typeof lastfmAuthorize>>,
+  TData = LastfmAuthorize200,
   TError = ErrorType<AuthenticationExceptionResponse | LastfmAuthorize500>
 >(options?: {
   query?: Partial<
     UseSuspenseQueryOptions<
-      Awaited<ReturnType<typeof lastfmAuthorize>>,
+      LastfmAuthorize200,
       TError,
       TData
     >
@@ -379,32 +379,32 @@ export const getLastfmAuthorizeSuspenseQueryOptions = <
 
   const queryKey = queryOptions?.queryKey ?? getLastfmAuthorizeQueryKey();
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof lastfmAuthorize>>> = ({
+  const queryFn: QueryFunction<LastfmAuthorize200> = ({
     signal,
   }) => lastfmAuthorize(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
-    Awaited<ReturnType<typeof lastfmAuthorize>>,
+    LastfmAuthorize200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type LastfmAuthorizeSuspenseQueryResult = NonNullable<
-  Awaited<ReturnType<typeof lastfmAuthorize>>
+  LastfmAuthorize200
 >;
 export type LastfmAuthorizeSuspenseQueryError = ErrorType<
   AuthenticationExceptionResponse | LastfmAuthorize500
 >;
 
 export function useLastfmAuthorizeSuspense<
-  TData = Awaited<ReturnType<typeof lastfmAuthorize>>,
+  TData = LastfmAuthorize200,
   TError = ErrorType<AuthenticationExceptionResponse | LastfmAuthorize500>
 >(
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof lastfmAuthorize>>,
+        LastfmAuthorize200,
         TError,
         TData
       >
@@ -416,13 +416,13 @@ export function useLastfmAuthorizeSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useLastfmAuthorizeSuspense<
-  TData = Awaited<ReturnType<typeof lastfmAuthorize>>,
+  TData = LastfmAuthorize200,
   TError = ErrorType<AuthenticationExceptionResponse | LastfmAuthorize500>
 >(
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof lastfmAuthorize>>,
+        LastfmAuthorize200,
         TError,
         TData
       >
@@ -434,13 +434,13 @@ export function useLastfmAuthorizeSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useLastfmAuthorizeSuspense<
-  TData = Awaited<ReturnType<typeof lastfmAuthorize>>,
+  TData = LastfmAuthorize200,
   TError = ErrorType<AuthenticationExceptionResponse | LastfmAuthorize500>
 >(
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof lastfmAuthorize>>,
+        LastfmAuthorize200,
         TError,
         TData
       >
@@ -453,13 +453,13 @@ export function useLastfmAuthorizeSuspense<
 };
 
 export function useLastfmAuthorizeSuspense<
-  TData = Awaited<ReturnType<typeof lastfmAuthorize>>,
+  TData = LastfmAuthorize200,
   TError = ErrorType<AuthenticationExceptionResponse | LastfmAuthorize500>
 >(
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof lastfmAuthorize>>,
+        LastfmAuthorize200,
         TError,
         TData
       >
@@ -485,12 +485,12 @@ export function useLastfmAuthorizeSuspense<
 }
 
 export const getLastfmAuthorizeSuspenseInfiniteQueryOptions = <
-  TData = InfiniteData<Awaited<ReturnType<typeof lastfmAuthorize>>>,
+  TData = InfiniteData<LastfmAuthorize200>,
   TError = ErrorType<AuthenticationExceptionResponse | LastfmAuthorize500>
 >(options?: {
   query?: Partial<
     UseSuspenseInfiniteQueryOptions<
-      Awaited<ReturnType<typeof lastfmAuthorize>>,
+      LastfmAuthorize200,
       TError,
       TData
     >
@@ -502,7 +502,7 @@ export const getLastfmAuthorizeSuspenseInfiniteQueryOptions = <
   const queryKey =
     queryOptions?.queryKey ?? getLastfmAuthorizeInfiniteQueryKey();
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof lastfmAuthorize>>> = ({
+  const queryFn: QueryFunction<LastfmAuthorize200> = ({
     signal,
   }) => lastfmAuthorize(requestOptions, signal);
 
@@ -511,27 +511,27 @@ export const getLastfmAuthorizeSuspenseInfiniteQueryOptions = <
     queryFn,
     ...queryOptions,
   } as UseSuspenseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof lastfmAuthorize>>,
+    LastfmAuthorize200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type LastfmAuthorizeSuspenseInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof lastfmAuthorize>>
+  LastfmAuthorize200
 >;
 export type LastfmAuthorizeSuspenseInfiniteQueryError = ErrorType<
   AuthenticationExceptionResponse | LastfmAuthorize500
 >;
 
 export function useLastfmAuthorizeSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof lastfmAuthorize>>>,
+  TData = InfiniteData<LastfmAuthorize200>,
   TError = ErrorType<AuthenticationExceptionResponse | LastfmAuthorize500>
 >(
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof lastfmAuthorize>>,
+        LastfmAuthorize200,
         TError,
         TData
       >
@@ -543,13 +543,13 @@ export function useLastfmAuthorizeSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useLastfmAuthorizeSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof lastfmAuthorize>>>,
+  TData = InfiniteData<LastfmAuthorize200>,
   TError = ErrorType<AuthenticationExceptionResponse | LastfmAuthorize500>
 >(
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof lastfmAuthorize>>,
+        LastfmAuthorize200,
         TError,
         TData
       >
@@ -561,13 +561,13 @@ export function useLastfmAuthorizeSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useLastfmAuthorizeSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof lastfmAuthorize>>>,
+  TData = InfiniteData<LastfmAuthorize200>,
   TError = ErrorType<AuthenticationExceptionResponse | LastfmAuthorize500>
 >(
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof lastfmAuthorize>>,
+        LastfmAuthorize200,
         TError,
         TData
       >
@@ -580,13 +580,13 @@ export function useLastfmAuthorizeSuspenseInfinite<
 };
 
 export function useLastfmAuthorizeSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof lastfmAuthorize>>>,
+  TData = InfiniteData<LastfmAuthorize200>,
   TError = ErrorType<AuthenticationExceptionResponse | LastfmAuthorize500>
 >(
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof lastfmAuthorize>>,
+        LastfmAuthorize200,
         TError,
         TData
       >

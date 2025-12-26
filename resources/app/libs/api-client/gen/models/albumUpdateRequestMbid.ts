@@ -13,6 +13,7 @@ The media information is organized and easily searchable, ensuring users can alw
  */
 
 /**
+ * External IDs
  * @maxLength 255
  */
-export type ArtistUpdateRequestDisambiguation = string | null;
+export type AlbumUpdateRequestMbid = string | null;

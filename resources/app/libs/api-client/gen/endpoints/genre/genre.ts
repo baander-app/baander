@@ -82,7 +82,7 @@ export const getGenresIndexQueryKey = (params?: GenresIndexParams) => {
 
 export const getGenresIndexInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof genresIndex>>,
+    GenresIndex200,
     GenresIndexParams["page"]
   >,
   TError = ErrorType<
@@ -93,7 +93,7 @@ export const getGenresIndexInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof genresIndex>>,
+        GenresIndex200,
         TError,
         TData,
         QueryKey,
@@ -109,7 +109,7 @@ export const getGenresIndexInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getGenresIndexInfiniteQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof genresIndex>>,
+    GenresIndex200,
     QueryKey,
     GenresIndexParams["page"]
   > = ({ signal, pageParam }) =>
@@ -120,7 +120,7 @@ export const getGenresIndexInfiniteQueryOptions = <
     );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof genresIndex>>,
+    GenresIndex200,
     TError,
     TData,
     QueryKey,
@@ -129,7 +129,7 @@ export const getGenresIndexInfiniteQueryOptions = <
 };
 
 export type GenresIndexInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof genresIndex>>
+  GenresIndex200
 >;
 export type GenresIndexInfiniteQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -137,7 +137,7 @@ export type GenresIndexInfiniteQueryError = ErrorType<
 
 export function useGenresIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof genresIndex>>,
+    GenresIndex200,
     GenresIndexParams["page"]
   >,
   TError = ErrorType<
@@ -148,7 +148,7 @@ export function useGenresIndexInfinite<
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof genresIndex>>,
+        GenresIndex200,
         TError,
         TData,
         QueryKey,
@@ -157,9 +157,9 @@ export function useGenresIndexInfinite<
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof genresIndex>>,
+          GenresIndex200,
           TError,
-          Awaited<ReturnType<typeof genresIndex>>,
+          GenresIndex200,
           QueryKey
         >,
         "initialData"
@@ -172,7 +172,7 @@ export function useGenresIndexInfinite<
 };
 export function useGenresIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof genresIndex>>,
+    GenresIndex200,
     GenresIndexParams["page"]
   >,
   TError = ErrorType<
@@ -183,7 +183,7 @@ export function useGenresIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof genresIndex>>,
+        GenresIndex200,
         TError,
         TData,
         QueryKey,
@@ -192,9 +192,9 @@ export function useGenresIndexInfinite<
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof genresIndex>>,
+          GenresIndex200,
           TError,
-          Awaited<ReturnType<typeof genresIndex>>,
+          GenresIndex200,
           QueryKey
         >,
         "initialData"
@@ -207,7 +207,7 @@ export function useGenresIndexInfinite<
 };
 export function useGenresIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof genresIndex>>,
+    GenresIndex200,
     GenresIndexParams["page"]
   >,
   TError = ErrorType<
@@ -218,7 +218,7 @@ export function useGenresIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof genresIndex>>,
+        GenresIndex200,
         TError,
         TData,
         QueryKey,
@@ -237,7 +237,7 @@ export function useGenresIndexInfinite<
 
 export function useGenresIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof genresIndex>>,
+    GenresIndex200,
     GenresIndexParams["page"]
   >,
   TError = ErrorType<
@@ -248,7 +248,7 @@ export function useGenresIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof genresIndex>>,
+        GenresIndex200,
         TError,
         TData,
         QueryKey,
@@ -276,7 +276,7 @@ export function useGenresIndexInfinite<
 }
 
 export const getGenresIndexQueryOptions = <
-  TData = Awaited<ReturnType<typeof genresIndex>>,
+  TData = GenresIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -284,7 +284,7 @@ export const getGenresIndexQueryOptions = <
   params?: GenresIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof genresIndex>>, TError, TData>
+      UseQueryOptions<GenresIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   }
@@ -293,26 +293,26 @@ export const getGenresIndexQueryOptions = <
 
   const queryKey = queryOptions?.queryKey ?? getGenresIndexQueryKey(params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof genresIndex>>> = ({
+  const queryFn: QueryFunction<GenresIndex200> = ({
     signal,
   }) => genresIndex(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof genresIndex>>,
+    GenresIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type GenresIndexQueryResult = NonNullable<
-  Awaited<ReturnType<typeof genresIndex>>
+  GenresIndex200
 >;
 export type GenresIndexQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useGenresIndex<
-  TData = Awaited<ReturnType<typeof genresIndex>>,
+  TData = GenresIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -320,13 +320,13 @@ export function useGenresIndex<
   params: undefined | GenresIndexParams,
   options: {
     query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof genresIndex>>, TError, TData>
+      UseQueryOptions<GenresIndex200, TError, TData>
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof genresIndex>>,
+          GenresIndex200,
           TError,
-          Awaited<ReturnType<typeof genresIndex>>
+          GenresIndex200
         >,
         "initialData"
       >;
@@ -337,7 +337,7 @@ export function useGenresIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useGenresIndex<
-  TData = Awaited<ReturnType<typeof genresIndex>>,
+  TData = GenresIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -345,13 +345,13 @@ export function useGenresIndex<
   params?: GenresIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof genresIndex>>, TError, TData>
+      UseQueryOptions<GenresIndex200, TError, TData>
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof genresIndex>>,
+          GenresIndex200,
           TError,
-          Awaited<ReturnType<typeof genresIndex>>
+          GenresIndex200
         >,
         "initialData"
       >;
@@ -362,7 +362,7 @@ export function useGenresIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useGenresIndex<
-  TData = Awaited<ReturnType<typeof genresIndex>>,
+  TData = GenresIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -370,7 +370,7 @@ export function useGenresIndex<
   params?: GenresIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof genresIndex>>, TError, TData>
+      UseQueryOptions<GenresIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -383,7 +383,7 @@ export function useGenresIndex<
  */
 
 export function useGenresIndex<
-  TData = Awaited<ReturnType<typeof genresIndex>>,
+  TData = GenresIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -391,7 +391,7 @@ export function useGenresIndex<
   params?: GenresIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof genresIndex>>, TError, TData>
+      UseQueryOptions<GenresIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -412,7 +412,7 @@ export function useGenresIndex<
 }
 
 export const getGenresIndexSuspenseQueryOptions = <
-  TData = Awaited<ReturnType<typeof genresIndex>>,
+  TData = GenresIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -421,7 +421,7 @@ export const getGenresIndexSuspenseQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof genresIndex>>,
+        GenresIndex200,
         TError,
         TData
       >
@@ -433,26 +433,26 @@ export const getGenresIndexSuspenseQueryOptions = <
 
   const queryKey = queryOptions?.queryKey ?? getGenresIndexQueryKey(params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof genresIndex>>> = ({
+  const queryFn: QueryFunction<GenresIndex200> = ({
     signal,
   }) => genresIndex(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
-    Awaited<ReturnType<typeof genresIndex>>,
+    GenresIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type GenresIndexSuspenseQueryResult = NonNullable<
-  Awaited<ReturnType<typeof genresIndex>>
+  GenresIndex200
 >;
 export type GenresIndexSuspenseQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useGenresIndexSuspense<
-  TData = Awaited<ReturnType<typeof genresIndex>>,
+  TData = GenresIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -461,7 +461,7 @@ export function useGenresIndexSuspense<
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof genresIndex>>,
+        GenresIndex200,
         TError,
         TData
       >
@@ -473,7 +473,7 @@ export function useGenresIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useGenresIndexSuspense<
-  TData = Awaited<ReturnType<typeof genresIndex>>,
+  TData = GenresIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -482,7 +482,7 @@ export function useGenresIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof genresIndex>>,
+        GenresIndex200,
         TError,
         TData
       >
@@ -494,7 +494,7 @@ export function useGenresIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useGenresIndexSuspense<
-  TData = Awaited<ReturnType<typeof genresIndex>>,
+  TData = GenresIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -503,7 +503,7 @@ export function useGenresIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof genresIndex>>,
+        GenresIndex200,
         TError,
         TData
       >
@@ -519,7 +519,7 @@ export function useGenresIndexSuspense<
  */
 
 export function useGenresIndexSuspense<
-  TData = Awaited<ReturnType<typeof genresIndex>>,
+  TData = GenresIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -528,7 +528,7 @@ export function useGenresIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof genresIndex>>,
+        GenresIndex200,
         TError,
         TData
       >
@@ -555,7 +555,7 @@ export function useGenresIndexSuspense<
 
 export const getGenresIndexSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof genresIndex>>,
+    GenresIndex200,
     GenresIndexParams["page"]
   >,
   TError = ErrorType<
@@ -566,7 +566,7 @@ export const getGenresIndexSuspenseInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof genresIndex>>,
+        GenresIndex200,
         TError,
         TData,
         QueryKey,
@@ -582,7 +582,7 @@ export const getGenresIndexSuspenseInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getGenresIndexInfiniteQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof genresIndex>>,
+    GenresIndex200,
     QueryKey,
     GenresIndexParams["page"]
   > = ({ signal, pageParam }) =>
@@ -597,7 +597,7 @@ export const getGenresIndexSuspenseInfiniteQueryOptions = <
     queryFn,
     ...queryOptions,
   } as UseSuspenseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof genresIndex>>,
+    GenresIndex200,
     TError,
     TData,
     QueryKey,
@@ -606,7 +606,7 @@ export const getGenresIndexSuspenseInfiniteQueryOptions = <
 };
 
 export type GenresIndexSuspenseInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof genresIndex>>
+  GenresIndex200
 >;
 export type GenresIndexSuspenseInfiniteQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -614,7 +614,7 @@ export type GenresIndexSuspenseInfiniteQueryError = ErrorType<
 
 export function useGenresIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof genresIndex>>,
+    GenresIndex200,
     GenresIndexParams["page"]
   >,
   TError = ErrorType<
@@ -625,7 +625,7 @@ export function useGenresIndexSuspenseInfinite<
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof genresIndex>>,
+        GenresIndex200,
         TError,
         TData,
         QueryKey,
@@ -640,7 +640,7 @@ export function useGenresIndexSuspenseInfinite<
 };
 export function useGenresIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof genresIndex>>,
+    GenresIndex200,
     GenresIndexParams["page"]
   >,
   TError = ErrorType<
@@ -651,7 +651,7 @@ export function useGenresIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof genresIndex>>,
+        GenresIndex200,
         TError,
         TData,
         QueryKey,
@@ -666,7 +666,7 @@ export function useGenresIndexSuspenseInfinite<
 };
 export function useGenresIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof genresIndex>>,
+    GenresIndex200,
     GenresIndexParams["page"]
   >,
   TError = ErrorType<
@@ -677,7 +677,7 @@ export function useGenresIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof genresIndex>>,
+        GenresIndex200,
         TError,
         TData,
         QueryKey,
@@ -696,7 +696,7 @@ export function useGenresIndexSuspenseInfinite<
 
 export function useGenresIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof genresIndex>>,
+    GenresIndex200,
     GenresIndexParams["page"]
   >,
   TError = ErrorType<
@@ -707,7 +707,7 @@ export function useGenresIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof genresIndex>>,
+        GenresIndex200,
         TError,
         TData,
         QueryKey,

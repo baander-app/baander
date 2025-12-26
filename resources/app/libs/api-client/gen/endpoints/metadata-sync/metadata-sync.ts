@@ -80,14 +80,14 @@ export const getMetadataSyncMutationOptions = <
   TContext = unknown
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof metadataSync>>,
+    MetadataSync200,
     TError,
     { data: BodyType<MetadataSyncBody> },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof metadataSync>>,
+  MetadataSync200,
   TError,
   { data: BodyType<MetadataSyncBody> },
   TContext
@@ -102,7 +102,7 @@ export const getMetadataSyncMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof metadataSync>>,
+    MetadataSync200,
     { data: BodyType<MetadataSyncBody> }
   > = (props) => {
     const { data } = props ?? {};
@@ -114,7 +114,7 @@ export const getMetadataSyncMutationOptions = <
 };
 
 export type MetadataSyncMutationResult = NonNullable<
-  Awaited<ReturnType<typeof metadataSync>>
+  MetadataSync200
 >;
 export type MetadataSyncMutationBody = BodyType<MetadataSyncBody>;
 export type MetadataSyncMutationError = ErrorType<
@@ -129,7 +129,7 @@ export const useMetadataSync = <
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof metadataSync>>,
+      MetadataSync200,
       TError,
       { data: BodyType<MetadataSyncBody> },
       TContext
@@ -138,7 +138,7 @@ export const useMetadataSync = <
   },
   queryClient?: QueryClient
 ): UseMutationResult<
-  Awaited<ReturnType<typeof metadataSync>>,
+  MetadataSync200,
   TError,
   { data: BodyType<MetadataSyncBody> },
   TContext

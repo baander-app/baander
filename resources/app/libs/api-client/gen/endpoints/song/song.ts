@@ -99,7 +99,7 @@ export const getSongsIndexQueryKey = (
 
 export const getSongsIndexInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof songsIndex>>,
+    SongsIndex200,
     SongsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -114,7 +114,7 @@ export const getSongsIndexInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof songsIndex>>,
+        SongsIndex200,
         TError,
         TData,
         QueryKey,
@@ -130,7 +130,7 @@ export const getSongsIndexInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getSongsIndexInfiniteQueryKey(library, params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof songsIndex>>,
+    SongsIndex200,
     QueryKey,
     SongsIndexParams["page"]
   > = ({ signal, pageParam }) =>
@@ -147,7 +147,7 @@ export const getSongsIndexInfiniteQueryOptions = <
     enabled: !!library,
     ...queryOptions,
   } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof songsIndex>>,
+    SongsIndex200,
     TError,
     TData,
     QueryKey,
@@ -156,7 +156,7 @@ export const getSongsIndexInfiniteQueryOptions = <
 };
 
 export type SongsIndexInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof songsIndex>>
+  SongsIndex200
 >;
 export type SongsIndexInfiniteQueryError = ErrorType<
   | SongsIndex400
@@ -167,7 +167,7 @@ export type SongsIndexInfiniteQueryError = ErrorType<
 
 export function useSongsIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof songsIndex>>,
+    SongsIndex200,
     SongsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -182,7 +182,7 @@ export function useSongsIndexInfinite<
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof songsIndex>>,
+        SongsIndex200,
         TError,
         TData,
         QueryKey,
@@ -191,9 +191,9 @@ export function useSongsIndexInfinite<
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof songsIndex>>,
+          SongsIndex200,
           TError,
-          Awaited<ReturnType<typeof songsIndex>>,
+          SongsIndex200,
           QueryKey
         >,
         "initialData"
@@ -206,7 +206,7 @@ export function useSongsIndexInfinite<
 };
 export function useSongsIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof songsIndex>>,
+    SongsIndex200,
     SongsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -221,7 +221,7 @@ export function useSongsIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof songsIndex>>,
+        SongsIndex200,
         TError,
         TData,
         QueryKey,
@@ -230,9 +230,9 @@ export function useSongsIndexInfinite<
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof songsIndex>>,
+          SongsIndex200,
           TError,
-          Awaited<ReturnType<typeof songsIndex>>,
+          SongsIndex200,
           QueryKey
         >,
         "initialData"
@@ -245,7 +245,7 @@ export function useSongsIndexInfinite<
 };
 export function useSongsIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof songsIndex>>,
+    SongsIndex200,
     SongsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -260,7 +260,7 @@ export function useSongsIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof songsIndex>>,
+        SongsIndex200,
         TError,
         TData,
         QueryKey,
@@ -279,7 +279,7 @@ export function useSongsIndexInfinite<
 
 export function useSongsIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof songsIndex>>,
+    SongsIndex200,
     SongsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -294,7 +294,7 @@ export function useSongsIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof songsIndex>>,
+        SongsIndex200,
         TError,
         TData,
         QueryKey,
@@ -326,7 +326,7 @@ export function useSongsIndexInfinite<
 }
 
 export const getSongsIndexQueryOptions = <
-  TData = Awaited<ReturnType<typeof songsIndex>>,
+  TData = SongsIndex200,
   TError = ErrorType<
     | SongsIndex400
     | AuthenticationExceptionResponse
@@ -338,7 +338,7 @@ export const getSongsIndexQueryOptions = <
   params?: SongsIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof songsIndex>>, TError, TData>
+      UseQueryOptions<SongsIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   }
@@ -348,7 +348,7 @@ export const getSongsIndexQueryOptions = <
   const queryKey =
     queryOptions?.queryKey ?? getSongsIndexQueryKey(library, params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof songsIndex>>> = ({
+  const queryFn: QueryFunction<SongsIndex200> = ({
     signal,
   }) => songsIndex(library, params, requestOptions, signal);
 
@@ -358,14 +358,14 @@ export const getSongsIndexQueryOptions = <
     enabled: !!library,
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof songsIndex>>,
+    SongsIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type SongsIndexQueryResult = NonNullable<
-  Awaited<ReturnType<typeof songsIndex>>
+  SongsIndex200
 >;
 export type SongsIndexQueryError = ErrorType<
   | SongsIndex400
@@ -375,7 +375,7 @@ export type SongsIndexQueryError = ErrorType<
 >;
 
 export function useSongsIndex<
-  TData = Awaited<ReturnType<typeof songsIndex>>,
+  TData = SongsIndex200,
   TError = ErrorType<
     | SongsIndex400
     | AuthenticationExceptionResponse
@@ -387,13 +387,13 @@ export function useSongsIndex<
   params: undefined | SongsIndexParams,
   options: {
     query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof songsIndex>>, TError, TData>
+      UseQueryOptions<SongsIndex200, TError, TData>
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof songsIndex>>,
+          SongsIndex200,
           TError,
-          Awaited<ReturnType<typeof songsIndex>>
+          SongsIndex200
         >,
         "initialData"
       >;
@@ -404,7 +404,7 @@ export function useSongsIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useSongsIndex<
-  TData = Awaited<ReturnType<typeof songsIndex>>,
+  TData = SongsIndex200,
   TError = ErrorType<
     | SongsIndex400
     | AuthenticationExceptionResponse
@@ -416,13 +416,13 @@ export function useSongsIndex<
   params?: SongsIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof songsIndex>>, TError, TData>
+      UseQueryOptions<SongsIndex200, TError, TData>
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof songsIndex>>,
+          SongsIndex200,
           TError,
-          Awaited<ReturnType<typeof songsIndex>>
+          SongsIndex200
         >,
         "initialData"
       >;
@@ -433,7 +433,7 @@ export function useSongsIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useSongsIndex<
-  TData = Awaited<ReturnType<typeof songsIndex>>,
+  TData = SongsIndex200,
   TError = ErrorType<
     | SongsIndex400
     | AuthenticationExceptionResponse
@@ -445,7 +445,7 @@ export function useSongsIndex<
   params?: SongsIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof songsIndex>>, TError, TData>
+      UseQueryOptions<SongsIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -458,7 +458,7 @@ export function useSongsIndex<
  */
 
 export function useSongsIndex<
-  TData = Awaited<ReturnType<typeof songsIndex>>,
+  TData = SongsIndex200,
   TError = ErrorType<
     | SongsIndex400
     | AuthenticationExceptionResponse
@@ -470,7 +470,7 @@ export function useSongsIndex<
   params?: SongsIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof songsIndex>>, TError, TData>
+      UseQueryOptions<SongsIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -491,7 +491,7 @@ export function useSongsIndex<
 }
 
 export const getSongsIndexSuspenseQueryOptions = <
-  TData = Awaited<ReturnType<typeof songsIndex>>,
+  TData = SongsIndex200,
   TError = ErrorType<
     | SongsIndex400
     | AuthenticationExceptionResponse
@@ -504,7 +504,7 @@ export const getSongsIndexSuspenseQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof songsIndex>>,
+        SongsIndex200,
         TError,
         TData
       >
@@ -517,19 +517,19 @@ export const getSongsIndexSuspenseQueryOptions = <
   const queryKey =
     queryOptions?.queryKey ?? getSongsIndexQueryKey(library, params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof songsIndex>>> = ({
+  const queryFn: QueryFunction<SongsIndex200> = ({
     signal,
   }) => songsIndex(library, params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
-    Awaited<ReturnType<typeof songsIndex>>,
+    SongsIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type SongsIndexSuspenseQueryResult = NonNullable<
-  Awaited<ReturnType<typeof songsIndex>>
+  SongsIndex200
 >;
 export type SongsIndexSuspenseQueryError = ErrorType<
   | SongsIndex400
@@ -539,7 +539,7 @@ export type SongsIndexSuspenseQueryError = ErrorType<
 >;
 
 export function useSongsIndexSuspense<
-  TData = Awaited<ReturnType<typeof songsIndex>>,
+  TData = SongsIndex200,
   TError = ErrorType<
     | SongsIndex400
     | AuthenticationExceptionResponse
@@ -552,7 +552,7 @@ export function useSongsIndexSuspense<
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof songsIndex>>,
+        SongsIndex200,
         TError,
         TData
       >
@@ -564,7 +564,7 @@ export function useSongsIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useSongsIndexSuspense<
-  TData = Awaited<ReturnType<typeof songsIndex>>,
+  TData = SongsIndex200,
   TError = ErrorType<
     | SongsIndex400
     | AuthenticationExceptionResponse
@@ -577,7 +577,7 @@ export function useSongsIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof songsIndex>>,
+        SongsIndex200,
         TError,
         TData
       >
@@ -589,7 +589,7 @@ export function useSongsIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useSongsIndexSuspense<
-  TData = Awaited<ReturnType<typeof songsIndex>>,
+  TData = SongsIndex200,
   TError = ErrorType<
     | SongsIndex400
     | AuthenticationExceptionResponse
@@ -602,7 +602,7 @@ export function useSongsIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof songsIndex>>,
+        SongsIndex200,
         TError,
         TData
       >
@@ -618,7 +618,7 @@ export function useSongsIndexSuspense<
  */
 
 export function useSongsIndexSuspense<
-  TData = Awaited<ReturnType<typeof songsIndex>>,
+  TData = SongsIndex200,
   TError = ErrorType<
     | SongsIndex400
     | AuthenticationExceptionResponse
@@ -631,7 +631,7 @@ export function useSongsIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof songsIndex>>,
+        SongsIndex200,
         TError,
         TData
       >
@@ -662,7 +662,7 @@ export function useSongsIndexSuspense<
 
 export const getSongsIndexSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof songsIndex>>,
+    SongsIndex200,
     SongsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -677,7 +677,7 @@ export const getSongsIndexSuspenseInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof songsIndex>>,
+        SongsIndex200,
         TError,
         TData,
         QueryKey,
@@ -693,7 +693,7 @@ export const getSongsIndexSuspenseInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getSongsIndexInfiniteQueryKey(library, params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof songsIndex>>,
+    SongsIndex200,
     QueryKey,
     SongsIndexParams["page"]
   > = ({ signal, pageParam }) =>
@@ -709,7 +709,7 @@ export const getSongsIndexSuspenseInfiniteQueryOptions = <
     queryFn,
     ...queryOptions,
   } as UseSuspenseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof songsIndex>>,
+    SongsIndex200,
     TError,
     TData,
     QueryKey,
@@ -718,7 +718,7 @@ export const getSongsIndexSuspenseInfiniteQueryOptions = <
 };
 
 export type SongsIndexSuspenseInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof songsIndex>>
+  SongsIndex200
 >;
 export type SongsIndexSuspenseInfiniteQueryError = ErrorType<
   | SongsIndex400
@@ -729,7 +729,7 @@ export type SongsIndexSuspenseInfiniteQueryError = ErrorType<
 
 export function useSongsIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof songsIndex>>,
+    SongsIndex200,
     SongsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -744,7 +744,7 @@ export function useSongsIndexSuspenseInfinite<
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof songsIndex>>,
+        SongsIndex200,
         TError,
         TData,
         QueryKey,
@@ -759,7 +759,7 @@ export function useSongsIndexSuspenseInfinite<
 };
 export function useSongsIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof songsIndex>>,
+    SongsIndex200,
     SongsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -774,7 +774,7 @@ export function useSongsIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof songsIndex>>,
+        SongsIndex200,
         TError,
         TData,
         QueryKey,
@@ -789,7 +789,7 @@ export function useSongsIndexSuspenseInfinite<
 };
 export function useSongsIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof songsIndex>>,
+    SongsIndex200,
     SongsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -804,7 +804,7 @@ export function useSongsIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof songsIndex>>,
+        SongsIndex200,
         TError,
         TData,
         QueryKey,
@@ -823,7 +823,7 @@ export function useSongsIndexSuspenseInfinite<
 
 export function useSongsIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof songsIndex>>,
+    SongsIndex200,
     SongsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -838,7 +838,7 @@ export function useSongsIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof songsIndex>>,
+        SongsIndex200,
         TError,
         TData,
         QueryKey,

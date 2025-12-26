@@ -6,7 +6,7 @@ import { ArtistBigCircle } from '@/app/modules/library-music/components/artwork/
 import { ArtistEditor } from '@/app/modules/library-music/components/artist-editor/artist-editor';
 import { CoverGrid } from '@/app/modules/library-music/components/cover-grid';
 import { ArtistResource } from '@/app/libs/api-client/gen/models';
-import { useArtistsIndex } from '@/app/libs/api-client/gen/endpoints/artist/artist.ts';
+import { useArtistsIndex, useArtistsUpdate } from '@/app/libs/api-client/gen/endpoints/artist/artist.ts';
 import { useMetadataSync } from '@/app/libs/api-client/gen/endpoints/metadata-sync/metadata-sync.ts';
 import { Container, ContextMenu, Dialog } from '@radix-ui/themes';
 import { useAppDispatch } from '@/app/store/hooks';
@@ -18,6 +18,29 @@ function ArtistContextMenu({ artist, librarySlug }: { artist: ArtistResource, li
   const [showEditor, editorHandlers] = useDisclosure(false);
   const dispatch = useAppDispatch();
 
+  // Update mutation with default cache invalidation
+  const updateMutation = useArtistsUpdate({
+    mutation: {
+      onSuccess: () => {
+        dispatch(createNotification({
+          title: 'Success',
+          message: 'Artist updated successfully!',
+          type: 'success',
+          toast: true,
+        }));
+        editorHandlers.close();
+      },
+      onError: (error: any) => {
+        dispatch(createNotification({
+          title: 'Error',
+          message: error.response?.data?.message || 'Failed to update artist',
+          type: 'error',
+          toast: true,
+        }));
+      },
+    },
+  });
+
   // Sync mutation
   const syncMutation = useMetadataSync({
     mutation: {
@@ -28,7 +51,6 @@ function ArtistContextMenu({ artist, librarySlug }: { artist: ArtistResource, li
           type: 'success',
           toast: true,
         }));
-        // TODO: Refresh the artists list
       },
       onError: (error: any) => {
         dispatch(createNotification({
@@ -51,24 +73,13 @@ function ArtistContextMenu({ artist, librarySlug }: { artist: ArtistResource, li
   }, [syncMutation, artist]);
 
   const handleArtistSubmit = useCallback(async (data: any) => {
-    try {
-      editorHandlers.close();
-      dispatch(createNotification({
-        title: 'Success',
-        message: 'Artist updated successfully!',
-        type: 'success',
-        toast: true,
-      }));
-      // TODO: Refresh the artists list
-    } catch (error: any) {
-      dispatch(createNotification({
-        title: 'Error',
-        message: error.response?.data?.message || 'Failed to update artist',
-        type: 'error',
-        toast: true,
-      }));
-    }
-  }, [artist, librarySlug, dispatch, editorHandlers]);
+    // Submit via React Query mutation (after Precognition validation passes)
+    updateMutation.mutate({
+      library: librarySlug,
+      artist: artist.publicId,
+      data: data,
+    });
+  }, [updateMutation, librarySlug, artist.publicId]);
 
   const handleMetadataApplied = useCallback(() => {
     dispatch(createNotification({

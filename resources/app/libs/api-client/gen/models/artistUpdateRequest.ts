@@ -11,8 +11,17 @@ Implemented queuing functionality through Redis offers efficient job management 
 The media information is organized and easily searchable, ensuring users can always find what they are looking for quickly and easily.
  * OpenAPI spec version: 0.0.1
  */
-import type { ArtistUpdateRequestBiography } from "./artistUpdateRequestBiography";
 import type { ArtistUpdateRequestDisambiguation } from "./artistUpdateRequestDisambiguation";
+import type { ArtistUpdateRequestType } from "./artistUpdateRequestType";
+import type { ArtistUpdateRequestCountry } from "./artistUpdateRequestCountry";
+import type { ArtistUpdateRequestGender } from "./artistUpdateRequestGender";
+import type { ArtistUpdateRequestSortName } from "./artistUpdateRequestSortName";
+import type { ArtistUpdateRequestMbid } from "./artistUpdateRequestMbid";
+import type { ArtistUpdateRequestDiscogsId } from "./artistUpdateRequestDiscogsId";
+import type { ArtistUpdateRequestSpotifyId } from "./artistUpdateRequestSpotifyId";
+import type { ArtistUpdateRequestBiography } from "./artistUpdateRequestBiography";
+import type { ArtistUpdateRequestLifeSpanBegin } from "./artistUpdateRequestLifeSpanBegin";
+import type { ArtistUpdateRequestLifeSpanEnd } from "./artistUpdateRequestLifeSpanEnd";
 
 export interface ArtistUpdateRequest {
   /**
@@ -20,26 +29,26 @@ export interface ArtistUpdateRequest {
    * @maxLength 255
    */
   name: string;
-  /**
-   * @minLength 1
-   * @maxLength 255
-   */
-  mbid?: string;
+  /** @maxLength 255 */
+  disambiguation?: ArtistUpdateRequestDisambiguation;
+  type?: ArtistUpdateRequestType;
+  /** @maxLength 2 */
+  country?: ArtistUpdateRequestCountry;
+  gender?: ArtistUpdateRequestGender;
+  /** @maxLength 255 */
+  sortName?: ArtistUpdateRequestSortName;
+  /** @maxLength 255 */
+  mbid?: ArtistUpdateRequestMbid;
   /**
    * @minimum 0
    * @maximum 999999999999
    */
-  discogsId?: number;
-  /**
-   * @minLength 1
-   * @maxLength 255
-   */
-  spotifyId?: string;
+  discogsId?: ArtistUpdateRequestDiscogsId;
+  /** @maxLength 255 */
+  spotifyId?: ArtistUpdateRequestSpotifyId;
+  /** @maxLength 4000 */
   biography?: ArtistUpdateRequestBiography;
-  /**
-   * @minLength 1
-   * @maxLength 255
-   */
-  disambiguation?: ArtistUpdateRequestDisambiguation;
-  locked_fields?: string[];
+  lifeSpanBegin?: ArtistUpdateRequestLifeSpanBegin;
+  lifeSpanEnd?: ArtistUpdateRequestLifeSpanEnd;
+  lockedFields?: string[];
 }

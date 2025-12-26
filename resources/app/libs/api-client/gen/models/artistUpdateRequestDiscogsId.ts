@@ -13,6 +13,7 @@ The media information is organized and easily searchable, ensuring users can alw
  */
 
 /**
- * @maxLength 255
+ * @minimum 0
+ * @maximum 999999999999
  */
-export type ArtistUpdateRequestDisambiguation = string | null;
+export type ArtistUpdateRequestDiscogsId = number | null;

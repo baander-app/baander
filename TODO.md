@@ -1,5 +1,5 @@
 # TODO
 
-## Album editor
+## Create iTunes Search API Integration
 
-After form update, clear/update react-query with correct query key
+https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/iTuneSearchAPI/index.html#//apple_ref/doc/uid/TP40017632-CH3-SW1

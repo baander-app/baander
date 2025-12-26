@@ -86,7 +86,7 @@ export const getLibrariesIndexQueryKey = (params?: LibrariesIndexParams) => {
 
 export const getLibrariesIndexInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof librariesIndex>>,
+    LibrariesIndex200,
     LibrariesIndexParams["page"]
   >,
   TError = ErrorType<
@@ -97,7 +97,7 @@ export const getLibrariesIndexInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof librariesIndex>>,
+        LibrariesIndex200,
         TError,
         TData,
         QueryKey,
@@ -113,7 +113,7 @@ export const getLibrariesIndexInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getLibrariesIndexInfiniteQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof librariesIndex>>,
+    LibrariesIndex200,
     QueryKey,
     LibrariesIndexParams["page"]
   > = ({ signal, pageParam }) =>
@@ -124,7 +124,7 @@ export const getLibrariesIndexInfiniteQueryOptions = <
     );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof librariesIndex>>,
+    LibrariesIndex200,
     TError,
     TData,
     QueryKey,
@@ -133,7 +133,7 @@ export const getLibrariesIndexInfiniteQueryOptions = <
 };
 
 export type LibrariesIndexInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof librariesIndex>>
+  LibrariesIndex200
 >;
 export type LibrariesIndexInfiniteQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -141,7 +141,7 @@ export type LibrariesIndexInfiniteQueryError = ErrorType<
 
 export function useLibrariesIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof librariesIndex>>,
+    LibrariesIndex200,
     LibrariesIndexParams["page"]
   >,
   TError = ErrorType<
@@ -152,7 +152,7 @@ export function useLibrariesIndexInfinite<
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof librariesIndex>>,
+        LibrariesIndex200,
         TError,
         TData,
         QueryKey,
@@ -161,9 +161,9 @@ export function useLibrariesIndexInfinite<
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof librariesIndex>>,
+          LibrariesIndex200,
           TError,
-          Awaited<ReturnType<typeof librariesIndex>>,
+          LibrariesIndex200,
           QueryKey
         >,
         "initialData"
@@ -176,7 +176,7 @@ export function useLibrariesIndexInfinite<
 };
 export function useLibrariesIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof librariesIndex>>,
+    LibrariesIndex200,
     LibrariesIndexParams["page"]
   >,
   TError = ErrorType<
@@ -187,7 +187,7 @@ export function useLibrariesIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof librariesIndex>>,
+        LibrariesIndex200,
         TError,
         TData,
         QueryKey,
@@ -196,9 +196,9 @@ export function useLibrariesIndexInfinite<
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof librariesIndex>>,
+          LibrariesIndex200,
           TError,
-          Awaited<ReturnType<typeof librariesIndex>>,
+          LibrariesIndex200,
           QueryKey
         >,
         "initialData"
@@ -211,7 +211,7 @@ export function useLibrariesIndexInfinite<
 };
 export function useLibrariesIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof librariesIndex>>,
+    LibrariesIndex200,
     LibrariesIndexParams["page"]
   >,
   TError = ErrorType<
@@ -222,7 +222,7 @@ export function useLibrariesIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof librariesIndex>>,
+        LibrariesIndex200,
         TError,
         TData,
         QueryKey,
@@ -241,7 +241,7 @@ export function useLibrariesIndexInfinite<
 
 export function useLibrariesIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof librariesIndex>>,
+    LibrariesIndex200,
     LibrariesIndexParams["page"]
   >,
   TError = ErrorType<
@@ -252,7 +252,7 @@ export function useLibrariesIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof librariesIndex>>,
+        LibrariesIndex200,
         TError,
         TData,
         QueryKey,
@@ -280,7 +280,7 @@ export function useLibrariesIndexInfinite<
 }
 
 export const getLibrariesIndexQueryOptions = <
-  TData = Awaited<ReturnType<typeof librariesIndex>>,
+  TData = LibrariesIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -288,7 +288,7 @@ export const getLibrariesIndexQueryOptions = <
   params?: LibrariesIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof librariesIndex>>, TError, TData>
+      UseQueryOptions<LibrariesIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   }
@@ -297,26 +297,26 @@ export const getLibrariesIndexQueryOptions = <
 
   const queryKey = queryOptions?.queryKey ?? getLibrariesIndexQueryKey(params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof librariesIndex>>> = ({
+  const queryFn: QueryFunction<LibrariesIndex200> = ({
     signal,
   }) => librariesIndex(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof librariesIndex>>,
+    LibrariesIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type LibrariesIndexQueryResult = NonNullable<
-  Awaited<ReturnType<typeof librariesIndex>>
+  LibrariesIndex200
 >;
 export type LibrariesIndexQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useLibrariesIndex<
-  TData = Awaited<ReturnType<typeof librariesIndex>>,
+  TData = LibrariesIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -324,13 +324,13 @@ export function useLibrariesIndex<
   params: undefined | LibrariesIndexParams,
   options: {
     query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof librariesIndex>>, TError, TData>
+      UseQueryOptions<LibrariesIndex200, TError, TData>
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof librariesIndex>>,
+          LibrariesIndex200,
           TError,
-          Awaited<ReturnType<typeof librariesIndex>>
+          LibrariesIndex200
         >,
         "initialData"
       >;
@@ -341,7 +341,7 @@ export function useLibrariesIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useLibrariesIndex<
-  TData = Awaited<ReturnType<typeof librariesIndex>>,
+  TData = LibrariesIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -349,13 +349,13 @@ export function useLibrariesIndex<
   params?: LibrariesIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof librariesIndex>>, TError, TData>
+      UseQueryOptions<LibrariesIndex200, TError, TData>
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof librariesIndex>>,
+          LibrariesIndex200,
           TError,
-          Awaited<ReturnType<typeof librariesIndex>>
+          LibrariesIndex200
         >,
         "initialData"
       >;
@@ -366,7 +366,7 @@ export function useLibrariesIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useLibrariesIndex<
-  TData = Awaited<ReturnType<typeof librariesIndex>>,
+  TData = LibrariesIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -374,7 +374,7 @@ export function useLibrariesIndex<
   params?: LibrariesIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof librariesIndex>>, TError, TData>
+      UseQueryOptions<LibrariesIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -387,7 +387,7 @@ export function useLibrariesIndex<
  */
 
 export function useLibrariesIndex<
-  TData = Awaited<ReturnType<typeof librariesIndex>>,
+  TData = LibrariesIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -395,7 +395,7 @@ export function useLibrariesIndex<
   params?: LibrariesIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof librariesIndex>>, TError, TData>
+      UseQueryOptions<LibrariesIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -416,7 +416,7 @@ export function useLibrariesIndex<
 }
 
 export const getLibrariesIndexSuspenseQueryOptions = <
-  TData = Awaited<ReturnType<typeof librariesIndex>>,
+  TData = LibrariesIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -425,7 +425,7 @@ export const getLibrariesIndexSuspenseQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof librariesIndex>>,
+        LibrariesIndex200,
         TError,
         TData
       >
@@ -437,26 +437,26 @@ export const getLibrariesIndexSuspenseQueryOptions = <
 
   const queryKey = queryOptions?.queryKey ?? getLibrariesIndexQueryKey(params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof librariesIndex>>> = ({
+  const queryFn: QueryFunction<LibrariesIndex200> = ({
     signal,
   }) => librariesIndex(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
-    Awaited<ReturnType<typeof librariesIndex>>,
+    LibrariesIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type LibrariesIndexSuspenseQueryResult = NonNullable<
-  Awaited<ReturnType<typeof librariesIndex>>
+  LibrariesIndex200
 >;
 export type LibrariesIndexSuspenseQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useLibrariesIndexSuspense<
-  TData = Awaited<ReturnType<typeof librariesIndex>>,
+  TData = LibrariesIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -465,7 +465,7 @@ export function useLibrariesIndexSuspense<
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof librariesIndex>>,
+        LibrariesIndex200,
         TError,
         TData
       >
@@ -477,7 +477,7 @@ export function useLibrariesIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useLibrariesIndexSuspense<
-  TData = Awaited<ReturnType<typeof librariesIndex>>,
+  TData = LibrariesIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -486,7 +486,7 @@ export function useLibrariesIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof librariesIndex>>,
+        LibrariesIndex200,
         TError,
         TData
       >
@@ -498,7 +498,7 @@ export function useLibrariesIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useLibrariesIndexSuspense<
-  TData = Awaited<ReturnType<typeof librariesIndex>>,
+  TData = LibrariesIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -507,7 +507,7 @@ export function useLibrariesIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof librariesIndex>>,
+        LibrariesIndex200,
         TError,
         TData
       >
@@ -523,7 +523,7 @@ export function useLibrariesIndexSuspense<
  */
 
 export function useLibrariesIndexSuspense<
-  TData = Awaited<ReturnType<typeof librariesIndex>>,
+  TData = LibrariesIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -532,7 +532,7 @@ export function useLibrariesIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof librariesIndex>>,
+        LibrariesIndex200,
         TError,
         TData
       >
@@ -559,7 +559,7 @@ export function useLibrariesIndexSuspense<
 
 export const getLibrariesIndexSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof librariesIndex>>,
+    LibrariesIndex200,
     LibrariesIndexParams["page"]
   >,
   TError = ErrorType<
@@ -570,7 +570,7 @@ export const getLibrariesIndexSuspenseInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof librariesIndex>>,
+        LibrariesIndex200,
         TError,
         TData,
         QueryKey,
@@ -586,7 +586,7 @@ export const getLibrariesIndexSuspenseInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getLibrariesIndexInfiniteQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof librariesIndex>>,
+    LibrariesIndex200,
     QueryKey,
     LibrariesIndexParams["page"]
   > = ({ signal, pageParam }) =>
@@ -601,7 +601,7 @@ export const getLibrariesIndexSuspenseInfiniteQueryOptions = <
     queryFn,
     ...queryOptions,
   } as UseSuspenseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof librariesIndex>>,
+    LibrariesIndex200,
     TError,
     TData,
     QueryKey,
@@ -610,7 +610,7 @@ export const getLibrariesIndexSuspenseInfiniteQueryOptions = <
 };
 
 export type LibrariesIndexSuspenseInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof librariesIndex>>
+  LibrariesIndex200
 >;
 export type LibrariesIndexSuspenseInfiniteQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -618,7 +618,7 @@ export type LibrariesIndexSuspenseInfiniteQueryError = ErrorType<
 
 export function useLibrariesIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof librariesIndex>>,
+    LibrariesIndex200,
     LibrariesIndexParams["page"]
   >,
   TError = ErrorType<
@@ -629,7 +629,7 @@ export function useLibrariesIndexSuspenseInfinite<
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof librariesIndex>>,
+        LibrariesIndex200,
         TError,
         TData,
         QueryKey,
@@ -644,7 +644,7 @@ export function useLibrariesIndexSuspenseInfinite<
 };
 export function useLibrariesIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof librariesIndex>>,
+    LibrariesIndex200,
     LibrariesIndexParams["page"]
   >,
   TError = ErrorType<
@@ -655,7 +655,7 @@ export function useLibrariesIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof librariesIndex>>,
+        LibrariesIndex200,
         TError,
         TData,
         QueryKey,
@@ -670,7 +670,7 @@ export function useLibrariesIndexSuspenseInfinite<
 };
 export function useLibrariesIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof librariesIndex>>,
+    LibrariesIndex200,
     LibrariesIndexParams["page"]
   >,
   TError = ErrorType<
@@ -681,7 +681,7 @@ export function useLibrariesIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof librariesIndex>>,
+        LibrariesIndex200,
         TError,
         TData,
         QueryKey,
@@ -700,7 +700,7 @@ export function useLibrariesIndexSuspenseInfinite<
 
 export function useLibrariesIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof librariesIndex>>,
+    LibrariesIndex200,
     LibrariesIndexParams["page"]
   >,
   TError = ErrorType<
@@ -711,7 +711,7 @@ export function useLibrariesIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof librariesIndex>>,
+        LibrariesIndex200,
         TError,
         TData,
         QueryKey,

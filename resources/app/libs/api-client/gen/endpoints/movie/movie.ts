@@ -74,7 +74,7 @@ export const getMoviesIndexQueryKey = (library?: string) => {
 };
 
 export const getMoviesIndexInfiniteQueryOptions = <
-  TData = InfiniteData<Awaited<ReturnType<typeof moviesIndex>>>,
+  TData = InfiniteData<MoviesIndex200>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -83,7 +83,7 @@ export const getMoviesIndexInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof moviesIndex>>,
+        MoviesIndex200,
         TError,
         TData
       >
@@ -96,7 +96,7 @@ export const getMoviesIndexInfiniteQueryOptions = <
   const queryKey =
     queryOptions?.queryKey ?? getMoviesIndexInfiniteQueryKey(library);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof moviesIndex>>> = ({
+  const queryFn: QueryFunction<MoviesIndex200> = ({
     signal,
   }) => moviesIndex(library, requestOptions, signal);
 
@@ -106,21 +106,21 @@ export const getMoviesIndexInfiniteQueryOptions = <
     enabled: !!library,
     ...queryOptions,
   } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof moviesIndex>>,
+    MoviesIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type MoviesIndexInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof moviesIndex>>
+  MoviesIndex200
 >;
 export type MoviesIndexInfiniteQueryError = ErrorType<
   AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
 >;
 
 export function useMoviesIndexInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof moviesIndex>>>,
+  TData = InfiniteData<MoviesIndex200>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -129,16 +129,16 @@ export function useMoviesIndexInfinite<
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof moviesIndex>>,
+        MoviesIndex200,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof moviesIndex>>,
+          MoviesIndex200,
           TError,
-          Awaited<ReturnType<typeof moviesIndex>>
+          MoviesIndex200
         >,
         "initialData"
       >;
@@ -149,7 +149,7 @@ export function useMoviesIndexInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useMoviesIndexInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof moviesIndex>>>,
+  TData = InfiniteData<MoviesIndex200>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -158,16 +158,16 @@ export function useMoviesIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof moviesIndex>>,
+        MoviesIndex200,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof moviesIndex>>,
+          MoviesIndex200,
           TError,
-          Awaited<ReturnType<typeof moviesIndex>>
+          MoviesIndex200
         >,
         "initialData"
       >;
@@ -178,7 +178,7 @@ export function useMoviesIndexInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useMoviesIndexInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof moviesIndex>>>,
+  TData = InfiniteData<MoviesIndex200>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -187,7 +187,7 @@ export function useMoviesIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof moviesIndex>>,
+        MoviesIndex200,
         TError,
         TData
       >
@@ -203,7 +203,7 @@ export function useMoviesIndexInfinite<
  */
 
 export function useMoviesIndexInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof moviesIndex>>>,
+  TData = InfiniteData<MoviesIndex200>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -212,7 +212,7 @@ export function useMoviesIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof moviesIndex>>,
+        MoviesIndex200,
         TError,
         TData
       >
@@ -238,7 +238,7 @@ export function useMoviesIndexInfinite<
 }
 
 export const getMoviesIndexQueryOptions = <
-  TData = Awaited<ReturnType<typeof moviesIndex>>,
+  TData = MoviesIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -246,7 +246,7 @@ export const getMoviesIndexQueryOptions = <
   library: string,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof moviesIndex>>, TError, TData>
+      UseQueryOptions<MoviesIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   }
@@ -255,7 +255,7 @@ export const getMoviesIndexQueryOptions = <
 
   const queryKey = queryOptions?.queryKey ?? getMoviesIndexQueryKey(library);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof moviesIndex>>> = ({
+  const queryFn: QueryFunction<MoviesIndex200> = ({
     signal,
   }) => moviesIndex(library, requestOptions, signal);
 
@@ -265,21 +265,21 @@ export const getMoviesIndexQueryOptions = <
     enabled: !!library,
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof moviesIndex>>,
+    MoviesIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type MoviesIndexQueryResult = NonNullable<
-  Awaited<ReturnType<typeof moviesIndex>>
+  MoviesIndex200
 >;
 export type MoviesIndexQueryError = ErrorType<
   AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
 >;
 
 export function useMoviesIndex<
-  TData = Awaited<ReturnType<typeof moviesIndex>>,
+  TData = MoviesIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -287,13 +287,13 @@ export function useMoviesIndex<
   library: string,
   options: {
     query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof moviesIndex>>, TError, TData>
+      UseQueryOptions<MoviesIndex200, TError, TData>
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof moviesIndex>>,
+          MoviesIndex200,
           TError,
-          Awaited<ReturnType<typeof moviesIndex>>
+          MoviesIndex200
         >,
         "initialData"
       >;
@@ -304,7 +304,7 @@ export function useMoviesIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useMoviesIndex<
-  TData = Awaited<ReturnType<typeof moviesIndex>>,
+  TData = MoviesIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -312,13 +312,13 @@ export function useMoviesIndex<
   library: string,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof moviesIndex>>, TError, TData>
+      UseQueryOptions<MoviesIndex200, TError, TData>
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof moviesIndex>>,
+          MoviesIndex200,
           TError,
-          Awaited<ReturnType<typeof moviesIndex>>
+          MoviesIndex200
         >,
         "initialData"
       >;
@@ -329,7 +329,7 @@ export function useMoviesIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useMoviesIndex<
-  TData = Awaited<ReturnType<typeof moviesIndex>>,
+  TData = MoviesIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -337,7 +337,7 @@ export function useMoviesIndex<
   library: string,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof moviesIndex>>, TError, TData>
+      UseQueryOptions<MoviesIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -350,7 +350,7 @@ export function useMoviesIndex<
  */
 
 export function useMoviesIndex<
-  TData = Awaited<ReturnType<typeof moviesIndex>>,
+  TData = MoviesIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -358,7 +358,7 @@ export function useMoviesIndex<
   library: string,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof moviesIndex>>, TError, TData>
+      UseQueryOptions<MoviesIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -379,7 +379,7 @@ export function useMoviesIndex<
 }
 
 export const getMoviesIndexSuspenseQueryOptions = <
-  TData = Awaited<ReturnType<typeof moviesIndex>>,
+  TData = MoviesIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -388,7 +388,7 @@ export const getMoviesIndexSuspenseQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof moviesIndex>>,
+        MoviesIndex200,
         TError,
         TData
       >
@@ -400,26 +400,26 @@ export const getMoviesIndexSuspenseQueryOptions = <
 
   const queryKey = queryOptions?.queryKey ?? getMoviesIndexQueryKey(library);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof moviesIndex>>> = ({
+  const queryFn: QueryFunction<MoviesIndex200> = ({
     signal,
   }) => moviesIndex(library, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
-    Awaited<ReturnType<typeof moviesIndex>>,
+    MoviesIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type MoviesIndexSuspenseQueryResult = NonNullable<
-  Awaited<ReturnType<typeof moviesIndex>>
+  MoviesIndex200
 >;
 export type MoviesIndexSuspenseQueryError = ErrorType<
   AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
 >;
 
 export function useMoviesIndexSuspense<
-  TData = Awaited<ReturnType<typeof moviesIndex>>,
+  TData = MoviesIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -428,7 +428,7 @@ export function useMoviesIndexSuspense<
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof moviesIndex>>,
+        MoviesIndex200,
         TError,
         TData
       >
@@ -440,7 +440,7 @@ export function useMoviesIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useMoviesIndexSuspense<
-  TData = Awaited<ReturnType<typeof moviesIndex>>,
+  TData = MoviesIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -449,7 +449,7 @@ export function useMoviesIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof moviesIndex>>,
+        MoviesIndex200,
         TError,
         TData
       >
@@ -461,7 +461,7 @@ export function useMoviesIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useMoviesIndexSuspense<
-  TData = Awaited<ReturnType<typeof moviesIndex>>,
+  TData = MoviesIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -470,7 +470,7 @@ export function useMoviesIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof moviesIndex>>,
+        MoviesIndex200,
         TError,
         TData
       >
@@ -486,7 +486,7 @@ export function useMoviesIndexSuspense<
  */
 
 export function useMoviesIndexSuspense<
-  TData = Awaited<ReturnType<typeof moviesIndex>>,
+  TData = MoviesIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -495,7 +495,7 @@ export function useMoviesIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof moviesIndex>>,
+        MoviesIndex200,
         TError,
         TData
       >
@@ -521,7 +521,7 @@ export function useMoviesIndexSuspense<
 }
 
 export const getMoviesIndexSuspenseInfiniteQueryOptions = <
-  TData = InfiniteData<Awaited<ReturnType<typeof moviesIndex>>>,
+  TData = InfiniteData<MoviesIndex200>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -530,7 +530,7 @@ export const getMoviesIndexSuspenseInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof moviesIndex>>,
+        MoviesIndex200,
         TError,
         TData
       >
@@ -543,7 +543,7 @@ export const getMoviesIndexSuspenseInfiniteQueryOptions = <
   const queryKey =
     queryOptions?.queryKey ?? getMoviesIndexInfiniteQueryKey(library);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof moviesIndex>>> = ({
+  const queryFn: QueryFunction<MoviesIndex200> = ({
     signal,
   }) => moviesIndex(library, requestOptions, signal);
 
@@ -552,21 +552,21 @@ export const getMoviesIndexSuspenseInfiniteQueryOptions = <
     queryFn,
     ...queryOptions,
   } as UseSuspenseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof moviesIndex>>,
+    MoviesIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type MoviesIndexSuspenseInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof moviesIndex>>
+  MoviesIndex200
 >;
 export type MoviesIndexSuspenseInfiniteQueryError = ErrorType<
   AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
 >;
 
 export function useMoviesIndexSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof moviesIndex>>>,
+  TData = InfiniteData<MoviesIndex200>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -575,7 +575,7 @@ export function useMoviesIndexSuspenseInfinite<
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof moviesIndex>>,
+        MoviesIndex200,
         TError,
         TData
       >
@@ -587,7 +587,7 @@ export function useMoviesIndexSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useMoviesIndexSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof moviesIndex>>>,
+  TData = InfiniteData<MoviesIndex200>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -596,7 +596,7 @@ export function useMoviesIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof moviesIndex>>,
+        MoviesIndex200,
         TError,
         TData
       >
@@ -608,7 +608,7 @@ export function useMoviesIndexSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useMoviesIndexSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof moviesIndex>>>,
+  TData = InfiniteData<MoviesIndex200>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -617,7 +617,7 @@ export function useMoviesIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof moviesIndex>>,
+        MoviesIndex200,
         TError,
         TData
       >
@@ -633,7 +633,7 @@ export function useMoviesIndexSuspenseInfinite<
  */
 
 export function useMoviesIndexSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof moviesIndex>>>,
+  TData = InfiniteData<MoviesIndex200>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -642,7 +642,7 @@ export function useMoviesIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof moviesIndex>>,
+        MoviesIndex200,
         TError,
         TData
       >

@@ -99,12 +99,12 @@ export const getPlaylistIndexQueryKey = () => {
 };
 
 export const getPlaylistIndexInfiniteQueryOptions = <
-  TData = InfiniteData<Awaited<ReturnType<typeof playlistIndex>>>,
+  TData = InfiniteData<PlaylistIndex200>,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(options?: {
   query?: Partial<
     UseInfiniteQueryOptions<
-      Awaited<ReturnType<typeof playlistIndex>>,
+      PlaylistIndex200,
       TError,
       TData
     >
@@ -115,40 +115,40 @@ export const getPlaylistIndexInfiniteQueryOptions = <
 
   const queryKey = queryOptions?.queryKey ?? getPlaylistIndexInfiniteQueryKey();
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof playlistIndex>>> = ({
+  const queryFn: QueryFunction<PlaylistIndex200> = ({
     signal,
   }) => playlistIndex(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof playlistIndex>>,
+    PlaylistIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type PlaylistIndexInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof playlistIndex>>
+  PlaylistIndex200
 >;
 export type PlaylistIndexInfiniteQueryError =
   ErrorType<AuthenticationExceptionResponse>;
 
 export function usePlaylistIndexInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof playlistIndex>>>,
+  TData = InfiniteData<PlaylistIndex200>,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof playlistIndex>>,
+        PlaylistIndex200,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof playlistIndex>>,
+          PlaylistIndex200,
           TError,
-          Awaited<ReturnType<typeof playlistIndex>>
+          PlaylistIndex200
         >,
         "initialData"
       >;
@@ -159,22 +159,22 @@ export function usePlaylistIndexInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function usePlaylistIndexInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof playlistIndex>>>,
+  TData = InfiniteData<PlaylistIndex200>,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof playlistIndex>>,
+        PlaylistIndex200,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof playlistIndex>>,
+          PlaylistIndex200,
           TError,
-          Awaited<ReturnType<typeof playlistIndex>>
+          PlaylistIndex200
         >,
         "initialData"
       >;
@@ -185,13 +185,13 @@ export function usePlaylistIndexInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function usePlaylistIndexInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof playlistIndex>>>,
+  TData = InfiniteData<PlaylistIndex200>,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof playlistIndex>>,
+        PlaylistIndex200,
         TError,
         TData
       >
@@ -207,13 +207,13 @@ export function usePlaylistIndexInfinite<
  */
 
 export function usePlaylistIndexInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof playlistIndex>>>,
+  TData = InfiniteData<PlaylistIndex200>,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof playlistIndex>>,
+        PlaylistIndex200,
         TError,
         TData
       >
@@ -239,11 +239,11 @@ export function usePlaylistIndexInfinite<
 }
 
 export const getPlaylistIndexQueryOptions = <
-  TData = Awaited<ReturnType<typeof playlistIndex>>,
+  TData = PlaylistIndex200,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(options?: {
   query?: Partial<
-    UseQueryOptions<Awaited<ReturnType<typeof playlistIndex>>, TError, TData>
+    UseQueryOptions<PlaylistIndex200, TError, TData>
   >;
   request?: SecondParameter<typeof customInstance>;
 }) => {
@@ -251,36 +251,36 @@ export const getPlaylistIndexQueryOptions = <
 
   const queryKey = queryOptions?.queryKey ?? getPlaylistIndexQueryKey();
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof playlistIndex>>> = ({
+  const queryFn: QueryFunction<PlaylistIndex200> = ({
     signal,
   }) => playlistIndex(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof playlistIndex>>,
+    PlaylistIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type PlaylistIndexQueryResult = NonNullable<
-  Awaited<ReturnType<typeof playlistIndex>>
+  PlaylistIndex200
 >;
 export type PlaylistIndexQueryError =
   ErrorType<AuthenticationExceptionResponse>;
 
 export function usePlaylistIndex<
-  TData = Awaited<ReturnType<typeof playlistIndex>>,
+  TData = PlaylistIndex200,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options: {
     query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof playlistIndex>>, TError, TData>
+      UseQueryOptions<PlaylistIndex200, TError, TData>
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof playlistIndex>>,
+          PlaylistIndex200,
           TError,
-          Awaited<ReturnType<typeof playlistIndex>>
+          PlaylistIndex200
         >,
         "initialData"
       >;
@@ -291,18 +291,18 @@ export function usePlaylistIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function usePlaylistIndex<
-  TData = Awaited<ReturnType<typeof playlistIndex>>,
+  TData = PlaylistIndex200,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof playlistIndex>>, TError, TData>
+      UseQueryOptions<PlaylistIndex200, TError, TData>
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof playlistIndex>>,
+          PlaylistIndex200,
           TError,
-          Awaited<ReturnType<typeof playlistIndex>>
+          PlaylistIndex200
         >,
         "initialData"
       >;
@@ -313,12 +313,12 @@ export function usePlaylistIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function usePlaylistIndex<
-  TData = Awaited<ReturnType<typeof playlistIndex>>,
+  TData = PlaylistIndex200,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof playlistIndex>>, TError, TData>
+      UseQueryOptions<PlaylistIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -331,12 +331,12 @@ export function usePlaylistIndex<
  */
 
 export function usePlaylistIndex<
-  TData = Awaited<ReturnType<typeof playlistIndex>>,
+  TData = PlaylistIndex200,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof playlistIndex>>, TError, TData>
+      UseQueryOptions<PlaylistIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -357,12 +357,12 @@ export function usePlaylistIndex<
 }
 
 export const getPlaylistIndexSuspenseQueryOptions = <
-  TData = Awaited<ReturnType<typeof playlistIndex>>,
+  TData = PlaylistIndex200,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(options?: {
   query?: Partial<
     UseSuspenseQueryOptions<
-      Awaited<ReturnType<typeof playlistIndex>>,
+      PlaylistIndex200,
       TError,
       TData
     >
@@ -373,31 +373,31 @@ export const getPlaylistIndexSuspenseQueryOptions = <
 
   const queryKey = queryOptions?.queryKey ?? getPlaylistIndexQueryKey();
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof playlistIndex>>> = ({
+  const queryFn: QueryFunction<PlaylistIndex200> = ({
     signal,
   }) => playlistIndex(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
-    Awaited<ReturnType<typeof playlistIndex>>,
+    PlaylistIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type PlaylistIndexSuspenseQueryResult = NonNullable<
-  Awaited<ReturnType<typeof playlistIndex>>
+  PlaylistIndex200
 >;
 export type PlaylistIndexSuspenseQueryError =
   ErrorType<AuthenticationExceptionResponse>;
 
 export function usePlaylistIndexSuspense<
-  TData = Awaited<ReturnType<typeof playlistIndex>>,
+  TData = PlaylistIndex200,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof playlistIndex>>,
+        PlaylistIndex200,
         TError,
         TData
       >
@@ -409,13 +409,13 @@ export function usePlaylistIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function usePlaylistIndexSuspense<
-  TData = Awaited<ReturnType<typeof playlistIndex>>,
+  TData = PlaylistIndex200,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof playlistIndex>>,
+        PlaylistIndex200,
         TError,
         TData
       >
@@ -427,13 +427,13 @@ export function usePlaylistIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function usePlaylistIndexSuspense<
-  TData = Awaited<ReturnType<typeof playlistIndex>>,
+  TData = PlaylistIndex200,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof playlistIndex>>,
+        PlaylistIndex200,
         TError,
         TData
       >
@@ -449,13 +449,13 @@ export function usePlaylistIndexSuspense<
  */
 
 export function usePlaylistIndexSuspense<
-  TData = Awaited<ReturnType<typeof playlistIndex>>,
+  TData = PlaylistIndex200,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof playlistIndex>>,
+        PlaylistIndex200,
         TError,
         TData
       >
@@ -481,12 +481,12 @@ export function usePlaylistIndexSuspense<
 }
 
 export const getPlaylistIndexSuspenseInfiniteQueryOptions = <
-  TData = InfiniteData<Awaited<ReturnType<typeof playlistIndex>>>,
+  TData = InfiniteData<PlaylistIndex200>,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(options?: {
   query?: Partial<
     UseSuspenseInfiniteQueryOptions<
-      Awaited<ReturnType<typeof playlistIndex>>,
+      PlaylistIndex200,
       TError,
       TData
     >
@@ -497,7 +497,7 @@ export const getPlaylistIndexSuspenseInfiniteQueryOptions = <
 
   const queryKey = queryOptions?.queryKey ?? getPlaylistIndexInfiniteQueryKey();
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof playlistIndex>>> = ({
+  const queryFn: QueryFunction<PlaylistIndex200> = ({
     signal,
   }) => playlistIndex(requestOptions, signal);
 
@@ -506,26 +506,26 @@ export const getPlaylistIndexSuspenseInfiniteQueryOptions = <
     queryFn,
     ...queryOptions,
   } as UseSuspenseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof playlistIndex>>,
+    PlaylistIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type PlaylistIndexSuspenseInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof playlistIndex>>
+  PlaylistIndex200
 >;
 export type PlaylistIndexSuspenseInfiniteQueryError =
   ErrorType<AuthenticationExceptionResponse>;
 
 export function usePlaylistIndexSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof playlistIndex>>>,
+  TData = InfiniteData<PlaylistIndex200>,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof playlistIndex>>,
+        PlaylistIndex200,
         TError,
         TData
       >
@@ -537,13 +537,13 @@ export function usePlaylistIndexSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function usePlaylistIndexSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof playlistIndex>>>,
+  TData = InfiniteData<PlaylistIndex200>,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof playlistIndex>>,
+        PlaylistIndex200,
         TError,
         TData
       >
@@ -555,13 +555,13 @@ export function usePlaylistIndexSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function usePlaylistIndexSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof playlistIndex>>>,
+  TData = InfiniteData<PlaylistIndex200>,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof playlistIndex>>,
+        PlaylistIndex200,
         TError,
         TData
       >
@@ -577,13 +577,13 @@ export function usePlaylistIndexSuspenseInfinite<
  */
 
 export function usePlaylistIndexSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof playlistIndex>>>,
+  TData = InfiniteData<PlaylistIndex200>,
   TError = ErrorType<AuthenticationExceptionResponse>
 >(
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof playlistIndex>>,
+        PlaylistIndex200,
         TError,
         TData
       >

@@ -122,14 +122,14 @@ export const getAuthLoginMutationOptions = <
   TContext = unknown
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof authLogin>>,
+    AuthLogin200,
     TError,
     { data: BodyType<LoginRequest> },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof authLogin>>,
+  AuthLogin200,
   TError,
   { data: BodyType<LoginRequest> },
   TContext
@@ -144,7 +144,7 @@ export const getAuthLoginMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof authLogin>>,
+    AuthLogin200,
     { data: BodyType<LoginRequest> }
   > = (props) => {
     const { data } = props ?? {};
@@ -156,7 +156,7 @@ export const getAuthLoginMutationOptions = <
 };
 
 export type AuthLoginMutationResult = NonNullable<
-  Awaited<ReturnType<typeof authLogin>>
+  AuthLogin200
 >;
 export type AuthLoginMutationBody = BodyType<LoginRequest>;
 export type AuthLoginMutationError = ErrorType<ValidationExceptionResponse>;
@@ -170,7 +170,7 @@ export const useAuthLogin = <
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof authLogin>>,
+      AuthLogin200,
       TError,
       { data: BodyType<LoginRequest> },
       TContext
@@ -179,7 +179,7 @@ export const useAuthLogin = <
   },
   queryClient?: QueryClient
 ): UseMutationResult<
-  Awaited<ReturnType<typeof authLogin>>,
+  AuthLogin200,
   TError,
   { data: BodyType<LoginRequest> },
   TContext

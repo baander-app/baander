@@ -66,12 +66,12 @@ export const getHorizonQueuesMetricsIndexQueryKey = () => {
 };
 
 export const getHorizonQueuesMetricsIndexInfiniteQueryOptions = <
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>>,
+  TData = InfiniteData<HorizonQueuesMetricsShow200>,
   TError = ErrorType<unknown>
 >(options?: {
   query?: Partial<
     UseInfiniteQueryOptions<
-      Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+      HorizonQueuesMetricsShow200,
       TError,
       TData
     >
@@ -84,38 +84,38 @@ export const getHorizonQueuesMetricsIndexInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getHorizonQueuesMetricsIndexInfiniteQueryKey();
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>
+    HorizonQueuesMetricsShow200
   > = ({ signal }) => horizonQueuesMetricsIndex(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+    HorizonQueuesMetricsShow200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type HorizonQueuesMetricsIndexInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>
+  HorizonQueuesMetricsShow200
 >;
 export type HorizonQueuesMetricsIndexInfiniteQueryError = ErrorType<unknown>;
 
 export function useHorizonQueuesMetricsIndexInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>>,
+  TData = InfiniteData<HorizonQueuesMetricsShow200>,
   TError = ErrorType<unknown>
 >(
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+        HorizonQueuesMetricsShow200,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+          HorizonQueuesMetricsShow200,
           TError,
-          Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>
+          HorizonQueuesMetricsShow200
         >,
         "initialData"
       >;
@@ -126,22 +126,22 @@ export function useHorizonQueuesMetricsIndexInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonQueuesMetricsIndexInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>>,
+  TData = InfiniteData<HorizonQueuesMetricsShow200>,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+        HorizonQueuesMetricsShow200,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+          HorizonQueuesMetricsShow200,
           TError,
-          Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>
+          HorizonQueuesMetricsShow200
         >,
         "initialData"
       >;
@@ -152,13 +152,13 @@ export function useHorizonQueuesMetricsIndexInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonQueuesMetricsIndexInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>>,
+  TData = InfiniteData<HorizonQueuesMetricsShow200>,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+        HorizonQueuesMetricsShow200,
         TError,
         TData
       >
@@ -174,13 +174,13 @@ export function useHorizonQueuesMetricsIndexInfinite<
  */
 
 export function useHorizonQueuesMetricsIndexInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>>,
+  TData = InfiniteData<HorizonQueuesMetricsShow200>,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+        HorizonQueuesMetricsShow200,
         TError,
         TData
       >
@@ -207,12 +207,12 @@ export function useHorizonQueuesMetricsIndexInfinite<
 }
 
 export const getHorizonQueuesMetricsIndexQueryOptions = <
-  TData = Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+  TData = HorizonQueuesMetricsShow200,
   TError = ErrorType<unknown>
 >(options?: {
   query?: Partial<
     UseQueryOptions<
-      Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+      HorizonQueuesMetricsShow200,
       TError,
       TData
     >
@@ -225,38 +225,38 @@ export const getHorizonQueuesMetricsIndexQueryOptions = <
     queryOptions?.queryKey ?? getHorizonQueuesMetricsIndexQueryKey();
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>
+    HorizonQueuesMetricsShow200
   > = ({ signal }) => horizonQueuesMetricsIndex(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+    HorizonQueuesMetricsShow200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type HorizonQueuesMetricsIndexQueryResult = NonNullable<
-  Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>
+  HorizonQueuesMetricsShow200
 >;
 export type HorizonQueuesMetricsIndexQueryError = ErrorType<unknown>;
 
 export function useHorizonQueuesMetricsIndex<
-  TData = Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+  TData = HorizonQueuesMetricsShow200,
   TError = ErrorType<unknown>
 >(
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+        HorizonQueuesMetricsShow200,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+          HorizonQueuesMetricsShow200,
           TError,
-          Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>
+          HorizonQueuesMetricsShow200
         >,
         "initialData"
       >;
@@ -267,22 +267,22 @@ export function useHorizonQueuesMetricsIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonQueuesMetricsIndex<
-  TData = Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+  TData = HorizonQueuesMetricsShow200,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+        HorizonQueuesMetricsShow200,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+          HorizonQueuesMetricsShow200,
           TError,
-          Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>
+          HorizonQueuesMetricsShow200
         >,
         "initialData"
       >;
@@ -293,13 +293,13 @@ export function useHorizonQueuesMetricsIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonQueuesMetricsIndex<
-  TData = Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+  TData = HorizonQueuesMetricsShow200,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+        HorizonQueuesMetricsShow200,
         TError,
         TData
       >
@@ -315,13 +315,13 @@ export function useHorizonQueuesMetricsIndex<
  */
 
 export function useHorizonQueuesMetricsIndex<
-  TData = Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+  TData = HorizonQueuesMetricsShow200,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+        HorizonQueuesMetricsShow200,
         TError,
         TData
       >
@@ -345,12 +345,12 @@ export function useHorizonQueuesMetricsIndex<
 }
 
 export const getHorizonQueuesMetricsIndexSuspenseQueryOptions = <
-  TData = Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+  TData = HorizonQueuesMetricsShow200,
   TError = ErrorType<unknown>
 >(options?: {
   query?: Partial<
     UseSuspenseQueryOptions<
-      Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+      HorizonQueuesMetricsShow200,
       TError,
       TData
     >
@@ -363,29 +363,29 @@ export const getHorizonQueuesMetricsIndexSuspenseQueryOptions = <
     queryOptions?.queryKey ?? getHorizonQueuesMetricsIndexQueryKey();
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>
+    HorizonQueuesMetricsShow200
   > = ({ signal }) => horizonQueuesMetricsIndex(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
-    Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+    HorizonQueuesMetricsShow200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type HorizonQueuesMetricsIndexSuspenseQueryResult = NonNullable<
-  Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>
+  HorizonQueuesMetricsShow200
 >;
 export type HorizonQueuesMetricsIndexSuspenseQueryError = ErrorType<unknown>;
 
 export function useHorizonQueuesMetricsIndexSuspense<
-  TData = Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+  TData = HorizonQueuesMetricsShow200,
   TError = ErrorType<unknown>
 >(
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+        HorizonQueuesMetricsShow200,
         TError,
         TData
       >
@@ -397,13 +397,13 @@ export function useHorizonQueuesMetricsIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonQueuesMetricsIndexSuspense<
-  TData = Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+  TData = HorizonQueuesMetricsShow200,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+        HorizonQueuesMetricsShow200,
         TError,
         TData
       >
@@ -415,13 +415,13 @@ export function useHorizonQueuesMetricsIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonQueuesMetricsIndexSuspense<
-  TData = Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+  TData = HorizonQueuesMetricsShow200,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+        HorizonQueuesMetricsShow200,
         TError,
         TData
       >
@@ -437,13 +437,13 @@ export function useHorizonQueuesMetricsIndexSuspense<
  */
 
 export function useHorizonQueuesMetricsIndexSuspense<
-  TData = Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+  TData = HorizonQueuesMetricsShow200,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+        HorizonQueuesMetricsShow200,
         TError,
         TData
       >
@@ -470,12 +470,12 @@ export function useHorizonQueuesMetricsIndexSuspense<
 }
 
 export const getHorizonQueuesMetricsIndexSuspenseInfiniteQueryOptions = <
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>>,
+  TData = InfiniteData<HorizonQueuesMetricsShow200>,
   TError = ErrorType<unknown>
 >(options?: {
   query?: Partial<
     UseSuspenseInfiniteQueryOptions<
-      Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+      HorizonQueuesMetricsShow200,
       TError,
       TData
     >
@@ -488,7 +488,7 @@ export const getHorizonQueuesMetricsIndexSuspenseInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getHorizonQueuesMetricsIndexInfiniteQueryKey();
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>
+    HorizonQueuesMetricsShow200
   > = ({ signal }) => horizonQueuesMetricsIndex(requestOptions, signal);
 
   return {
@@ -496,26 +496,26 @@ export const getHorizonQueuesMetricsIndexSuspenseInfiniteQueryOptions = <
     queryFn,
     ...queryOptions,
   } as UseSuspenseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+    HorizonQueuesMetricsShow200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type HorizonQueuesMetricsIndexSuspenseInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>
+  HorizonQueuesMetricsShow200
 >;
 export type HorizonQueuesMetricsIndexSuspenseInfiniteQueryError =
   ErrorType<unknown>;
 
 export function useHorizonQueuesMetricsIndexSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>>,
+  TData = InfiniteData<HorizonQueuesMetricsShow200>,
   TError = ErrorType<unknown>
 >(
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+        HorizonQueuesMetricsShow200,
         TError,
         TData
       >
@@ -527,13 +527,13 @@ export function useHorizonQueuesMetricsIndexSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonQueuesMetricsIndexSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>>,
+  TData = InfiniteData<HorizonQueuesMetricsShow200>,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+        HorizonQueuesMetricsShow200,
         TError,
         TData
       >
@@ -545,13 +545,13 @@ export function useHorizonQueuesMetricsIndexSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonQueuesMetricsIndexSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>>,
+  TData = InfiniteData<HorizonQueuesMetricsShow200>,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+        HorizonQueuesMetricsShow200,
         TError,
         TData
       >
@@ -567,13 +567,13 @@ export function useHorizonQueuesMetricsIndexSuspenseInfinite<
  */
 
 export function useHorizonQueuesMetricsIndexSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>>,
+  TData = InfiniteData<HorizonQueuesMetricsShow200>,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonQueuesMetricsIndex>>,
+        HorizonQueuesMetricsShow200,
         TError,
         TData
       >

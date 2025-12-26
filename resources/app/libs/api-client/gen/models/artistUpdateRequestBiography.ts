@@ -12,4 +12,7 @@ The media information is organized and easily searchable, ensuring users can alw
  * OpenAPI spec version: 0.0.1
  */
 
+/**
+ * @maxLength 4000
+ */
 export type ArtistUpdateRequestBiography = string | null;

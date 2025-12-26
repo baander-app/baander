@@ -26,7 +26,9 @@ export interface UseFormEditorReturn<T extends Record<string, unknown>> {
 
 /**
  * Hook for form editors with Precognition validation and field locking
- * Combines form state, lock management, and submission handling
+ *
+ * With Precognition configured to validate-only (determineSuccessUsing(() => false)),
+ * this hook validates the form and then calls onSubmit for actual submission via React Query.
  *
  * @example
  * ```tsx
@@ -34,15 +36,12 @@ export interface UseFormEditorReturn<T extends Record<string, unknown>> {
  *   = useFormEditor({
  *     method: 'put',
  *     url: `/api/libraries/${librarySlug}/albums/${album?.publicId}`,
- *     initialData: {
- *       title: album?.title || '',
- *       type: album?.type || '',
- *       // ... other fields
- *     },
+ *     initialData: { title: album?.title || '', ... },
  *     initialLockedFields: album?.lockedFields,
  *     onSubmit: async (data) => {
- *       await updateAlbum(data);
- *       onClose();
+ *       // This will be called AFTER validation passes
+ *       // Use React Query mutation here
+ *       await updateAlbum.mutateAsync(data);
  *     },
  *   });
  * ```
@@ -61,17 +60,21 @@ export function useFormEditor<T extends Record<string, unknown>>({
   // Initialize Precognition form
   const form = useForm<T>(method, url, initialData);
 
-  // Submit handler that includes locked fields
+  // Submit handler that validates via Precognition, then calls onSubmit callback
   const submit = async () => {
+    // Trigger Precognition validation (won't actually submit due to determineSuccessUsing)
     await form.submit();
 
-    if (onSubmit) {
-      const data = { ...form.data } as T;
-      const dataWithLocks = {
-        ...data,
-        lockedFields: Array.from(lockedFields) as string[],
-      };
-      await onSubmit(dataWithLocks);
+    // Check if validation passed (no errors)
+    if (!form.hasErrors) {
+      if (onSubmit) {
+        const data = { ...form.data } as T;
+        const dataWithLocks = {
+          ...data,
+          lockedFields: Array.from(lockedFields) as string[],
+        };
+        await onSubmit(dataWithLocks);
+      }
     }
   };
 

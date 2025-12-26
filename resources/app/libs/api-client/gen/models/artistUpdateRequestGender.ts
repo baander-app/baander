@@ -12,7 +12,10 @@ The media information is organized and easily searchable, ensuring users can alw
  * OpenAPI spec version: 0.0.1
  */
 
-/**
- * @maxLength 255
- */
-export type ArtistUpdateRequestDisambiguation = string | null;
+export type ArtistUpdateRequestGender =
+  | "male"
+  | "female"
+  | "non_binary"
+  | "other"
+  | "unknown"
+  | null;

@@ -79,7 +79,7 @@ export const getHorizonPendingJobsIndexQueryKey = (
 
 export const getHorizonPendingJobsIndexInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+    HorizonPendingJobsIndex200,
     HorizonPendingJobsIndexParams["page"]
   >,
   TError = ErrorType<unknown>
@@ -88,7 +88,7 @@ export const getHorizonPendingJobsIndexInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+        HorizonPendingJobsIndex200,
         TError,
         TData,
         QueryKey,
@@ -105,7 +105,7 @@ export const getHorizonPendingJobsIndexInfiniteQueryOptions = <
     getHorizonPendingJobsIndexInfiniteQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+    HorizonPendingJobsIndex200,
     QueryKey,
     HorizonPendingJobsIndexParams["page"]
   > = ({ signal, pageParam }) =>
@@ -116,7 +116,7 @@ export const getHorizonPendingJobsIndexInfiniteQueryOptions = <
     );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+    HorizonPendingJobsIndex200,
     TError,
     TData,
     QueryKey,
@@ -125,13 +125,13 @@ export const getHorizonPendingJobsIndexInfiniteQueryOptions = <
 };
 
 export type HorizonPendingJobsIndexInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof horizonPendingJobsIndex>>
+  HorizonPendingJobsIndex200
 >;
 export type HorizonPendingJobsIndexInfiniteQueryError = ErrorType<unknown>;
 
 export function useHorizonPendingJobsIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+    HorizonPendingJobsIndex200,
     HorizonPendingJobsIndexParams["page"]
   >,
   TError = ErrorType<unknown>
@@ -140,7 +140,7 @@ export function useHorizonPendingJobsIndexInfinite<
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+        HorizonPendingJobsIndex200,
         TError,
         TData,
         QueryKey,
@@ -149,9 +149,9 @@ export function useHorizonPendingJobsIndexInfinite<
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+          HorizonPendingJobsIndex200,
           TError,
-          Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+          HorizonPendingJobsIndex200,
           QueryKey
         >,
         "initialData"
@@ -164,7 +164,7 @@ export function useHorizonPendingJobsIndexInfinite<
 };
 export function useHorizonPendingJobsIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+    HorizonPendingJobsIndex200,
     HorizonPendingJobsIndexParams["page"]
   >,
   TError = ErrorType<unknown>
@@ -173,7 +173,7 @@ export function useHorizonPendingJobsIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+        HorizonPendingJobsIndex200,
         TError,
         TData,
         QueryKey,
@@ -182,9 +182,9 @@ export function useHorizonPendingJobsIndexInfinite<
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+          HorizonPendingJobsIndex200,
           TError,
-          Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+          HorizonPendingJobsIndex200,
           QueryKey
         >,
         "initialData"
@@ -197,7 +197,7 @@ export function useHorizonPendingJobsIndexInfinite<
 };
 export function useHorizonPendingJobsIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+    HorizonPendingJobsIndex200,
     HorizonPendingJobsIndexParams["page"]
   >,
   TError = ErrorType<unknown>
@@ -206,7 +206,7 @@ export function useHorizonPendingJobsIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+        HorizonPendingJobsIndex200,
         TError,
         TData,
         QueryKey,
@@ -225,7 +225,7 @@ export function useHorizonPendingJobsIndexInfinite<
 
 export function useHorizonPendingJobsIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+    HorizonPendingJobsIndex200,
     HorizonPendingJobsIndexParams["page"]
   >,
   TError = ErrorType<unknown>
@@ -234,7 +234,7 @@ export function useHorizonPendingJobsIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+        HorizonPendingJobsIndex200,
         TError,
         TData,
         QueryKey,
@@ -265,14 +265,14 @@ export function useHorizonPendingJobsIndexInfinite<
 }
 
 export const getHorizonPendingJobsIndexQueryOptions = <
-  TData = Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+  TData = HorizonPendingJobsIndex200,
   TError = ErrorType<unknown>
 >(
   params?: HorizonPendingJobsIndexParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+        HorizonPendingJobsIndex200,
         TError,
         TData
       >
@@ -286,39 +286,39 @@ export const getHorizonPendingJobsIndexQueryOptions = <
     queryOptions?.queryKey ?? getHorizonPendingJobsIndexQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof horizonPendingJobsIndex>>
+    HorizonPendingJobsIndex200
   > = ({ signal }) => horizonPendingJobsIndex(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+    HorizonPendingJobsIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type HorizonPendingJobsIndexQueryResult = NonNullable<
-  Awaited<ReturnType<typeof horizonPendingJobsIndex>>
+  HorizonPendingJobsIndex200
 >;
 export type HorizonPendingJobsIndexQueryError = ErrorType<unknown>;
 
 export function useHorizonPendingJobsIndex<
-  TData = Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+  TData = HorizonPendingJobsIndex200,
   TError = ErrorType<unknown>
 >(
   params: undefined | HorizonPendingJobsIndexParams,
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+        HorizonPendingJobsIndex200,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+          HorizonPendingJobsIndex200,
           TError,
-          Awaited<ReturnType<typeof horizonPendingJobsIndex>>
+          HorizonPendingJobsIndex200
         >,
         "initialData"
       >;
@@ -329,23 +329,23 @@ export function useHorizonPendingJobsIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonPendingJobsIndex<
-  TData = Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+  TData = HorizonPendingJobsIndex200,
   TError = ErrorType<unknown>
 >(
   params?: HorizonPendingJobsIndexParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+        HorizonPendingJobsIndex200,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+          HorizonPendingJobsIndex200,
           TError,
-          Awaited<ReturnType<typeof horizonPendingJobsIndex>>
+          HorizonPendingJobsIndex200
         >,
         "initialData"
       >;
@@ -356,14 +356,14 @@ export function useHorizonPendingJobsIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonPendingJobsIndex<
-  TData = Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+  TData = HorizonPendingJobsIndex200,
   TError = ErrorType<unknown>
 >(
   params?: HorizonPendingJobsIndexParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+        HorizonPendingJobsIndex200,
         TError,
         TData
       >
@@ -379,14 +379,14 @@ export function useHorizonPendingJobsIndex<
  */
 
 export function useHorizonPendingJobsIndex<
-  TData = Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+  TData = HorizonPendingJobsIndex200,
   TError = ErrorType<unknown>
 >(
   params?: HorizonPendingJobsIndexParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+        HorizonPendingJobsIndex200,
         TError,
         TData
       >
@@ -410,14 +410,14 @@ export function useHorizonPendingJobsIndex<
 }
 
 export const getHorizonPendingJobsIndexSuspenseQueryOptions = <
-  TData = Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+  TData = HorizonPendingJobsIndex200,
   TError = ErrorType<unknown>
 >(
   params?: HorizonPendingJobsIndexParams,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+        HorizonPendingJobsIndex200,
         TError,
         TData
       >
@@ -431,30 +431,30 @@ export const getHorizonPendingJobsIndexSuspenseQueryOptions = <
     queryOptions?.queryKey ?? getHorizonPendingJobsIndexQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof horizonPendingJobsIndex>>
+    HorizonPendingJobsIndex200
   > = ({ signal }) => horizonPendingJobsIndex(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
-    Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+    HorizonPendingJobsIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type HorizonPendingJobsIndexSuspenseQueryResult = NonNullable<
-  Awaited<ReturnType<typeof horizonPendingJobsIndex>>
+  HorizonPendingJobsIndex200
 >;
 export type HorizonPendingJobsIndexSuspenseQueryError = ErrorType<unknown>;
 
 export function useHorizonPendingJobsIndexSuspense<
-  TData = Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+  TData = HorizonPendingJobsIndex200,
   TError = ErrorType<unknown>
 >(
   params: undefined | HorizonPendingJobsIndexParams,
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+        HorizonPendingJobsIndex200,
         TError,
         TData
       >
@@ -466,14 +466,14 @@ export function useHorizonPendingJobsIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonPendingJobsIndexSuspense<
-  TData = Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+  TData = HorizonPendingJobsIndex200,
   TError = ErrorType<unknown>
 >(
   params?: HorizonPendingJobsIndexParams,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+        HorizonPendingJobsIndex200,
         TError,
         TData
       >
@@ -485,14 +485,14 @@ export function useHorizonPendingJobsIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonPendingJobsIndexSuspense<
-  TData = Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+  TData = HorizonPendingJobsIndex200,
   TError = ErrorType<unknown>
 >(
   params?: HorizonPendingJobsIndexParams,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+        HorizonPendingJobsIndex200,
         TError,
         TData
       >
@@ -508,14 +508,14 @@ export function useHorizonPendingJobsIndexSuspense<
  */
 
 export function useHorizonPendingJobsIndexSuspense<
-  TData = Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+  TData = HorizonPendingJobsIndex200,
   TError = ErrorType<unknown>
 >(
   params?: HorizonPendingJobsIndexParams,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+        HorizonPendingJobsIndex200,
         TError,
         TData
       >
@@ -545,7 +545,7 @@ export function useHorizonPendingJobsIndexSuspense<
 
 export const getHorizonPendingJobsIndexSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+    HorizonPendingJobsIndex200,
     HorizonPendingJobsIndexParams["page"]
   >,
   TError = ErrorType<unknown>
@@ -554,7 +554,7 @@ export const getHorizonPendingJobsIndexSuspenseInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+        HorizonPendingJobsIndex200,
         TError,
         TData,
         QueryKey,
@@ -571,7 +571,7 @@ export const getHorizonPendingJobsIndexSuspenseInfiniteQueryOptions = <
     getHorizonPendingJobsIndexInfiniteQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+    HorizonPendingJobsIndex200,
     QueryKey,
     HorizonPendingJobsIndexParams["page"]
   > = ({ signal, pageParam }) =>
@@ -586,7 +586,7 @@ export const getHorizonPendingJobsIndexSuspenseInfiniteQueryOptions = <
     queryFn,
     ...queryOptions,
   } as UseSuspenseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+    HorizonPendingJobsIndex200,
     TError,
     TData,
     QueryKey,
@@ -595,14 +595,14 @@ export const getHorizonPendingJobsIndexSuspenseInfiniteQueryOptions = <
 };
 
 export type HorizonPendingJobsIndexSuspenseInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof horizonPendingJobsIndex>>
+  HorizonPendingJobsIndex200
 >;
 export type HorizonPendingJobsIndexSuspenseInfiniteQueryError =
   ErrorType<unknown>;
 
 export function useHorizonPendingJobsIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+    HorizonPendingJobsIndex200,
     HorizonPendingJobsIndexParams["page"]
   >,
   TError = ErrorType<unknown>
@@ -611,7 +611,7 @@ export function useHorizonPendingJobsIndexSuspenseInfinite<
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+        HorizonPendingJobsIndex200,
         TError,
         TData,
         QueryKey,
@@ -626,7 +626,7 @@ export function useHorizonPendingJobsIndexSuspenseInfinite<
 };
 export function useHorizonPendingJobsIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+    HorizonPendingJobsIndex200,
     HorizonPendingJobsIndexParams["page"]
   >,
   TError = ErrorType<unknown>
@@ -635,7 +635,7 @@ export function useHorizonPendingJobsIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+        HorizonPendingJobsIndex200,
         TError,
         TData,
         QueryKey,
@@ -650,7 +650,7 @@ export function useHorizonPendingJobsIndexSuspenseInfinite<
 };
 export function useHorizonPendingJobsIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+    HorizonPendingJobsIndex200,
     HorizonPendingJobsIndexParams["page"]
   >,
   TError = ErrorType<unknown>
@@ -659,7 +659,7 @@ export function useHorizonPendingJobsIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+        HorizonPendingJobsIndex200,
         TError,
         TData,
         QueryKey,
@@ -678,7 +678,7 @@ export function useHorizonPendingJobsIndexSuspenseInfinite<
 
 export function useHorizonPendingJobsIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+    HorizonPendingJobsIndex200,
     HorizonPendingJobsIndexParams["page"]
   >,
   TError = ErrorType<unknown>
@@ -687,7 +687,7 @@ export function useHorizonPendingJobsIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonPendingJobsIndex>>,
+        HorizonPendingJobsIndex200,
         TError,
         TData,
         QueryKey,

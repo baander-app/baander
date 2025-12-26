@@ -85,7 +85,7 @@ export const getUsersIndexQueryKey = (params?: UsersIndexParams) => {
 
 export const getUsersIndexInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof usersIndex>>,
+    UsersIndex200,
     UsersIndexParams["page"]
   >,
   TError = ErrorType<
@@ -96,7 +96,7 @@ export const getUsersIndexInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof usersIndex>>,
+        UsersIndex200,
         TError,
         TData,
         QueryKey,
@@ -112,7 +112,7 @@ export const getUsersIndexInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getUsersIndexInfiniteQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof usersIndex>>,
+    UsersIndex200,
     QueryKey,
     UsersIndexParams["page"]
   > = ({ signal, pageParam }) =>
@@ -123,7 +123,7 @@ export const getUsersIndexInfiniteQueryOptions = <
     );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof usersIndex>>,
+    UsersIndex200,
     TError,
     TData,
     QueryKey,
@@ -132,7 +132,7 @@ export const getUsersIndexInfiniteQueryOptions = <
 };
 
 export type UsersIndexInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof usersIndex>>
+  UsersIndex200
 >;
 export type UsersIndexInfiniteQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -140,7 +140,7 @@ export type UsersIndexInfiniteQueryError = ErrorType<
 
 export function useUsersIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof usersIndex>>,
+    UsersIndex200,
     UsersIndexParams["page"]
   >,
   TError = ErrorType<
@@ -151,7 +151,7 @@ export function useUsersIndexInfinite<
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof usersIndex>>,
+        UsersIndex200,
         TError,
         TData,
         QueryKey,
@@ -160,9 +160,9 @@ export function useUsersIndexInfinite<
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof usersIndex>>,
+          UsersIndex200,
           TError,
-          Awaited<ReturnType<typeof usersIndex>>,
+          UsersIndex200,
           QueryKey
         >,
         "initialData"
@@ -175,7 +175,7 @@ export function useUsersIndexInfinite<
 };
 export function useUsersIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof usersIndex>>,
+    UsersIndex200,
     UsersIndexParams["page"]
   >,
   TError = ErrorType<
@@ -186,7 +186,7 @@ export function useUsersIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof usersIndex>>,
+        UsersIndex200,
         TError,
         TData,
         QueryKey,
@@ -195,9 +195,9 @@ export function useUsersIndexInfinite<
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof usersIndex>>,
+          UsersIndex200,
           TError,
-          Awaited<ReturnType<typeof usersIndex>>,
+          UsersIndex200,
           QueryKey
         >,
         "initialData"
@@ -210,7 +210,7 @@ export function useUsersIndexInfinite<
 };
 export function useUsersIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof usersIndex>>,
+    UsersIndex200,
     UsersIndexParams["page"]
   >,
   TError = ErrorType<
@@ -221,7 +221,7 @@ export function useUsersIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof usersIndex>>,
+        UsersIndex200,
         TError,
         TData,
         QueryKey,
@@ -240,7 +240,7 @@ export function useUsersIndexInfinite<
 
 export function useUsersIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof usersIndex>>,
+    UsersIndex200,
     UsersIndexParams["page"]
   >,
   TError = ErrorType<
@@ -251,7 +251,7 @@ export function useUsersIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof usersIndex>>,
+        UsersIndex200,
         TError,
         TData,
         QueryKey,
@@ -279,7 +279,7 @@ export function useUsersIndexInfinite<
 }
 
 export const getUsersIndexQueryOptions = <
-  TData = Awaited<ReturnType<typeof usersIndex>>,
+  TData = UsersIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -287,7 +287,7 @@ export const getUsersIndexQueryOptions = <
   params?: UsersIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof usersIndex>>, TError, TData>
+      UseQueryOptions<UsersIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   }
@@ -296,26 +296,26 @@ export const getUsersIndexQueryOptions = <
 
   const queryKey = queryOptions?.queryKey ?? getUsersIndexQueryKey(params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof usersIndex>>> = ({
+  const queryFn: QueryFunction<UsersIndex200> = ({
     signal,
   }) => usersIndex(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof usersIndex>>,
+    UsersIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type UsersIndexQueryResult = NonNullable<
-  Awaited<ReturnType<typeof usersIndex>>
+  UsersIndex200
 >;
 export type UsersIndexQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useUsersIndex<
-  TData = Awaited<ReturnType<typeof usersIndex>>,
+  TData = UsersIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -323,13 +323,13 @@ export function useUsersIndex<
   params: undefined | UsersIndexParams,
   options: {
     query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof usersIndex>>, TError, TData>
+      UseQueryOptions<UsersIndex200, TError, TData>
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof usersIndex>>,
+          UsersIndex200,
           TError,
-          Awaited<ReturnType<typeof usersIndex>>
+          UsersIndex200
         >,
         "initialData"
       >;
@@ -340,7 +340,7 @@ export function useUsersIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useUsersIndex<
-  TData = Awaited<ReturnType<typeof usersIndex>>,
+  TData = UsersIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -348,13 +348,13 @@ export function useUsersIndex<
   params?: UsersIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof usersIndex>>, TError, TData>
+      UseQueryOptions<UsersIndex200, TError, TData>
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof usersIndex>>,
+          UsersIndex200,
           TError,
-          Awaited<ReturnType<typeof usersIndex>>
+          UsersIndex200
         >,
         "initialData"
       >;
@@ -365,7 +365,7 @@ export function useUsersIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useUsersIndex<
-  TData = Awaited<ReturnType<typeof usersIndex>>,
+  TData = UsersIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -373,7 +373,7 @@ export function useUsersIndex<
   params?: UsersIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof usersIndex>>, TError, TData>
+      UseQueryOptions<UsersIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -386,7 +386,7 @@ export function useUsersIndex<
  */
 
 export function useUsersIndex<
-  TData = Awaited<ReturnType<typeof usersIndex>>,
+  TData = UsersIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -394,7 +394,7 @@ export function useUsersIndex<
   params?: UsersIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof usersIndex>>, TError, TData>
+      UseQueryOptions<UsersIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -415,7 +415,7 @@ export function useUsersIndex<
 }
 
 export const getUsersIndexSuspenseQueryOptions = <
-  TData = Awaited<ReturnType<typeof usersIndex>>,
+  TData = UsersIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -424,7 +424,7 @@ export const getUsersIndexSuspenseQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof usersIndex>>,
+        UsersIndex200,
         TError,
         TData
       >
@@ -436,26 +436,26 @@ export const getUsersIndexSuspenseQueryOptions = <
 
   const queryKey = queryOptions?.queryKey ?? getUsersIndexQueryKey(params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof usersIndex>>> = ({
+  const queryFn: QueryFunction<UsersIndex200> = ({
     signal,
   }) => usersIndex(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
-    Awaited<ReturnType<typeof usersIndex>>,
+    UsersIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type UsersIndexSuspenseQueryResult = NonNullable<
-  Awaited<ReturnType<typeof usersIndex>>
+  UsersIndex200
 >;
 export type UsersIndexSuspenseQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useUsersIndexSuspense<
-  TData = Awaited<ReturnType<typeof usersIndex>>,
+  TData = UsersIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -464,7 +464,7 @@ export function useUsersIndexSuspense<
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof usersIndex>>,
+        UsersIndex200,
         TError,
         TData
       >
@@ -476,7 +476,7 @@ export function useUsersIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useUsersIndexSuspense<
-  TData = Awaited<ReturnType<typeof usersIndex>>,
+  TData = UsersIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -485,7 +485,7 @@ export function useUsersIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof usersIndex>>,
+        UsersIndex200,
         TError,
         TData
       >
@@ -497,7 +497,7 @@ export function useUsersIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useUsersIndexSuspense<
-  TData = Awaited<ReturnType<typeof usersIndex>>,
+  TData = UsersIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -506,7 +506,7 @@ export function useUsersIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof usersIndex>>,
+        UsersIndex200,
         TError,
         TData
       >
@@ -522,7 +522,7 @@ export function useUsersIndexSuspense<
  */
 
 export function useUsersIndexSuspense<
-  TData = Awaited<ReturnType<typeof usersIndex>>,
+  TData = UsersIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -531,7 +531,7 @@ export function useUsersIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof usersIndex>>,
+        UsersIndex200,
         TError,
         TData
       >
@@ -558,7 +558,7 @@ export function useUsersIndexSuspense<
 
 export const getUsersIndexSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof usersIndex>>,
+    UsersIndex200,
     UsersIndexParams["page"]
   >,
   TError = ErrorType<
@@ -569,7 +569,7 @@ export const getUsersIndexSuspenseInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof usersIndex>>,
+        UsersIndex200,
         TError,
         TData,
         QueryKey,
@@ -585,7 +585,7 @@ export const getUsersIndexSuspenseInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getUsersIndexInfiniteQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof usersIndex>>,
+    UsersIndex200,
     QueryKey,
     UsersIndexParams["page"]
   > = ({ signal, pageParam }) =>
@@ -600,7 +600,7 @@ export const getUsersIndexSuspenseInfiniteQueryOptions = <
     queryFn,
     ...queryOptions,
   } as UseSuspenseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof usersIndex>>,
+    UsersIndex200,
     TError,
     TData,
     QueryKey,
@@ -609,7 +609,7 @@ export const getUsersIndexSuspenseInfiniteQueryOptions = <
 };
 
 export type UsersIndexSuspenseInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof usersIndex>>
+  UsersIndex200
 >;
 export type UsersIndexSuspenseInfiniteQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -617,7 +617,7 @@ export type UsersIndexSuspenseInfiniteQueryError = ErrorType<
 
 export function useUsersIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof usersIndex>>,
+    UsersIndex200,
     UsersIndexParams["page"]
   >,
   TError = ErrorType<
@@ -628,7 +628,7 @@ export function useUsersIndexSuspenseInfinite<
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof usersIndex>>,
+        UsersIndex200,
         TError,
         TData,
         QueryKey,
@@ -643,7 +643,7 @@ export function useUsersIndexSuspenseInfinite<
 };
 export function useUsersIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof usersIndex>>,
+    UsersIndex200,
     UsersIndexParams["page"]
   >,
   TError = ErrorType<
@@ -654,7 +654,7 @@ export function useUsersIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof usersIndex>>,
+        UsersIndex200,
         TError,
         TData,
         QueryKey,
@@ -669,7 +669,7 @@ export function useUsersIndexSuspenseInfinite<
 };
 export function useUsersIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof usersIndex>>,
+    UsersIndex200,
     UsersIndexParams["page"]
   >,
   TError = ErrorType<
@@ -680,7 +680,7 @@ export function useUsersIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof usersIndex>>,
+        UsersIndex200,
         TError,
         TData,
         QueryKey,
@@ -699,7 +699,7 @@ export function useUsersIndexSuspenseInfinite<
 
 export function useUsersIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof usersIndex>>,
+    UsersIndex200,
     UsersIndexParams["page"]
   >,
   TError = ErrorType<
@@ -710,7 +710,7 @@ export function useUsersIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof usersIndex>>,
+        UsersIndex200,
         TError,
         TData,
         QueryKey,

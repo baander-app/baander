@@ -78,14 +78,14 @@ export const getImageServeQueryKey = (image?: string) => {
 };
 
 export const getImageServeInfiniteQueryOptions = <
-  TData = InfiniteData<Awaited<ReturnType<typeof imageServe>>>,
+  TData = InfiniteData<Blob>,
   TError = ErrorType<ModelNotFoundExceptionResponse>
 >(
   image: string,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof imageServe>>,
+        Blob,
         TError,
         TData
       >
@@ -98,7 +98,7 @@ export const getImageServeInfiniteQueryOptions = <
   const queryKey =
     queryOptions?.queryKey ?? getImageServeInfiniteQueryKey(image);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof imageServe>>> = ({
+  const queryFn: QueryFunction<Blob> = ({
     signal,
   }) => imageServe(image, requestOptions, signal);
 
@@ -108,36 +108,36 @@ export const getImageServeInfiniteQueryOptions = <
     enabled: !!image,
     ...queryOptions,
   } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof imageServe>>,
+    Blob,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type ImageServeInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof imageServe>>
+  Blob
 >;
 export type ImageServeInfiniteQueryError =
   ErrorType<ModelNotFoundExceptionResponse>;
 
 export function useImageServeInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof imageServe>>>,
+  TData = InfiniteData<Blob>,
   TError = ErrorType<ModelNotFoundExceptionResponse>
 >(
   image: string,
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof imageServe>>,
+        Blob,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof imageServe>>,
+          Blob,
           TError,
-          Awaited<ReturnType<typeof imageServe>>
+          Blob
         >,
         "initialData"
       >;
@@ -148,23 +148,23 @@ export function useImageServeInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useImageServeInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof imageServe>>>,
+  TData = InfiniteData<Blob>,
   TError = ErrorType<ModelNotFoundExceptionResponse>
 >(
   image: string,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof imageServe>>,
+        Blob,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof imageServe>>,
+          Blob,
           TError,
-          Awaited<ReturnType<typeof imageServe>>
+          Blob
         >,
         "initialData"
       >;
@@ -175,14 +175,14 @@ export function useImageServeInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useImageServeInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof imageServe>>>,
+  TData = InfiniteData<Blob>,
   TError = ErrorType<ModelNotFoundExceptionResponse>
 >(
   image: string,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof imageServe>>,
+        Blob,
         TError,
         TData
       >
@@ -198,14 +198,14 @@ export function useImageServeInfinite<
  */
 
 export function useImageServeInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof imageServe>>>,
+  TData = InfiniteData<Blob>,
   TError = ErrorType<ModelNotFoundExceptionResponse>
 >(
   image: string,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof imageServe>>,
+        Blob,
         TError,
         TData
       >
@@ -231,13 +231,13 @@ export function useImageServeInfinite<
 }
 
 export const getImageServeQueryOptions = <
-  TData = Awaited<ReturnType<typeof imageServe>>,
+  TData = Blob,
   TError = ErrorType<ModelNotFoundExceptionResponse>
 >(
   image: string,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof imageServe>>, TError, TData>
+      UseQueryOptions<Blob, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   }
@@ -246,7 +246,7 @@ export const getImageServeQueryOptions = <
 
   const queryKey = queryOptions?.queryKey ?? getImageServeQueryKey(image);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof imageServe>>> = ({
+  const queryFn: QueryFunction<Blob> = ({
     signal,
   }) => imageServe(image, requestOptions, signal);
 
@@ -256,31 +256,31 @@ export const getImageServeQueryOptions = <
     enabled: !!image,
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof imageServe>>,
+    Blob,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type ImageServeQueryResult = NonNullable<
-  Awaited<ReturnType<typeof imageServe>>
+  Blob
 >;
 export type ImageServeQueryError = ErrorType<ModelNotFoundExceptionResponse>;
 
 export function useImageServe<
-  TData = Awaited<ReturnType<typeof imageServe>>,
+  TData = Blob,
   TError = ErrorType<ModelNotFoundExceptionResponse>
 >(
   image: string,
   options: {
     query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof imageServe>>, TError, TData>
+      UseQueryOptions<Blob, TError, TData>
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof imageServe>>,
+          Blob,
           TError,
-          Awaited<ReturnType<typeof imageServe>>
+          Blob
         >,
         "initialData"
       >;
@@ -291,19 +291,19 @@ export function useImageServe<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useImageServe<
-  TData = Awaited<ReturnType<typeof imageServe>>,
+  TData = Blob,
   TError = ErrorType<ModelNotFoundExceptionResponse>
 >(
   image: string,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof imageServe>>, TError, TData>
+      UseQueryOptions<Blob, TError, TData>
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof imageServe>>,
+          Blob,
           TError,
-          Awaited<ReturnType<typeof imageServe>>
+          Blob
         >,
         "initialData"
       >;
@@ -314,13 +314,13 @@ export function useImageServe<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useImageServe<
-  TData = Awaited<ReturnType<typeof imageServe>>,
+  TData = Blob,
   TError = ErrorType<ModelNotFoundExceptionResponse>
 >(
   image: string,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof imageServe>>, TError, TData>
+      UseQueryOptions<Blob, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -333,13 +333,13 @@ export function useImageServe<
  */
 
 export function useImageServe<
-  TData = Awaited<ReturnType<typeof imageServe>>,
+  TData = Blob,
   TError = ErrorType<ModelNotFoundExceptionResponse>
 >(
   image: string,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof imageServe>>, TError, TData>
+      UseQueryOptions<Blob, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -360,14 +360,14 @@ export function useImageServe<
 }
 
 export const getImageServeSuspenseQueryOptions = <
-  TData = Awaited<ReturnType<typeof imageServe>>,
+  TData = Blob,
   TError = ErrorType<ModelNotFoundExceptionResponse>
 >(
   image: string,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof imageServe>>,
+        Blob,
         TError,
         TData
       >
@@ -379,32 +379,32 @@ export const getImageServeSuspenseQueryOptions = <
 
   const queryKey = queryOptions?.queryKey ?? getImageServeQueryKey(image);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof imageServe>>> = ({
+  const queryFn: QueryFunction<Blob> = ({
     signal,
   }) => imageServe(image, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
-    Awaited<ReturnType<typeof imageServe>>,
+    Blob,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type ImageServeSuspenseQueryResult = NonNullable<
-  Awaited<ReturnType<typeof imageServe>>
+  Blob
 >;
 export type ImageServeSuspenseQueryError =
   ErrorType<ModelNotFoundExceptionResponse>;
 
 export function useImageServeSuspense<
-  TData = Awaited<ReturnType<typeof imageServe>>,
+  TData = Blob,
   TError = ErrorType<ModelNotFoundExceptionResponse>
 >(
   image: string,
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof imageServe>>,
+        Blob,
         TError,
         TData
       >
@@ -416,14 +416,14 @@ export function useImageServeSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useImageServeSuspense<
-  TData = Awaited<ReturnType<typeof imageServe>>,
+  TData = Blob,
   TError = ErrorType<ModelNotFoundExceptionResponse>
 >(
   image: string,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof imageServe>>,
+        Blob,
         TError,
         TData
       >
@@ -435,14 +435,14 @@ export function useImageServeSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useImageServeSuspense<
-  TData = Awaited<ReturnType<typeof imageServe>>,
+  TData = Blob,
   TError = ErrorType<ModelNotFoundExceptionResponse>
 >(
   image: string,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof imageServe>>,
+        Blob,
         TError,
         TData
       >
@@ -458,14 +458,14 @@ export function useImageServeSuspense<
  */
 
 export function useImageServeSuspense<
-  TData = Awaited<ReturnType<typeof imageServe>>,
+  TData = Blob,
   TError = ErrorType<ModelNotFoundExceptionResponse>
 >(
   image: string,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof imageServe>>,
+        Blob,
         TError,
         TData
       >
@@ -491,14 +491,14 @@ export function useImageServeSuspense<
 }
 
 export const getImageServeSuspenseInfiniteQueryOptions = <
-  TData = InfiniteData<Awaited<ReturnType<typeof imageServe>>>,
+  TData = InfiniteData<Blob>,
   TError = ErrorType<ModelNotFoundExceptionResponse>
 >(
   image: string,
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof imageServe>>,
+        Blob,
         TError,
         TData
       >
@@ -511,7 +511,7 @@ export const getImageServeSuspenseInfiniteQueryOptions = <
   const queryKey =
     queryOptions?.queryKey ?? getImageServeInfiniteQueryKey(image);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof imageServe>>> = ({
+  const queryFn: QueryFunction<Blob> = ({
     signal,
   }) => imageServe(image, requestOptions, signal);
 
@@ -520,27 +520,27 @@ export const getImageServeSuspenseInfiniteQueryOptions = <
     queryFn,
     ...queryOptions,
   } as UseSuspenseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof imageServe>>,
+    Blob,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type ImageServeSuspenseInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof imageServe>>
+  Blob
 >;
 export type ImageServeSuspenseInfiniteQueryError =
   ErrorType<ModelNotFoundExceptionResponse>;
 
 export function useImageServeSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof imageServe>>>,
+  TData = InfiniteData<Blob>,
   TError = ErrorType<ModelNotFoundExceptionResponse>
 >(
   image: string,
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof imageServe>>,
+        Blob,
         TError,
         TData
       >
@@ -552,14 +552,14 @@ export function useImageServeSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useImageServeSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof imageServe>>>,
+  TData = InfiniteData<Blob>,
   TError = ErrorType<ModelNotFoundExceptionResponse>
 >(
   image: string,
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof imageServe>>,
+        Blob,
         TError,
         TData
       >
@@ -571,14 +571,14 @@ export function useImageServeSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useImageServeSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof imageServe>>>,
+  TData = InfiniteData<Blob>,
   TError = ErrorType<ModelNotFoundExceptionResponse>
 >(
   image: string,
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof imageServe>>,
+        Blob,
         TError,
         TData
       >
@@ -594,14 +594,14 @@ export function useImageServeSuspenseInfinite<
  */
 
 export function useImageServeSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof imageServe>>>,
+  TData = InfiniteData<Blob>,
   TError = ErrorType<ModelNotFoundExceptionResponse>
 >(
   image: string,
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof imageServe>>,
+        Blob,
         TError,
         TData
       >

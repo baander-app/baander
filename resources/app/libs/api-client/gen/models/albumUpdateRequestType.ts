@@ -12,7 +12,19 @@ The media information is organized and easily searchable, ensuring users can alw
  * OpenAPI spec version: 0.0.1
  */
 
-/**
- * @maxLength 255
- */
-export type ArtistUpdateRequestDisambiguation = string | null;
+export type AlbumUpdateRequestType =
+  | "studio"
+  | "live"
+  | "compilation"
+  | "soundtrack"
+  | "remix"
+  | "ep"
+  | "single"
+  | "demo"
+  | "mixtape"
+  | "bootleg"
+  | "interview"
+  | "audiobook"
+  | "spoken_word"
+  | "other"
+  | null;

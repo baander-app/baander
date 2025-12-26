@@ -31,3 +31,7 @@ import { client } from 'laravel-precognition-react';
 import { AXIOS_INSTANCE } from '@/app/libs/api-client/axios-instance.ts';
 
 client.use(AXIOS_INSTANCE);
+
+// Configure Precognition to only validate, not submit
+// Actual submission is handled by React Query mutations
+client.determineSuccessUsing(() => false);

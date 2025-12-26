@@ -12,7 +12,8 @@ The media information is organized and easily searchable, ensuring users can alw
  * OpenAPI spec version: 0.0.1
  */
 
-export type AuthLogin401 = {
-  /** Error overview. */
-  message: string;
-};
+/**
+ * @minimum 0
+ * @maximum 9999
+ */
+export type AlbumUpdateRequestYear = number | null;

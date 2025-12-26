@@ -96,7 +96,7 @@ export const getAlbumsIndexQueryKey = (
 
 export const getAlbumsIndexInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof albumsIndex>>,
+    AlbumsIndex200,
     AlbumsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -110,7 +110,7 @@ export const getAlbumsIndexInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof albumsIndex>>,
+        AlbumsIndex200,
         TError,
         TData,
         QueryKey,
@@ -126,7 +126,7 @@ export const getAlbumsIndexInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getAlbumsIndexInfiniteQueryKey(library, params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof albumsIndex>>,
+    AlbumsIndex200,
     QueryKey,
     AlbumsIndexParams["page"]
   > = ({ signal, pageParam }) =>
@@ -143,7 +143,7 @@ export const getAlbumsIndexInfiniteQueryOptions = <
     enabled: !!library,
     ...queryOptions,
   } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof albumsIndex>>,
+    AlbumsIndex200,
     TError,
     TData,
     QueryKey,
@@ -152,7 +152,7 @@ export const getAlbumsIndexInfiniteQueryOptions = <
 };
 
 export type AlbumsIndexInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof albumsIndex>>
+  AlbumsIndex200
 >;
 export type AlbumsIndexInfiniteQueryError = ErrorType<
   | AuthenticationExceptionResponse
@@ -162,7 +162,7 @@ export type AlbumsIndexInfiniteQueryError = ErrorType<
 
 export function useAlbumsIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof albumsIndex>>,
+    AlbumsIndex200,
     AlbumsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -176,7 +176,7 @@ export function useAlbumsIndexInfinite<
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof albumsIndex>>,
+        AlbumsIndex200,
         TError,
         TData,
         QueryKey,
@@ -185,9 +185,9 @@ export function useAlbumsIndexInfinite<
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof albumsIndex>>,
+          AlbumsIndex200,
           TError,
-          Awaited<ReturnType<typeof albumsIndex>>,
+          AlbumsIndex200,
           QueryKey
         >,
         "initialData"
@@ -200,7 +200,7 @@ export function useAlbumsIndexInfinite<
 };
 export function useAlbumsIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof albumsIndex>>,
+    AlbumsIndex200,
     AlbumsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -214,7 +214,7 @@ export function useAlbumsIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof albumsIndex>>,
+        AlbumsIndex200,
         TError,
         TData,
         QueryKey,
@@ -223,9 +223,9 @@ export function useAlbumsIndexInfinite<
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof albumsIndex>>,
+          AlbumsIndex200,
           TError,
-          Awaited<ReturnType<typeof albumsIndex>>,
+          AlbumsIndex200,
           QueryKey
         >,
         "initialData"
@@ -238,7 +238,7 @@ export function useAlbumsIndexInfinite<
 };
 export function useAlbumsIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof albumsIndex>>,
+    AlbumsIndex200,
     AlbumsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -252,7 +252,7 @@ export function useAlbumsIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof albumsIndex>>,
+        AlbumsIndex200,
         TError,
         TData,
         QueryKey,
@@ -271,7 +271,7 @@ export function useAlbumsIndexInfinite<
 
 export function useAlbumsIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof albumsIndex>>,
+    AlbumsIndex200,
     AlbumsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -285,7 +285,7 @@ export function useAlbumsIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof albumsIndex>>,
+        AlbumsIndex200,
         TError,
         TData,
         QueryKey,
@@ -317,7 +317,7 @@ export function useAlbumsIndexInfinite<
 }
 
 export const getAlbumsIndexQueryOptions = <
-  TData = Awaited<ReturnType<typeof albumsIndex>>,
+  TData = AlbumsIndex200,
   TError = ErrorType<
     | AuthenticationExceptionResponse
     | ModelNotFoundExceptionResponse
@@ -328,7 +328,7 @@ export const getAlbumsIndexQueryOptions = <
   params?: AlbumsIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof albumsIndex>>, TError, TData>
+      UseQueryOptions<AlbumsIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   }
@@ -338,7 +338,7 @@ export const getAlbumsIndexQueryOptions = <
   const queryKey =
     queryOptions?.queryKey ?? getAlbumsIndexQueryKey(library, params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof albumsIndex>>> = ({
+  const queryFn: QueryFunction<AlbumsIndex200> = ({
     signal,
   }) => albumsIndex(library, params, requestOptions, signal);
 
@@ -348,14 +348,14 @@ export const getAlbumsIndexQueryOptions = <
     enabled: !!library,
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof albumsIndex>>,
+    AlbumsIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type AlbumsIndexQueryResult = NonNullable<
-  Awaited<ReturnType<typeof albumsIndex>>
+  AlbumsIndex200
 >;
 export type AlbumsIndexQueryError = ErrorType<
   | AuthenticationExceptionResponse
@@ -364,7 +364,7 @@ export type AlbumsIndexQueryError = ErrorType<
 >;
 
 export function useAlbumsIndex<
-  TData = Awaited<ReturnType<typeof albumsIndex>>,
+  TData = AlbumsIndex200,
   TError = ErrorType<
     | AuthenticationExceptionResponse
     | ModelNotFoundExceptionResponse
@@ -375,13 +375,13 @@ export function useAlbumsIndex<
   params: undefined | AlbumsIndexParams,
   options: {
     query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof albumsIndex>>, TError, TData>
+      UseQueryOptions<AlbumsIndex200, TError, TData>
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof albumsIndex>>,
+          AlbumsIndex200,
           TError,
-          Awaited<ReturnType<typeof albumsIndex>>
+          AlbumsIndex200
         >,
         "initialData"
       >;
@@ -392,7 +392,7 @@ export function useAlbumsIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useAlbumsIndex<
-  TData = Awaited<ReturnType<typeof albumsIndex>>,
+  TData = AlbumsIndex200,
   TError = ErrorType<
     | AuthenticationExceptionResponse
     | ModelNotFoundExceptionResponse
@@ -403,13 +403,13 @@ export function useAlbumsIndex<
   params?: AlbumsIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof albumsIndex>>, TError, TData>
+      UseQueryOptions<AlbumsIndex200, TError, TData>
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof albumsIndex>>,
+          AlbumsIndex200,
           TError,
-          Awaited<ReturnType<typeof albumsIndex>>
+          AlbumsIndex200
         >,
         "initialData"
       >;
@@ -420,7 +420,7 @@ export function useAlbumsIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useAlbumsIndex<
-  TData = Awaited<ReturnType<typeof albumsIndex>>,
+  TData = AlbumsIndex200,
   TError = ErrorType<
     | AuthenticationExceptionResponse
     | ModelNotFoundExceptionResponse
@@ -431,7 +431,7 @@ export function useAlbumsIndex<
   params?: AlbumsIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof albumsIndex>>, TError, TData>
+      UseQueryOptions<AlbumsIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -444,7 +444,7 @@ export function useAlbumsIndex<
  */
 
 export function useAlbumsIndex<
-  TData = Awaited<ReturnType<typeof albumsIndex>>,
+  TData = AlbumsIndex200,
   TError = ErrorType<
     | AuthenticationExceptionResponse
     | ModelNotFoundExceptionResponse
@@ -455,7 +455,7 @@ export function useAlbumsIndex<
   params?: AlbumsIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof albumsIndex>>, TError, TData>
+      UseQueryOptions<AlbumsIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -476,7 +476,7 @@ export function useAlbumsIndex<
 }
 
 export const getAlbumsIndexSuspenseQueryOptions = <
-  TData = Awaited<ReturnType<typeof albumsIndex>>,
+  TData = AlbumsIndex200,
   TError = ErrorType<
     | AuthenticationExceptionResponse
     | ModelNotFoundExceptionResponse
@@ -488,7 +488,7 @@ export const getAlbumsIndexSuspenseQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof albumsIndex>>,
+        AlbumsIndex200,
         TError,
         TData
       >
@@ -501,19 +501,19 @@ export const getAlbumsIndexSuspenseQueryOptions = <
   const queryKey =
     queryOptions?.queryKey ?? getAlbumsIndexQueryKey(library, params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof albumsIndex>>> = ({
+  const queryFn: QueryFunction<AlbumsIndex200> = ({
     signal,
   }) => albumsIndex(library, params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
-    Awaited<ReturnType<typeof albumsIndex>>,
+    AlbumsIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type AlbumsIndexSuspenseQueryResult = NonNullable<
-  Awaited<ReturnType<typeof albumsIndex>>
+  AlbumsIndex200
 >;
 export type AlbumsIndexSuspenseQueryError = ErrorType<
   | AuthenticationExceptionResponse
@@ -522,7 +522,7 @@ export type AlbumsIndexSuspenseQueryError = ErrorType<
 >;
 
 export function useAlbumsIndexSuspense<
-  TData = Awaited<ReturnType<typeof albumsIndex>>,
+  TData = AlbumsIndex200,
   TError = ErrorType<
     | AuthenticationExceptionResponse
     | ModelNotFoundExceptionResponse
@@ -534,7 +534,7 @@ export function useAlbumsIndexSuspense<
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof albumsIndex>>,
+        AlbumsIndex200,
         TError,
         TData
       >
@@ -546,7 +546,7 @@ export function useAlbumsIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useAlbumsIndexSuspense<
-  TData = Awaited<ReturnType<typeof albumsIndex>>,
+  TData = AlbumsIndex200,
   TError = ErrorType<
     | AuthenticationExceptionResponse
     | ModelNotFoundExceptionResponse
@@ -558,7 +558,7 @@ export function useAlbumsIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof albumsIndex>>,
+        AlbumsIndex200,
         TError,
         TData
       >
@@ -570,7 +570,7 @@ export function useAlbumsIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useAlbumsIndexSuspense<
-  TData = Awaited<ReturnType<typeof albumsIndex>>,
+  TData = AlbumsIndex200,
   TError = ErrorType<
     | AuthenticationExceptionResponse
     | ModelNotFoundExceptionResponse
@@ -582,7 +582,7 @@ export function useAlbumsIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof albumsIndex>>,
+        AlbumsIndex200,
         TError,
         TData
       >
@@ -598,7 +598,7 @@ export function useAlbumsIndexSuspense<
  */
 
 export function useAlbumsIndexSuspense<
-  TData = Awaited<ReturnType<typeof albumsIndex>>,
+  TData = AlbumsIndex200,
   TError = ErrorType<
     | AuthenticationExceptionResponse
     | ModelNotFoundExceptionResponse
@@ -610,7 +610,7 @@ export function useAlbumsIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof albumsIndex>>,
+        AlbumsIndex200,
         TError,
         TData
       >
@@ -641,7 +641,7 @@ export function useAlbumsIndexSuspense<
 
 export const getAlbumsIndexSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof albumsIndex>>,
+    AlbumsIndex200,
     AlbumsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -655,7 +655,7 @@ export const getAlbumsIndexSuspenseInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof albumsIndex>>,
+        AlbumsIndex200,
         TError,
         TData,
         QueryKey,
@@ -671,7 +671,7 @@ export const getAlbumsIndexSuspenseInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getAlbumsIndexInfiniteQueryKey(library, params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof albumsIndex>>,
+    AlbumsIndex200,
     QueryKey,
     AlbumsIndexParams["page"]
   > = ({ signal, pageParam }) =>
@@ -687,7 +687,7 @@ export const getAlbumsIndexSuspenseInfiniteQueryOptions = <
     queryFn,
     ...queryOptions,
   } as UseSuspenseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof albumsIndex>>,
+    AlbumsIndex200,
     TError,
     TData,
     QueryKey,
@@ -696,7 +696,7 @@ export const getAlbumsIndexSuspenseInfiniteQueryOptions = <
 };
 
 export type AlbumsIndexSuspenseInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof albumsIndex>>
+  AlbumsIndex200
 >;
 export type AlbumsIndexSuspenseInfiniteQueryError = ErrorType<
   | AuthenticationExceptionResponse
@@ -706,7 +706,7 @@ export type AlbumsIndexSuspenseInfiniteQueryError = ErrorType<
 
 export function useAlbumsIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof albumsIndex>>,
+    AlbumsIndex200,
     AlbumsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -720,7 +720,7 @@ export function useAlbumsIndexSuspenseInfinite<
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof albumsIndex>>,
+        AlbumsIndex200,
         TError,
         TData,
         QueryKey,
@@ -735,7 +735,7 @@ export function useAlbumsIndexSuspenseInfinite<
 };
 export function useAlbumsIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof albumsIndex>>,
+    AlbumsIndex200,
     AlbumsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -749,7 +749,7 @@ export function useAlbumsIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof albumsIndex>>,
+        AlbumsIndex200,
         TError,
         TData,
         QueryKey,
@@ -764,7 +764,7 @@ export function useAlbumsIndexSuspenseInfinite<
 };
 export function useAlbumsIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof albumsIndex>>,
+    AlbumsIndex200,
     AlbumsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -778,7 +778,7 @@ export function useAlbumsIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof albumsIndex>>,
+        AlbumsIndex200,
         TError,
         TData,
         QueryKey,
@@ -797,7 +797,7 @@ export function useAlbumsIndexSuspenseInfinite<
 
 export function useAlbumsIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof albumsIndex>>,
+    AlbumsIndex200,
     AlbumsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -811,7 +811,7 @@ export function useAlbumsIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof albumsIndex>>,
+        AlbumsIndex200,
         TError,
         TData,
         QueryKey,

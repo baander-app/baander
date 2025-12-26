@@ -73,7 +73,7 @@ export const getMetadataSearchAlbumQueryKey = (album?: number) => {
 };
 
 export const getMetadataSearchAlbumInfiniteQueryOptions = <
-  TData = InfiniteData<Awaited<ReturnType<typeof metadataSearchAlbum>>>,
+  TData = InfiniteData<MetadataSearchAlbum200>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -82,7 +82,7 @@ export const getMetadataSearchAlbumInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof metadataSearchAlbum>>,
+        MetadataSearchAlbum200,
         TError,
         TData
       >
@@ -96,7 +96,7 @@ export const getMetadataSearchAlbumInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getMetadataSearchAlbumInfiniteQueryKey(album);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof metadataSearchAlbum>>
+    MetadataSearchAlbum200
   > = ({ signal }) => metadataSearchAlbum(album, requestOptions, signal);
 
   return {
@@ -105,21 +105,21 @@ export const getMetadataSearchAlbumInfiniteQueryOptions = <
     enabled: !!album,
     ...queryOptions,
   } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof metadataSearchAlbum>>,
+    MetadataSearchAlbum200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type MetadataSearchAlbumInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof metadataSearchAlbum>>
+  MetadataSearchAlbum200
 >;
 export type MetadataSearchAlbumInfiniteQueryError = ErrorType<
   AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
 >;
 
 export function useMetadataSearchAlbumInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof metadataSearchAlbum>>>,
+  TData = InfiniteData<MetadataSearchAlbum200>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -128,16 +128,16 @@ export function useMetadataSearchAlbumInfinite<
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof metadataSearchAlbum>>,
+        MetadataSearchAlbum200,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof metadataSearchAlbum>>,
+          MetadataSearchAlbum200,
           TError,
-          Awaited<ReturnType<typeof metadataSearchAlbum>>
+          MetadataSearchAlbum200
         >,
         "initialData"
       >;
@@ -148,7 +148,7 @@ export function useMetadataSearchAlbumInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useMetadataSearchAlbumInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof metadataSearchAlbum>>>,
+  TData = InfiniteData<MetadataSearchAlbum200>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -157,16 +157,16 @@ export function useMetadataSearchAlbumInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof metadataSearchAlbum>>,
+        MetadataSearchAlbum200,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof metadataSearchAlbum>>,
+          MetadataSearchAlbum200,
           TError,
-          Awaited<ReturnType<typeof metadataSearchAlbum>>
+          MetadataSearchAlbum200
         >,
         "initialData"
       >;
@@ -177,7 +177,7 @@ export function useMetadataSearchAlbumInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useMetadataSearchAlbumInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof metadataSearchAlbum>>>,
+  TData = InfiniteData<MetadataSearchAlbum200>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -186,7 +186,7 @@ export function useMetadataSearchAlbumInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof metadataSearchAlbum>>,
+        MetadataSearchAlbum200,
         TError,
         TData
       >
@@ -202,7 +202,7 @@ export function useMetadataSearchAlbumInfinite<
  */
 
 export function useMetadataSearchAlbumInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof metadataSearchAlbum>>>,
+  TData = InfiniteData<MetadataSearchAlbum200>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -211,7 +211,7 @@ export function useMetadataSearchAlbumInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof metadataSearchAlbum>>,
+        MetadataSearchAlbum200,
         TError,
         TData
       >
@@ -240,7 +240,7 @@ export function useMetadataSearchAlbumInfinite<
 }
 
 export const getMetadataSearchAlbumQueryOptions = <
-  TData = Awaited<ReturnType<typeof metadataSearchAlbum>>,
+  TData = MetadataSearchAlbum200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -249,7 +249,7 @@ export const getMetadataSearchAlbumQueryOptions = <
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof metadataSearchAlbum>>,
+        MetadataSearchAlbum200,
         TError,
         TData
       >
@@ -263,7 +263,7 @@ export const getMetadataSearchAlbumQueryOptions = <
     queryOptions?.queryKey ?? getMetadataSearchAlbumQueryKey(album);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof metadataSearchAlbum>>
+    MetadataSearchAlbum200
   > = ({ signal }) => metadataSearchAlbum(album, requestOptions, signal);
 
   return {
@@ -272,21 +272,21 @@ export const getMetadataSearchAlbumQueryOptions = <
     enabled: !!album,
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof metadataSearchAlbum>>,
+    MetadataSearchAlbum200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type MetadataSearchAlbumQueryResult = NonNullable<
-  Awaited<ReturnType<typeof metadataSearchAlbum>>
+  MetadataSearchAlbum200
 >;
 export type MetadataSearchAlbumQueryError = ErrorType<
   AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
 >;
 
 export function useMetadataSearchAlbum<
-  TData = Awaited<ReturnType<typeof metadataSearchAlbum>>,
+  TData = MetadataSearchAlbum200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -295,16 +295,16 @@ export function useMetadataSearchAlbum<
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof metadataSearchAlbum>>,
+        MetadataSearchAlbum200,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof metadataSearchAlbum>>,
+          MetadataSearchAlbum200,
           TError,
-          Awaited<ReturnType<typeof metadataSearchAlbum>>
+          MetadataSearchAlbum200
         >,
         "initialData"
       >;
@@ -315,7 +315,7 @@ export function useMetadataSearchAlbum<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useMetadataSearchAlbum<
-  TData = Awaited<ReturnType<typeof metadataSearchAlbum>>,
+  TData = MetadataSearchAlbum200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -324,16 +324,16 @@ export function useMetadataSearchAlbum<
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof metadataSearchAlbum>>,
+        MetadataSearchAlbum200,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof metadataSearchAlbum>>,
+          MetadataSearchAlbum200,
           TError,
-          Awaited<ReturnType<typeof metadataSearchAlbum>>
+          MetadataSearchAlbum200
         >,
         "initialData"
       >;
@@ -344,7 +344,7 @@ export function useMetadataSearchAlbum<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useMetadataSearchAlbum<
-  TData = Awaited<ReturnType<typeof metadataSearchAlbum>>,
+  TData = MetadataSearchAlbum200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -353,7 +353,7 @@ export function useMetadataSearchAlbum<
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof metadataSearchAlbum>>,
+        MetadataSearchAlbum200,
         TError,
         TData
       >
@@ -369,7 +369,7 @@ export function useMetadataSearchAlbum<
  */
 
 export function useMetadataSearchAlbum<
-  TData = Awaited<ReturnType<typeof metadataSearchAlbum>>,
+  TData = MetadataSearchAlbum200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -378,7 +378,7 @@ export function useMetadataSearchAlbum<
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof metadataSearchAlbum>>,
+        MetadataSearchAlbum200,
         TError,
         TData
       >
@@ -402,7 +402,7 @@ export function useMetadataSearchAlbum<
 }
 
 export const getMetadataSearchAlbumSuspenseQueryOptions = <
-  TData = Awaited<ReturnType<typeof metadataSearchAlbum>>,
+  TData = MetadataSearchAlbum200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -411,7 +411,7 @@ export const getMetadataSearchAlbumSuspenseQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof metadataSearchAlbum>>,
+        MetadataSearchAlbum200,
         TError,
         TData
       >
@@ -425,25 +425,25 @@ export const getMetadataSearchAlbumSuspenseQueryOptions = <
     queryOptions?.queryKey ?? getMetadataSearchAlbumQueryKey(album);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof metadataSearchAlbum>>
+    MetadataSearchAlbum200
   > = ({ signal }) => metadataSearchAlbum(album, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
-    Awaited<ReturnType<typeof metadataSearchAlbum>>,
+    MetadataSearchAlbum200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type MetadataSearchAlbumSuspenseQueryResult = NonNullable<
-  Awaited<ReturnType<typeof metadataSearchAlbum>>
+  MetadataSearchAlbum200
 >;
 export type MetadataSearchAlbumSuspenseQueryError = ErrorType<
   AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
 >;
 
 export function useMetadataSearchAlbumSuspense<
-  TData = Awaited<ReturnType<typeof metadataSearchAlbum>>,
+  TData = MetadataSearchAlbum200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -452,7 +452,7 @@ export function useMetadataSearchAlbumSuspense<
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof metadataSearchAlbum>>,
+        MetadataSearchAlbum200,
         TError,
         TData
       >
@@ -464,7 +464,7 @@ export function useMetadataSearchAlbumSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useMetadataSearchAlbumSuspense<
-  TData = Awaited<ReturnType<typeof metadataSearchAlbum>>,
+  TData = MetadataSearchAlbum200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -473,7 +473,7 @@ export function useMetadataSearchAlbumSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof metadataSearchAlbum>>,
+        MetadataSearchAlbum200,
         TError,
         TData
       >
@@ -485,7 +485,7 @@ export function useMetadataSearchAlbumSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useMetadataSearchAlbumSuspense<
-  TData = Awaited<ReturnType<typeof metadataSearchAlbum>>,
+  TData = MetadataSearchAlbum200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -494,7 +494,7 @@ export function useMetadataSearchAlbumSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof metadataSearchAlbum>>,
+        MetadataSearchAlbum200,
         TError,
         TData
       >
@@ -510,7 +510,7 @@ export function useMetadataSearchAlbumSuspense<
  */
 
 export function useMetadataSearchAlbumSuspense<
-  TData = Awaited<ReturnType<typeof metadataSearchAlbum>>,
+  TData = MetadataSearchAlbum200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -519,7 +519,7 @@ export function useMetadataSearchAlbumSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof metadataSearchAlbum>>,
+        MetadataSearchAlbum200,
         TError,
         TData
       >
@@ -548,7 +548,7 @@ export function useMetadataSearchAlbumSuspense<
 }
 
 export const getMetadataSearchAlbumSuspenseInfiniteQueryOptions = <
-  TData = InfiniteData<Awaited<ReturnType<typeof metadataSearchAlbum>>>,
+  TData = InfiniteData<MetadataSearchAlbum200>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -557,7 +557,7 @@ export const getMetadataSearchAlbumSuspenseInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof metadataSearchAlbum>>,
+        MetadataSearchAlbum200,
         TError,
         TData
       >
@@ -571,7 +571,7 @@ export const getMetadataSearchAlbumSuspenseInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getMetadataSearchAlbumInfiniteQueryKey(album);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof metadataSearchAlbum>>
+    MetadataSearchAlbum200
   > = ({ signal }) => metadataSearchAlbum(album, requestOptions, signal);
 
   return {
@@ -579,21 +579,21 @@ export const getMetadataSearchAlbumSuspenseInfiniteQueryOptions = <
     queryFn,
     ...queryOptions,
   } as UseSuspenseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof metadataSearchAlbum>>,
+    MetadataSearchAlbum200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type MetadataSearchAlbumSuspenseInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof metadataSearchAlbum>>
+  MetadataSearchAlbum200
 >;
 export type MetadataSearchAlbumSuspenseInfiniteQueryError = ErrorType<
   AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
 >;
 
 export function useMetadataSearchAlbumSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof metadataSearchAlbum>>>,
+  TData = InfiniteData<MetadataSearchAlbum200>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -602,7 +602,7 @@ export function useMetadataSearchAlbumSuspenseInfinite<
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof metadataSearchAlbum>>,
+        MetadataSearchAlbum200,
         TError,
         TData
       >
@@ -614,7 +614,7 @@ export function useMetadataSearchAlbumSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useMetadataSearchAlbumSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof metadataSearchAlbum>>>,
+  TData = InfiniteData<MetadataSearchAlbum200>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -623,7 +623,7 @@ export function useMetadataSearchAlbumSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof metadataSearchAlbum>>,
+        MetadataSearchAlbum200,
         TError,
         TData
       >
@@ -635,7 +635,7 @@ export function useMetadataSearchAlbumSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useMetadataSearchAlbumSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof metadataSearchAlbum>>>,
+  TData = InfiniteData<MetadataSearchAlbum200>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -644,7 +644,7 @@ export function useMetadataSearchAlbumSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof metadataSearchAlbum>>,
+        MetadataSearchAlbum200,
         TError,
         TData
       >
@@ -660,7 +660,7 @@ export function useMetadataSearchAlbumSuspenseInfinite<
  */
 
 export function useMetadataSearchAlbumSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof metadataSearchAlbum>>>,
+  TData = InfiniteData<MetadataSearchAlbum200>,
   TError = ErrorType<
     AuthenticationExceptionResponse | ModelNotFoundExceptionResponse
   >
@@ -669,7 +669,7 @@ export function useMetadataSearchAlbumSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof metadataSearchAlbum>>,
+        MetadataSearchAlbum200,
         TError,
         TData
       >

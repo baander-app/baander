@@ -92,7 +92,7 @@ export const getUserTokensIndexQueryKey = (
 
 export const getUserTokensIndexInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndex200,
     UserTokensIndexParams["page"]
   >,
   TError = ErrorType<
@@ -104,7 +104,7 @@ export const getUserTokensIndexInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof userTokensIndex>>,
+        UserTokensIndex200,
         TError,
         TData,
         QueryKey,
@@ -120,7 +120,7 @@ export const getUserTokensIndexInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getUserTokensIndexInfiniteQueryKey(user, params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndex200,
     QueryKey,
     UserTokensIndexParams["page"]
   > = ({ signal, pageParam }) =>
@@ -137,7 +137,7 @@ export const getUserTokensIndexInfiniteQueryOptions = <
     enabled: !!user,
     ...queryOptions,
   } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndex200,
     TError,
     TData,
     QueryKey,
@@ -146,7 +146,7 @@ export const getUserTokensIndexInfiniteQueryOptions = <
 };
 
 export type UserTokensIndexInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof userTokensIndex>>
+  UserTokensIndex200
 >;
 export type UserTokensIndexInfiniteQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -154,7 +154,7 @@ export type UserTokensIndexInfiniteQueryError = ErrorType<
 
 export function useUserTokensIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndex200,
     UserTokensIndexParams["page"]
   >,
   TError = ErrorType<
@@ -166,7 +166,7 @@ export function useUserTokensIndexInfinite<
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof userTokensIndex>>,
+        UserTokensIndex200,
         TError,
         TData,
         QueryKey,
@@ -175,9 +175,9 @@ export function useUserTokensIndexInfinite<
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof userTokensIndex>>,
+          UserTokensIndex200,
           TError,
-          Awaited<ReturnType<typeof userTokensIndex>>,
+          UserTokensIndex200,
           QueryKey
         >,
         "initialData"
@@ -190,7 +190,7 @@ export function useUserTokensIndexInfinite<
 };
 export function useUserTokensIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndex200,
     UserTokensIndexParams["page"]
   >,
   TError = ErrorType<
@@ -202,7 +202,7 @@ export function useUserTokensIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof userTokensIndex>>,
+        UserTokensIndex200,
         TError,
         TData,
         QueryKey,
@@ -211,9 +211,9 @@ export function useUserTokensIndexInfinite<
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof userTokensIndex>>,
+          UserTokensIndex200,
           TError,
-          Awaited<ReturnType<typeof userTokensIndex>>,
+          UserTokensIndex200,
           QueryKey
         >,
         "initialData"
@@ -226,7 +226,7 @@ export function useUserTokensIndexInfinite<
 };
 export function useUserTokensIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndex200,
     UserTokensIndexParams["page"]
   >,
   TError = ErrorType<
@@ -238,7 +238,7 @@ export function useUserTokensIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof userTokensIndex>>,
+        UserTokensIndex200,
         TError,
         TData,
         QueryKey,
@@ -257,7 +257,7 @@ export function useUserTokensIndexInfinite<
 
 export function useUserTokensIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndex200,
     UserTokensIndexParams["page"]
   >,
   TError = ErrorType<
@@ -269,7 +269,7 @@ export function useUserTokensIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof userTokensIndex>>,
+        UserTokensIndex200,
         TError,
         TData,
         QueryKey,
@@ -301,7 +301,7 @@ export function useUserTokensIndexInfinite<
 }
 
 export const getUserTokensIndexQueryOptions = <
-  TData = Awaited<ReturnType<typeof userTokensIndex>>,
+  TData = UserTokensIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -311,7 +311,7 @@ export const getUserTokensIndexQueryOptions = <
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof userTokensIndex>>,
+        UserTokensIndex200,
         TError,
         TData
       >
@@ -324,7 +324,7 @@ export const getUserTokensIndexQueryOptions = <
   const queryKey =
     queryOptions?.queryKey ?? getUserTokensIndexQueryKey(user, params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof userTokensIndex>>> = ({
+  const queryFn: QueryFunction<UserTokensIndex200> = ({
     signal,
   }) => userTokensIndex(user, params, requestOptions, signal);
 
@@ -334,21 +334,21 @@ export const getUserTokensIndexQueryOptions = <
     enabled: !!user,
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type UserTokensIndexQueryResult = NonNullable<
-  Awaited<ReturnType<typeof userTokensIndex>>
+  UserTokensIndex200
 >;
 export type UserTokensIndexQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useUserTokensIndex<
-  TData = Awaited<ReturnType<typeof userTokensIndex>>,
+  TData = UserTokensIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -358,16 +358,16 @@ export function useUserTokensIndex<
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof userTokensIndex>>,
+        UserTokensIndex200,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof userTokensIndex>>,
+          UserTokensIndex200,
           TError,
-          Awaited<ReturnType<typeof userTokensIndex>>
+          UserTokensIndex200
         >,
         "initialData"
       >;
@@ -378,7 +378,7 @@ export function useUserTokensIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useUserTokensIndex<
-  TData = Awaited<ReturnType<typeof userTokensIndex>>,
+  TData = UserTokensIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -388,16 +388,16 @@ export function useUserTokensIndex<
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof userTokensIndex>>,
+        UserTokensIndex200,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof userTokensIndex>>,
+          UserTokensIndex200,
           TError,
-          Awaited<ReturnType<typeof userTokensIndex>>
+          UserTokensIndex200
         >,
         "initialData"
       >;
@@ -408,7 +408,7 @@ export function useUserTokensIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useUserTokensIndex<
-  TData = Awaited<ReturnType<typeof userTokensIndex>>,
+  TData = UserTokensIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -418,7 +418,7 @@ export function useUserTokensIndex<
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof userTokensIndex>>,
+        UserTokensIndex200,
         TError,
         TData
       >
@@ -434,7 +434,7 @@ export function useUserTokensIndex<
  */
 
 export function useUserTokensIndex<
-  TData = Awaited<ReturnType<typeof userTokensIndex>>,
+  TData = UserTokensIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -444,7 +444,7 @@ export function useUserTokensIndex<
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof userTokensIndex>>,
+        UserTokensIndex200,
         TError,
         TData
       >
@@ -468,7 +468,7 @@ export function useUserTokensIndex<
 }
 
 export const getUserTokensIndexSuspenseQueryOptions = <
-  TData = Awaited<ReturnType<typeof userTokensIndex>>,
+  TData = UserTokensIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -478,7 +478,7 @@ export const getUserTokensIndexSuspenseQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof userTokensIndex>>,
+        UserTokensIndex200,
         TError,
         TData
       >
@@ -491,26 +491,26 @@ export const getUserTokensIndexSuspenseQueryOptions = <
   const queryKey =
     queryOptions?.queryKey ?? getUserTokensIndexQueryKey(user, params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof userTokensIndex>>> = ({
+  const queryFn: QueryFunction<UserTokensIndex200> = ({
     signal,
   }) => userTokensIndex(user, params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
-    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type UserTokensIndexSuspenseQueryResult = NonNullable<
-  Awaited<ReturnType<typeof userTokensIndex>>
+  UserTokensIndex200
 >;
 export type UserTokensIndexSuspenseQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useUserTokensIndexSuspense<
-  TData = Awaited<ReturnType<typeof userTokensIndex>>,
+  TData = UserTokensIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -520,7 +520,7 @@ export function useUserTokensIndexSuspense<
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof userTokensIndex>>,
+        UserTokensIndex200,
         TError,
         TData
       >
@@ -532,7 +532,7 @@ export function useUserTokensIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useUserTokensIndexSuspense<
-  TData = Awaited<ReturnType<typeof userTokensIndex>>,
+  TData = UserTokensIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -542,7 +542,7 @@ export function useUserTokensIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof userTokensIndex>>,
+        UserTokensIndex200,
         TError,
         TData
       >
@@ -554,7 +554,7 @@ export function useUserTokensIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useUserTokensIndexSuspense<
-  TData = Awaited<ReturnType<typeof userTokensIndex>>,
+  TData = UserTokensIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -564,7 +564,7 @@ export function useUserTokensIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof userTokensIndex>>,
+        UserTokensIndex200,
         TError,
         TData
       >
@@ -580,7 +580,7 @@ export function useUserTokensIndexSuspense<
  */
 
 export function useUserTokensIndexSuspense<
-  TData = Awaited<ReturnType<typeof userTokensIndex>>,
+  TData = UserTokensIndex200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -590,7 +590,7 @@ export function useUserTokensIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof userTokensIndex>>,
+        UserTokensIndex200,
         TError,
         TData
       >
@@ -621,7 +621,7 @@ export function useUserTokensIndexSuspense<
 
 export const getUserTokensIndexSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndex200,
     UserTokensIndexParams["page"]
   >,
   TError = ErrorType<
@@ -633,7 +633,7 @@ export const getUserTokensIndexSuspenseInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof userTokensIndex>>,
+        UserTokensIndex200,
         TError,
         TData,
         QueryKey,
@@ -649,7 +649,7 @@ export const getUserTokensIndexSuspenseInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getUserTokensIndexInfiniteQueryKey(user, params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndex200,
     QueryKey,
     UserTokensIndexParams["page"]
   > = ({ signal, pageParam }) =>
@@ -665,7 +665,7 @@ export const getUserTokensIndexSuspenseInfiniteQueryOptions = <
     queryFn,
     ...queryOptions,
   } as UseSuspenseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndex200,
     TError,
     TData,
     QueryKey,
@@ -674,7 +674,7 @@ export const getUserTokensIndexSuspenseInfiniteQueryOptions = <
 };
 
 export type UserTokensIndexSuspenseInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof userTokensIndex>>
+  UserTokensIndex200
 >;
 export type UserTokensIndexSuspenseInfiniteQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -682,7 +682,7 @@ export type UserTokensIndexSuspenseInfiniteQueryError = ErrorType<
 
 export function useUserTokensIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndex200,
     UserTokensIndexParams["page"]
   >,
   TError = ErrorType<
@@ -694,7 +694,7 @@ export function useUserTokensIndexSuspenseInfinite<
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof userTokensIndex>>,
+        UserTokensIndex200,
         TError,
         TData,
         QueryKey,
@@ -709,7 +709,7 @@ export function useUserTokensIndexSuspenseInfinite<
 };
 export function useUserTokensIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndex200,
     UserTokensIndexParams["page"]
   >,
   TError = ErrorType<
@@ -721,7 +721,7 @@ export function useUserTokensIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof userTokensIndex>>,
+        UserTokensIndex200,
         TError,
         TData,
         QueryKey,
@@ -736,7 +736,7 @@ export function useUserTokensIndexSuspenseInfinite<
 };
 export function useUserTokensIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndex200,
     UserTokensIndexParams["page"]
   >,
   TError = ErrorType<
@@ -748,7 +748,7 @@ export function useUserTokensIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof userTokensIndex>>,
+        UserTokensIndex200,
         TError,
         TData,
         QueryKey,
@@ -767,7 +767,7 @@ export function useUserTokensIndexSuspenseInfinite<
 
 export function useUserTokensIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof userTokensIndex>>,
+    UserTokensIndex200,
     UserTokensIndexParams["page"]
   >,
   TError = ErrorType<
@@ -779,7 +779,7 @@ export function useUserTokensIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof userTokensIndex>>,
+        UserTokensIndex200,
         TError,
         TData,
         QueryKey,

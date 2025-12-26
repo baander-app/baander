@@ -11,8 +11,9 @@ Implemented queuing functionality through Redis offers efficient job management 
 The media information is organized and easily searchable, ensuring users can always find what they are looking for quickly and easily.
  * OpenAPI spec version: 0.0.1
  */
-import type { AuthStreamToken200StreamToken } from "./authStreamToken200StreamToken";
 
-export type AuthStreamToken200 = {
-  streamToken: AuthStreamToken200StreamToken;
-};
+/**
+ * Release Details
+ * @maxLength 260
+ */
+export type AlbumUpdateRequestLabel = string | null;

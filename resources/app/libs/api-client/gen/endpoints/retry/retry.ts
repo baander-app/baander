@@ -45,14 +45,14 @@ export const getHorizonRetryJobsShowMutationOptions = <
   TContext = unknown
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof horizonRetryJobsShow>>,
+    HorizonRetryJobsShow200,
     TError,
     { id: string },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof horizonRetryJobsShow>>,
+  HorizonRetryJobsShow200,
   TError,
   { id: string },
   TContext
@@ -67,7 +67,7 @@ export const getHorizonRetryJobsShowMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof horizonRetryJobsShow>>,
+    HorizonRetryJobsShow200,
     { id: string }
   > = (props) => {
     const { id } = props ?? {};
@@ -79,7 +79,7 @@ export const getHorizonRetryJobsShowMutationOptions = <
 };
 
 export type HorizonRetryJobsShowMutationResult = NonNullable<
-  Awaited<ReturnType<typeof horizonRetryJobsShow>>
+  HorizonRetryJobsShow200
 >;
 
 export type HorizonRetryJobsShowMutationError = ErrorType<unknown>;
@@ -93,7 +93,7 @@ export const useHorizonRetryJobsShow = <
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof horizonRetryJobsShow>>,
+      HorizonRetryJobsShow200,
       TError,
       { id: string },
       TContext
@@ -102,7 +102,7 @@ export const useHorizonRetryJobsShow = <
   },
   queryClient?: QueryClient
 ): UseMutationResult<
-  Awaited<ReturnType<typeof horizonRetryJobsShow>>,
+  HorizonRetryJobsShow200,
   TError,
   { id: string },
   TContext

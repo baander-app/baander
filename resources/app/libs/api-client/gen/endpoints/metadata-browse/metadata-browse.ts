@@ -92,7 +92,7 @@ export const getMetadataBrowseAlbumsQueryKey = (
 
 export const getMetadataBrowseAlbumsInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+    MetadataBrowseAlbums200,
     MetadataBrowseAlbumsParams["page"]
   >,
   TError = ErrorType<
@@ -103,7 +103,7 @@ export const getMetadataBrowseAlbumsInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+        MetadataBrowseAlbums200,
         TError,
         TData,
         QueryKey,
@@ -119,7 +119,7 @@ export const getMetadataBrowseAlbumsInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getMetadataBrowseAlbumsInfiniteQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+    MetadataBrowseAlbums200,
     QueryKey,
     MetadataBrowseAlbumsParams["page"]
   > = ({ signal, pageParam }) =>
@@ -130,7 +130,7 @@ export const getMetadataBrowseAlbumsInfiniteQueryOptions = <
     );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+    MetadataBrowseAlbums200,
     TError,
     TData,
     QueryKey,
@@ -139,7 +139,7 @@ export const getMetadataBrowseAlbumsInfiniteQueryOptions = <
 };
 
 export type MetadataBrowseAlbumsInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof metadataBrowseAlbums>>
+  MetadataBrowseAlbums200
 >;
 export type MetadataBrowseAlbumsInfiniteQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -147,7 +147,7 @@ export type MetadataBrowseAlbumsInfiniteQueryError = ErrorType<
 
 export function useMetadataBrowseAlbumsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+    MetadataBrowseAlbums200,
     MetadataBrowseAlbumsParams["page"]
   >,
   TError = ErrorType<
@@ -158,7 +158,7 @@ export function useMetadataBrowseAlbumsInfinite<
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+        MetadataBrowseAlbums200,
         TError,
         TData,
         QueryKey,
@@ -167,9 +167,9 @@ export function useMetadataBrowseAlbumsInfinite<
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+          MetadataBrowseAlbums200,
           TError,
-          Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+          MetadataBrowseAlbums200,
           QueryKey
         >,
         "initialData"
@@ -182,7 +182,7 @@ export function useMetadataBrowseAlbumsInfinite<
 };
 export function useMetadataBrowseAlbumsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+    MetadataBrowseAlbums200,
     MetadataBrowseAlbumsParams["page"]
   >,
   TError = ErrorType<
@@ -193,7 +193,7 @@ export function useMetadataBrowseAlbumsInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+        MetadataBrowseAlbums200,
         TError,
         TData,
         QueryKey,
@@ -202,9 +202,9 @@ export function useMetadataBrowseAlbumsInfinite<
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+          MetadataBrowseAlbums200,
           TError,
-          Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+          MetadataBrowseAlbums200,
           QueryKey
         >,
         "initialData"
@@ -217,7 +217,7 @@ export function useMetadataBrowseAlbumsInfinite<
 };
 export function useMetadataBrowseAlbumsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+    MetadataBrowseAlbums200,
     MetadataBrowseAlbumsParams["page"]
   >,
   TError = ErrorType<
@@ -228,7 +228,7 @@ export function useMetadataBrowseAlbumsInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+        MetadataBrowseAlbums200,
         TError,
         TData,
         QueryKey,
@@ -247,7 +247,7 @@ export function useMetadataBrowseAlbumsInfinite<
 
 export function useMetadataBrowseAlbumsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+    MetadataBrowseAlbums200,
     MetadataBrowseAlbumsParams["page"]
   >,
   TError = ErrorType<
@@ -258,7 +258,7 @@ export function useMetadataBrowseAlbumsInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+        MetadataBrowseAlbums200,
         TError,
         TData,
         QueryKey,
@@ -289,7 +289,7 @@ export function useMetadataBrowseAlbumsInfinite<
 }
 
 export const getMetadataBrowseAlbumsQueryOptions = <
-  TData = Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+  TData = MetadataBrowseAlbums200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -298,7 +298,7 @@ export const getMetadataBrowseAlbumsQueryOptions = <
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+        MetadataBrowseAlbums200,
         TError,
         TData
       >
@@ -312,25 +312,25 @@ export const getMetadataBrowseAlbumsQueryOptions = <
     queryOptions?.queryKey ?? getMetadataBrowseAlbumsQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof metadataBrowseAlbums>>
+    MetadataBrowseAlbums200
   > = ({ signal }) => metadataBrowseAlbums(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+    MetadataBrowseAlbums200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type MetadataBrowseAlbumsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof metadataBrowseAlbums>>
+  MetadataBrowseAlbums200
 >;
 export type MetadataBrowseAlbumsQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useMetadataBrowseAlbums<
-  TData = Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+  TData = MetadataBrowseAlbums200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -339,16 +339,16 @@ export function useMetadataBrowseAlbums<
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+        MetadataBrowseAlbums200,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+          MetadataBrowseAlbums200,
           TError,
-          Awaited<ReturnType<typeof metadataBrowseAlbums>>
+          MetadataBrowseAlbums200
         >,
         "initialData"
       >;
@@ -359,7 +359,7 @@ export function useMetadataBrowseAlbums<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useMetadataBrowseAlbums<
-  TData = Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+  TData = MetadataBrowseAlbums200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -368,16 +368,16 @@ export function useMetadataBrowseAlbums<
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+        MetadataBrowseAlbums200,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+          MetadataBrowseAlbums200,
           TError,
-          Awaited<ReturnType<typeof metadataBrowseAlbums>>
+          MetadataBrowseAlbums200
         >,
         "initialData"
       >;
@@ -388,7 +388,7 @@ export function useMetadataBrowseAlbums<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useMetadataBrowseAlbums<
-  TData = Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+  TData = MetadataBrowseAlbums200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -397,7 +397,7 @@ export function useMetadataBrowseAlbums<
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+        MetadataBrowseAlbums200,
         TError,
         TData
       >
@@ -413,7 +413,7 @@ export function useMetadataBrowseAlbums<
  */
 
 export function useMetadataBrowseAlbums<
-  TData = Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+  TData = MetadataBrowseAlbums200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -422,7 +422,7 @@ export function useMetadataBrowseAlbums<
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+        MetadataBrowseAlbums200,
         TError,
         TData
       >
@@ -446,7 +446,7 @@ export function useMetadataBrowseAlbums<
 }
 
 export const getMetadataBrowseAlbumsSuspenseQueryOptions = <
-  TData = Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+  TData = MetadataBrowseAlbums200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -455,7 +455,7 @@ export const getMetadataBrowseAlbumsSuspenseQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+        MetadataBrowseAlbums200,
         TError,
         TData
       >
@@ -469,25 +469,25 @@ export const getMetadataBrowseAlbumsSuspenseQueryOptions = <
     queryOptions?.queryKey ?? getMetadataBrowseAlbumsQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof metadataBrowseAlbums>>
+    MetadataBrowseAlbums200
   > = ({ signal }) => metadataBrowseAlbums(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
-    Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+    MetadataBrowseAlbums200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type MetadataBrowseAlbumsSuspenseQueryResult = NonNullable<
-  Awaited<ReturnType<typeof metadataBrowseAlbums>>
+  MetadataBrowseAlbums200
 >;
 export type MetadataBrowseAlbumsSuspenseQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
 >;
 
 export function useMetadataBrowseAlbumsSuspense<
-  TData = Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+  TData = MetadataBrowseAlbums200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -496,7 +496,7 @@ export function useMetadataBrowseAlbumsSuspense<
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+        MetadataBrowseAlbums200,
         TError,
         TData
       >
@@ -508,7 +508,7 @@ export function useMetadataBrowseAlbumsSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useMetadataBrowseAlbumsSuspense<
-  TData = Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+  TData = MetadataBrowseAlbums200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -517,7 +517,7 @@ export function useMetadataBrowseAlbumsSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+        MetadataBrowseAlbums200,
         TError,
         TData
       >
@@ -529,7 +529,7 @@ export function useMetadataBrowseAlbumsSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useMetadataBrowseAlbumsSuspense<
-  TData = Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+  TData = MetadataBrowseAlbums200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -538,7 +538,7 @@ export function useMetadataBrowseAlbumsSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+        MetadataBrowseAlbums200,
         TError,
         TData
       >
@@ -554,7 +554,7 @@ export function useMetadataBrowseAlbumsSuspense<
  */
 
 export function useMetadataBrowseAlbumsSuspense<
-  TData = Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+  TData = MetadataBrowseAlbums200,
   TError = ErrorType<
     AuthenticationExceptionResponse | ValidationExceptionResponse
   >
@@ -563,7 +563,7 @@ export function useMetadataBrowseAlbumsSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+        MetadataBrowseAlbums200,
         TError,
         TData
       >
@@ -593,7 +593,7 @@ export function useMetadataBrowseAlbumsSuspense<
 
 export const getMetadataBrowseAlbumsSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+    MetadataBrowseAlbums200,
     MetadataBrowseAlbumsParams["page"]
   >,
   TError = ErrorType<
@@ -604,7 +604,7 @@ export const getMetadataBrowseAlbumsSuspenseInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+        MetadataBrowseAlbums200,
         TError,
         TData,
         QueryKey,
@@ -620,7 +620,7 @@ export const getMetadataBrowseAlbumsSuspenseInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getMetadataBrowseAlbumsInfiniteQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+    MetadataBrowseAlbums200,
     QueryKey,
     MetadataBrowseAlbumsParams["page"]
   > = ({ signal, pageParam }) =>
@@ -635,7 +635,7 @@ export const getMetadataBrowseAlbumsSuspenseInfiniteQueryOptions = <
     queryFn,
     ...queryOptions,
   } as UseSuspenseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+    MetadataBrowseAlbums200,
     TError,
     TData,
     QueryKey,
@@ -644,7 +644,7 @@ export const getMetadataBrowseAlbumsSuspenseInfiniteQueryOptions = <
 };
 
 export type MetadataBrowseAlbumsSuspenseInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof metadataBrowseAlbums>>
+  MetadataBrowseAlbums200
 >;
 export type MetadataBrowseAlbumsSuspenseInfiniteQueryError = ErrorType<
   AuthenticationExceptionResponse | ValidationExceptionResponse
@@ -652,7 +652,7 @@ export type MetadataBrowseAlbumsSuspenseInfiniteQueryError = ErrorType<
 
 export function useMetadataBrowseAlbumsSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+    MetadataBrowseAlbums200,
     MetadataBrowseAlbumsParams["page"]
   >,
   TError = ErrorType<
@@ -663,7 +663,7 @@ export function useMetadataBrowseAlbumsSuspenseInfinite<
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+        MetadataBrowseAlbums200,
         TError,
         TData,
         QueryKey,
@@ -678,7 +678,7 @@ export function useMetadataBrowseAlbumsSuspenseInfinite<
 };
 export function useMetadataBrowseAlbumsSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+    MetadataBrowseAlbums200,
     MetadataBrowseAlbumsParams["page"]
   >,
   TError = ErrorType<
@@ -689,7 +689,7 @@ export function useMetadataBrowseAlbumsSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+        MetadataBrowseAlbums200,
         TError,
         TData,
         QueryKey,
@@ -704,7 +704,7 @@ export function useMetadataBrowseAlbumsSuspenseInfinite<
 };
 export function useMetadataBrowseAlbumsSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+    MetadataBrowseAlbums200,
     MetadataBrowseAlbumsParams["page"]
   >,
   TError = ErrorType<
@@ -715,7 +715,7 @@ export function useMetadataBrowseAlbumsSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+        MetadataBrowseAlbums200,
         TError,
         TData,
         QueryKey,
@@ -734,7 +734,7 @@ export function useMetadataBrowseAlbumsSuspenseInfinite<
 
 export function useMetadataBrowseAlbumsSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+    MetadataBrowseAlbums200,
     MetadataBrowseAlbumsParams["page"]
   >,
   TError = ErrorType<
@@ -745,7 +745,7 @@ export function useMetadataBrowseAlbumsSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof metadataBrowseAlbums>>,
+        MetadataBrowseAlbums200,
         TError,
         TData,
         QueryKey,

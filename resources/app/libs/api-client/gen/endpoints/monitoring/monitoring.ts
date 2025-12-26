@@ -76,12 +76,12 @@ export const getHorizonMonitoringIndexQueryKey = () => {
 };
 
 export const getHorizonMonitoringIndexInfiniteQueryOptions = <
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonMonitoringIndex>>>,
+  TData = InfiniteData<HorizonMonitoringIndex200>,
   TError = ErrorType<unknown>
 >(options?: {
   query?: Partial<
     UseInfiniteQueryOptions<
-      Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+      HorizonMonitoringIndex200,
       TError,
       TData
     >
@@ -94,38 +94,38 @@ export const getHorizonMonitoringIndexInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getHorizonMonitoringIndexInfiniteQueryKey();
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof horizonMonitoringIndex>>
+    HorizonMonitoringIndex200
   > = ({ signal }) => horizonMonitoringIndex(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+    HorizonMonitoringIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type HorizonMonitoringIndexInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof horizonMonitoringIndex>>
+  HorizonMonitoringIndex200
 >;
 export type HorizonMonitoringIndexInfiniteQueryError = ErrorType<unknown>;
 
 export function useHorizonMonitoringIndexInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonMonitoringIndex>>>,
+  TData = InfiniteData<HorizonMonitoringIndex200>,
   TError = ErrorType<unknown>
 >(
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+        HorizonMonitoringIndex200,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+          HorizonMonitoringIndex200,
           TError,
-          Awaited<ReturnType<typeof horizonMonitoringIndex>>
+          HorizonMonitoringIndex200
         >,
         "initialData"
       >;
@@ -136,22 +136,22 @@ export function useHorizonMonitoringIndexInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonMonitoringIndexInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonMonitoringIndex>>>,
+  TData = InfiniteData<HorizonMonitoringIndex200>,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+        HorizonMonitoringIndex200,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+          HorizonMonitoringIndex200,
           TError,
-          Awaited<ReturnType<typeof horizonMonitoringIndex>>
+          HorizonMonitoringIndex200
         >,
         "initialData"
       >;
@@ -162,13 +162,13 @@ export function useHorizonMonitoringIndexInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonMonitoringIndexInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonMonitoringIndex>>>,
+  TData = InfiniteData<HorizonMonitoringIndex200>,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+        HorizonMonitoringIndex200,
         TError,
         TData
       >
@@ -184,13 +184,13 @@ export function useHorizonMonitoringIndexInfinite<
  */
 
 export function useHorizonMonitoringIndexInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonMonitoringIndex>>>,
+  TData = InfiniteData<HorizonMonitoringIndex200>,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+        HorizonMonitoringIndex200,
         TError,
         TData
       >
@@ -216,12 +216,12 @@ export function useHorizonMonitoringIndexInfinite<
 }
 
 export const getHorizonMonitoringIndexQueryOptions = <
-  TData = Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+  TData = HorizonMonitoringIndex200,
   TError = ErrorType<unknown>
 >(options?: {
   query?: Partial<
     UseQueryOptions<
-      Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+      HorizonMonitoringIndex200,
       TError,
       TData
     >
@@ -234,38 +234,38 @@ export const getHorizonMonitoringIndexQueryOptions = <
     queryOptions?.queryKey ?? getHorizonMonitoringIndexQueryKey();
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof horizonMonitoringIndex>>
+    HorizonMonitoringIndex200
   > = ({ signal }) => horizonMonitoringIndex(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+    HorizonMonitoringIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type HorizonMonitoringIndexQueryResult = NonNullable<
-  Awaited<ReturnType<typeof horizonMonitoringIndex>>
+  HorizonMonitoringIndex200
 >;
 export type HorizonMonitoringIndexQueryError = ErrorType<unknown>;
 
 export function useHorizonMonitoringIndex<
-  TData = Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+  TData = HorizonMonitoringIndex200,
   TError = ErrorType<unknown>
 >(
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+        HorizonMonitoringIndex200,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+          HorizonMonitoringIndex200,
           TError,
-          Awaited<ReturnType<typeof horizonMonitoringIndex>>
+          HorizonMonitoringIndex200
         >,
         "initialData"
       >;
@@ -276,22 +276,22 @@ export function useHorizonMonitoringIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonMonitoringIndex<
-  TData = Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+  TData = HorizonMonitoringIndex200,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+        HorizonMonitoringIndex200,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+          HorizonMonitoringIndex200,
           TError,
-          Awaited<ReturnType<typeof horizonMonitoringIndex>>
+          HorizonMonitoringIndex200
         >,
         "initialData"
       >;
@@ -302,13 +302,13 @@ export function useHorizonMonitoringIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonMonitoringIndex<
-  TData = Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+  TData = HorizonMonitoringIndex200,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+        HorizonMonitoringIndex200,
         TError,
         TData
       >
@@ -324,13 +324,13 @@ export function useHorizonMonitoringIndex<
  */
 
 export function useHorizonMonitoringIndex<
-  TData = Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+  TData = HorizonMonitoringIndex200,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+        HorizonMonitoringIndex200,
         TError,
         TData
       >
@@ -354,12 +354,12 @@ export function useHorizonMonitoringIndex<
 }
 
 export const getHorizonMonitoringIndexSuspenseQueryOptions = <
-  TData = Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+  TData = HorizonMonitoringIndex200,
   TError = ErrorType<unknown>
 >(options?: {
   query?: Partial<
     UseSuspenseQueryOptions<
-      Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+      HorizonMonitoringIndex200,
       TError,
       TData
     >
@@ -372,29 +372,29 @@ export const getHorizonMonitoringIndexSuspenseQueryOptions = <
     queryOptions?.queryKey ?? getHorizonMonitoringIndexQueryKey();
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof horizonMonitoringIndex>>
+    HorizonMonitoringIndex200
   > = ({ signal }) => horizonMonitoringIndex(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
-    Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+    HorizonMonitoringIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type HorizonMonitoringIndexSuspenseQueryResult = NonNullable<
-  Awaited<ReturnType<typeof horizonMonitoringIndex>>
+  HorizonMonitoringIndex200
 >;
 export type HorizonMonitoringIndexSuspenseQueryError = ErrorType<unknown>;
 
 export function useHorizonMonitoringIndexSuspense<
-  TData = Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+  TData = HorizonMonitoringIndex200,
   TError = ErrorType<unknown>
 >(
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+        HorizonMonitoringIndex200,
         TError,
         TData
       >
@@ -406,13 +406,13 @@ export function useHorizonMonitoringIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonMonitoringIndexSuspense<
-  TData = Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+  TData = HorizonMonitoringIndex200,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+        HorizonMonitoringIndex200,
         TError,
         TData
       >
@@ -424,13 +424,13 @@ export function useHorizonMonitoringIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonMonitoringIndexSuspense<
-  TData = Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+  TData = HorizonMonitoringIndex200,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+        HorizonMonitoringIndex200,
         TError,
         TData
       >
@@ -446,13 +446,13 @@ export function useHorizonMonitoringIndexSuspense<
  */
 
 export function useHorizonMonitoringIndexSuspense<
-  TData = Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+  TData = HorizonMonitoringIndex200,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+        HorizonMonitoringIndex200,
         TError,
         TData
       >
@@ -478,12 +478,12 @@ export function useHorizonMonitoringIndexSuspense<
 }
 
 export const getHorizonMonitoringIndexSuspenseInfiniteQueryOptions = <
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonMonitoringIndex>>>,
+  TData = InfiniteData<HorizonMonitoringIndex200>,
   TError = ErrorType<unknown>
 >(options?: {
   query?: Partial<
     UseSuspenseInfiniteQueryOptions<
-      Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+      HorizonMonitoringIndex200,
       TError,
       TData
     >
@@ -496,7 +496,7 @@ export const getHorizonMonitoringIndexSuspenseInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getHorizonMonitoringIndexInfiniteQueryKey();
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof horizonMonitoringIndex>>
+    HorizonMonitoringIndex200
   > = ({ signal }) => horizonMonitoringIndex(requestOptions, signal);
 
   return {
@@ -504,26 +504,26 @@ export const getHorizonMonitoringIndexSuspenseInfiniteQueryOptions = <
     queryFn,
     ...queryOptions,
   } as UseSuspenseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+    HorizonMonitoringIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type HorizonMonitoringIndexSuspenseInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof horizonMonitoringIndex>>
+  HorizonMonitoringIndex200
 >;
 export type HorizonMonitoringIndexSuspenseInfiniteQueryError =
   ErrorType<unknown>;
 
 export function useHorizonMonitoringIndexSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonMonitoringIndex>>>,
+  TData = InfiniteData<HorizonMonitoringIndex200>,
   TError = ErrorType<unknown>
 >(
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+        HorizonMonitoringIndex200,
         TError,
         TData
       >
@@ -535,13 +535,13 @@ export function useHorizonMonitoringIndexSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonMonitoringIndexSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonMonitoringIndex>>>,
+  TData = InfiniteData<HorizonMonitoringIndex200>,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+        HorizonMonitoringIndex200,
         TError,
         TData
       >
@@ -553,13 +553,13 @@ export function useHorizonMonitoringIndexSuspenseInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useHorizonMonitoringIndexSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonMonitoringIndex>>>,
+  TData = InfiniteData<HorizonMonitoringIndex200>,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+        HorizonMonitoringIndex200,
         TError,
         TData
       >
@@ -575,13 +575,13 @@ export function useHorizonMonitoringIndexSuspenseInfinite<
  */
 
 export function useHorizonMonitoringIndexSuspenseInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof horizonMonitoringIndex>>>,
+  TData = InfiniteData<HorizonMonitoringIndex200>,
   TError = ErrorType<unknown>
 >(
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof horizonMonitoringIndex>>,
+        HorizonMonitoringIndex200,
         TError,
         TData
       >

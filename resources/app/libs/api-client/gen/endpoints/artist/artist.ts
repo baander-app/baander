@@ -96,7 +96,7 @@ export const getArtistsIndexQueryKey = (
 
 export const getArtistsIndexInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof artistsIndex>>,
+    ArtistsIndex200,
     ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -110,7 +110,7 @@ export const getArtistsIndexInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof artistsIndex>>,
+        ArtistsIndex200,
         TError,
         TData,
         QueryKey,
@@ -126,7 +126,7 @@ export const getArtistsIndexInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getArtistsIndexInfiniteQueryKey(library, params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof artistsIndex>>,
+    ArtistsIndex200,
     QueryKey,
     ArtistsIndexParams["page"]
   > = ({ signal, pageParam }) =>
@@ -143,7 +143,7 @@ export const getArtistsIndexInfiniteQueryOptions = <
     enabled: !!library,
     ...queryOptions,
   } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof artistsIndex>>,
+    ArtistsIndex200,
     TError,
     TData,
     QueryKey,
@@ -152,7 +152,7 @@ export const getArtistsIndexInfiniteQueryOptions = <
 };
 
 export type ArtistsIndexInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof artistsIndex>>
+  ArtistsIndex200
 >;
 export type ArtistsIndexInfiniteQueryError = ErrorType<
   | AuthenticationExceptionResponse
@@ -162,7 +162,7 @@ export type ArtistsIndexInfiniteQueryError = ErrorType<
 
 export function useArtistsIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof artistsIndex>>,
+    ArtistsIndex200,
     ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -176,7 +176,7 @@ export function useArtistsIndexInfinite<
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof artistsIndex>>,
+        ArtistsIndex200,
         TError,
         TData,
         QueryKey,
@@ -185,9 +185,9 @@ export function useArtistsIndexInfinite<
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof artistsIndex>>,
+          ArtistsIndex200,
           TError,
-          Awaited<ReturnType<typeof artistsIndex>>,
+          ArtistsIndex200,
           QueryKey
         >,
         "initialData"
@@ -200,7 +200,7 @@ export function useArtistsIndexInfinite<
 };
 export function useArtistsIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof artistsIndex>>,
+    ArtistsIndex200,
     ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -214,7 +214,7 @@ export function useArtistsIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof artistsIndex>>,
+        ArtistsIndex200,
         TError,
         TData,
         QueryKey,
@@ -223,9 +223,9 @@ export function useArtistsIndexInfinite<
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof artistsIndex>>,
+          ArtistsIndex200,
           TError,
-          Awaited<ReturnType<typeof artistsIndex>>,
+          ArtistsIndex200,
           QueryKey
         >,
         "initialData"
@@ -238,7 +238,7 @@ export function useArtistsIndexInfinite<
 };
 export function useArtistsIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof artistsIndex>>,
+    ArtistsIndex200,
     ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -252,7 +252,7 @@ export function useArtistsIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof artistsIndex>>,
+        ArtistsIndex200,
         TError,
         TData,
         QueryKey,
@@ -271,7 +271,7 @@ export function useArtistsIndexInfinite<
 
 export function useArtistsIndexInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof artistsIndex>>,
+    ArtistsIndex200,
     ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -285,7 +285,7 @@ export function useArtistsIndexInfinite<
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof artistsIndex>>,
+        ArtistsIndex200,
         TError,
         TData,
         QueryKey,
@@ -317,7 +317,7 @@ export function useArtistsIndexInfinite<
 }
 
 export const getArtistsIndexQueryOptions = <
-  TData = Awaited<ReturnType<typeof artistsIndex>>,
+  TData = ArtistsIndex200,
   TError = ErrorType<
     | AuthenticationExceptionResponse
     | ModelNotFoundExceptionResponse
@@ -328,7 +328,7 @@ export const getArtistsIndexQueryOptions = <
   params?: ArtistsIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof artistsIndex>>, TError, TData>
+      UseQueryOptions<ArtistsIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   }
@@ -338,7 +338,7 @@ export const getArtistsIndexQueryOptions = <
   const queryKey =
     queryOptions?.queryKey ?? getArtistsIndexQueryKey(library, params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof artistsIndex>>> = ({
+  const queryFn: QueryFunction<ArtistsIndex200> = ({
     signal,
   }) => artistsIndex(library, params, requestOptions, signal);
 
@@ -348,14 +348,14 @@ export const getArtistsIndexQueryOptions = <
     enabled: !!library,
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof artistsIndex>>,
+    ArtistsIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type ArtistsIndexQueryResult = NonNullable<
-  Awaited<ReturnType<typeof artistsIndex>>
+  ArtistsIndex200
 >;
 export type ArtistsIndexQueryError = ErrorType<
   | AuthenticationExceptionResponse
@@ -364,7 +364,7 @@ export type ArtistsIndexQueryError = ErrorType<
 >;
 
 export function useArtistsIndex<
-  TData = Awaited<ReturnType<typeof artistsIndex>>,
+  TData = ArtistsIndex200,
   TError = ErrorType<
     | AuthenticationExceptionResponse
     | ModelNotFoundExceptionResponse
@@ -375,13 +375,13 @@ export function useArtistsIndex<
   params: undefined | ArtistsIndexParams,
   options: {
     query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof artistsIndex>>, TError, TData>
+      UseQueryOptions<ArtistsIndex200, TError, TData>
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof artistsIndex>>,
+          ArtistsIndex200,
           TError,
-          Awaited<ReturnType<typeof artistsIndex>>
+          ArtistsIndex200
         >,
         "initialData"
       >;
@@ -392,7 +392,7 @@ export function useArtistsIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useArtistsIndex<
-  TData = Awaited<ReturnType<typeof artistsIndex>>,
+  TData = ArtistsIndex200,
   TError = ErrorType<
     | AuthenticationExceptionResponse
     | ModelNotFoundExceptionResponse
@@ -403,13 +403,13 @@ export function useArtistsIndex<
   params?: ArtistsIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof artistsIndex>>, TError, TData>
+      UseQueryOptions<ArtistsIndex200, TError, TData>
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof artistsIndex>>,
+          ArtistsIndex200,
           TError,
-          Awaited<ReturnType<typeof artistsIndex>>
+          ArtistsIndex200
         >,
         "initialData"
       >;
@@ -420,7 +420,7 @@ export function useArtistsIndex<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useArtistsIndex<
-  TData = Awaited<ReturnType<typeof artistsIndex>>,
+  TData = ArtistsIndex200,
   TError = ErrorType<
     | AuthenticationExceptionResponse
     | ModelNotFoundExceptionResponse
@@ -431,7 +431,7 @@ export function useArtistsIndex<
   params?: ArtistsIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof artistsIndex>>, TError, TData>
+      UseQueryOptions<ArtistsIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -444,7 +444,7 @@ export function useArtistsIndex<
  */
 
 export function useArtistsIndex<
-  TData = Awaited<ReturnType<typeof artistsIndex>>,
+  TData = ArtistsIndex200,
   TError = ErrorType<
     | AuthenticationExceptionResponse
     | ModelNotFoundExceptionResponse
@@ -455,7 +455,7 @@ export function useArtistsIndex<
   params?: ArtistsIndexParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof artistsIndex>>, TError, TData>
+      UseQueryOptions<ArtistsIndex200, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -476,7 +476,7 @@ export function useArtistsIndex<
 }
 
 export const getArtistsIndexSuspenseQueryOptions = <
-  TData = Awaited<ReturnType<typeof artistsIndex>>,
+  TData = ArtistsIndex200,
   TError = ErrorType<
     | AuthenticationExceptionResponse
     | ModelNotFoundExceptionResponse
@@ -488,7 +488,7 @@ export const getArtistsIndexSuspenseQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof artistsIndex>>,
+        ArtistsIndex200,
         TError,
         TData
       >
@@ -501,19 +501,19 @@ export const getArtistsIndexSuspenseQueryOptions = <
   const queryKey =
     queryOptions?.queryKey ?? getArtistsIndexQueryKey(library, params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof artistsIndex>>> = ({
+  const queryFn: QueryFunction<ArtistsIndex200> = ({
     signal,
   }) => artistsIndex(library, params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
-    Awaited<ReturnType<typeof artistsIndex>>,
+    ArtistsIndex200,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
 export type ArtistsIndexSuspenseQueryResult = NonNullable<
-  Awaited<ReturnType<typeof artistsIndex>>
+  ArtistsIndex200
 >;
 export type ArtistsIndexSuspenseQueryError = ErrorType<
   | AuthenticationExceptionResponse
@@ -522,7 +522,7 @@ export type ArtistsIndexSuspenseQueryError = ErrorType<
 >;
 
 export function useArtistsIndexSuspense<
-  TData = Awaited<ReturnType<typeof artistsIndex>>,
+  TData = ArtistsIndex200,
   TError = ErrorType<
     | AuthenticationExceptionResponse
     | ModelNotFoundExceptionResponse
@@ -534,7 +534,7 @@ export function useArtistsIndexSuspense<
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof artistsIndex>>,
+        ArtistsIndex200,
         TError,
         TData
       >
@@ -546,7 +546,7 @@ export function useArtistsIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useArtistsIndexSuspense<
-  TData = Awaited<ReturnType<typeof artistsIndex>>,
+  TData = ArtistsIndex200,
   TError = ErrorType<
     | AuthenticationExceptionResponse
     | ModelNotFoundExceptionResponse
@@ -558,7 +558,7 @@ export function useArtistsIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof artistsIndex>>,
+        ArtistsIndex200,
         TError,
         TData
       >
@@ -570,7 +570,7 @@ export function useArtistsIndexSuspense<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useArtistsIndexSuspense<
-  TData = Awaited<ReturnType<typeof artistsIndex>>,
+  TData = ArtistsIndex200,
   TError = ErrorType<
     | AuthenticationExceptionResponse
     | ModelNotFoundExceptionResponse
@@ -582,7 +582,7 @@ export function useArtistsIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof artistsIndex>>,
+        ArtistsIndex200,
         TError,
         TData
       >
@@ -598,7 +598,7 @@ export function useArtistsIndexSuspense<
  */
 
 export function useArtistsIndexSuspense<
-  TData = Awaited<ReturnType<typeof artistsIndex>>,
+  TData = ArtistsIndex200,
   TError = ErrorType<
     | AuthenticationExceptionResponse
     | ModelNotFoundExceptionResponse
@@ -610,7 +610,7 @@ export function useArtistsIndexSuspense<
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
-        Awaited<ReturnType<typeof artistsIndex>>,
+        ArtistsIndex200,
         TError,
         TData
       >
@@ -641,7 +641,7 @@ export function useArtistsIndexSuspense<
 
 export const getArtistsIndexSuspenseInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof artistsIndex>>,
+    ArtistsIndex200,
     ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -655,7 +655,7 @@ export const getArtistsIndexSuspenseInfiniteQueryOptions = <
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof artistsIndex>>,
+        ArtistsIndex200,
         TError,
         TData,
         QueryKey,
@@ -671,7 +671,7 @@ export const getArtistsIndexSuspenseInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getArtistsIndexInfiniteQueryKey(library, params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof artistsIndex>>,
+    ArtistsIndex200,
     QueryKey,
     ArtistsIndexParams["page"]
   > = ({ signal, pageParam }) =>
@@ -687,7 +687,7 @@ export const getArtistsIndexSuspenseInfiniteQueryOptions = <
     queryFn,
     ...queryOptions,
   } as UseSuspenseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof artistsIndex>>,
+    ArtistsIndex200,
     TError,
     TData,
     QueryKey,
@@ -696,7 +696,7 @@ export const getArtistsIndexSuspenseInfiniteQueryOptions = <
 };
 
 export type ArtistsIndexSuspenseInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof artistsIndex>>
+  ArtistsIndex200
 >;
 export type ArtistsIndexSuspenseInfiniteQueryError = ErrorType<
   | AuthenticationExceptionResponse
@@ -706,7 +706,7 @@ export type ArtistsIndexSuspenseInfiniteQueryError = ErrorType<
 
 export function useArtistsIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof artistsIndex>>,
+    ArtistsIndex200,
     ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -720,7 +720,7 @@ export function useArtistsIndexSuspenseInfinite<
   options: {
     query: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof artistsIndex>>,
+        ArtistsIndex200,
         TError,
         TData,
         QueryKey,
@@ -735,7 +735,7 @@ export function useArtistsIndexSuspenseInfinite<
 };
 export function useArtistsIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof artistsIndex>>,
+    ArtistsIndex200,
     ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -749,7 +749,7 @@ export function useArtistsIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof artistsIndex>>,
+        ArtistsIndex200,
         TError,
         TData,
         QueryKey,
@@ -764,7 +764,7 @@ export function useArtistsIndexSuspenseInfinite<
 };
 export function useArtistsIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof artistsIndex>>,
+    ArtistsIndex200,
     ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -778,7 +778,7 @@ export function useArtistsIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof artistsIndex>>,
+        ArtistsIndex200,
         TError,
         TData,
         QueryKey,
@@ -797,7 +797,7 @@ export function useArtistsIndexSuspenseInfinite<
 
 export function useArtistsIndexSuspenseInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof artistsIndex>>,
+    ArtistsIndex200,
     ArtistsIndexParams["page"]
   >,
   TError = ErrorType<
@@ -811,7 +811,7 @@ export function useArtistsIndexSuspenseInfinite<
   options?: {
     query?: Partial<
       UseSuspenseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof artistsIndex>>,
+        ArtistsIndex200,
         TError,
         TData,
         QueryKey,
