@@ -43,6 +43,11 @@ class GenreIndexRequest extends FormRequest
             'librarySlug' => 'string',
             /**
              * @query
+             * Constrain the query to only fetch genres that have songs
+             */
+            'hasSongs'   => 'boolean',
+            /**
+             * @query
              * Current page
              */
             'page'        => 'int',

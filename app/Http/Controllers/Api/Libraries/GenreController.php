@@ -33,9 +33,12 @@ class GenreController extends Controller
         /** @var string|null $fields Comma-separated list of fields to select */
         $fields = $request->query('fields');
         $librarySlug = $request->query('librarySlug');
+        $hasSongs = $request->query('hasSongs');
 
         $genres = Genre::query()
-            ->whereHas('songs')
+            ->when($hasSongs, function ($query) {
+                $query->whereHas('songs');
+            })
 //            ->selectFields(Genre::$filterFields, $fields)
             ->withRelations(Genre::$filterFields, $fields)
             ->paginate();

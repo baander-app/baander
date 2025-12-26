@@ -16,6 +16,7 @@ export type GenresIndexParams = {
   fields?: string;
   relations?: string;
   librarySlug?: string;
+  hasSongs?: boolean;
   page?: number;
   limit?: number;
 };
