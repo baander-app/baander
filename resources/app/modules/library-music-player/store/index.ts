@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { globalAudioProcessor } from '../../../services/global-audio-processor-service';
 import { useEffect, useRef, useState } from 'react';
+import { createLogger } from '../../../services/logger';
+
+const logger = createLogger('MusicPlayerStore');
 
 type Song = { publicId: string; title?: string; } | null;
 
@@ -151,6 +154,20 @@ export const useMusicPlayerStore = create<MusicPlayerState>()(
         el.src = src || '';
         if (src) {
           el.preload = 'auto';
+          // Connect processor when source is set - the global service will handle
+          // whether to actually connect based on whether the element has media
+          const st = get();
+          if (st.processor) {
+            logger.debug('Connecting processor to audio element with source');
+            Promise.resolve(st.processor.connect?.(el))
+              .then(() => {
+                logger.debug('Processor connection completed');
+                useMusicPlayerStore.setState({ processorConnected: true });
+              })
+              .catch((err) => {
+                logger.error('Failed to connect processor:', err);
+              });
+          }
         } else {
           try { el.removeAttribute('src'); } catch {}
         }
@@ -239,11 +256,22 @@ export function attachAudioElement(el: HTMLAudioElement, handlers?: PlayerEventH
     el.preload = 'auto';
   }
 
-  // Attempt to connect processor if available and not yet connected
-  if (st.processor && !st.processorConnected) {
+  // Attempt to connect processor if available and element has a source
+  // Only connect when the audio element has a source, as createMediaElementSource
+  // requires the element to have media content
+  if (st.processor && !st.processorConnected && el.src) {
+    logger.debug('Connecting audio element to processor...');
     Promise.resolve(st.processor.connect?.(el))
-      .then(() => useMusicPlayerStore.setState({ processorConnected: true }))
-      .catch(() => useMusicPlayerStore.setState({ processorConnected: false }));
+      .then(() => {
+        logger.debug('Processor connected successfully');
+        useMusicPlayerStore.setState({ processorConnected: true });
+      })
+      .catch((err) => {
+        logger.error('Failed to connect processor:', err);
+        useMusicPlayerStore.setState({ processorConnected: false });
+      });
+  } else {
+    logger.debug('Skipping processor connection:', { hasProcessor: !!st.processor, isConnected: st.processorConnected, hasSource: !!el.src });
   }
 
   // Throttle currentTime updates
@@ -375,9 +403,11 @@ export async function autoplayIfAllowed() {
  * Initialize and connect the global audio processor to the music player store
  */
 export async function initializeGlobalAudioProcessor() {
+  logger.debug('initializeGlobalAudioProcessor: Starting...');
   const store = useMusicPlayerStore.getState();
 
   // Initialize the global processor
+  logger.debug('initializeGlobalAudioProcessor: Calling globalAudioProcessor.initialize()...');
   globalAudioProcessor.initialize();
 
   // Create the processor API that matches the expected interface
@@ -394,8 +424,10 @@ export async function initializeGlobalAudioProcessor() {
   };
 
   // Connect the processor API to the store
+  logger.debug('initializeGlobalAudioProcessor: Connecting processor to store...');
   await store.connectAudioProcessor(processorApi);
 
+  logger.debug('initializeGlobalAudioProcessor: Completed!');
   return processorApi;
 }
 

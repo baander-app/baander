@@ -5,7 +5,7 @@
       <DevServerState>
         <option name="packageJsonPath" value="$PROJECT_DIR$/package.json" />
         <option name="scriptName" value="dev" />
-        <option name="url" value="https://baander.test/" />
+        <option name="url" value="http://localhost:3000" />
       </DevServerState>
     </option>
   </component>

@@ -12,7 +12,8 @@
       "react",
       "react-dom"
     ],
-    "composite": true
+    "composite": true,
+    "jsx": "react-jsx"
   },
   "include": [
     "src/**/*.ts",
