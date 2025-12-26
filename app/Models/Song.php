@@ -148,7 +148,8 @@ class Song extends BaseModel implements DirectStreamableFile, Recommendable
     public function artists()
     {
         return $this->belongsToMany(Artist::class)
-            ->using(ArtistSong::class);
+            ->using(ArtistSong::class)
+            ->withPivot('role');
     }
 
     public function userMediaActivies()

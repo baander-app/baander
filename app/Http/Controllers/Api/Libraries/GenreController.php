@@ -35,6 +35,7 @@ class GenreController extends Controller
         $librarySlug = $request->query('librarySlug');
 
         $genres = Genre::query()
+            ->whereHas('songs')
 //            ->selectFields(Genre::$filterFields, $fields)
             ->withRelations(Genre::$filterFields, $fields)
             ->paginate();

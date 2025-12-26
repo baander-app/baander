@@ -4,7 +4,7 @@ namespace App\Jobs\Library\Music;
 
 use App\Extensions\StrExt;
 use App\Jobs\BaseJob;
-use App\Models\{Album, Artist, Genre, Library, Song};
+use App\Models\{Album, AlbumRole, Artist, Genre, Library, Song};
 use App\Modules\Logging\Attributes\LogChannel;
 use App\Modules\Logging\Channel;
 use App\Modules\Lyrics\Lrc;
@@ -114,7 +114,15 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
 
             try {
                 $song->saveOrFail();
-                $song->artists()->sync($this->getArtistIds($songData['artists']));
+                $artistIds = $this->getArtistIds($songData['artists']);
+
+                // Sync artists without role first
+                $song->artists()->sync($artistIds);
+
+                // Then set the first artist as Primary if artists exist
+                if (!empty($artistIds)) {
+                    $song->artists()->updateExistingPivot($artistIds[0], ['role' => AlbumRole::Primary->value]);
+                }
                 $song->genres()->sync($this->getGenreIds($songData['genres']));
             } catch (Throwable $e) {
                 $this->getLogger()->error("Failed to save song: $song->title", [
@@ -170,8 +178,6 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
 
                 // Split artists with smart detection
                 $artists = $delimiterService->splitArtists($metadataReader->getArtist());
-                $artistIds = $this->getArtistIds($artists);
-                $album->artists()->sync($artistIds);
 
                 // Split genres with smart detection
                 $genres = $delimiterService->splitGenres($metadataReader->getGenre());

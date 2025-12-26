@@ -39,6 +39,7 @@ export interface ArtistResource {
   spotifyId: ArtistResourceSpotifyId;
   createdAt: ArtistResourceCreatedAt;
   updatedAt: ArtistResourceUpdatedAt;
+  role?: string;
   /** Portrait relation */
   portrait?: ImageResource;
   lockedFields: ArtistResourceLockedFields;

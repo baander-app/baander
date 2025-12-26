@@ -124,12 +124,6 @@ class Artist extends BaseModel
         ], $attributes));
     }
 
-    public function albums()
-    {
-        return $this->belongsToMany(Album::class)
-            ->using(AlbumArtist::class);
-    }
-
     public function songs()
     {
         return $this->belongsToMany(Song::class)

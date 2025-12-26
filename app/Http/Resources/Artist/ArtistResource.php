@@ -4,8 +4,8 @@ namespace App\Http\Resources\Artist;
 
 use App\Http\Resources\HasJsonCollection;
 use App\Http\Resources\Image\ImageResource;
-use App\Models\AlbumArtist;
 use App\Models\Artist;
+use App\Models\ArtistSong;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -37,7 +37,7 @@ class ArtistResource extends JsonResource
             'spotifyId'      => $this->spotify_id,
             'createdAt'      => $this->created_at,
             'updatedAt'      => $this->updated_at,
-            'role' => $this->whenPivotLoaded(new AlbumArtist, function () {
+            'role' => $this->whenPivotLoaded(new ArtistSong, function () {
                return $this->pivot->role;
             }),
             /**
