@@ -78,9 +78,6 @@ class GenreHierarchyService
                     'musicbrainz' => $musicBrainzData,
                 ];
             }
-
-            // Small delay between batches to avoid rate limiting
-            usleep(1000000); // 1 second
         }
 
         return $this->organizeHierarchyWithAlternatives($hierarchy, $genres);

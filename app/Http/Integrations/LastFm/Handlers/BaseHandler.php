@@ -76,9 +76,9 @@ abstract class BaseHandler
      */
     protected function makeRequest(array $params): array
     {
-        if (!$this->hasValidCredentials()) {
-            AuthException::throwMissingCredentials();
-        }
+//        if (!$this->hasValidCredentials()) {
+//            AuthException::throwMissingCredentials();
+//        }
 
         try {
             $response = $this->client->get($this->baseUrl, [

@@ -67,18 +67,18 @@ trait CachesGetRequests
 
         if ($cached !== null) {
             CacheHit::dispatch(
-                integration: get_class($this),
-                endpoint: $endpoint,
-                cacheKey: $cacheKey,
+                get_class($this),
+                $endpoint,
+                $cacheKey,
             );
             return $cached;
         }
 
         // Cache miss - fetch from API
         CacheMiss::dispatch(
-            integration: get_class($this),
-            endpoint: $endpoint,
-            cacheKey: $cacheKey,
+            get_class($this),
+            $endpoint,
+            $cacheKey,
         );
 
         $data = $this->fetchEndpoint($endpoint, $params);
@@ -88,17 +88,17 @@ trait CachesGetRequests
             $ttl = $this->getCacheTtl();
             Cache::tags($tags)->put($cacheKey, $data, $ttl);
             CacheStore::dispatch(
-                integration: get_class($this),
-                endpoint: $endpoint,
-                cacheKey: $cacheKey,
-                ttl: $ttl,
+                get_class($this),
+                $endpoint,
+                $cacheKey,
+                $ttl,
             );
         } else {
             CacheSkip::dispatch(
-                integration: get_class($this),
-                endpoint: $endpoint,
-                cacheKey: $cacheKey,
-                response: $data,
+                get_class($this),
+                $endpoint,
+                $cacheKey,
+                $data,
             );
         }
 
@@ -168,8 +168,8 @@ trait CachesGetRequests
         try {
             Cache::tags($tags)->flush();
             CacheCleared::dispatch(
-                integration: get_class($this),
-                tags: $tags,
+                get_class($this),
+                $tags,
             );
             return true;
         } catch (\Exception $e) {
