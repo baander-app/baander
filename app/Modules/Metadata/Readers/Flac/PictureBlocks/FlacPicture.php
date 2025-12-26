@@ -2,15 +2,16 @@
 
 namespace App\Modules\Metadata\Readers\Flac\PictureBlocks;
 
+use App\Modules\Metadata\Contracts\PictureInterface;
+
 /**
  * FLAC picture value object
  * Represents a single METADATA_BLOCK_PICTURE
  *
  * Compatible with ID3 APIC interface for unified handling
  */
-class FlacPicture
+class FlacPicture implements PictureInterface
 {
-    // Use same constants as MediaMeta for compatibility
     public const IMAGE_OTHER = 0;
     public const IMAGE_FILE_ICON = 1;
     public const IMAGE_OTHER_FILE_ICON = 2;

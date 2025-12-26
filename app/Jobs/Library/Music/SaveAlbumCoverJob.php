@@ -6,6 +6,7 @@ use App\Jobs\BaseJob;
 use App\Models\Album;
 use App\Modules\Logging\Attributes\LogChannel;
 use App\Modules\Logging\Channel;
+use App\Modules\Metadata\Contracts\PictureInterface;
 use App\Modules\Metadata\MediaMeta\Frame\Apic;
 use App\Modules\Metadata\MediaMeta\MediaMeta;
 use App\Modules\Metadata\Readers\MetadataReader;
@@ -102,7 +103,7 @@ class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
         }
     }
 
-    private function createImage(object $artwork): array
+    private function createImage(PictureInterface $artwork): array
     {
         $extension = $this->detectFileExtension($artwork->getImageData());
         $fileName = Str::replace(['/', '\\'], '', Str::ascii($this->album->title)) . '_' . 'cover';

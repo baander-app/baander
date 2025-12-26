@@ -82,16 +82,16 @@ interface MetadataReaderInterface
     /**
      * Get all embedded images
      *
-     * @return array List of image objects
+     * @return array<PictureInterface> List of image objects
      */
     public function getImages(): array;
 
     /**
      * Get the first/front cover image
      *
-     * @return object|null Cover image or null
+     * @return PictureInterface|null Cover image or null
      */
-    public function getFrontCoverImage(): ?object;
+    public function getFrontCoverImage(): ?PictureInterface;
 
     /**
      * Get the audio file format

@@ -2,11 +2,13 @@
 
 namespace App\Modules\Metadata\Readers\Id3;
 
+use App\Modules\Metadata\Contracts\PictureInterface;
+
 /**
  * ID3 picture value object
  * Represents an APIC frame (Attached Picture)
  */
-class Id3Picture
+class Id3Picture implements PictureInterface
 {
     // Use same constants as MediaMeta for compatibility
     public const IMAGE_OTHER = 0;

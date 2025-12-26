@@ -3,6 +3,7 @@
 namespace App\Modules\Metadata\Readers\Flac;
 
 use App\Modules\Metadata\Contracts\Flac\FlacReaderInterface;
+use App\Modules\Metadata\Contracts\PictureInterface;
 use App\Modules\Metadata\Exceptions\InvalidFlacFileException;
 use App\Modules\Metadata\Readers\Flac\PictureBlocks\FlacPicture;
 use Illuminate\Support\Facades\Log;
@@ -163,7 +164,7 @@ class FlacReader implements FlacReaderInterface
         return $this->pictures;
     }
 
-    public function getFrontCoverImage(): ?object
+    public function getFrontCoverImage(): ?PictureInterface
     {
         // Try to get cover front (type 3), fall back to first picture
         $pictures = $this->getPicturesByType(FlacPicture::IMAGE_COVER_FRONT);

@@ -4,6 +4,7 @@ namespace App\Modules\Metadata\Readers;
 
 use App\Modules\Metadata\Contracts\FormatDetectorInterface;
 use App\Modules\Metadata\Contracts\MetadataReaderInterface;
+use App\Modules\Metadata\Contracts\PictureInterface;
 use App\Modules\Metadata\Contracts\Flac\FlacReaderInterface;
 use App\Modules\Metadata\Exceptions\UnsupportedFormatException;
 use FFMpeg\FFMpeg;
@@ -190,7 +191,7 @@ class MetadataReader implements MetadataReaderInterface
         return $this->delegateReader->getImages();
     }
 
-    public function getFrontCoverImage(): ?object
+    public function getFrontCoverImage(): ?PictureInterface
     {
         return $this->delegateReader->getFrontCoverImage();
     }
@@ -198,7 +199,7 @@ class MetadataReader implements MetadataReaderInterface
     /**
      * Get the first image (any type) from the file
      */
-    public function getImage(): ?object
+    public function getImage(): ?PictureInterface
     {
         $images = $this->getImages();
         return count($images) > 0 ? $images[0] : null;
@@ -208,9 +209,9 @@ class MetadataReader implements MetadataReaderInterface
      * Get the first image of a specific type
      *
      * @param int $imageType The image type (use the IMAGE_* constants)
-     * @return object|null The first image of the specified type, or null if not available
+     * @return PictureInterface|null The first image of the specified type, or null if not available
      */
-    public function getImageByType(int $imageType): ?object
+    public function getImageByType(int $imageType): ?PictureInterface
     {
         $images = $this->getImagesByType($imageType);
         return count($images) > 0 ? $images[0] : null;
@@ -233,7 +234,7 @@ class MetadataReader implements MetadataReaderInterface
     /**
      * Get the back cover image
      */
-    public function getBackCoverImage(): ?object
+    public function getBackCoverImage(): ?PictureInterface
     {
         return $this->getImageByType(self::IMAGE_COVER_BACK);
     }
@@ -241,7 +242,7 @@ class MetadataReader implements MetadataReaderInterface
     /**
      * Get the artist image
      */
-    public function getArtistImage(): ?object
+    public function getArtistImage(): ?PictureInterface
     {
         return $this->getImageByType(self::IMAGE_ARTIST);
     }
