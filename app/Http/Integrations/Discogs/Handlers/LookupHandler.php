@@ -3,6 +3,7 @@
 namespace App\Http\Integrations\Discogs\Handlers;
 
 use App\Http\Integrations\Discogs\Handler;
+use App\Http\Integrations\Traits\CachesGetRequests;
 use App\Http\Integrations\Discogs\Models\{
     Artist,
     Release,
@@ -13,12 +14,24 @@ use GuzzleHttp\Promise\PromiseInterface;
 
 class LookupHandler extends Handler
 {
+    use CachesGetRequests;
+
+    protected function getCacheTags(): array
+    {
+        return ['discogs', 'lookup'];
+    }
+
+    protected function getCacheTtl(): int
+    {
+        return 60 * 60;
+    }
+
     /**
      * Get artist by ID
      */
     public function artist(int $id): ?Artist
     {
-        $data = $this->fetchEndpoint("artists/{$id}");
+        $data = $this->fetchCached("artists/{$id}");
         return $data ? Artist::fromApiData($data) : null;
     }
 
@@ -27,7 +40,7 @@ class LookupHandler extends Handler
      */
     public function artistReleases(int $id, int $page = 1, int $per_page = 50): ?array
     {
-        $data = $this->fetchEndpoint("artists/{$id}/releases", [
+        $data = $this->fetchCached("artists/{$id}/releases", [
             'page' => $page,
             'per_page' => $per_page
         ]);
@@ -50,7 +63,7 @@ class LookupHandler extends Handler
      */
     public function release(int $id): ?Release
     {
-        $data = $this->fetchEndpoint("releases/{$id}");
+        $data = $this->fetchCached("releases/{$id}");
         return $data ? Release::fromApiData($data) : null;
     }
 
@@ -59,7 +72,7 @@ class LookupHandler extends Handler
      */
     public function master(int $id): ?Master
     {
-        $data = $this->fetchEndpoint("masters/{$id}");
+        $data = $this->fetchCached("masters/{$id}");
         return $data ? Master::fromApiData($data) : null;
     }
 
@@ -68,7 +81,7 @@ class LookupHandler extends Handler
      */
     public function masterVersions(int $id, int $page = 1, int $per_page = 50): ?array
     {
-        $data = $this->fetchEndpoint("masters/{$id}/versions", [
+        $data = $this->fetchCached("masters/{$id}/versions", [
             'page' => $page,
             'per_page' => $per_page
         ]);
@@ -91,7 +104,7 @@ class LookupHandler extends Handler
      */
     public function label(int $id): ?Label
     {
-        $data = $this->fetchEndpoint("labels/{$id}");
+        $data = $this->fetchCached("labels/{$id}");
         return $data ? Label::fromApiData($data) : null;
     }
 
@@ -100,7 +113,7 @@ class LookupHandler extends Handler
      */
     public function labelReleases(int $id, int $page = 1, int $per_page = 50): ?array
     {
-        $data = $this->fetchEndpoint("labels/{$id}/releases", [
+        $data = $this->fetchCached("labels/{$id}/releases", [
             'page' => $page,
             'per_page' => $per_page
         ]);
