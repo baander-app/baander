@@ -25,7 +25,8 @@
     "dist:win": "yarn build:electron && electron-builder -c electron-builder.yml --win",
     "dist:linux": "yarn build:electron && electron-builder -c electron-builder.yml --linux",
     "dist:mac": "yarn build:electron && electron-builder -c electron-builder.yml --mac",
-    "dist:all": "yarn build:electron && electron-builder -c electron-builder.yml -w -l -m"
+    "dist:all": "yarn build:electron && electron-builder -c electron-builder.yml -w -l -m",
+    "sleep": "sleep 20000"
   },
   "dependencies": {
     "@napi-rs/keyring": "^1.1.10",
@@ -68,6 +69,7 @@
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
     "@types/react-helmet": "^6.1.11",
+    "@react-buddy/ide-toolbox": "file:./packages/react-buddy-ide",
     "@visx/hierarchy": "^3.12.0",
     "@visx/zoom": "^3.12.0",
     "@vitejs/plugin-react": "^4.3.4",

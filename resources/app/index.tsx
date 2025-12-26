@@ -15,6 +15,8 @@ import { createIDBPersister, queryClient } from '@/app/common/react-query.ts';
 import { RadixProvider } from '@/app/providers/radix-provider.tsx';
 import { Reset } from '@radix-ui/themes';
 import { TestModeProvider } from '@/app/providers/test-mode-provider.tsx';
+import { DevSupport } from '@react-buddy/ide-toolbox';
+import { ComponentPreviews, useInitial } from './dev';
 // @ts-ignore
 globalThis.Ziggy = Ziggy;
 
@@ -25,13 +27,18 @@ ReactDOM.createRoot(document.getElementById('baanderapproot') as HTMLElement).re
     <TestModeProvider>
       <PersistQueryClientProvider
         client={queryClient}
-        persistOptions={{ buster: 'baander', persister: reactQueryPersister }}
+        persistOptions={{buster: 'baander', persister: reactQueryPersister}}
       >
         <Provider store={store}>
           <DateFormatterProvider>
             <RadixProvider>
               <Reset>
-                <App/>
+                <DevSupport
+                  ComponentPreviews={ComponentPreviews}
+                  useInitialHook={useInitial}
+                >
+                  <App/>
+                </DevSupport>
               </Reset>
             </RadixProvider>
           </DateFormatterProvider>

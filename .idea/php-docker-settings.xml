@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PhpDockerContainerSettings">
+    <list>
+      <map>
+        <entry key="c7aa3a43-dc22-4866-bd98-4476692e7328">
+          <value>
+            <DockerContainerSettings>
+              <option name="networkMode" value="baander-backtier" />
+              <option name="runCliOptions" value="" />
+              <option name="version" value="1" />
+              <option name="volumeBindings">
+                <list>
+                  <DockerVolumeBindingImpl>
+                    <option name="containerPath" value="/opt/projects" />
+                    <option name="hostPath" value="\\wsl.localhost\Ubuntu\home\martin\dev\baander" />
+                  </DockerVolumeBindingImpl>
+                  <DockerVolumeBindingImpl>
+                    <option name="containerPath" value="/var/www/html" />
+                    <option name="hostPath" value="\\wsl.localhost\Ubuntu\home\martin\dev\baander" />
+                  </DockerVolumeBindingImpl>
+                </list>
+              </option>
+            </DockerContainerSettings>
+          </value>
+        </entry>
+      </map>
+    </list>
+  </component>
+</project>

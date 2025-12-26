@@ -38,6 +38,8 @@
     "resources/app/**/*.tsx",
     "resources/docs/**/*.ts",
     "resources/docs/**/*.tsx",
+    "packages/react-buddy-ide/src/*.ts",
+    "packages/react-buddy-ide/src/*.tsx",
     "electron/**/*.ts",
     "electron/**/*.tsx",
     "vite.config.mts"

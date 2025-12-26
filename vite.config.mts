@@ -10,7 +10,6 @@ import laravelTranslations from 'vite-plugin-laravel-translations';
 import Icons from 'unplugin-icons/vite';
 import { analyzer, adapter } from 'vite-bundle-analyzer'
 
-
 const ReactCompilerConfig = {};
 
 // https://vitejs.dev/config/
@@ -23,6 +22,7 @@ export default defineConfig(config => {
   return {
     define: {
       __APP_ENV__: JSON.stringify(env.APP_ENV),
+      REACT_APP_IDE_DEVMODE: true,
     },
     server: {
       port: 3000,
