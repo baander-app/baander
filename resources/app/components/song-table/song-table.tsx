@@ -1,4 +1,4 @@
-import { memo, RefObject, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Iconify } from '@/app/ui/icons/iconify';
 import { useAppDispatch, useAppSelector } from '@/app/store/hooks';
 import { setQueueAndSong } from '@/app/store/music/music-player-slice';
@@ -8,7 +8,7 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   Header,
-  Row, RowData,
+  Row,
   SortingState,
   Table,
   useReactTable,
@@ -37,12 +37,11 @@ interface TableHeaderProps {
 }
 
 interface StickyHeaderProps {
-  table: Table<RowData>;
+  table: Table<SongResource>;
 }
 
 interface HeaderCellProps {
-  key: string;
-  header: Header<RowData, unknown>;
+  header: Header<SongResource, unknown>;
 }
 
 interface VirtualizedRowsProps {
@@ -61,7 +60,7 @@ interface VirtualizedRowData {
 }
 
 interface UseVirtualizedTableProps {
-  table: Table<RowData>;
+  table: Table<SongResource>;
   parentRef: RefObject<HTMLDivElement | null>;
   estimatedTotalCount?: number;
   onScrollToBottom?: () => void;
@@ -190,7 +189,7 @@ export function SongTable({
   );
 }
 
-function TableHeader({ title, description }: TableHeaderProps) {
+const TableHeader = memo(({ title, description }: TableHeaderProps) => {
   if (!title && !description) return null;
 
   return (
@@ -199,9 +198,11 @@ function TableHeader({ title, description }: TableHeaderProps) {
       {description && <p className={styles.description}>{description}</p>}
     </div>
   );
-}
+});
 
-function StickyHeader({ table }: StickyHeaderProps) {
+TableHeader.displayName = 'TableHeader';
+
+const StickyHeader = memo(({ table }: StickyHeaderProps) => {
   return (
     <div className={styles.fixedHeader}>
       <table>
@@ -217,9 +218,11 @@ function StickyHeader({ table }: StickyHeaderProps) {
       </table>
     </div>
   );
-}
+});
 
-function HeaderCell({ header }: HeaderCellProps) {
+StickyHeader.displayName = 'StickyHeader';
+
+const HeaderCell = memo(({ header }: HeaderCellProps) => {
   return (
     <th style={{ width: header.getSize() }}>
       {header.isPlaceholder ? null : (
@@ -233,58 +236,74 @@ function HeaderCell({ header }: HeaderCellProps) {
       )}
     </th>
   );
-}
+});
 
-function VirtualizedRows({ visibleRows, onSongClick, contextMenuActions }: VirtualizedRowsProps) {
+HeaderCell.displayName = 'HeaderCell';
+
+const VirtualizedRows = memo(({ visibleRows, onSongClick, contextMenuActions }: VirtualizedRowsProps) => {
   return (
     <table>
       <tbody>
-      {visibleRows.map(({ virtualRow, row }) => (
-        <ContextMenu.Root key={row.id}>
-          <ContextMenu.Trigger>
-            <tr
-              onClick={() => onSongClick(row.original.publicId)}
-              className={`${styles.listItem} ${styles.virtualizedRow}`}
-              style={{
-                height: `${virtualRow.size}px`,
-                transform: `translateY(${virtualRow.start}px)`,
-              }}
-            >
-              {row.getVisibleCells().map((cell) => (
-                <td key={cell.id} style={{ width: cell.column.getSize() }}>
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
-            </tr>
-          </ContextMenu.Trigger>
+      {visibleRows.map(({ virtualRow, row }) => {
+        const handleRowClick = useCallback(() => {
+          onSongClick(row.original.publicId);
+        }, [row.original.publicId, onSongClick]);
 
-          {contextMenuActions && (
-            <SongContextMenu
-              song={row.original}
-              onEdit={contextMenuActions.onEdit}
-            />
-          )}
-        </ContextMenu.Root>
-      ))}
+        return (
+          <ContextMenu.Root key={row.id}>
+            <ContextMenu.Trigger>
+              <tr
+                onClick={handleRowClick}
+                className={`${styles.listItem} ${styles.virtualizedRow}`}
+                style={{
+                  height: `${virtualRow.size}px`,
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <td key={cell.id} style={{ width: cell.column.getSize() }}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+            </ContextMenu.Trigger>
+
+            {contextMenuActions && (
+              <SongContextMenu
+                song={row.original}
+                onEdit={contextMenuActions.onEdit}
+              />
+            )}
+          </ContextMenu.Root>
+        );
+      })}
       </tbody>
     </table>
   );
-}
+});
+
+VirtualizedRows.displayName = 'VirtualizedRows';
 
 interface SongContextMenuProps {
   song: SongResource;
   onEdit: (song: SongResource) => void;
 }
 
-function SongContextMenu({ song, onEdit }: SongContextMenuProps) {
+const SongContextMenu = memo(({ song, onEdit }: SongContextMenuProps) => {
+  const handleEditClick = useCallback(() => {
+    onEdit(song);
+  }, [onEdit, song]);
+
   return (
     <ContextMenu.Content>
-      <ContextMenu.Item onClick={() => onEdit(song)}>Edit</ContextMenu.Item>
+      <ContextMenu.Item onClick={handleEditClick}>Edit</ContextMenu.Item>
       <ContextMenu.Separator />
       <ContextMenu.Item color="red">Delete</ContextMenu.Item>
     </ContextMenu.Content>
   );
-}
+});
+
+SongContextMenu.displayName = 'SongContextMenu';
 
 function useVirtualizedTable({
                                table,
@@ -350,12 +369,15 @@ function useVirtualizedTable({
   }, [onScrollToBottom, virtualizer, actualRowCount, lastScrollTime, hasTriggered]);
 
   const virtualItems = virtualizer.getVirtualItems();
-  const visibleRows = virtualItems
-    .filter(virtualRow => virtualRow.index < actualRowCount)
-    .map(virtualRow => ({
-      virtualRow,
-      row: rows[virtualRow.index],
-    }));
+  const visibleRows = useMemo(() =>
+    virtualItems
+      .filter(virtualRow => virtualRow.index < actualRowCount)
+      .map(virtualRow => ({
+        virtualRow,
+        row: rows[virtualRow.index],
+      })),
+    [virtualItems, actualRowCount, rows]
+  );
 
   return {virtualizer, visibleRows} as UseVirtualizedTableReturn;
 }
