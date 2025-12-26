@@ -58,7 +58,7 @@ services:
     networks:
       - baander-backtier
     ports:
-      - "127.0.0.1:5432:5432"
+      - "5432:5432"
     shm_size: 256mb
     environment:
       POSTGRES_USER: ${DB_USERNAME}

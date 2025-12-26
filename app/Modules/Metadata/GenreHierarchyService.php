@@ -19,14 +19,16 @@ class GenreHierarchyService
     )]
     private LoggerInterface $logger;
 
-    private readonly LastFmClient $lastFmClient;
+    private LastFmClient $lastFmClient;
 
     public function __construct(
         private readonly MusicBrainzClient $musicBrainzClient,
         private readonly DiscogsClient     $discogsClient,
+        LastFmClient                       $lastFmClient,
     )
     {
-        $this->lastFmClient = app(LastFmClient::class)->forUser(User::first());
+        $user = User::first();
+        $this->lastFmClient = $user ? $lastFmClient->forUser($user) : $lastFmClient;
     }
 
     /**
@@ -38,7 +40,7 @@ class GenreHierarchyService
         $batches = array_chunk($genres, $batchSize);
 
         foreach ($batches as $batchIndex => $batch) {
-            $this->logger->info("Processing batch {$batchIndex}", ['genres' => $batch]);
+            $this->logger->info("Processing batch $batchIndex", ['genres' => $batch]);
 
             foreach ($batch as $genre) {
                 $genre = trim($genre);
@@ -47,14 +49,14 @@ class GenreHierarchyService
                 try {
                     $tagInfo = $this->lastFmClient->tags->getTagInfo($genre);
                 } catch (Exception $e) {
-                    $this->logger->warning("LastFM failed for {$genre}", ['error' => $e->getMessage()]);
+                    $this->logger->warning("LastFM failed for $genre", ['error' => $e->getMessage()]);
                     $tagInfo = [];
                 }
 
                 // Get Discogs data using search-only approach
                 $discogsData = $this->getDiscogsGenreData($genre);
 
-                $this->logger->info("Processed genre: {$genre}", [
+                $this->logger->info("Processed genre: $genre", [
                     'lastfm_popularity'    => $tagInfo['reach'] ?? 0,
                     'discogs_styles_count' => count($discogsData['related_styles']),
                     'discogs_genres_count' => count($discogsData['related_genres']),
@@ -315,7 +317,7 @@ class GenreHierarchyService
 
         // Reverse matches (child -> parent)
         foreach ($manualRules as $parent => $children) {
-            if (in_array($lowerGenre, array_map('strtolower', $children), true)) {
+            if (in_array($lowerGenre, array_map('mb_strtolower', $children), true)) {
                 $relationships[] = [
                     'name'  => $parent,
                     'match' => 0.9,

@@ -215,6 +215,24 @@ USER ${USERNAME}
 # Add bash aliases
 RUN echo 'alias artisan="php /var/www/html/artisan"' >> /home/${USERNAME}/.bashrc
 
+# -------------------------------------------------
+# 1.  Let the app user edit xdebug.ini
+# -------------------------------------------------
+USER root
+RUN chmod 644 /usr/local/etc/php/conf.d/xdebug.ini && \
+    chown ${USERNAME}:${USERNAME} /usr/local/etc/php/conf.d/xdebug.ini
+
+# -------------------------------------------------
+# 2.  Add debug-on / debug-off aliases
+# -------------------------------------------------
+RUN echo '' >> /home/${USERNAME}/.bashrc && \
+    echo '# ----- Xdebug quick toggle -----' >> /home/${USERNAME}/.bashrc && \
+    echo 'alias debug-on="sed -i \"s/xdebug\.mode.*/xdebug.mode = debug,develop/\" /usr/local/etc/php/conf.d/xdebug.ini && echo \"Xdebug DEBUG mode ON\""' >> /home/${USERNAME}/.bashrc && \
+    echo 'alias debug-off="sed -i \"s/xdebug\.mode.*/xdebug.mode = develop/\"      /usr/local/etc/php/conf.d/xdebug.ini && echo \"Xdebug DEBUG mode OFF\""' >> /home/${USERNAME}/.bashrc
+
+# switch back to app user for the remaining layers
+USER ${USERNAME}
+
 # Copy application files
 COPY --chown=${USERNAME}:${USERNAME} . ${APP_HOME}/
 COPY --chown=${USERNAME}:${USERNAME} .env ${APP_HOME}/.env

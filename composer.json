@@ -129,12 +129,6 @@
         ]
     },
     "extra": {
-        "patches": {
-            "psr/log": [
-                "patches/psr-log-src-nulllogger-php.patch",
-                "patches/psr-log-src-loggertrait-php.patch"
-            ]
-        },
         "laravel": {
             "dont-discover": [
                 "laravel/telescope"

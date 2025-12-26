@@ -18,8 +18,8 @@ class LastFmClient
     public UserHandler $user;
 
     public function __construct(
-        private readonly Client $client,
-        private readonly LastFmCredentialService $credentialService
+        private Client $client,
+        private readonly LastFmCredentialService $credentialService,
     ) {
         // Create handlers directly in constructor
         $this->auth = new AuthHandler($this->client, self::BASE_URL);
@@ -44,6 +44,21 @@ class LastFmClient
                 $handler->setCredentialService($this->credentialService);
             }
         }
+    }
+
+    public function setClient(Client $client): void
+    {
+        $this->client = $client;
+
+        // Recreate all handlers with the new client
+        $this->auth = new AuthHandler($this->client, self::BASE_URL);
+        $this->search = new SearchHandler($this->client, self::BASE_URL);
+        $this->lookup = new LookupHandler($this->client, self::BASE_URL);
+        $this->tags = new TagHandler($this->client, self::BASE_URL);
+        $this->user = new UserHandler($this->client, self::BASE_URL);
+
+        // Re-inject credential service into all handlers
+        $this->injectCredentialService();
     }
 
     /**
