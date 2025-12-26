@@ -51,7 +51,7 @@ class MetadataReader implements MetadataReaderInterface
     private const READER_MAP = [
         'flac' => Flac\FlacReader::class,
         'id3' => Id3\Id3Reader::class,
-        // Future: 'ogg' => Flac\OggReader::class, (OGG uses Vorbis comments)
+        'ogg' => Flac\OggReader::class,  // OGG uses Vorbis comments
         // Future: 'mp4' => Mp4\Mp4Reader::class,
     ];
 

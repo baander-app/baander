@@ -126,7 +126,7 @@ class FlacParser
                     $this->parseVorbisCommentBlock($blockData);
                     break;
                 case self::BLOCK_PICTURE:
-                    $this->pictureBlocks[] = $this->parsePictureBlock($blockData);
+                    $this->pictureBlocks[] = self::parsePictureBlock($blockData);
                     break;
                 case self::BLOCK_SEEKTABLE:
                     $this->parseSeektableBlock($blockData);
@@ -281,7 +281,7 @@ class FlacParser
         ]);
     }
 
-    private function parsePictureBlock(string $data): array
+    public static function parsePictureBlock(string $data): array
     {
         $offset = 0;
 

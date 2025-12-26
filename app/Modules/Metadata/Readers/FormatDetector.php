@@ -46,8 +46,8 @@ class FormatDetector implements FormatDetectorInterface
                 return 'flac';
             }
 
-            // Check ID3v2 (MP3)
-            if ($signature === self::ID3V2_SIGNATURE) {
+            // Check ID3v2 (MP3) - signature is "ID3" followed by version byte
+            if (str_starts_with($signature, self::ID3V2_SIGNATURE)) {
                 Log::debug(self::LOG_TAG . 'Detected ID3/MP3 format', ['file' => $filePath]);
                 return 'id3';
             }
