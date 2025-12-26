@@ -242,9 +242,16 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
             return null;
         }
 
+        $trackNumber = $metadataReader->getTrackNumber();
+
+        // Fallback: extract track number from filename if not available in metadata
+        if ($trackNumber === null) {
+            $trackNumber = $this->extractTrackNumberFromFilename($file->getBasename());
+        }
+
         return [
             'title'     => $metadataReader->getTitle() ?? $file->getBasename() ?? LocaleString::delimit('library.song.unknown'),
-            'track'     => $metadataReader->getTrackNumber(),
+            'track'     => $trackNumber,
             'length'    => $metadataReader->probeLength(),
             'lyrics'    => $lyric ? StrExt::convertToUtf8($lyric) : null,
             'path'      => $file->getRealPath(),
@@ -253,6 +260,36 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
             'hash'      => $hash,
             'comment'   => $metadataReader->getComment(),
         ];
+    }
+
+    /**
+     * Extract track number from filename
+     *
+     * Handles formats like:
+     * - "03 - title.mp3" -> 3
+     * - "03-title.mp3" -> 3
+     * - "03 title.mp3" -> 3
+     *
+     * @param string $filename The filename (without extension)
+     * @return int|null The track number or null if not found
+     */
+    private function extractTrackNumberFromFilename(string $filename): ?int
+    {
+        // Remove file extension
+        $filenameWithoutExt = pathinfo($filename, PATHINFO_FILENAME);
+
+        // Match patterns like "03 - title", "03-title", "03 title", etc.
+        // Pattern: number at start, followed by space, dash, or dot
+        if (preg_match('/^(\d+)\s*[-.\s]\s*(.+)$/', $filenameWithoutExt, $matches)) {
+            $trackNumber = (int) $matches[1];
+
+            // Sanity check: track numbers are usually 1-99
+            if ($trackNumber >= 1 && $trackNumber <= 99) {
+                return $trackNumber;
+            }
+        }
+
+        return null;
     }
 
     private function getArtistIds(array $artists): array
