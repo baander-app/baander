@@ -15,6 +15,7 @@ use Arr;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\{DB, File};
+use Illuminate\Support\Carbon;
 use Illuminate\Support\LazyCollection;
 use Psr\Log\LoggerInterface;
 use SplFileInfo;
@@ -152,7 +153,8 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
 
         try {
             $directoryName = basename(File::basename($file));
-            $album = $this->findOrCreateAlbum(directoryName: $directoryName, albumTitle: $metadataReader->getAlbum(), year: $metadataReader->getYear());
+            $year = $metadataReader->getYear() ? Carbon::parse($metadataReader->getYear())->format('Y') : null;
+            $album = $this->findOrCreateAlbum(directoryName: $directoryName, albumTitle: $metadataReader->getAlbum(), year: $year);
 
             if (!$album) {
                 $this->getLogger()->error("Failed to find or create album for file: $filePath");
