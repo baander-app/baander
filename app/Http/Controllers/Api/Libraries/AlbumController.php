@@ -95,7 +95,7 @@ class AlbumController extends Controller
      * @throws ModelNotFoundException When an album is not found in the library
      * @response AlbumResource
      */
-    #[Put('{album}', 'api.albums.update')]
+    #[Put('{album}', 'api.albums.update', ['auth:oauth', 'scope:access-api', 'precognitive'])]
     public function update(Library $library, Album $album, AlbumUpdateRequest $request): AlbumResource
     {
         $album->setRelation('library', $library);

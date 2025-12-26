@@ -1,6 +1,5 @@
 import React, { useState, useCallback } from 'react';
 import { ChevronRightIcon, ChevronDownIcon } from '@radix-ui/react-icons';
-import ReactJsonView from '@microlink/react-json-view';
 import { Box, Text } from '@radix-ui/themes';
 
 interface JsonLogLineProps {
@@ -275,24 +274,24 @@ export const JsonLogLine: React.FC<JsonLogLineProps> = ({
                   maxHeight: '400px',
                 }}
               >
-                <ReactJsonView
-                  src={parsedJson}
-                  theme="monokai"
-                  style={{
-                    backgroundColor: 'transparent',
-                    fontSize: '13px',
-                    fontFamily: 'var(--font-family-mono)',
-                  }}
-                  displayObjectSize={false}
-                  displayDataTypes={false}
-                  enableClipboard={true}
-                  collapsed={false}
-                  collapseStringsAfterLength={100}
-                  indentWidth={2}
-                  iconStyle="triangle"
-                  quotesOnKeys={false}
-                  sortKeys={false}
-                />
+                {/*<ReactJsonView*/}
+                {/*  src={parsedJson}*/}
+                {/*  theme="monokai"*/}
+                {/*  style={{*/}
+                {/*    backgroundColor: 'transparent',*/}
+                {/*    fontSize: '13px',*/}
+                {/*    fontFamily: 'var(--font-family-mono)',*/}
+                {/*  }}*/}
+                {/*  displayObjectSize={false}*/}
+                {/*  displayDataTypes={false}*/}
+                {/*  enableClipboard={true}*/}
+                {/*  collapsed={false}*/}
+                {/*  collapseStringsAfterLength={100}*/}
+                {/*  indentWidth={2}*/}
+                {/*  iconStyle="triangle"*/}
+                {/*  quotesOnKeys={false}*/}
+                {/*  sortKeys={false}*/}
+                {/*/>*/}
               </Text>
 
               {/* Message suffix */}

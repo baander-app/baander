@@ -8,6 +8,7 @@ import react from '@vitejs/plugin-react';
 import Info from 'unplugin-info/vite';
 import laravelTranslations from 'vite-plugin-laravel-translations';
 import Icons from 'unplugin-icons/vite';
+import { analyzer, adapter } from 'vite-bundle-analyzer'
 
 
 const ReactCompilerConfig = {};
@@ -34,6 +35,9 @@ export default defineConfig(config => {
       },
     },
     plugins: [
+      adapter(analyzer({
+        analyzerMode: 'server',
+      })),
       laravel({
         input: [
           'resources/app/index.tsx',

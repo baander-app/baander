@@ -1,68 +1,79 @@
-import { useState, useEffect } from 'react';
-import { Button, TextField, Flex, Box, Badge, TextArea, Dialog } from '@radix-ui/themes';
-import { useForm } from 'react-hook-form';
-import styles from './artist-editor.module.scss';
-import { Form } from 'radix-ui';
-import { ArtistResource } from '@/app/libs/api-client/gen/models';
-import { LockClosedIcon } from '@radix-ui/react-icons';
+import { useState, useMemo, Fragment } from 'react';
+import { Button, Flex, Box, Badge, Dialog, IconButton, Tabs } from '@radix-ui/themes';
+import { LockClosedIcon, LockOpen1Icon } from '@radix-ui/react-icons';
 import { BrowseTab } from '@/app/modules/dashboard/music/components/browse-tab/browse-tab';
+import { FormField, FormFieldConfig, useFormEditor } from '@/app/ui/form';
+import { ARTIST_TYPE_OPTIONS, GENDER_OPTIONS, COUNTRY_OPTIONS } from '@/app/constants/metadata';
+import { artistFieldConfig, artistFormSections } from './artist-editor.config';
+import { ArtistEditorProps, ArtistFormData } from './artist-editor.types';
+import styles from './artist-editor.module.scss';
 
-interface ArtistEditorProps {
-  artist?: ArtistResource;
-  onSubmit: (data: ArtistFormData) => void;
-  onCancel?: () => void;
-  onSync?: () => void;
-  librarySlug?: string;
-  onMetadataApplied?: () => void;
-}
-
-interface ArtistFormData {
-  name: string;
-  mbid?: string;
-  discogsId?: number;
-  spotifyId?: string;
-  biography?: string;
-  disambiguation?: string;
-  lockedFields?: string[];
-}
-
-export function ArtistEditor({ artist, onSubmit, onCancel, onSync, librarySlug, onMetadataApplied }: ArtistEditorProps) {
-  const [lockMode, setLockMode] = useState(false);
-  const [lockedFields, setLockedFields] = useState<string[]>([]);
+/**
+ * Artist Editor - Config-driven form with Precognition validation
+ *
+ * Features:
+ * - 12 editable metadata fields with real-time validation
+ * - 3 grouped sections for better UX (Basic Info, Biography, Metadata)
+ * - Field locking to prevent metadata sync overwrites
+ * - Metadata browsing from MusicBrainz/Discogs
+ * - Config-driven for easy maintenance and reuse
+ */
+export function ArtistEditor({
+  artist,
+  librarySlug,
+  onSubmit,
+  onCancel,
+  onSync,
+  onMetadataApplied
+}: ArtistEditorProps) {
   const [showBrowseDialog, setShowBrowseDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('basic-info');
 
-  const { register, handleSubmit, formState: { errors } } = useForm<ArtistFormData>();
+  // Form editor with Precognition validation and field locking
+  const { form, lockMode, setLockMode, toggleFieldLock, isFieldLocked, submit } =
+    useFormEditor<ArtistFormData>({
+      method: 'put',
+      url: `/api/libraries/${librarySlug}/artists/${artist?.publicId}`,
+      initialData: {
+        name: artist?.name || '',
+        disambiguation: artist?.disambiguation || '',
+        type: artist?.type || '',
+        country: artist?.country || '',
+        gender: (artist as any)?.gender || '',
+        sortName: artist?.sortName || '',
+        mbid: artist?.mbid || '',
+        discogsId: artist?.discogsId || undefined,
+        spotifyId: artist?.spotifyId || '',
+        biography: (artist as any)?.biography || '',
+        lifeSpanBegin: artist?.lifeSpanBegin || '',
+        lifeSpanEnd: artist?.lifeSpanEnd || '',
+      },
+      initialLockedFields: artist?.lockedFields as (keyof ArtistFormData)[],
+      onSubmit: async (data) => {
+        await onSubmit(data);
+      },
+    });
 
-  // Initialize locked fields from artist
-  useEffect(() => {
-    if (artist?.lockedFields) {
-      setLockedFields(artist.lockedFields as string[]);
-    }
-  }, [artist]);
-
-  const handleFieldClick = (fieldName: string) => {
-    if (!lockMode) return;
-
-    setLockedFields(prev => {
-      if (prev.includes(fieldName)) {
-        return prev.filter(f => f !== fieldName);
-      } else {
-        return [...prev, fieldName];
+  // Build field config with options at runtime
+  const fieldConfigWithOptions = useMemo(() => {
+    return artistFieldConfig.map((config): FormFieldConfig<ArtistFormData> => {
+      switch (config.name) {
+        case 'type':
+          return { ...config, options: [...ARTIST_TYPE_OPTIONS] };
+        case 'country':
+          return { ...config, options: [...COUNTRY_OPTIONS] };
+        case 'gender':
+          return { ...config, options: [...GENDER_OPTIONS] };
+        default:
+          return config;
       }
     });
-  };
-
-  const isFieldLocked = (fieldName: string) => {
-    return lockedFields.includes(fieldName);
-  };
-
-  const handleFormSubmit = (data: ArtistFormData) => {
-    onSubmit({ ...data, lockedFields });
-  };
+  }, []);
 
   return (
     <Box>
       <Flex direction="column" gap="4">
+        {/* Header with lock mode toggle */}
         <Flex justify="between" align="center">
           <Box />
           <Flex gap="3" align="center">
@@ -71,14 +82,14 @@ export function ArtistEditor({ artist, onSubmit, onCancel, onSync, librarySlug, 
                 Lock Mode
               </Badge>
             )}
-            <Button
-              variant={lockMode ? "solid" : "soft"}
-              size="1"
+            <IconButton
+              variant={lockMode ? "solid" : "outline"}
+              color={lockMode ? "blue" : "gray"}
               onClick={() => setLockMode(!lockMode)}
+              title={lockMode ? "Disable lock mode" : "Enable lock mode"}
             >
-              <LockClosedIcon />
-              {lockMode ? 'Lock Mode ON' : 'Lock Mode OFF'}
-            </Button>
+              {lockMode ? <LockClosedIcon /> : <LockOpen1Icon />}
+            </IconButton>
           </Flex>
         </Flex>
 
@@ -102,121 +113,77 @@ export function ArtistEditor({ artist, onSubmit, onCancel, onSync, librarySlug, 
           )}
         </Flex>
 
-        <Form.Root onSubmit={handleSubmit(handleFormSubmit)} className={styles.form}>
+        {/* Form */}
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }} className={styles.form}>
           <Flex direction="column" gap="4">
-            <Form.Field name="name">
-              <Form.Label>Name</Form.Label>
-              <Form.Control asChild>
-                <TextField.Root
-                  {...register('name', { required: 'Name is required' })}
-                  placeholder="Artist name"
-                  disabled={lockMode && isFieldLocked('name')}
-                  className={lockMode && isFieldLocked('name') ? styles.lockedField : ''}
-                  onClick={() => handleFieldClick('name')}
-                />
-              </Form.Control>
-              {errors.name && (
-                <Form.Message>{errors.name.message}</Form.Message>
-              )}
-            </Form.Field>
+            {/* Tabs */}
+            <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
+              <Tabs.List>
+                {artistFormSections.map(section => (
+                  <Tabs.Trigger key={section.title} value={section.title.toLowerCase().replace(/\s+/g, '-')}>
+                    {section.title}
+                  </Tabs.Trigger>
+                ))}
+              </Tabs.List>
 
-            <Form.Field name="mbid">
-              <Form.Label>MusicBrainz ID</Form.Label>
-              <Form.Control asChild>
-                <TextField.Root
-                  {...register('mbid')}
-                  placeholder="MusicBrainz ID"
-                  disabled={lockMode && isFieldLocked('mbid')}
-                  className={lockMode && isFieldLocked('mbid') ? styles.lockedField : ''}
-                  onClick={() => handleFieldClick('mbid')}
-                />
-              </Form.Control>
-              {errors.mbid && (
-                <Form.Message>{errors.mbid.message}</Form.Message>
-              )}
-            </Form.Field>
+              {/* Tab Content */}
+              <Box mt="4">
+                {artistFormSections.map(section => {
+                  const tabValue = section.title.toLowerCase().replace(/\s+/g, '-');
+                  return (
+                    <Tabs.Content
+                      key={section.title}
+                      value={tabValue}
+                    >
+                      {activeTab === tabValue && (
+                        <Flex direction="column" gap="3">
+                          {section.fields.map((fieldName) => {
+                            const config = fieldConfigWithOptions.find((c) => c.name === fieldName);
+                            if (!config) return null;
 
-            <Form.Field name="discogsId">
-              <Form.Label>Discogs ID</Form.Label>
-              <Form.Control asChild>
-                <TextField.Root
-                  type="number"
-                  {...register('discogsId', {
-                    min: { value: 0, message: 'Discogs ID must be positive' },
-                    max: { value: 999999999999, message: 'Discogs ID is too large' }
-                  })}
-                  placeholder="Discogs ID"
-                  disabled={lockMode && isFieldLocked('discogsId')}
-                  className={lockMode && isFieldLocked('discogsId') ? styles.lockedField : ''}
-                  onClick={() => handleFieldClick('discogsId')}
-                />
-              </Form.Control>
-              {errors.discogsId && (
-                <Form.Message>{errors.discogsId.message}</Form.Message>
-              )}
-            </Form.Field>
+                            const fieldValue = form.data[fieldName];
+                            const handleChange = (value: unknown) => {
+                              form.setData(fieldName, value);
+                            };
 
-            <Form.Field name="spotifyId">
-              <Form.Label>Spotify ID</Form.Label>
-              <Form.Control asChild>
-                <TextField.Root
-                  {...register('spotifyId')}
-                  placeholder="Spotify ID"
-                  disabled={lockMode && isFieldLocked('spotifyId')}
-                  className={lockMode && isFieldLocked('spotifyId') ? styles.lockedField : ''}
-                  onClick={() => handleFieldClick('spotifyId')}
-                />
-              </Form.Control>
-              {errors.spotifyId && (
-                <Form.Message>{errors.spotifyId.message}</Form.Message>
-              )}
-            </Form.Field>
+                            return (
+                              <Fragment key={String(fieldName)}>
+                                <FormField
+                                  config={config}
+                                  value={fieldValue}
+                                  onChange={handleChange}
+                                  errors={form.errors}
+                                  lockMode={lockMode}
+                                  isFieldLocked={isFieldLocked}
+                                  onToggleLock={toggleFieldLock}
+                                />
+                              </Fragment>
+                            );
+                          })}
+                        </Flex>
+                      )}
+                    </Tabs.Content>
+                  );
+                })}
+              </Box>
+            </Tabs.Root>
 
-            <Form.Field name="disambiguation">
-              <Form.Label>Disambiguation</Form.Label>
-              <Form.Control asChild>
-                <TextField.Root
-                  {...register('disambiguation')}
-                  placeholder="Disambiguation comment to distinguish similar artists"
-                  disabled={lockMode && isFieldLocked('disambiguation')}
-                  className={lockMode && isFieldLocked('disambiguation') ? styles.lockedField : ''}
-                  onClick={() => handleFieldClick('disambiguation')}
-                />
-              </Form.Control>
-              {errors.disambiguation && (
-                <Form.Message>{errors.disambiguation.message}</Form.Message>
-              )}
-            </Form.Field>
-
-            <Form.Field name="biography">
-              <Form.Label>Biography</Form.Label>
-              <Form.Control asChild>
-                <TextArea
-                  {...register('biography')}
-                  placeholder="Artist biography or annotation"
-                  disabled={lockMode && isFieldLocked('biography')}
-                  className={lockMode && isFieldLocked('biography') ? styles.lockedField : ''}
-                  onClick={() => handleFieldClick('biography')}
-                  rows={6}
-                />
-              </Form.Control>
-              {errors.biography && (
-                <Form.Message>{errors.biography.message}</Form.Message>
-              )}
-            </Form.Field>
-
+            {/* Form Actions */}
             <Flex gap="3" mt="4" justify="end">
               {onCancel && (
                 <Button type="button" variant="soft" onClick={onCancel}>
                   Cancel
                 </Button>
               )}
-              <Button type="submit">
-                Save
+              <Button type="submit" disabled={form.processing}>
+                {form.processing ? 'Saving...' : 'Save'}
               </Button>
             </Flex>
           </Flex>
-        </Form.Root>
+        </form>
 
         {/* Browse Metadata Dialog */}
         <Dialog.Root open={showBrowseDialog} onOpenChange={setShowBrowseDialog}>

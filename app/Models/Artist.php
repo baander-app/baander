@@ -30,6 +30,7 @@ class Artist extends BaseModel
         'life_span_end',
         'disambiguation',
         'sort_name',
+        'biography',
         'mbid',
         'discogs_id',
         'spotify_id',

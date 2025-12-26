@@ -23,14 +23,20 @@ class ArtistUpdateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name'           => 'required|string|min:1|max:255',
-            'mbid'           => 'string|min:1|max:255',
-            'discogsId'      => 'numeric|min:0|max:999999999999',
-            'spotifyId'      => 'string|min:1|max:255',
-            'biography'      => 'string|nullable',
-            'disambiguation' => 'string|min:1|max:255|nullable',
-            'locked_fields'  => 'array',
-            'locked_fields.*' => 'string',
+            'name'            => 'required|string|min:1|max:255',
+            'disambiguation'  => 'nullable|string|max:255',
+            'type'            => 'nullable|string|in:person,group,orchestra,choir,character,other,undefined',
+            'country'         => 'nullable|string|max:2|regex:/^[A-Z]{2}$/',
+            'gender'          => 'nullable|string|in:male,female,non_binary,other,unknown',
+            'sortName'        => 'nullable|string|max:255',
+            'mbid'            => 'nullable|string|max:255',
+            'discogsId'       => 'nullable|numeric|min:0|max:999999999999',
+            'spotifyId'       => 'nullable|string|max:255',
+            'biography'       => 'nullable|string|max:4000',
+            'lifeSpanBegin'   => 'nullable|string|date',
+            'lifeSpanEnd'     => 'nullable|string|date|after:lifeSpanBegin',
+            'lockedFields'    => 'array',
+            'lockedFields.*'  => 'string',
         ];
     }
 }

@@ -52,11 +52,6 @@ function ArtistContextMenu({ artist, librarySlug }: { artist: ArtistResource, li
 
   const handleArtistSubmit = useCallback(async (data: any) => {
     try {
-      await fetch(`/api/libraries/${librarySlug}/artists/${artist.publicId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
       editorHandlers.close();
       dispatch(createNotification({
         title: 'Success',

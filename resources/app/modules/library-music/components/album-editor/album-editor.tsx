@@ -1,162 +1,100 @@
-import { useState, useEffect } from 'react';
-import { Button, TextField, Flex, Box, Select, Badge, Dialog } from '@radix-ui/themes';
-import { useForm, Controller } from 'react-hook-form';
-import styles from './album-editor.module.scss';
-import { Form } from 'radix-ui';
-import { useGenresIndex } from '@/app/libs/api-client/gen/endpoints/genre/genre.ts';
-import { AlbumResource } from '@/app/libs/api-client/gen/models';
-import { LockClosedIcon } from '@radix-ui/react-icons';
+import { useState, useMemo, Fragment } from 'react';
+import { Button, Flex, Box, Badge, Dialog, IconButton, Tabs } from '@radix-ui/themes';
+import { useGenresIndex } from '@/app/libs/api-client/gen/endpoints/genre/genre';
+import { LockClosedIcon, LockOpen1Icon } from '@radix-ui/react-icons';
 import { BrowseTab } from '@/app/modules/dashboard/music/components/browse-tab/browse-tab';
+import { FormField, FormFieldConfig, useFormEditor } from '@/app/ui/form';
+import { ALBUM_TYPE_OPTIONS, COUNTRY_OPTIONS, LANGUAGE_OPTIONS } from '@/app/constants/metadata';
+import { albumFieldConfig, albumFormSections } from './album-editor.config';
+import { AlbumEditorProps, AlbumFormData } from './album-editor.types';
+import styles from './album-editor.module.scss';
+import { GenresIndex200 } from '@/app/libs/api-client/gen/models';
 
-interface AlbumEditorProps {
-  album?: AlbumResource;
-  librarySlug: string;
-  onSubmit: (data: AlbumFormData) => void;
-  onCancel?: () => void;
-  onSync?: () => void;
-  onMetadataApplied?: () => void;
-}
-
-interface AlbumFormData {
-  title: string;
-  year?: number;
-  mbid?: string;
-  discogsId?: number;
-  genres: string[];
-  lockedFields?: string[];
-}
-
-// Simple multi-select for genres
-type MultiSelectProps = {
-  placeholder: string;
-  value: string[];
-  onChange: (value: string[]) => void;
-  options: { id: number; name: string }[];
-  disabled?: boolean;
-};
-
-function MultiSelect({ placeholder, value, onChange, options, disabled }: MultiSelectProps) {
-  const [selectedItems, setSelectedItems] = useState<{ id: number; name: string }[]>([]);
-
-  // Initialize selected items from value prop
-  useEffect(() => {
-    const selected = options.filter(item => value.includes(item.name));
-    setSelectedItems(selected);
-  }, [value, options]);
-
-  const handleSelectChange = (selectedValue: string) => {
-    const selectedOption = options.find(option => option.name === selectedValue);
-    if (selectedOption && !selectedItems.some(item => item.id === selectedOption.id)) {
-      const newSelectedItems = [...selectedItems, selectedOption];
-      setSelectedItems(newSelectedItems);
-      onChange(newSelectedItems.map(item => item.name));
-    }
-  };
-
-  const handleRemoveItem = (id: number) => {
-    const newSelectedItems = selectedItems.filter(item => item.id !== id);
-    setSelectedItems(newSelectedItems);
-    onChange(newSelectedItems.map(item => item.name));
-  };
-
-  const availableOptions = options.filter(option =>
-    !selectedItems.some(selected => selected.id === option.id)
-  );
-
-  return (
-    <Box width="100%">
-      <Flex direction="column" gap="2">
-        {selectedItems.length > 0 && (
-          <Flex wrap="wrap" gap="1">
-            {selectedItems.map(item => (
-              <Badge key={item.id} variant="soft" className={styles.selectedBadge}>
-                {item.name}
-                <Button
-                  size="1"
-                  variant="ghost"
-                  onClick={() => handleRemoveItem(item.id)}
-                  className={styles.removeButton}
-                  disabled={disabled}
-                >
-                  ×
-                </Button>
-              </Badge>
-            ))}
-          </Flex>
-        )}
-
-        <Select.Root onValueChange={handleSelectChange} value="" disabled={disabled}>
-          <Select.Trigger placeholder={placeholder} />
-          <Select.Content>
-            {availableOptions.map(option => (
-              <Select.Item key={option.id} value={option.name} style={{ cursor: 'pointer' }}>
-                {option.name}
-              </Select.Item>
-            ))}
-          </Select.Content>
-        </Select.Root>
-      </Flex>
-    </Box>
-  );
-}
-
-export function AlbumEditor({ album, librarySlug, onSubmit, onCancel, onSync, onMetadataApplied }: AlbumEditorProps) {
-  const [lockMode, setLockMode] = useState(false);
-  const [lockedFields, setLockedFields] = useState<string[]>([]);
+/**
+ * Album Editor - Config-driven form with Precognition validation
+ *
+ * Features:
+ * - 11 editable metadata fields with real-time validation
+ * - 4 grouped sections for better UX
+ * - Field locking to prevent metadata sync overwrites
+ * - Metadata browsing from MusicBrainz/Discogs
+ * - Config-driven for easy maintenance and reuse
+ */
+export function AlbumEditor({
+  album,
+  librarySlug,
+  onSubmit,
+  onCancel,
+  onSync,
+  onMetadataApplied
+}: AlbumEditorProps) {
   const [showBrowseDialog, setShowBrowseDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('basic-info');
 
-  const { register, handleSubmit, control, formState: { errors } } = useForm<AlbumFormData>({
-    defaultValues: {
-      title: album?.title || '',
-      year: album?.year || undefined,
-      mbid: album?.mbid || '',
-      discogsId: album?.discogsId || undefined,
-      genres: album?.genres?.map(g => g.name) || [],
-    }
-  });
+  // Form editor with Precognition validation and field locking
+  const { form, lockMode, setLockMode, toggleFieldLock, isFieldLocked, submit } =
+    useFormEditor<AlbumFormData>({
+      method: 'put',
+      // url: `/api/libraries/${librarySlug}/albums/${album?.publicId}`,
+      url: route('api.albums.update', { librarySlug, id: album?.publicId }),
+      initialData: {
+        title: album?.title || '',
+        type: album?.type || '',
+        year: album?.year || undefined,
+        disambiguation: album?.disambiguation || '',
+        mbid: album?.mbid || '',
+        discogsId: album?.discogsId || undefined,
+        spotifyId: album?.spotifyId || '',
+        label: album?.label || '',
+        catalogNumber: album?.catalogNumber || '',
+        barcode: album?.barcode || '',
+        country: album?.country || '',
+        language: album?.language || '',
+        annotation: album?.annotation || '',
+        genres: album?.genres?.map(g => g.name) || [],
+      },
+      initialLockedFields: album?.lockedFields as (keyof AlbumFormData)[],
+      onSubmit: async (data) => {
+        await onSubmit(data);
+      },
+    });
 
-  // Initialize locked fields from album
-  useEffect(() => {
-    if (album?.lockedFields) {
-      setLockedFields(album.lockedFields as string[]);
-    }
-  }, [album]);
-
-  // Fetch genres
+  // Fetch genres for multiselect
   const { data: genresData } = useGenresIndex({
     librarySlug: librarySlug || '',
     limit: 100,
   });
 
-  // Format the data for the multiselect component
-  const genreOptions = genresData?.data?.map(genre => ({
-    id: genre.id,
-    name: genre.name,
-  })) || [];
+  const genreOptions = useMemo(
+    () => (genresData as GenresIndex200)?.data?.map(g => ({ id: g.id, name: g.name })) || [],
+    [genresData]
+  );
 
-  const handleFieldClick = (fieldName: string) => {
-    if (!lockMode) return;
-
-    setLockedFields(prev => {
-      if (prev.includes(fieldName)) {
-        return prev.filter(f => f !== fieldName);
-      } else {
-        return [...prev, fieldName];
+  // Build field config with options at runtime
+  const fieldConfigWithOptions = useMemo(() => {
+    return albumFieldConfig.map((config): FormFieldConfig<AlbumFormData> => {
+      switch (config.name) {
+        case 'type':
+          return { ...config, options: [...ALBUM_TYPE_OPTIONS] };
+        case 'country':
+          return { ...config, options: [...COUNTRY_OPTIONS] };
+        case 'language':
+          return { ...config, options: [...LANGUAGE_OPTIONS] };
+        case 'genres':
+          return {
+            ...config,
+            options: genreOptions,
+          };
+        default:
+          return config;
       }
     });
-  };
-
-  const isFieldLocked = (fieldName: string) => {
-    return lockedFields.includes(fieldName);
-  };
-
-  const handleFormSubmit = (data: AlbumFormData) => {
-    onSubmit({ ...data, lockedFields });
-  };
+  }, [genreOptions]);
 
   return (
     <Box>
       <Flex direction="column" gap="4">
+        {/* Header with lock mode toggle */}
         <Flex justify="between" align="center">
           <Box />
           <Flex gap="3" align="center">
@@ -165,14 +103,14 @@ export function AlbumEditor({ album, librarySlug, onSubmit, onCancel, onSync, on
                 Lock Mode
               </Badge>
             )}
-            <Button
-              variant={lockMode ? "solid" : "soft"}
-              size="1"
+            <IconButton
+              variant={lockMode ? "solid" : "outline"}
+              color={lockMode ? "blue" : "gray"}
               onClick={() => setLockMode(!lockMode)}
+              title={lockMode ? "Disable lock mode" : "Enable lock mode"}
             >
-              <LockClosedIcon />
-              {lockMode ? 'Lock Mode ON' : 'Lock Mode OFF'}
-            </Button>
+              {lockMode ? <LockClosedIcon /> : <LockOpen1Icon />}
+            </IconButton>
           </Flex>
         </Flex>
 
@@ -196,114 +134,77 @@ export function AlbumEditor({ album, librarySlug, onSubmit, onCancel, onSync, on
           )}
         </Flex>
 
-        <Form.Root onSubmit={handleSubmit(handleFormSubmit)} className={styles.form}>
+        {/* Form */}
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }} className={styles.form}>
           <Flex direction="column" gap="4">
-            <Form.Field name="title">
-              <Form.Label>Title</Form.Label>
-              <Form.Control asChild>
-                <TextField.Root
-                  {...register('title', { required: 'Title is required' })}
-                  placeholder="Album title"
-                  disabled={lockMode && isFieldLocked('title')}
-                  className={lockMode && isFieldLocked('title') ? styles.lockedField : ''}
-                  onClick={() => handleFieldClick('title')}
-                />
-              </Form.Control>
-              {errors.title && (
-                <Form.Message>{errors.title.message}</Form.Message>
-              )}
-            </Form.Field>
+            {/* Tabs */}
+            <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
+              <Tabs.List>
+                {albumFormSections.map(section => (
+                  <Tabs.Trigger key={section.title} value={section.title.toLowerCase().replace(/\s+/g, '-')}>
+                    {section.title}
+                  </Tabs.Trigger>
+                ))}
+              </Tabs.List>
 
-            <Form.Field name="year">
-              <Form.Label>Year</Form.Label>
-              <Form.Control asChild>
-                <TextField.Root
-                  type="number"
-                  {...register('year', {
-                    min: { value: 0, message: 'Year must be positive' },
-                    max: { value: 9999, message: 'Year must be less than 10000' }
-                  })}
-                  placeholder="Release year"
-                  disabled={lockMode && isFieldLocked('year')}
-                  className={lockMode && isFieldLocked('year') ? styles.lockedField : ''}
-                  onClick={() => handleFieldClick('year')}
-                />
-              </Form.Control>
-              {errors.year && (
-                <Form.Message>{errors.year.message}</Form.Message>
-              )}
-            </Form.Field>
+              {/* Tab Content */}
+              <Box mt="4">
+                {albumFormSections.map(section => {
+                  const tabValue = section.title.toLowerCase().replace(/\s+/g, '-');
+                  return (
+                    <Tabs.Content
+                      key={section.title}
+                      value={tabValue}
+                    >
+                      {activeTab === tabValue && (
+                        <Flex direction="column" gap="3">
+                          {section.fields.map((fieldName) => {
+                            const config = fieldConfigWithOptions.find((c) => c.name === fieldName);
+                            if (!config) return null;
 
-            <Form.Field name="mbid">
-              <Form.Label>MusicBrainz ID</Form.Label>
-              <Form.Control asChild>
-                <TextField.Root
-                  {...register('mbid')}
-                  placeholder="MusicBrainz ID"
-                  disabled={lockMode && isFieldLocked('mbid')}
-                  className={lockMode && isFieldLocked('mbid') ? styles.lockedField : ''}
-                  onClick={() => handleFieldClick('mbid')}
-                />
-              </Form.Control>
-              {errors.mbid && (
-                <Form.Message>{errors.mbid.message}</Form.Message>
-              )}
-            </Form.Field>
+                            const fieldValue = form.data[fieldName];
+                            const handleChange = (value: unknown) => {
+                              form.setData(fieldName, value);
+                            };
 
-            <Form.Field name="discogsId">
-              <Form.Label>Discogs ID</Form.Label>
-              <Form.Control asChild>
-                <TextField.Root
-                  type="number"
-                  {...register('discogsId', {
-                    min: { value: 0, message: 'Discogs ID must be positive' },
-                    max: { value: 999999999999, message: 'Discogs ID is too large' }
-                  })}
-                  placeholder="Discogs ID"
-                  disabled={lockMode && isFieldLocked('discogsId')}
-                  className={lockMode && isFieldLocked('discogsId') ? styles.lockedField : ''}
-                  onClick={() => handleFieldClick('discogsId')}
-                />
-              </Form.Control>
-              {errors.discogsId && (
-                <Form.Message>{errors.discogsId.message}</Form.Message>
-              )}
-            </Form.Field>
+                            return (
+                              <Fragment key={String(fieldName)}>
+                                <FormField
+                                  config={config}
+                                  value={fieldValue}
+                                  onChange={handleChange}
+                                  errors={form.errors}
+                                  lockMode={lockMode}
+                                  isFieldLocked={isFieldLocked}
+                                  onToggleLock={toggleFieldLock}
+                                />
+                              </Fragment>
+                            );
+                          })}
+                        </Flex>
+                      )}
+                    </Tabs.Content>
+                  );
+                })}
+              </Box>
+            </Tabs.Root>
 
-            <Form.Field name="genres">
-              <Form.Label>Genres</Form.Label>
-              <Controller
-                name="genres"
-                control={control}
-                render={({ field }) => (
-                  <Box
-                    onClick={() => handleFieldClick('genres')}
-                    className={lockMode && isFieldLocked('genres') ? styles.lockedField : ''}
-                  >
-                    <MultiSelect
-                      placeholder="Select genres"
-                      value={field.value}
-                      onChange={field.onChange}
-                      options={genreOptions}
-                      disabled={lockMode && isFieldLocked('genres')}
-                    />
-                  </Box>
-                )}
-              />
-            </Form.Field>
-
+            {/* Form Actions */}
             <Flex gap="3" mt="4" justify="end">
               {onCancel && (
                 <Button type="button" variant="soft" onClick={onCancel}>
                   Cancel
                 </Button>
               )}
-              <Button type="submit">
-                Save
+              <Button type="submit" disabled={form.processing}>
+                {form.processing ? 'Saving...' : 'Save'}
               </Button>
             </Flex>
           </Flex>
-        </Form.Root>
+        </form>
 
         {/* Browse Metadata Dialog */}
         <Dialog.Root open={showBrowseDialog} onOpenChange={setShowBrowseDialog}>

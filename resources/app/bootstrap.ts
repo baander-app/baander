@@ -26,3 +26,8 @@ import '@fontsource-variable/source-code-pro';
 import { initAuthStore } from '@/app/modules/auth/store';
 
 initAuthStore();
+
+import { client } from 'laravel-precognition-react';
+import { AXIOS_INSTANCE } from '@/app/libs/api-client/axios-instance.ts';
+
+client.use(AXIOS_INSTANCE);

@@ -2,4 +2,4 @@
 
 ## Album editor
 
-Choose album artist
+After form update, clear/update react-query with correct query key

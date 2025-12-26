@@ -5,6 +5,7 @@ namespace App\Http;
 use App\Http\Middleware\CheckOAuthScopes;
 use App\Http\Middleware\ConvertQueryTokenToHeaderMiddleware;
 use App\Http\Middleware\EncryptCookies;
+use App\Http\Middleware\HandlePrecognitiveRequests;
 use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Http\Middleware\TrimStrings;
 use App\Http\Middleware\TrustProxies;

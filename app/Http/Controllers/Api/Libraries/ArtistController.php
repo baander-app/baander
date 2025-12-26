@@ -86,7 +86,7 @@ class ArtistController extends Controller
      * @throws ModelNotFoundException When an artist is not found in the library
      * @response ArtistResource
      */
-    #[Put('{artist}', 'api.artists.update', ['auth:oauth', 'scope:access-api'])]
+    #[Put('{artist}', 'api.artists.update', ['auth:oauth', 'scope:access-api', 'precognitive'])]
     public function update(Library $library, Artist $artist, ArtistUpdateRequest $request): ArtistResource
     {
         $artist->setRelation('library', $library);
