@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Box, Select, Badge, Button, Flex } from '@radix-ui/themes';
+import { useState, useEffect, useMemo } from 'react';
+import { Box, Select, Badge, Button, Flex, TextField, Text } from '@radix-ui/themes';
 
 interface MultiSelectProps {
   placeholder: string;
@@ -12,9 +12,15 @@ interface MultiSelectProps {
 /**
  * MultiSelect component for selecting multiple items with badge display
  * Reusable across all form editors (album, song, artist, etc.)
+ *
+ * Features:
+ * - Search/filter input for finding items
+ * - Max height with scrollbar for dropdown
+ * - Badge display of selected items with remove button
  */
 export function MultiSelect({ placeholder, value, onChange, options, disabled }: MultiSelectProps) {
   const [selectedItems, setSelectedItems] = useState<{ id: number; name: string }[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Initialize selected items from value prop
   useEffect(() => {
@@ -27,6 +33,7 @@ export function MultiSelect({ placeholder, value, onChange, options, disabled }:
     if (selectedOption && !selectedItems.some(item => item.id === selectedOption.id)) {
       const newSelectedItems = [...selectedItems, selectedOption];
       setSelectedItems(newSelectedItems);
+      setSearchQuery(''); // Clear search after selection
       onChange(newSelectedItems.map(item => item.name));
     }
   };
@@ -37,9 +44,21 @@ export function MultiSelect({ placeholder, value, onChange, options, disabled }:
     onChange(newSelectedItems.map(item => item.name));
   };
 
-  const availableOptions = options.filter(option =>
-    !selectedItems.some(selected => selected.id === option.id)
-  );
+  // Filter available options (exclude selected) and filter by search query
+  const availableOptions = useMemo(() => {
+    const unselected = options.filter(option =>
+      !selectedItems.some(selected => selected.id === option.id)
+    );
+
+    if (!searchQuery.trim()) {
+      return unselected;
+    }
+
+    const query = searchQuery.toLowerCase();
+    return unselected.filter(option =>
+      option.name.toLowerCase().includes(query)
+    );
+  }, [options, selectedItems, searchQuery]);
 
   return (
     <Box width="100%">
@@ -63,14 +82,38 @@ export function MultiSelect({ placeholder, value, onChange, options, disabled }:
           </Flex>
         )}
 
-        <Select.Root onValueChange={handleSelectChange} value="" disabled={disabled}>
+        {/* Search Input */}
+        <TextField.Root
+          placeholder="Search..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          disabled={disabled}
+        >
+          <TextField.Slot />
+        </TextField.Root>
+
+        <Select.Root
+          onValueChange={handleSelectChange}
+          value=""
+          disabled={disabled}
+        >
           <Select.Trigger placeholder={placeholder} />
-          <Select.Content>
-            {availableOptions.map(option => (
-              <Select.Item key={option.id} value={option.name} style={{ cursor: 'pointer' }}>
-                {option.name}
-              </Select.Item>
-            ))}
+          <Select.Content maxHeight="200px">
+            {availableOptions.length === 0 ? (
+              <Text size="2" color="gray" style={{ padding: '8px 16px' }}>
+                {searchQuery ? 'No results found' : 'All items selected'}
+              </Text>
+            ) : (
+              availableOptions.map(option => (
+                <Select.Item
+                  key={option.id}
+                  value={option.name}
+                  style={{ cursor: 'pointer' }}
+                >
+                  {option.name}
+                </Select.Item>
+              ))
+            )}
           </Select.Content>
         </Select.Root>
       </Flex>
