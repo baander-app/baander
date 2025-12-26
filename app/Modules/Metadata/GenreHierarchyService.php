@@ -129,6 +129,17 @@ class GenreHierarchyService
             $filter = new ReleaseFilter(genre: $genre, per_page: 50);
             $searchResults = $this->discogsClient->search->releaseRaw($filter);
 
+            // Handle rate limiting or API failures
+            if ($searchResults === null) {
+                $this->logger->warning("Discogs search returned null (rate limited or failed) for {$genre}");
+                return [
+                    'related_styles' => [],
+                    'related_genres' => [],
+                    'release_count'  => 0,
+                    'method'         => 'failed',
+                ];
+            }
+
             $allStyles = [];
             $allGenres = [];
 

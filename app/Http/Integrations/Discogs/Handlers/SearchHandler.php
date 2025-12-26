@@ -101,7 +101,7 @@ class SearchHandler extends Handler
     /**
      * Get raw API response for artists (for backward compatibility)
      */
-    public function artistRaw($filter): array
+    public function artistRaw($filter): ?array
     {
         return $this->fetchCached('database/search', array_merge($filter->toQueryParameters(), ['type' => 'artist']));
     }
@@ -109,7 +109,7 @@ class SearchHandler extends Handler
     /**
      * Get raw API response for releases (for backward compatibility)
      */
-    public function releaseRaw($filter): array
+    public function releaseRaw($filter): ?array
     {
         return $this->fetchCached('database/search', array_merge($filter->toQueryParameters(), ['type' => 'release']));
     }
