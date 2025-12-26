@@ -185,15 +185,14 @@ abstract class Handler
     /**
      * Wait for rate limit to expire before making requests
      *
-     * Waits up to 5 seconds initially, with up to 3 retry attempts.
-     * Returns false if still rate limited after retries.
+     * Respects the actual expires_at time from rate limit headers.
+     * Has a safety net of max attempts in case something goes wrong.
      *
      * @return bool True if we can proceed, false if timeout reached
      */
     public function waitForRateLimit(): bool
     {
         $maxAttempts = 3;
-        $maxWaitPerAttempt = 5; // seconds
 
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
             if ($this->canMakeRequest()) {
@@ -203,17 +202,22 @@ abstract class Handler
             $expiresAt = Cache::get(self::RATE_LIMIT_CACHE_KEY . '_expires');
             $remaining = $expiresAt ? now()->diffInSeconds($expiresAt) : 0;
 
-            // Cap wait time at 5 seconds
-            $waitTime = min($remaining, $maxWaitPerAttempt);
-
-            if ($waitTime > 0) {
-                Log::info("Waiting for Discogs rate limit (attempt $attempt/$maxAttempts)", [
-                    'seconds_remaining' => $remaining,
-                    'waiting_seconds' => $waitTime,
-                ]);
-
-                sleep($waitTime);
+            if ($remaining <= 0) {
+                // Should be expired but cache hasn't cleared, try to proceed
+                return true;
             }
+
+            // Wait for the full remaining time (up to 60 seconds)
+            // This respects the actual rate limit expires_at time
+            $waitTime = min($remaining, 60);
+
+            Log::info("Waiting for Discogs rate limit (attempt $attempt/$maxAttempts)", [
+                'seconds_remaining' => $remaining,
+                'waiting_seconds' => $waitTime,
+                'expires_at' => $expiresAt,
+            ]);
+
+            sleep($waitTime);
         }
 
         // Final check after all attempts

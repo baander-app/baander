@@ -2,6 +2,7 @@
 
 namespace App\Modules\Metadata;
 
+use App\Format\TextSimilarity;
 use App\Http\Integrations\Discogs\DiscogsClient;
 use App\Http\Integrations\Discogs\Filters\ReleaseFilter;
 use App\Http\Integrations\LastFm\LastFmClient;
@@ -23,7 +24,8 @@ class GenreHierarchyService
 
     public function __construct(
         private readonly DiscogsClient $discogsClient,
-        LastFmClient                   $lastFmClient,
+        LastFmClient $lastFmClient,
+        private readonly TextSimilarity $textSimilarity,
     )
     {
         $user = User::first();
@@ -454,37 +456,14 @@ class GenreHierarchyService
     }
 
     /**
-     * Calculate string-based similarity
+     * Calculate string-based similarity using TextSimilarity
      */
     private function calculateStringSimilarity(string $genre1, string $genre2): float
     {
-        $genre1Lower = mb_strtolower($genre1);
-        $genre2Lower = mb_strtolower($genre2);
-
-        // Check for substring relationships
-        if (str_contains($genre1Lower, $genre2Lower) || str_contains($genre2Lower, $genre1Lower)) {
-            return 0.6;
-        }
-
-        // Check for common words
-        $words1 = explode(' ', $genre1Lower);
-        $words2 = explode(' ', $genre2Lower);
-        $commonWords = array_intersect($words1, $words2);
-
-        if (!empty($commonWords)) {
-            return count($commonWords) / max(count($words1), count($words2)) * 0.5;
-        }
-
-        // Levenshtein distance for very similar spellings
-        $maxLen = max(mb_strlen($genre1Lower), mb_strlen($genre2Lower));
-        if ($maxLen <= 20) { // Only for short genre names
-            $distance = levenshtein($genre1Lower, $genre2Lower);
-            if ($distance <= 3) {
-                return max(0.0, 1.0 - ($distance / $maxLen));
-            }
-        }
-
-        return 0.0;
+        // Use TextSimilarity for more accurate comparison
+        // Returns score 0-100, normalize to 0-1 for consistency
+        $similarity = $this->textSimilarity->calculateSimilarity($genre1, $genre2);
+        return $similarity / 100.0;
     }
 
     /**

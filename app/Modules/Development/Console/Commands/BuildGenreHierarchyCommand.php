@@ -2,8 +2,11 @@
 
 namespace App\Modules\Development\Console\Commands;
 
+use App\Format\TextSimilarity;
+use App\Models\Genre;
 use App\Modules\Metadata\GenreHierarchyService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\Console\Command\Command as SymfonyCommand;
 
 class BuildGenreHierarchyCommand extends Command
@@ -30,6 +33,7 @@ class BuildGenreHierarchyCommand extends Command
 
     public function __construct(
         private readonly GenreHierarchyService $genreHierarchy,
+        private readonly TextSimilarity $textSimilarity,
     ) {
         parent::__construct();
     }
@@ -100,7 +104,7 @@ class BuildGenreHierarchyCommand extends Command
 
         // From database
         if ($this->option('from-db')) {
-            $genres = \App\Models\Genre::pluck('name')->toArray();
+            $genres = Genre::pluck('name')->toArray();
             $this->info("Loaded " . count($genres) . " genres from database");
             return $genres;
         }
@@ -177,6 +181,64 @@ class BuildGenreHierarchyCommand extends Command
     }
 
     /**
+     * Find an existing genre by name (case-insensitive, using TextSimilarity)
+     *
+     * @param string $genreName The genre name to find
+     * @param \Illuminate\Support\Collection $allGenres All genres in database
+     * @param array $genreCache Cache of normalized names to genre models
+     * @return Genre|null Existing genre or null if not found
+     */
+    private function findExistingGenre(string $genreName, \Illuminate\Support\Collection $allGenres, array &$genreCache): ?Genre
+    {
+        $normalizedName = $this->textSimilarity->normalizeInternationalText($genreName);
+
+        // Check cache first
+        if (isset($genreCache[$normalizedName])) {
+            return $genreCache[$normalizedName];
+        }
+
+        // First try exact match (fastest)
+        $exactMatch = $allGenres->firstWhere('name', $genreName);
+        if ($exactMatch) {
+            $genreCache[$normalizedName] = $exactMatch;
+            return $exactMatch;
+        }
+
+        // Try case-insensitive match using normalized comparison
+        foreach ($allGenres as $genre) {
+            $existingNormalized = $this->textSimilarity->normalizeInternationalText($genre->name);
+            if ($existingNormalized === $normalizedName) {
+                $genreCache[$normalizedName] = $genre;
+                $genreCache[$existingNormalized] = $genre; // Cache both normalizations
+                return $genre;
+            }
+        }
+
+        // Use TextSimilarity to find near-exact matches (handle slight variations)
+        $matches = $this->textSimilarity->findBestMatches(
+            $genreName,
+            $allGenres->pluck('name')->toArray(),
+            threshold: 95.0, // Very high threshold - only match if essentially the same
+            limit: 1
+        );
+
+        if (!empty($matches)) {
+            $match = $matches[0];
+            $matchedGenre = $allGenres->firstWhere('name', $match['text']);
+
+            if ($matchedGenre && $match['similarity'] >= 99.0) {
+                // Only use if it's an almost perfect match (handles diacritics, spacing, etc.)
+                $genreCache[$normalizedName] = $matchedGenre;
+                return $matchedGenre;
+            }
+        }
+
+        // Cache that we didn't find anything
+        $genreCache[$normalizedName] = null;
+        return null;
+    }
+
+    /**
      * Persist hierarchy to database
      */
     private function persistHierarchy(array $hierarchy): void
@@ -185,47 +247,53 @@ class BuildGenreHierarchyCommand extends Command
         $this->info('Persisting hierarchy to database...');
 
         $relationships = $hierarchy['relationships'] ?? [];
-        $stats = ['created' => 0, 'updated' => 0, 'linked' => 0];
+        $stats = ['created' => 0, 'matched' => 0, 'linked' => 0];
+        $allGenres = Genre::all(['id', 'name']);
+        $genreCache = []; // Cache of genre names to models for quick lookup
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($relationships, &$stats) {
+        DB::transaction(function () use ($relationships, &$stats, $allGenres, &$genreCache) {
             foreach ($relationships as $relationship) {
                 $childName = $relationship['child'];
                 $parentName = $relationship['parent'];
 
-                // Ensure child genre exists
-                $child = \App\Models\Genre::firstOrCreate([
-                    'name' => $childName,
-                ], [
-                    'slug' => \Illuminate\Support\Str::slug($childName),
-                ]);
+                // Try to find existing child genre (case-insensitive)
+                $child = $this->findExistingGenre($childName, $allGenres, $genreCache);
 
-                if ($child->wasRecentlyCreated) {
+                if (!$child) {
+                    // Create new child genre if not found
+                    $child = Genre::create([
+                        'name' => $childName,
+                        'slug' => \Illuminate\Support\Str::slug($childName),
+                    ]);
                     $stats['created']++;
+                } else {
+                    $stats['matched']++;
                 }
 
-                // Ensure parent genre exists
-                $parent = \App\Models\Genre::firstOrCreate([
-                    'name' => $parentName,
-                ], [
-                    'slug' => \Illuminate\Support\Str::slug($parentName),
-                ]);
+                // Try to find existing parent genre (case-insensitive)
+                $parent = $this->findExistingGenre($parentName, $allGenres, $genreCache);
 
-                if ($parent->wasRecentlyCreated) {
+                if (!$parent) {
+                    // Create new parent genre if not found
+                    $parent = Genre::create([
+                        'name' => $parentName,
+                        'slug' => \Illuminate\Support\Str::slug($parentName),
+                    ]);
                     $stats['created']++;
+                } else {
+                    $stats['matched']++;
                 }
 
                 // Link child to parent
                 if ($child->parent_id !== $parent->id) {
                     $child->update(['parent_id' => $parent->id]);
                     $stats['linked']++;
-                } else {
-                    $stats['updated']++;
                 }
             }
         });
 
-        $this->info("✓ Created {$stats['created']} genres");
-        $this->info("✓ Updated {$stats['updated']} existing relationships");
-        $this->info("✓ Linked {$stats['linked']} new parent-child relationships");
+        $this->info("✓ Created {$stats['created']} new genres");
+        $this->info("✓ Matched {$stats['matched']} existing genres (case-insensitive)");
+        $this->info("✓ Linked {$stats['linked']} parent-child relationships");
     }
 }
