@@ -5,7 +5,6 @@ namespace App\Modules\Metadata;
 use App\Http\Integrations\Discogs\DiscogsClient;
 use App\Http\Integrations\Discogs\Filters\ReleaseFilter;
 use App\Http\Integrations\LastFm\LastFmClient;
-use App\Http\Integrations\MusicBrainz\MusicBrainzClient;
 use App\Models\Genre;
 use App\Models\User;
 use App\Modules\Logging\Attributes\LogChannel;
@@ -23,9 +22,8 @@ class GenreHierarchyService
     private LastFmClient $lastFmClient;
 
     public function __construct(
-        private readonly MusicBrainzClient $musicBrainzClient,
-        private readonly DiscogsClient     $discogsClient,
-        LastFmClient                       $lastFmClient,
+        private readonly DiscogsClient $discogsClient,
+        LastFmClient                   $lastFmClient,
     )
     {
         $user = User::first();
@@ -70,13 +68,13 @@ class GenreHierarchyService
                 ]);
 
                 $hierarchy[$genre] = [
-                    'lastfm'  => [
+                    'lastfm'      => [
                         'info'        => $tagInfo,
                         'similar'     => [],
                         'popularity'  => $tagInfo['reach'] ?? 0,
                         'description' => $tagInfo['wiki']['summary'] ?? null,
                     ],
-                    'discogs' => $discogsData,
+                    'discogs'     => $discogsData,
                     'musicbrainz' => $musicBrainzData,
                 ];
             }
@@ -98,16 +96,16 @@ class GenreHierarchyService
 
             if (!$genreRecord) {
                 return [
-                    'mbid' => null,
+                    'mbid'           => null,
                     'canonical_name' => null,
-                    'found' => false,
+                    'found'          => false,
                 ];
             }
 
             return [
-                'mbid' => $genreRecord->mbid,
+                'mbid'           => $genreRecord->mbid,
                 'canonical_name' => $genreRecord->name,
-                'found' => !empty($genreRecord->mbid),
+                'found'          => !empty($genreRecord->mbid),
             ];
         } catch (\Exception $e) {
             $this->logger->warning("MusicBrainz genre lookup failed for {$genre}", [
@@ -115,9 +113,9 @@ class GenreHierarchyService
             ]);
 
             return [
-                'mbid' => null,
+                'mbid'           => null,
                 'canonical_name' => null,
-                'found' => false,
+                'found'          => false,
             ];
         }
     }
@@ -503,13 +501,13 @@ class GenreHierarchyService
             $musicBrainzData = $this->getMusicBrainzGenreData($genre);
 
             $hierarchy[$genre] = [
-                'lastfm'  => [
+                'lastfm'      => [
                     'info'        => $tagInfo,
                     'similar'     => [],
                     'popularity'  => $tagInfo['reach'] ?? 0,
                     'description' => $tagInfo['wiki']['summary'] ?? null,
                 ],
-                'discogs' => [
+                'discogs'     => [
                     'related_styles' => [],
                     'related_genres' => [],
                     'release_count'  => 0,

@@ -130,19 +130,19 @@ class PruneLibrariesCommand extends \Illuminate\Console\Command
                 DB::table('artists')->whereIn('id', $orphanedArtists)->delete();
             }
 
-            // Clean up orphaned genres (genres with no songs)
-            $orphanedGenres = DB::table('genres')
-                ->leftJoin('genre_song', 'genres.id', '=', 'genre_song.genre_id')
-                ->whereNull('genre_song.genre_id')
-                ->pluck('genres.id');
-
-            if ($orphanedGenres->isNotEmpty()) {
-                DB::table('genres')->whereIn('id', $orphanedGenres)->delete();
-            }
+//            // Clean up orphaned genres (genres with no songs)
+//            $orphanedGenres = DB::table('genres')
+//                ->leftJoin('genre_song', 'genres.id', '=', 'genre_song.genre_id')
+//                ->whereNull('genre_song.genre_id')
+//                ->pluck('genres.id');
+//
+//            if ($orphanedGenres->isNotEmpty()) {
+//                DB::table('genres')->whereIn('id', $orphanedGenres)->delete();
+//            }
 
             $this->info("✓ Deleted {$albumCount} albums and {$songCount} songs from library '{$library->slug}'");
             $this->info("✓ Cleaned up orphaned artists: " . $orphanedArtists->count());
-            $this->info("✓ Cleaned up orphaned genres: " . $orphanedGenres->count());
+//            $this->info("✓ Cleaned up orphaned genres: " . $orphanedGenres->count());
         });
 
         $this->info("Media data truncation completed for library: {$library->slug}");
