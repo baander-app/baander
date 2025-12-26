@@ -35,8 +35,7 @@ export function AlbumEditor({
   const { form, lockMode, setLockMode, toggleFieldLock, isFieldLocked, submit } =
     useFormEditor<AlbumFormData>({
       method: 'put',
-      // url: `/api/libraries/${librarySlug}/albums/${album?.publicId}`,
-      url: route('api.albums.update', { librarySlug, id: album?.publicId }),
+      url: route('api.albums.update', { library: librarySlug, album: album?.publicId }),
       initialData: {
         title: album?.title || '',
         type: album?.type || '',

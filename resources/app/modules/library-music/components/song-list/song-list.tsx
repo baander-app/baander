@@ -154,7 +154,6 @@ export function SongList() {
         className={styles.songListTable}
         contextMenuActions={{
           onEdit: handleEdit,
-          onSync: (song) => handleSync(song),
         }}
       />
 

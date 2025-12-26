@@ -28,8 +28,6 @@ export interface SongTableProps {
   className?: string;
   contextMenuActions?: {
     onEdit: (song: SongResource) => void;
-    onBrowse?: (song: SongResource) => void;
-    onSync?: (song: SongResource) => void;
   };
 }
 
@@ -82,7 +80,7 @@ const COLUMN_DEFINITIONS: ColumnDef<SongResource>[] = [
   },
   {
     header: 'Lyrics',
-    accessorKey: 'lyricsExist',
+    accessorFn: (row) => !!row.lyrics,
     cell: (info) => info.getValue() ? <Iconify icon="arcticons:quicklyric"/> : null,
     size: 60,
   },
@@ -93,6 +91,10 @@ const COLUMN_DEFINITIONS: ColumnDef<SongResource>[] = [
   {
     header: 'Album',
     accessorFn: (row) => row.album?.title,
+  },
+  {
+    header: 'Genre',
+    accessorFn: (row) => row.genres?.map(x => x.name).join(', '),
   },
   {
     header: 'Duration',
@@ -205,7 +207,7 @@ function StickyHeader({ table }: StickyHeaderProps) {
         {table.getHeaderGroups().map((headerGroup) => (
           <tr key={headerGroup.id}>
             {headerGroup.headers.map((header) => (
-              <HeaderCell key={header.id} header={header}/>
+              <HeaderCell header={header}/>
             ))}
           </tr>
         ))}
@@ -258,8 +260,6 @@ function VirtualizedRows({ visibleRows, onSongClick, contextMenuActions }: Virtu
             <SongContextMenu
               song={row.original}
               onEdit={contextMenuActions.onEdit}
-              onBrowse={contextMenuActions.onBrowse}
-              onSync={contextMenuActions.onSync}
             />
           )}
         </ContextMenu.Root>
@@ -272,20 +272,12 @@ function VirtualizedRows({ visibleRows, onSongClick, contextMenuActions }: Virtu
 interface SongContextMenuProps {
   song: SongResource;
   onEdit: (song: SongResource) => void;
-  onBrowse?: (song: SongResource) => void;
-  onSync?: (song: SongResource) => void;
 }
 
-function SongContextMenu({ song, onEdit, onBrowse, onSync }: SongContextMenuProps) {
+function SongContextMenu({ song, onEdit }: SongContextMenuProps) {
   return (
     <ContextMenu.Content>
       <ContextMenu.Item onClick={() => onEdit(song)}>Edit</ContextMenu.Item>
-      {onBrowse && (
-        <ContextMenu.Item onClick={() => onBrowse(song)}>Browse for Metadata</ContextMenu.Item>
-      )}
-      {onSync && (
-        <ContextMenu.Item onClick={() => onSync(song)}>Sync Metadata</ContextMenu.Item>
-      )}
       <ContextMenu.Separator />
       <ContextMenu.Item color="red">Delete</ContextMenu.Item>
     </ContextMenu.Content>

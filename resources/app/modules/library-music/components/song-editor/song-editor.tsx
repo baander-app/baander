@@ -30,11 +30,10 @@ export function SongEditor({
   const [showBrowseDialog, setShowBrowseDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('details');
 
-  // Form editor with Precognition validation and field locking
   const { form, lockMode, setLockMode, toggleFieldLock, isFieldLocked, submit } =
     useFormEditor<SongFormData>({
       method: 'put',
-      url: route('api.songs.update', { librarySlug, id: song?.publicId }),
+      url: route('api.songs.update', { library: librarySlug, song: song?.publicId }),
       initialData: {
         title: song?.title || '',
         track: song?.track || undefined,
