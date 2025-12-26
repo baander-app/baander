@@ -99,6 +99,7 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
   // Keep existing timing behavior
   const updateIntervalRef = useRef<number | null>(null);
   const lastDispatchTimeRef = useRef<number>(0);
+  const lastLogTimeRef = useRef<number>(0);
   const knobRef = useRef<HTMLDivElement>(null);
 
   const isMuted = usePlayerIsMuted();
@@ -140,6 +141,8 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
   useEffect(() => {
     const processor = globalAudioProcessor.getProcessor();
 
+    console.log('[Equalizer] processor:', !!processor, 'isPlaying:', isPlaying, 'processor?.isActive:', processor?.isActive);
+
     if (!processor || !isPlaying) {
       if (updateIntervalRef.current) {
         clearInterval(updateIntervalRef.current);
@@ -154,6 +157,19 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
         const isActive = processor.isActive;
         const processorMode = (processor as any).passiveMode ? 'passive' : 'direct';
         const data = processor.getAnalysisData();
+
+        // Log throttled to once per second
+        const now = performance.now();
+        if (now - lastLogTimeRef.current > 1000) {
+          console.log('[Equalizer] Got analysis data:', {
+            leftChannel: data?.leftChannel?.toFixed(1),
+            rightChannel: data?.rightChannel?.toFixed(1),
+            lufs: data?.lufs?.toFixed(1),
+            peakFreq: data?.peakFrequency,
+            maxFreq: data?.frequencyData ? Math.max(...Array.from(data.frequencyData).slice(0, 100)) : 0
+          });
+          lastLogTimeRef.current = now;
+        }
 
         // Update processor state
         setEqState((prev) => ({
@@ -363,7 +379,7 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
     [eqState.masterGain, normalization.currentGain]
   );
   const formattedPeakFrequency = useMemo(() => {
-    const freq = displayData.peakFrequency;
+    const freq = displayData.peakFrequency ?? 0;
     return freq > 1000 ? `${(freq / 1000).toFixed(1)}K` : `${Math.round(freq)}`;
   }, [displayData.peakFrequency]);
 
@@ -440,7 +456,7 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
             <div className={styles.correlationMeter}>
               <span className={styles.correlationLabel}>CORR:</span>
               <span className={styles.correlationValue}>
-                {((displayData.leftChannel + displayData.rightChannel) / 200).toFixed(2)}
+                {(((displayData.leftChannel ?? 0) + (displayData.rightChannel ?? 0)) / 200).toFixed(2)}
               </span>
             </div>
           </div>
@@ -450,7 +466,7 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
       <div className={styles.vfdFooter}>
         <div className={styles.lufsDisplay}>
           <span className={styles.lufsLabel}>LUFS:</span>
-          <span className={styles.lufsValue}>{displayData.lufs.toFixed(1)}</span>
+          <span className={styles.lufsValue}>{(displayData.lufs ?? -30).toFixed(1)}</span>
         </div>
         <div className={styles.volumeDisplay}>
           <span className={styles.volumeLabel}>VOL:</span>

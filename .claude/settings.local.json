@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(yarn dev:electron:*)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(dir:*)",
+      "Bash(Get-ChildItem -Path node_modules.vite -Recurse -Filter \"*pid*\" -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object:*)",
+      "Bash(rm:*)"
+    ]
+  }
+}

@@ -1,3 +1,4 @@
+import React from 'react';
 import { CSSProperties, PropsWithChildren } from 'react';
 
 interface PaletteProps {

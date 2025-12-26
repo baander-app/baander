@@ -6,10 +6,10 @@
       <sourceFolder url="file://$MODULE_DIR$/database/factories" isTestSource="false" packagePrefix="Database\Factories\" />
       <sourceFolder url="file://$MODULE_DIR$/database/seeders" isTestSource="false" packagePrefix="Database\Seeders\" />
       <sourceFolder url="file://$MODULE_DIR$/packages/redis-stack/src" isTestSource="false" packagePrefix="Baander\RedisStack\" />
-      <sourceFolder url="file://$MODULE_DIR$/packages/scout-redisearch/src" isTestSource="false" packagePrefix="Baander\ScoutRediSearch\" />
       <sourceFolder url="file://$MODULE_DIR$/tests" isTestSource="true" packagePrefix="Tests\" />
       <sourceFolder url="file://$MODULE_DIR$/tests/Feature" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/tests/Unit" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/packages/scout-redisearch/src" isTestSource="false" packagePrefix="Baander\ScoutRediSearch\" />
       <sourceFolder url="file://$MODULE_DIR$/third_party/music-brainz/src" isTestSource="false" packagePrefix="MusicBrainz\" />
       <sourceFolder url="file://$MODULE_DIR$/third_party/music-brainz/tests/specification" isTestSource="false" packagePrefix="MusicBrainz\SpecificationTest\" />
       <sourceFolder url="file://$MODULE_DIR$/third_party/music-brainz/tests/unit" isTestSource="false" packagePrefix="MusicBrainz\Test\" />
@@ -17,12 +17,16 @@
       <excludeFolder url="file://$MODULE_DIR$/packages/redis-stack/vendor/composer" />
       <excludeFolder url="file://$MODULE_DIR$/storage/app" />
       <excludeFolder url="file://$MODULE_DIR$/storage/assets" />
+      <excludeFolder url="file://$MODULE_DIR$/storage/clockwork" />
       <excludeFolder url="file://$MODULE_DIR$/storage/framework" />
       <excludeFolder url="file://$MODULE_DIR$/storage/metadata" />
-      <excludeFolder url="file://$MODULE_DIR$/vendor/_laravel_idea" />
+      <excludeFolder url="file://$MODULE_DIR$/storage/muzak" />
+      <excludeFolder url="file://$MODULE_DIR$/storage/temp" />
+      <excludeFolder url="file://$MODULE_DIR$/storage/test" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/bacon/bacon-qr-code" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/barryvdh/laravel-ide-helper" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/barryvdh/reflection-docblock" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/brianium/paratest" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/brick/math" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/brick/varexporter" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/carbonphp/carbon-doctrine-types" />
@@ -40,9 +44,11 @@
       <excludeFolder url="file://$MODULE_DIR$/vendor/doctrine/lexer" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/dragonmantank/cron-expression" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/egulias/email-validator" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/eliashaeussler/sse" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/ergebnis/clock" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/evenement/evenement" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/fakerphp/faker" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/fidry/cpu-core-counter" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/filp/whoops" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/fruitcake/php-cors" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/graham-campbell/result-type" />
@@ -55,6 +61,8 @@
       <excludeFolder url="file://$MODULE_DIR$/vendor/icanhazstring/composer-unused" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/intervention/gif" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/intervention/image" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/itsgoingd/clockwork" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/jean85/pretty-package-versions" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/jfcherng/php-color-output" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/jfcherng/php-diff" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/jfcherng/php-mb-string" />
@@ -99,6 +107,7 @@
       <excludeFolder url="file://$MODULE_DIR$/vendor/phar-io/manifest" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/phar-io/version" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/php-ffmpeg/php-ffmpeg" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/php-http/discovery" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/php-http/guzzle7-adapter" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/php-http/httplug" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/php-http/promise" />
@@ -132,8 +141,6 @@
       <excludeFolder url="file://$MODULE_DIR$/vendor/ramsey/collection" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/ramsey/uuid" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/sebastian/cli-parser" />
-      <excludeFolder url="file://$MODULE_DIR$/vendor/sebastian/code-unit" />
-      <excludeFolder url="file://$MODULE_DIR$/vendor/sebastian/code-unit-reverse-lookup" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/sebastian/comparator" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/sebastian/complexity" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/sebastian/diff" />
@@ -221,17 +228,8 @@
       <excludeFolder url="file://$MODULE_DIR$/vendor/webmozart/glob" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/xammie/mailbook" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/xenos/asklucy" />
-      <excludeFolder url="file://$MODULE_DIR$/storage/muzak" />
-      <excludeFolder url="file://$MODULE_DIR$/vendor/itsgoingd/clockwork" />
-      <excludeFolder url="file://$MODULE_DIR$/storage/clockwork" />
-      <excludeFolder url="file://$MODULE_DIR$/vendor/brianium/paratest" />
-      <excludeFolder url="file://$MODULE_DIR$/vendor/eliashaeussler/sse" />
-      <excludeFolder url="file://$MODULE_DIR$/vendor/fidry/cpu-core-counter" />
-      <excludeFolder url="file://$MODULE_DIR$/vendor/jean85/pretty-package-versions" />
-      <excludeFolder url="file://$MODULE_DIR$/vendor/php-http/discovery" />
-      <excludeFolder url="file://$MODULE_DIR$/storage/test" />
-      <excludeFolder url="file://$MODULE_DIR$/storage/temp" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/xenos/musicbrainz" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/zend/php-reader" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

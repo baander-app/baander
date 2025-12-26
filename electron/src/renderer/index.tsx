@@ -79,10 +79,10 @@ async function bootstrap() {
   // await loadWasmHelpers().catch(() => { /* continue without WASM */ });
 
   // Now import and start the real app entry
-  await import('@/index.tsx');
+  await import('@/app/index.tsx');
 }
 
 bootstrap().catch((e) => {
   console.error('[bootstrap] Unhandled error:', e);
-  import('@/index.tsx');
+  import('@/app/index.tsx');
 });

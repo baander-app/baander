@@ -36,6 +36,7 @@ export function InlinePlayer() {
     setSong,
     seekTo,
     togglePlayPause,
+    setSource,
   } = usePlayerActions();
   const canQuery = Boolean(sourceSong?.publicId && sourceSong?.librarySlug);
   const { data: song } = useSongsShow(sourceSong?.librarySlug!, sourceSong?.publicId!, {
@@ -84,13 +85,13 @@ export function InlinePlayer() {
   useEffect(() => {
     const audioElement = existingAudioElement;
     if (audioElement && currentStreamUrl) {
-      audioElement.src = currentStreamUrl;
+      setSource(currentStreamUrl);
       audioElement.play();
     } else if (audioElement && !currentStreamUrl) {
-      audioElement.src = '';
+      setSource(null);
       audioElement.pause();
     }
-  }, [currentStreamUrl, existingAudioElement]);
+  }, [currentStreamUrl, existingAudioElement, setSource]);
 
   useEffect(() => {
     if (song) {

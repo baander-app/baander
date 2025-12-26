@@ -2,14 +2,14 @@
 <project version="4">
   <component name="LaravelPint">
     <laravel_pint_settings>
-      <laravel_pint_by_interpreter asDefaultInterpreter="true" interpreter_id="c7aa3a43-dc22-4866-bd98-4476692e7328">
+      <laravel_pint_by_interpreter asDefaultInterpreter="true" interpreter_id="19bc4d5e-a706-40cf-a8f7-0236b1bd03ea">
         <option name="timeout" value="30000" />
       </laravel_pint_by_interpreter>
     </laravel_pint_settings>
   </component>
   <component name="MessDetector">
     <phpmd_settings>
-      <phpmd_by_interpreter asDefaultInterpreter="true" interpreter_id="c7aa3a43-dc22-4866-bd98-4476692e7328" timeout="30000" />
+      <phpmd_by_interpreter asDefaultInterpreter="true" interpreter_id="19bc4d5e-a706-40cf-a8f7-0236b1bd03ea" timeout="30000" />
     </phpmd_settings>
   </component>
   <component name="MessDetectorOptionsConfiguration">
@@ -24,12 +24,12 @@
   </component>
   <component name="PhpCSFixer">
     <phpcsfixer_settings>
-      <phpcs_fixer_by_interpreter asDefaultInterpreter="true" interpreter_id="c7aa3a43-dc22-4866-bd98-4476692e7328" timeout="30000" />
+      <phpcs_fixer_by_interpreter asDefaultInterpreter="true" interpreter_id="19bc4d5e-a706-40cf-a8f7-0236b1bd03ea" timeout="30000" />
     </phpcsfixer_settings>
   </component>
   <component name="PhpCodeSniffer">
     <phpcs_settings>
-      <phpcs_by_interpreter asDefaultInterpreter="true" interpreter_id="c7aa3a43-dc22-4866-bd98-4476692e7328" timeout="30000" />
+      <phpcs_by_interpreter asDefaultInterpreter="true" interpreter_id="19bc4d5e-a706-40cf-a8f7-0236b1bd03ea" timeout="30000" />
     </phpcs_settings>
   </component>
   <component name="PhpIncludePathManager">
@@ -153,8 +153,6 @@
       <path value="$PROJECT_DIR$/vendor/ramsey/collection" />
       <path value="$PROJECT_DIR$/vendor/ramsey/uuid" />
       <path value="$PROJECT_DIR$/vendor/sebastian/cli-parser" />
-      <path value="$PROJECT_DIR$/vendor/sebastian/code-unit" />
-      <path value="$PROJECT_DIR$/vendor/sebastian/code-unit-reverse-lookup" />
       <path value="$PROJECT_DIR$/vendor/sebastian/comparator" />
       <path value="$PROJECT_DIR$/vendor/sebastian/complexity" />
       <path value="$PROJECT_DIR$/vendor/sebastian/diff" />
@@ -242,24 +240,26 @@
       <path value="$PROJECT_DIR$/vendor/webmozart/glob" />
       <path value="$PROJECT_DIR$/vendor/xammie/mailbook" />
       <path value="$PROJECT_DIR$/vendor/xenos/asklucy" />
-      <path value="$PROJECT_DIR$/vendor/zend/php-reader" />
-      <path value="$PROJECT_DIR$/vendor/_laravel_idea" />
       <path value="$PROJECT_DIR$/vendor/xenos/musicbrainz" />
+      <path value="$PROJECT_DIR$/vendor/zend/php-reader" />
     </include_path>
   </component>
   <component name="PhpInterpreters">
     <interpreters>
-      <interpreter id="c7aa3a43-dc22-4866-bd98-4476692e7328" name="martinjuul/baander-app:latest" home="docker://DATA" auto="false" debugger_id="php.debugger.XDebug">
-        <configuration_options>
-          <configuration_option name="xdebug.client_host" value="host.docker.internal" />
-        </configuration_options>
-        <remote_data INTERPRETER_PATH="php" HELPERS_PATH="/opt/.phpstorm_helpers" VALID="true" RUN_AS_ROOT_VIA_SUDO="false" DOCKER_ACCOUNT_NAME="Docker" DOCKER_IMAGE_NAME="martinjuul/baander-app:latest" DOCKER_REMOTE_PROJECT_PATH="/opt/project" />
+      <interpreter id="19bc4d5e-a706-40cf-a8f7-0236b1bd03ea" name="app" home="docker-compose://DATA" auto="false" debugger_id="php.debugger.XDebug">
+        <remote_data INTERPRETER_PATH="php" HELPERS_PATH="/opt/.phpstorm_helpers" VALID="true" RUN_AS_ROOT_VIA_SUDO="false" DOCKER_ACCOUNT_NAME="Docker" DOCKER_COMPOSE_SERVICE_NAME="app" DOCKER_REMOTE_PROJECT_PATH="/opt/project">
+          <type_data command="EXEC" />
+          <dockerComposeConfigurationPaths>
+            <item value="$PROJECT_DIR$/docker-compose.yml" />
+          </dockerComposeConfigurationPaths>
+          <envs />
+        </remote_data>
       </interpreter>
     </interpreters>
   </component>
   <component name="PhpInterpretersPhpInfoCache">
     <phpInfoCache>
-      <interpreter name="martinjuul/baander-app:latest">
+      <interpreter name="app">
         <phpinfo binary_type="PHP" php_cgi="/usr/local/bin/php-cgi" php_cli="/usr/local/bin/php" path_separator=":" version="8.4.16">
           <additional_php_ini>/usr/local/etc/php/conf.d/docker-php-ext-excimer.ini, /usr/local/etc/php/conf.d/docker-php-ext-exif.ini, /usr/local/etc/php/conf.d/docker-php-ext-ffi.ini, /usr/local/etc/php/conf.d/docker-php-ext-gd.ini, /usr/local/etc/php/conf.d/docker-php-ext-gettext.ini, /usr/local/etc/php/conf.d/docker-php-ext-grpc.ini, /usr/local/etc/php/conf.d/docker-php-ext-igbinary.ini, /usr/local/etc/php/conf.d/docker-php-ext-imagick.ini, /usr/local/etc/php/conf.d/docker-php-ext-inotify.ini, /usr/local/etc/php/conf.d/docker-php-ext-intl.ini, /usr/local/etc/php/conf.d/docker-php-ext-jsonpath.ini, /usr/local/etc/php/conf.d/docker-php-ext-mailparse.ini, /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini, /usr/local/etc/php/conf.d/docker-php-ext-pcntl.ini, /usr/local/etc/php/conf.d/docker-php-ext-pdo_pgsql.ini, /usr/local/etc/php/conf.d/docker-php-ext-pgsql.ini, /usr/local/etc/php/conf.d/docker-php-ext-protobuf.ini, /usr/local/etc/php/conf.d/docker-php-ext-redis.ini, /usr/local/etc/php/conf.d/docker-php-ext-shmop.ini, /usr/local/etc/php/conf.d/docker-php-ext-sockets.ini, /usr/local/etc/php/conf.d/docker-php-ext-sodium.ini, /usr/local/etc/php/conf.d/docker-php-ext-ssh2.ini, /usr/local/etc/php/conf.d/docker-php-ext-swoole.ini, /usr/local/etc/php/conf.d/docker-php-ext-sysvmsg.ini, /usr/local/etc/php/conf.d/docker-php-ext-uv.ini, /usr/local/etc/php/conf.d/docker-php-ext-yaml.ini, /usr/local/etc/php/conf.d/docker-php-ext-zip.ini, /usr/local/etc/php/conf.d/xdebug.ini</additional_php_ini>
           <configuration_file />
@@ -337,8 +337,10 @@
       </interpreter>
     </phpInfoCache>
   </component>
-  <component name="PhpProjectSharedConfiguration" php_language_level="8.4" />
-  <component name="PhpRuntimeConfiguration" default_stubs_path="D:\stubs\phpstorm-stubs">
+  <component name="PhpProjectSharedConfiguration" php_language_level="8.4">
+    <option name="suggestChangeDefaultLanguageLevel" value="false" />
+  </component>
+  <component name="PhpRuntimeConfiguration">
     <extensions>
       <extension name="Ev" enabled="false" />
       <extension name="FFI" enabled="true" />
@@ -398,8 +400,6 @@
       <extension name="odbc" enabled="false" />
       <extension name="opentelemetry" enabled="false" />
       <extension name="pdflib" enabled="false" />
-      <extension name="pdo_ibm" enabled="false" />
-      <extension name="pdo_mysql" enabled="false" />
       <extension name="pspell" enabled="false" />
       <extension name="pthreads" enabled="false" />
       <extension name="rar" enabled="false" />
@@ -416,7 +416,6 @@
       <extension name="sybase" enabled="false" />
       <extension name="sysvsem" enabled="false" />
       <extension name="sysvshm" enabled="false" />
-      <extension name="tests" enabled="false" />
       <extension name="tidy" enabled="false" />
       <extension name="uri" enabled="false" />
       <extension name="uv" enabled="true" />
@@ -434,7 +433,7 @@
   </component>
   <component name="PhpStan">
     <PhpStan_settings>
-      <phpstan_by_interpreter asDefaultInterpreter="true" interpreter_id="c7aa3a43-dc22-4866-bd98-4476692e7328" timeout="60000" />
+      <phpstan_by_interpreter asDefaultInterpreter="true" interpreter_id="19bc4d5e-a706-40cf-a8f7-0236b1bd03ea" timeout="60000" />
     </PhpStan_settings>
   </component>
   <component name="PhpStanOptionsConfiguration">
@@ -442,13 +441,12 @@
   </component>
   <component name="PhpUnit">
     <phpunit_settings>
-      <phpunit_by_interpreter interpreter_id="c7aa3a43-dc22-4866-bd98-4476692e7328" configuration_file_path="phpunit.xml" custom_loader_path="vendor/autoload.php" paratest_path="$PROJECT_DIR$/vendor/bin/paratest_for_phpstorm" phpunit_phar_path="" use_configuration_file="true" />
-      <PhpUnitSettings configuration_file_path="$PROJECT_DIR$/phpunit.xml" custom_loader_path="$PROJECT_DIR$/vendor/autoload.php" paratest_path="$PROJECT_DIR$/vendor/bin/paratest_for_phpstorm" use_configuration_file="true" />
+      <phpunit_by_interpreter interpreter_id="19bc4d5e-a706-40cf-a8f7-0236b1bd03ea" configuration_file_path="/var/www/html/phpunit.xml" custom_loader_path="/var/www/html/vendor/autoload.php" paratest_path="/var/www/html/vendor/bin/paratest_for_phpstorm" phpunit_phar_path="" use_configuration_file="true" />
     </phpunit_settings>
   </component>
   <component name="Psalm">
     <Psalm_settings>
-      <psalm_fixer_by_interpreter asDefaultInterpreter="true" interpreter_id="c7aa3a43-dc22-4866-bd98-4476692e7328" timeout="60000" />
+      <psalm_fixer_by_interpreter asDefaultInterpreter="true" interpreter_id="19bc4d5e-a706-40cf-a8f7-0236b1bd03ea" timeout="60000" />
     </Psalm_settings>
   </component>
   <component name="PsalmOptionsConfiguration">

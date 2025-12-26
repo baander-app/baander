@@ -31,9 +31,6 @@ import { CloseButton } from '@/app/ui/buttons/close-button.tsx';
 export const PaletteTree = () => (
   <Palette>
     <Category name="ui">
-      <Component name="BlurHashCanvas">
-        <p>test</p>
-      </Component>
       <Component name="Brand">
         <Variant>
           <Brand/>
