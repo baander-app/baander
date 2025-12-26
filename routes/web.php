@@ -10,5 +10,5 @@ Route::get('/help', [UIController::class, 'getDocs'])
 Route::get('/{any}', [UIController::class, 'getUI'])
     ->name('webui')
     ->middleware('cors.policy')
-    ->where('any', '^(?!api|docs|storage|public-api|clockwork|system|2fa|login|dbg|jobs).*$');
+    ->where('any', '^(?!api|help|docs|storage|public-api|clockwork|system|2fa|login|dbg|jobs).*$');
 

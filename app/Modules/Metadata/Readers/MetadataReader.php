@@ -6,8 +6,10 @@ use App\Modules\Metadata\Contracts\FormatDetectorInterface;
 use App\Modules\Metadata\Contracts\MetadataReaderInterface;
 use App\Modules\Metadata\Contracts\Flac\FlacReaderInterface;
 use App\Modules\Metadata\Exceptions\UnsupportedFormatException;
-use App\Modules\Metadata\MediaMeta\MediaMeta;
+use FFMpeg\FFMpeg;
+use FFMpeg\FFProbe\DataMapping\StreamCollection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Unified metadata reader facade
@@ -19,10 +21,36 @@ class MetadataReader implements MetadataReaderInterface
 {
     private const string LOG_TAG = 'MetadataReader ';
 
+    // Image type constants (same as ID3 APIC and FLAC METADATA_BLOCK_PICTURE)
+    public const IMAGE_OTHER = 0;
+    public const IMAGE_FILE_ICON = 1;
+    public const IMAGE_OTHER_FILE_ICON = 2;
+    public const IMAGE_COVER_FRONT = 3;
+    public const IMAGE_COVER_BACK = 4;
+    public const IMAGE_LEAFLET = 5;
+    public const IMAGE_MEDIA = 6;
+    public const IMAGE_LEAD_ARTIST = 7;
+    public const IMAGE_ARTIST = 8;
+    public const IMAGE_CONDUCTOR = 9;
+    public const IMAGE_BAND = 10;
+    public const IMAGE_COMPOSER = 11;
+    public const IMAGE_LYRICIST = 12;
+    public const IMAGE_RECORDING_LOCATION = 13;
+    public const IMAGE_DURING_RECORDING = 14;
+    public const IMAGE_DURING_PERFORMANCE = 15;
+    public const IMAGE_SCREEN_CAPTURE = 16;
+    public const IMAGE_FISH = 17;
+    public const IMAGE_ILLUSTRATION = 18;
+    public const IMAGE_BAND_LOGO = 19;
+    public const IMAGE_PUBLISHER_LOGO = 20;
+
+    private ?FFMpeg $ffmpeg = null;
+    private StreamCollection|null $streamCollection = null;
+
     // Reader factory map (follows AlgorithmFactory pattern)
     private const READER_MAP = [
         'flac' => Flac\FlacReader::class,
-        'id3' => Id3Reader::class,
+        'id3' => Id3\Id3Reader::class,
         // Future: 'ogg' => Flac\OggReader::class, (OGG uses Vorbis comments)
         // Future: 'mp4' => Mp4\Mp4Reader::class,
     ];
@@ -91,6 +119,19 @@ class MetadataReader implements MetadataReaderInterface
         return null;
     }
 
+    /**
+     * Get ID3-specific reader if format is ID3
+     *
+     * @return MetadataReaderInterface|null
+     */
+    public function getId3Reader(): ?MetadataReaderInterface
+    {
+        if ($this->format === 'id3') {
+            return $this->delegateReader;
+        }
+        return null;
+    }
+
     // Delegate all standard methods to the appropriate reader
     // This maintains the MediaMeta facade pattern with fallback logic
 
@@ -154,6 +195,101 @@ class MetadataReader implements MetadataReaderInterface
         return $this->delegateReader->getFrontCoverImage();
     }
 
+    /**
+     * Get the first image (any type) from the file
+     */
+    public function getImage(): ?object
+    {
+        $images = $this->getImages();
+        return count($images) > 0 ? $images[0] : null;
+    }
+
+    /**
+     * Get the first image of a specific type
+     *
+     * @param int $imageType The image type (use the IMAGE_* constants)
+     * @return object|null The first image of the specified type, or null if not available
+     */
+    public function getImageByType(int $imageType): ?object
+    {
+        $images = $this->getImagesByType($imageType);
+        return count($images) > 0 ? $images[0] : null;
+    }
+
+    /**
+     * Get all images of a specific type
+     *
+     * @param int $imageType The image type (use the IMAGE_* constants)
+     * @return array An array of images of the specified type
+     */
+    public function getImagesByType(int $imageType): array
+    {
+        return array_filter(
+            $this->getImages(),
+            fn($image) => $image->getImageType() === $imageType
+        );
+    }
+
+    /**
+     * Get the back cover image
+     */
+    public function getBackCoverImage(): ?object
+    {
+        return $this->getImageByType(self::IMAGE_COVER_BACK);
+    }
+
+    /**
+     * Get the artist image
+     */
+    public function getArtistImage(): ?object
+    {
+        return $this->getImageByType(self::IMAGE_ARTIST);
+    }
+
+    /**
+     * Get the image data (binary) of the first image of a specific type
+     */
+    public function getImageDataByType(int $imageType): ?string
+    {
+        $image = $this->getImageByType($imageType);
+        return $image?->getImageData();
+    }
+
+    /**
+     * Get the MIME type of the first image of a specific type
+     */
+    public function getImageMimeTypeByType(int $imageType): ?string
+    {
+        $image = $this->getImageByType($imageType);
+        return $image?->getMimeType();
+    }
+
+    /**
+     * Get the description of the first image of a specific type
+     */
+    public function getImageDescriptionByType(int $imageType): ?string
+    {
+        $image = $this->getImageByType($imageType);
+        return $image?->getDescription();
+    }
+
+    /**
+     * Get the image type of the first image
+     */
+    public function getImageType(): ?int
+    {
+        $image = $this->getImage();
+        return $image?->getImageType();
+    }
+
+    /**
+     * Get the image data (binary) of the front cover
+     */
+    public function getFrontCoverImageData(): ?string
+    {
+        return $this->getImageDataByType(self::IMAGE_COVER_FRONT);
+    }
+
     public function getFormat(): string
     {
         return $this->format;
@@ -167,5 +303,39 @@ class MetadataReader implements MetadataReaderInterface
     public function getFilePath(): string
     {
         return $this->filePath;
+    }
+
+    public function probeLength()
+    {
+        $stream = $this->getStreams()->first();
+
+        if (!$stream) {
+            return 0;
+        }
+
+        return (float)$stream->get('duration');
+    }
+
+    public function getMimeType(): string
+    {
+        return new \finfo(FILEINFO_MIME_TYPE)->file($this->filePath);
+    }
+
+    public function isAudioFile(): bool
+    {
+        return Str::startsWith($this->getMimeType(), 'audio/');
+    }
+
+    private function getStreams()
+    {
+        if (!$this->ffmpeg) {
+            $this->ffmpeg = FFMpeg::create();
+        }
+
+        if ($this->streamCollection === null) {
+            $this->streamCollection = $this->ffmpeg->getFFProbe()->streams($this->filePath);
+        }
+
+        return $this->streamCollection;
     }
 }
