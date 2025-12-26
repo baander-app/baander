@@ -564,3 +564,5 @@ export * from "./usersIndex200MetaTo";
 export * from "./usersIndexParams";
 export * from "./validationExceptionResponse";
 export * from "./validationExceptionResponseErrors";
+export * from "./songUpdateRequestComment";
+export * from "./songUpdateRequestLyrics";

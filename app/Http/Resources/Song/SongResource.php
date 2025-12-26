@@ -6,6 +6,7 @@ use App\Format\Bytes;
 use App\Format\Duration;
 use App\Http\Resources\Album\AlbumWithoutSongsResource;
 use App\Http\Resources\Artist\ArtistResource;
+use App\Http\Resources\Genre\GenreResource;
 use App\Http\Resources\HasJsonCollection;
 use App\Models\Song;
 use Illuminate\Http\Request;
@@ -35,7 +36,6 @@ class SongResource extends JsonResource
             'durationHuman' => (new Duration)->humanize($this->length),
             'lyrics'        => $this->lyrics,
             'lyricsExist'   => (bool)$this->lyrics,
-            'modifiedTime'  => $this->modified_time,
             'path'          => $this->path,
             'track'         => $this->track,
             'size'          => $this->size,
@@ -49,6 +49,7 @@ class SongResource extends JsonResource
             'updatedAt'     => $this->updated_at,
             'album'         => AlbumWithoutSongsResource::make($this->whenLoaded('album')),
             'artists'       => ArtistResource::collection($this->whenLoaded('artists')),
+            'genres'        => GenreResource::collection($this->whenLoaded('genres')),
             'librarySlug'   => $this->librarySlug,
             'lockedFields'  => $this->locked_fields,
         ];

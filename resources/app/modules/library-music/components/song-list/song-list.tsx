@@ -97,7 +97,7 @@ export function SongList() {
     setShowEditorDialog(true);
   }, []);
 
-  const handleSync = useCallback((song: SongResource | undefined) => {
+  const handleSync = useCallback((song: SongResource | null) => {
     if (song) {
       syncMutation.mutate({
         data: {

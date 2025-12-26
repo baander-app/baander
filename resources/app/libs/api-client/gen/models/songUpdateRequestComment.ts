@@ -11,45 +11,5 @@ Implemented queuing functionality through Redis offers efficient job management 
 The media information is organized and easily searchable, ensuring users can always find what they are looking for quickly and easily.
  * OpenAPI spec version: 0.0.1
  */
-import type { SongUpdateRequestLyrics } from "./songUpdateRequestLyrics";
-import type { SongUpdateRequestComment } from "./songUpdateRequestComment";
 
-export interface SongUpdateRequest {
-  /**
-   * @minLength 1
-   * @maxLength 255
-   */
-  title: string;
-  /**
-   * @minimum 0
-   * @maximum 9999
-   */
-  track_number?: number;
-  /**
-   * @minimum 0
-   * @maximum 9999
-   */
-  disc_number?: number;
-  /**
-   * @minimum 0
-   * @maximum 9999
-   */
-  year?: number;
-  /**
-   * @minLength 1
-   * @maxLength 255
-   */
-  mbid?: string;
-  /**
-   * @minimum 0
-   * @maximum 999999999999
-   */
-  discogs_id?: number;
-  /** @maxLength 255 */
-  spotify_id?: string;
-  explicit?: boolean;
-  lyrics?: SongUpdateRequestLyrics;
-  comment?: SongUpdateRequestComment;
-  genres?: number[];
-  locked_fields?: string[];
-}
+export type SongUpdateRequestComment = string | null;

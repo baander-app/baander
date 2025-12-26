@@ -1,4 +1,4 @@
-import { TextField, Select, Text, Box, Button, Flex, TextArea } from '@radix-ui/themes';
+import { TextField, Select, Text, Box, Button, Flex, TextArea, Checkbox } from '@radix-ui/themes';
 import { LockClosedIcon, LockOpen1Icon } from '@radix-ui/react-icons';
 import { FormFieldConfig, SelectOption, MultiSelectOption } from './types';
 import { MultiSelect } from './MultiSelect';
@@ -78,7 +78,7 @@ export function FormField<TFormValues extends Record<string, any>>({
     ) : null;
 
   const renderDescription = () =>
-    description ? (
+    description && type !== 'checkbox' ? (
       <Text size="1" color="gray" mb="1">
         {description}
       </Text>
@@ -118,6 +118,21 @@ export function FormField<TFormValues extends Record<string, any>>({
           disabled={locked || disabled}
           rows={4}
         />
+      )}
+
+      {type === 'checkbox' && (
+        <Flex align="center" gap="2">
+          <Checkbox
+            checked={value ?? false}
+            onCheckedChange={(checked) => {
+              onChange(checked === true ? true : false);
+            }}
+            disabled={locked || disabled}
+          />
+          <Text size="2" color="gray">
+            {description}
+          </Text>
+        </Flex>
       )}
 
       {type === 'select' && options && isSelectOption(options) && (

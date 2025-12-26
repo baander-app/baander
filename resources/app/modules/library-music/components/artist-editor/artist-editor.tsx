@@ -33,7 +33,8 @@ export function ArtistEditor({
   const { form, lockMode, setLockMode, toggleFieldLock, isFieldLocked, submit } =
     useFormEditor<ArtistFormData>({
       method: 'put',
-      url: `/api/libraries/${librarySlug}/artists/${artist?.publicId}`,
+      // url: `/api/libraries/${librarySlug}/artists/${artist?.publicId}`,
+      url: route('api.artists.update', {librarySlug, publicId: artist?.publicId}),
       initialData: {
         name: artist?.name || '',
         disambiguation: artist?.disambiguation || '',

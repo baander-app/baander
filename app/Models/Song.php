@@ -39,6 +39,7 @@ class Song extends BaseModel implements DirectStreamableFile, Recommendable
     {
         return [
             'locked_fields' => 'array',
+            'explicit' => 'boolean',
         ];
     }
 
@@ -52,13 +53,14 @@ class Song extends BaseModel implements DirectStreamableFile, Recommendable
         'lyrics',
         'track',
         'disc',
-        'modified_time',
         'year',
         'comment',
         'hash',
         'librarySlug',
         'mbid',
         'discogs_id',
+        'spotify_id',
+        'explicit',
         'position',
         'locked_fields',
     ];

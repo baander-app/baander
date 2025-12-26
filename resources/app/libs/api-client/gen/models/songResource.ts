@@ -24,6 +24,7 @@ import type { SongResourceCreatedAt } from "./songResourceCreatedAt";
 import type { SongResourceUpdatedAt } from "./songResourceUpdatedAt";
 import type { AlbumWithoutSongsResource } from "./albumWithoutSongsResource";
 import type { ArtistResource } from "./artistResource";
+import type { GenreResource } from "./genreResource";
 import type { SongResourceLockedFields } from "./songResourceLockedFields";
 
 export interface SongResource {
@@ -50,6 +51,7 @@ export interface SongResource {
   updatedAt: SongResourceUpdatedAt;
   album?: AlbumWithoutSongsResource;
   artists?: ArtistResource[];
+  genres?: GenreResource[];
   librarySlug: string;
   lockedFields: SongResourceLockedFields;
 }

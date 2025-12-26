@@ -2,7 +2,7 @@
  * Type definitions for reusable form components
  */
 
-export type FieldType = 'text' | 'textarea' | 'select' | 'multiselect';
+export type FieldType = 'text' | 'textarea' | 'select' | 'multiselect' | 'checkbox';
 
 export interface SelectOption {
   value: string;
