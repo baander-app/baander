@@ -6,6 +6,7 @@ use App\Http\Integrations\Discogs\DiscogsClient;
 use App\Http\Integrations\Discogs\Filters\ReleaseFilter;
 use App\Http\Integrations\LastFm\LastFmClient;
 use App\Http\Integrations\MusicBrainz\MusicBrainzClient;
+use App\Models\Genre;
 use App\Models\User;
 use App\Modules\Logging\Attributes\LogChannel;
 use App\Modules\Logging\Channel;
@@ -56,11 +57,16 @@ class GenreHierarchyService
                 // Get Discogs data using search-only approach
                 $discogsData = $this->getDiscogsGenreData($genre);
 
+                // Get MusicBrainz data
+                $musicBrainzData = $this->getMusicBrainzGenreData($genre);
+
                 $this->logger->info("Processed genre: $genre", [
                     'lastfm_popularity'    => $tagInfo['reach'] ?? 0,
                     'discogs_styles_count' => count($discogsData['related_styles']),
                     'discogs_genres_count' => count($discogsData['related_genres']),
                     'discogs_releases'     => $discogsData['release_count'],
+                    'musicbrainz_found'    => $musicBrainzData['found'],
+                    'musicbrainz_mbid'     => $musicBrainzData['mbid'],
                 ]);
 
                 $hierarchy[$genre] = [
@@ -71,6 +77,7 @@ class GenreHierarchyService
                         'description' => $tagInfo['wiki']['summary'] ?? null,
                     ],
                     'discogs' => $discogsData,
+                    'musicbrainz' => $musicBrainzData,
                 ];
             }
 
@@ -79,6 +86,40 @@ class GenreHierarchyService
         }
 
         return $this->organizeHierarchyWithAlternatives($hierarchy, $genres);
+    }
+
+    /**
+     * Get MusicBrainz genre data from database
+     */
+    private function getMusicBrainzGenreData(string $genre): array
+    {
+        try {
+            $genreRecord = Genre::where('name', $genre)->first();
+
+            if (!$genreRecord) {
+                return [
+                    'mbid' => null,
+                    'canonical_name' => null,
+                    'found' => false,
+                ];
+            }
+
+            return [
+                'mbid' => $genreRecord->mbid,
+                'canonical_name' => $genreRecord->name,
+                'found' => !empty($genreRecord->mbid),
+            ];
+        } catch (\Exception $e) {
+            $this->logger->warning("MusicBrainz genre lookup failed for {$genre}", [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'mbid' => null,
+                'canonical_name' => null,
+                'found' => false,
+            ];
+        }
     }
 
     /**
@@ -458,6 +499,9 @@ class GenreHierarchyService
                 $tagInfo = [];
             }
 
+            // Get MusicBrainz data from database
+            $musicBrainzData = $this->getMusicBrainzGenreData($genre);
+
             $hierarchy[$genre] = [
                 'lastfm'  => [
                     'info'        => $tagInfo,
@@ -470,6 +514,7 @@ class GenreHierarchyService
                     'related_genres' => [],
                     'release_count'  => 0,
                 ],
+                'musicbrainz' => $musicBrainzData,
             ];
         }
 

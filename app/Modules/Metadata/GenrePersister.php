@@ -35,19 +35,19 @@ class GenrePersister
      * Creates or updates genre records based on the provided hierarchy data.
      * Supports linking parent-child relationships and various persistence options.
      *
-     * @param array $hierarchyData Hierarchical genre data structure
-     *                             Expected format: [
-     *                                 ['name' => 'Rock', 'mbid' => '...', 'children' => [...]],
-     *                                 ...
+     * @param array $hierarchyData GenreHierarchyService output format:
+     *                             [
+     *                                 'genre_details' => [...],
+     *                                 'relationships' => [...]
      *                             ]
      * @param array $options Persistence options:
-     *                       - 'update_existing' (bool): Update records if they exist (default: true)
+     *                       - 'update_existing' (bool): Update records if they exist (default: false)
      *                       - 'delete_orphans' (bool): Delete genres not in hierarchy (default: false)
      * @return array Statistics array with keys: created, updated, linked, errors
      */
     public function persistHierarchy(array $hierarchyData, array $options = []): array
     {
-        $updateExisting = $options['update_existing'] ?? true;
+        $updateExisting = $options['update_existing'] ?? false;
         $deleteOrphans = $options['delete_orphans'] ?? false;
 
         $stats = [
@@ -57,125 +57,79 @@ class GenrePersister
             'errors' => [],
         ];
 
-        $processedGenreIds = [];
+        DB::beginTransaction();
 
         try {
-            DB::beginTransaction();
+            $genreDetails = $hierarchyData['genre_details'] ?? [];
+            $relationships = $hierarchyData['relationships'] ?? [];
 
-            // Process the hierarchy recursively
-            foreach ($hierarchyData as $genreData) {
-                $result = $this->processGenreNode($genreData, null, $updateExisting, $processedGenreIds);
-                $stats['created'] += $result['created'];
-                $stats['updated'] += $result['updated'];
-                $stats['linked'] += $result['linked'];
-                $stats['errors'] = array_merge($stats['errors'], $result['errors']);
+            // Step 1: Create/update all genre records
+            $genreMap = [];
+            foreach ($genreDetails as $genreName => $details) {
+                $genre = Genre::where('name', $genreName)->first();
+
+                if (!$genre) {
+                    $genre = Genre::create([
+                        'name' => $genreName,
+                        'slug' => Str::slug($genreName),
+                        'mbid' => $details['musicbrainz']['mbid'] ?? null,
+                    ]);
+                    $stats['created']++;
+                    $this->logger->debug("Created genre: {$genreName}");
+                } elseif ($updateExisting) {
+                    $genre->update([
+                        'mbid' => $details['musicbrainz']['mbid'] ?? $genre->mbid,
+                    ]);
+                    $stats['updated']++;
+                    $this->logger->debug("Updated genre: {$genreName}");
+                }
+
+                $genreMap[$genreName] = $genre->id;
             }
 
-            // Optionally delete orphaned genres
-            if ($deleteOrphans && !empty($processedGenreIds)) {
-                $orphanedCount = Genre::whereNotIn('id', $processedGenreIds)->delete();
-                $this->logger->info("Deleted {$orphanedCount} orphaned genre(s)");
+            // Step 2: Link parent-child relationships
+            foreach ($relationships as $relationship) {
+                $childName = $relationship['child'];
+                $parentName = $relationship['parent'];
+
+                if (!isset($genreMap[$childName]) || !isset($genreMap[$parentName])) {
+                    $this->logger->warning("Skipping relationship - missing genre", [
+                        'child' => $childName,
+                        'parent' => $parentName,
+                    ]);
+                    $stats['errors'][] = "Missing genre for relationship: {$parentName} -> {$childName}";
+                    continue;
+                }
+
+                $childId = $genreMap[$childName];
+                $parentId = $genreMap[$parentName];
+
+                Genre::where('id', $childId)->update(['parent_id' => $parentId]);
+                $stats['linked']++;
+            }
+
+            // Step 3: Optionally delete orphaned genres
+            if ($deleteOrphans) {
+                $orphanCount = Genre::whereNotIn('name', array_keys($genreDetails))
+                    ->whereNull('parent_id')
+                    ->delete();
+                $this->logger->info("Deleted {$orphanCount} orphaned genres");
             }
 
             DB::commit();
-
-            $this->logger->info('Genre hierarchy persisted successfully', $stats);
+            $this->logger->info('Genre hierarchy persisted successfully', [
+                'created' => $stats['created'],
+                'updated' => $stats['updated'],
+                'linked' => $stats['linked'],
+                'errors' => count($stats['errors']),
+            ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
             $this->logger->error('Failed to persist genre hierarchy', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
             ]);
             $stats['errors'][] = $e->getMessage();
-        }
-
-        return $stats;
-    }
-
-    /**
-     * Process a single genre node recursively.
-     *
-     * @param array $genreData Genre data including name, mbid, and optional children
-     * @param int|null $parentId Parent genre ID
-     * @param bool $updateExisting Whether to update existing records
-     * @param array &$processedGenreIds Array to track processed genre IDs
-     * @return array Statistics for this node and its children
-     */
-    private function processGenreNode(
-        array $genreData,
-        ?int $parentId,
-        bool $updateExisting,
-        array &$processedGenreIds
-    ): array {
-        $stats = [
-            'created' => 0,
-            'updated' => 0,
-            'linked' => 0,
-            'errors' => [],
-        ];
-
-        try {
-            $name = $genreData['name'] ?? throw new \InvalidArgumentException('Genre name is required');
-            $mbid = $genreData['mbid'] ?? null;
-            $slug = Str::slug($name);
-            $children = $genreData['children'] ?? [];
-
-            // Find or create the genre
-            $genre = Genre::query()
-                ->where('slug', $slug)
-                ->when($mbid, fn ($q) => $q->orWhere('mbid', $mbid))
-                ->first();
-
-            if ($genre) {
-                // Update existing genre
-                if ($updateExisting) {
-                    $genre->update([
-                        'name' => $name,
-                        'slug' => $slug,
-                        'mbid' => $mbid ?? $genre->mbid,
-                        'parent_id' => $parentId,
-                    ]);
-                    $stats['updated']++;
-                    $this->logger->debug("Updated genre: {$name}");
-                } else {
-                    // Just update parent relationship if changed
-                    if ($genre->parent_id !== $parentId) {
-                        $genre->update(['parent_id' => $parentId]);
-                        $stats['linked']++;
-                        $this->logger->debug("Linked genre {$name} to parent");
-                    }
-                }
-            } else {
-                // Create new genre
-                $genre = Genre::create([
-                    'name' => $name,
-                    'slug' => $slug,
-                    'mbid' => $mbid,
-                    'parent_id' => $parentId,
-                ]);
-                $stats['created']++;
-                $this->logger->debug("Created genre: {$name}");
-            }
-
-            $processedGenreIds[] = $genre->id;
-
-            // Process children recursively
-            foreach ($children as $childData) {
-                $childStats = $this->processGenreNode($childData, $genre->id, $updateExisting, $processedGenreIds);
-                $stats['created'] += $childStats['created'];
-                $stats['updated'] += $childStats['updated'];
-                $stats['linked'] += $childStats['linked'];
-                $stats['errors'] = array_merge($stats['errors'], $childStats['errors']);
-            }
-
-        } catch (\Exception $e) {
-            $this->logger->error('Failed to process genre node', [
-                'genre_data' => $genreData,
-                'error' => $e->getMessage(),
-            ]);
-            $genreName = $genreData['name'] ?? null;
-            $stats['errors'][] = "Failed to process genre '{$genreName}': {$e->getMessage()}";
         }
 
         return $stats;
