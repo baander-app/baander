@@ -14,7 +14,7 @@ class BuildGenreHierarchyCommand extends Command
      * @var string
      */
     protected $signature = 'genres:build
-                            {genres* : List of genre names to process}
+                            {genres?* : List of genre names to process}
                             {--batch : Use batch processing mode (slower but more robust)}
                             {--batch-size=5 : Number of genres to process per batch}
                             {--file= : Load genres from a file (one per line)}
@@ -46,7 +46,19 @@ class BuildGenreHierarchyCommand extends Command
             return SymfonyCommand::FAILURE;
         }
 
-        $this->info("Building hierarchies for " . count($genres) . " genres...");
+        $genreCount = count($genres);
+
+        // Warn about large datasets
+        if ($genreCount > 500) {
+            $this->warn("Processing {$genreCount} genres may take a long time and use significant memory.");
+            $this->warn('Consider processing in smaller batches or use --batch mode.');
+
+            if (!$this->confirm('Continue?', default: false)) {
+                return SymfonyCommand::SUCCESS;
+            }
+        }
+
+        $this->info("Building hierarchies for {$genreCount} genres...");
 
         $useBatch = $this->option('batch');
         $batchSize = (int) $this->option('batch-size');
