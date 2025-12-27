@@ -40,7 +40,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
-      outDir: resolve(process.cwd(), 'dist/electron/renderer'),
+      outDir: resolve(process.cwd(), 'electron/dist-electron/renderer'),
       emptyOutDir: true,
       sourcemap: false,
       target: ['chrome128', 'esnext'],
@@ -84,7 +84,7 @@ export default defineConfig(({ mode }) => {
           vite: {
             envDir: process.cwd(),
             build: {
-              outDir: resolve(process.cwd(), 'dist/electron/main'),
+              outDir: resolve(process.cwd(), 'electron/dist-electron/main'),
               emptyOutDir: true,
               sourcemap: false,
               rollupOptions: {
@@ -105,7 +105,7 @@ export default defineConfig(({ mode }) => {
           vite: {
             envDir: process.cwd(),
             build: {
-              outDir: resolve(process.cwd(), 'dist/electron/preload'),
+              outDir: resolve(process.cwd(), 'electron/dist-electron/preload'),
               emptyOutDir: false,
               sourcemap: false,
               // Build preload as CommonJS and name it preload.cjs
