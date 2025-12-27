@@ -6,16 +6,13 @@ export interface PlaylistLayoutContextMenuProps {
 }
 
 export function PlaylistLayoutContextMenu({id}: PlaylistLayoutContextMenuProps) {
-  const deleteMutation = usePlaylistDestroy({
-
-  });
+  const deleteMutation = usePlaylistDestroy({});
 
   const handleDelete = () => {
     deleteMutation.mutate({
       playlist: id,
-
-    })
-  }
+    });
+  };
 
   return (
     <ContextMenu.Content>
@@ -23,10 +20,10 @@ export function PlaylistLayoutContextMenu({id}: PlaylistLayoutContextMenuProps) 
       <ContextMenu.Item>Shuffle</ContextMenu.Item>
       <ContextMenu.Item>Play Next</ContextMenu.Item>
       <ContextMenu.Item>Play Later</ContextMenu.Item>
-      <ContextMenu.Separator />
+      <ContextMenu.Separator/>
       <ContextMenu.Item>Duplicate</ContextMenu.Item>
-      <ContextMenu.Separator />
+      <ContextMenu.Separator/>
       <ContextMenu.Item onClick={() => handleDelete()}>Delete</ContextMenu.Item>
     </ContextMenu.Content>
-  )
+  );
 }

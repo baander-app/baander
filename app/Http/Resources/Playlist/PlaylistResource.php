@@ -32,12 +32,12 @@ class PlaylistResource extends JsonResource
             'createdAt'       => $this->created_at,
             'updatedAt'       => $this->updated_at,
             'songsCount'      => $this->whenCounted('songs'),
-            //            'statistics'      => $this->whenLoaded('statistics', [
-            //                'views'     => $this->statistics->views,
-            //                'plays'     => $this->statistics->plays,
-            //                'shares'    => $this->statistics->shares,
-            //                'favorites' => $this->statistics->favorites,
-            //            ]),
+            'statistics'      => $this->whenLoaded('statistics', [
+                'views'     => $this->statistics?->views ?? 0,
+                'plays'     => $this->statistics?->plays ?? 0,
+                'shares'    => $this->statistics?->shares ?? 0,
+                'favorites' => $this->statistics?->favorites ?? 0,
+            ]),
             'songs'           => SongResource::collection($this->whenLoaded('songs')),
             'owner'           => $this->whenLoaded('user', [
                 'email' => $this->user->email,

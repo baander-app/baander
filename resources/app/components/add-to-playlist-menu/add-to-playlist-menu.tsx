@@ -11,7 +11,7 @@ interface AddToPlaylistMenuProps {
   onSuccess?: () => void;
 }
 
-export const AddToPlaylistMenu = memo(({ songPublicId, librarySlug, onSuccess }: AddToPlaylistMenuProps) => {
+export const AddToPlaylistMenu = memo(({ songPublicId, librarySlug: _librarySlug, onSuccess }: AddToPlaylistMenuProps) => {
   const dispatch = useAppDispatch();
   const { data: playlistsData, isLoading } = usePlaylistIndex();
   const addMutation = usePlaylistAddSong();

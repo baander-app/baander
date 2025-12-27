@@ -24,6 +24,7 @@ interface MenuLink {
   isDeepestLevelItem?: boolean;
   isTextOnly?: boolean;
   type?: 'playlist';
+  rightIcon?: string;
 }
 
 interface MenuSection {
@@ -37,9 +38,9 @@ export function RootMenu() {
   const { data: libraryData } = useLibrariesIndex();
   const { data: playlistData } = usePlaylistIndex();
 
-  const musicLibraries: LibraryResource[] = useMemo(() => libraryData?.data?.filter(library => library?.type === 'music') ?? [], [libraryData]);
-  const movieLibraries: LibraryResource[] = useMemo(() => libraryData?.data?.filter(library => library?.type === 'movie') ?? [], [libraryData]);
-  const playlists: PlaylistResource[] = useMemo(() => playlistData?.data ?? [], [playlistData]);
+  const musicLibraries: LibraryResource[] = useMemo(() => libraryData?.data?.filter(library => library?.type === 'music') ?? [], [libraryData?.data]);
+  const movieLibraries: LibraryResource[] = useMemo(() => libraryData?.data?.filter(library => library?.type === 'movie') ?? [], [libraryData?.data]);
+  const playlists: PlaylistResource[] = useMemo(() => playlistData?.data ?? [], [playlistData?.data]);
 
   const librariesMenu: MenuSection[] = useMemo(() => {
     const sections: MenuSection[] = [];
@@ -86,13 +87,6 @@ export function RootMenu() {
     // Add music libraries as subsections
     if (musicLibraries.length > 0) {
       for (const library of musicLibraries) {
-        // Add library as a subsection header
-        musicSection.links.push({
-          label: library.name,
-          isSubsectionHeader: true,
-          isTextOnly: true,
-        });
-
         // Add library links as subsection items
         musicSection.links.push(
           {
@@ -119,7 +113,8 @@ export function RootMenu() {
     musicSection.links.push({
       label: 'Playlists',
       isSubsectionHeader: true,
-      isTextOnly: true,
+      to: '/playlists/music',
+      rightIcon: 'ph:playlist'
     });
 
     // Add individual playlists directly by title
@@ -151,7 +146,7 @@ export function RootMenu() {
     }
 
     return sections;
-  }, [musicLibraries, playlists]);
+  }, [musicLibraries, playlists, movieLibraries]);
 
   const staticMenu: MenuSection[] = [
     {
@@ -274,7 +269,12 @@ export function RootMenu() {
                       className={linkClassName}
                       activeClassName={styles.activeLink}
                     >
-                      {link.label}
+                      <Flex align="center" justify="between" width="100%">
+                        <Text>{link.label}</Text>
+                        {link.rightIcon && (
+                          <Iconify icon={link.rightIcon} width={16} height={16} />
+                        )}
+                      </Flex>
                     </NavLink>
                   ) : link.href ? (
                     <a

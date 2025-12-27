@@ -1,6 +1,8 @@
 import { memo, RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Iconify } from '@/app/ui/icons/iconify';
 import { usePlayerActions, usePlayerCurrentSongPublicId } from '@/app/modules/library-music-player/store';
+import { useAppDispatch } from '@/app/store/hooks';
+import { createNotification } from '@/app/store/notifications/notifications-slice';
 import {
   ColumnDef,
   flexRender,
@@ -15,7 +17,7 @@ import {
 import { useVirtualizer, VirtualItem, Virtualizer } from '@tanstack/react-virtual';
 import { SpeakerLoudIcon } from '@radix-ui/react-icons';
 import { ContextMenu } from '@radix-ui/themes';
-import { DndContext, closestCenter, DragEndEvent, PointerSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core';
+import { DndContext, closestCenter, DragEndEvent, DragStartEvent, PointerSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import styles from './song-table.module.scss';
@@ -30,7 +32,7 @@ export interface SongTableProps {
   estimatedTotalCount?: number;
   className?: string;
   contextMenuActions?: {
-    onEdit: (song: SongResource) => void;
+    onEdit?: (song: SongResource) => void;
     onRemoveFromPlaylist?: (song: SongResource) => void;
   };
   reorderable?: boolean;
@@ -99,11 +101,12 @@ const createColumnDefinitions = (reorderable?: boolean): ColumnDef<SongResource>
       id: 'drag',
       header: '',
       cell: () => (
-        <div className={styles.dragHandle} style={{ cursor: 'grab' }}>
+        <div className={styles.dragHandle}>
           <Iconify icon="ph:dots-six-vertical-bold" width={16} height={16} />
         </div>
       ),
       size: 40,
+      enableSorting: false,
     });
   }
 
@@ -193,7 +196,7 @@ export function SongTable({
     })
   );
 
-  const handleDragStart = useCallback((event: { active: { id: string } }) => {
+  const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id);
   }, []);
 
@@ -250,12 +253,26 @@ export function SongTable({
 
         <div ref={parentRef} className={styles.scrollableContent}>
           <div className={styles.virtualizedContainer} style={{ height: `${virtualizer.getTotalSize()}px` }}>
-            <VirtualizedRows
-              visibleRows={visibleRows}
-              onSongClick={handleSongClick}
-              contextMenuActions={contextMenuActions}
-              reorderable={reorderable}
-            />
+            {reorderable ? (
+              <SortableContext
+                items={songsState.map(s => s.publicId)}
+                strategy={verticalListSortingStrategy}
+              >
+                <VirtualizedRows
+                  visibleRows={visibleRows}
+                  onSongClick={handleSongClick}
+                  contextMenuActions={contextMenuActions}
+                  reorderable={reorderable}
+                />
+              </SortableContext>
+            ) : (
+              <VirtualizedRows
+                visibleRows={visibleRows}
+                onSongClick={handleSongClick}
+                contextMenuActions={contextMenuActions}
+                reorderable={reorderable}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -273,12 +290,14 @@ export function SongTable({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <SortableContext
-        items={songsState.map(s => s.publicId)}
-        strategy={verticalListSortingStrategy}
-      >
-        {tableContent}
-      </SortableContext>
+      {tableContent}
+      <DragOverlay>
+        {activeId ? (
+          <div style={{ background: 'var(--gray-3)', padding: '8px', borderRadius: '4px', opacity: 0.8 }}>
+            {songsState.find(s => s.publicId === activeId)?.title}
+          </div>
+        ) : null}
+      </DragOverlay>
     </DndContext>
   );
 }
@@ -369,7 +388,6 @@ const VirtualizedRow = memo(({ virtualRow, row, onSongClick, contextMenuActions,
   const rowProps = reorderable ? {
     ref: setNodeRef,
     ...attributes,
-    ...listeners,
   } : {};
 
   return (
@@ -381,11 +399,18 @@ const VirtualizedRow = memo(({ virtualRow, row, onSongClick, contextMenuActions,
           className={`${styles.listItem} ${styles.virtualizedRow}`}
           style={rowStyle as any}
         >
-          {row.getVisibleCells().map((cell) => (
-            <td key={cell.id} style={{ width: cell.column.getSize() }}>
-              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-            </td>
-          ))}
+          {row.getVisibleCells().map((cell) => {
+            const isDragHandle = cell.column.id === 'drag';
+            const cellProps = isDragHandle && reorderable ? {
+              ...listeners,
+            } : {};
+
+            return (
+              <td key={cell.id} style={{ width: cell.column.getSize() }} {...cellProps}>
+                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              </td>
+            );
+          })}
         </tr>
       </ContextMenu.Trigger>
 
@@ -431,6 +456,9 @@ interface SongContextMenuProps {
 }
 
 const SongContextMenu = memo(({ song, onEdit, onRemoveFromPlaylist }: SongContextMenuProps) => {
+  const { setQueueAndPlay, insertInQueue, addToQueue } = usePlayerActions();
+  const dispatch = useAppDispatch();
+
   const handleEditClick = useCallback(() => {
     onEdit?.(song);
   }, [onEdit, song]);
@@ -439,10 +467,49 @@ const SongContextMenu = memo(({ song, onEdit, onRemoveFromPlaylist }: SongContex
     onRemoveFromPlaylist?.(song);
   }, [onRemoveFromPlaylist, song]);
 
+  const handlePlayNow = useCallback(() => {
+    // Find the song in the current songs array and play it
+    // This is a simple implementation that just plays the song
+    setQueueAndPlay([song], song.publicId);
+  }, [song, setQueueAndPlay]);
+
+  const handlePlayNext = useCallback(() => {
+    insertInQueue(song);
+    dispatch(
+      createNotification({
+        title: 'Added to queue',
+        message: `"${song.title}" will play next`,
+        type: 'success',
+        toast: true,
+      })
+    );
+  }, [song, insertInQueue, dispatch]);
+
+  const handleAddToQueue = useCallback(() => {
+    addToQueue(song);
+    dispatch(
+      createNotification({
+        title: 'Added to queue',
+        message: `"${song.title}" added to queue`,
+        type: 'success',
+        toast: true,
+      })
+    );
+  }, [song, addToQueue, dispatch]);
+
   return (
     <ContextMenu.Content>
-      <AddToPlaylistMenu songPublicId={song.publicId} librarySlug={song.librarySlug || 'music'} />
+      <ContextMenu.Item onClick={handlePlayNow}>
+        Play Now
+      </ContextMenu.Item>
+      <ContextMenu.Item onClick={handlePlayNext}>
+        Play Next
+      </ContextMenu.Item>
+      <ContextMenu.Item onClick={handleAddToQueue}>
+        Add to Queue
+      </ContextMenu.Item>
       <ContextMenu.Separator />
+      <AddToPlaylistMenu songPublicId={song.publicId} librarySlug={song.librarySlug || 'music'} />
       {onEdit && <ContextMenu.Item onClick={handleEditClick}>Edit</ContextMenu.Item>}
       {onRemoveFromPlaylist && (
         <>

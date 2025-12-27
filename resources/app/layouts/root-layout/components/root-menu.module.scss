@@ -74,9 +74,11 @@
 .subsectionHeader {
   font-weight: 600;
   color: var(--gray-12);
+  cursor: pointer;
 
   &:hover {
     color: var(--gray-12);
+    background-color: var(--gray-4);
   }
 }
 

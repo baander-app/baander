@@ -317,6 +317,7 @@ export function usePlayerActions() {
     // Queue management
     setQueue: useMusicPlayerStore(s => s.setQueue),
     addToQueue: useMusicPlayerStore(s => s.addToQueue),
+    insertInQueue: useMusicPlayerStore(s => s.insertInQueue),
     addManyToQueue: useMusicPlayerStore(s => s.addManyToQueue),
     removeFromQueue: useMusicPlayerStore(s => s.removeFromQueue),
     playSongAtIndex: useMusicPlayerStore(s => s.playSongAtIndex),

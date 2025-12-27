@@ -12,6 +12,7 @@ export interface QueueSlice {
   // Actions
   setQueue: (queue: SongResource[]) => void;
   addToQueue: (song: SongResource) => void;
+  insertInQueue: (song: SongResource) => void;
   addManyToQueue: (songs: SongResource[]) => void;
   removeFromQueue: (index: number) => void;
   playSongAtIndex: (index: number) => void;
@@ -39,6 +40,17 @@ export const createQueueSlice: StateCreator<QueueSlice> = (set) => ({
     queue: [...state.queue, song],
     source: PlaybackSource.LIBRARY,
   })),
+
+  insertInQueue: (song) => set((state) => {
+    // Insert after the current song
+    const insertIndex = state.currentSongIndex + 1;
+    const newQueue = [...state.queue];
+    newQueue.splice(insertIndex, 0, song);
+    return {
+      queue: newQueue,
+      source: PlaybackSource.LIBRARY,
+    };
+  }),
 
   addManyToQueue: (songs) => set((state) => ({
     queue: [...state.queue, ...songs],
