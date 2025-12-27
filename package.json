@@ -25,8 +25,7 @@
     "dist:win": "yarn build:electron && electron-builder -c electron-builder.yml --win",
     "dist:linux": "yarn build:electron && electron-builder -c electron-builder.yml --linux",
     "dist:mac": "yarn build:electron && electron-builder -c electron-builder.yml --mac",
-    "dist:all": "yarn build:electron && electron-builder -c electron-builder.yml -w -l -m",
-    "sleep": "sleep 20000"
+    "dist:all": "yarn build:electron && electron-builder -c electron-builder.yml -w -l -m"
   },
   "dependencies": {
     "@napi-rs/keyring": "^1.1.10",
@@ -42,7 +41,6 @@
     "@fontsource-variable/inter": "^5.1.1",
     "@fontsource-variable/source-code-pro": "^5.1.0",
     "@fontsource/open-sans": "^5.1.0",
-    "@hookform/devtools": "^4.4.0",
     "@iconify-json/akar-icons": "^1.2.7",
     "@iconify-json/arcticons": "^1.2.37",
     "@iconify-json/entypo": "^1.2.1",
