@@ -94,7 +94,7 @@ export function createMainWindow() {
     show: false,
     webPreferences: {
       preload: app.isPackaged
-        ? join(__dirname, 'preload/preload.cjs')  // Production: same dir, preload subfolder
+        ? join(__dirname, 'preload.cjs')  // Production: same directory (flattened)
         : join(__dirname, '../preload/preload.cjs'),  // Dev: go up to dist-electron, then preload
       contextIsolation: true,
       nodeIntegration: false,
