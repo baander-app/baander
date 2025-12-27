@@ -37,4 +37,4 @@ repomix-output.xml
 /scramble:export.js
 /packages/dsp/**/*.wasm
 dist/
-electron/
+electron/dist-*
