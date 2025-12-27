@@ -1,7 +1,6 @@
 import { memo, RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Iconify } from '@/app/ui/icons/iconify';
-import { useAppDispatch, useAppSelector } from '@/app/store/hooks';
-import { setQueueAndSong } from '@/app/store/music/music-player-slice';
+import { usePlayerActions, usePlayerCurrentSongPublicId } from '@/app/modules/library-music-player/store';
 import {
   ColumnDef,
   flexRender,
@@ -118,7 +117,7 @@ const COLUMN_DEFINITIONS: ColumnDef<SongResource>[] = [
 ];
 
 const SongTitleCell = memo(({ song }: SongTitleCellProps) => {
-  const { currentSongPublicId } = useAppSelector(state => state.musicPlayer);
+  const currentSongPublicId = usePlayerCurrentSongPublicId();
   const isCurrentSong = currentSongPublicId === song.publicId;
 
   return (
@@ -140,7 +139,7 @@ export function SongTable({
                             className,
                             contextMenuActions,
                           }: SongTableProps) {
-  const dispatch = useAppDispatch();
+  const { setQueueAndPlay } = usePlayerActions();
   const [sorting, setSorting] = useState<SortingState>([]);
   const parentRef = useRef<HTMLDivElement | null>(null);
   const lastScrollTimeRef = useRef(0);
@@ -150,11 +149,8 @@ export function SongTable({
     const newQueue = [...songs];
     const index = newQueue.findIndex(x => x.publicId === publicId);
     newQueue.splice(0, 0, newQueue.splice(index, 1)[0]);
-    dispatch(setQueueAndSong({
-      queue: newQueue,
-      playPublicId: newQueue[0].publicId,
-    }));
-  }, [dispatch, songs]);
+    setQueueAndPlay(newQueue, newQueue[0].publicId);
+  }, [setQueueAndPlay, songs]);
 
 
   const table = useReactTable<SongResource>({

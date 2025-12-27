@@ -3,8 +3,7 @@ import {
   PlayPauseButton,
   PreviousButton,
 } from '@/app/modules/library-music-player/components/player-buttons/player-buttons.tsx';
-import { useAppDispatch } from '@/app/store/hooks.ts';
-import { playNextSong, playPreviousSong } from '@/app/store/music/music-player-slice.ts';
+import { usePlayerActions } from '@/app/modules/library-music-player/store';
 
 import styles from './player-controls.module.scss';
 
@@ -13,26 +12,18 @@ export interface PlayerControlsProps {
   togglePlayPause: () => void;
 }
 export function PlayerControls({ isPlaying, togglePlayPause }: PlayerControlsProps) {
-  const dispatch = useAppDispatch();
-
-  const onPlayNextSong = () => {
-    dispatch(playNextSong());
-  }
-
-  const onPlayPreviousSong = () => {
-    dispatch(playPreviousSong());
-  }
+  const { playNext, playPrevious } = usePlayerActions();
 
   return (
     <div className={styles.playerControls}>
-      <PreviousButton onClick={() => onPlayPreviousSong()}/>
+      <PreviousButton onClick={() => playPrevious()}/>
 
       <PlayPauseButton
         isPlaying={isPlaying}
         onClick={() => togglePlayPause()}
       />
 
-      <NextButton onClick={() => onPlayNextSong()}/>
+      <NextButton onClick={() => playNext()}/>
     </div>
   )
 }

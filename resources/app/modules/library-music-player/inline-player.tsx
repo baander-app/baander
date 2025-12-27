@@ -6,11 +6,10 @@ import {
   PlayerMetaControls,
 } from '@/app/modules/library-music-player/components/player-meta-controls/player-meta-controls.tsx';
 import { LyricsProvider } from '@/app/ui/lyrics-viewer/providers/lyrics-provider.tsx';
-import { selectSong } from '@/app/store/music/music-player-slice.ts';
-import { useAppSelector } from '@/app/store/hooks.ts';
 import {
   attachAudioElement,
   usePlayerActions,
+  usePlayerCurrentSong,
   usePlayerBuffered,
   usePlayerCurrentTime,
   usePlayerDuration,
@@ -22,7 +21,7 @@ import { Token } from '@/app/services/auth/token.ts';
 import { useSongsShow } from '@/app/libs/api-client/gen/endpoints/song/song.ts';
 
 export function InlinePlayer() {
-  const sourceSong = useAppSelector(selectSong);
+  const sourceSong = usePlayerCurrentSong();
   const buffered = usePlayerBuffered();
   const duration = usePlayerDuration();
   const isPlaying = usePlayerIsPlaying();
@@ -30,7 +29,7 @@ export function InlinePlayer() {
   const existingAudioElement = usePlayerAudioElement();
   const cleanupRef = useRef<(() => void) | null>(null);
   const hasInitialized = useRef(false);
-  const currentSong = useAppSelector(selectSong);
+  const currentSong = usePlayerCurrentSong();
   const [currentStreamUrl, setCurrentStreamUrl] = useState<string | null>(null);
   const {
     setSong,

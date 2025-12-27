@@ -1,8 +1,7 @@
 import { Cover } from '@/app/modules/library-music/components/artwork/cover';
 import { Box, Card, Flex, ScrollArea, Skeleton, Text } from '@radix-ui/themes';
 import { AlertLoadingError } from '@/app/ui/alerts/alert-loading-error.tsx';
-import { useAppDispatch } from '@/app/store/hooks.ts';
-import { setQueueAndSong } from '@/app/store/music/music-player-slice.ts';
+import { usePlayerActions } from '@/app/modules/library-music-player/store';
 import { TrackRow } from '@/app/ui/music/track-row/track-row.tsx';
 
 import styles from './album-detail.module.scss';
@@ -79,7 +78,7 @@ interface AlbumSongProps {
 }
 
 function AlbumSongs({ songs }: AlbumSongProps) {
-  const dispatch = useAppDispatch();
+  const { setQueueAndPlay } = usePlayerActions();
 
   const onSongClick = useCallback((song: SongResource, songs: SongResource[]) => {
     console.group('onSongClick');
@@ -91,11 +90,8 @@ function AlbumSongs({ songs }: AlbumSongProps) {
     const index = newQueue.findIndex(x => x.publicId === song.publicId);
     newQueue.splice(0, 0, newQueue.splice(index, 1)[0]);
 
-    dispatch(setQueueAndSong({
-      queue: newQueue,
-      playPublicId: song.publicId,
-    }));
-  }, [dispatch]);
+    setQueueAndPlay(newQueue, song.publicId);
+  }, [setQueueAndPlay]);
 
 
   const rows = songs.map((song) => (

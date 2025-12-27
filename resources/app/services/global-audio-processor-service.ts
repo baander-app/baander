@@ -1,5 +1,6 @@
 import { AudioProcessor } from './audio-processor.ts';
 import { createLogger } from '@/app/services/logger';
+import { initializeAudioProcessorSettings } from '@/app/store/settings';
 
 const logger = createLogger('GlobalAudioProcessor');
 
@@ -16,6 +17,9 @@ class GlobalAudioProcessorService {
         this.processor = new AudioProcessor();
         this.isInitialized = true;
         logger.debug('AudioProcessor created successfully');
+
+        // Apply saved settings immediately after processor creation
+        initializeAudioProcessorSettings();
 
         if (this.pendingAudioElement) {
           this.connectAudioElement(this.pendingAudioElement);

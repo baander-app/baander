@@ -10,6 +10,7 @@ import { useEffect } from 'react';
 import { useDisclosure } from '@/app/hooks/use-disclosure';
 import { Box } from '@radix-ui/themes';
 import { Equalizer } from '@/app/modules/dsp/equalizer/equalizer.tsx';
+import { ErrorBoundary } from '@/app/components/error-boundary';
 import { SongResource } from '@/app/libs/api-client/gen/models';
 
 export interface PlayerMetaControlsProps {
@@ -50,13 +51,17 @@ export function PlayerMetaControls({ song }: PlayerMetaControlsProps) {
 
       {showLyrics && (
         <Box style={{ position: 'absolute', right: 20, bottom: 90 }}>
-          <LyricsViewer key="lyrics" />
+          <ErrorBoundary name="Lyrics Viewer">
+            <LyricsViewer key="lyrics" />
+          </ErrorBoundary>
         </Box>
       )}
 
       {showEq && (
         <Box style={{ position: 'absolute', right: 20, bottom: 120, zIndex: 100 }}>
-          <Equalizer />
+          <ErrorBoundary name="Equalizer">
+            <Equalizer />
+          </ErrorBoundary>
         </Box>
       )}
 
