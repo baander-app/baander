@@ -1,0 +1,46 @@
+.card {
+  width: 200px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+
+    .coverWrapper {
+      box-shadow: 0 0 12px 0 rgba(0, 0, 0, 0.2);
+    }
+  }
+}
+
+.coverWrapper {
+  position: relative;
+  margin-bottom: 8px;
+  transition: box-shadow 0.2s ease;
+}
+
+.smartBadge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  gap: 4px;
+}
+
+.collabBadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+.title {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-bottom: 4px;
+  color: var(--color-text-primary);
+}
+
+.subtitle {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}

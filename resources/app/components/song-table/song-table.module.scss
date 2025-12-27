@@ -134,3 +134,15 @@
     var(--sb-track-color);
   }
 }
+
+.dragHandle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gray-9);
+  cursor: grab;
+
+  &:active {
+    cursor: grabbing;
+  }
+}

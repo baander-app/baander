@@ -18,6 +18,7 @@ export interface QueueSlice {
   playNext: () => void;
   playPrevious: () => void;
   setQueueAndPlay: (queue: SongResource[], publicId: string) => void;
+  shuffleAndPlay: (songs: SongResource[]) => void;
   setPlaybackSource: (source: PlaybackSource) => void;
 }
 
@@ -95,6 +96,22 @@ export const createQueueSlice: StateCreator<QueueSlice> = (set) => ({
     currentSongIndex: queue.findIndex(song => song.publicId === publicId),
     currentSongPublicId: publicId,
     source: PlaybackSource.LIBRARY,
+  }),
+
+  shuffleAndPlay: (songs) => set(() => {
+    // Fisher-Yates shuffle
+    const shuffled = [...songs];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    return {
+      queue: shuffled,
+      currentSongIndex: 0,
+      currentSongPublicId: shuffled.length > 0 ? shuffled[0].publicId : null,
+      source: PlaybackSource.LIBRARY,
+    };
   }),
 
   setPlaybackSource: (source) => set({ source }),

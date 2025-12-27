@@ -141,7 +141,7 @@ export default function Artists() {
   return (
     <Container className={styles.artistsLayout}>
       <CoverGrid style={{ gap: '32px' }}>
-        {artistsData?.data.map((artist, index) => (
+        {artistsData?.data.map((artist) => (
           <ContextMenu.Root key={artist.publicId}>
             <ContextMenu.Trigger>
               <div style={{ display: 'inline-block', cursor: 'context-menu' }}>

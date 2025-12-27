@@ -28,6 +28,9 @@
     "dist:all": "yarn build:electron && electron-builder -c electron-builder.yml -w -l -m"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@napi-rs/keyring": "^1.1.10",
     "@stoplight/elements": "^9.0.13",
     "axios": "^1.7.9",

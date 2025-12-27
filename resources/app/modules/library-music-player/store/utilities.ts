@@ -323,6 +323,7 @@ export function usePlayerActions() {
     playNext: useMusicPlayerStore(s => s.playNext),
     playPrevious: useMusicPlayerStore(s => s.playPrevious),
     setQueueAndPlay: useMusicPlayerStore(s => s.setQueueAndPlay),
+    shuffleAndPlay: useMusicPlayerStore(s => s.shuffleAndPlay),
 
     // Playback mode
     setShuffleEnabled: useMusicPlayerStore(s => s.setShuffleEnabled),

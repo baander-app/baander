@@ -1,126 +1,115 @@
-import { Button, Flex, Switch, Text, TextField } from '@radix-ui/themes';
-import { useForm, Controller } from 'react-hook-form';
-import { useState } from 'react';
+import { FormField, FormFieldConfig, useFormEditor } from '@/app/ui/form';
+import { useAppDispatch } from '@/app/store/hooks';
+import { createNotification } from '@/app/store/notifications/notifications-slice';
+import { usePlaylistStore } from '@/app/libs/api-client/gen/endpoints/playlist/playlist';
+import { Button, Flex, Switch, Text } from '@radix-ui/themes';
+import { Dialog } from '@radix-ui/themes';
 import styles from './create-playlist.module.scss';
 
-interface PlaylistForm {
+interface CreatePlaylistForm {
   name: string;
-  description: string;
-  is_public: boolean;
+  description: string | null;
+  isPublic: boolean;
 }
 
 export function CreatePlaylist() {
-  const {
-    register,
-    handleSubmit,
-    control,
-    formState: { errors, isSubmitting },
-  } = useForm<PlaylistForm>({
-    defaultValues: {
+  const dispatch = useAppDispatch();
+  const storeMutation = usePlaylistStore();
+
+  const { form, submit } = useFormEditor<CreatePlaylistForm>({
+    method: 'post',
+    url: '/api/playlists',
+    initialData: {
       name: '',
-      description: '',
-      is_public: false,
+      description: null,
+      isPublic: false,
+    },
+    onSubmit: async (data) => {
+      storeMutation.mutate(
+        {
+          data: {
+            name: data.name,
+            description: data.description,
+            isPublic: data.isPublic,
+          },
+        },
+        {
+          onSuccess: () => {
+            dispatch(
+              createNotification({
+                title: 'Success',
+                message: 'Playlist created successfully!',
+                type: 'success',
+                toast: true,
+              })
+            );
+            // Close dialog by triggering a click on the close button
+            (document.querySelector('[data-state="open"] button[data-radix-themes="true"]') as HTMLElement)?.click();
+          },
+          onError: (error: any) => {
+            dispatch(
+              createNotification({
+                title: 'Error',
+                message: error.response?.data?.message || 'Failed to create playlist',
+                type: 'error',
+                toast: true,
+              })
+            );
+          },
+        }
+      );
     },
   });
 
-  const [error, setError] = useState<string | null>(null);
-
-  const onSubmit = async (data: PlaylistForm) => {
-    try {
-      setError(null);
-
-      const response = await fetch('/api/playlists', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create playlist');
-      }
-
-      // Handle success - redirect or show success message
-      window.location.href = '/library/playlists';
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
-    }
-  };
+  const fieldConfigs: FormFieldConfig<CreatePlaylistForm>[] = [
+    {
+      name: 'name',
+      label: 'Name',
+      type: 'text',
+      placeholder: 'Playlist name',
+    },
+    {
+      name: 'description',
+      label: 'Description',
+      type: 'textarea',
+      placeholder: 'Optional description',
+    },
+    {
+      name: 'isPublic',
+      label: 'Public',
+      type: 'checkbox',
+      description: 'Anyone with the link can view this playlist',
+    },
+  ];
 
   return (
-    <div className={styles.container}>
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <Flex direction="column" gap="4">
-          {error && (
-            <Text color="red" size="2" className={styles.error}>
-              {error}
-            </Text>
-          )}
+    <Flex direction="column" gap="4">
+      {fieldConfigs.map((config) => (
+        <FormField
+          key={config.name}
+          config={config}
+          value={form.data[config.name]}
+          onChange={(value) => form.setData(config.name, value)}
+          errors={form.errors}
+          lockMode={false}
+          isFieldLocked={() => false}
+          onToggleLock={() => {}}
+        />
+      ))}
 
-          <Flex direction="column" gap="3">
-            <div className={styles.formGroup}>
-              <label className={styles.label}>
-                <Text as="div" size="2" mb="1" weight="bold" className={styles.title}>
-                  Name
-                </Text>
-                <TextField.Root
-                  data-1p-ignore
-                  placeholder="Playlist name"
-                  className={styles.input}
-                  {...register('name', { required: 'Name is required' })}
-                />
-                {errors.name && (
-                  <Text color="red" size="1" className={styles.error}>
-                    {errors.name.message}
-                  </Text>
-                )}
-              </label>
-            </div>
-
-            <div className={styles.formGroup}>
-              <label className={styles.label}>
-                <Text as="div" size="2" mb="1" weight="bold" className={styles.title}>
-                  Description
-                </Text>
-                <TextField.Root
-                  data-1p-ignore
-                  placeholder="Optional description"
-                  className={styles.input}
-                  {...register('description')}
-                />
-              </label>
-            </div>
-
-            <div className={styles.formGroup}>
-              <label className={styles.label}>
-                <Flex align="center" gap="2">
-                  <Text as="div" size="2" weight="bold" className={styles.title}>
-                    Public
-                  </Text>
-                  <Controller
-                    name="is_public"
-                    control={control}
-                    render={({ field }) => (
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    )}
-                  />
-                </Flex>
-              </label>
-            </div>
-          </Flex>
-
-          <Flex justify="end" mt="4" className={styles.submitButton}>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Creating...' : 'Create Playlist'}
-            </Button>
-          </Flex>
-        </Flex>
-      </form>
-    </div>
+      <Flex justify="end" gap="2">
+        <Button
+          type="button"
+          variant="soft"
+          onClick={() => (document.querySelector('[data-state="open"] button[data-radix-themes="true"]') as HTMLElement)?.click()}
+        >
+          Cancel
+        </Button>
+        <Button onClick={submit} disabled={storeMutation.isPending || form.processing}>
+          {storeMutation.isPending || form.processing ? 'Creating...' : 'Create Playlist'}
+        </Button>
+      </Flex>
+    </Flex>
   );
 }
+
