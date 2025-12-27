@@ -1,13 +1,11 @@
 import { CoverGrid } from '@/app/modules/library-music/components/cover-grid';
 import { PlaylistCard } from '@/app/modules/library-music-playlists/components/playlist-card/playlist-card';
-import { PlaylistDetail } from '@/app/modules/library-music-playlists/components/playlist-detail/playlist-detail';
 import { Box, Flex, Skeleton } from '@radix-ui/themes';
-import { useState } from 'react';
 import styles from './playlists.module.scss';
 import { usePlaylistIndex } from '@/app/libs/api-client/gen/endpoints/playlist/playlist.ts';
+import { Link} from 'react-router-dom';
 
 export default function Playlists() {
-  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
   const {data, isLoading} = usePlaylistIndex({
     request: {
       params: {
@@ -25,33 +23,12 @@ export default function Playlists() {
             <>
               {data.data.map((playlist) => (
                 <div className={styles.playlist} key={playlist.publicId}>
-                  <PlaylistCard
-                    playlist={playlist}
-                    onClick={() => setSelectedPlaylistId(playlist.publicId)}
-                  />
+                  <Link to={playlist.publicId}><PlaylistCard playlist={playlist}/></Link>
                 </div>
               ))}
             </>
           )}
         </CoverGrid>
-      </Box>
-
-      <Box
-        display="block"
-        position="sticky"
-        right="8px"
-        top="8px"
-        minHeight="300px"
-        minWidth="300px"
-        className={styles.sidebar}
-        style={{alignSelf: 'flex-start'}}
-      >
-        {selectedPlaylistId && (
-          <PlaylistDetail
-            playlistId={selectedPlaylistId}
-            librarySlug="music"
-          />
-        )}
       </Box>
     </Flex>
   );

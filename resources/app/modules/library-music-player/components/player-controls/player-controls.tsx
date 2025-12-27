@@ -6,7 +6,7 @@ import {
 } from '@/app/modules/library-music-player/components/player-buttons/player-buttons.tsx';
 import { usePlayerActions } from '@/app/modules/library-music-player/store';
 import { QueueModal } from '@/app/modules/library-music-player/components/queue-modal/queue-modal';
-import { LockOpen2Icon } from '@radix-ui/react-icons';
+import { ListBulletIcon, LockOpen2Icon } from '@radix-ui/react-icons';
 import { IconButton } from '@radix-ui/themes';
 
 import styles from './player-controls.module.scss';
@@ -29,7 +29,7 @@ export function PlayerControls({ isPlaying, togglePlayPause }: PlayerControlsPro
         onClick={() => setIsQueueModalOpen(true)}
         className={styles.queueButton}
       >
-        <LockOpen2Icon width={20} height={20} />
+        <ListBulletIcon width={20} height={20} />
       </IconButton>
 
       <PreviousButton onClick={() => playPrevious()}/>

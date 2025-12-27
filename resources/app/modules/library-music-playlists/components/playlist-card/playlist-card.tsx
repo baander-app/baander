@@ -7,7 +7,7 @@ import styles from './playlist-card.module.scss';
 
 interface PlaylistCardProps {
   playlist: PlaylistResource;
-  onClick: () => void;
+  onClick?: () => void;
 }
 
 export const PlaylistCard = memo(({ playlist, onClick }: PlaylistCardProps) => {
