@@ -1,116 +1,342 @@
+/**
+ * Multi-Queue Slice
+ * Refactored to support multiple queues (music, audiobook, podcast)
+ * Maintains backward compatibility with existing selectors
+ */
+
 import { StateCreator } from 'zustand';
-import { SongResource } from '@/app/libs/api-client/gen/models';
+import {
+  MusicQueueItem,
+  AudiobookQueueItem,
+  PodcastQueueItem,
+  QueueItem,
+  QueueState,
+  QueueOperationResult,
+  QueueError,
+  getMediaType,
+  isMusicItem,
+  isAudiobookItem,
+  isPodcastItem,
+} from '../../services/queue';
 import { PlaybackSource } from '@/app/models/playback-source';
+import { QueueMode } from '@/app/store/settings/settings-types';
+import { useSettingsStore } from '@/app/store/settings';
+import { MediaType } from '@/app/models/media-type.ts';
+
+// ============================================================================
+// QUEUE SLICE INTERFACE
+// ============================================================================
 
 export interface QueueSlice {
   // State
-  queue: SongResource[];
-  currentSongIndex: number;
-  currentSongPublicId: string | null;
-  source: PlaybackSource;
+  activeQueueType: MediaType;
+  queues: {
+    [MediaType.MUSIC]: QueueState<MusicQueueItem>;
+    [MediaType.AUDIOBOOK]: QueueState<AudiobookQueueItem>;
+    [MediaType.PODCAST]: QueueState<PodcastQueueItem>;
+  };
 
-  // Actions
-  setQueue: (queue: SongResource[]) => void;
-  addToQueue: (song: SongResource) => void;
-  insertInQueue: (song: SongResource) => void;
-  addManyToQueue: (songs: SongResource[]) => void;
+  // Actions - Queue switching
+  setActiveQueueType: (type: MediaType) => void;
+  switchQueueType: (type: MediaType) => void;
+
+  // Actions - Queue manipulation (works with active queue)
+  setQueue: <T extends QueueItem>(queue: T[]) => void;
+  addToQueue: <T extends QueueItem>(item: T) => void;
+  insertInQueue: <T extends QueueItem>(item: T) => void;
+  addManyToQueue: <T extends QueueItem>(items: T[]) => void;
   removeFromQueue: (index: number) => void;
+  clearQueue: () => void;
+
+  // Actions - Playback navigation
   playSongAtIndex: (index: number) => void;
   playNext: () => void;
   playPrevious: () => void;
-  setQueueAndPlay: (queue: SongResource[], publicId: string) => void;
-  shuffleAndPlay: (songs: SongResource[]) => void;
+
+  // Actions - Special queue operations
+  setQueueAndPlay: <T extends QueueItem>(queue: T[], publicId: string) => void;
+  shuffleAndPlay: <T extends QueueItem>(songs: T[]) => void;
   setPlaybackSource: (source: PlaybackSource) => void;
 }
 
-export const createQueueSlice: StateCreator<QueueSlice> = (set) => ({
-  // Initial state
-  queue: [],
-  currentSongIndex: -1,
-  currentSongPublicId: null,
-  source: PlaybackSource.NONE,
+// ============================================================================
+// CREATE QUEUE SLICE
+// ============================================================================
 
-  // Actions
-  setQueue: (queue) => set({
-    queue,
-    source: PlaybackSource.LIBRARY,
+export const createQueueSlice: StateCreator<QueueSlice> = (set, get) => ({
+  // =========================================================================
+  // INITIAL STATE
+  // =========================================================================
+  activeQueueType: MediaType.MUSIC,
+  queues: {
+    [MediaType.MUSIC]: {
+      items: [],
+      currentIndex: -1,
+      currentItemPublicId: null,
+      source: PlaybackSource.NONE,
+      lastUpdated: Date.now(),
+    },
+    [MediaType.AUDIOBOOK]: {
+      items: [],
+      currentIndex: -1,
+      currentItemPublicId: null,
+      source: PlaybackSource.NONE,
+      lastUpdated: Date.now(),
+    },
+    [MediaType.PODCAST]: {
+      items: [],
+      currentIndex: -1,
+      currentItemPublicId: null,
+      source: PlaybackSource.NONE,
+      lastUpdated: Date.now(),
+    },
+  },
+
+  // =========================================================================
+  // QUEUE SWITCHING
+  // =========================================================================
+
+  setActiveQueueType: (type) => set({ activeQueueType: type }),
+
+  switchQueueType: (type) => set((state) => {
+    if (type === state.activeQueueType) {
+      return {}; // No change needed
+    }
+
+    return {
+      activeQueueType: type,
+    };
   }),
 
-  addToQueue: (song) => set((state) => ({
-    queue: [...state.queue, song],
-    source: PlaybackSource.LIBRARY,
-  })),
+  // =========================================================================
+  // QUEUE MANIPULATION
+  // =========================================================================
 
-  insertInQueue: (song) => set((state) => {
-    // Insert after the current song
-    const insertIndex = state.currentSongIndex + 1;
-    const newQueue = [...state.queue];
-    newQueue.splice(insertIndex, 0, song);
+  setQueue: <T extends QueueItem>(queue: T[]) => set((state) => {
+    const activeType = state.activeQueueType;
+
     return {
-      queue: newQueue,
+      queues: {
+        ...state.queues,
+        [activeType]: {
+          ...state.queues[activeType],
+          items: queue,
+          lastUpdated: Date.now(),
+        },
+      },
       source: PlaybackSource.LIBRARY,
     };
   }),
 
-  addManyToQueue: (songs) => set((state) => ({
-    queue: [...state.queue, ...songs],
-    source: PlaybackSource.LIBRARY,
-  })),
+  addToQueue: <T extends QueueItem>(item: T) => set((state) => {
+    const activeType = state.activeQueueType;
 
-  removeFromQueue: (index) => set((state) => {
-    const newQueue = [...state.queue];
-    newQueue.splice(index, 1);
-    return { queue: newQueue };
+    return {
+      queues: {
+        ...state.queues,
+        [activeType]: {
+          ...state.queues[activeType],
+          items: [...state.queues[activeType].items, item],
+          lastUpdated: Date.now(),
+        },
+      },
+      source: PlaybackSource.LIBRARY,
+    };
   }),
 
-  playSongAtIndex: (index) => set((state) => {
-    if (index >= 0 && index < state.queue.length) {
-      const song = state.queue[index];
-      return {
-        currentSongIndex: index,
-        currentSongPublicId: song.publicId,
-        song: { publicId: song.publicId, title: song.title },
-      };
+  insertInQueue: <T extends QueueItem>(item: T) => set((state) => {
+    const activeType = state.activeQueueType;
+    const currentQueue = state.queues[activeType];
+    const insertIndex = currentQueue.currentIndex + 1;
+
+    const newItems = [...currentQueue.items];
+    newItems.splice(insertIndex, 0, item);
+
+    return {
+      queues: {
+        ...state.queues,
+        [activeType]: {
+          ...currentQueue,
+          items: newItems,
+          lastUpdated: Date.now(),
+        },
+      },
+      source: PlaybackSource.LIBRARY,
+    };
+  }),
+
+  addManyToQueue: <T extends QueueItem>(items: T[]) => set((state) => {
+    const activeType = state.activeQueueType;
+
+    return {
+      queues: {
+        ...state.queues,
+        [activeType]: {
+          ...state.queues[activeType],
+          items: [...state.queues[activeType].items, ...items],
+          lastUpdated: Date.now(),
+        },
+      },
+      source: PlaybackSource.LIBRARY,
+    };
+  }),
+
+  removeFromQueue: (index) => set((state) => {
+    const activeType = state.activeQueueType;
+    const currentQueue = state.queues[activeType];
+
+    const newItems = [...currentQueue.items];
+    newItems.splice(index, 1);
+
+    // Adjust current index if needed
+    let newIndex = currentQueue.currentIndex;
+    if (index < currentQueue.currentIndex) {
+      newIndex = currentQueue.currentIndex - 1;
+    } else if (index === currentQueue.currentIndex) {
+      // If removing current item, stay at same index (next item becomes current)
+      newIndex = Math.min(index, newItems.length - 1);
     }
-    return {};
+
+    return {
+      queues: {
+        ...state.queues,
+        [activeType]: {
+          ...currentQueue,
+          items: newItems,
+          currentIndex: newIndex,
+          currentItemPublicId: newIndex >= 0 ? newItems[newIndex]?.publicId ?? null : null,
+          lastUpdated: Date.now(),
+        },
+      },
+    };
+  }),
+
+  clearQueue: () => set((state) => {
+    const activeType = state.activeQueueType;
+
+    return {
+      queues: {
+        ...state.queues,
+        [activeType]: {
+          items: [],
+          currentIndex: -1,
+          currentItemPublicId: null,
+          source: PlaybackSource.NONE,
+          lastUpdated: Date.now(),
+        },
+      },
+    };
+  }),
+
+  // =========================================================================
+  // PLAYBACK NAVIGATION
+  // =========================================================================
+
+  playSongAtIndex: (index) => set((state) => {
+    const activeType = state.activeQueueType;
+    const currentQueue = state.queues[activeType];
+
+    if (index < 0 || index >= currentQueue.items.length) {
+      return {};
+    }
+
+    const item = currentQueue.items[index];
+
+    return {
+      queues: {
+        ...state.queues,
+        [activeType]: {
+          ...currentQueue,
+          currentIndex: index,
+          currentItemPublicId: item.publicId,
+          lastUpdated: Date.now(),
+        },
+      },
+      song: { publicId: item.publicId, title: item.title },
+    };
   }),
 
   playNext: () => set((state) => {
-    if (state.queue.length === 0) return {};
-    let nextIndex = state.currentSongIndex + 1;
-    if (nextIndex >= state.queue.length) {
+    const activeType = state.activeQueueType;
+    const currentQueue = state.queues[activeType];
+
+    if (currentQueue.items.length === 0) {
+      return {};
+    }
+
+    let nextIndex = currentQueue.currentIndex + 1;
+    if (nextIndex >= currentQueue.items.length) {
       nextIndex = 0; // Loop back to start
     }
-    const song = state.queue[nextIndex];
+
+    const item = currentQueue.items[nextIndex];
+
     return {
-      currentSongIndex: nextIndex,
-      currentSongPublicId: song.publicId,
-      song: { publicId: song.publicId, title: song.title },
+      queues: {
+        ...state.queues,
+        [activeType]: {
+          ...currentQueue,
+          currentIndex: nextIndex,
+          currentItemPublicId: item.publicId,
+          lastUpdated: Date.now(),
+        },
+      },
+      song: { publicId: item.publicId, title: item.title },
     };
   }),
 
   playPrevious: () => set((state) => {
-    if (state.queue.length === 0) return {};
-    let prevIndex = state.currentSongIndex - 1;
-    if (prevIndex < 0) {
-      prevIndex = state.queue.length - 1; // Loop back to end
+    const activeType = state.activeQueueType;
+    const currentQueue = state.queues[activeType];
+
+    if (currentQueue.items.length === 0) {
+      return {};
     }
-    const song = state.queue[prevIndex];
+
+    let prevIndex = currentQueue.currentIndex - 1;
+    if (prevIndex < 0) {
+      prevIndex = currentQueue.items.length - 1; // Loop to end
+    }
+
+    const item = currentQueue.items[prevIndex];
+
     return {
-      currentSongIndex: prevIndex,
-      currentSongPublicId: song.publicId,
-      song: { publicId: song.publicId, title: song.title },
+      queues: {
+        ...state.queues,
+        [activeType]: {
+          ...currentQueue,
+          currentIndex: prevIndex,
+          currentItemPublicId: item.publicId,
+          lastUpdated: Date.now(),
+        },
+      },
+      song: { publicId: item.publicId, title: item.title },
     };
   }),
 
-  setQueueAndPlay: (queue, publicId) => set({
-    queue,
-    currentSongIndex: queue.findIndex(song => song.publicId === publicId),
-    currentSongPublicId: publicId,
-    source: PlaybackSource.LIBRARY,
+  // =========================================================================
+  // SPECIAL QUEUE OPERATIONS
+  // =========================================================================
+
+  setQueueAndPlay: <T extends QueueItem>(queue: T[], publicId: string) => set((state) => {
+    const activeType = state.activeQueueType;
+    const index = queue.findIndex(item => item.publicId === publicId);
+
+    return {
+      queues: {
+        ...state.queues,
+        [activeType]: {
+          items: queue,
+          currentIndex: index,
+          currentItemPublicId: publicId,
+          source: PlaybackSource.LIBRARY,
+          lastUpdated: Date.now(),
+        },
+      },
+    };
   }),
 
-  shuffleAndPlay: (songs) => set(() => {
+  shuffleAndPlay: <T extends QueueItem>(songs: T[]) => set(() => {
     // Fisher-Yates shuffle
     const shuffled = [...songs];
     for (let i = shuffled.length - 1; i > 0; i--) {
@@ -118,13 +344,57 @@ export const createQueueSlice: StateCreator<QueueSlice> = (set) => ({
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
 
+    const activeType = MediaType.MUSIC; // Default to music for shuffle
+
     return {
-      queue: shuffled,
-      currentSongIndex: 0,
-      currentSongPublicId: shuffled.length > 0 ? shuffled[0].publicId : null,
-      source: PlaybackSource.LIBRARY,
+      queues: {
+        [MediaType.MUSIC]: {
+          items: shuffled as any,
+          currentIndex: 0,
+          currentItemPublicId: shuffled.length > 0 ? shuffled[0].publicId : null,
+          source: PlaybackSource.LIBRARY,
+          lastUpdated: Date.now(),
+        },
+        [MediaType.AUDIOBOOK]: {
+          items: [],
+          currentIndex: -1,
+          currentItemPublicId: null,
+          source: PlaybackSource.NONE,
+          lastUpdated: Date.now(),
+        },
+        [MediaType.PODCAST]: {
+          items: [],
+          currentIndex: -1,
+          currentItemPublicId: null,
+          source: PlaybackSource.NONE,
+          lastUpdated: Date.now(),
+        },
+      },
+      activeQueueType: activeType,
     };
   }),
 
-  setPlaybackSource: (source) => set({ source }),
+  setPlaybackSource: (source) => set((state) => {
+    const activeType = state.activeQueueType;
+
+    return {
+      queues: {
+        ...state.queues,
+        [activeType]: {
+          ...state.queues[activeType],
+          source,
+        },
+      },
+    };
+  }),
+
+  // =========================================================================
+  // BACKWARD COMPATIBILITY - GETTERS
+  // =========================================================================
+
+  // Note: Getters removed as they cause initialization issues.
+  // Use selectors from utilities.ts instead:
+  // - usePlayerQueue() -> state.queues[state.activeQueueType].items
+  // - usePlayerCurrentSongIndex() -> state.queues[state.activeQueueType].currentIndex
+  // - usePlayerCurrentSongPublicId() -> state.queues[state.activeQueueType].currentItemPublicId
 });

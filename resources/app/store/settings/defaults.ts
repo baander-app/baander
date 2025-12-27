@@ -1,11 +1,11 @@
-import { AppSettings, EQPreset } from './settings-types';
+import { AppSettings, EQPreset, QueueMode, QueueCompletionBehavior } from './settings-types';
 
 /**
  * Default application settings
  * Used when initializing the store or when settings are missing/corrupted
  */
 export const DEFAULT_SETTINGS: AppSettings = {
-  version: 1,
+  version: 2,
   audio: {
     equalizer: {
       enabled: true,
@@ -42,6 +42,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
     playback: {
       crossfadeDuration: 0,
       gaplessPlayback: true,
+      queueCompletion: QueueCompletionBehavior.STOP,
+    },
+    queue: {
+      mode: QueueMode.SIMPLE,
+      rememberPosition: true,
+      autoSwitch: true,
+      warnOnQueueReplace: true,
     },
     library: {
       defaultSort: 'title',

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
-import { AppSettings, EQPreset } from './settings-types';
+import { AppSettings, EQPreset, QueueCompletionBehavior, QueueMode } from './settings-types';
 import { DEFAULT_SETTINGS, EQ_PRESETS } from './defaults';
 import { migrateSettings } from './migrations';
 
@@ -37,6 +37,11 @@ export interface SettingsActions {
   setGaplessPlayback: (enabled: boolean) => void;
   setDefaultLibraryView: (view: 'grid' | 'list') => void;
   setDefaultLibrarySort: (sort: string) => void;
+  setQueueCompletion: (behavior: QueueCompletionBehavior) => void;
+  setQueueMode: (mode: QueueMode) => void;
+  setQueueAutoSwitch: (enabled: boolean) => void;
+  setQueueRememberPosition: (enabled: boolean) => void;
+  setQueueWarnOnReplace: (enabled: boolean) => void;
 
   // Metadata
   resetToDefaults: () => void;
@@ -311,6 +316,61 @@ export const useSettingsStore = create<SettingsStore>()(
               library: {
                 ...state.preferences.library,
                 defaultSort: sort,
+              },
+            },
+          })),
+
+        setQueueCompletion: (behavior) =>
+          set((state) => ({
+            preferences: {
+              ...state.preferences,
+              playback: {
+                ...state.preferences.playback,
+                queueCompletion: behavior,
+              },
+            },
+          })),
+
+        setQueueMode: (mode) =>
+          set((state) => ({
+            preferences: {
+              ...state.preferences,
+              queue: {
+                ...state.preferences.queue,
+                mode: mode,
+              },
+            },
+          })),
+
+        setQueueAutoSwitch: (enabled) =>
+          set((state) => ({
+            preferences: {
+              ...state.preferences,
+              queue: {
+                ...state.preferences.queue,
+                autoSwitch: enabled,
+              },
+            },
+          })),
+
+        setQueueRememberPosition: (enabled) =>
+          set((state) => ({
+            preferences: {
+              ...state.preferences,
+              queue: {
+                ...state.preferences.queue,
+                rememberPosition: enabled,
+              },
+            },
+          })),
+
+        setQueueWarnOnReplace: (enabled) =>
+          set((state) => ({
+            preferences: {
+              ...state.preferences,
+              queue: {
+                ...state.preferences.queue,
+                warnOnQueueReplace: enabled,
               },
             },
           })),

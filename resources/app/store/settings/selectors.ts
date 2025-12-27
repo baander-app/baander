@@ -60,8 +60,11 @@ export const useVisualizerQuality = () => useSettingsStore((state) => state.ui.d
 export const useUserPreferences = () => useSettingsStore((state) => state.preferences);
 export const usePlaybackPreferences = () => useSettingsStore((state) => state.preferences.playback);
 export const useLibraryPreferences = () => useSettingsStore((state) => state.preferences.library);
+export const useQueuePreferences = () => useSettingsStore((state) => state.preferences.queue);
 export const useCrossfadeDuration = () => useSettingsStore((state) => state.preferences.playback.crossfadeDuration);
 export const useGaplessPlayback = () => useSettingsStore((state) => state.preferences.playback.gaplessPlayback);
+export const useQueueCompletionBehavior = () => useSettingsStore((state) => state.preferences.playback.queueCompletion);
+export const useQueueMode = () => useSettingsStore((state) => state.preferences.queue.mode);
 export const useDefaultLibraryView = () => useSettingsStore((state) => state.preferences.library.defaultView);
 export const useDefaultLibrarySort = () => useSettingsStore((state) => state.preferences.library.defaultSort);
 
@@ -104,11 +107,15 @@ export const useSettingsActions = (): SettingsActions =>
       setGaplessPlayback: state.setGaplessPlayback,
       setDefaultLibraryView: state.setDefaultLibraryView,
       setDefaultLibrarySort: state.setDefaultLibrarySort,
+      setQueueCompletion: state.setQueueCompletion,
+      setQueueMode: state.setQueueMode,
+      setQueueAutoSwitch: state.setQueueAutoSwitch,
+      setQueueRememberPosition: state.setQueueRememberPosition,
+      setQueueWarnOnReplace: state.setQueueWarnOnReplace,
 
       // Metadata
       resetToDefaults: state.resetToDefaults,
-    }),
-    shallow
+    })
   );
 
 // ============================================================================

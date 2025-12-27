@@ -64,11 +64,35 @@ export interface UserPreferences {
   playback: {
     crossfadeDuration: number; // seconds
     gaplessPlayback: boolean;
+    queueCompletion: QueueCompletionBehavior; // Queue completion behavior
+  };
+  queue: {
+    mode: QueueMode; // Simple or advanced queue mode
+    rememberPosition: boolean; // For audiobooks/podcasts
+    autoSwitch: boolean; // Auto-switch queues based on library type
+    warnOnQueueReplace: boolean; // Warn when replacing non-empty queue
   };
   library: {
     defaultSort: string;
     defaultView: 'grid' | 'list';
   };
+}
+
+/**
+ * Queue completion behavior
+ */
+export enum QueueCompletionBehavior {
+  STOP = 'stop', // Stop playback when queue ends
+  SHUFFLE = 'shuffle', // Shuffle and replay queue
+  PLAY_RANDOM = 'play-random', // Play random item from library
+}
+
+/**
+ * Queue management mode
+ */
+export enum QueueMode {
+  SIMPLE = 'simple', // Queues are isolated, no mixing
+  ADVANCED = 'advanced', // Allow mixing with warnings
 }
 
 // Complete Settings State

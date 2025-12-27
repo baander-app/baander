@@ -273,14 +273,15 @@ export const usePlayerAudioElement = () => useMusicPlayerStore(s => s.audioEl);
 export const usePlayerHasUserInteracted = () => useMusicPlayerStore(s => s.hasUserInteracted);
 
 // Queue selectors
-export const usePlayerQueue = () => useMusicPlayerStore(s => s.queue);
-export const usePlayerCurrentSongIndex = () => useMusicPlayerStore(s => s.currentSongIndex);
-export const usePlayerCurrentSongPublicId = () => useMusicPlayerStore(s => s.currentSongPublicId);
+export const usePlayerQueue = () => useMusicPlayerStore(s => s.queues[s.activeQueueType].items);
+export const usePlayerCurrentSongIndex = () => useMusicPlayerStore(s => s.queues[s.activeQueueType].currentIndex);
+export const usePlayerCurrentSongPublicId = () => useMusicPlayerStore(s => s.queues[s.activeQueueType].currentItemPublicId);
 
 export const usePlayerCurrentSong = () =>
   useMusicPlayerStore(s => {
-    if (s.queue.length === 0 || s.currentSongIndex < 0) return null;
-    return s.queue[s.currentSongIndex] || null;
+    const activeQueue = s.queues[s.activeQueueType];
+    if (activeQueue.items.length === 0 || activeQueue.currentIndex < 0) return null;
+    return activeQueue.items[activeQueue.currentIndex] || null;
   });
 
 // Playback mode selectors
@@ -289,7 +290,7 @@ export const usePlayerRepeatEnabled = () => useMusicPlayerStore(s => s.playbackM
 
 // Progress & source selectors
 export const usePlayerProgress = () => useMusicPlayerStore(s => s.progress);
-export const usePlayerSource = () => useMusicPlayerStore(s => s.source);
+export const usePlayerSource = () => useMusicPlayerStore(s => s.streamUrl);
 
 // Lyrics selector
 export const usePlayerLyricsOffset = () => useMusicPlayerStore(s => s.lyricsOffset);

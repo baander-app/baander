@@ -1,4 +1,4 @@
-import { AppSettings } from './settings-types';
+import { AppSettings, QueueCompletionBehavior, QueueMode } from './settings-types';
 import { DEFAULT_SETTINGS } from './defaults';
 
 /**
@@ -18,19 +18,24 @@ export const migrations: Record<number, Migration> = {
     version: 1,
   }),
 
-  // Example future migration (uncomment when needed):
-  // 2: (settings) => ({
-  //   ...settings,
-  //   version: 2,
-  //   audio: {
-  //     ...settings.audio,
-  //     effects: {
-  //       ...settings.audio?.effects,
-  //       // Add new feature with default value
-  //       newFeature: true,
-  //     },
-  //   },
-  // }),
+  // Version 2: Add queue management settings
+  2: (settings) => ({
+    ...settings,
+    version: 2,
+    preferences: {
+      ...settings.preferences,
+      playback: {
+        ...settings.preferences?.playback,
+        queueCompletion: QueueCompletionBehavior.STOP,
+      },
+      queue: {
+        mode: QueueMode.SIMPLE,
+        rememberPosition: true,
+        autoSwitch: true,
+        warnOnQueueReplace: true,
+      },
+    },
+  }),
 };
 
 /**
@@ -119,6 +124,10 @@ function deepMergeSettings(defaults: AppSettings, settings: Partial<AppSettings>
       playback: {
         ...defaults.preferences.playback,
         ...settings.preferences?.playback,
+      },
+      queue: {
+        ...defaults.preferences.queue,
+        ...settings.preferences?.queue,
       },
       library: {
         ...defaults.preferences.library,

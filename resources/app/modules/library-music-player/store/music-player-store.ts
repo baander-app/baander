@@ -148,12 +148,52 @@ export const useMusicPlayerStore = create<MusicPlayerState>()(
       }),
       {
         name: 'baander-music-player',
+        version: 2,
+        migrate: (persistedState: any, version: number) => {
+          // Migrate from version 1 (single queue) to version 2 (multi-queue)
+          if (version === 0 && persistedState.queue && !persistedState.queues) {
+            // Old single queue format - migrate to music queue
+            return {
+              ...persistedState,
+              activeQueueType: 'music',
+              queues: {
+                music: {
+                  items: persistedState.queue || [],
+                  currentIndex: persistedState.currentSongIndex ?? -1,
+                  currentItemPublicId: persistedState.currentSongPublicId ?? null,
+                  source: persistedState.source || 'none',
+                  lastUpdated: Date.now(),
+                },
+                audiobook: {
+                  items: [],
+                  currentIndex: -1,
+                  currentItemPublicId: null,
+                  source: 'none',
+                  lastUpdated: Date.now(),
+                },
+                podcast: {
+                  items: [],
+                  currentIndex: -1,
+                  currentItemPublicId: null,
+                  source: 'none',
+                  lastUpdated: Date.now(),
+                },
+              },
+              // Remove old fields
+              queue: undefined,
+              currentSongIndex: undefined,
+              currentSongPublicId: undefined,
+            };
+          }
+          return persistedState;
+        },
         partialize: (state) => ({
-          // Only persist these fields - exclude runtime-only data
-          queue: state.queue,
-          currentSongIndex: state.currentSongIndex,
-          currentSongPublicId: state.currentSongPublicId,
-          source: state.source,
+          // Persist multi-queue state
+          activeQueueType: state.activeQueueType,
+          queues: state.queues,
+          // Persist current song
+          song: state.song,
+          // Persist other settings
           playbackMode: state.playbackMode,
           lyricsOffset: state.lyricsOffset,
           volumePercent: state.volumePercent,
