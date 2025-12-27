@@ -35,6 +35,7 @@ export default defineConfig(({ mode }) => {
           resolve(process.cwd(), ''),
           resolve(process.cwd(), 'resources'),
           resolve(process.cwd(), 'node_modules'),
+          resolve(process.cwd(), 'electron/src'),
         ],
       },
     },
@@ -44,10 +45,20 @@ export default defineConfig(({ mode }) => {
       sourcemap: false,
       target: ['chrome128', 'esnext'],
       minify: 'esbuild',
+      assetsInlineLimit: 0, // Keep WASM as separate files
       rollupOptions: {
         input: {
           main: resolve(process.cwd(), 'electron/src/renderer/index.html'),
           config: resolve(process.cwd(), 'electron/src/renderer/config/index.html'),
+        },
+        output: {
+          // Keep WASM files in dsp/ directory structure
+          assetFileNames: (assetInfo) => {
+            if (assetInfo.name?.endsWith('.wasm')) {
+              return 'dsp/[name][extname]';
+            }
+            return 'assets/[name]-[hash][extname]';
+          },
         },
       },
     },
@@ -57,6 +68,7 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@/app': fileURLToPath(new URL('../../resources/app', import.meta.url)),
+        '@/dsp': fileURLToPath(new URL('../src/dsp', import.meta.url)),
       },
     },
     define: {

@@ -6,7 +6,8 @@
       "Bash(findstr:*)",
       "Bash(dir:*)",
       "Bash(Select-Object:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(yarn build:*)"
     ]
   }
 }
