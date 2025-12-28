@@ -2,7 +2,7 @@
 
 namespace App\Providers;
 
-use App\Modules\Humanize\HumanDuration;
+use App\Format\Duration;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecurityScheme;
@@ -17,18 +17,14 @@ class ScrambleServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        $humanDuration = new HumanDuration();
+        $humanDuration = new Duration();
 
-        $accessTokenLifeTime = $humanDuration->humanize(config('sanctum.access_token_expiration') * 60);
-        $refreshTokenLifeTime = $humanDuration->humanize(config('sanctum.refresh_token_expiration') * 60);
-        $streamTokenLifeTime = $humanDuration->humanize(config('sanctum.stream_token_expiration') * 60);
+        $accessTokenLifeTime = $humanDuration->humanize(config('oauth.access_token_ttl'));
+        $refreshTokenLifeTime = $humanDuration->humanize(config('oauth.refresh_token_ttl'));
 
         $desc = <<<DESC
 ### Access token
 Only tokens with the ability 'access-api' will have access to the endpoints. Access tokens have a lifetime of $accessTokenLifeTime.
-
-### Stream token
-Stream tokens can only be used for accessing media streams. Stream tokens have a lifetime of $streamTokenLifeTime.
 
 ### Refresh token
 The refresh token has the 'issue-access-token' ability. Refresh tokens have a lifetime of $refreshTokenLifeTime.
@@ -48,11 +44,18 @@ DESC;
 
         Scramble::routes(function (Route $route) {
             $whitelist = ['api/', 'webauthn'];
+            $blacklist = [];
 
-
-            if (array_any($whitelist, fn($str) => Str::contains($route->uri, $str))) {
-                return true;
+            // Exclude OAuth and Sanctum routes from documentation
+            if (array_any($blacklist, fn($str) => Str::contains($route->uri, $str))) {
+                return false;
             }
+
+            // Include only whitelisted routes
+            return array_any($whitelist, fn($str) => Str::contains($route->uri, $str));
         });
+
+        Scramble::ignoreDefaultRoutes();
+        Scramble::registerJsonSpecificationRoute('/docs/api.json');
     }
 }

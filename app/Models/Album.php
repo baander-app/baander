@@ -5,7 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\HasLibraryAccess;
 use App\Modules\Eloquent\BaseBuilder;
 use App\Modules\Nanoid\Concerns\HasNanoPublicId;
-use App\Modules\Translation\LocaleString;
+use App\Format\LocaleString;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Overtrue\LaravelVersionable\Versionable;
@@ -56,12 +56,14 @@ class Album extends BaseModel implements HasMedia
         'language',
         'disambiguation',
         'annotation',
+        'locked_fields',
     ];
 
     protected function casts(): array
     {
         return [
             'type' => AlbumType::class,
+            'locked_fields' => 'array',
         ];
     }
 
@@ -84,6 +86,12 @@ class Album extends BaseModel implements HasMedia
     ];
 
     protected $perPage = 60;
+
+    /**
+     * Default relationships to eager load.
+     * Cover is almost always needed when displaying albums.
+     */
+    protected $with = ['cover'];
 
 
     public function registerMediaConversions(?Media $media = null): void
@@ -141,8 +149,27 @@ class Album extends BaseModel implements HasMedia
 
     public function artists()
     {
-        return $this->belongsToMany(Artist::class)
-            ->using(AlbumArtist::class);
+        $instance = $this->newRelatedInstance(Artist::class);
+
+        $query = $instance->newQuery();
+
+        $relation = new \App\Modules\Eloquent\Relations\BelongsToManyThrough(
+            $query,
+            $this,
+            'songs',
+            'artist_song',
+            'artist_id',
+            'song_id',
+            'id',
+            $instance->getKeyName(),
+            'artists',
+        );
+
+        return $relation
+            ->setThroughKeys('album_id', 'id')
+            ->using(ArtistSong::class)
+            ->withPivot('role', 'song_id')
+            ->distinct('artist_id', 'artist_song.role');
     }
 
     public function cover(): MorphOne

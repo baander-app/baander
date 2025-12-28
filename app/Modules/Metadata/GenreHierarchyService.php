@@ -2,10 +2,11 @@
 
 namespace App\Modules\Metadata;
 
+use App\Format\TextSimilarity;
 use App\Http\Integrations\Discogs\DiscogsClient;
 use App\Http\Integrations\Discogs\Filters\ReleaseFilter;
 use App\Http\Integrations\LastFm\LastFmClient;
-use App\Http\Integrations\MusicBrainz\MusicBrainzClient;
+use App\Models\Genre;
 use App\Models\User;
 use App\Modules\Logging\Attributes\LogChannel;
 use App\Modules\Logging\Channel;
@@ -19,14 +20,16 @@ class GenreHierarchyService
     )]
     private LoggerInterface $logger;
 
-    private readonly LastFmClient $lastFmClient;
+    private LastFmClient $lastFmClient;
 
     public function __construct(
-        private readonly MusicBrainzClient $musicBrainzClient,
-        private readonly DiscogsClient     $discogsClient,
+        private readonly DiscogsClient $discogsClient,
+        LastFmClient $lastFmClient,
+        private readonly TextSimilarity $textSimilarity,
     )
     {
-        $this->lastFmClient = app(LastFmClient::class)->forUser(User::first());
+        $user = User::first();
+        $this->lastFmClient = $user ? $lastFmClient->forUser($user) : $lastFmClient;
     }
 
     /**
@@ -38,7 +41,7 @@ class GenreHierarchyService
         $batches = array_chunk($genres, $batchSize);
 
         foreach ($batches as $batchIndex => $batch) {
-            $this->logger->info("Processing batch {$batchIndex}", ['genres' => $batch]);
+            $this->logger->info("Processing batch $batchIndex", ['genres' => $batch]);
 
             foreach ($batch as $genre) {
                 $genre = trim($genre);
@@ -47,36 +50,73 @@ class GenreHierarchyService
                 try {
                     $tagInfo = $this->lastFmClient->tags->getTagInfo($genre);
                 } catch (Exception $e) {
-                    $this->logger->warning("LastFM failed for {$genre}", ['error' => $e->getMessage()]);
+                    $this->logger->warning("LastFM failed for $genre", ['error' => $e->getMessage()]);
                     $tagInfo = [];
                 }
 
                 // Get Discogs data using search-only approach
                 $discogsData = $this->getDiscogsGenreData($genre);
 
-                $this->logger->info("Processed genre: {$genre}", [
+                // Get MusicBrainz data
+                $musicBrainzData = $this->getMusicBrainzGenreData($genre);
+
+                $this->logger->info("Processed genre: $genre", [
                     'lastfm_popularity'    => $tagInfo['reach'] ?? 0,
                     'discogs_styles_count' => count($discogsData['related_styles']),
                     'discogs_genres_count' => count($discogsData['related_genres']),
                     'discogs_releases'     => $discogsData['release_count'],
+                    'musicbrainz_found'    => $musicBrainzData['found'],
+                    'musicbrainz_mbid'     => $musicBrainzData['mbid'],
                 ]);
 
                 $hierarchy[$genre] = [
-                    'lastfm'  => [
+                    'lastfm'      => [
                         'info'        => $tagInfo,
                         'similar'     => [],
                         'popularity'  => $tagInfo['reach'] ?? 0,
                         'description' => $tagInfo['wiki']['summary'] ?? null,
                     ],
-                    'discogs' => $discogsData,
+                    'discogs'     => $discogsData,
+                    'musicbrainz' => $musicBrainzData,
                 ];
             }
-
-            // Small delay between batches to avoid rate limiting
-            usleep(1000000); // 1 second
         }
 
         return $this->organizeHierarchyWithAlternatives($hierarchy, $genres);
+    }
+
+    /**
+     * Get MusicBrainz genre data from database
+     */
+    private function getMusicBrainzGenreData(string $genre): array
+    {
+        try {
+            $genreRecord = Genre::where('name', $genre)->first();
+
+            if (!$genreRecord) {
+                return [
+                    'mbid'           => null,
+                    'canonical_name' => null,
+                    'found'          => false,
+                ];
+            }
+
+            return [
+                'mbid'           => $genreRecord->mbid,
+                'canonical_name' => $genreRecord->name,
+                'found'          => !empty($genreRecord->mbid),
+            ];
+        } catch (\Exception $e) {
+            $this->logger->warning("MusicBrainz genre lookup failed for {$genre}", [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'mbid'           => null,
+                'canonical_name' => null,
+                'found'          => false,
+            ];
+        }
     }
 
     /**
@@ -87,6 +127,17 @@ class GenreHierarchyService
         try {
             $filter = new ReleaseFilter(genre: $genre, per_page: 50);
             $searchResults = $this->discogsClient->search->releaseRaw($filter);
+
+            // Handle rate limiting or API failures
+            if ($searchResults === null) {
+                $this->logger->warning("Discogs search returned null (rate limited or failed) for {$genre}");
+                return [
+                    'related_styles' => [],
+                    'related_genres' => [],
+                    'release_count'  => 0,
+                    'method'         => 'failed',
+                ];
+            }
 
             $allStyles = [];
             $allGenres = [];
@@ -315,7 +366,7 @@ class GenreHierarchyService
 
         // Reverse matches (child -> parent)
         foreach ($manualRules as $parent => $children) {
-            if (in_array($lowerGenre, array_map('strtolower', $children), true)) {
+            if (in_array($lowerGenre, array_map('mb_strtolower', $children), true)) {
                 $relationships[] = [
                     'name'  => $parent,
                     'match' => 0.9,
@@ -405,37 +456,14 @@ class GenreHierarchyService
     }
 
     /**
-     * Calculate string-based similarity
+     * Calculate string-based similarity using TextSimilarity
      */
     private function calculateStringSimilarity(string $genre1, string $genre2): float
     {
-        $genre1Lower = mb_strtolower($genre1);
-        $genre2Lower = mb_strtolower($genre2);
-
-        // Check for substring relationships
-        if (str_contains($genre1Lower, $genre2Lower) || str_contains($genre2Lower, $genre1Lower)) {
-            return 0.6;
-        }
-
-        // Check for common words
-        $words1 = explode(' ', $genre1Lower);
-        $words2 = explode(' ', $genre2Lower);
-        $commonWords = array_intersect($words1, $words2);
-
-        if (!empty($commonWords)) {
-            return count($commonWords) / max(count($words1), count($words2)) * 0.5;
-        }
-
-        // Levenshtein distance for very similar spellings
-        $maxLen = max(mb_strlen($genre1Lower), mb_strlen($genre2Lower));
-        if ($maxLen <= 20) { // Only for short genre names
-            $distance = levenshtein($genre1Lower, $genre2Lower);
-            if ($distance <= 3) {
-                return max(0.0, 1.0 - ($distance / $maxLen));
-            }
-        }
-
-        return 0.0;
+        // Use TextSimilarity for more accurate comparison
+        // Returns score 0-100, normalize to 0-1 for consistency
+        $similarity = $this->textSimilarity->calculateSimilarity($genre1, $genre2);
+        return $similarity / 100.0;
     }
 
     /**
@@ -456,18 +484,22 @@ class GenreHierarchyService
                 $tagInfo = [];
             }
 
+            // Get MusicBrainz data from database
+            $musicBrainzData = $this->getMusicBrainzGenreData($genre);
+
             $hierarchy[$genre] = [
-                'lastfm'  => [
+                'lastfm'      => [
                     'info'        => $tagInfo,
                     'similar'     => [],
                     'popularity'  => $tagInfo['reach'] ?? 0,
                     'description' => $tagInfo['wiki']['summary'] ?? null,
                 ],
-                'discogs' => [
+                'discogs'     => [
                     'related_styles' => [],
                     'related_genres' => [],
                     'release_count'  => 0,
                 ],
+                'musicbrainz' => $musicBrainzData,
             ];
         }
 

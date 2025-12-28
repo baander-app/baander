@@ -1,17 +1,16 @@
-import { Cover } from '@/modules/library-music/components/artwork/cover';
+import { Cover } from '@/app/modules/library-music/components/artwork/cover';
 import { Box, Card, Flex, ScrollArea, Skeleton, Text } from '@radix-ui/themes';
-import { AlertLoadingError } from '@/ui/alerts/alert-loading-error.tsx';
-import { useAppDispatch } from '@/store/hooks.ts';
-import { setQueueAndSong } from '@/store/music/music-player-slice.ts';
-import { TrackRow } from '@/ui/music/track-row/track-row.tsx';
+import { AlertLoadingError } from '@/app/ui/alerts/alert-loading-error.tsx';
+import { usePlayerActions } from '@/app/modules/library-music-player/store';
+import { TrackRow } from '@/app/ui/music/track-row/track-row.tsx';
 
 import styles from './album-detail.module.scss';
-import { usePathParam } from '@/hooks/use-path-param.ts';
-import { LibraryParams } from '@/modules/library-music/routes/_routes.tsx';
-import { generateBlurhashBackgroundImage } from '@/libs/blurhash/generate-bg-image.ts';
+import { usePathParam } from '@/app/hooks/use-path-param.ts';
+import { LibraryParams } from '@/app/modules/library-music/routes/_routes.tsx';
+import { generateBlurhashBackgroundImage } from '@/app/libs/blurhash/generate-bg-image.ts';
 import { useCallback } from 'react';
-import { useAlbumShow } from '@/libs/api-client/gen/endpoints/album/album.ts';
-import { SongResource } from '@/libs/api-client/gen/models';
+import { useAlbumsShow } from '@/app/libs/api-client/gen/endpoints/album/album.ts';
+import { SongResource } from '@/app/libs/api-client/gen/models';
 
 interface AlbumDetailProps extends React.HTMLAttributes<HTMLDivElement> {
   albumSlug: string;
@@ -19,7 +18,7 @@ interface AlbumDetailProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export function AlbumDetail({ albumSlug, ...rest }: AlbumDetailProps) {
   const { library } = usePathParam<LibraryParams>();
-  const { data, isLoadingError, refetch } = useAlbumShow(library, albumSlug);
+  const { data, isLoadingError, refetch } = useAlbumsShow(library, albumSlug);
 
   const genres = data?.genres?.map((genre) => genre.name).join(', ');
   const blurhash = data?.cover && generateBlurhashBackgroundImage(data.cover.blurhash, 128, 128);
@@ -79,7 +78,7 @@ interface AlbumSongProps {
 }
 
 function AlbumSongs({ songs }: AlbumSongProps) {
-  const dispatch = useAppDispatch();
+  const { setQueueAndPlay } = usePlayerActions();
 
   const onSongClick = useCallback((song: SongResource, songs: SongResource[]) => {
     console.group('onSongClick');
@@ -91,11 +90,8 @@ function AlbumSongs({ songs }: AlbumSongProps) {
     const index = newQueue.findIndex(x => x.publicId === song.publicId);
     newQueue.splice(0, 0, newQueue.splice(index, 1)[0]);
 
-    dispatch(setQueueAndSong({
-      queue: newQueue,
-      playPublicId: song.publicId,
-    }));
-  }, [dispatch]);
+    setQueueAndPlay(newQueue, song.publicId);
+  }, [setQueueAndPlay]);
 
 
   const rows = songs.map((song) => (

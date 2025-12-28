@@ -1,13 +1,13 @@
-import { ScrollList, ScrollListItem } from '@/modules/library-music/components/scroll-list';
+import { ScrollList, ScrollListItem } from '@/app/modules/library-music/components/scroll-list';
 import { Flex } from '@radix-ui/themes';
 import { useEffect, useState } from 'react';
-import { SongList } from '@/modules/library-music/components/song-list/song-list.tsx';
-import { usePathParam } from '@/hooks/use-path-param.ts';
-import { LibraryParams } from '@/modules/library-music/routes/_routes.tsx';
-import { useGenresIndex } from '@/libs/api-client/gen/endpoints/genre/genre.ts';
-import { GenreResource } from '@/libs/api-client/gen/models';
-import { useAlbumsIndex } from '@/libs/api-client/gen/endpoints/album/album.ts';
-import { useArtistsIndex } from '@/libs/api-client/gen/endpoints/artist/artist.ts';
+import { SongList } from '@/app/modules/library-music/components/song-list/song-list.tsx';
+import { usePathParam } from '@/app/hooks/use-path-param.ts';
+import { LibraryParams } from '@/app/modules/library-music/routes/_routes.tsx';
+import { useGenresIndex } from '@/app/libs/api-client/gen/endpoints/genre/genre.ts';
+import { GenreResource } from '@/app/libs/api-client/gen/models';
+import { useAlbumsIndex } from '@/app/libs/api-client/gen/endpoints/album/album.ts';
+import { useArtistsIndex } from '@/app/libs/api-client/gen/endpoints/artist/artist.ts';
 
 export default function Songs() {
   const { library } = usePathParam<LibraryParams>();

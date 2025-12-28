@@ -16,8 +16,15 @@ Come back to this document once you've properly setup your environment.
 
 ## Starting the environment
 
-First run `make build` this will build the application container defined in [Dockerfile](/Dockerfile). Then you'll
-want to run `make start` this will start all docker services.
+First run `make build` this will build the application container defined in [Dockerfile](/Dockerfile).
+
+Create the docker network
+
+```
+$ docker network create baander-backtier
+```
+
+Then you'll want to run `make start` this will start all docker services.
 
 Once you've seen all services start up without error, you can ssh into the application container to install the composer dependencies:
 

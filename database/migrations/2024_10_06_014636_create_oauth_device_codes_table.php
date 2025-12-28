@@ -9,11 +9,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('oauth_device_codes', function (Blueprint $table) {
-            $table->uuid('id')->primary();
+            $table->id()->primary();
             $table->text('device_code')->unique()->index();
             $table->text('user_code', 20)->unique()->index();
-            $table->uuid('user_id')->nullable()->index();
-            $table->uuid('client_id');
+            $table->bigInteger('user_id')->nullable()->index();
+            $table->bigInteger('client_id');
             $table->jsonb('scopes')->nullable();
             $table->text('verification_uri');
             $table->text('verification_uri_complete')->nullable();

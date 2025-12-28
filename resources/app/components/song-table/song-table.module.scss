@@ -31,6 +31,7 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    pointer-events: auto;
   }
 
   tbody tr:hover {
@@ -132,5 +133,18 @@
   .scrollbar {
     scrollbar-color: var(--sb-thumb-color)
     var(--sb-track-color);
+  }
+}
+
+.dragHandle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gray-9);
+  cursor: grab;
+  pointer-events: auto;
+
+  &:active {
+    cursor: grabbing;
   }
 }

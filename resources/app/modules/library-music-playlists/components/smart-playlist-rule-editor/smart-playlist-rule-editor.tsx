@@ -3,8 +3,8 @@ import { useFieldArray, useWatch, Control, Controller, FieldErrors } from 'react
 import { PlusIcon, TrashIcon } from '@radix-ui/react-icons';
 import styles from './smart-playlist-rule-editor.module.scss';
 import { useState, useEffect } from 'react';
-import { useGenresIndex } from '@/libs/api-client/gen/endpoints/genre/genre.ts';
-import { useArtistsIndex } from '@/libs/api-client/gen/endpoints/artist/artist.ts';
+import { useGenresIndex } from '@/app/libs/api-client/gen/endpoints/genre/genre.ts';
+import { useArtistsIndex } from '@/app/libs/api-client/gen/endpoints/artist/artist.ts';
 
 const RULE_FIELDS = [
   { value: 'genre', label: 'Genre' },

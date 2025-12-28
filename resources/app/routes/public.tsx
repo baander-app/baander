@@ -1,8 +1,8 @@
-import { BareLayout } from '@/layouts/bare-layout/bare-layout.tsx';
+import { BareLayout } from '@/app/layouts/bare-layout/bare-layout.tsx';
 import { Navigate, Outlet } from 'react-router-dom';
-import { AuthorizeRoutes } from '@/modules/authorize/routes.tsx';
-import Login from '@/modules/auth/routes/login.tsx';
-import { AuthRoutes } from '@/modules/auth/routes/_routes.tsx';
+import { AuthorizeRoutes } from '@/app/modules/authorize/routes.tsx';
+import Login from '@/app/modules/auth/routes/login.tsx';
+import { AuthRoutes } from '@/app/modules/auth/routes/_routes.tsx';
 
 const App = () => {
   return (

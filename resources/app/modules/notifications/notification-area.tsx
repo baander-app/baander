@@ -1,9 +1,9 @@
 import { Button, Flex, Popover, ScrollArea, Text } from '@radix-ui/themes';
-import { useAppDispatch, useAppSelector } from '@/store/hooks.ts';
-import { NotificationCard } from '@/modules/notifications/components/notification-card/notification-card.tsx';
-import { Notification } from '@/modules/notifications/models';
-import { Iconify } from '@/ui/icons/iconify.tsx';
-import { clearNotifications } from '@/store/notifications/notifications-slice.ts';
+import { useAppDispatch, useAppSelector } from '@/app/store/hooks.ts';
+import { NotificationCard } from '@/app/modules/notifications/components/notification-card/notification-card.tsx';
+import { Notification } from '@/app/modules/notifications/models';
+import { Iconify } from '@/app/ui/icons/iconify.tsx';
+import { clearNotifications } from '@/app/store/notifications/notifications-slice.ts';
 
 export function NotificationArea() {
   const { notifications } = useAppSelector(state => state.notifications);

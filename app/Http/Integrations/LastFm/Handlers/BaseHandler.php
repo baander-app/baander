@@ -2,6 +2,7 @@
 
 namespace App\Http\Integrations\LastFm\Handlers;
 
+use App\Exceptions\Integration\AuthException;
 use App\Modules\Auth\LastFmCredentialService;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
@@ -75,6 +76,10 @@ abstract class BaseHandler
      */
     protected function makeRequest(array $params): array
     {
+//        if (!$this->hasValidCredentials()) {
+//            AuthException::throwMissingCredentials();
+//        }
+
         try {
             $response = $this->client->get($this->baseUrl, [
                 'query' => $this->buildQueryParams($params),
@@ -107,6 +112,10 @@ abstract class BaseHandler
      */
     protected function makeRequestAsync(array $params): PromiseInterface
     {
+        if (!$this->hasValidCredentials()) {
+            AuthException::throwMissingCredentials();
+        }
+
         return $this->client->getAsync($this->baseUrl, [
             'query' => $this->buildQueryParams($params),
         ])->then(

@@ -9,10 +9,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('oauth_auth_codes', function (Blueprint $table) {
-            $table->uuid('id')->primary();
+            $table->id()->primary();
             $table->text('code_id')->unique()->index();
-            $table->uuid('user_id');
-            $table->uuid('client_id');
+            $table->bigInteger('user_id');
+            $table->bigInteger('client_id');
             $table->jsonb('scopes')->nullable();
             $table->boolean('revoked')->default(false);
             $table->timestampTz('expires_at');

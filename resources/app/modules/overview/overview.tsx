@@ -1,8 +1,8 @@
 import { Flex, Heading, Section } from '@radix-ui/themes';
-import { Carousel } from '@/ui/carousel/carousel.tsx';
+import { Carousel } from '@/app/ui/carousel/carousel.tsx';
 import { ReactNode, useEffect, useState } from 'react';
-import { Album } from '@/modules/library-music/components/album';
-import { useAlbumsIndex } from '@/libs/api-client/gen/endpoints/album/album.ts';
+import { Album } from '@/app/modules/library-music/components/album';
+import { useAlbumsIndex } from '@/app/libs/api-client/gen/endpoints/album/album.ts';
 
 export interface OverviewProps {
   title: string;

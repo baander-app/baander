@@ -95,7 +95,9 @@ export function createConfigWindow() {
     show: true,
     title: 'Bånder — Configure Server',
     webPreferences: {
-      preload: join(__dirname, 'preload.cjs'),
+      preload: app.isPackaged
+        ? join(__dirname, 'preload.cjs')  // Production: same directory (flattened)
+        : join(__dirname, '../preload/preload.cjs'),  // Dev: go up to dist-electron, then preload
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -123,7 +125,7 @@ export function createConfigWindow() {
     // Determine path based on whether app is packed
     const configPath = app.isPackaged
                        ? 'config/index.html'  // In packaged app.asar
-                       : join(__dirname, '../../dist/config/index.html');  // In development build
+                       : join(__dirname, '../renderer/config/index.html');  // In development build
 
     configWindow.loadFile(configPath).catch(err => {
       mainLog.error('[fatal] Failed to load built config HTML', err);

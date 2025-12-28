@@ -13,14 +13,14 @@ interface LineJumpNavigationProps {
 }
 
 export const LineJumpNavigation: React.FC<LineJumpNavigationProps> = ({
-                                                                        totalLines,
-                                                                        currentLine,
-                                                                        onJumpToLine,
-                                                                        onLoadMore,
-                                                                        isLoading = false,
-                                                                        hasMoreBefore = false,
-                                                                        hasMoreAfter = false
-                                                                      }) => {
+  totalLines,
+  currentLine,
+  onJumpToLine,
+  onLoadMore,
+  isLoading = false,
+  hasMoreBefore = false,
+  hasMoreAfter = false,
+}) => {
   const [jumpValue, setJumpValue] = useState('');
 
   const handleJump = () => {
@@ -38,14 +38,17 @@ export const LineJumpNavigation: React.FC<LineJumpNavigationProps> = ({
   };
 
   return (
-    <Box style={{
-      padding: '8px 12px',
-      borderTop: '1px solid #374151',
-      backgroundColor: '#1e293b'
-    }}>
+    <Box
+      style={{
+        padding: '12px 16px',
+        borderTop: '1px solid #27272a',
+        backgroundColor: '#09090b',
+        borderRadius: '0 0 8px 8px',
+      }}
+    >
       <Flex justify="between" align="center" gap="4">
-        <Text style={{ color: '#6b7280', fontSize: '12px' }}>
-          Line {currentLine.toLocaleString()} of {totalLines.toLocaleString()}
+        <Text style={{ color: '#a1a1aa', fontSize: '13px', fontWeight: '500' }}>
+          {currentLine.toLocaleString()} / {totalLines.toLocaleString()} lines
         </Text>
 
         <Flex gap="2" align="center">
@@ -54,20 +57,28 @@ export const LineJumpNavigation: React.FC<LineJumpNavigationProps> = ({
             <>
               <Button
                 size="1"
-                variant="soft"
+                variant="outline"
                 onClick={() => onLoadMore('before')}
                 disabled={isLoading || !hasMoreBefore}
+                style={{
+                  borderColor: '#3f3f46',
+                  color: hasMoreBefore ? '#fafafa' : '#71717a',
+                }}
               >
                 <ChevronUpIcon width="12" height="12" />
-                Load Earlier
+                Earlier
               </Button>
               <Button
                 size="1"
-                variant="soft"
+                variant="outline"
                 onClick={() => onLoadMore('after')}
                 disabled={isLoading || !hasMoreAfter}
+                style={{
+                  borderColor: '#3f3f46',
+                  color: hasMoreAfter ? '#fafafa' : '#71717a',
+                }}
               >
-                Load Later
+                Later
                 <ChevronDownIcon width="12" height="12" />
               </Button>
             </>
@@ -75,36 +86,39 @@ export const LineJumpNavigation: React.FC<LineJumpNavigationProps> = ({
 
           {/* Jump to line controls */}
           <TextField.Root
-            placeholder="Jump to line..."
+            placeholder="Line..."
             value={jumpValue}
             onChange={(e) => setJumpValue(e.target.value)}
             onKeyPress={handleKeyPress}
-            style={{ width: '120px' }}
+            style={{ width: '80px' }}
             size="1"
           />
           <Button
             size="1"
-            variant="soft"
+            variant="outline"
             onClick={handleJump}
             disabled={isLoading || !jumpValue}
+            style={{ borderColor: '#3f3f46' }}
           >
-            Jump
+            Go
           </Button>
 
           {/* Quick navigation */}
           <Button
             size="1"
-            variant="soft"
+            variant="outline"
             onClick={() => onJumpToLine(1)}
             disabled={isLoading}
+            style={{ borderColor: '#3f3f46' }}
           >
             First
           </Button>
           <Button
             size="1"
-            variant="soft"
+            variant="outline"
             onClick={() => onJumpToLine(totalLines)}
             disabled={isLoading}
+            style={{ borderColor: '#3f3f46' }}
           >
             Last
           </Button>

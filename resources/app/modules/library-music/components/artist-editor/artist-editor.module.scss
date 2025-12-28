@@ -1,0 +1,20 @@
+.form {
+  width: 100%;
+  max-width: 700px;
+  padding: 12px;
+}
+
+// Form field locked state
+.form-field {
+  &.locked {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+}
+
+// Lock button styling
+.lock-button {
+  cursor: pointer;
+  padding: 4px;
+  min-width: 24px;
+}

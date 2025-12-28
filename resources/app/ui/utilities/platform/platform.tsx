@@ -1,5 +1,5 @@
 import { ReactNode, useMemo } from 'react';
-import { getPlatform, Platform as PlatformType } from '@/utils/platform.ts';
+import { getPlatform, Platform as PlatformType } from '@/app/utils/platform.ts';
 
 export interface PlatformProps {
   platform: PlatformType;

@@ -1,16 +1,17 @@
 import {
   EqButton,
   LyricsButton,
-} from '@/modules/library-music-player/components/player-buttons/player-buttons.tsx';
+} from '@/app/modules/library-music-player/components/player-buttons/player-buttons.tsx';
 import styles from './player-meta-controls.module.scss';
-import { VolumeSlider } from '@/modules/library-music-player/components/volume-slider/volume-slider.tsx';
-import { useLyrics } from '@/ui/lyrics-viewer/providers/lyrics-provider.tsx';
-import { LyricsViewer } from '@/ui/lyrics-viewer/lyrics-viewer.tsx';
+import { VolumeSlider } from '@/app/modules/library-music-player/components/volume-slider/volume-slider.tsx';
+import { useLyrics } from '@/app/ui/lyrics-viewer/providers/lyrics-provider.tsx';
+import { LyricsViewer } from '@/app/ui/lyrics-viewer/lyrics-viewer.tsx';
 import { useEffect } from 'react';
-import { useDisclosure } from '@/hooks/use-disclosure';
+import { useDisclosure } from '@/app/hooks/use-disclosure';
 import { Box } from '@radix-ui/themes';
-import { Equalizer } from '@/modules/dsp/equalizer/equalizer.tsx';
-import { SongResource } from '@/libs/api-client/gen/models';
+import { Equalizer } from '@/app/modules/dsp/equalizer/equalizer.tsx';
+import { ErrorBoundary } from '@/app/components/error-boundary';
+import { SongResource } from '@/app/libs/api-client/gen/models';
 
 export interface PlayerMetaControlsProps {
   song?: SongResource;
@@ -50,13 +51,17 @@ export function PlayerMetaControls({ song }: PlayerMetaControlsProps) {
 
       {showLyrics && (
         <Box style={{ position: 'absolute', right: 20, bottom: 90 }}>
-          <LyricsViewer key="lyrics" />
+          <ErrorBoundary name="Lyrics Viewer">
+            <LyricsViewer key="lyrics" />
+          </ErrorBoundary>
         </Box>
       )}
 
       {showEq && (
         <Box style={{ position: 'absolute', right: 20, bottom: 120, zIndex: 100 }}>
-          <Equalizer />
+          <ErrorBoundary name="Equalizer">
+            <Equalizer />
+          </ErrorBoundary>
         </Box>
       )}
 

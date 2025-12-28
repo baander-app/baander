@@ -1,19 +1,33 @@
 import { AudioProcessor } from './audio-processor.ts';
+import { createLogger } from '@/app/services/logger';
+import { initializeAudioProcessorSettings } from '@/app/store/settings';
+
+const logger = createLogger('GlobalAudioProcessor');
 
 class GlobalAudioProcessorService {
   private processor: AudioProcessor | null = null;
   private pendingAudioElement: HTMLAudioElement | null = null;
   private isInitialized = false;
-  private connectionAttempted = false;
 
   public initialize() {
+    logger.debug('initialize called, isInitialized:', this.isInitialized);
     if (!this.isInitialized) {
-      this.processor = new AudioProcessor();
-      this.isInitialized = true;
+      try {
+        logger.debug('creating new AudioProcessor...');
+        this.processor = new AudioProcessor();
+        this.isInitialized = true;
+        logger.debug('AudioProcessor created successfully');
 
-      if (this.pendingAudioElement) {
-        this.connectAudioElement(this.pendingAudioElement);
-        this.pendingAudioElement = null;
+        // Apply saved settings immediately after processor creation
+        initializeAudioProcessorSettings();
+
+        if (this.pendingAudioElement) {
+          this.connectAudioElement(this.pendingAudioElement);
+          this.pendingAudioElement = null;
+        }
+      } catch (error) {
+        logger.error('Failed to create AudioProcessor:', error);
+        throw error;
       }
     }
   }
@@ -25,23 +39,21 @@ class GlobalAudioProcessorService {
       return;
     }
 
-    if (this.connectionAttempted) {
-      console.log('Audio processor already connected or connection attempted');
+    // Check if element has a source - if not, don't connect yet
+    if (!audioElement.src) {
+      logger.debug('Element has no source, skipping connection');
       return;
     }
 
-    this.connectionAttempted = true;
-
     try {
       await this.processor.connectAudioElement(audioElement);
-      console.log('Global audio processor connected to audio element');
+      logger.info('Global audio processor connected to audio element');
     } catch (error) {
       if (error instanceof DOMException && error.name === 'InvalidStateError') {
-        console.log('Audio element already connected to another context - using passive monitoring');
+        logger.info('Audio element already connected to another context - using passive monitoring');
         await this.processor.initializePassiveMode();
       } else {
-        console.error('Failed to connect audio processor:', error);
-        this.connectionAttempted = false;
+        logger.error('Failed to connect audio processor:', error);
       }
     }
   }
@@ -59,6 +71,7 @@ class GlobalAudioProcessorService {
   }
 
   public getProcessor(): AudioProcessor | null {
+    logger.debug('getProcessor called, returning:', !!this.processor);
     return this.processor;
   }
 
@@ -68,13 +81,11 @@ class GlobalAudioProcessorService {
       this.processor = null;
     }
     this.isInitialized = false;
-    this.connectionAttempted = false;
     this.pendingAudioElement = null;
   }
 
-
   public reset() {
-    this.connectionAttempted = false;
+    // Reset is no longer needed since we allow reconnection
   }
 }
 

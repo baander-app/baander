@@ -2,33 +2,53 @@
 
 namespace App\Http\Controllers\Api\Auth\Concerns;
 
-use App\Http\Resources\Auth\NewAccessTokenResource;
-use App\Models\{PersonalAccessToken, TokenAbility, User};
-use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
+use App\Modules\Auth\OAuth\Services\OAuthTokenService;
+use App\Modules\Auth\TokenBindingService;
+use App\Models\User;
+use Illuminate\Http\{JsonResponse, Request};
 
 trait HandlesUserTokens
 {
-    private function createTokenSet(Request $request, User $user)
+    /**
+     * Create a token set for a user after successful authentication.
+     *
+     * Generates OAuth access and refresh tokens with security bindings
+     * for device fingerprinting, IP tracking, and location data.
+     *
+     * @param Request $request The authentication request
+     * @param User $user The authenticated user
+     * @response array{
+     *   tokenType: string,
+     *   expires_in: int,
+     *   access_token: string,
+     *   refresh_token: string
+     * }
+     */
+    protected function createTokenSet(Request $request, User $user): JsonResponse
     {
-        $device = PersonalAccessToken::prepareDeviceFromRequest($request);
+        /** @var OAuthTokenService $oauthTokenService */
+        $oauthTokenService = app(OAuthTokenService::class);
 
-        $accessToken = $user->createToken(
-            name: 'access_token',
-            abilities: [TokenAbility::ACCESS_API->value, TokenAbility::ACCESS_BROADCASTING->value],
-            expiresAt: Carbon::now()->addMinutes(config('sanctum.access_token_expiration')),
-            device: $device,
-        );
-        $refreshToken = $user->createToken(
-            name: 'refresh_token',
-            abilities: [TokenAbility::ISSUE_ACCESS_TOKEN->value],
-            expiresAt: Carbon::now()->addMinutes(config('sanctum.refresh_token_expiration')),
-            device: $device,
+        /** @var TokenBindingService $tokenBindingService */
+        $tokenBindingService = app(TokenBindingService::class);
+
+        // Generate session and fingerprint for security bindings
+        $sessionId = $tokenBindingService->generateSessionId();
+        $fingerprint = $tokenBindingService->generateClientFingerprint($request);
+
+        // Create OAuth tokens with metadata
+        $tokens = $oauthTokenService->createTokenSet(
+            $request,
+            $user,
+            ['access-api', 'access-broadcasting'],
+            $sessionId,
+            $fingerprint,
         );
 
         return response()->json([
-            'accessToken'  => new NewAccessTokenResource($accessToken),
-            'refreshToken' => new NewAccessTokenResource($refreshToken),
-        ]);
+            'accessToken' => $tokens['access_token'],
+            'refreshToken' => $tokens['refresh_token'],
+            'sessionId' => $sessionId,
+        ], 201);
     }
 }

@@ -1,10 +1,10 @@
 import { Box, Button, Container, Flex, Heading, Text } from '@radix-ui/themes';
-import { useAppDispatch } from '@/store/hooks.ts';
+import { useAppDispatch } from '@/app/store/hooks.ts';
 import { useCallback } from 'react';
-import { useTestMode } from '@/providers/test-mode-provider.tsx';
-import { CreateNotification } from '@/modules/notifications/models.ts';
-import { createNotification } from '@/store/notifications/notifications-slice.ts';
-import { Token } from '@/services/auth/token.ts';
+import { useTestMode } from '@/app/providers/test-mode-provider.tsx';
+import { CreateNotification } from '@/app/modules/notifications/models.ts';
+import { createNotification } from '@/app/store/notifications/notifications-slice.ts';
+import { Token } from '@/app/services/auth/token.ts';
 
 export function DevPanel() {
   const dispatch = useAppDispatch();
@@ -12,15 +12,15 @@ export function DevPanel() {
 
   const copyAccessToken = useCallback(() => {
     const token = Token.get();
-    if (token) {
-      navigator.clipboard.writeText(token.accessToken.token);
+    if (token?.access_token) {
+      navigator.clipboard.writeText(token.access_token);
     }
   }, []);
 
   const copyRefreshToken = useCallback(() => {
     const token = Token.get();
-    if (token) {
-      navigator.clipboard.writeText(token.refreshToken.token);
+    if (token?.refresh_token) {
+      navigator.clipboard.writeText(token.refresh_token);
     }
   }, []);
 

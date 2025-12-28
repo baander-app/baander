@@ -1,19 +1,97 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import styles from './albums.module.scss';
-import { AlbumDetail } from '@/modules/library-music/components/album-detail/album-detail.tsx';
-import { CoverGrid } from '@/modules/library-music/components/cover-grid';
-import { Album } from '@/modules/library-music/components/album';
+import { AlbumDetail } from '@/app/modules/library-music/components/album-detail/album-detail.tsx';
+import { CoverGrid } from '@/app/modules/library-music/components/cover-grid';
+import { Album } from '@/app/modules/library-music/components/album';
 import { Box, ContextMenu, Dialog, Flex, Skeleton } from '@radix-ui/themes';
-import { usePathParam } from '@/hooks/use-path-param.ts';
-import { LibraryParams } from '@/modules/library-music/routes/_routes.tsx';
+import { usePathParam } from '@/app/hooks/use-path-param.ts';
+import { LibraryParams } from '@/app/modules/library-music/routes/_routes.tsx';
 import { motion } from 'motion/react';
-import { useDisclosure } from '@/hooks/use-disclosure.ts';
-import { AlbumEditor } from '@/modules/library-music/components/album-editor/album-editor.tsx';
-import { AlbumResource } from '@/libs/api-client/gen/models';
-import { useAlbumsIndex } from '@/libs/api-client/gen/endpoints/album/album.ts';
+import { useDisclosure } from '@/app/hooks/use-disclosure.ts';
+import { AlbumEditor } from '@/app/modules/library-music/components/album-editor/album-editor.tsx';
+import { AlbumResource, AlbumUpdateRequest } from '@/app/libs/api-client/gen/models';
+import { useAlbumsIndex, useAlbumsUpdate } from '@/app/libs/api-client/gen/endpoints/album/album.ts';
+import { useMetadataSync } from '@/app/libs/api-client/gen/endpoints/metadata-sync/metadata-sync.ts';
+import { useAppDispatch } from '@/app/store/hooks';
+import { createNotification } from '@/app/store/notifications/notifications-slice';
 
 function AlbumContextMenu({ album, librarySlug }: { album: AlbumResource, librarySlug: string }) {
   const [showEditor, editorHandlers] = useDisclosure(false);
+  const dispatch = useAppDispatch();
+
+  // Update mutation with default cache invalidation
+  const updateMutation = useAlbumsUpdate({
+    mutation: {
+      onSuccess: () => {
+        dispatch(createNotification({
+          title: 'Success',
+          message: 'Album updated successfully!',
+          type: 'success',
+          toast: true,
+        }));
+        editorHandlers.close();
+      },
+      onError: (error: any) => {
+        dispatch(createNotification({
+          title: 'Error',
+          message: error.response?.data?.message || 'Failed to update album',
+          type: 'error',
+          toast: true,
+        }));
+      },
+    },
+  });
+
+  // Sync mutation
+  const syncMutation = useMetadataSync({
+    mutation: {
+      onSuccess: () => {
+        dispatch(createNotification({
+          title: 'Success',
+          message: 'Metadata synced successfully!',
+          type: 'success',
+          toast: true,
+        }));
+        // TODO: Refresh the albums list
+      },
+      onError: (error: any) => {
+        dispatch(createNotification({
+          title: 'Error',
+          message: error.response?.data?.message || 'Failed to sync metadata',
+          type: 'error',
+          toast: true,
+        }));
+      }
+    }
+  });
+
+  const handleSync = useCallback(() => {
+    syncMutation.mutate({
+      data: {
+        album_public_ids: [album.publicId],
+        force_update: true,
+      }
+    });
+  }, [syncMutation, album]);
+
+  const handleAlbumSubmit = useCallback(async (data: AlbumUpdateRequest) => {
+    // Submit via React Query mutation (after Precognition validation passes)
+    updateMutation.mutate({
+      library: librarySlug,
+      album: album.publicId,
+      data: data,
+    });
+  }, [updateMutation, librarySlug, album.publicId]);
+
+  const handleMetadataApplied = useCallback(() => {
+    dispatch(createNotification({
+      title: 'Success',
+      message: 'Metadata applied successfully!',
+      type: 'success',
+      toast: true,
+    }));
+    // TODO: Refresh the albums list
+  }, [dispatch]);
 
   return (
     <>
@@ -31,22 +109,26 @@ function AlbumContextMenu({ album, librarySlug }: { album: AlbumResource, librar
           border: '1px solid var(--gray-6)',
           borderRadius: '8px',
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-          padding: '60px',
+          padding: '0',
           maxWidth: '650px',
           width: '100%',
+          maxHeight: '80vh',
+          overflow: 'auto',
         }}>
-          <Dialog.Title>Edit Album</Dialog.Title>
-          <Dialog.Description>
+          <Dialog.Title style={{ padding: '24px 24px 0 24px' }}>Edit Album</Dialog.Title>
+          <Dialog.Description style={{ padding: '0 24px 24px 24px' }}>
             Make changes to the album information.
           </Dialog.Description>
 
-          <AlbumEditor
-            album={album}
-            onSubmit={() => {
-              editorHandlers.close();
-            }}
-            librarySlug={librarySlug}
-          />
+          <div style={{ padding: '0 24px 24px 24px' }}>
+            <AlbumEditor
+              album={album}
+              onSubmit={(data) => handleAlbumSubmit(data)}
+              librarySlug={librarySlug}
+              onSync={handleSync}
+              onMetadataApplied={handleMetadataApplied}
+            />
+          </div>
         </Dialog.Content>
       </Dialog.Root>
 

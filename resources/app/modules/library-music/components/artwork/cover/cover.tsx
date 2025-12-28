@@ -1,6 +1,6 @@
-
+import * as React from 'react';
 import styles from './cover.module.scss';
-import { Iconify } from '@/ui/icons/iconify.tsx';
+import { Iconify } from '@/app/ui/icons/iconify.tsx';
 
 interface CoverProps {
   imgSrc?: string;

@@ -1,10 +1,10 @@
-import { NewAccessTokenResource } from '@/libs/api-client/gen/models';
-import { CreateNotification } from '@/modules/notifications/models.ts';
+import { CreateNotification } from '@/app/modules/notifications/models.ts';
 
 export interface AuthEvents {
   'auth:login': {
-    tokens: { accessToken: NewAccessTokenResource; refreshToken: NewAccessTokenResource; },
-    sessionId: string
+    tokens: { accessToken: string; refreshToken: string | null; },
+    session_id: string,
+    expires_in: number,
   };
   'auth:logout': void;
   'auth:token-refresh': { tokens: any };

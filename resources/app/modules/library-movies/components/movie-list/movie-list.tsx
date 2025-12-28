@@ -1,8 +1,8 @@
 import { forwardRef } from 'react';
 import { VirtuosoGrid, Components } from 'react-virtuoso';
-import { MediaItem } from '@/ui/media-library/media-item/media-item.tsx';
-import { MovieResource } from '@/libs/api-client/gen/models';
-import { useMoviesIndex } from '@/libs/api-client/gen/endpoints/movie/movie.ts';
+import { MediaItem } from '@/app/ui/media-library/media-item/media-item.tsx';
+import { MovieResource } from '@/app/libs/api-client/gen/models';
+import { useMoviesIndex } from '@/app/libs/api-client/gen/endpoints/movie/movie.ts';
 
 // Ensure that this stays out of the component,
 // Otherwise the grid will remount with each render due to new component instances.

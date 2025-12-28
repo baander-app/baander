@@ -1,27 +1,26 @@
 import { useState, useCallback } from 'react';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { setQueue, setCurrentSongIndex } from '@/store/music/music-player-slice';
-import { SongResource } from '@/libs/api-client/gen/models';
+import { usePlayerQueue, usePlayerActions } from '@/app/modules/library-music-player/store';
+import { SongResource } from '@/app/libs/api-client/gen/models';
 
 export function useQueue() {
-  const dispatch = useAppDispatch();
-  const queue = useAppSelector((state) => state.musicPlayer.queue);
+  const queue = usePlayerQueue();
+  const { setQueue, playSongAtIndex } = usePlayerActions();
   const [activeIndex, setActiveIndex] = useState(0);
 
   const overwriteQueue = useCallback((newQueue: SongResource[]) => {
-    dispatch(setQueue(newQueue));
+    setQueue(newQueue);
     setActiveIndex(0);
-  }, [dispatch]);
+  }, [setQueue]);
 
-  const playSongAtIndex = useCallback((index: number) => {
+  const playSongAtIndexHandler = useCallback((index: number) => {
     setActiveIndex(index);
-    dispatch(setCurrentSongIndex(index));
-  }, [dispatch]);
+    playSongAtIndex(index);
+  }, [playSongAtIndex]);
 
   return {
     queue,
     activeIndex,
     overwriteQueue,
-    playSongAtIndex,
+    playSongAtIndex: playSongAtIndexHandler,
   };
 }

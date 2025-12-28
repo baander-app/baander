@@ -1,8 +1,8 @@
 import { ReactNode } from 'react';
 import styles from '../root-layout/root-layout.module.scss';
-import { lazyImport } from '@/utils/lazy-import';
+import { lazyImport } from '@/app/utils/lazy-import';
 
-const { DashboardMenu } = lazyImport(() => import('@/layouts/dashboard-layout/components/dashboard-menu.tsx'), 'DashboardMenu');
+const { DashboardMenu } = lazyImport(() => import('@/app/layouts/dashboard-layout/components/dashboard-menu.tsx'), 'DashboardMenu');
 
 export interface DashboardLayoutProps {
   children?: ReactNode;

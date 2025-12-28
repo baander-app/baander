@@ -4,7 +4,7 @@ import styles from './login.module.scss';
 import { Form } from 'radix-ui';
 import { Link } from 'react-router-dom';
 import * as Checkbox from '@radix-ui/react-checkbox';
-import { useRemember } from '@/modules/auth/remember/use-remember';
+import { useRemember } from '@/app/modules/auth/remember/use-remember';
 
 export default function Login() {
   const { remember, setRemember, email, setEmail, handleSubmit } = useRemember();

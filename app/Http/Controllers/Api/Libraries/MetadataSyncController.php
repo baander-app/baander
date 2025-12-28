@@ -3,19 +3,17 @@
 namespace App\Http\Controllers\Api\Libraries;
 
 use App\Http\Controllers\Controller;
-use App\Models\TokenAbility;
+
 use App\Modules\Metadata\MetadataJobDispatcher;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
-use Spatie\RouteAttributes\Attributes\Middleware;
-use Spatie\RouteAttributes\Attributes\Prefix;
-use Symfony\Component\Routing\Attribute\Route;
+use Spatie\RouteAttributes\Attributes\{Middleware, Post, Get, Prefix};
 
 #[Prefix('/metadata')]
 #[Middleware([
-    'auth:sanctum',
-    'ability:' . TokenAbility::ACCESS_API->value,
+    'auth:oauth',
+    'scope:access-api',
     'force.json',
 ])]
 class MetadataSyncController extends Controller
@@ -24,16 +22,16 @@ class MetadataSyncController extends Controller
         private readonly MetadataJobDispatcher $metadataSyncService
     ) {}
 
-    #[Route('/sync', 'api.metadata.sync')]
+    #[Post('/sync', 'api.metadata.sync')]
     public function sync(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'album_ids'       => 'sometimes|array',
-            'album_ids.*'     => 'integer|exists:albums,id',
-            'song_ids'        => 'sometimes|array',
-            'song_ids.*'      => 'integer|exists:songs,id',
-            'artist_ids'      => 'sometimes|array',
-            'artist_ids.*'    => 'integer|exists:artists,id',
+            'album_public_ids'       => 'sometimes|array',
+            'album_public_ids.*'     => 'string|exists:albums,public_id',
+            'song_public_ids'        => 'sometimes|array',
+            'song_public_ids.*'      => 'string|exists:songs,public_id',
+            'artist_public_ids'      => 'sometimes|array',
+            'artist_public_ids.*'    => 'string|exists:artists,public_id',
             'library_id'      => 'sometimes|integer|exists:libraries,id',
             'include_songs'   => 'sometimes|boolean',
             'include_artists' => 'sometimes|boolean',
@@ -42,14 +40,33 @@ class MetadataSyncController extends Controller
             'queue'           => 'sometimes|string',
         ]);
 
-        $albumIds = $validated['album_ids'] ?? [];
-        $songIds = $validated['song_ids'] ?? [];
-        $artistIds = $validated['artist_ids'] ?? [];
+        // Convert public_ids to database IDs
+        $albumIds = [];
+        if (!empty($validated['album_public_ids'])) {
+            $albumIds = \App\Models\Album::whereIn('public_id', $validated['album_public_ids'])
+                ->pluck('id')
+                ->toArray();
+        }
+
+        $songIds = [];
+        if (!empty($validated['song_public_ids'])) {
+            $songIds = \App\Models\Song::whereIn('public_id', $validated['song_public_ids'])
+                ->pluck('id')
+                ->toArray();
+        }
+
+        $artistIds = [];
+        if (!empty($validated['artist_public_ids'])) {
+            $artistIds = \App\Models\Artist::whereIn('public_id', $validated['artist_public_ids'])
+                ->pluck('id')
+                ->toArray();
+        }
+
         $libraryId = $validated['library_id'] ?? null;
 
         if (!$libraryId && empty($albumIds) && empty($songIds) && empty($artistIds)) {
             throw ValidationException::withMessages([
-                'sync' => 'You must specify at least one of: album_ids, song_ids, artist_ids, or library_id',
+                'sync' => 'You must specify at least one of: album_public_ids, song_public_ids, artist_public_ids, or library_id',
             ]);
         }
 
@@ -79,7 +96,7 @@ class MetadataSyncController extends Controller
         ]);
     }
 
-    #[Route('/stats', 'api.metadata.stats')]
+    #[Get('/stats/{libraryId}', 'api.metadata.stats')]
     public function getLibraryStats(Request $request, int $libraryId): JsonResponse
     {
         $stats = $this->metadataSyncService->getLibraryStats($libraryId);
@@ -90,22 +107,44 @@ class MetadataSyncController extends Controller
         ]);
     }
 
-    #[Route('/validate', 'api.metadata.validate')]
+    #[Post('/validate', 'api.metadata.validate')]
     public function validateIds(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'album_ids'    => 'sometimes|array',
-            'album_ids.*'  => 'integer',
-            'song_ids'     => 'sometimes|array',
-            'song_ids.*'   => 'integer',
-            'artist_ids'   => 'sometimes|array',
-            'artist_ids.*' => 'integer',
+            'album_public_ids'    => 'sometimes|array',
+            'album_public_ids.*'  => 'string',
+            'song_public_ids'     => 'sometimes|array',
+            'song_public_ids.*'   => 'string',
+            'artist_public_ids'   => 'sometimes|array',
+            'artist_public_ids.*' => 'string',
         ]);
 
+        // Convert public_ids to database IDs for validation
+        $albumIds = [];
+        if (!empty($validated['album_public_ids'])) {
+            $albumIds = \App\Models\Album::whereIn('public_id', $validated['album_public_ids'])
+                ->pluck('id')
+                ->toArray();
+        }
+
+        $songIds = [];
+        if (!empty($validated['song_public_ids'])) {
+            $songIds = \App\Models\Song::whereIn('public_id', $validated['song_public_ids'])
+                ->pluck('id')
+                ->toArray();
+        }
+
+        $artistIds = [];
+        if (!empty($validated['artist_public_ids'])) {
+            $artistIds = \App\Models\Artist::whereIn('public_id', $validated['artist_public_ids'])
+                ->pluck('id')
+                ->toArray();
+        }
+
         $validation = $this->metadataSyncService->validateIds(
-            $validated['album_ids'] ?? [],
-            $validated['song_ids'] ?? [],
-            $validated['artist_ids'] ?? [],
+            $albumIds,
+            $songIds,
+            $artistIds,
         );
 
         return response()->json([

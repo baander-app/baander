@@ -2,17 +2,15 @@
 
 namespace App\Providers;
 
-use App\Guards\OAuthGuard;
-use App\Models\PersonalAccessToken;
+use App\Modules\Auth\OAuth\Guards\OAuthGuard;
 use App\Models\User;
+use App\Modules\Auth\OAuth\Psr7Factory;
 use App\Modules\Auth\Webauthn\CounterChecker;
 use App\Modules\Auth\Webauthn\WebauthnService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
-use Laravel\Sanctum\Sanctum;
 use League\OAuth2\Server\ResourceServer;
-use Symfony\Bridge\PsrHttpMessage\Factory\PsrHttpFactory;
 use Webauthn\AttestationStatement\AttestationStatementSupportManager;
 use Webauthn\AttestationStatement\NoneAttestationStatementSupport;
 use Webauthn\CeremonyStep\CeremonyStepManagerFactory;
@@ -41,14 +39,12 @@ class AuthServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
-
         // Register OAuth guard
         Auth::extend('oauth', function ($app, $name, array $config) {
             return new OAuthGuard(
                 $app['request'],
                 $app[ResourceServer::class],
-                $app[PsrHttpFactory::class]
+                $app[Psr7Factory::class]
             );
         });
 

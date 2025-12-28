@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { resolveCredentialStore } from './credentialStore';
-import { useAuthStore } from '@/modules/auth/store';
-import { LOCAL_STORAGE_KEY } from '@/common/constants';
+import { useAuthStore } from '@/app/modules/auth/store';
+import { LOCAL_STORAGE_KEY } from '@/app/common/constants';
 
 type LoginInput = { email: string; password: string };
 

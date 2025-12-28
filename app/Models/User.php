@@ -3,27 +3,23 @@
 namespace App\Models;
 
 use App\Auth\Role;
+use App\Models\Auth\OAuth\Token as OAuthToken;
+use App\Models\Auth\Passkey;
+use App\Models\Auth\ThirdPartyCredential;
 use App\Modules\Auth\Webauthn\Concerns\HasPasskeys;
 use App\Modules\Nanoid\Concerns\HasNanoPublicId;
-use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Str;
-use Laravel\Fortify\TwoFactorAuthenticatable;
-use Laravel\Sanctum\{HasApiTokens, NewAccessToken};
-use Ramsey\Uuid\Uuid;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements HasPasskeys
 {
     use HasFactory,
-        HasApiTokens,
         HasNanoPublicId,
         HasRoles,
-        Notifiable,
-        TwoFactorAuthenticatable;
+        Notifiable;
 
     protected $dateFormat = 'Y-m-d H:i:sO';
 
@@ -56,6 +52,7 @@ class User extends Authenticatable implements HasPasskeys
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password'          => 'hashed',
+        'oauth'             => 'array',
     ];
 
     public function getRouteKeyName(): string
@@ -64,32 +61,21 @@ class User extends Authenticatable implements HasPasskeys
     }
 
     /**
-     * Create a new personal access token for the user.
-     *
-     * @param string $name
-     * @param array $abilities
-     * @param DateTimeInterface|null $expiresAt
-     * @param array $device
-     * @return NewAccessToken
+     * Get all OAuth tokens for the user.
      */
-    public function createToken(string $name, array $abilities = ['*'], ?DateTimeInterface $expiresAt = null, array $device = [])
+    public function tokens(): HasMany
     {
-        $plainTextToken = $this->generateTokenString();
-        $broadcastToken = Str::replace('-', '', Uuid::uuid4()->toString());
+        return $this->hasMany(OAuthToken::class, 'user_id');
+    }
 
-        $attributes = [
-            'name'            => $name,
-            'token'           => hash('xxh3', $plainTextToken),
-            'broadcast_token' => $broadcastToken,
-            'abilities'       => $abilities,
-            'expires_at'      => $expiresAt,
-        ];
-
-        $attributes += $device;
-
-        $token = $this->tokens()->create($attributes);
-
-        return new NewAccessToken($token, $token->getKey() . '|' . $plainTextToken);
+    /**
+     * Get the current access token being used.
+     */
+    public function currentAccessToken(): ?OAuthToken
+    {
+        // Implementation depends on how the OAuth guard tracks current token
+        // The guard should provide this
+        return null;
     }
 
     protected function getDefaultGuardName(): string

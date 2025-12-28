@@ -1,9 +1,9 @@
 import { Box, Button, Container, Heading } from '@radix-ui/themes';
 import { ReactNode, useEffect, useState } from 'react';
-import { useAppDispatch } from '@/store/hooks.ts';
-import { createNotification } from '@/store/notifications/notifications-slice.ts';
-import { useLibrariesIndex } from '@/libs/api-client/gen/endpoints/library/library.ts';
-import { useJobLibraryScan } from '@/libs/api-client/gen/endpoints/job/job.ts';
+import { useAppDispatch } from '@/app/store/hooks.ts';
+import { createNotification } from '@/app/store/notifications/notifications-slice.ts';
+import { useLibrariesIndex } from '@/app/libs/api-client/gen/endpoints/library/library.ts';
+import { useJobLibraryScan } from '@/app/libs/api-client/gen/endpoints/system/system.ts';
 
 export function LibrariesList() {
   const { data } = useLibrariesIndex();

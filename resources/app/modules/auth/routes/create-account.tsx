@@ -1,6 +1,6 @@
 import { Flex, Text } from '@radix-ui/themes';
 import styles from './create-account.module.scss';
-import { CreateAccountForm } from '@/modules/auth/create-account/create-account-form.tsx';
+import { CreateAccountForm } from '@/app/modules/auth/create-account/create-account-form.tsx';
 import { Link } from 'react-router-dom';
 
 export function CreateAccount() {

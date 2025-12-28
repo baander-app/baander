@@ -6,8 +6,10 @@ use App\Jobs\BaseJob;
 use App\Models\Album;
 use App\Modules\Logging\Attributes\LogChannel;
 use App\Modules\Logging\Channel;
+use App\Modules\Metadata\Contracts\PictureInterface;
 use App\Modules\Metadata\MediaMeta\Frame\Apic;
 use App\Modules\Metadata\MediaMeta\MediaMeta;
+use App\Modules\Metadata\Readers\MetadataReader;
 use Exception;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
@@ -57,9 +59,8 @@ class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
 
         try {
             $song = $this->album->songs()->firstOrFail();
-            $mediaMeta = new MediaMeta($song->path);
-
-            $images = $mediaMeta->getImages();
+            $metadataReader = new MetadataReader($song->path);
+            $images = $metadataReader->getImages();
             $imageCount = count($images);
 
             if ($imageCount === 0) {
@@ -71,7 +72,7 @@ class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
 
             // Use the first image if front cover isn't available
             try {
-                $cover = $mediaMeta->getFrontCoverImage() ?: $images[0];
+                $cover = $metadataReader->getFrontCoverImage() ?: $images[0];
             } catch (Exception $e) {
                 $this->getLogger()->warning('Failed to get front cover, using first available image', [
                     'error' => $e->getMessage(),
@@ -102,10 +103,10 @@ class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
         }
     }
 
-    private function createImage(Apic $artwork): array
+    private function createImage(PictureInterface $artwork): array
     {
         $extension = $this->detectFileExtension($artwork->getImageData());
-        $fileName = Str::replace(['/', '\\'], '', Str::ascii($this->album->title)) . '_' . Apic::$types[$artwork->getImageType()];
+        $fileName = Str::replace(['/', '\\'], '', Str::ascii($this->album->title)) . '_' . 'cover';
         $destination = config('image.storage.covers') . DIRECTORY_SEPARATOR . $fileName . '.' . $extension;
 
         \File::put($destination, $artwork->getImageData());

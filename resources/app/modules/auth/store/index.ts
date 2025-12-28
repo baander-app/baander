@@ -4,9 +4,9 @@ import {
   login as loginFn,
   logout as logoutFn,
   revokeAllTokensExceptCurrent as revokeOthersFn,
-} from '@/services/auth/auth.service.ts';
-import { Token } from '@/services/auth/token.ts';
-import { tokenBindingService } from '@/services/auth/token-binding.service.ts';
+} from '@/app/services/auth/auth.service.ts';
+import { Token } from '@/app/services/auth/token.ts';
+import { tokenBindingService } from '@/app/services/auth/token-binding.service.ts';
 
 type AuthStatus = 'idle' | 'loading' | 'authenticated' | 'unauthenticated';
 
@@ -35,7 +35,7 @@ export const useAuthStore = create<AuthState>()(
           try {
             const stored = Token.get();
             const sid = tokenBindingService.getSessionId();
-            const authed = !!stored?.accessToken && !!sid;
+            const authed = !!stored?.access_token && !!sid;
             set({
               status: authed ? 'authenticated' : 'unauthenticated',
               isAuthenticated: authed,
@@ -51,7 +51,7 @@ export const useAuthStore = create<AuthState>()(
           try {
             const res = await loginFn(credentials);
             // Tokens and sessionId are persisted by the service/Token helpers.
-            const sid = res?.sessionId ?? tokenBindingService.getSessionId() ?? null;
+            const sid = res?.session_id ?? tokenBindingService.getSessionId() ?? null;
             set({
               status: 'authenticated',
               isAuthenticated: true,
@@ -60,7 +60,7 @@ export const useAuthStore = create<AuthState>()(
 
             console.log({rememberMe})
             if (rememberMe) {
-              await window.BaanderElectron.config.setUser(credentials.email, credentials.password);
+              await window.BaanderElectron?.config.setUser(credentials.email, credentials.password);
             }
           } catch (e) {
             set({ status: 'unauthenticated', isAuthenticated: false, sessionId: null });

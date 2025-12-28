@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\TokenAbility;
+
 use App\Modules\Logging\Attributes\LogChannel;
 use App\Modules\Logging\Channel;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
@@ -27,9 +28,10 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
  * with threading and optimized search capabilities.
  */
 #[Prefix('/logs')]
+#[Group('System')]
 #[Middleware([
-    'auth:sanctum',
-    'ability:' . TokenAbility::ACCESS_API->value,
+    'auth:oauth',
+    'scope:access-api',
     'force.json',
 ])]
 class LogsController extends Controller
@@ -53,7 +55,7 @@ class LogsController extends Controller
      * @response array<LogFile>
      */
     #[Get('/', 'api.logs.index')]
-    public function index(): array
+    public function index()
     {
         /** @var array<LogFile> $files Sorted array of available log files */
         $files = $this->logFileService->getSortedFiles();

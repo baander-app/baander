@@ -27,6 +27,11 @@ class QueueMonitor extends BaseModel
         'exception'   => 'json',
     ];
 
+    public function failedJob()
+    {
+        return $this->hasOne(FailedJob::class, 'uuid', 'job_uuid');
+    }
+
     // Scopes
 
     protected function scopeWhereJob(Builder $query, $jobId): void

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { LoadingSpinner } from '@/modules/common/LoadingSpinner.tsx';
-import { ErrorDisplay } from '@/modules/common/ErrorDisplay.tsx';
+import { LoadingSpinner } from '@/app/modules/common/LoadingSpinner.tsx';
+import { ErrorDisplay } from '@/app/modules/common/ErrorDisplay.tsx';
 import { Box, Button, Card, Flex, Grid, Heading, IconButton, Progress, Table, Text } from '@radix-ui/themes';
 import { ChevronDownIcon, ChevronUpIcon, DownloadIcon } from '@radix-ui/react-icons';
-import { useLogsStats } from '@/libs/api-client/gen/endpoints/logs/logs.ts';
+import { useLogsStats } from '@/app/libs/api-client/gen/endpoints/system/system.ts';
 
 interface LogStatsProps {
   logFileId: string;

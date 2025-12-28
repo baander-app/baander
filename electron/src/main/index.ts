@@ -20,6 +20,7 @@ if(process.platform === 'win32') {
 setCliFlags();
 
 // Initialize the config store for the main process
+// @ts-ignore
 initMainProcessImpl(app, fs, path);
 
 const require = createRequire(import.meta.url);

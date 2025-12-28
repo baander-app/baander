@@ -1,6 +1,6 @@
 import { Form } from 'radix-ui';
 import { Button, Select, TextField } from '@radix-ui/themes';
-import { getLibraryTypesForSelect } from '@/services/libraries/support.ts';
+import { getLibraryTypesForSelect } from '@/app/services/libraries/support.ts';
 import styles from './create-library.module.css';
 
 export function CreateLibrary() {

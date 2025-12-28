@@ -1,7 +1,7 @@
 import React, { ReactNode } from 'react';
 import { EmblaOptionsType } from 'embla-carousel';
 import useEmblaCarousel from 'embla-carousel-react';
-import { NextButton, PrevButton, usePrevNextButtons } from '@/ui/carousel/components/arrow-buttons.tsx';
+import { NextButton, PrevButton, usePrevNextButtons } from '@/app/ui/carousel/components/arrow-buttons.tsx';
 import './carousel.scss';
 
 type PropType = {

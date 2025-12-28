@@ -12,25 +12,19 @@ interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
-interface TracingConfigData {
-  enabled: boolean;
-  url: string;
-  token: string;
-}
-
 declare interface Window {
   BaanderAppConfig: {
     name: string;
     url: string;
     apiUrl: string;
+    apiDocsUrl: string;
     environment: 'local' | 'production' | 'testing';
     debug: boolean;
     locale: string;
     version: string;
-    tracing: TracingConfigData;
   };
 
-  BaanderElectron: {
+  BaanderElectron?: {
     config: {
       getServerUrl(): Promise<string>;
       setServerUrl(url: string): Promise<boolean>;

@@ -1,63 +1,49 @@
-import { Token } from '@/services/auth/token.ts';
-import { NotificationFacade } from '@/modules/notifications/notification-facade.ts';
-import { authRefreshToken, authStreamToken } from '@/libs/api-client/gen/endpoints/auth/auth.ts';
-import { tokenBindingService } from '@/services/auth/token-binding.service.ts';
-import { HeaderExt } from '@/models/header-ext.ts';
+import { Token } from '@/app/services/auth/token.ts';
+import { NotificationFacade } from '@/app/modules/notifications/notification-facade.ts';
+import { authRefreshToken } from '@/app/libs/api-client/gen/endpoints/auth/auth.ts';
+import { tokenBindingService } from '@/app/services/auth/token-binding.service.ts';
 
-type TokenType = 'access' | 'stream';
-
-export async function refreshToken(type: TokenType) {
+export async function refreshToken() {
   const authTokens = Token.get();
 
-  if (!authTokens?.refreshToken) {
+  if (!authTokens?.refresh_token) {
     throw new Error('Refresh token not found');
   }
 
-  const sessionId = tokenBindingService.getSessionId();
-  const headers = {
-    'Authorization': `Bearer ${authTokens.refreshToken.token}`,
-    ...(sessionId && { [HeaderExt.X_BAANDER_SESSION_ID]: sessionId }),
-  };
+  // const sessionId = tokenBindingService.getSessionId();
+  // const headers = {
+  //   'Authorization': `Bearer ${authTokens.refresh_token}`,
+  //   ...(sessionId && { [HeaderExt.X_BAANDER_SESSION_ID]: sessionId }),
+  // };
 
   try {
-    if (type === 'access') {
-      await refreshAccessToken(authTokens, headers);
-    } else {
-      await refreshStreamToken(headers);
-    }
+    await refreshAccessToken(authTokens);
   } catch (error) {
-    handleRefreshError(type, error);
+    handleRefreshError(error);
     throw error;
   }
 }
 
-async function refreshAccessToken(authTokens: any, headers: Record<string, string>) {
-  const response = await authRefreshToken({
-    headers,
-    _skipAuth: false,
-  });
+async function refreshAccessToken(authTokens: any) {
+  if (authTokens.refresh_token === null) {
+    return;
+  }
+
+  const response = await authRefreshToken(authTokens);
 
   Token.set({
-    accessToken: response.accessToken,
-    refreshToken: authTokens.refreshToken, // Keep existing refresh token
-    sessionId: authTokens.sessionId,
+    access_token: response.access_token,
+    refresh_token: authTokens.refresh_token, // Keep existing refresh token
+    session_id: authTokens.session_id,
+    expires_in: response.expires_in
   });
 }
 
-async function refreshStreamToken(headers: Record<string, string>) {
-  const response = await authStreamToken({
-    headers,
-    _skipAuth: false,
-  });
-
-  Token.setStreamToken(response.streamToken);
-}
-
-function handleRefreshError(type: TokenType, error: any) {
+function handleRefreshError(error: any) {
   NotificationFacade.create({
     type: 'error',
     title: 'Authentication error',
-    message: `Failed to refresh ${type} token\n\n${error.message}`,
+    message: `Failed to refresh token\n\n${error.message}`,
     toast: true,
   });
 

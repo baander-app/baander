@@ -4,24 +4,23 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Modules\Auth\OAuth\Psr7Factory;
 use Closure;
 use Illuminate\Http\Request;
 use League\OAuth2\Server\Exception\OAuthServerException;
 use League\OAuth2\Server\ResourceServer;
-use Symfony\Bridge\PsrHttpMessage\Factory\PsrHttpFactory;
 use Symfony\Component\HttpFoundation\Response;
 
 class ValidateOAuthToken
 {
     public function __construct(
         private readonly ResourceServer $resourceServer,
-        private readonly PsrHttpFactory $psrFactory,
-    ) {
-    }
+        private readonly Psr7Factory $psr,
+    ) {}
 
     public function handle(Request $request, Closure $next): Response
     {
-        $psrRequest = $this->psrFactory->createRequest($request);
+        $psrRequest = $this->psr->createRequest($request);
 
         try {
             $psrRequest = $this->resourceServer->validateAuthenticatedRequest($psrRequest);

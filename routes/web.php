@@ -3,10 +3,12 @@
 use App\Http\Controllers\UIController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/dbg', [UIController::class, 'dbg'])->name('dbg');
+Route::get('/help', [UIController::class, 'getDocs'])
+    ->name('ui.docs-get')
+    ->middleware('cors.policy');
 
 Route::get('/{any}', [UIController::class, 'getUI'])
     ->name('webui')
     ->middleware('cors.policy')
-    ->where('any', '^(?!api|docs|storage|public-api|clockwork|system|2fa|login|dbg|jobs).*$');
+    ->where('any', '^(?!api|help|docs|storage|public-api|clockwork|system|2fa|login|dbg|jobs).*$');
 

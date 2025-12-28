@@ -1,28 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Flex } from '@radix-ui/themes';
-import { PlayerControls } from '@/modules/library-music-player/components/player-controls/player-controls.tsx';
-import PlayerFacePlate from '@/modules/library-music-player/components/player-face-plate/player-face-plate.tsx';
+import { PlayerControls } from '@/app/modules/library-music-player/components/player-controls/player-controls.tsx';
+import PlayerFacePlate from '@/app/modules/library-music-player/components/player-face-plate/player-face-plate.tsx';
 import {
   PlayerMetaControls,
-} from '@/modules/library-music-player/components/player-meta-controls/player-meta-controls.tsx';
-import { LyricsProvider } from '@/ui/lyrics-viewer/providers/lyrics-provider.tsx';
-import { selectSong } from '@/store/music/music-player-slice.ts';
-import { useAppSelector } from '@/store/hooks.ts';
+} from '@/app/modules/library-music-player/components/player-meta-controls/player-meta-controls.tsx';
+import { LyricsProvider } from '@/app/ui/lyrics-viewer/providers/lyrics-provider.tsx';
 import {
   attachAudioElement,
   usePlayerActions,
+  usePlayerCurrentSong,
   usePlayerBuffered,
   usePlayerCurrentTime,
   usePlayerDuration,
   usePlayerIsPlaying,
   usePlayerAudioElement,
-} from '@/modules/library-music-player/store';
-import { useShowByPublicIdSong } from '@/libs/api-client/gen/endpoints/library-resource/library-resource.ts';
-import { ensureStreamToken } from '@/services/auth/ensure-stream-token.ts';
-import { isElectron } from '@/utils/platform.ts';
+} from '@/app/modules/library-music-player/store';
+import { isElectron } from '@/app/utils/platform.ts';
+import { Token } from '@/app/services/auth/token.ts';
+import { useSongsShow } from '@/app/libs/api-client/gen/endpoints/song/song.ts';
 
 export function InlinePlayer() {
-  const sourceSong = useAppSelector(selectSong);
+  const sourceSong = usePlayerCurrentSong();
   const buffered = usePlayerBuffered();
   const duration = usePlayerDuration();
   const isPlaying = usePlayerIsPlaying();
@@ -30,15 +29,16 @@ export function InlinePlayer() {
   const existingAudioElement = usePlayerAudioElement();
   const cleanupRef = useRef<(() => void) | null>(null);
   const hasInitialized = useRef(false);
-  const currentSong = useAppSelector(selectSong);
+  const currentSong = usePlayerCurrentSong();
   const [currentStreamUrl, setCurrentStreamUrl] = useState<string | null>(null);
   const {
     setSong,
     seekTo,
     togglePlayPause,
+    setSource,
   } = usePlayerActions();
-  const canQuery = Boolean(sourceSong?.publicId);
-  const { data: song } = useShowByPublicIdSong(sourceSong?.publicId!, {
+  const canQuery = Boolean(sourceSong?.publicId && sourceSong?.librarySlug);
+  const { data: song } = useSongsShow(sourceSong?.librarySlug!, sourceSong?.publicId!, {
     relations: 'album.cover'
   }, {
     query: {
@@ -69,14 +69,13 @@ export function InlinePlayer() {
 
   useEffect(() => {
     if (currentSong?.streamUrl) {
-      ensureStreamToken().then(token => {
-        if (token) {
-          const url = `${currentSong.streamUrl}?_token=${token}`;
-          setCurrentStreamUrl(url);
-        } else {
-          setCurrentStreamUrl(null);
-        }
-      });
+      const token = Token.get()?.access_token;
+      if (token) {
+        const url = `${currentSong.streamUrl}?_token=${token}`;
+        setCurrentStreamUrl(url);
+      } else {
+        setCurrentStreamUrl(null);
+      }
     } else {
       setCurrentStreamUrl(null);
     }
@@ -85,13 +84,13 @@ export function InlinePlayer() {
   useEffect(() => {
     const audioElement = existingAudioElement;
     if (audioElement && currentStreamUrl) {
-      audioElement.src = currentStreamUrl;
+      setSource(currentStreamUrl);
       audioElement.play();
     } else if (audioElement && !currentStreamUrl) {
-      audioElement.src = '';
+      setSource(null);
       audioElement.pause();
     }
-  }, [currentStreamUrl, existingAudioElement]);
+  }, [currentStreamUrl, existingAudioElement, setSource]);
 
   useEffect(() => {
     if (song) {
@@ -111,7 +110,7 @@ export function InlinePlayer() {
 
   const coverUrl = useMemo(() => {
     return song?.album?.cover?.url ?? '';
-  }, [song]);
+  }, [song?.album?.cover?.url]);
 
   const artistNames = useMemo(() => {
     return song && song?.artists?.map(artist => artist.name);

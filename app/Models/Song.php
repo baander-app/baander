@@ -35,6 +35,14 @@ class Song extends BaseModel implements DirectStreamableFile, Recommendable
 
     protected $with = ['album'];
 
+    protected function casts(): array
+    {
+        return [
+            'locked_fields' => 'array',
+            'explicit' => 'boolean',
+        ];
+    }
+
     protected $fillable = [
         'album_id',
         'title',
@@ -45,14 +53,16 @@ class Song extends BaseModel implements DirectStreamableFile, Recommendable
         'lyrics',
         'track',
         'disc',
-        'modified_time',
         'year',
         'comment',
         'hash',
         'librarySlug',
         'mbid',
         'discogs_id',
+        'spotify_id',
+        'explicit',
         'position',
+        'locked_fields',
     ];
 
     public function getRouteKeyName(): string
@@ -140,7 +150,8 @@ class Song extends BaseModel implements DirectStreamableFile, Recommendable
     public function artists()
     {
         return $this->belongsToMany(Artist::class)
-            ->using(ArtistSong::class);
+            ->using(ArtistSong::class)
+            ->withPivot('role');
     }
 
     public function userMediaActivies()

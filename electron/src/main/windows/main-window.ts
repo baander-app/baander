@@ -93,7 +93,9 @@ export function createMainWindow() {
     height: 800,
     show: false,
     webPreferences: {
-      preload: join(__dirname, 'preload.cjs'),
+      preload: app.isPackaged
+        ? join(__dirname, 'preload.cjs')  // Production: same directory (flattened)
+        : join(__dirname, '../preload/preload.cjs'),  // Dev: go up to dist-electron, then preload
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
@@ -121,7 +123,7 @@ export function createMainWindow() {
     // Determine path based on whether app is packed
     const indexPath = app.isPackaged
                       ? 'index.html'  // In packaged app.asar
-                      : join(__dirname, '../../dist/index.html');  // In development build
+                      : join(__dirname, '../renderer/index.html');  // In development build
 
     mainWindow.loadFile(indexPath).catch(err => {
       mainLog.error('[fatal] Failed to load built index.html', err);

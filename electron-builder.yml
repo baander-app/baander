@@ -11,13 +11,13 @@ directories:
   buildResources: electron/build
 
 files:
-  - from: "dist/electron/renderer"
+  - from: "electron/dist-electron/renderer"
     to: "."
-  - from: "dist/electron/main"
+  - from: "electron/dist-electron/main"
     to: "."
   - from: "electron/public"
     to: "public"
-  - from: "dist/electron/preload"
+  - from: "electron/dist-electron/preload"
     to: "."
   - package.json
 

@@ -1,9 +1,8 @@
 import React, { createContext, ReactEventHandler, ReactNode, useContext, useEffect, useState } from 'react';
-import { Lrc } from '@/libs/lyrics/lrc.ts';
-import { AudioLyricSynchronizer } from '@/libs/lyrics/audio-lyric-synchronizer.ts';
-import { useAppSelector } from '@/store/hooks.ts';
-import { usePlayerAudioElement, usePlayerSong } from '@/modules/library-music-player/store';
-import { useSongsShow } from '@/libs/api-client/gen/endpoints/song/song.ts';
+import { Lrc } from '@/app/libs/lyrics/lrc.ts';
+import { AudioLyricSynchronizer } from '@/app/libs/lyrics/audio-lyric-synchronizer.ts';
+import { usePlayerAudioElement, usePlayerSong, usePlayerLyricsOffset } from '@/app/modules/library-music-player/store';
+import { useSongsShow } from '@/app/libs/api-client/gen/endpoints/song/song.ts';
 
 interface LyricsProviderContextProps {
   lyrics: Lrc | undefined;
@@ -15,7 +14,7 @@ const LyricsProviderContext = createContext<LyricsProviderContextProps | undefin
 LyricsProviderContext.displayName = 'LyricsProviderContext';
 
 const LyricsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { lyrics: lyricOptions } = useAppSelector(state => state.musicPlayer);
+  const lyricsOffset = usePlayerLyricsOffset();
 
   const [lyrics, _setLyrics] = useState<Lrc>();
   const playerSong = usePlayerSong();
@@ -31,10 +30,10 @@ const LyricsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const audioElement = usePlayerAudioElement();
 
   useEffect(() => {
-    if (lyricOptions.offsetMs && audioLyricsSynchronizer.defaultOffset !== lyricOptions.offsetMs) {
-      audioLyricsSynchronizer.setDefaultOffset(lyricOptions.offsetMs);
+    if (lyricsOffset && audioLyricsSynchronizer.defaultOffset !== lyricsOffset) {
+      audioLyricsSynchronizer.setDefaultOffset(lyricsOffset);
     }
-  }, [lyricOptions, audioLyricsSynchronizer]);
+  }, [lyricsOffset, audioLyricsSynchronizer]);
 
   useEffect(() => {
     if (data?.lyrics) {

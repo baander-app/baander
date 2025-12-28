@@ -4,4 +4,16 @@
   align-items: center;
   height: 100%;
   flex-grow: 1;
+  gap: 0.5rem;
+}
+
+.queueButton {
+  // Visual
+  opacity: 0.8;
+  transition: opacity 0.15s ease;
+  cursor: pointer;
+  // Hover state
+  &:hover {
+    opacity: 1;
+  }
 }

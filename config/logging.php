@@ -56,23 +56,8 @@ return [
     'channels' => [
         'stack' => [
             'driver'            => 'stack',
-            'channels'          => ['daily', 'otel'],
+            'channels'          => ['daily'],
             'ignore_exceptions' => false,
-        ],
-
-        'otel' => [
-            'driver' => 'custom',
-            'via'    => OpenTelemetryMonolog::class,
-            'name'   => 'otel',
-            'level'  => LogLevel::DEBUG,
-            'bubble' => true,
-        ],
-
-        'otel_debug' => [
-            'driver'               => 'single',
-            'path'                 => storage_path('logs/otel.log'),
-            'level'                => env('LOG_LEVEL', 'debug'),
-            'replace_placeholders' => true,
         ],
 
         'single' => [
@@ -157,17 +142,9 @@ return [
             'replace_placeholders' => true,
         ],
 
-        'metadata_otel' => [
-            'driver' => 'custom',
-            'via'    => OpenTelemetryMonolog::class,
-            'name'   => 'metadata_otel',
-            'level'  => LogLevel::DEBUG,
-            'bubble' => true,
-        ],
-
         'metadata' => [
             'driver'            => 'stack',
-            'channels'          => ['metadata_file', 'metadata_otel'],
+            'channels'          => ['metadata_file'],
             'ignore_exceptions' => false,
         ],
 

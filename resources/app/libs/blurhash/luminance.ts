@@ -1,4 +1,4 @@
-import { decodeBlurhash } from '@/libs/blurhash/decode.ts';
+import { decodeBlurhash } from '@/app/libs/blurhash/decode.ts';
 
 export const calculateLuminance = (r: number, g: number, b: number): number => {
   // Convert sRGB to linear RGB

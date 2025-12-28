@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api\Services;
 
 use App\Http\Controllers\Controller;
 use App\Http\Integrations\Spotify\SpotifyClient;
-use App\Models\ThirdPartyCredential;
-use App\Models\TokenAbility;
+use App\Models\Auth\ThirdPartyCredential;
+use Dedoc\Scramble\Attributes\Group;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 use Spatie\RouteAttributes\Attributes\{Get, Post, Prefix};
 
 #[Prefix('services/spotify')]
+#[Group('Connections')]
 class SpotifyController extends Controller
 {
     public function __construct(
@@ -23,8 +24,8 @@ class SpotifyController extends Controller
     }
 
     #[Get('authorize', 'spotify.authorize', [
-        'auth:sanctum',
-        'ability:' . TokenAbility::ACCESS_API->value,
+        'auth:oauth',
+        'scope:access-api',
     ])]
     public function authorizeSpotify(Request $request)
     {
@@ -176,8 +177,8 @@ class SpotifyController extends Controller
     }
 
     #[Post('disconnect', 'spotify.disconnect', [
-        'auth:sanctum',
-        'ability:' . TokenAbility::ACCESS_API->value,
+        'auth:oauth',
+        'scope:access-api',
     ])]
     public function disconnect()
     {
@@ -189,8 +190,8 @@ class SpotifyController extends Controller
     }
 
     #[Get('status', 'spotify.status', [
-        'auth:sanctum',
-        'ability:' . TokenAbility::ACCESS_API->value,
+        'auth:oauth',
+        'scope:access-api',
     ])]
     public function status()
     {
@@ -263,8 +264,8 @@ class SpotifyController extends Controller
     }
 
     #[Get('user/profile', 'spotify.user.profile', [
-        'auth:sanctum',
-        'ability:' . TokenAbility::ACCESS_API->value,
+        'auth:oauth',
+        'scope:access-api',
     ])]
     public function getUserProfile()
     {
@@ -281,8 +282,8 @@ class SpotifyController extends Controller
     }
 
     #[Get('user/playlists', 'spotify.user.playlists', [
-        'auth:sanctum',
-        'ability:' . TokenAbility::ACCESS_API->value,
+        'auth:oauth',
+        'scope:access-api',
     ])]
     public function getUserPlaylists(Request $request)
     {
@@ -302,8 +303,8 @@ class SpotifyController extends Controller
     }
 
     #[Get('search', 'spotify.search', [
-        'auth:sanctum',
-        'ability:' . TokenAbility::ACCESS_API->value,
+        'auth:oauth',
+        'scope:access-api',
     ])]
     public function search(Request $request)
     {
@@ -330,8 +331,8 @@ class SpotifyController extends Controller
     }
 
     #[Get('genres/seeds', 'spotify.genres.seeds', [
-        'auth:sanctum',
-        'ability:' . TokenAbility::ACCESS_API->value,
+        'auth:oauth',
+        'scope:access-api',
     ])]
     public function getGenreSeeds()
     {

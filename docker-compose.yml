@@ -39,24 +39,6 @@ services:
         hard: 10000
     extra_hosts:
       - 'host.docker.internal:host-gateway'
-    environment:
-      - OTEL_PHP_AUTOLOAD_ENABLED=false
-      - OTEL_ENABLED=true
-      - OTEL_EXPORTER_OTLP_INSECURE=true
-      - OTEL_EXPORTER_OTLP_TIMEOUT=30
-      - OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.juul.localdomain
-      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://otel.juul.localdomain/v1/traces
-      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
-      - OTEL_EXPORTER_OTLP_TIMEOUT=30
-      - OTEL_PROPAGATORS=tracecontext,baggage
-      - OTEL_SERVICE_NAME=baander-backend
-      - OTEL_SERVICE_VERSION=1.0.0
-      - OTEL_LOGS_PROCESSOR=batch
-      - OTEL_LOGS_EXPORTER=otlp
-      - OTEL_TRACES_PROCESSOR=batch
-      - OTEL_TRACES_EXPORTER=otlp
-      - OTEL_METRICS_PROCESSOR=batch
-      - OTEL_METRICS_EXPORTER=otlp
     volumes:
       - /mnt/c/baander-library:/storage/baander-library
       - ./:/var/www/html:cached
@@ -70,13 +52,13 @@ services:
       context: ./docker/
       dockerfile: ./postgres/Dockerfile
       args:
-        PGROONGA_VERSION: 4.0.1-1
-        POSTGRESQL_VERSION: 17
+        PGROONGA_VERSION: 4.0.5-1
+        POSTGRESQL_VERSION: 18
     restart: unless-stopped
     networks:
       - baander-backtier
     ports:
-      - "127.0.0.1:5432:5432"
+      - "5432:5432"
     shm_size: 256mb
     environment:
       POSTGRES_USER: ${DB_USERNAME}
@@ -107,18 +89,6 @@ services:
       - baander-backtier
     ports:
       - "127.0.0.1:6379:6379"
-
-#  buggregator:
-#    image: ghcr.io/buggregator/server:latest
-#    container_name: baander-buggregator
-#    restart: unless-stopped
-#    networks:
-#      - baander-backtier
-#    ports:
-#      - "127.0.0.1:8000:8000"
-#      - "127.0.0.1:1025:1025"
-#      - "127.0.0.1:9912:9912"
-#      - "127.0.0.1:9913:9913"
 
 volumes:
   postgres_data:

@@ -2,21 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { LogViewer } from './components/log-viewer.tsx';
 import { LogSearch } from './components/log-search.tsx';
 import { LogStats } from './components/log-stats.tsx';
-import { LoadingSpinner } from '@/modules/common/LoadingSpinner.tsx';
-import { ErrorDisplay } from '@/modules/common/ErrorDisplay.tsx';
+import { LoadingSpinner } from '@/app/modules/common/LoadingSpinner.tsx';
+import { ErrorDisplay } from '@/app/modules/common/ErrorDisplay.tsx';
 import { 
   Box, 
   Flex,
   Container,
 } from '@radix-ui/themes';
 import './logs.css';
-import { useLogsIndex } from '@/libs/api-client/gen/endpoints/logs/logs.ts';
+import { useLogsIndex } from '@/app/libs/api-client/gen/endpoints/system/system.ts';
 
 export const LogsPage: React.FC = () => {
   const [selectedLogFile, setSelectedLogFile] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [viewMode, setViewMode] = useState<'tail' | 'head' | 'content' | 'search'>('tail');
-  const [linesCount, setLinesCount] = useState<number>(50);
+  const [linesCount, setLinesCount] = useState<number>(1000);
 
   // Fetch log files
   const { 

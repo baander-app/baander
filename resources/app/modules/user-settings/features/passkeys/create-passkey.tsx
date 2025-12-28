@@ -1,9 +1,9 @@
-import { useWebauthn } from '@/hooks/use-webauthn.ts';
+import { useWebauthn } from '@/app/hooks/use-webauthn.ts';
 import { Button, Flex, TextField } from '@radix-ui/themes';
 import { useForm } from 'react-hook-form';
-import { Iconify } from '@/ui/icons/iconify.tsx';
+import { Iconify } from '@/app/ui/icons/iconify.tsx';
 import { useEffect } from 'react';
-import { authPasskeyRegister, authPasskeyRegisterOption } from '@/libs/api-client/gen/endpoints/auth/auth.ts';
+import { authPasskeyRegister, authPasskeyRegisterOption } from '@/app/libs/api-client/gen/endpoints/auth/auth.ts';
 import KeyOutline from '~icons/ion/key-outline';
 
 

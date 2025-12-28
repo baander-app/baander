@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { generateMockDataFromType } from '@/utils/testing/generateMockDataFromType.ts';
+import { generateMockDataFromType } from '@/app/utils/testing/generateMockDataFromType.ts';
 
 interface TestModeContextType {
   isTestMode: boolean;

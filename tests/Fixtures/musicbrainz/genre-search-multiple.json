@@ -1,0 +1,9 @@
+{
+  "genres": [
+    {"id": "mbid-rock", "name": "rock", "count": 125430},
+    {"id": "mbid-hardrock", "name": "hard rock", "count": 45000},
+    {"id": "mbid-punkrock", "name": "punk rock", "count": 32000}
+  ],
+  "count": 3,
+  "offset": 0
+}

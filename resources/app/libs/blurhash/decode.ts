@@ -1,4 +1,4 @@
-import { linearTosRGB, sRGBToLinear } from '@/libs/blurhash/srgb.ts';
+import { linearTosRGB, sRGBToLinear } from '@/app/libs/blurhash/srgb.ts';
 
 export const decode83 = (str: String) => {
   let value = 0;

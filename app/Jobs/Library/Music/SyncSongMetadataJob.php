@@ -3,6 +3,7 @@
 namespace App\Jobs\Library\Music;
 
 use App\Jobs\BaseJob;
+use App\Jobs\Middleware\MetadataRateLimiter;
 use App\Models\Artist;
 use App\Models\Genre;
 use App\Models\Song;
@@ -32,6 +33,20 @@ class SyncSongMetadataJob extends BaseJob implements ShouldQueue
         private readonly bool $forceUpdate = false,
     )
     {
+    }
+
+    /**
+     * Get the middleware the job should pass through.
+     *
+     * @return array<int, object>
+     */
+    public function middleware(): array
+    {
+        return [
+            new MetadataRateLimiter(
+                perSecond: config('scanner.music.rate_limiting.sync_jobs_per_second', 1)
+            ),
+        ];
     }
 
     public function handle(): void

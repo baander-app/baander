@@ -31,25 +31,20 @@
         "bacon/bacon-qr-code": "^v3.0.1",
         "dedoc/scramble": "^v0.12.9",
         "defuse/php-encryption": "^2.4",
+        "eliashaeussler/sse": "^2.0",
         "ergebnis/clock": "^2.10.0",
         "guzzlehttp/guzzle": "^7.9.2",
         "hidehalo/nanoid-php": "^2.0",
         "intervention/image": "^3.11.1",
-        "laravel/fortify": "^v1.25.4",
         "laravel/framework": "^12.0.1",
         "laravel/horizon": "^v5.30.3",
         "laravel/octane": "v2.11.0",
-        "laravel/sanctum": "^v4.0.5",
         "laravel/tinker": "^v2.7.3",
         "league/csv": "^9.24",
         "league/flysystem-read-only": "^3.28.0",
         "league/mime-type-detection": "^1.16.0",
-        "league/oauth2-server": "^8.5",
+        "league/oauth2-server": "^9.3.0",
         "nyholm/psr7": "*",
-        "open-telemetry/exporter-otlp": "^1.3",
-        "open-telemetry/opentelemetry-logger-monolog": "^1.1",
-        "open-telemetry/sem-conv": "1.32.1",
-        "open-telemetry/transport-grpc": "*",
         "overtrue/laravel-versionable": "^5.4.0",
         "php-ffmpeg/php-ffmpeg": "^1.3",
         "php-http/guzzle7-adapter": "^1.1",
@@ -71,19 +66,22 @@
     },
     "require-dev": {
         "barryvdh/laravel-ide-helper": "^3.6",
+        "brianium/paratest": "^7.0",
         "cweagans/composer-patches": "^1.7",
         "doctrine/dbal": "^4.2.2",
         "fakerphp/faker": "^v1.24.1",
         "icanhazstring/composer-unused": "^0.9.3",
+        "itsgoingd/clockwork": "^5.3",
         "laracraft-tech/laravel-schema-rules": "^v1.5.0",
         "mockery/mockery": "^1.6.12",
         "nikic/php-parser": "^v5.4.0",
         "nunomaduro/collision": "^v8.6",
         "phpmd/phpmd": "^2.15.0",
         "phpstan/phpstan": "^2.1.6",
-        "phpunit/phpunit": "^11",
+        "phpunit/phpunit": "^12",
         "spatie/laravel-ignition": "^2.9.1",
         "squizlabs/php_codesniffer": "^3.11.3",
+        "symfony/var-dumper": "^7.4",
         "symplify/vendor-patches": "*",
         "xammie/mailbook": "^1.9.0"
     },
@@ -99,10 +97,7 @@
             "Baander\\RedisStack\\": "packages/redis-stack/src/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
-        },
-        "files": [
-            "app/Modules/Humanize/bytes.php"
-        ]
+        }
     },
     "autoload-dev": {
         "psr-4": {
@@ -134,12 +129,6 @@
         ]
     },
     "extra": {
-        "patches": {
-            "psr/log": [
-                "patches/psr-log-src-nulllogger-php.patch",
-                "patches/psr-log-src-loggertrait-php.patch"
-            ]
-        },
         "laravel": {
             "dont-discover": [
                 "laravel/telescope"
@@ -157,7 +146,7 @@
             "tbachert/spi": true
         }
     },
-    "minimum-stability": "dev",
+    "minimum-stability": "resources/app/dev",
     "prefer-stable": true,
     "repositories": [
         {
@@ -173,10 +162,6 @@
             "options": {
                 "symlink": true
             }
-        },
-        {
-            "type": "git",
-            "url": "https://github.com/opentelemetry-php/sem-conv.git"
         }
     ]
 }

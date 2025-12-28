@@ -1,6 +1,6 @@
 import { Flex, Text } from '@radix-ui/themes';
 import { Link } from 'react-router-dom';
-import { ForgotPasswordForm } from '@/modules/auth/forgot-password-form/forgot-password-form.tsx';
+import { ForgotPasswordForm } from '@/app/modules/auth/forgot-password-form/forgot-password-form.tsx';
 import styles from './forgot-password.module.scss';
 
 export function ForgotPassword() {

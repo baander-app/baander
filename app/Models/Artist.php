@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Format\LocaleString;
+use App\Modules\Eloquent\Relations\BelongsToManyThrough;
 use App\Modules\Nanoid\Concerns\HasNanoPublicId;
-use App\Modules\Translation\LocaleString;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Artist extends BaseModel
 {
@@ -30,14 +32,17 @@ class Artist extends BaseModel
         'life_span_end',
         'disambiguation',
         'sort_name',
+        'biography',
         'mbid',
         'discogs_id',
         'spotify_id',
+        'locked_fields',
     ];
 
     protected $casts = [
         'life_span_begin' => 'date',
-        'life_span_end' => 'date',
+        'life_span_end'   => 'date',
+        'locked_fields'   => 'array',
     ];
 
     public function getRouteKeyName(): string
@@ -118,20 +123,46 @@ class Artist extends BaseModel
     public static function createUnknown(array $attributes = []): static
     {
         return static::create(array_merge([
-            'name' => LocaleString::delimitString('media.unknown_artist'),
+            'name' => LocaleString::delimit('media.unknown_artist'),
         ], $attributes));
     }
 
     public function albums()
     {
-        return $this->belongsToMany(Album::class)
-            ->using(AlbumArtist::class);
+        $instance = $this->newRelatedInstance(Album::class);
+
+        $query = $instance->newQuery();
+
+        return new BelongsToManyThrough(
+            $query,
+            $this,
+            'songs',
+            'artist_song',
+            'artist_id',
+            'song_id',
+            'id',
+            $instance->getKeyName(),
+            'albums',
+        )->setThroughKeys('album_id', 'id')
+         ->groupBy('albums.id');
     }
 
     public function songs()
     {
-        return $this->belongsToMany(Song::class)
-            ->using(ArtistSong::class);
+        $instance = $this->newRelatedInstance(Song::class);
+
+        $query = $instance->newQuery();
+
+        return new BelongsToManyThrough(
+            $query,
+            $this,
+            'songs',
+            'artist_song',
+            'artist_id',
+            'song_id',
+            $instance->getKeyName(),
+            'songs',
+        )->withPivot('role');
     }
 
     public function portrait()

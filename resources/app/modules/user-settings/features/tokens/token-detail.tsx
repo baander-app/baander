@@ -1,10 +1,9 @@
-import { PersonalAccessTokenViewResource } from '@/libs/api-client/gen/models';
 import { Code, Badge, Card, DataList } from '@radix-ui/themes';
-import { useDateFormatter } from '@/providers/dayjs-provider.tsx';
-import { DateTime } from '@/ui/dates/date-time.tsx';
+import { useDateFormatter } from '@/app/providers/dayjs-provider.tsx';
+import { DateTime } from '@/app/ui/dates/date-time.tsx';
 
 export interface TokenDetailProps {
-  item: PersonalAccessTokenViewResource;
+  item: any;
 }
 
 export function TokenDetail({ item }: TokenDetailProps) {

@@ -1,0 +1,18 @@
+.playlistsLayout {
+  display: flex;
+  gap: 16px;
+  height: 100%;
+}
+
+.grid {
+  flex-grow: 1;
+  flex-basis: 999;
+}
+
+.playlist {
+  transition: transform 0.2s ease;
+}
+
+.sidebar {
+  flex-shrink: 0;
+}

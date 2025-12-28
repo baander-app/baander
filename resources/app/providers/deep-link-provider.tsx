@@ -1,8 +1,8 @@
 import React, { useCallback, useContext, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { noop } from '@/utils/noop.ts';
-import { useDeepLink } from '@/hooks/use-deep-link.ts';
-import { DeepLinkRoute, parseDeepLinkUrl } from '@/utils/deep-link-parser.ts';
+import { noop } from '@/app/utils/noop.ts';
+import { useDeepLink } from '@/app/hooks/use-deep-link.ts';
+import { DeepLinkRoute, parseDeepLinkUrl } from '@/app/utils/deep-link-parser.ts';
 
 interface DeepLinkContextType {
   handleDeepLink: (route: DeepLinkRoute) => void;

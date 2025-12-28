@@ -20,13 +20,16 @@ abstract class Handler
 
     protected function fetchEndpoint(string $endpoint, array $params = []): ?array
     {
-        // Check if we're currently rate limited
-        if (Cache::has(self::RATE_LIMIT_CACHE_KEY)) {
-            Log::warning('Discogs API request skipped due to rate limiting', [
-                'endpoint' => $endpoint,
-                'rate_limit_expires' => Cache::get(self::RATE_LIMIT_CACHE_KEY . '_expires')
-            ]);
-            return null;
+        // Check if we're currently rate limited and wait if needed
+        if (!$this->canMakeRequest()) {
+            if (!$this->waitForRateLimit()) {
+                // Still rate limited after waiting
+                Log::warning('Discogs API request skipped after rate limit wait timeout', [
+                    'endpoint' => $endpoint,
+                    'rate_limit_expires' => Cache::get(self::RATE_LIMIT_CACHE_KEY . '_expires')
+                ]);
+                return null;
+            }
         }
 
         if (config('services.discogs.api_key')) {
@@ -177,6 +180,57 @@ abstract class Handler
     public function canMakeRequest(): bool
     {
         return !Cache::has(self::RATE_LIMIT_CACHE_KEY);
+    }
+
+    /**
+     * Wait for rate limit to expire before making requests
+     *
+     * Respects the actual expires_at time from rate limit headers.
+     * Has a safety net of max attempts in case something goes wrong.
+     *
+     * @return bool True if we can proceed, false if timeout reached
+     */
+    public function waitForRateLimit(): bool
+    {
+        $maxAttempts = 3;
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            if ($this->canMakeRequest()) {
+                return true;
+            }
+
+            $expiresAt = Cache::get(self::RATE_LIMIT_CACHE_KEY . '_expires');
+            $remaining = $expiresAt ? now()->diffInSeconds($expiresAt) : 0;
+
+            if ($remaining <= 0) {
+                // Should be expired but cache hasn't cleared, try to proceed
+                return true;
+            }
+
+            // Wait for the full remaining time (up to 60 seconds)
+            // This respects the actual rate limit expires_at time
+            $waitTime = min($remaining, 60);
+
+            Log::info("Waiting for Discogs rate limit (attempt $attempt/$maxAttempts)", [
+                'seconds_remaining' => $remaining,
+                'waiting_seconds' => $waitTime,
+                'expires_at' => $expiresAt,
+            ]);
+
+            sleep($waitTime);
+        }
+
+        // Final check after all attempts
+        $canProceed = $this->canMakeRequest();
+
+        if (!$canProceed) {
+            Log::warning('Discogs rate limit wait timeout exceeded', [
+                'attempts' => $maxAttempts,
+                'expires_at' => Cache::get(self::RATE_LIMIT_CACHE_KEY . '_expires'),
+            ]);
+        }
+
+        return $canProceed;
     }
 
     /**

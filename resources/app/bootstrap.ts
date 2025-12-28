@@ -23,6 +23,15 @@ dayjs.extend(localizedFormat);
 
 import '@fontsource-variable/inter';
 import '@fontsource-variable/source-code-pro';
-import { initAuthStore } from '@/modules/auth/store';
+import { initAuthStore } from '@/app/modules/auth/store';
 
 initAuthStore();
+
+import { client } from 'laravel-precognition-react';
+import { AXIOS_INSTANCE } from '@/app/libs/api-client/axios-instance.ts';
+
+client.use(AXIOS_INSTANCE);
+
+// Configure Precognition to only validate, not submit
+// Actual submission is handled by React Query mutations
+client.determineSuccessUsing(() => false);

@@ -1,9 +1,9 @@
-import { Notification } from '@/modules/notifications/models';
+import { Notification } from '@/app/modules/notifications/models';
 import { Box, Button, Card, Flex, Text } from '@radix-ui/themes';
-import { Iconify } from '@/ui/icons/iconify.tsx';
-import { useAppDispatch } from '@/store/hooks.ts';
-import { removeNotification } from '@/store/notifications/notifications-slice.ts';
-import { DateTime } from '@/ui/dates/date-time.tsx';
+import { Iconify } from '@/app/ui/icons/iconify.tsx';
+import { useAppDispatch } from '@/app/store/hooks.ts';
+import { removeNotification } from '@/app/store/notifications/notifications-slice.ts';
+import { DateTime } from '@/app/ui/dates/date-time.tsx';
 
 export interface NotificationCardProps extends React.ComponentPropsWithoutRef<'div'> {
   notification: Notification;

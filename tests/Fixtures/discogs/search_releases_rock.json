@@ -1,0 +1,34 @@
+{
+  "results": [
+    {
+      "id": 1,
+      "title": "Nevermind",
+      "genre": ["rock"],
+      "style": ["grunge", "alternative rock"],
+      "year": 1991,
+      "resource_url": "https://api.discogs.com/releases/1"
+    },
+    {
+      "id": 2,
+      "title": "Led Zeppelin IV",
+      "genre": ["rock"],
+      "style": ["hard rock", "classic rock"],
+      "year": 1971,
+      "resource_url": "https://api.discogs.com/releases/2"
+    },
+    {
+      "id": 3,
+      "title": "Back in Black",
+      "genre": ["rock"],
+      "style": ["hard rock"],
+      "year": 1980,
+      "resource_url": "https://api.discogs.com/releases/3"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "pages": 100,
+    "per_page": 50,
+    "items": 5000
+  }
+}

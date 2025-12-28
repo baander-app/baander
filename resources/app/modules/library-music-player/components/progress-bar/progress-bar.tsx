@@ -1,7 +1,7 @@
 import { memo, startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useMusicPlayerStore } from '@/modules/library-music-player/store';
+import { useMusicPlayerStore } from '@/app/modules/library-music-player/store';
 import styles from './progress-bar.module.scss';
-import { clamp } from '@/utils/clamp.ts';
+import { clamp } from '@/app/utils/clamp.ts';
 import { Flex } from '@radix-ui/themes';
 
 interface ProgressBarProps {

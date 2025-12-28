@@ -1,5 +1,5 @@
 import { Button, Container, Dialog, Heading, Inset } from '@radix-ui/themes';
-import { CreatePasskey } from '@/modules/user-settings/features/passkeys/create-passkey.tsx';
+import { CreatePasskey } from '@/app/modules/user-settings/features/passkeys/create-passkey.tsx';
 
 export function Passkeys() {
 

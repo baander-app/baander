@@ -1,4 +1,4 @@
-import { isElectron } from '@/utils/platform.ts';
+import { isElectron } from '@/app/utils/platform.ts';
 
 export interface CredentialStore {
   readonly supported: boolean;

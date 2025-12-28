@@ -1,17 +1,17 @@
-import { RootLayout } from '@/layouts/root-layout/root-layout.tsx';
+import { RootLayout } from '@/app/layouts/root-layout/root-layout.tsx';
 import { Navigate, Outlet, RouteObject } from 'react-router-dom';
 import { Suspense } from 'react';
-import { LibraryMusicRoutes } from '@/modules/library-music/routes/_routes.tsx';
-import { DashboardLayout } from '@/layouts/dashboard-layout/dashboard-layout.tsx';
-import { DashboardRoutes } from '@/modules/dashboard/routes.tsx';
-import { UserSettingsRoutes } from '@/modules/user-settings/routes.tsx';
-import { usePathParam } from '@/hooks/use-path-param.ts';
-import { LibraryMoviesRoutes } from '@/modules/library-movies/routes/_routes.tsx';
-import { LibraryType } from '@/models/library-type.ts';
-import { Overview } from '@/modules/overview/overview.tsx';
-import { LibraryMusicPlaylistsRoutes } from '@/modules/library-music-playlists/_routes.tsx';
-import { useLibraryShowSuspense } from '@/libs/api-client/gen/endpoints/library/library.ts';
-import { ErrorRoutes } from '@/modules/error/routes/_routes.tsx';
+import { LibraryMusicRoutes } from '@/app/modules/library-music/routes/_routes.tsx';
+import { DashboardLayout } from '@/app/layouts/dashboard-layout/dashboard-layout.tsx';
+import { DashboardRoutes } from '@/app/modules/dashboard/routes.tsx';
+import { UserSettingsRoutes } from '@/app/modules/user-settings/routes.tsx';
+import { usePathParam } from '@/app/hooks/use-path-param.ts';
+import { LibraryMoviesRoutes } from '@/app/modules/library-movies/routes/_routes.tsx';
+import { LibraryType } from '@/app/models/library-type.ts';
+import { Overview } from '@/app/modules/overview/overview.tsx';
+import { LibraryMusicPlaylistsRoutes } from '@/app/modules/library-music-playlists/_routes.tsx';
+import { useLibraryShowSuspense } from '@/app/libs/api-client/gen/endpoints/library/library.ts';
+import { ErrorRoutes } from '@/app/modules/error/routes/_routes.tsx';
 
 const App = () => {
   return (

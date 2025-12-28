@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Http\OpenApi\JsonPaginatorExtension;
+use App\Modules\Http\OpenApi\JsonAnonymousResourceCollectionExtension;
 use App\Modules\Http\OpenApi\LaravelDataCollectionExtension;
 use App\Modules\Http\OpenApi\LaravelDataRequestExtension;
 use App\Modules\Http\OpenApi\LaravelDataToSchema;
@@ -98,6 +99,7 @@ DESCRIPTION
 
     'extensions' => [
         JsonPaginatorExtension::class,
+        JsonAnonymousResourceCollectionExtension::class,
         LaravelDataRequestExtension::class,
         LaravelDataToSchema::class,
         LaravelDataCollectionExtension::class,

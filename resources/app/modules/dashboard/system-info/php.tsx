@@ -1,7 +1,7 @@
 import { Card, Container, Grid, Text, Heading } from '@radix-ui/themes';
 
 import styles from './php.module.scss';
-import { useSystemInfoPhp } from '@/libs/api-client/gen/endpoints/system-info/system-info.ts';
+import { useSystemInfoPhp } from '@/app/libs/api-client/gen/endpoints/system/system.ts';
 
 function Section(section: { section: string, values: { key: string, value: string|number|boolean|null }[] }) {
   return (

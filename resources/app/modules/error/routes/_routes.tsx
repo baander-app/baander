@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { NotFound } from '@/modules/error/routes/not-found.tsx';
+import { NotFound } from '@/app/modules/error/routes/not-found.tsx';
 
 
 export const ErrorRoutes = () => {

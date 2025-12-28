@@ -1,5 +1,5 @@
 import { Container, Flex, Heading, Text } from '@radix-ui/themes';
-import { Env } from '@/common/env.ts';
+import { Env } from '@/app/common/env.ts';
 
 export function DashboardHome() {
   return (

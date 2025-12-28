@@ -1,5 +1,5 @@
 import { Button } from '@radix-ui/themes';
-import { Iconify } from '@/ui/icons/iconify.tsx';
+import { Iconify } from '@/app/ui/icons/iconify.tsx';
 
 export interface CloseButtonProps {
   onClick?: () => void;

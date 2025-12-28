@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasRecursiveRelationships;
+use App\Modules\Eloquent\RecursiveBaseBuilder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Spatie\Sluggable\{HasSlug, SlugOptions};
 
 class Genre extends BaseModel
@@ -22,6 +24,8 @@ class Genre extends BaseModel
     protected $fillable = [
         'name',
         'slug',
+        'parent_id',
+        'mbid',
     ];
 
     /**
@@ -41,7 +45,29 @@ class Genre extends BaseModel
 
     public function songs()
     {
-        return $this->belongsTo(Song::class)
+        return $this->belongsToMany(Song::class)
             ->using(GenreSong::class);
+    }
+
+    /**
+     * Create a new Eloquent query builder for the model.
+     * Override to use RecursiveBaseBuilder for hierarchical queries.
+     *
+     * @param QueryBuilder $query
+     * @return RecursiveBaseBuilder
+     */
+    public function newEloquentBuilder($query): RecursiveBaseBuilder
+    {
+        return new RecursiveBaseBuilder($query);
+    }
+
+    /**
+     * Get the MusicBrainz URL for the genre.
+     *
+     * @return string|null
+     */
+    public function getMusicBrainzUrlAttribute(): ?string
+    {
+        return $this->mbid ? "https://musicbrainz.org/genre/{$this->mbid}" : null;
     }
 }

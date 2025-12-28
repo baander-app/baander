@@ -1,7 +1,6 @@
 import { Box, Button, Text } from '@radix-ui/themes';
 import { SubmitHandler, useForm } from 'react-hook-form';
-import { useAppDispatch, useAppSelector } from '@/store/hooks.ts';
-import { setLyricsOffset } from '@/store/music/music-player-slice.ts';
+import { usePlayerLyricsOffset, usePlayerActions } from '@/app/modules/library-music-player/store';
 import styles from './lyrics-settings.module.scss';
 
 interface LyricsSettingsForm {
@@ -9,8 +8,8 @@ interface LyricsSettingsForm {
 }
 
 export function LyricsSettings() {
-  const { lyrics } = useAppSelector(state => state.musicPlayer);
-  const dispatch = useAppDispatch();
+  const lyricsOffset = usePlayerLyricsOffset();
+  const { setLyricsOffset } = usePlayerActions();
 
   const {
     register,
@@ -18,12 +17,12 @@ export function LyricsSettings() {
     formState: { errors },
   } = useForm<LyricsSettingsForm>({
     defaultValues: {
-      offset: lyrics.offsetMs,
+      offset: lyricsOffset,
     },
   });
 
   const onSubmit: SubmitHandler<LyricsSettingsForm> = (data) => {
-    dispatch(setLyricsOffset({ ms: data.offset }));
+    setLyricsOffset(data.offset);
   };
 
   return (

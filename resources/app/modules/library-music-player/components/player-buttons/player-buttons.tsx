@@ -1,8 +1,8 @@
 import React from 'react';
 
 import styles from './player-controls.module.scss';
-import { MUSIC_CONTROL_ICON_SIZE } from '@/modules/library-music-player/constants.ts';
-import { Iconify } from '@/ui/icons/iconify.tsx';
+import { MUSIC_CONTROL_ICON_SIZE } from '@/app/modules/library-music-player/constants.ts';
+import { Iconify } from '@/app/ui/icons/iconify.tsx';
 
 interface BaseControlProps extends React.HTMLAttributes<HTMLButtonElement> {
   iconName: string;

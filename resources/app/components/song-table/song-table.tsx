@@ -1,22 +1,28 @@
-import { memo, RefObject, useCallback, useEffect, useRef, useState } from 'react';
-import { Iconify } from '@/ui/icons/iconify';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { setQueueAndSong } from '@/store/music/music-player-slice';
+import { memo, RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Iconify } from '@/app/ui/icons/iconify';
+import { usePlayerActions, usePlayerCurrentSongPublicId } from '@/app/modules/library-music-player/store';
+import { useAppDispatch } from '@/app/store/hooks';
+import { createNotification } from '@/app/store/notifications/notifications-slice';
 import {
   ColumnDef,
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
   Header,
-  Row,
+  Row, RowData,
   SortingState,
   Table,
   useReactTable,
 } from '@tanstack/react-table';
 import { useVirtualizer, VirtualItem, Virtualizer } from '@tanstack/react-virtual';
 import { SpeakerLoudIcon } from '@radix-ui/react-icons';
+import { ContextMenu } from '@radix-ui/themes';
+import { DndContext, closestCenter, DragEndEvent, DragStartEvent, PointerSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import styles from './song-table.module.scss';
-import { SongResource } from '@/libs/api-client/gen/models';
+import { SongResource } from '@/app/libs/api-client/gen/models';
+import { AddToPlaylistMenu } from '@/app/components/add-to-playlist-menu/add-to-playlist-menu';
 
 export interface SongTableProps {
   songs: SongResource[];
@@ -25,6 +31,12 @@ export interface SongTableProps {
   onScrollToBottom?: () => void;
   estimatedTotalCount?: number;
   className?: string;
+  contextMenuActions?: {
+    onEdit?: (song: SongResource) => void;
+    onRemoveFromPlaylist?: (song: SongResource) => void;
+  };
+  reorderable?: boolean;
+  onReorder?: (oldIndex: number, newIndex: number) => void;
 }
 
 interface TableHeaderProps {
@@ -33,16 +45,29 @@ interface TableHeaderProps {
 }
 
 interface StickyHeaderProps {
-  table: Table<SongResource>;
+  table: Table<RowData>;
 }
 
 interface HeaderCellProps {
-  header: Header<SongResource, unknown>;
+  key: string;
+  header: Header<RowData, unknown>;
 }
 
 interface VirtualizedRowsProps {
   visibleRows: VirtualizedRowData[];
   onSongClick: (id: string) => void;
+  contextMenuActions?: SongTableProps['contextMenuActions'];
+  reorderable?: boolean;
+}
+
+interface VirtualizedRowProps {
+  key: string;
+  virtualRow: VirtualItem;
+  row: Row<SongResource>;
+  onSongClick: (id: string) => void;
+  contextMenuActions?: SongTableProps['contextMenuActions'];
+  reorderable?: boolean;
+  index?: number;
 }
 
 interface SongTitleCellProps {
@@ -55,7 +80,7 @@ interface VirtualizedRowData {
 }
 
 interface UseVirtualizedTableProps {
-  table: Table<SongResource>;
+  table: Table<RowData>;
   parentRef: RefObject<HTMLDivElement | null>;
   estimatedTotalCount?: number;
   onScrollToBottom?: () => void;
@@ -68,39 +93,63 @@ interface UseVirtualizedTableReturn {
   visibleRows: VirtualizedRowData[];
 }
 
-const COLUMN_DEFINITIONS: ColumnDef<SongResource>[] = [
-  {
-    header: 'Title',
-    cell: (info) => <SongTitleCell song={info.row.original}/>,
-  },
-  {
-    header: 'Lyrics',
-    accessorKey: 'lyricsExist',
-    cell: (info) => info.getValue() ? <Iconify icon="arcticons:quicklyric"/> : null,
-    size: 60,
-  },
-  {
-    header: 'Artist',
-    accessorFn: (row) => row.artists?.map(x => x.name).join(', '),
-  },
-  {
-    header: 'Album',
-    accessorFn: (row) => row.album?.title,
-  },
-  {
-    header: 'Duration',
-    accessorKey: 'durationHuman',
-    size: 80,
-  },
-  {
-    header: 'Track',
-    accessorKey: 'track',
-    size: 60,
-  },
-];
+const createColumnDefinitions = (reorderable?: boolean): ColumnDef<SongResource>[] => {
+  const columns: ColumnDef<SongResource>[] = [];
+
+  if (reorderable) {
+    columns.push({
+      id: 'drag',
+      header: '',
+      cell: () => (
+        <div className={styles.dragHandle}>
+          <Iconify icon="ph:dots-six-vertical-bold" width={16} height={16} />
+        </div>
+      ),
+      size: 40,
+      enableSorting: false,
+    });
+  }
+
+  columns.push(
+    {
+      header: 'Title',
+      cell: (info) => <SongTitleCell song={info.row.original}/>,
+    },
+    {
+      header: 'Lyrics',
+      accessorFn: (row) => !!row.lyrics,
+      cell: (info) => info.getValue() ? <Iconify icon="arcticons:quicklyric"/> : null,
+      size: 60,
+    },
+    {
+      header: 'Artist',
+      accessorFn: (row) => row.artists?.map(x => x.name).join(', '),
+    },
+    {
+      header: 'Album',
+      accessorFn: (row) => row.album?.title,
+    },
+    {
+      header: 'Genre',
+      accessorFn: (row) => row.genres?.map(x => x.name).join(', '),
+    },
+    {
+      header: 'Duration',
+      accessorKey: 'durationHuman',
+      size: 80,
+    },
+    {
+      header: 'Track',
+      accessorKey: 'track',
+      size: 60,
+    }
+  );
+
+  return columns;
+};
 
 const SongTitleCell = memo(({ song }: SongTitleCellProps) => {
-  const { currentSongPublicId } = useAppSelector(state => state.musicPlayer);
+  const currentSongPublicId = usePlayerCurrentSongPublicId();
   const isCurrentSong = currentSongPublicId === song.publicId;
 
   return (
@@ -120,26 +169,64 @@ export function SongTable({
                             onScrollToBottom,
                             estimatedTotalCount,
                             className,
+                            contextMenuActions,
+                            reorderable,
+                            onReorder,
                           }: SongTableProps) {
-  const dispatch = useAppDispatch();
+  const { setQueueAndPlay } = usePlayerActions();
   const [sorting, setSorting] = useState<SortingState>([]);
-  const parentRef = useRef<HTMLDivElement>(null);
+  const [songsState, setSongsState] = useState(songs);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const parentRef = useRef<HTMLDivElement | null>(null);
   const lastScrollTimeRef = useRef(0);
   const hasTriggeredRef = useRef(false);
+
+  // Update songs state when prop changes
+  useEffect(() => {
+    if (!reorderable) {
+      setSongsState(songs);
+    }
+  }, [songs, reorderable]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveId(event.active.id);
+  }, []);
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (over && active.id !== over.id) {
+      const oldIndex = songsState.findIndex((s) => s.publicId === active.id);
+      const newIndex = songsState.findIndex((s) => s.publicId === over.id);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newSongs = arrayMove(songsState, oldIndex, newIndex);
+        setSongsState(newSongs);
+        onReorder?.(oldIndex, newIndex);
+      }
+    }
+  }, [songsState, onReorder]);
 
   const handleSongClick = useCallback((publicId: string) => {
     const newQueue = [...songs];
     const index = newQueue.findIndex(x => x.publicId === publicId);
     newQueue.splice(0, 0, newQueue.splice(index, 1)[0]);
-    dispatch(setQueueAndSong({
-      queue: newQueue,
-      playPublicId: newQueue[0].publicId,
-    }));
-  }, [dispatch, songs]);
+    setQueueAndPlay(newQueue, newQueue[0].publicId);
+  }, [setQueueAndPlay, songs]);
 
-  const table = useReactTable({
-    data: songs,
-    columns: COLUMN_DEFINITIONS,
+
+  const table = useReactTable<SongResource>({
+    data: reorderable ? songsState : songs,
+    columns: createColumnDefinitions(reorderable),
     state: { sorting },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
@@ -157,7 +244,7 @@ export function SongTable({
     hasTriggered: hasTriggeredRef,
   });
 
-  return (
+  const tableContent = (
     <div className={`${styles.scrollList} ${className || ''}`}>
       <TableHeader title={title} description={description}/>
 
@@ -166,18 +253,56 @@ export function SongTable({
 
         <div ref={parentRef} className={styles.scrollableContent}>
           <div className={styles.virtualizedContainer} style={{ height: `${virtualizer.getTotalSize()}px` }}>
-            <VirtualizedRows
-              visibleRows={visibleRows}
-              onSongClick={handleSongClick}
-            />
+            {reorderable ? (
+              <SortableContext
+                items={songsState.map(s => s.publicId)}
+                strategy={verticalListSortingStrategy}
+              >
+                <VirtualizedRows
+                  visibleRows={visibleRows}
+                  onSongClick={handleSongClick}
+                  contextMenuActions={contextMenuActions}
+                  reorderable={reorderable}
+                />
+              </SortableContext>
+            ) : (
+              <VirtualizedRows
+                visibleRows={visibleRows}
+                onSongClick={handleSongClick}
+                contextMenuActions={contextMenuActions}
+                reorderable={reorderable}
+              />
+            )}
           </div>
         </div>
       </div>
     </div>
   );
+
+  if (!reorderable) {
+    return tableContent;
+  }
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
+      {tableContent}
+      <DragOverlay>
+        {activeId ? (
+          <div style={{ background: 'var(--gray-3)', padding: '8px', borderRadius: '4px', opacity: 0.8 }}>
+            {songsState.find(s => s.publicId === activeId)?.title}
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
+  );
 }
 
-function TableHeader({ title, description }: TableHeaderProps) {
+const TableHeader = memo(({ title, description }: TableHeaderProps) => {
   if (!title && !description) return null;
 
   return (
@@ -186,9 +311,11 @@ function TableHeader({ title, description }: TableHeaderProps) {
       {description && <p className={styles.description}>{description}</p>}
     </div>
   );
-}
+});
 
-function StickyHeader({ table }: StickyHeaderProps) {
+TableHeader.displayName = 'TableHeader';
+
+const StickyHeader = memo(({ table }: StickyHeaderProps) => {
   return (
     <div className={styles.fixedHeader}>
       <table>
@@ -204,9 +331,11 @@ function StickyHeader({ table }: StickyHeaderProps) {
       </table>
     </div>
   );
-}
+});
 
-function HeaderCell({ header }: HeaderCellProps) {
+StickyHeader.displayName = 'StickyHeader';
+
+const HeaderCell = memo(({ header }: HeaderCellProps) => {
   return (
     <th style={{ width: header.getSize() }}>
       {header.isPlaceholder ? null : (
@@ -215,38 +344,184 @@ function HeaderCell({ header }: HeaderCellProps) {
           onClick={header.column.getToggleSortingHandler()}
         >
           {flexRender(header.column.columnDef.header, header.getContext())}
-          {getSortIcon(header.column.getIsSorted())}
         </div>
       )}
     </th>
   );
-}
+});
 
-function VirtualizedRows({ visibleRows, onSongClick }: VirtualizedRowsProps) {
+HeaderCell.displayName = 'HeaderCell';
+
+const VirtualizedRow = memo(({ virtualRow, row, onSongClick, contextMenuActions, reorderable }: VirtualizedRowProps) => {
+  const handleRowClick = useCallback(() => {
+    onSongClick(row.original.publicId);
+  }, [row.original.publicId, onSongClick]);
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: row.original.publicId,
+    disabled: !reorderable,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    height: `${virtualRow.size}px`,
+    position: 'relative' as const,
+    top: 0,
+    left: 0,
+    width: '100%',
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const rowStyle = reorderable ? style : {
+    height: `${virtualRow.size}px`,
+    transform: `translateY(${virtualRow.start}px)`,
+  };
+
+  const rowProps = reorderable ? {
+    ref: setNodeRef,
+    ...attributes,
+  } : {};
+
+  return (
+    <ContextMenu.Root key={row.id}>
+      <ContextMenu.Trigger>
+        <tr
+          {...rowProps}
+          onClick={handleRowClick}
+          className={`${styles.listItem} ${styles.virtualizedRow}`}
+          style={rowStyle as any}
+        >
+          {row.getVisibleCells().map((cell) => {
+            const isDragHandle = cell.column.id === 'drag';
+            const cellProps = isDragHandle && reorderable ? {
+              ...listeners,
+            } : {};
+
+            return (
+              <td key={cell.id} style={{ width: cell.column.getSize() }} {...cellProps}>
+                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              </td>
+            );
+          })}
+        </tr>
+      </ContextMenu.Trigger>
+
+      {contextMenuActions && (
+        <SongContextMenu
+          song={row.original}
+          onEdit={contextMenuActions.onEdit}
+          onRemoveFromPlaylist={contextMenuActions.onRemoveFromPlaylist}
+        />
+      )}
+    </ContextMenu.Root>
+  );
+});
+
+VirtualizedRow.displayName = 'VirtualizedRow';
+
+const VirtualizedRows = memo(({ visibleRows, onSongClick, contextMenuActions, reorderable }: VirtualizedRowsProps) => {
   return (
     <table>
       <tbody>
-      {visibleRows.map(({ virtualRow, row }) => (
-        <tr
+      {visibleRows.map(({ virtualRow, row }, index) => (
+        <VirtualizedRow
           key={row.id}
-          onClick={() => onSongClick(row.original.publicId)}
-          className={`${styles.listItem} ${styles.virtualizedRow}`}
-          style={{
-            height: `${virtualRow.size}px`,
-            transform: `translateY(${virtualRow.start}px)`,
-          }}
-        >
-          {row.getVisibleCells().map((cell) => (
-            <td key={cell.id} style={{ width: cell.column.getSize() }}>
-              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-            </td>
-          ))}
-        </tr>
+          virtualRow={virtualRow}
+          row={row}
+          onSongClick={onSongClick}
+          contextMenuActions={contextMenuActions}
+          reorderable={reorderable}
+          index={index}
+        />
       ))}
       </tbody>
     </table>
   );
+});
+
+VirtualizedRows.displayName = 'VirtualizedRows';
+
+interface SongContextMenuProps {
+  song: SongResource;
+  onEdit?: (song: SongResource) => void;
+  onRemoveFromPlaylist?: (song: SongResource) => void;
 }
+
+const SongContextMenu = memo(({ song, onEdit, onRemoveFromPlaylist }: SongContextMenuProps) => {
+  const { setQueueAndPlay, insertInQueue, addToQueue } = usePlayerActions();
+  const dispatch = useAppDispatch();
+
+  const handleEditClick = useCallback(() => {
+    onEdit?.(song);
+  }, [onEdit, song]);
+
+  const handleRemoveClick = useCallback(() => {
+    onRemoveFromPlaylist?.(song);
+  }, [onRemoveFromPlaylist, song]);
+
+  const handlePlayNow = useCallback(() => {
+    // Find the song in the current songs array and play it
+    // This is a simple implementation that just plays the song
+    setQueueAndPlay([song], song.publicId);
+  }, [song, setQueueAndPlay]);
+
+  const handlePlayNext = useCallback(() => {
+    insertInQueue(song);
+    dispatch(
+      createNotification({
+        title: 'Added to queue',
+        message: `"${song.title}" will play next`,
+        type: 'success',
+        toast: true,
+      })
+    );
+  }, [song, insertInQueue, dispatch]);
+
+  const handleAddToQueue = useCallback(() => {
+    addToQueue(song);
+    dispatch(
+      createNotification({
+        title: 'Added to queue',
+        message: `"${song.title}" added to queue`,
+        type: 'success',
+        toast: true,
+      })
+    );
+  }, [song, addToQueue, dispatch]);
+
+  return (
+    <ContextMenu.Content>
+      <ContextMenu.Item onClick={handlePlayNow}>
+        Play Now
+      </ContextMenu.Item>
+      <ContextMenu.Item onClick={handlePlayNext}>
+        Play Next
+      </ContextMenu.Item>
+      <ContextMenu.Item onClick={handleAddToQueue}>
+        Add to Queue
+      </ContextMenu.Item>
+      <ContextMenu.Separator />
+      <AddToPlaylistMenu songPublicId={song.publicId} librarySlug={song.librarySlug || 'music'} />
+      {onEdit && <ContextMenu.Item onClick={handleEditClick}>Edit</ContextMenu.Item>}
+      {onRemoveFromPlaylist && (
+        <>
+          <ContextMenu.Separator />
+          <ContextMenu.Item color="red" onClick={handleRemoveClick}>Remove from Playlist</ContextMenu.Item>
+        </>
+      )}
+    </ContextMenu.Content>
+  );
+});
+
+SongContextMenu.displayName = 'SongContextMenu';
 
 function useVirtualizedTable({
                                table,
@@ -312,18 +587,15 @@ function useVirtualizedTable({
   }, [onScrollToBottom, virtualizer, actualRowCount, lastScrollTime, hasTriggered]);
 
   const virtualItems = virtualizer.getVirtualItems();
-  const visibleRows = virtualItems
-    .filter(virtualRow => virtualRow.index < actualRowCount)
-    .map(virtualRow => ({
-      virtualRow,
-      row: rows[virtualRow.index],
-    }));
+  const visibleRows = useMemo(() =>
+    virtualItems
+      .filter(virtualRow => virtualRow.index < actualRowCount)
+      .map(virtualRow => ({
+        virtualRow,
+        row: rows[virtualRow.index],
+      })),
+    [virtualItems, actualRowCount, rows]
+  );
 
-  return { virtualizer, visibleRows };
-}
-
-function getSortIcon(sortDirection: string | false) {
-  const icons = { asc: ' 🔼', desc: ' 🔽' };
-
-  return icons[sortDirection as keyof typeof icons] ?? null;
+  return {virtualizer, visibleRows} as UseVirtualizedTableReturn;
 }

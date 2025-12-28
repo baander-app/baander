@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 
-import { CreateAccount } from '@/modules/auth/routes/create-account.tsx';
-import { ForgotPassword } from '@/modules/auth/routes/forgot-password.tsx';
+import { CreateAccount } from '@/app/modules/auth/routes/create-account.tsx';
+import { ForgotPassword } from '@/app/modules/auth/routes/forgot-password.tsx';
 
 export const AuthRoutes = () => {
   return (

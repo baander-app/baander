@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { TableVirtuoso } from 'react-virtuoso';
 import { Button, Dialog, Flex, Text } from '@radix-ui/themes';
-import { JobStatus } from '@/modules/dashboard/queue-monitor/components/job-status.tsx';
+import { JobStatus } from '@/app/modules/dashboard/queue-monitor/components/job-status.tsx';
 import dayjs from 'dayjs';
 
 import styles from './jobs-list.module.scss';
-import { JobDetails } from '@/modules/dashboard/queue-monitor/components/job-details.tsx';
-import { useQueueMetricsShowInfinite } from '@/libs/api-client/gen/endpoints/queue/queue.ts';
-import { QueueMonitorResource } from '@/libs/api-client/gen/models';
+import { JobDetails } from '@/app/modules/dashboard/queue-monitor/components/job-details.tsx';
+import { useQueueMetricsShowInfinite } from '@/app/libs/api-client/gen/endpoints/system/system.ts';
+import { QueueMonitorResource } from '@/app/libs/api-client/gen/models';
 
 export interface JobsList extends React.ComponentPropsWithoutRef<'div'> {
 

@@ -1,3 +1,6 @@
+import { resolveDspLoader } from './loaders';
+import type { DspModuleType } from './loaders/dsp-loader.interface';
+
 const dspCache: {
   dynamics?: Promise<DynamicsMeterAPI>;
   loudness?: Promise<LoudnessR128API>;
@@ -6,82 +9,43 @@ const dspCache: {
   spectral?: Promise<SpectralFeaturesApi>;
 } = {};
 
-type DspType = 'dynamics' | 'loudness' | 'convolver' | 'resampler' | 'spectral';
+const loader = resolveDspLoader();
 
-const fetchAndImport = async (url: string) => {
-  const src = await fetch(url).then(res => res.text());
-  const blob = new Blob([src], { type: 'application/javascript' });
-  return await import(/* @vite-ignore */URL.createObjectURL(blob));
-}
-
-const dspJsFetcher = (type: DspType) => {
-  switch (type) {
-    case 'dynamics':
-      return fetchAndImport('/dsp/dynamics_meter.js');
-    case 'loudness':
-      return fetchAndImport('/dsp/loudness_r128.js');
-    case 'convolver':
-      return fetchAndImport('/dsp/partitioned_convolver.js');
-    case 'resampler':
-      return fetchAndImport('/dsp/resampler_hq.js');
-    case 'spectral':
-      return fetchAndImport('/dsp/spectral_features.js');
-    default:
-      throw new Error(`Unknown DSP type: ${type}`);
-  }
+type DspModule = {
+  name: DspModuleType;
+  loadMethod: string;
 };
 
+const modules: DspModule[] = [
+  { name: 'dynamics_meter', loadMethod: 'loadDynamics' },
+  { name: 'loudness_r128', loadMethod: 'loadLoudness' },
+  { name: 'partitioned_convolver', loadMethod: 'loadConvolver' },
+  { name: 'resampler_hq', loadMethod: 'loadResampler' },
+  { name: 'spectral_features', loadMethod: 'loadSpectralFeatures' },
+];
+
+async function loadModule(module: DspModule): Promise<any> {
+  const mod = await loader.loadJsModule(module.name);
+  const wasmUrl = loader.getWasmUrl(module.name);
+  return mod[module.loadMethod](wasmUrl);
+}
+
 export function getDynamics(): Promise<DynamicsMeterAPI> {
-  return dspCache.dynamics ??= loadDynamics();
+  return dspCache.dynamics ??= loadModule(modules[0]);
 }
 
 export function getLoudness(): Promise<LoudnessR128API> {
-  return dspCache.loudness ??= loadLoudness();
+  return dspCache.loudness ??= loadModule(modules[1]);
 }
 
 export function getConvolver(): Promise<PartitionedConvolverAPI> {
-  return dspCache.convolver ??= loadConvolver();
+  return dspCache.convolver ??= loadModule(modules[2]);
 }
 
 export function getResampler(): Promise<ResamplerHQAPI> {
-  return dspCache.resampler ??= loadResampler();
+  return dspCache.resampler ??= loadModule(modules[3]);
 }
 
 export function getSpectralFeatures(): Promise<SpectralFeaturesApi> {
-  return dspCache.spectral ??= loadSpectralFeatures();
-}
-
-async function loadDynamics(): Promise<DynamicsMeterAPI> {
-  const mod = await dspJsFetcher('dynamics') as {
-    loadDynamics: (url?: string) => Promise<DynamicsMeterAPI>;
-  };
-  return mod.loadDynamics('/dsp/dynamics_meter.wasm');
-}
-
-async function loadLoudness(): Promise<LoudnessR128API> {
-  const mod = await dspJsFetcher('loudness') as {
-    loadLoudness: (url?: string) => Promise<LoudnessR128API>;
-  };
-  return mod.loadLoudness('/dsp/loudness_r128.wasm');
-}
-
-async function loadConvolver(): Promise<PartitionedConvolverAPI> {
-  const mod = await dspJsFetcher('convolver') as {
-    loadConvolver: (url?: string) => Promise<PartitionedConvolverAPI>;
-  };
-  return mod.loadConvolver('/dsp/partitioned_convolver.wasm');
-}
-
-async function loadResampler(): Promise<ResamplerHQAPI> {
-  const mod = await dspJsFetcher('resampler') as {
-    loadResampler: (url?: string) => Promise<ResamplerHQAPI>;
-  };
-  return mod.loadResampler('/dsp/resampler_hq.wasm');
-}
-
-async function loadSpectralFeatures(): Promise<SpectralFeaturesApi> {
-  const mod = await dspJsFetcher('spectral') as {
-    loadSpectralFeatures: (url?: string) => Promise<SpectralFeaturesApi>;
-  };
-  return mod.loadSpectralFeatures('/dsp/spectral_features.wasm');
+  return dspCache.spectral ??= loadModule(modules[4]);
 }

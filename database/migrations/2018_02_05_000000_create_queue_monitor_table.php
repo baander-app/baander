@@ -30,6 +30,8 @@ return new class extends Migration {
             $table->text('exception_class')->nullable();
 
             $table->text('data')->nullable();
+
+            $table->timestampsTz();
         });
     }
 

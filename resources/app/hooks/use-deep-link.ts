@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { isElectron } from '@/utils/platform.ts';
+import { isElectron } from '@/app/utils/platform.ts';
 
 export function useDeepLink() {
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);

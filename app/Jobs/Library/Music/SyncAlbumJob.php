@@ -4,6 +4,7 @@ namespace App\Jobs\Library\Music;
 
 use App\Jobs\BaseJob;
 use App\Jobs\Library\Music\Concerns\UpdatesAlbumMetadata;
+use App\Jobs\Middleware\MetadataRateLimiter;
 use App\Models\Album;
 use App\Modules\Logging\Attributes\LogChannel;
 use App\Modules\Logging\Channel;
@@ -32,6 +33,20 @@ class SyncAlbumJob extends BaseJob implements ShouldQueue
         private readonly bool  $cascade = true,
     )
     {
+    }
+
+    /**
+     * Get the middleware the job should pass through.
+     *
+     * @return array<int, object>
+     */
+    public function middleware(): array
+    {
+        return [
+            new MetadataRateLimiter(
+                perSecond: config('scanner.music.rate_limiting.sync_jobs_per_second', 1)
+            ),
+        ];
     }
 
     public function handle(): void

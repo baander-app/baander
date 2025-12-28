@@ -1,6 +1,6 @@
-import { CreateNotification, Notification } from '@/modules/notifications/models.ts';
-import { store } from '@/store';
-import { createNotification } from '@/store/notifications/notifications-slice.ts';
+import { CreateNotification, Notification } from '@/app/modules/notifications/models.ts';
+import { store } from '@/app/store';
+import { createNotification } from '@/app/store/notifications/notifications-slice.ts';
 
 export class NotificationFacade {
   static create(options: CreateNotification) {

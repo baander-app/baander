@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { getDynamics, getLoudness, getSpectralFeatures } from '@/modules/dsp/dsp-repository.ts';
+import { getDynamics, getLoudness, getSpectralFeatures } from '@/app/modules/dsp/dsp-repository.ts';
+import { createLogger } from '@/app/services/logger';
+
+const logger = createLogger('AudioProcessor');
 
 interface WorkletAnalysisData {
   type: 'analysis';
@@ -82,22 +85,36 @@ export class AudioProcessor {
   private contextResumed = false;
   private isPlaying = false;
 
+  // Throttled logging for analysis data (logs once per second)
+  private readonly throttledLog = logger.throttle(1000);
+
   private readonly frequencies = [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 
   private analysisInterval: number | null = null;
   private readonly ANALYSIS_INTERVAL = 40; // 25fps
 
   constructor() {
-    this.audioContext = new AudioContext();
-    this.initializeSharedBuffers();
-    this.initializeNodes();
-    this.setupAudioGraph();
+    logger.debug('Constructor called');
+    try {
+      this.audioContext = new AudioContext();
+      logger.debug('AudioContext created');
 
-    this.tempFrequencyData = new Uint8Array(this.FFT_SIZE / 2);
-    this.tempTimeDomainData = new Uint8Array(this.FFT_SIZE);
+      this.initializeSharedBuffers();
+      this.initializeNodes();
+      this.setupAudioGraph();
 
-    this.initializeDSP();
-    this.initializeWorker();
+      this.tempFrequencyData = new Uint8Array(this.FFT_SIZE / 2);
+      this.tempTimeDomainData = new Uint8Array(this.FFT_SIZE);
+
+      logger.debug('Initializing DSP...');
+      this.initializeDSP();
+      logger.debug('Initializing Worker...');
+      this.initializeWorker();
+      logger.debug('Constructor completed successfully');
+    } catch (error) {
+      logger.error('Constructor failed:', error);
+      throw error;
+    }
   }
 
   private async initializeDSP() {
@@ -115,9 +132,9 @@ export class AudioProcessor {
       this.spectralAPI.init(this.FFT_SIZE, this.audioContext.sampleRate);
 
       this.dspReady = true;
-      console.log('DSP modules initialized successfully');
+      logger.info('DSP modules initialized successfully');
     } catch (error) {
-      console.warn('Failed to initialize DSP modules:', error);
+      logger.warn('Failed to initialize DSP modules:', error);
       this.dspReady = false;
     }
   }
@@ -128,8 +145,8 @@ export class AudioProcessor {
         await this.audioContext.resume();
       }
 
-      // Load the WASM spectrum processor from packages/dsp/fft2048/
-      await this.audioContext.audioWorklet.addModule('/dsp/wasm-spectrum.js');
+      // Load the WASM spectrum processor
+      await this.audioContext.audioWorklet.addModule('/audio-worklets/wasm-spectrum.js');
 
       this.wasmSpectrumNode = new AudioWorkletNode(
         this.audioContext,
@@ -153,9 +170,9 @@ export class AudioProcessor {
 
         if (msg.type === 'ready') {
           this.wasmSpectrumReady = true;
-          console.log('WASM spectrum processor ready');
+          logger.info('WASM spectrum processor ready');
         } else if (msg.type === 'error') {
-          console.error('WASM spectrum processor error:', msg);
+          logger.error('WASM spectrum processor error:', msg);
           this.wasmSpectrumReady = false;
         } else if (msg.type === 'spectrum') {
           // Update our frequency and time domain data
@@ -179,7 +196,7 @@ export class AudioProcessor {
       };
 
     } catch (error) {
-      console.warn('Failed to initialize WASM spectrum processor:', error);
+      logger.warn('Failed to initialize WASM spectrum processor:', error);
       this.wasmSpectrumReady = false;
     }
   }
@@ -209,7 +226,7 @@ export class AudioProcessor {
       // Cleanup
       this.spectralAPI.free(magPtr);
     } catch (error) {
-      console.warn('Spectral features computation error:', error);
+      logger.warn('Spectral features computation error:', error);
     }
   }
 
@@ -336,7 +353,7 @@ export class AudioProcessor {
         });
       }
     } catch (error) {
-      console.warn('Failed to send spectral WASM to worker:', error);
+      logger.warn('Failed to send spectral WASM to worker:', error);
     }
   }
 
@@ -363,6 +380,8 @@ export class AudioProcessor {
     if (this.analysisInterval) {
       clearInterval(this.analysisInterval);
     }
+
+    logger.debug('Setting up analysis interval, isPlaying:', this.isPlaying);
 
     this.analysisInterval = window.setInterval(() => {
       this.performUnifiedAnalysis();
@@ -408,6 +427,18 @@ export class AudioProcessor {
     } else if (this.analyzerNode) {
       this.analyzerNode.getByteFrequencyData(this.tempFrequencyData);
       this.analyzerNode.getByteTimeDomainData(this.tempTimeDomainData);
+
+      // Check if we're actually getting data
+      let hasNonZero = false;
+      for (let i = 0; i < Math.min(100, this.tempFrequencyData.length); i++) {
+        if (this.tempFrequencyData[i] > 0) {
+          hasNonZero = true;
+          break;
+        }
+      }
+      if (!hasNonZero && Math.random() < 0.05) {
+        this.throttledLog('warn')('WARNING: Analyzer returning all zeros!');
+      }
 
       const freqLen = Math.min(this.frequencyData.length, this.tempFrequencyData.length);
       const timeLen = Math.min(this.timeDomainData.length, this.tempTimeDomainData.length);
@@ -510,7 +541,7 @@ export class AudioProcessor {
         });
       }
     } catch (error) {
-      console.warn('Failed to send DSP to worklet:', error);
+      logger.warn('Failed to send DSP to worklet:', error);
     }
   }
 
@@ -540,6 +571,7 @@ export class AudioProcessor {
 
   // Public method to update playing state
   public setPlayingState(isPlaying: boolean) {
+    logger.debug('setPlayingState called:', isPlaying, 'was:', this.isPlaying);
     if (this.isPlaying === isPlaying) return; // No change
 
     this.isPlaying = isPlaying;
@@ -582,7 +614,7 @@ export class AudioProcessor {
         await this.audioContext.resume();
         this.contextResumed = true;
       } catch (error) {
-        console.warn('Failed to resume AudioContext:', error);
+        logger.warn('Failed to resume AudioContext:', error);
         throw error;
       }
     }
@@ -590,6 +622,9 @@ export class AudioProcessor {
 
   async connectAudioElement(audioElement: HTMLAudioElement) {
     try {
+      logger.debug('connectAudioElement called, element:', audioElement.src?.substring(0, 50) || 'no src');
+      logger.debug('Current state:', { isConnected: this.isConnected, currentElement: this.audioElement?.src?.substring(0, 50) || 'null' });
+
       // Guard against multiple connections
       if (this.analysisInterval) clearInterval(this.analysisInterval);
 
@@ -597,12 +632,15 @@ export class AudioProcessor {
         this.disconnect();
       }
       if (this.isConnected && this.audioElement === audioElement) {
+        logger.debug('Already connected to this element');
         return;
       }
 
       this.audioElement = audioElement;
+      logger.debug('Creating MediaElementSourceNode...');
       this.sourceNode = this.audioContext.createMediaElementSource(audioElement);
       this.sourceNode.connect(this.analyzerNode);
+      logger.debug('Connected source → analyzer');
 
       this.isConnected = true;
       this.passiveMode = false;
@@ -624,7 +662,7 @@ export class AudioProcessor {
         this.setupOptimizedFallbackAnalysis();
       }
     } catch (error) {
-      console.error('Failed to connect audio element:', error);
+      logger.error('Failed to connect audio element:', error);
       if (error instanceof DOMException && error.name === 'InvalidStateError') {
         await this.initializePassiveMode();
       } else {
@@ -766,6 +804,7 @@ export class AudioProcessor {
   getAnalysisData() {
     // Early exit if not playing - return static data
     if (!this.isPlaying) {
+      logger.debug('getAnalysisData called but not playing, returning zeros');
       return {
         frequencyData: this.frequencyData,
         timeDomainData: this.timeDomainData,
@@ -809,11 +848,22 @@ export class AudioProcessor {
       this.analyzerNode.getByteFrequencyData(this.tempFrequencyData);
       this.analyzerNode.getByteTimeDomainData(this.tempTimeDomainData);
 
+      // Check if we're getting real audio data
+      let maxFreq = 0;
+      for (let i = 0; i < Math.min(100, this.tempFrequencyData.length); i++) {
+        if (this.tempFrequencyData[i] > maxFreq) maxFreq = this.tempFrequencyData[i];
+      }
+
       for (let i = 0; i < this.tempFrequencyData.length && i < this.frequencyData.length; i++) {
         this.frequencyData[i] = this.tempFrequencyData[i];
       }
       for (let i = 0; i < this.tempTimeDomainData.length && i < this.timeDomainData.length; i++) {
         this.timeDomainData[i] = this.tempTimeDomainData[i];
+      }
+
+      // Log if we're getting silence
+      if (maxFreq === 0) {
+        this.throttledLog('warn')('analyzer returning all zeros! audioElement:', this.audioElement?.src?.substring(0, 50), 'isConnected:', this.isConnected, 'passiveMode:', this.passiveMode);
       }
 
       // Compute simple meters from temp time-domain
@@ -840,17 +890,18 @@ export class AudioProcessor {
         timeDomainData: this.timeDomainData,
         leftChannel: leftLevel,
         rightChannel: rightLevel,
-        lufs,
+        lufs: lufs,
         peakFrequency: this.peakFrequency,
         spectralCentroid: this.spectralCentroid,
         spectralRolloff: this.spectralRolloff,
         spectralFlux: this.spectralFlux,
         spectralFlatness: this.spectralFlatness,
-        rms: Math.sqrt(leftSum + rightSum) / (bufferLength / 4),
+        rms: Math.sqrt((leftSum + rightSum) / (bufferLength / 4)),
       };
     }
 
     // Fallback if analyzer is missing
+    logger.warn('getAnalysisData: no analyzer available, returning zeros');
     return {
       frequencyData: this.frequencyData,
       timeDomainData: this.timeDomainData,

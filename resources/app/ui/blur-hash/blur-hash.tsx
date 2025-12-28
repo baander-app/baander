@@ -1,5 +1,5 @@
 import { CSSProperties, HTMLAttributes, useEffect } from 'react';
-import { BlurHashCanvas } from '@/ui/blur-hash/blur-hash-canvas.tsx';
+import { BlurHashCanvas } from '@/app/ui/blur-hash/blur-hash-canvas.tsx';
 
 const canvasStyle: CSSProperties = {
   position: 'absolute',

@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Models\Passkey;
+use App\Models\Auth\Passkey;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

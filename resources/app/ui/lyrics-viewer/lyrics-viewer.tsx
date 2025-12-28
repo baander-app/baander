@@ -1,11 +1,11 @@
 import { motion } from 'motion/react';
 import { Box, Flex, IconButton, Popover, Tooltip } from '@radix-ui/themes';
-import { LyricsAnimation } from '@/ui/lyrics-viewer/components/lyrics-animation/lyrics-animation.tsx';
+import { LyricsAnimation } from '@/app/ui/lyrics-viewer/components/lyrics-animation/lyrics-animation.tsx';
 import { MixerHorizontalIcon } from '@radix-ui/react-icons';
-import { LyricsSettings } from '@/ui/lyrics-viewer/components/lyrics-settings/lyrics-settings.tsx';
+import { LyricsSettings } from '@/app/ui/lyrics-viewer/components/lyrics-settings/lyrics-settings.tsx';
 import styles from './lyrics-viewer.module.scss';
-import { usePlayerCurrentTime, usePlayerSong } from '@/modules/library-music-player/store';
-import { useSongsShow } from '@/libs/api-client/gen/endpoints/song/song.ts';
+import { usePlayerCurrentTime, usePlayerSong } from '@/app/modules/library-music-player/store';
+import { useSongsShow } from '@/app/libs/api-client/gen/endpoints/song/song.ts';
 
 const AnimatedBackground = motion.div;
 

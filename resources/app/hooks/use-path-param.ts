@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom';
-import { assertIsDefined } from '@/utils/assert/is-defined.ts';
+import { assertIsDefined } from '@/app/utils/assert/is-defined.ts';
 
 export function usePathParam<T>() : T {
   const params = useParams() as Partial<T>;

@@ -12,7 +12,7 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     /* Bundler mode */
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
@@ -23,26 +23,29 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "baseUrl": "./resources/app",
-    "paths": {
-      "@/*": [
-        "*"
-      ]
-    },
     "types": [
-      "unplugin-icons/types/react"
-    ]
+      "unplugin-icons/types/react",
+      "vite/client"
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@/app/*": ["./resources/app/*"],
+      "@/docs/*": ["./resources/docs/*"]
+    }
   },
   "include": [
-    "resources/app"
+    "resources/app/**/*.ts",
+    "resources/app/**/*.tsx",
+    "resources/docs/**/*.ts",
+    "resources/docs/**/*.tsx",
+    "electron/**/*.ts",
+    "electron/**/*.tsx",
+    "vite.config.mts"
   ],
   "exclude": [
-    "resources/app/libs/api-client/gen"
-  ],
-  "references": [
-    {
-      "path": "./tsconfig.node.json"
-    }
-  ],
-  "extends": "./tsconfig.paths.json"
+    "node_modules",
+    "vendor",
+    "public",
+    "storage"
+  ]
 }

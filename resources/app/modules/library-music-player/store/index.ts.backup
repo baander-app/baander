@@ -1,0 +1,793 @@
+import { create } from 'zustand';
+import { subscribeWithSelector, persist } from 'zustand/middleware';
+import { globalAudioProcessor } from '../../../services/global-audio-processor-service';
+import { useEffect, useRef, useState } from 'react';
+import { createLogger } from '../../../services/logger';
+import { SongResource } from '@/app/libs/api-client/gen/models';
+import { PlaybackSource } from '@/app/models/playback-source';
+
+const logger = createLogger('MusicPlayerStore');
+
+type Song = { publicId: string; title?: string; } | null;
+
+type ProcessorApi = {
+  connect?: (el: HTMLAudioElement) => Promise<void> | void;
+  setPlayingState?: (playing: boolean) => void;
+  resumeContextIfNeeded?: () => Promise<void> | void;
+} | null;
+
+type PlayerEventHandlers = {
+  onLoadStart?: () => void;
+  onCanPlay?: () => void;
+  onCanPlayThrough?: (loadDurationMs: number) => void;
+  onPlay?: () => void;
+  onPause?: () => void;
+  onEnded?: () => void;
+  onError?: (error: MediaError | null) => void;
+  onBuffer?: (percentage: number) => void;
+};
+
+export type MusicPlayerState = {
+  // Core timing (seconds)
+  duration: number;
+  currentTime: number;
+  buffered: number;
+
+  // Playback
+  isPlaying: boolean;
+  isReady: boolean;
+
+  // Volume
+  volumePercent: number; // 0..100
+  isMuted: boolean;
+
+  // Metadata / source
+  song: Song;
+  src: string | null;
+
+  // Element
+  audioEl: HTMLAudioElement | null;
+
+  // UX gating
+  hasUserInteracted: boolean;
+
+  // Processor integration
+  processor: ProcessorApi;
+  processorConnected: boolean;
+
+  // Throttling flags
+  lastTimeUpdateMs: number;
+
+  // Queue management
+  queue: SongResource[];
+  currentSongIndex: number;
+  currentSongPublicId: string | null;
+  source: PlaybackSource;
+
+  // Playback mode
+  playbackMode: {
+    isShuffleEnabled: boolean;
+    isRepeatEnabled: boolean;
+  };
+
+  // Progress
+  progress: number;
+
+  // Lyrics
+  lyricsOffset: number;
+
+  // Analysis data (runtime-only, not persisted)
+  analysis: {
+    leftChannel: number;
+    rightChannel: number;
+    frequencies: number[];
+    lufs: number;
+    bufferSize: number;
+  };
+
+  // Actions (pure state)
+  setDuration: (s: number) => void;
+  setCurrentTime: (s: number) => void;
+  setBuffered: (s: number) => void;
+  setIsPlaying: (v: boolean) => void;
+  setIsReady: (v: boolean) => void;
+
+  setVolumePercent: (v: number) => void;
+  setMuted: (v: boolean) => void;
+  toggleMute: () => void;
+
+  setSong: (song: Song) => void;
+  setSource: (src: string | null) => void;
+
+  // UX gating
+  setHasUserInteracted: (v: boolean) => void;
+
+  // Control (uses audio element if present)
+  setAudioEl: (el: HTMLAudioElement | null) => void;
+  seekTo: (s: number) => void;
+  play: () => Promise<void> | void;
+  pause: () => void;
+  togglePlayPause: () => Promise<void> | void;
+
+  // Processor
+  connectAudioProcessor: (api: ProcessorApi) => Promise<void> | void;
+  resumeProcessorContext: () => Promise<void> | void;
+
+  // Queue management
+  setQueue: (queue: SongResource[]) => void;
+  addToQueue: (song: SongResource) => void;
+  addManyToQueue: (songs: SongResource[]) => void;
+  removeFromQueue: (index: number) => void;
+  playSongAtIndex: (index: number) => void;
+  playNext: () => void;
+  playPrevious: () => void;
+  setQueueAndPlay: (queue: SongResource[], publicId: string) => void;
+
+  // Playback mode
+  setShuffleEnabled: (enabled: boolean) => void;
+  setRepeatEnabled: (enabled: boolean) => void;
+
+  // Progress & source
+  setProgress: (progress: number) => void;
+  setPlaybackSource: (source: PlaybackSource) => void;
+
+  // Lyrics
+  setLyricsOffset: (offset: number) => void;
+
+  // Analysis data
+  setLeftChannel: (level: number) => void;
+  setRightChannel: (level: number) => void;
+  setFrequencies: (freqs: number[]) => void;
+  setLufs: (lufs: number) => void;
+  setBufferSize: (size: number) => void;
+};
+
+// Configuration for time update throttling
+const TIME_UPDATE_THROTTLE_MS = 250; // Update at most 4 times per second
+
+export const useMusicPlayerStore = create<MusicPlayerState>()(
+  subscribeWithSelector(
+    persist(
+      (set, get) => ({
+        duration: 0,
+        currentTime: 0,
+        buffered: 0,
+
+        isPlaying: false,
+        isReady: false,
+
+        volumePercent: 100,
+        isMuted: false,
+
+        song: null,
+        src: null,
+
+        audioEl: null,
+
+        hasUserInteracted: false,
+
+        processor: null,
+        processorConnected: false,
+
+        // Add throttling timestamp
+        lastTimeUpdateMs: 0,
+
+        // Queue management - new state
+        queue: [],
+        currentSongIndex: -1,
+        currentSongPublicId: null,
+        source: PlaybackSource.NONE,
+
+        // Playback mode - new state
+        playbackMode: {
+          isShuffleEnabled: false,
+          isRepeatEnabled: false,
+        },
+
+        // Progress - new state
+        progress: 0,
+
+        // Lyrics - new state
+        lyricsOffset: -150,
+
+        // Analysis data - new state (runtime-only)
+        analysis: {
+          leftChannel: 0,
+          rightChannel: 0,
+          frequencies: [],
+          lufs: 0,
+          bufferSize: 0,
+        },
+
+        setDuration: (s) => set({ duration: Number.isFinite(s) ? s : 0 }),
+        setCurrentTime: (s) => set({
+          currentTime: Number.isFinite(s) ? s : 0,
+          lastTimeUpdateMs: performance.now()
+        }),
+        setBuffered: (s) => set({ buffered: Number.isFinite(s) ? s : 0 }),
+        setIsPlaying: (v) => {
+          set({ isPlaying: !!v });
+          const proc = get().processor;
+          proc?.setPlayingState?.(!!v);
+        },
+        setIsReady: (v) => set({ isReady: !!v }),
+
+        setVolumePercent: (v) => {
+          const level = Math.max(0, Math.min(100, Math.round(v)));
+          set({ volumePercent: level });
+          const el = get().audioEl;
+          if (el && !get().isMuted) el.volume = level / 100;
+        },
+
+        setMuted: (v) => {
+          set({ isMuted: !!v });
+          const el = get().audioEl;
+          if (el) el.muted = !!v;
+        },
+
+        toggleMute: () => {
+          const next = !get().isMuted;
+          set({ isMuted: next });
+          const el = get().audioEl;
+          if (el) el.muted = next;
+        },
+
+        setSong: (song) => set({ song }),
+        setSource: (src) => {
+          set({ src });
+          const el = get().audioEl;
+          if (el) {
+            el.src = src || '';
+            if (src) {
+              el.preload = 'auto';
+              // Connect processor when source is set - the global service will handle
+              // whether to actually connect based on whether the element has media
+              const st = get();
+              if (st.processor) {
+                logger.debug('Connecting processor to audio element with source');
+                Promise.resolve(st.processor.connect?.(el))
+                  .then(() => {
+                    logger.debug('Processor connection completed');
+                    useMusicPlayerStore.setState({ processorConnected: true });
+                  })
+                  .catch((err) => {
+                    logger.error('Failed to connect processor:', err);
+                  });
+              }
+            } else {
+              try { el.removeAttribute('src'); } catch {}
+            }
+          }
+        },
+
+        setHasUserInteracted: (v) => set({ hasUserInteracted: !!v }),
+
+        setAudioEl: (el) => set({ audioEl: el }),
+
+        seekTo: (s) => {
+          const { audioEl, duration } = get();
+          const clamped = Math.max(0, Math.min(duration || 0, s || 0));
+          if (audioEl) audioEl.currentTime = clamped;
+          set({
+            currentTime: clamped,
+            lastTimeUpdateMs: performance.now()
+          });
+        },
+
+        play: async () => {
+          const el = get().audioEl;
+          if (!el) return;
+          const proc = get().processor;
+          await proc?.resumeContextIfNeeded?.();
+          await el.play();
+          set({ isPlaying: true });
+          proc?.setPlayingState?.(true);
+        },
+
+        pause: () => {
+          const el = get().audioEl;
+          if (!el) return;
+          el.pause();
+          set({ isPlaying: false });
+          const proc = get().processor;
+          proc?.setPlayingState?.(false);
+        },
+
+        togglePlayPause: async () => {
+          const el = get().audioEl;
+          if (!el) return;
+          if (el.paused) {
+            await get().play();
+          } else {
+            get().pause();
+          }
+        },
+
+        connectAudioProcessor: async (api) => {
+          set({ processor: api || null });
+          const el = get().audioEl;
+          if (!api || !el) return;
+          try {
+            await api.connect?.(el);
+            set({ processorConnected: true });
+          } catch {
+            set({ processorConnected: false });
+          }
+        },
+
+        resumeProcessorContext: async () => {
+          const proc = get().processor;
+          await proc?.resumeContextIfNeeded?.();
+        },
+
+        // Queue management - new actions
+        setQueue: (queue) => set({
+          queue,
+          source: PlaybackSource.LIBRARY,
+        }),
+
+        addToQueue: (song) => set((state) => ({
+          queue: [...state.queue, song],
+          source: PlaybackSource.LIBRARY,
+        })),
+
+        addManyToQueue: (songs) => set((state) => ({
+          queue: [...state.queue, ...songs],
+          source: PlaybackSource.LIBRARY,
+        })),
+
+        removeFromQueue: (index) => set((state) => {
+          const newQueue = [...state.queue];
+          newQueue.splice(index, 1);
+          return { queue: newQueue };
+        }),
+
+        playSongAtIndex: (index) => set((state) => {
+          if (index >= 0 && index < state.queue.length) {
+            const song = state.queue[index];
+            return {
+              currentSongIndex: index,
+              currentSongPublicId: song.publicId,
+              song: { publicId: song.publicId, title: song.title },
+            };
+          }
+          return {};
+        }),
+
+        playNext: () => set((state) => {
+          if (state.queue.length === 0) return {};
+          let nextIndex = state.currentSongIndex + 1;
+          if (nextIndex >= state.queue.length) {
+            nextIndex = 0; // Loop back to start
+          }
+          const song = state.queue[nextIndex];
+          return {
+            currentSongIndex: nextIndex,
+            currentSongPublicId: song.publicId,
+            song: { publicId: song.publicId, title: song.title },
+          };
+        }),
+
+        playPrevious: () => set((state) => {
+          if (state.queue.length === 0) return {};
+          let prevIndex = state.currentSongIndex - 1;
+          if (prevIndex < 0) {
+            prevIndex = state.queue.length - 1; // Loop back to end
+          }
+          const song = state.queue[prevIndex];
+          return {
+            currentSongIndex: prevIndex,
+            currentSongPublicId: song.publicId,
+            song: { publicId: song.publicId, title: song.title },
+          };
+        }),
+
+        setQueueAndPlay: (queue, publicId) => set({
+          queue,
+          currentSongIndex: queue.findIndex(song => song.publicId === publicId),
+          currentSongPublicId: publicId,
+          source: PlaybackSource.LIBRARY,
+        }),
+
+        // Playback mode - new actions
+        setShuffleEnabled: (enabled) => set((state) => ({
+          playbackMode: {
+            ...state.playbackMode,
+            isShuffleEnabled: enabled,
+            isRepeatEnabled: false, // Mutual exclusive
+          },
+        })),
+
+        setRepeatEnabled: (enabled) => set((state) => ({
+          playbackMode: {
+            ...state.playbackMode,
+            isRepeatEnabled: enabled,
+            isShuffleEnabled: false, // Mutual exclusive
+          },
+        })),
+
+        // Progress & source - new actions
+        setProgress: (progress) => set({ progress }),
+
+        setPlaybackSource: (source) => set({ source }),
+
+        // Lyrics - new action
+        setLyricsOffset: (offset) => set({ lyricsOffset: offset }),
+
+        // Analysis data - new actions
+        setLeftChannel: (level) => set((state) => ({
+          analysis: { ...state.analysis, leftChannel: level },
+        })),
+
+        setRightChannel: (level) => set((state) => ({
+          analysis: { ...state.analysis, rightChannel: level },
+        })),
+
+        setFrequencies: (freqs) => set((state) => ({
+          analysis: { ...state.analysis, frequencies: freqs },
+        })),
+
+        setLufs: (lufs) => set((state) => ({
+          analysis: { ...state.analysis, lufs },
+        })),
+
+        setBufferSize: (size) => set((state) => ({
+          analysis: { ...state.analysis, bufferSize: size },
+        })),
+      }),
+      {
+        name: 'baander-music-player',
+        partialize: (state) => ({
+          // Only persist these fields - exclude runtime-only data
+          queue: state.queue,
+          currentSongIndex: state.currentSongIndex,
+          currentSongPublicId: state.currentSongPublicId,
+          source: state.source,
+          playbackMode: state.playbackMode,
+          lyricsOffset: state.lyricsOffset,
+          // Exclude: analysis (runtime-only), audio element, processor, timing, etc.
+        }),
+      }
+    )
+  )
+);
+
+/**
+ /**
+ * Attach an HTMLAudioElement to the store and wire events.
+ * Optional handlers let the app record metrics/telemetry without coupling the store.
+ * Returns a cleanup function to detach listeners.
+ */
+export function attachAudioElement(el: HTMLAudioElement, handlers?: PlayerEventHandlers) {
+  const st = useMusicPlayerStore.getState();
+  st.setAudioEl(el);
+
+  // Initialize element from store
+  el.muted = st.isMuted;
+  el.volume = st.isMuted ? 0 : st.volumePercent / 100;
+
+  // If a source is already set in state, apply it
+  if (st.src) {
+    el.src = st.src;
+    el.preload = 'auto';
+  }
+
+  // Attempt to connect processor if available and element has a source
+  // Only connect when the audio element has a source, as createMediaElementSource
+  // requires the element to have media content
+  if (st.processor && !st.processorConnected && el.src) {
+    logger.debug('Connecting audio element to processor...');
+    Promise.resolve(st.processor.connect?.(el))
+      .then(() => {
+        logger.debug('Processor connected successfully');
+        useMusicPlayerStore.setState({ processorConnected: true });
+      })
+      .catch((err) => {
+        logger.error('Failed to connect processor:', err);
+        useMusicPlayerStore.setState({ processorConnected: false });
+      });
+  } else {
+    logger.debug('Skipping processor connection:', { hasProcessor: !!st.processor, isConnected: st.processorConnected, hasSource: !!el.src });
+  }
+
+  // Throttle currentTime updates
+  let rafId: number | null = null;
+  let pendingTime: number | null = null;
+
+  const onTimeUpdate = () => {
+    pendingTime = el.currentTime;
+
+    // Only proceed with the update if we're not already waiting for a rAF
+    // or if enough time has passed since the last update
+    if (rafId == null) {
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        if (pendingTime != null) {
+          const state = useMusicPlayerStore.getState();
+          const timeSinceLastUpdate = performance.now() - state.lastTimeUpdateMs;
+
+          // Only update if:
+          // 1. More than the throttle time has passed, or
+          // 2. We're at the start/end boundaries, or
+          // 3. We're seeking (current and pending times differ significantly)
+          if (timeSinceLastUpdate >= TIME_UPDATE_THROTTLE_MS ||
+            pendingTime < 0.1 ||
+            pendingTime >= (state.duration - 0.1) ||
+            Math.abs(pendingTime - state.currentTime) > 0.5) {
+
+            state.setCurrentTime(pendingTime);
+          }
+          pendingTime = null;
+        }
+      });
+    }
+  };
+
+  let loadStart = 0;
+  const onLoadStart = () => {
+    loadStart = performance.now();
+    handlers?.onLoadStart?.();
+  };
+  const onDurationChange = () => {
+    useMusicPlayerStore.getState().setDuration(Number.isFinite(el.duration) ? el.duration : 0);
+  };
+  const onCanPlay = () => {
+    useMusicPlayerStore.getState().setIsReady(true);
+    handlers?.onCanPlay?.();
+  };
+  const onCanPlayThrough = () => {
+    const dur = performance.now() - loadStart;
+    handlers?.onCanPlayThrough?.(dur);
+  };
+  const onProgress = () => {
+    try {
+      const dur = el.duration;
+      if (!Number.isFinite(dur) || dur <= 0 || el.buffered.length === 0) return;
+      for (let i = el.buffered.length - 1; i >= 0; i--) {
+        if (el.buffered.start(i) <= el.currentTime) {
+          const end = el.buffered.end(i);
+          useMusicPlayerStore.getState().setBuffered(end);
+          const pct = Math.max(0, Math.min(100, (end / dur) * 100));
+          handlers?.onBuffer?.(pct);
+          break;
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const onPlay = () => {
+    useMusicPlayerStore.getState().setIsPlaying(true);
+    handlers?.onPlay?.();
+  };
+  const onPause = () => {
+    useMusicPlayerStore.getState().setIsPlaying(false);
+    handlers?.onPause?.();
+  };
+  const onEnded = () => {
+    useMusicPlayerStore.getState().setIsPlaying(false);
+    handlers?.onEnded?.();
+  };
+  const onError = () => handlers?.onError?.(el.error || null);
+
+  // When seeking, we want to update immediately
+  const onSeeking = () => {
+    useMusicPlayerStore.getState().setCurrentTime(el.currentTime);
+  };
+
+  el.addEventListener('loadstart', onLoadStart);
+  el.addEventListener('timeupdate', onTimeUpdate);
+  el.addEventListener('durationchange', onDurationChange);
+  el.addEventListener('canplay', onCanPlay);
+  el.addEventListener('canplaythrough', onCanPlayThrough);
+  el.addEventListener('progress', onProgress);
+  el.addEventListener('play', onPlay);
+  el.addEventListener('pause', onPause);
+  el.addEventListener('ended', onEnded);
+  el.addEventListener('error', onError);
+  el.addEventListener('seeking', onSeeking);
+
+  return () => {
+    if (rafId != null) cancelAnimationFrame(rafId);
+    el.removeEventListener('loadstart', onLoadStart);
+    el.removeEventListener('timeupdate', onTimeUpdate);
+    el.removeEventListener('durationchange', onDurationChange);
+    el.removeEventListener('canplay', onCanPlay);
+    el.removeEventListener('canplaythrough', onCanPlayThrough);
+    el.removeEventListener('progress', onProgress);
+    el.removeEventListener('play', onPlay);
+    el.removeEventListener('pause', onPause);
+    el.removeEventListener('ended', onEnded);
+    el.removeEventListener('error', onError);
+    el.removeEventListener('seeking', onSeeking);
+    useMusicPlayerStore.getState().setAudioEl(null);
+  };
+}
+
+/**
+ * Convenience: autoplay if user has interacted and a source exists.
+ */
+export async function autoplayIfAllowed() {
+  const st = useMusicPlayerStore.getState();
+  if (!st.audioEl || !st.src) return;
+  if (!st.hasUserInteracted) return;
+  await st.play();
+}
+
+/**
+ * Initialize and connect the global audio processor to the music player store
+ */
+export async function initializeGlobalAudioProcessor() {
+  logger.debug('initializeGlobalAudioProcessor: Starting...');
+  const store = useMusicPlayerStore.getState();
+
+  // Initialize the global processor
+  logger.debug('initializeGlobalAudioProcessor: Calling globalAudioProcessor.initialize()...');
+  globalAudioProcessor.initialize();
+
+  // Create the processor API that matches the expected interface
+  const processorApi: ProcessorApi = {
+    connect: async (el: HTMLAudioElement) => {
+      await globalAudioProcessor.connectAudioElement(el);
+    },
+    setPlayingState: (playing: boolean) => {
+      globalAudioProcessor.setPlayingState(playing);
+    },
+    resumeContextIfNeeded: async () => {
+      await globalAudioProcessor.resumeContextIfNeeded();
+    }
+  };
+
+  // Connect the processor API to the store
+  logger.debug('initializeGlobalAudioProcessor: Connecting processor to store...');
+  await store.connectAudioProcessor(processorApi);
+
+  logger.debug('initializeGlobalAudioProcessor: Completed!');
+  return processorApi;
+}
+
+/**
+ * Reset the global audio processor connection
+ */
+export function resetGlobalAudioProcessor() {
+  globalAudioProcessor.reset();
+  const store = useMusicPlayerStore.getState();
+  store.connectAudioProcessor(null);
+}
+
+// Selector hooks with optimizations for consumers (read-only)
+export const usePlayerDuration = () => useMusicPlayerStore(s => s.duration);
+
+// Throttled hook for current time to prevent excessive re-renders
+export function usePlayerCurrentTime() {
+  // Get the raw value from the store
+  const currentTime = useMusicPlayerStore(s => s.currentTime);
+  const isPlaying = useMusicPlayerStore(s => s.isPlaying);
+
+  // Always create state and refs regardless of playing state
+  const [throttledTime, setThrottledTime] = useState(currentTime);
+  const lastUpdateRef = useRef(performance.now());
+  const currentTimeRef = useRef(currentTime);
+
+  // Always keep the ref updated with latest value
+  currentTimeRef.current = currentTime;
+
+  // Set up a timer to update the throttled value periodically during playback
+  useEffect(() => {
+    // Only activate the interval when playing
+    if (!isPlaying) {
+      // When not playing, sync the throttled time with the actual time
+      setThrottledTime(currentTime);
+      return;
+    }
+
+    const updateInterval = setInterval(() => {
+      const now = performance.now();
+      if (now - lastUpdateRef.current >= TIME_UPDATE_THROTTLE_MS) {
+        setThrottledTime(currentTimeRef.current);
+        lastUpdateRef.current = now;
+      }
+    }, TIME_UPDATE_THROTTLE_MS);
+
+    return () => clearInterval(updateInterval);
+  }, [isPlaying, currentTime]);
+
+  // When seeking, update immediately
+  useEffect(() => {
+    const diff = Math.abs(throttledTime - currentTime);
+    if (diff > 0.5) {  // If difference is significant (seeking)
+      setThrottledTime(currentTime);
+      lastUpdateRef.current = performance.now();
+    }
+  }, [currentTime, throttledTime]);
+
+  // Return the throttled time whether playing or not
+  return throttledTime;
+}
+
+export const usePlayerBuffered = () => useMusicPlayerStore(s => s.buffered);
+export const usePlayerIsPlaying = () => useMusicPlayerStore(s => s.isPlaying);
+export const usePlayerIsReady = () => useMusicPlayerStore(s => s.isReady);
+export const usePlayerVolumePercent = () => useMusicPlayerStore(s => s.volumePercent);
+export const usePlayerIsMuted = () => useMusicPlayerStore(s => s.isMuted);
+export const usePlayerSong = () => useMusicPlayerStore(s => s.song);
+export const usePlayerAudioElement = () => useMusicPlayerStore(s => s.audioEl);
+export const usePlayerHasUserInteracted = () => useMusicPlayerStore(s => s.hasUserInteracted);
+
+// Queue selectors
+export const usePlayerQueue = () => useMusicPlayerStore(s => s.queue);
+export const usePlayerCurrentSongIndex = () => useMusicPlayerStore(s => s.currentSongIndex);
+export const usePlayerCurrentSongPublicId = () => useMusicPlayerStore(s => s.currentSongPublicId);
+
+// Computed selector for current song from queue
+export const usePlayerCurrentSong = () =>
+  useMusicPlayerStore(s => {
+    if (s.queue.length === 0 || s.currentSongIndex < 0) return null;
+    return s.queue[s.currentSongIndex] || null;
+  });
+
+// Playback mode selectors
+export const usePlayerShuffleEnabled = () => useMusicPlayerStore(s => s.playbackMode.isShuffleEnabled);
+export const usePlayerRepeatEnabled = () => useMusicPlayerStore(s => s.playbackMode.isRepeatEnabled);
+
+// Progress & source selectors
+export const usePlayerProgress = () => useMusicPlayerStore(s => s.progress);
+export const usePlayerSource = () => useMusicPlayerStore(s => s.source);
+
+// Lyrics selector
+export const usePlayerLyricsOffset = () => useMusicPlayerStore(s => s.lyricsOffset);
+
+// Analysis data selectors (for equalizer)
+export const usePlayerAnalysis = () => useMusicPlayerStore(s => s.analysis);
+export const usePlayerLufs = () => useMusicPlayerStore(s => s.analysis.lufs);
+
+// Action accessors for consumers (imperative controls)
+export function usePlayerActions() {
+  return {
+    seekTo: useMusicPlayerStore(s => s.seekTo),
+    play: useMusicPlayerStore(s => s.play),
+    pause: useMusicPlayerStore(s => s.pause),
+    togglePlayPause: useMusicPlayerStore(s => s.togglePlayPause),
+    setVolumePercent: useMusicPlayerStore(s => s.setVolumePercent),
+    setMuted: useMusicPlayerStore(s => s.setMuted),
+    toggleMute: useMusicPlayerStore(s => s.toggleMute),
+    setSong: useMusicPlayerStore(s => s.setSong),
+    setSource: useMusicPlayerStore(s => s.setSource),
+    setHasUserInteracted: useMusicPlayerStore(s => s.setHasUserInteracted),
+    connectAudioProcessor: useMusicPlayerStore(s => s.connectAudioProcessor),
+    resumeProcessorContext: useMusicPlayerStore(s => s.resumeProcessorContext),
+
+    // Queue management
+    setQueue: useMusicPlayerStore(s => s.setQueue),
+    addToQueue: useMusicPlayerStore(s => s.addToQueue),
+    addManyToQueue: useMusicPlayerStore(s => s.addManyToQueue),
+    removeFromQueue: useMusicPlayerStore(s => s.removeFromQueue),
+    playSongAtIndex: useMusicPlayerStore(s => s.playSongAtIndex),
+    playNext: useMusicPlayerStore(s => s.playNext),
+    playPrevious: useMusicPlayerStore(s => s.playPrevious),
+    setQueueAndPlay: useMusicPlayerStore(s => s.setQueueAndPlay),
+
+    // Playback mode
+    setShuffleEnabled: useMusicPlayerStore(s => s.setShuffleEnabled),
+    setRepeatEnabled: useMusicPlayerStore(s => s.setRepeatEnabled),
+
+    // Progress & source
+    setProgress: useMusicPlayerStore(s => s.setProgress),
+    setPlaybackSource: useMusicPlayerStore(s => s.setPlaybackSource),
+
+    // Lyrics
+    setLyricsOffset: useMusicPlayerStore(s => s.setLyricsOffset),
+
+    // Analysis
+    setLeftChannel: useMusicPlayerStore(s => s.setLeftChannel),
+    setRightChannel: useMusicPlayerStore(s => s.setRightChannel),
+    setFrequencies: useMusicPlayerStore(s => s.setFrequencies),
+    setLufs: useMusicPlayerStore(s => s.setLufs),
+    setBufferSize: useMusicPlayerStore(s => s.setBufferSize),
+
+    // Global processor functions
+    initializeGlobalAudioProcessor,
+    resetGlobalAudioProcessor,
+  };
+}

@@ -5,17 +5,17 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\OAuth\Client;
-use App\Models\TokenAbility;
+use App\Models\Auth\OAuth\Client;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Spatie\RouteAttributes\Attributes\Delete;
 use Spatie\RouteAttributes\Attributes\Get;
-use Spatie\RouteAttributes\Attributes\Post;
-use Spatie\RouteAttributes\Attributes\Put;
-use Spatie\RouteAttributes\Attributes\Prefix;
 use Spatie\RouteAttributes\Attributes\Middleware;
+use Spatie\RouteAttributes\Attributes\Post;
+use Spatie\RouteAttributes\Attributes\Prefix;
+use Spatie\RouteAttributes\Attributes\Put;
 
 /**
  * OAuth Client Management Controller
@@ -26,9 +26,10 @@ use Spatie\RouteAttributes\Attributes\Middleware;
  * @tags OAuth
  */
 #[Prefix('oauth/clients')]
+#[Group('Auth')]
 #[Middleware([
-    'auth:sanctum',
-    'ability:' . TokenAbility::ACCESS_API->value,
+    'auth:oauth',
+    'scope:access-api',
 ])]
 class ClientController extends Controller
 {
@@ -86,25 +87,24 @@ class ClientController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'redirect' => 'required|url',
+            'name'                   => 'required|string|max:255',
+            'redirect'               => 'required|url',
             'personal_access_client' => 'boolean',
-            'password_client' => 'boolean',
-            'device_client' => 'boolean',
-            'confidential' => 'boolean',
-            'first_party' => 'boolean',
+            'password_client'        => 'boolean',
+            'device_client'          => 'boolean',
+            'confidential'           => 'boolean',
+            'first_party'            => 'boolean',
         ]);
 
         $client = Client::create([
-            'id' => Str::uuid(),
-            'name' => $validated['name'],
-            'secret' => $validated['confidential'] ?? true ? Str::random(40) : null,
-            'redirect' => $validated['redirect'],
+            'name'                   => $validated['name'],
+            'secret'                 => $validated['confidential'] ?? true ? Str::random(40) : null,
+            'redirect'               => $validated['redirect'],
             'personal_access_client' => $validated['personal_access_client'] ?? false,
-            'password_client' => $validated['password_client'] ?? false,
-            'device_client' => $validated['device_client'] ?? false,
-            'confidential' => $validated['confidential'] ?? true,
-            'first_party' => $validated['first_party'] ?? false,
+            'password_client'        => $validated['password_client'] ?? false,
+            'device_client'          => $validated['device_client'] ?? false,
+            'confidential'           => $validated['confidential'] ?? true,
+            'first_party'            => $validated['first_party'] ?? false,
         ]);
 
         return response()->json($client, 201);
@@ -160,12 +160,12 @@ class ClientController extends Controller
     public function update(Request $request, Client $client): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'string|max:255',
-            'redirect' => 'url',
+            'name'                   => 'string|max:255',
+            'redirect'               => 'url',
             'personal_access_client' => 'boolean',
-            'password_client' => 'boolean',
-            'device_client' => 'boolean',
-            'first_party' => 'boolean',
+            'password_client'        => 'boolean',
+            'device_client'          => 'boolean',
+            'first_party'            => 'boolean',
         ]);
 
         $client->update($validated);
@@ -190,7 +190,7 @@ class ClientController extends Controller
         $client->update(['revoked' => true]);
 
         return response()->json([
-            'message' => 'Client revoked successfully'
+            'message' => 'Client revoked successfully',
         ]);
     }
 
@@ -210,16 +210,16 @@ class ClientController extends Controller
     {
         if (!$client->confidential) {
             return response()->json([
-                'message' => 'Cannot regenerate secret for public client'
+                'message' => 'Cannot regenerate secret for public client',
             ], 400);
         }
 
         $client->update([
-            'secret' => Str::random(40)
+            'secret' => Str::random(40),
         ]);
 
         return response()->json([
-            'secret' => $client->secret
+            'secret' => $client->secret,
         ]);
     }
 }

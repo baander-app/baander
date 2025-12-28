@@ -9,7 +9,7 @@ import {
 } from '@radix-ui/themes';
 import { MagnifyingGlassIcon, Cross2Icon } from '@radix-ui/react-icons';
 import { ToggleGroup } from 'radix-ui';
-import { useDateFormatter } from '@/providers/dayjs-provider.tsx';
+import { useDateFormatter } from '@/app/providers/dayjs-provider.tsx';
 
 interface LogFile {
   id: string;

@@ -2,7 +2,7 @@
 
 namespace App\Modules\Auth\Webauthn\Actions;
 
-use App\Models\Passkey;
+use App\Models\Auth\Passkey;
 use App\Modules\Auth\Webauthn\Concerns\HasPasskeys;
 use App\Modules\Auth\Webauthn\Exceptions\InvalidPasskey;
 use App\Modules\Auth\Webauthn\PasskeyService;

@@ -1,6 +1,6 @@
-import { isPromise } from '@/utils/is-promise.ts';
+import { isPromise } from '@/app/utils/is-promise.ts';
 import { useCallback } from 'react';
-import Alert from '@/ui/alerts/alert.tsx';
+import Alert from '@/app/ui/alerts/alert.tsx';
 
 export interface AlertLoadingErrorProps {
   message?: string;

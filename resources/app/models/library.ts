@@ -1,4 +1,4 @@
-import { LibraryResource, LibraryType } from '@/api-client/requests';
+import { LibraryResource, LibraryType } from '@/app/api-client/requests';
 
 export class Library implements Partial<LibraryResource> {
   name!: string;

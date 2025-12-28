@@ -1,14 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useAppDispatch, useAppSelector } from '@/store/hooks.ts';
-import { globalAudioProcessor } from '@/services/global-audio-processor-service.ts';
-import { setLufs, setNormalizationGain, setVolumeNormalization } from '@/store/music/music-player-slice.ts';
+import { globalAudioProcessor } from '@/app/services/global-audio-processor-service.ts';
 import styles from './equalizer.module.scss';
 import {
   usePlayerActions,
   usePlayerIsMuted,
   usePlayerIsPlaying,
   usePlayerVolumePercent,
-} from '@/modules/library-music-player/store';
+} from '@/app/modules/library-music-player/store';
+import {
+  useEQSettings,
+  useAudioEffects,
+  useTargetLufs,
+  useVisualizerMode,
+  useVolumeNormalization,
+  useSettingsStore,
+} from '@/app/store/settings';
+import { EQ_PRESETS } from '@/app/store/settings/defaults';
 
 interface EqualizerProps {
   className?: string;
@@ -22,35 +29,20 @@ interface EqualizerBand {
 }
 
 const EQ_BANDS: EqualizerBand[] = [
-  { frequency: 31.5, label: '31.5', gain: 0, q: 0.7 },
-  { frequency: 63, label: '63', gain: 0, q: 0.7 },
-  { frequency: 125, label: '125', gain: 0, q: 0.7 },
-  { frequency: 250, label: '250', gain: 0, q: 0.7 },
-  { frequency: 500, label: '500', gain: 0, q: 0.7 },
-  { frequency: 1000, label: '1K', gain: 0, q: 0.7 },
-  { frequency: 2000, label: '2K', gain: 0, q: 0.7 },
-  { frequency: 4000, label: '4K', gain: 0, q: 0.7 },
-  { frequency: 8000, label: '8K', gain: 0, q: 0.7 },
-  { frequency: 16000, label: '16K', gain: 0, q: 0.7 },
+  {frequency: 31.5, label: '31.5', gain: 0, q: 0.7},
+  {frequency: 63, label: '63', gain: 0, q: 0.7},
+  {frequency: 125, label: '125', gain: 0, q: 0.7},
+  {frequency: 250, label: '250', gain: 0, q: 0.7},
+  {frequency: 500, label: '500', gain: 0, q: 0.7},
+  {frequency: 1000, label: '1K', gain: 0, q: 0.7},
+  {frequency: 2000, label: '2K', gain: 0, q: 0.7},
+  {frequency: 4000, label: '4K', gain: 0, q: 0.7},
+  {frequency: 8000, label: '8K', gain: 0, q: 0.7},
+  {frequency: 16000, label: '16K', gain: 0, q: 0.7},
 ];
 
-const EQ_PRESETS = {
-  FLAT: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  ROCK: [4, 3, -1, -2, -1, 2, 4, 5, 5, 5],
-  POP: [2, 3, 4, 3, 0, -1, -2, -1, 2, 3],
-  JAZZ: [3, 2, 1, 2, 3, 3, 2, 1, 2, 3],
-  CLASSICAL: [4, 3, 2, 1, 0, 0, 2, 3, 4, 5],
-  ELECTRONIC: [5, 4, 2, 0, -1, 2, 3, 4, 5, 6],
-  'HIP-HOP': [5, 4, 2, 3, -1, -1, 2, 3, 4, 5],
-  VOCAL: [2, 1, -1, 2, 4, 4, 3, 2, 1, -1],
-  ACOUSTIC: [3, 2, 1, 2, 3, 2, 3, 4, 3, 2],
-  BASS_BOOST: [7, 5, 3, 2, 0, 0, 0, 0, 0, 0],
-  TREBLE_BOOST: [0, 0, 0, 0, 0, 2, 4, 6, 8, 9],
-  CUSTOM: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-};
-
 // Memoized components
-const SpectrumBar = React.memo(({ height, index }: { height: number; index: number }) => {
+const SpectrumBar = React.memo(({height, index}: { height: number; index: number }) => {
   const color = useMemo(() => {
     if (height > 80) return '#ff4444';
     if (height > 60) return '#ffaa00';
@@ -63,13 +55,13 @@ const SpectrumBar = React.memo(({ height, index }: { height: number; index: numb
       className={styles.spectrumBar}
       style={{
         height: `${Math.max(2, height)}%`,
-        backgroundColor: color
+        backgroundColor: color,
       }}
     />
   );
 });
 
-const ChannelMeter = React.memo(({ label, level }: { label: string; level: number }) => {
+const ChannelMeter = React.memo(({label, level}: { label: string; level: number }) => {
   const color = useMemo(() => {
     if (level > 80) return '#ff4444';
     if (level > 60) return '#ffaa00';
@@ -84,7 +76,7 @@ const ChannelMeter = React.memo(({ label, level }: { label: string; level: numbe
           className={styles.meterFill}
           style={{
             width: `${Math.min(100, level)}%`,
-            backgroundColor: color
+            backgroundColor: color,
           }}
         />
       </div>
@@ -93,35 +85,42 @@ const ChannelMeter = React.memo(({ label, level }: { label: string; level: numbe
   );
 });
 
-export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
-  const dispatch = useAppDispatch();
-
+export const Equalizer: React.FC<EqualizerProps> = ({className}) => {
   // Keep existing timing behavior
   const updateIntervalRef = useRef<number | null>(null);
   const lastDispatchTimeRef = useRef<number>(0);
+  const lastLogTimeRef = useRef<number>(0);
   const knobRef = useRef<HTMLDivElement>(null);
 
   const isMuted = usePlayerIsMuted();
   const isPlaying = usePlayerIsPlaying();
   const volumePercent = usePlayerVolumePercent();
 
-  const { setVolumePercent, toggleMute } = usePlayerActions();
-  const { volume: volumeState } = useAppSelector((state) => state.musicPlayer);
-  const normalization = volumeState.normalization;
+  const {setVolumePercent, toggleMute, setLufs} = usePlayerActions();
+  const normalization = useVolumeNormalization();
 
-  // Simple state without heavy arrays
-  const [eqState, setEqState] = useState({
-    isEnabled: true,
-    currentPreset: 'FLAT',
-    bands: [...EQ_BANDS],
-    displayMode: 'SPECTRUM' as 'SPECTRUM' | 'METERS' | 'PHASE',
-    compressionEnabled: true,
-    spatialEnhancement: false,
-    masterGain: 0,
-    lufsTarget: -16,
-    processorActive: false,
-    processorMode: 'direct' as 'passive' | 'direct',
-  });
+  // Use individual selectors to avoid duplicate subscriptions
+  const equalizer = useEQSettings();
+  const effects = useAudioEffects();
+  const visualizerMode = useVisualizerMode();
+  const targetLufs = useTargetLufs();
+
+  // Get actions directly from store with shallow comparison to prevent infinite loops
+  const setEQPreset = useSettingsStore(s => s.setEQPreset);
+  const setEQBand = useSettingsStore(s => s.setEQBand);
+  const setCompressionEnabled = useSettingsStore(s => s.setCompressionEnabled);
+  const setMasterGain = useSettingsStore(s => s.setMasterGain);
+  const setTargetLufs = useSettingsStore(s => s.setTargetLufs);
+  const setVisualizerMode = useSettingsStore(s => s.setVisualizerMode);
+
+  // Combine EQ_BANDS structure with gain values from settings store
+  const bands = useMemo(() =>
+      EQ_BANDS.map((band, index) => ({
+        ...band,
+        gain: equalizer.bands[index],
+      })),
+    [equalizer.bands],
+  );
 
   // Lightweight display state
   const [displayData, setDisplayData] = useState({
@@ -140,6 +139,8 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
   useEffect(() => {
     const processor = globalAudioProcessor.getProcessor();
 
+    console.log('[Equalizer] processor:', !!processor, 'isPlaying:', isPlaying, 'processor?.isActive:', processor?.isActive);
+
     if (!processor || !isPlaying) {
       if (updateIntervalRef.current) {
         clearInterval(updateIntervalRef.current);
@@ -151,16 +152,20 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
     // Match the processor's exact timing - 40ms (25fps)
     updateIntervalRef.current = window.setInterval(() => {
       try {
-        const isActive = processor.isActive;
-        const processorMode = (processor as any).passiveMode ? 'passive' : 'direct';
         const data = processor.getAnalysisData();
 
-        // Update processor state
-        setEqState((prev) => ({
-          ...prev,
-          processorActive: isActive,
-          processorMode,
-        }));
+        // Log throttled to once per second
+        const now = performance.now();
+        if (now - lastLogTimeRef.current > 1000) {
+          console.log('[Equalizer] Got analysis data:', {
+            leftChannel: data?.leftChannel?.toFixed(1),
+            rightChannel: data?.rightChannel?.toFixed(1),
+            lufs: data?.lufs?.toFixed(1),
+            peakFreq: data?.peakFrequency,
+            maxFreq: data?.frequencyData ? Math.max(...Array.from(data.frequencyData).slice(0, 100)) : 0,
+          });
+          lastLogTimeRef.current = now;
+        }
 
         if (data) {
           // Compute spectrum bars with smoothing
@@ -196,29 +201,19 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
             frequencyBars: bars,
           });
 
-          dispatch(setLufs(data.lufs));
+          setLufs(data.lufs);
 
           // Volume normalization - throttled
           const now = performance.now();
           if (normalization.enabled && data.lufs !== 0 && !isNaN(data.lufs)) {
             if (now - lastDispatchTimeRef.current > 300) {
-              const targetLufs = eqState.lufsTarget;
-              const gainDifference = targetLufs - data.lufs;
-              const maxGainAdjustment = 6;
-              const limitedGain = Math.max(-maxGainAdjustment, Math.min(maxGainAdjustment, gainDifference));
-
-              const previousGain = normalization.currentGain || 0;
-              const smoothingFactor = 0.1;
-              const smoothedGain = previousGain + (limitedGain - previousGain) * smoothingFactor;
-
-              dispatch(setNormalizationGain(smoothedGain));
+              // Normalization gain is computed as (targetLufs - currentLufs)
+              // The audio processor handles the actual gain application
               lastDispatchTimeRef.current = now;
             }
-          } else if (!normalization.enabled && normalization.currentGain !== 0) {
-            dispatch(setNormalizationGain(0));
           }
 
-          processor.setMasterGain(eqState.masterGain);
+          processor.setMasterGain(effects.masterGain);
         }
       } catch (error) {
         console.error('Error in analysis update:', error);
@@ -232,57 +227,23 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
       }
     };
   }, [
-    dispatch,
     normalization.enabled,
     isPlaying,
-    eqState.lufsTarget,
-    eqState.masterGain,
-    normalization.currentGain,
-  ]);
-
-  // Initialize processor settings
-  useEffect(() => {
-    const processor = globalAudioProcessor.getProcessor();
-    if (!processor) return;
-
-    processor.setEnabled();
-    processor.updateEQBands(eqState.bands.map((band) => band.gain));
-    processor.setVolume(volumePercent);
-    processor.setMuted(isMuted);
-    processor.setCompression(eqState.compressionEnabled);
-    processor.setSpatialEnhancement(eqState.spatialEnhancement);
-    processor.setMasterGain(eqState.masterGain);
-  }, [
-    eqState.bands,
-    eqState.compressionEnabled,
-    eqState.spatialEnhancement,
-    eqState.masterGain,
-    volumePercent,
-    isMuted,
+    targetLufs,
+    effects.masterGain,
+    visualizerMode,
+    equalizer.enabled,
+    equalizer.preset,
   ]);
 
   // Event handlers
   const handlePresetChange = useCallback((presetName: keyof typeof EQ_PRESETS) => {
-    const presetValues = EQ_PRESETS[presetName];
-    setEqState((prev) => ({
-      ...prev,
-      currentPreset: presetName,
-      bands: prev.bands.map((band, index) => ({
-        ...band,
-        gain: presetValues[index] || 0
-      })),
-    }));
-  }, []);
+    setEQPreset(presetName);
+  }, [setEQPreset]);
 
   const handleBandChange = useCallback((bandIndex: number, gain: number) => {
-    setEqState((prev) => ({
-      ...prev,
-      currentPreset: 'CUSTOM',
-      bands: prev.bands.map((band, index) =>
-        index === bandIndex ? { ...band, gain } : band
-      ),
-    }));
-  }, []);
+    setEQBand(bandIndex, gain);
+  }, [setEQBand]);
 
   const handleVolumeChange = useCallback((value: number) => {
     setVolumePercent(value);
@@ -294,26 +255,20 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
 
   const handleNormalizationToggle = useCallback(() => {
     const newEnabled = !normalization.enabled;
-    dispatch(setVolumeNormalization(newEnabled));
-    if (!newEnabled) {
-      dispatch(setNormalizationGain(0));
-    }
-  }, [dispatch, normalization.enabled]);
+    setCompressionEnabled(newEnabled);
+  }, [normalization.enabled, setCompressionEnabled]);
 
   const handleMasterGainChange = useCallback((value: number) => {
-    setEqState((prev) => ({ ...prev, masterGain: value }));
-  }, []);
+    setMasterGain(value);
+  }, [setMasterGain]);
 
   const handleLufsTargetChange = useCallback((value: number) => {
-    setEqState((prev) => ({ ...prev, lufsTarget: value }));
-    if (normalization.enabled) {
-      dispatch(setNormalizationGain(0));
-    }
-  }, [dispatch, normalization.enabled]);
+    setTargetLufs(value as -14 | -16 | -18 | -23);
+  }, [setTargetLufs]);
 
   const handleDisplayModeChange = useCallback((mode: 'SPECTRUM' | 'METERS' | 'PHASE') => {
-    setEqState((prev) => ({ ...prev, displayMode: mode }));
-  }, []);
+    setVisualizerMode(mode.toLowerCase() as 'spectrum' | 'meters' | 'phase');
+  }, [setVisualizerMode]);
 
   const handleKnobMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -358,12 +313,19 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
 
   // Memoized computed values
   const knobRotation = useMemo(() => volumePercent * 300 + 30, [volumePercent]);
+
+  // Compute current gain for display (targetLufs - currentLufs)
+  const currentGain = useMemo(
+    () => normalization.enabled ? (targetLufs - displayData.lufs) : 0,
+    [normalization.enabled, targetLufs, displayData.lufs],
+  );
+
   const totalGain = useMemo(
-    () => (eqState.masterGain + (normalization.currentGain || 0)).toFixed(1),
-    [eqState.masterGain, normalization.currentGain]
+    () => (effects.masterGain + currentGain).toFixed(1),
+    [effects.masterGain, currentGain],
   );
   const formattedPeakFrequency = useMemo(() => {
-    const freq = displayData.peakFrequency;
+    const freq = displayData.peakFrequency ?? 0;
     return freq > 1000 ? `${(freq / 1000).toFixed(1)}K` : `${Math.round(freq)}`;
   }, [displayData.peakFrequency]);
 
@@ -384,7 +346,7 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
 
   const renderSpectrumBars = useMemo(() => {
     return displayData.frequencyBars.map((height, i) => (
-      <SpectrumBar key={i} height={height} index={i} />
+      <SpectrumBar key={i} height={height} index={i}/>
     ));
   }, [displayData.frequencyBars]);
 
@@ -395,22 +357,22 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
           <span className={`${styles.indicator} ${styles.active}`}>PWR</span>
           <span className={`${styles.indicator} ${isMuted ? styles.active : ''}`}>MUTE</span>
           <span className={`${styles.indicator} ${normalization.enabled ? styles.active : ''}`}>NORM</span>
-          <span className={`${styles.indicator} ${eqState.processorActive ? styles.active : ''}`}>PROC</span>
+          <span className={`${styles.indicator} ${equalizer.enabled ? styles.active : ''}`}>PROC</span>
         </div>
-        <div className={styles.presetDisplay}>{eqState.currentPreset}</div>
+        <div className={styles.presetDisplay}>{equalizer.preset}</div>
       </div>
 
       <div className={styles.vfdContent}>
-        <div className={`${styles.displayContainer} ${eqState.displayMode === 'SPECTRUM' ? styles.active : styles.hidden}`}>
+        <div className={`${styles.displayContainer} ${visualizerMode === 'spectrum' ? styles.active : styles.hidden}`}>
           <div className={styles.spectrumDisplay}>
             {renderSpectrumBars}
           </div>
         </div>
 
-        <div className={`${styles.displayContainer} ${eqState.displayMode === 'METERS' ? styles.active : styles.hidden}`}>
+        <div className={`${styles.displayContainer} ${visualizerMode === 'meters' ? styles.active : styles.hidden}`}>
           <div className={styles.levelMeters}>
-            <ChannelMeter label="L" level={displayData.leftChannel} />
-            <ChannelMeter label="R" level={displayData.rightChannel} />
+            <ChannelMeter label="L" level={displayData.leftChannel}/>
+            <ChannelMeter label="R" level={displayData.rightChannel}/>
             <div className={styles.frequencyDisplay}>
               <span className={styles.freqLabel}>PEAK:</span>
               <span className={styles.freqValue}>{formattedPeakFrequency}Hz</span>
@@ -418,15 +380,15 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
           </div>
         </div>
 
-        <div className={`${styles.displayContainer} ${eqState.displayMode === 'PHASE' ? styles.active : styles.hidden}`}>
+        <div className={`${styles.displayContainer} ${visualizerMode === 'phase' ? styles.active : styles.hidden}`}>
           <div className={styles.phaseDisplay}>
             <div className={styles.phaseScope}>
               <svg width="100%" height="100%" viewBox="0 0 200 100" aria-hidden="true">
                 <defs>
                   <linearGradient id="phaseGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#00ff00" />
-                    <stop offset="50%" stopColor="#ffff00" />
-                    <stop offset="100%" stopColor="#ff0000" />
+                    <stop offset="0%" stopColor="#00ff00"/>
+                    <stop offset="50%" stopColor="#ffff00"/>
+                    <stop offset="100%" stopColor="#ff0000"/>
                   </linearGradient>
                 </defs>
                 <path
@@ -440,7 +402,7 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
             <div className={styles.correlationMeter}>
               <span className={styles.correlationLabel}>CORR:</span>
               <span className={styles.correlationValue}>
-                {((displayData.leftChannel + displayData.rightChannel) / 200).toFixed(2)}
+                {(((displayData.leftChannel ?? 0) + (displayData.rightChannel ?? 0)) / 200).toFixed(2)}
               </span>
             </div>
           </div>
@@ -450,7 +412,7 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
       <div className={styles.vfdFooter}>
         <div className={styles.lufsDisplay}>
           <span className={styles.lufsLabel}>LUFS:</span>
-          <span className={styles.lufsValue}>{displayData.lufs.toFixed(1)}</span>
+          <span className={styles.lufsValue}>{(displayData.lufs ?? -30).toFixed(1)}</span>
         </div>
         <div className={styles.volumeDisplay}>
           <span className={styles.volumeLabel}>VOL:</span>
@@ -458,25 +420,11 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
         </div>
         <div className={styles.gainDisplay}>
           <span className={styles.gainLabel}>GAIN:</span>
-          <span className={styles.gainValue}>{eqState.masterGain.toFixed(1)}dB</span>
+          <span className={styles.gainValue}>{effects.masterGain.toFixed(1)}dB</span>
         </div>
       </div>
     </div>
-  ), [
-    isMuted,
-    normalization.enabled,
-    eqState.processorActive,
-    eqState.currentPreset,
-    eqState.displayMode,
-    renderSpectrumBars,
-    displayData.leftChannel,
-    displayData.rightChannel,
-    formattedPeakFrequency,
-    phasePath,
-    displayData.lufs,
-    volumePercent,
-    eqState.masterGain
-  ]);
+  ), [isMuted, normalization.enabled, equalizer.enabled, equalizer.preset, visualizerMode, renderSpectrumBars, displayData.leftChannel, displayData.rightChannel, formattedPeakFrequency, phasePath, displayData.lufs, volumePercent, effects.masterGain]);
 
   const renderEqualizerBand = useCallback((band: EqualizerBand, index: number) => (
     <div key={band.frequency} className={styles.eqBand}>
@@ -501,10 +449,10 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
   ), [handleBandChange]);
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+    <div style={{position: 'relative', width: '100%', height: '100%'}}>
       <div
         className={`${styles.equalizer} ${className || ''}`}
-        style={{ boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)' }}
+        style={{boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)'}}
       >
         <header className={styles.header}>
           <div className={styles.branding}>
@@ -553,7 +501,7 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
                   <div
                     className={styles.knobIndicator}
                     style={{
-                      transform: `translateX(-50%) rotate(${knobRotation}deg)`
+                      transform: `translateX(-50%) rotate(${knobRotation}deg)`,
                     }}
                   />
                   <div className={styles.volumeValue}>{volumePercent}</div>
@@ -578,12 +526,9 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
                 NORM
               </button>
               <button
-                className={`${styles.controlBtn} ${eqState.compressionEnabled ? styles.active : ''}`}
-                onClick={() => setEqState((prev) => ({
-                  ...prev,
-                  compressionEnabled: !prev.compressionEnabled
-                }))}
-                aria-pressed={eqState.compressionEnabled}
+                className={`${styles.controlBtn} ${effects.compression.enabled ? styles.active : ''}`}
+                onClick={() => setCompressionEnabled(!effects.compression.enabled)}
+                aria-pressed={effects.compression.enabled}
               >
                 COMP
               </button>
@@ -596,19 +541,19 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
                 min="-12"
                 max="12"
                 step="0.5"
-                value={eqState.masterGain}
+                value={effects.masterGain}
                 onChange={(e) => handleMasterGainChange(parseFloat(e.target.value))}
                 className={styles.paramSlider}
                 aria-label="Master Gain"
               />
               <div className={styles.paramValue}>
-                {eqState.masterGain >= 0 ? '+' : ''}
-                {eqState.masterGain.toFixed(1)} dB
+                {effects.masterGain >= 0 ? '+' : ''}
+                {effects.masterGain.toFixed(1)} dB
               </div>
 
               <div className={styles.paramLabel}>LUFS TARGET</div>
               <select
-                value={eqState.lufsTarget}
+                value={targetLufs}
                 onChange={(e) => handleLufsTargetChange(parseFloat(e.target.value))}
                 className={styles.lufsSelect}
                 disabled={!normalization.enabled}
@@ -627,23 +572,23 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
 
             <div className={styles.displayControls}>
               <button
-                className={`${styles.displayBtn} ${eqState.displayMode === 'SPECTRUM' ? styles.active : ''}`}
+                className={`${styles.displayBtn} ${visualizerMode === 'spectrum' ? styles.active : ''}`}
                 onClick={() => handleDisplayModeChange('SPECTRUM')}
-                aria-pressed={eqState.displayMode === 'SPECTRUM'}
+                aria-pressed={visualizerMode === 'spectrum'}
               >
                 SPECTRUM
               </button>
               <button
-                className={`${styles.displayBtn} ${eqState.displayMode === 'METERS' ? styles.active : ''}`}
+                className={`${styles.displayBtn} ${visualizerMode === 'meters' ? styles.active : ''}`}
                 onClick={() => handleDisplayModeChange('METERS')}
-                aria-pressed={eqState.displayMode === 'METERS'}
+                aria-pressed={visualizerMode === 'meters'}
               >
                 METERS
               </button>
               <button
-                className={`${styles.displayBtn} ${eqState.displayMode === 'PHASE' ? styles.active : ''}`}
+                className={`${styles.displayBtn} ${visualizerMode === 'phase' ? styles.active : ''}`}
                 onClick={() => handleDisplayModeChange('PHASE')}
-                aria-pressed={eqState.displayMode === 'PHASE'}
+                aria-pressed={visualizerMode === 'phase'}
               >
                 PHASE
               </button>
@@ -656,9 +601,9 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
               {Object.keys(EQ_PRESETS).map((preset) => (
                 <button
                   key={preset}
-                  className={`${styles.presetBtn} ${eqState.currentPreset === preset ? styles.active : ''}`}
+                  className={`${styles.presetBtn} ${equalizer.preset === preset ? styles.active : ''}`}
                   onClick={() => handlePresetChange(preset as keyof typeof EQ_PRESETS)}
-                  aria-pressed={eqState.currentPreset === preset}
+                  aria-pressed={equalizer.preset === preset}
                 >
                   {preset}
                 </button>
@@ -670,7 +615,7 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
         <div className={styles.equalizerSection}>
           <div className={styles.sectionTitle}>10-BAND GRAPHIC EQUALIZER</div>
           <div className={styles.eqBands}>
-            {eqState.bands.map((band, index) => renderEqualizerBand(band, index))}
+            {bands.map((band, index) => renderEqualizerBand(band, index))}
           </div>
         </div>
 
@@ -678,12 +623,12 @@ export const Equalizer: React.FC<EqualizerProps> = ({ className }) => {
           <div className={styles.statusLeft}>
             <span className={styles.statusLabel}>STATUS:</span>
             <span className={styles.statusValue}>
-              {eqState.processorActive ? 'ACTIVE' : 'STANDBY'}
+              {equalizer.enabled ? 'ACTIVE' : 'STANDBY'}
             </span>
           </div>
           <div className={styles.statusCenter}>
             <span className={styles.statusLabel}>PRESET:</span>
-            <span className={styles.statusValue}>{eqState.currentPreset}</span>
+            <span className={styles.statusValue}>{equalizer.preset}</span>
           </div>
           <div className={styles.statusRight}>
             <span className={styles.statusLabel}>TOTAL GAIN:</span>

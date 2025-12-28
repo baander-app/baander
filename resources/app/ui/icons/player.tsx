@@ -1,4 +1,4 @@
-import { Iconify, IconifyProps } from '@/ui/icons/iconify.tsx';
+import { Iconify, IconifyProps } from '@/app/ui/icons/iconify.tsx';
 
 export interface PlayerIconProps extends Omit<IconifyProps, 'icon'> {
 

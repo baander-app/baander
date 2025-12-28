@@ -15,9 +15,10 @@ auth.json
 npm-debug.log
 yarn-error.log
 /.fleet
-/.idea
 /.vscode
 bundle-visualization.html
+*.cer
+*.Identifier
 
 # Project exclude paths
 /storage/testlibrary/
@@ -35,3 +36,5 @@ repomix-output.xml
 /scramble_export.js
 /scramble:export.js
 /packages/dsp/**/*.wasm
+dist/
+electron/dist-*

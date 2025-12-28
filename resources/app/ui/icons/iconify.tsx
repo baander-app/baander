@@ -24,8 +24,11 @@ import MakiKaraoke from '~icons/maki/karaoke';
 import ArcticonsQuicklyric from '~icons/arcticons/quicklyric';
 import AkarMusicAlbumFill from '~icons/akar-icons/music-album-fill';
 import EntypoControllerPaus from '~icons/entypo/controller-paus';
+import EvaAlertCircleOutline from '~icons/eva/alert-circle-outline';
+import EvaCheckmarkCircle2Outline from '~icons/eva/checkmark-circle-2-outline';
+import EvaRefreshFill from '~icons/eva/refresh-fill';
 
-import { Env } from '@/common/env.ts';
+import { Env } from '@/app/common/env.ts';
 
 // If you use more icons, add them above and wire them here.
 const ICONS: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
@@ -50,6 +53,9 @@ const ICONS: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
   'arcticons:quicklyric': ArcticonsQuicklyric,
   'akar-icons:music-album-fill': AkarMusicAlbumFill,
   'entypo:controller-paus': EntypoControllerPaus,
+  'eva:alert-circle-outline': EvaAlertCircleOutline,
+  'eva:checkmark-circle-2-outline': EvaCheckmarkCircle2Outline,
+  'eva:refresh-fill': EvaRefreshFill,
 };
 
 type NumOrStr = number | string;

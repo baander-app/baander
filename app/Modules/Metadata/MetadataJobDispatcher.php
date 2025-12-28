@@ -117,10 +117,8 @@ class MetadataJobDispatcher
             foreach ($albums as $album) {
                 // Dispatch album sync job
                 $job = match ($syncType) {
-                    'general' => SyncAlbumJob::syncGeneral($album->id, $forceUpdate),
                     'identifier' => SyncAlbumJob::syncIdentifierBased($album->id, $forceUpdate),
                     'full' => SyncAlbumJob::syncAll($album->id, $forceUpdate),
-                    'legacy' => SyncAlbumJob::syncLegacy($album->id, $forceUpdate),
                     default => SyncAlbumJob::syncGeneral($album->id, $forceUpdate)
                 };
 
@@ -232,10 +230,8 @@ class MetadataJobDispatcher
         ) {
             foreach ($artists as $artist) {
                 $job = match ($syncType) {
-                    'general' => SyncArtistJob::syncGeneral($artist->id, $forceUpdate),
                     'identifier' => SyncArtistJob::syncIdentifierBased($artist->id, $forceUpdate),
                     'full' => SyncArtistJob::syncAll($artist->id, $forceUpdate),
-                    'legacy' => SyncArtistJob::syncLegacy($artist->id, $forceUpdate), // For backward compatibility
                     default => SyncArtistJob::syncGeneral($artist->id, $forceUpdate)
                 };
 

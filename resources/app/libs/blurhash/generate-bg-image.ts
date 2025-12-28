@@ -1,5 +1,5 @@
-import { decodeBlurhash } from '@/libs/blurhash/decode.ts';
-import { getIsLightFromPixels } from '@/libs/blurhash/luminance.ts';
+import { decodeBlurhash } from '@/app/libs/blurhash/decode.ts';
+import { getIsLightFromPixels } from '@/app/libs/blurhash/luminance.ts';
 
 /**
  * Util function to convert Uint8ClampedArray to base64 image string

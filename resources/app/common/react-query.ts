@@ -4,7 +4,7 @@ import {
   PersistedClient,
   Persister,
 } from '@tanstack/react-query-persist-client';
-import { Env } from '@/common/env.ts';
+import { Env } from '@/app/common/env.ts';
 
 const queryCache = new QueryCache({
   onError: (error: DefaultError, query: Query<unknown, unknown, unknown>) => {

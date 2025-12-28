@@ -21,7 +21,7 @@ class PlaylistResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'publicId'              => $this->public_id,
+            'publicId'        => $this->public_id,
             'name'            => $this->name,
             'description'     => $this->description,
             'isPublic'        => $this->is_public,
@@ -33,10 +33,10 @@ class PlaylistResource extends JsonResource
             'updatedAt'       => $this->updated_at,
             'songsCount'      => $this->whenCounted('songs'),
             'statistics'      => $this->whenLoaded('statistics', [
-                'views'     => $this->statistics->views,
-                'plays'     => $this->statistics->plays,
-                'shares'    => $this->statistics->shares,
-                'favorites' => $this->statistics->favorites,
+                'views'     => $this->statistics?->views ?? 0,
+                'plays'     => $this->statistics?->plays ?? 0,
+                'shares'    => $this->statistics?->shares ?? 0,
+                'favorites' => $this->statistics?->favorites ?? 0,
             ]),
             'songs'           => SongResource::collection($this->whenLoaded('songs')),
             'owner'           => $this->whenLoaded('user', [

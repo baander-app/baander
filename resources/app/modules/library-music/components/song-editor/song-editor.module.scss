@@ -1,0 +1,53 @@
+.container {
+  width: 100%;
+  max-width: 600px;
+}
+
+.form {
+  width: 100%;
+  padding: 12px;
+}
+
+.selectedBadge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+}
+
+.removeButton {
+  padding: 0;
+  margin: 0;
+  height: 16px;
+  width: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.lockButton {
+  padding: 2px;
+  min-width: 24px;
+  height: 24px;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--gray-a3);
+  }
+}
+
+.disabledField {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--gray-a2);
+
+  &:disabled {
+    pointer-events: none;
+  }
+}

@@ -1,5 +1,5 @@
 import { Badge } from '@radix-ui/themes';
-import { statusToColor } from '@/utils/job-status.ts';
+import { statusToColor } from '@/app/utils/job-status.ts';
 
 export interface JobStatusProps {
   status: string;

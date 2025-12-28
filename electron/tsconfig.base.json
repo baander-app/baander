@@ -11,8 +11,5 @@
     "strict": true,
     "skipLibCheck": true,
     "baseUrl": "../",
-    "paths": {
-      "@/*": ["resources/app/*"]
-    }
   }
 }

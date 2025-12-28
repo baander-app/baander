@@ -1,5 +1,5 @@
 import { Route, Routes } from 'react-router-dom';
-import { Overview } from '@/modules/library-movies/routes/overview.tsx';
+import { Overview } from '@/app/modules/library-movies/routes/overview.tsx';
 
 
 export const LibraryMoviesRoutes = () => {

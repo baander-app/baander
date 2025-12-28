@@ -1,5 +1,5 @@
-import Axios, { AxiosError, AxiosRequestConfig } from 'axios';
-import { applyInterceptors } from '@/libs/api-client/interceptors';
+import Axios, { AxiosError, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
+import { applyInterceptors } from '@/app/libs/api-client/interceptors';
 
 export interface CustomAxiosRequestConfig extends AxiosRequestConfig {
   _skipAuth?: boolean;
@@ -13,16 +13,24 @@ const headers: Record<string, string> = {
 
 const csrfToken = document.head.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
-if (csrfToken) {
-  headers['X-CSRF-TOKEN'] = csrfToken;
-}
-
-
-export const AXIOS_INSTANCE = Axios.create({
+const AXIOS_INSTANCE = Axios.create({
   baseURL: import.meta.env.VITE_APP_URL,
-  headers,
   withCredentials: true,
-}); // use your own URL here or environment variable
+});
+
+AXIOS_INSTANCE.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    if (csrfToken) {
+      config.headers['X-CSRF-TOKEN'] = csrfToken;
+    }
+
+    return config;
+  }
+)
+
+export {
+  AXIOS_INSTANCE,
+}
 
 applyInterceptors(AXIOS_INSTANCE);
 

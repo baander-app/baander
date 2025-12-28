@@ -4,16 +4,18 @@ namespace App\Jobs\Library\Music;
 
 use App\Extensions\StrExt;
 use App\Jobs\BaseJob;
-use App\Models\{Album, Artist, Genre, Library, Song};
+use App\Models\{Album, AlbumRole, Artist, Genre, Library, Song};
 use App\Modules\Logging\Attributes\LogChannel;
 use App\Modules\Logging\Channel;
 use App\Modules\Lyrics\Lrc;
-use App\Modules\Metadata\MediaMeta\MediaMeta;
-use App\Modules\Translation\LocaleString;
+use App\Modules\Metadata\Readers\MetadataReader;
+use App\Services\Metadata\MetadataDelimiterService;
+use App\Format\LocaleString;
 use Arr;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\{DB, File};
+use Illuminate\Support\Carbon;
 use Illuminate\Support\LazyCollection;
 use Psr\Log\LoggerInterface;
 use SplFileInfo;
@@ -21,8 +23,6 @@ use Throwable;
 
 class ScanDirectoryJob extends BaseJob implements ShouldQueue
 {
-    public const string ARTIST_SEPARATOR = ';';
-    public const string GENRE_SEPARATOR = ';';
     private const int BATCH_SIZE = 50;
 
     #[LogChannel(
@@ -30,11 +30,20 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
     )]
     private LoggerInterface $logger;
 
+    /**
+     * Default options for delimiter detection.
+     */
+    private const array DEFAULT_OPTIONS = [
+        'smart_detection' => true,
+        'artist_delimiters' => [';', '/', '&'],
+        'genre_delimiters' => [';', '/'],
+    ];
+
     public function __construct(
-        private string  $directory,
+        private string $directory,
         private Library $library,
-    )
-    {
+        private array $options = self::DEFAULT_OPTIONS,
+    ) {
     }
 
     /**
@@ -45,7 +54,9 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
     public function middleware(): array
     {
         $hash = hash('xxh3', $this->directory);
-        return [new WithoutOverlapping("scan_music_directory_$hash")];
+        return [
+            new WithoutOverlapping("scan_music_directory_$hash"),
+        ];
     }
 
     /**
@@ -59,8 +70,6 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
             $files = LazyCollection::make(File::files($this->directory));
             $this->processFiles($files);
         });
-
-        unset($this->directory, $this->library, $this->tagger);
     }
 
     private function processFiles(LazyCollection $files): void
@@ -75,8 +84,8 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         $fileCount = $files->count();
 
         $files->each(function (SplFileInfo $file) use (&$songs, &$coverJobs, &$lyrics, &$processedFiles, &$fileCount) {
-            $mediaMeta = new MediaMeta($file->getRealPath());
-            $this->processFile($mediaMeta, $file, $songs, $coverJobs);
+            $metadataReader = new MetadataReader($file->getRealPath());
+            $this->processFile($metadataReader, $file, $songs, $coverJobs);
 
             if (count($songs) >= self::BATCH_SIZE) {
                 $this->batchSaveSongs($songs);
@@ -94,7 +103,6 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
 
         $this->queueProgress(100);
         $this->queueData(['processedFiles' => $processedFiles, 'fileCount' => $fileCount]);
-        $this->delete();
     }
 
 
@@ -106,7 +114,15 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
 
             try {
                 $song->saveOrFail();
-                $song->artists()->sync($this->getArtistIds($songData['artists']));
+                $artistIds = $this->getArtistIds($songData['artists']);
+
+                // Sync artists without role first
+                $song->artists()->sync($artistIds);
+
+                // Then set the first artist as Primary if artists exist
+                if (!empty($artistIds)) {
+                    $song->artists()->updateExistingPivot($artistIds[0], ['role' => AlbumRole::Primary->value]);
+                }
                 $song->genres()->sync($this->getGenreIds($songData['genres']));
             } catch (Throwable $e) {
                 $this->getLogger()->error("Failed to save song: $song->title", [
@@ -116,18 +132,18 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         }
     }
 
-    private function processFile(MediaMeta $mediaMeta, SplFileInfo $file, array &$songs, array &$coverJobs): void
+    private function processFile(MetadataReader $metadataReader, SplFileInfo $file, array &$songs, array &$coverJobs): void
     {
         try {
             $filePath = $file->getRealPath();
 
             $hash = hash('xxh3', $filePath);
 
-            if (!$mediaMeta->isAudioFile() || Song::whereHash($hash)->exists()) {
+            if (!$metadataReader->isAudioFile() || Song::whereHash($hash)->exists()) {
                 return;
             }
 
-            if ($songData = $this->processMetadata(mediaMeta: $mediaMeta, filePath: $filePath, hash: $hash, file: $file, coverJobs: $coverJobs)) {
+            if ($songData = $this->processMetadata(metadataReader: $metadataReader, filePath: $filePath, hash: $hash, file: $file, coverJobs: $coverJobs)) {
                 $songs[] = $songData;
             }
         } catch (\Exception $e) {
@@ -139,13 +155,14 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         }
     }
 
-    private function processMetadata(MediaMeta $mediaMeta, string $filePath, string $hash, SplFileInfo $file, array &$coverJobs): ?array
+    private function processMetadata(MetadataReader $metadataReader, string $filePath, string $hash, SplFileInfo $file, array &$coverJobs): ?array
     {
         $this->getLogger()->info("Processing metadata for file: $filePath");
 
         try {
             $directoryName = basename(File::basename($file));
-            $album = $this->findOrCreateAlbum(directoryName: $directoryName, albumTitle: $mediaMeta->getAlbum(), year: $mediaMeta->getYear());
+            $year = $metadataReader->getYear() ? Carbon::parse($metadataReader->getYear())->format('Y') : null;
+            $album = $this->findOrCreateAlbum(directoryName: $directoryName, albumTitle: $metadataReader->getAlbum(), year: $year);
 
             if (!$album) {
                 $this->getLogger()->error("Failed to find or create album for file: $filePath");
@@ -153,22 +170,23 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
                 return null;
             }
 
-            $songAttributes = $this->makeSongAttributes(mediaMeta: $mediaMeta, file: $file, hash: $hash, lyric: $this->getLyric($file));
+            $songAttributes = $this->makeSongAttributes(metadataReader: $metadataReader, file: $file, hash: $hash, lyric: $this->getLyric($file));
             if ($songAttributes) {
                 $this->queueCoverJob($album, $coverJobs);
 
-                $cleanBadNames = static fn($v) => trim($v) !== '' && $v !== null;
+                $delimiterService = new MetadataDelimiterService($this->options);
 
-                $artists = $mediaMeta->getArtist();
-                $artists = is_array($artists) ? array_filter($mediaMeta->getArtist(), $cleanBadNames) : array_filter(explode(self::ARTIST_SEPARATOR, $artists ?? ''), $cleanBadNames);
-                $artistIds = $this->getArtistIds($artists);
-                $album->artists()->sync($artistIds);
+                // Split artists with smart detection
+                $artists = $delimiterService->splitArtists($metadataReader->getArtist());
+
+                // Split genres with smart detection
+                $genres = $delimiterService->splitGenres($metadataReader->getGenre());
 
                 return [
                     'attributes' => $songAttributes,
                     'album'      => $album,
                     'artists'    => $artists,
-                    'genres'     => array_filter(explode(self::GENRE_SEPARATOR, $mediaMeta->getGenre() ?? ''), $cleanBadNames),
+                    'genres'     => $genres,
                 ];
             }
 
@@ -198,7 +216,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
     {
         $title = $albumTitle;
         $album = Album::whereTitle($title)->whereLibraryId($this->library->id)->first();
-        $fallback = $this->isSongInBaseDirectory($directoryName) ? LocaleString::delimitString('library.album.unknown') : $directoryName;
+        $fallback = $this->isSongInBaseDirectory($directoryName) ? LocaleString::delimit('library.album.unknown') : $directoryName;
 
         if (!$album) {
             $album = new Album([
@@ -220,9 +238,9 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         return $album;
     }
 
-    private function makeSongAttributes(MediaMeta $mediaMeta, SplFileInfo $file, string $hash, ?string $lyric): ?array
+    private function makeSongAttributes(MetadataReader $metadataReader, SplFileInfo $file, string $hash, ?string $lyric): ?array
     {
-        $mimeType = $mediaMeta->getMimeType();
+        $mimeType = $metadataReader->getMimeType();
 
         if (!$mimeType) {
             $this->getLogger()->error("Failed to get mime type for file: $file");
@@ -230,17 +248,54 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
             return null;
         }
 
+        $trackNumber = $metadataReader->getTrackNumber();
+
+        // Fallback: extract track number from filename if not available in metadata
+        if ($trackNumber === null) {
+            $trackNumber = $this->extractTrackNumberFromFilename($file->getBasename());
+        }
+
         return [
-            'title'     => $mediaMeta->getTitle() ?? $file->getBasename() ?? LocaleString::delimitString('library.song.unknown'),
-            'track'     => $mediaMeta->getTrackNumber(),
-            'length'    => $mediaMeta->probeLength(),
+            'title'     => $metadataReader->getTitle() ?? $file->getBasename() ?? LocaleString::delimit('library.song.unknown'),
+            'track'     => $trackNumber,
+            'length'    => $metadataReader->probeLength(),
             'lyrics'    => $lyric ? StrExt::convertToUtf8($lyric) : null,
             'path'      => $file->getRealPath(),
-            'mime_type' => $mediaMeta->getMimeType(),
+            'mime_type' => $metadataReader->getMimeType(),
             'size'      => is_int($file->getSize()) ? $file->getSize() : 0,
             'hash'      => $hash,
-            'comment'   => $mediaMeta->getComment(),
+            'comment'   => $metadataReader->getComment(),
         ];
+    }
+
+    /**
+     * Extract track number from filename
+     *
+     * Handles formats like:
+     * - "03 - title.mp3" -> 3
+     * - "03-title.mp3" -> 3
+     * - "03 title.mp3" -> 3
+     *
+     * @param string $filename The filename (without extension)
+     * @return int|null The track number or null if not found
+     */
+    private function extractTrackNumberFromFilename(string $filename): ?int
+    {
+        // Remove file extension
+        $filenameWithoutExt = pathinfo($filename, PATHINFO_FILENAME);
+
+        // Match patterns like "03 - title", "03-title", "03 title", etc.
+        // Pattern: number at start, followed by space, dash, or dot
+        if (preg_match('/^(\d+)\s*[-.\s]\s*(.+)$/', $filenameWithoutExt, $matches)) {
+            $trackNumber = (int) $matches[1];
+
+            // Sanity check: track numbers are usually 1-99
+            if ($trackNumber >= 1 && $trackNumber <= 99) {
+                return $trackNumber;
+            }
+        }
+
+        return null;
     }
 
     private function getArtistIds(array $artists): array

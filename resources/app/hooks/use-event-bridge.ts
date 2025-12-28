@@ -1,6 +1,6 @@
-import { EventCallback, EventMap } from '@/services/event-bridge/events';
+import { EventCallback, EventMap } from '@/app/services/event-bridge/events';
 import { useCallback, useEffect, useRef } from 'react';
-import { eventBridge } from '@/services/event-bridge/bridge.ts';
+import { eventBridge } from '@/app/services/event-bridge/bridge.ts';
 
 export function useEventBridge() {
   const unsubscribersRef = useRef<Array<() => void>>([]);

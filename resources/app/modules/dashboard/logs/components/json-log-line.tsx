@@ -1,6 +1,5 @@
 import React, { useState, useCallback } from 'react';
 import { ChevronRightIcon, ChevronDownIcon } from '@radix-ui/react-icons';
-import ReactJsonView from '@microlink/react-json-view';
 import { Box, Text } from '@radix-ui/themes';
 
 interface JsonLogLineProps {
@@ -125,7 +124,6 @@ export const JsonLogLine: React.FC<JsonLogLineProps> = ({
     if (!isJsonChecked) {
       // First click - check for JSON
       const foundJson = findJsonInLine(content);
-      console.log(foundJson);
       setJsonInfo(foundJson);
       setIsJsonChecked(true);
 
@@ -158,11 +156,11 @@ export const JsonLogLine: React.FC<JsonLogLineProps> = ({
           alignItems: 'flex-start',
           paddingLeft: '12px',
           paddingRight: '16px',
-          paddingTop: '2px',
-          paddingBottom: '2px',
-          fontFamily: 'var(--font-family-mono)',
+          paddingTop: '4px',
+          paddingBottom: '4px',
+          fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
           fontSize: '13px',
-          lineHeight: '20px',
+          lineHeight: '1.5',
         }}
       >
         {/* Line number */}
@@ -172,7 +170,7 @@ export const JsonLogLine: React.FC<JsonLogLineProps> = ({
             textAlign: 'right',
             paddingRight: '16px',
             userSelect: 'none',
-            color: '#6b7280',
+            color: '#71717a',
             fontSize: '12px',
             fontWeight: '500',
             flexShrink: 0,
@@ -195,15 +193,15 @@ export const JsonLogLine: React.FC<JsonLogLineProps> = ({
             }}
           >
             {isExpanded ? (
-              <ChevronDownIcon width="14" height="14" style={{ color: '#64748b' }} />
+              <ChevronDownIcon width="14" height="14" style={{ color: '#a1a1aa' }} />
             ) : (
-               <ChevronRightIcon width="14" height="14" style={{ color: '#64748b' }} />
+               <ChevronRightIcon width="14" height="14" style={{ color: '#a1a1aa' }} />
              )}
           </div>
         )}
 
         {/* Content */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ flex: 1, minWidth: 0, overflowWrap: 'break-word' }}>
           {/* Regular log line or collapsed JSON */}
           {!isExpanded && (
             <Text
@@ -215,7 +213,6 @@ export const JsonLogLine: React.FC<JsonLogLineProps> = ({
                 fontFamily: 'inherit',
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word',
-                overflow: 'hidden',
               }}
             >
               {jsonInfo ? (
@@ -248,16 +245,16 @@ export const JsonLogLine: React.FC<JsonLogLineProps> = ({
 
           {/* Expanded JSON view */}
           {isExpanded && parsedJson && jsonInfo && (
-            <Text style={{ marginTop: '8px' }}>
+            <Text style={{ marginTop: '10px' }}>
               {/* Message prefix */}
               {jsonInfo.prefix && (
                 <Text
                   style={{
-                    marginBottom: '8px',
-                    color: '#e2e8f0',
-                    fontSize: '13px',
+                    marginBottom: '10px',
+                    color: '#e4e4e7',
+                    fontSize: '14px',
                     fontFamily: 'inherit',
-                    lineHeight: '20px',
+                    lineHeight: '22px',
                   }}
                 >
                   {jsonInfo.prefix}
@@ -267,8 +264,8 @@ export const JsonLogLine: React.FC<JsonLogLineProps> = ({
               {/* JSON viewer */}
               <Text
                 style={{
-                  backgroundColor: '#1e293b',
-                  border: '1px solid #334155',
+                  backgroundColor: '#18181b',
+                  border: '1px solid #27272a',
                   borderRadius: '6px',
                   padding: '12px',
                   marginTop: '4px',
@@ -277,35 +274,35 @@ export const JsonLogLine: React.FC<JsonLogLineProps> = ({
                   maxHeight: '400px',
                 }}
               >
-                <ReactJsonView
-                  src={parsedJson}
-                  theme="monokai"
-                  style={{
-                    backgroundColor: 'transparent',
-                    fontSize: '12px',
-                    fontFamily: 'var(--font-family-mono)',
-                  }}
-                  displayObjectSize={false}
-                  displayDataTypes={false}
-                  enableClipboard={true}
-                  collapsed={false}
-                  collapseStringsAfterLength={100}
-                  indentWidth={2}
-                  iconStyle="triangle"
-                  quotesOnKeys={false}
-                  sortKeys={false}
-                />
+                {/*<ReactJsonView*/}
+                {/*  src={parsedJson}*/}
+                {/*  theme="monokai"*/}
+                {/*  style={{*/}
+                {/*    backgroundColor: 'transparent',*/}
+                {/*    fontSize: '13px',*/}
+                {/*    fontFamily: 'var(--font-family-mono)',*/}
+                {/*  }}*/}
+                {/*  displayObjectSize={false}*/}
+                {/*  displayDataTypes={false}*/}
+                {/*  enableClipboard={true}*/}
+                {/*  collapsed={false}*/}
+                {/*  collapseStringsAfterLength={100}*/}
+                {/*  indentWidth={2}*/}
+                {/*  iconStyle="triangle"*/}
+                {/*  quotesOnKeys={false}*/}
+                {/*  sortKeys={false}*/}
+                {/*/>*/}
               </Text>
 
               {/* Message suffix */}
               {jsonInfo.suffix && (
                 <Box
                   style={{
-                    marginTop: '8px',
-                    color: '#e2e8f0',
-                    fontSize: '13px',
+                    marginTop: '10px',
+                    color: '#e4e4e7',
+                    fontSize: '14px',
                     fontFamily: 'inherit',
-                    lineHeight: '20px',
+                    lineHeight: '22px',
                   }}
                 >
                   {jsonInfo.suffix}

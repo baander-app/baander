@@ -1,11 +1,11 @@
 import { ColumnDef, getCoreRowModel, getSortedRowModel, SortingState, useReactTable } from './types';
 import { useMemo, useState } from 'react';
-import { Iconify } from '@/ui/icons/iconify.tsx';
+import { Iconify } from '@/app/ui/icons/iconify.tsx';
 import { Tooltip } from 'radix-ui';
 import { Button, Flex, Text } from '@radix-ui/themes';
 import  { Table } from '@radix-ui/themes';
-import { UserResource } from '@/libs/api-client/gen/models';
-import { useUsersIndex } from '@/libs/api-client/gen/endpoints/user/user.ts';
+import { UserResource } from '@/app/libs/api-client/gen/models';
+import { useUsersIndex } from '@/app/libs/api-client/gen/endpoints/users/users.ts';
 
 export function UserTable() {
   const columns = useMemo<ColumnDef<UserResource>[]>(

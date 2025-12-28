@@ -1,8 +1,8 @@
 import { ComponentPropsWithoutRef } from 'react';
 import { Flex, Text } from '@radix-ui/themes';
-import { lazyImport } from '@/utils/lazy-import.ts';
+import { lazyImport } from '@/app/utils/lazy-import.ts';
 
-const { BaanderLogo } = lazyImport(() => import('@/ui/branding/baander-logo/baander-logo.tsx'), 'BaanderLogo');
+const { BaanderLogo } = lazyImport(() => import('@/app/ui/branding/baander-logo/baander-logo.tsx'), 'BaanderLogo');
 
 export interface BrandProps extends ComponentPropsWithoutRef<'div'> {
 }

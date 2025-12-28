@@ -11,9 +11,9 @@ return [
     |
     */
 
-    'private_key' => env('OAUTH_PRIVATE_KEY', storage_path('oauth-private.key')),
-    'public_key' => env('OAUTH_PUBLIC_KEY', storage_path('oauth-public.key')),
-    'encryption_key' => env('OAUTH_ENCRYPTION_KEY', env('APP_KEY')),
+    'private_key'    => env('OAUTH_PRIVATE_KEY', storage_path('oauth-private.key')),
+    'public_key'     => env('OAUTH_PUBLIC_KEY', storage_path('oauth-public.key')),
+    'encryption_key' => env('OAUTH_ENCRYPTION_KEY'),
 
     /*
     |--------------------------------------------------------------------------
@@ -25,9 +25,9 @@ return [
     |
     */
 
-    'access_token_ttl' => env('OAUTH_ACCESS_TOKEN_TTL', 'PT1H'), // 1 hour
+    'access_token_ttl'  => env('OAUTH_ACCESS_TOKEN_TTL', 'PT1H'), // 1 hour
     'refresh_token_ttl' => env('OAUTH_REFRESH_TOKEN_TTL', 'P1M'), // 1 month
-    'auth_code_ttl' => env('OAUTH_AUTH_CODE_TTL', 'PT10M'), // 10 minutes
+    'auth_code_ttl'     => env('OAUTH_AUTH_CODE_TTL', 'PT10M'), // 10 minutes
 
     /*
     |--------------------------------------------------------------------------
@@ -40,7 +40,7 @@ return [
 
     'device_code_ttl' => env('OAUTH_DEVICE_CODE_TTL', 600), // 10 minutes in seconds
     'device_code_interval' => env('OAUTH_DEVICE_CODE_INTERVAL', 5), // 5 seconds
-    'device_verification_uri' => env('OAUTH_DEVICE_VERIFICATION_URI', env('APP_URL') . '/device'),
+    'device_verification_uri' => env('OAUTH_DEVICE_VERIFICATION_URI', env('APP_URL') . '/oauth/device/verify'),
 
     /*
     |--------------------------------------------------------------------------
@@ -52,11 +52,11 @@ return [
     */
 
     'default_scopes' => [
-        'read' => 'Read access to user data',
-        'write' => 'Write access to user data',
+        'read'   => 'Read access to user data',
+        'write'  => 'Write access to user data',
         'delete' => 'Delete access to user data',
         'stream' => 'Stream media content',
-        'admin' => 'Administrative access',
+        'admin'  => 'Administrative access',
     ],
 
     /*
@@ -71,9 +71,9 @@ return [
     'grants' => [
         'authorization_code' => true,
         'client_credentials' => true,
-        'password' => env('OAUTH_PASSWORD_GRANT_ENABLED', false),
-        'refresh_token' => true,
-        'device_code' => true,
+        'password'           => env('OAUTH_PASSWORD_GRANT_ENABLED', false),
+        'refresh_token'      => true,
+        'device_code'        => true,
     ],
 
     /*

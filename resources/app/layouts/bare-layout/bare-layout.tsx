@@ -1,8 +1,8 @@
 import { ReactNode } from 'react';
 import { Flex } from '@radix-ui/themes';
-import { lazyImport } from '@/utils/lazy-import.ts';
+import { lazyImport } from '@/app/utils/lazy-import.ts';
 
-const { Brand } = lazyImport(() => import('@/ui/brand/Brand.tsx'), 'Brand');
+const { Brand } = lazyImport(() => import('@/app/ui/brand/Brand.tsx'), 'Brand');
 
 export function BareLayout(props: { children?: ReactNode }) {
   return (

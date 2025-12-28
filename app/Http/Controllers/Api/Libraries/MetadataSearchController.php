@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers\Api\Libraries;
 
-use App\Models\{Album, TokenAbility};
+use App\Models\Album;
 use App\Modules\Metadata\Search\AlbumSearchService;
 use Spatie\RouteAttributes\Attributes\{Get, Middleware, Prefix};
 
 #[Prefix('/metadata/search')]
 #[Middleware([
-    'auth:sanctum',
-    'ability:' . TokenAbility::ACCESS_API->value,
+    'auth:oauth',
+    'scope:access-api',
     'force.json',
 ])]
 class MetadataSearchController

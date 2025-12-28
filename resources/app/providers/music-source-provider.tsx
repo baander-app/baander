@@ -1,8 +1,7 @@
 import React, { RefObject, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { noop } from '@/utils/noop.ts';
-import { useAppDispatch, useAppSelector } from '@/store/hooks.ts';
-import { playNextSong, selectSong } from '@/store/music/music-player-slice.ts';
-import { Token } from '@/services/auth/token.ts';
+import { noop } from '@/app/utils/noop.ts';
+import { usePlayerCurrentSong, usePlayerActions } from '@/app/modules/library-music-player/store';
+import { Token } from '@/app/services/auth/token.ts';
 
 interface MusicSourceContextType {
   authenticatedSource: string | undefined;
@@ -18,22 +17,21 @@ export const MusicSourceContext = React.createContext<MusicSourceContextType>({
 MusicSourceContext.displayName = 'MusicSourceContext';
 
 export function MusicSourceProvider({ children }: { children: React.ReactNode }) {
-  const dispatch = useAppDispatch();
-
-  const currentSong = useAppSelector(selectSong);
+  const currentSong = usePlayerCurrentSong();
+  const { playNext } = usePlayerActions();
   const [audioRef, setAudioRef] = useState<RefObject<HTMLAudioElement | null>>();
 
   const authenticatedSource = useMemo(() => {
-    const streamToken = Token.getStreamToken();
-    if (currentSong?.streamUrl && streamToken) {
-      return `${currentSong.streamUrl}?_token=${streamToken.token}`;
+    const token = Token.get()?.access_token;
+    if (currentSong?.streamUrl && token) {
+      return `${currentSong.streamUrl}?_token=${token}`;
     }
     return undefined;
-  }, [currentSong]);
+  }, [currentSong?.streamUrl]);
 
   const onSongEnd = useCallback(() => {
-    dispatch(playNextSong());
-  }, [dispatch]);
+    playNext();
+  }, [playNext]);
 
   useEffect(() => {
     if (audioRef?.current) {

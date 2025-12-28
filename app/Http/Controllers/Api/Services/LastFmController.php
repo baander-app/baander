@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api\Services;
 
 use App\Http\Controllers\Controller;
 use App\Http\Integrations\LastFm\LastFmClient;
-use App\Models\ThirdPartyCredential;
-use App\Models\TokenAbility;
+use App\Models\Auth\ThirdPartyCredential;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -14,6 +14,7 @@ use Spatie\RouteAttributes\Attributes\{Get, Post, Prefix};
 
 
 #[Prefix('services/lastfm')]
+#[Group('Connections')]
 class LastFmController extends Controller
 {
     public function __construct(
@@ -23,8 +24,8 @@ class LastFmController extends Controller
     }
 
     #[Get('authorize', 'lastfm.authorize', [
-        'auth:sanctum',
-        'ability:' . TokenAbility::ACCESS_API->value,
+        'auth:oauth',
+        'scope:access-api',
     ])]
     public function authorizeLastFm(Request $request)
     {
@@ -145,8 +146,8 @@ class LastFmController extends Controller
     }
 
     #[Post('disconnect', 'lastfm.disconnect', [
-        'auth:sanctum',
-        'ability:' . TokenAbility::ACCESS_API->value,
+        'auth:oauth',
+        'scope:access-api',
     ])]
     public function disconnect()
     {
@@ -158,8 +159,8 @@ class LastFmController extends Controller
     }
 
     #[Get('status', 'lastfm.status',
-        ['auth:sanctum',
-         'ability:' . TokenAbility::ACCESS_API->value,
+        ['auth:oauth',
+         'scope:access-api',
         ])]
     public function status()
     {

@@ -1,4 +1,4 @@
-import { eventBridge } from '@/services/event-bridge/bridge';
+import { eventBridge } from '@/app/services/event-bridge/bridge';
 import { Action, Middleware } from '@reduxjs/toolkit';
 
 // Define the shape of your Redux actions
@@ -6,6 +6,8 @@ interface AuthLoginSuccessAction extends Action<'auth/loginSuccess'> {
   payload: {
     user: any;
     tokens: any;
+    session_id: any;
+    expires_in: any;
   };
 }
 
@@ -41,6 +43,8 @@ export const eventBridgeMiddleware: Middleware = () => (next) => (action: unknow
         const loginAction = typedAction as AuthLoginSuccessAction;
         eventBridge.emit('auth:login', {
           tokens: loginAction.payload.tokens,
+          session_id: loginAction.payload.session_id,
+          expires_in: loginAction.payload.expires_in,
         });
       }
       break;

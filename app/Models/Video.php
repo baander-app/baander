@@ -6,7 +6,6 @@ use App\Observers\VideoObserver;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use SplFileInfo;
 
-#[ObservedBy(VideoObserver::class)]
 class Video extends BaseModel
 {
     protected $fillable = [

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useLyrics } from '@/ui/lyrics-viewer/providers/lyrics-provider.tsx';
+import { useLyrics } from '@/app/ui/lyrics-viewer/providers/lyrics-provider.tsx';
 import { Box } from '@radix-ui/themes';
 import styles from './lyrics-animation.module.scss';
 

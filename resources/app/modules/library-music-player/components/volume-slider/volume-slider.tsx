@@ -1,9 +1,9 @@
 import { Flex, IconButton, Slider } from '@radix-ui/themes';
-import { Iconify } from '@/ui/icons/iconify.tsx';
-import { MUSIC_CONTROL_ICON_SIZE } from '@/modules/library-music-player/constants.ts';
+import { Iconify } from '@/app/ui/icons/iconify.tsx';
+import { MUSIC_CONTROL_ICON_SIZE } from '@/app/modules/library-music-player/constants.ts';
 import { useState, useCallback } from 'react';
 import styles from './volume-slider.module.scss';
-import { usePlayerActions, usePlayerIsMuted, usePlayerVolumePercent } from '@/modules/library-music-player/store';
+import { usePlayerActions, usePlayerIsMuted, usePlayerVolumePercent } from '@/app/modules/library-music-player/store';
 
 function getVolumeIcon(isMuted: boolean, volume: number): string {
   if (isMuted || volume === 0) {

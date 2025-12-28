@@ -68,5 +68,14 @@ class SetupDevCommand extends DevelopmentCommand
         $this->call('db:seed', [
             '--class' => UsersSeed::class,
         ]);
+
+        $this->call('oauth:client:create', [
+            '--name'        => config('app.name'),
+            '--redirect'    => '/api/oauth/device/verify',
+            '--personal'    => true,
+            '--password'    => true,
+            '--device'      => true,
+            '--first-party' => true,
+        ]);
     }
 }

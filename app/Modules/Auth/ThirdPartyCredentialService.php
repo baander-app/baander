@@ -2,7 +2,7 @@
 
 namespace App\Modules\Auth;
 
-use App\Models\ThirdPartyCredential;
+use App\Models\Auth\ThirdPartyCredential;
 use App\Models\User;
 use DateTime;
 use Illuminate\Support\Collection;
@@ -15,7 +15,7 @@ class ThirdPartyCredentialService
         array     $metaData,
         ?DateTime $expiresAt = null
     ): ThirdPartyCredential {
-        return (new \App\Models\ThirdPartyCredential)->updateOrCreate(
+        return (new \App\Models\Auth\ThirdPartyCredential)->updateOrCreate(
             [
                 'user_id' => $user->id,
                 'provider' => $provider,
@@ -72,7 +72,7 @@ class ThirdPartyCredentialService
 
     public function removeCredential(User $user, string $provider): bool
     {
-        return (new \App\Models\ThirdPartyCredential)->where('user_id', $user->id)
+        return (new \App\Models\Auth\ThirdPartyCredential)->where('user_id', $user->id)
                 ->where('provider', $provider)
                 ->delete() > 0;
     }
@@ -91,14 +91,14 @@ class ThirdPartyCredentialService
 
     public function getExpiredCredentials(): Collection
     {
-        return (new \App\Models\ThirdPartyCredential)->where('expires_at', '<', now())
+        return (new \App\Models\Auth\ThirdPartyCredential)->where('expires_at', '<', now())
             ->whereNotNull('expires_at')
             ->get();
     }
 
     public function cleanupExpiredCredentials(): int
     {
-        return (new \App\Models\ThirdPartyCredential)->where('expires_at', '<', now())
+        return (new \App\Models\Auth\ThirdPartyCredential)->where('expires_at', '<', now())
             ->whereNotNull('expires_at')
             ->delete();
     }

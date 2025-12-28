@@ -16,7 +16,7 @@ class ReleaseFilter extends BaseFilter
         public ?string $genre = null,
         public ?string $style = null,
         int $page = 1,
-        int $per_page = 50
+        int $per_page = 50,
     ) {
         parent::__construct($page, $per_page);
     }

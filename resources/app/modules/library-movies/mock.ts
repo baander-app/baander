@@ -1,4 +1,4 @@
-import { MovieResource } from '@/modules/library-movies/modes.ts';
+import { MovieResource } from '@/app/modules/library-movies/modes.ts';
 
 export const movieResources: MovieResource[] = [
   {

@@ -1,10 +1,10 @@
 import { ReactNode } from 'react';
 import styles from './root-layout.module.scss';
-import { lazyImport } from '@/utils/lazy-import';
-import { RootMenu } from '@/layouts/root-layout/components/root-menu';
-import { NotificationArea } from '@/modules/notifications/notification-area.tsx';
+import { lazyImport } from '@/app/utils/lazy-import';
+import { RootMenu } from '@/app/layouts/root-layout/components/root-menu';
+import { NotificationArea } from '@/app/modules/notifications/notification-area.tsx';
 
-const { InlinePlayer } = lazyImport(() => import('@/modules/library-music-player/inline-player.tsx'), 'InlinePlayer');
+const { InlinePlayer } = lazyImport(() => import('@/app/modules/library-music-player/inline-player.tsx'), 'InlinePlayer');
 
 export function RootLayout(props: { children?: ReactNode }) {
   return (

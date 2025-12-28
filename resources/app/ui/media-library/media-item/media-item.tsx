@@ -1,5 +1,5 @@
 import { Box, Text } from '@radix-ui/themes';
-import { MovieResource } from '@/api-client/requests';
+import { MovieResource } from '@/app/api-client/requests';
 
 export interface MediaItemProps {
   item: MovieResource;

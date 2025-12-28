@@ -1,6 +1,6 @@
 import { Box, Container, Heading } from '@radix-ui/themes';
-import { JobsList } from '@/modules/dashboard/queue-monitor/components/jobs-list.tsx';
-import { Metrics } from '@/modules/dashboard/queue-monitor/components/metrics.tsx';
+import { JobsList } from '@/app/modules/dashboard/queue-monitor/components/jobs-list.tsx';
+import { Metrics } from '@/app/modules/dashboard/queue-monitor/components/metrics.tsx';
 
 
 export function QueueMonitor() {

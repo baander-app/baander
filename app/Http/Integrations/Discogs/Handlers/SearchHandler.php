@@ -4,6 +4,7 @@ namespace App\Http\Integrations\Discogs\Handlers;
 
 use App\Http\Integrations\Discogs\Filters\ArtistFilter;
 use App\Http\Integrations\Discogs\Handler;
+use App\Http\Integrations\Traits\CachesGetRequests;
 use App\Http\Integrations\Discogs\Models\{
     Artist,
     Release,
@@ -15,14 +16,26 @@ use Illuminate\Support\Collection;
 
 class SearchHandler extends Handler
 {
+    use CachesGetRequests;
+
     private ?array $lastPagination = null;
+
+    protected function getCacheTags(): array
+    {
+        return ['discogs', 'search'];
+    }
+
+    protected function getCacheTtl(): int
+    {
+        return 60 * 60;
+    }
 
     /**
      * Search for artists and return models
      */
     public function artist(ArtistFilter $filter): Collection
     {
-        $data = $this->fetchEndpoint('database/search', array_merge($filter->toQueryParameters(), ['type' => 'artist']));
+        $data = $this->fetchCached('database/search', array_merge($filter->toQueryParameters(), ['type' => 'artist']));
 
         // Store pagination for later retrieval
         $this->lastPagination = $data['pagination'] ?? null;
@@ -39,7 +52,7 @@ class SearchHandler extends Handler
      */
     public function release($filter): Collection
     {
-        $data = $this->fetchEndpoint('database/search', array_merge($filter->toQueryParameters(), ['type' => 'release']));
+        $data = $this->fetchCached('database/search', array_merge($filter->toQueryParameters(), ['type' => 'release']));
 
         // Store pagination for later retrieval
         $this->lastPagination = $data['pagination'] ?? null;
@@ -56,7 +69,7 @@ class SearchHandler extends Handler
      */
     public function master($filter): Collection
     {
-        $data = $this->fetchEndpoint('database/search', array_merge($filter->toQueryParameters(), ['type' => 'master']));
+        $data = $this->fetchCached('database/search', array_merge($filter->toQueryParameters(), ['type' => 'master']));
 
         // Store pagination for later retrieval
         $this->lastPagination = $data['pagination'] ?? null;
@@ -73,7 +86,7 @@ class SearchHandler extends Handler
      */
     public function label($filter): Collection
     {
-        $data = $this->fetchEndpoint('database/search', array_merge($filter->toQueryParameters(), ['type' => 'label']));
+        $data = $this->fetchCached('database/search', array_merge($filter->toQueryParameters(), ['type' => 'label']));
 
         // Store pagination for later retrieval
         $this->lastPagination = $data['pagination'] ?? null;
@@ -88,17 +101,17 @@ class SearchHandler extends Handler
     /**
      * Get raw API response for artists (for backward compatibility)
      */
-    public function artistRaw($filter): array
+    public function artistRaw($filter): ?array
     {
-        return $this->fetchEndpoint('database/search', array_merge($filter->toQueryParameters(), ['type' => 'artist']));
+        return $this->fetchCached('database/search', array_merge($filter->toQueryParameters(), ['type' => 'artist']));
     }
 
     /**
      * Get raw API response for releases (for backward compatibility)
      */
-    public function releaseRaw($filter): array
+    public function releaseRaw($filter): ?array
     {
-        return $this->fetchEndpoint('database/search', array_merge($filter->toQueryParameters(), ['type' => 'release']));
+        return $this->fetchCached('database/search', array_merge($filter->toQueryParameters(), ['type' => 'release']));
     }
 
     // Async methods

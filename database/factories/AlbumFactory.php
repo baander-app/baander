@@ -18,9 +18,15 @@ class AlbumFactory extends Factory
     public function definition(): array
     {
         return [
+            'library_id' => \App\Models\Library::factory(),
             'title' => $this->faker->words(3, true),
+            'type' => 'studio',
             'year' => $this->faker->year(),
-            'library_id' => 1, // Default library
+            'label' => $this->faker->company(),
+            'catalog_number' => $this->faker->bothify('CAT-????'),
+            'barcode' => $this->faker->numerify('#############'),
+            'country' => $this->faker->countryCode(),
+            'language' => 'eng',
         ];
     }
 }

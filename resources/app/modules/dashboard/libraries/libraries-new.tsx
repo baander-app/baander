@@ -1,5 +1,5 @@
 import { Container, Heading } from '@radix-ui/themes';
-import { CreateLibrary } from '@/modules/dashboard/libraries/components/create-library.tsx';
+import { CreateLibrary } from '@/app/modules/dashboard/libraries/components/create-library.tsx';
 
 export function LibrariesNew() {
   return (

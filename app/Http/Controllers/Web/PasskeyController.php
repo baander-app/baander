@@ -2,21 +2,23 @@
 
 namespace App\Http\Controllers\Web;
 
-use App\Events\Auth\PasskeyUsedToAuthenticateEvent;
+use App\Events\Auth\{PasskeyAuthenticationFailedEvent, PasskeyRegisteredEvent, PasskeyUsedToAuthenticateEvent,};
 use App\Http\Controllers\Api\Auth\Concerns\HandlesUserTokens;
 use App\Http\Controllers\Controller;
-use App\Models\Passkey;
 use App\Http\Requests\Auth\{AuthenticateUsingPasskeyRequest, StorePasskeyRequest};
+use App\Models\Auth\Passkey;
 use App\Models\User;
 use App\Modules\Auth\Webauthn\Actions\{FindPasskeyToAuthenticateAction,
     GeneratePasskeyAuthenticationOptionsAction,
     GeneratePasskeyRegisterOptionsAction,
     StorePasskeyAction};
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
-use Illuminate\Support\Facades\{Auth, Log, Session};
+use Illuminate\Support\Facades\{Auth, Cache, Event, Log, Session};
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Spatie\RouteAttributes\Attributes\{Get, Post, Prefix};
 use Throwable;
 
@@ -30,6 +32,7 @@ use Throwable;
  * @tags Auth
  */
 #[Prefix('/webauthn/passkey')]
+#[Group('Auth')]
 class PasskeyController extends Controller
 {
     use HandlesUserTokens;
@@ -55,7 +58,8 @@ class PasskeyController extends Controller
      *     transports: array<string>
      *   }>,
      *   userVerification: string,
-     *   timeout: int
+     *   timeout: int,
+     *   challengeId: string
      * }
      */
     #[Get('/', 'auth.passkey.options')]
@@ -66,11 +70,17 @@ class PasskeyController extends Controller
         /** @var array $options WebAuthn authentication challenge options */
         $options = $action->execute($request->user());
 
-        // Store options in session for later verification
+        // Generate a unique challenge ID and store options in cache
+        $challengeId = Str::random(40);
+        Cache::put("passkey_challenge:{$challengeId}", json_encode($options), now()->addMinutes(5));
+
+        // Store options in session for backward compatibility with web flow
         Session::put('passkey-authentication-options', $options);
 
         // WebAuthn authentication challenge for passkey login.
-        return response()->json($options);
+        return response()->json(array_merge($options, [
+            'challengeId' => $challengeId,
+        ]));
     }
 
     /**
@@ -147,6 +157,9 @@ class PasskeyController extends Controller
             'user_agent' => request()->userAgent(),
             'timestamp'  => now(),
         ]);
+
+        // Fire failed authentication event
+        Event::dispatch(new PasskeyAuthenticationFailedEvent(request(), 'invalid_credential'));
 
         // Invalid passkey authentication error.
         return response()->json([
@@ -235,7 +248,7 @@ class PasskeyController extends Controller
      *   }
      * }
      */
-    #[Get('/register', 'auth.passkey.register-option', ['auth:sanctum'])]
+    #[Get('/register', 'auth.passkey.register-option', ['auth:oauth'])]
     public function getRegisterOptions(Request $request): array
     {
         /** @var User|null $user */
@@ -271,7 +284,7 @@ class PasskeyController extends Controller
      * @response array{message: string}|array{error: string}
      * @status 201
      */
-    #[Post('/register', 'auth.passkey.register', ['auth:sanctum'])]
+    #[Post('/register', 'auth.passkey.register', ['auth:oauth'])]
     public function registerPasskey(StorePasskeyRequest $request): JsonResponse
     {
         /** @var User $user */
@@ -297,6 +310,9 @@ class PasskeyController extends Controller
                 'ip_address'   => $request->ip(),
                 'user_agent'   => $request->userAgent(),
             ]);
+
+            // Fire passkey registration event
+            Event::dispatch(new PasskeyRegisteredEvent($passkey, $user, $request->get('name'), $request));
 
             return response()->json([
                 'message' => 'Passkey successfully stored',

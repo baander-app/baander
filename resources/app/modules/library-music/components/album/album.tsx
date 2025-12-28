@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cover } from '@/modules/library-music/components/artwork/cover';
+import { Cover } from '@/app/modules/library-music/components/artwork/cover';
 import styles from './album.module.scss';
 import { Box, Flex, Text } from '@radix-ui/themes';
 

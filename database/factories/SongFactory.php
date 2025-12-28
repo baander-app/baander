@@ -20,8 +20,10 @@ class SongFactory extends Factory
         return [
             'title' => $this->faker->words(3, true),
             'path' => $this->faker->filePath(),
+            'size' => $this->faker->numberBetween(1024 * 1024, 50 * 1024 * 1024), // 1MB to 50MB
+            'mime_type' => 'audio/mpeg',
             'track' => $this->faker->numberBetween(1, 20),
-            'duration' => $this->faker->numberBetween(30, 300),
+            'length' => $this->faker->numberBetween(30, 300),
         ];
     }
 }
