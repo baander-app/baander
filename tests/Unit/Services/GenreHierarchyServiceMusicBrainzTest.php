@@ -8,8 +8,6 @@ use PHPUnit\Framework\Attributes\Test;
 
 class GenreHierarchyServiceMusicBrainzTest extends ServiceTestCase
 {
-    // ==================== MODEL TESTS ====================
-
     #[Test]
     public function it_handles_parent_id_mass_assignment(): void
     {
@@ -46,8 +44,6 @@ class GenreHierarchyServiceMusicBrainzTest extends ServiceTestCase
         $this->assertEquals($mbid, $genre->mbid);
         $this->assertEquals("https://musicbrainz.org/genre/{$mbid}", $genre->music_brainz_url);
     }
-
-    // ==================== PERSISTENCE TESTS ====================
 
     #[Test]
     public function it_creates_parent_child_relationships(): void
@@ -113,8 +109,6 @@ class GenreHierarchyServiceMusicBrainzTest extends ServiceTestCase
         $this->assertNull($genre->music_brainz_url);
         $this->assertEquals('Unknown Genre', $genre->name);
     }
-
-    // ==================== TREE QUERY TESTS ====================
 
     #[Test]
     public function it_gets_genre_tree(): void
