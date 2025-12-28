@@ -2,10 +2,7 @@
 
 namespace App\Modules\Transcoder\Dto;
 
-/**
- * User request tracking value object
- */
-final readonly class UserRequest
+readonly class UserRequest
 {
     public function __construct(
         public string      $userId,

@@ -4,10 +4,7 @@ namespace App\Modules\Transcoder\Dto;
 
 use DateTimeImmutable;
 
-/**
- * Video metadata value object
- */
-final readonly class VideoMetadata
+readonly class VideoMetadata
 {
     public function __construct(
         public string             $id,
@@ -30,6 +27,7 @@ final readonly class VideoMetadata
 
     /**
      * Create from array (API response)
+     * @throws \DateMalformedStringException
      */
     public static function fromArray(array $data): self
     {

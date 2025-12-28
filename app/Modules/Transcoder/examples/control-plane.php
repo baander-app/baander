@@ -24,14 +24,13 @@ use App\Modules\Transcoder\Exception\SocketException;
 $socketPath = '/tmp/transcoder.sock';
 
 // ============================================================================
-// Example 1: Health Check with DTOs
+// Example 1: Health Check
 // ============================================================================
 echo "=== Example 1: Health Check ===\n";
 
 try {
     $client = new ControlClient($socketPath);
 
-    /** @var HealthStatus $health */
     $health = $client->getHealth();
     echo "Server status: {$health->status}\n";
     echo "Version: {$health->version}\n";
@@ -42,16 +41,15 @@ try {
 }
 
 // ============================================================================
-// Example 2: Server Statistics with DTOs
+// Example 2: Server Statistics
 // ============================================================================
 echo "=== Example 2: Server Statistics ===\n";
 
 try {
     $client = new ControlClient($socketPath);
 
-    /** @var ServerStats $stats */
     $stats = $client->getStats();
-    echo "Active sessions: {$stats->activeSessions}\n";
+    echo "Active sessions: $stats->activeSessions\n";
     echo "Memory used: {$stats->getMemoryUsedFormatted()} / {$stats->getMemoryTotalFormatted()}\n";
     echo "Uptime: {$stats->getUptimeFormatted()}\n\n";
 
@@ -60,7 +58,7 @@ try {
 }
 
 // ============================================================================
-// Example 3: Start Transcode with DTOs
+// Example 3: Start Transcode
 // ============================================================================
 echo "=== Example 3: Start Transcode ===\n";
 
@@ -68,7 +66,6 @@ try {
     $client = new ControlClient($socketPath);
 
     // Start a transcode job
-    /** @var TranscodeJob $job */
     $job = $client->startTranscode('my-video', [
         'qualities' => ['1080p', '720p', '480p'],
         'format'    => 'hls',
@@ -89,7 +86,7 @@ try {
 }
 
 // ============================================================================
-// Example 4: Video Metadata with DTOs
+// Example 4: Video Metadata
 // ============================================================================
 echo "=== Example 4: Video Metadata ===\n";
 
@@ -97,20 +94,19 @@ try {
     $client = new ControlClient($socketPath);
     $videoId = 'my-video';
 
-    /** @var VideoMetadata $metadata */
     $metadata = $client->getVideoMetadata($videoId);
-    echo "Title: {$metadata->title}\n";
+    echo "Title: $metadata->title\n";
     echo "Duration: {$metadata->getDurationFormatted()} ({$metadata->duration}s)\n";
     echo "Resolution: {$metadata->getResolution()}\n";
-    echo "FPS: {$metadata->fps}\n";
-    echo "Codec: {$metadata->codec}\n\n";
+    echo "FPS: $metadata->fps\n";
+    echo "Codec: $metadata->codec\n\n";
 
 } catch (SocketException $e) {
     echo "Error: {$e->getMessage()}\n";
 }
 
 // ============================================================================
-// Example 5: Monitor Transcode Progress with DTOs
+// Example 5: Monitor Transcode Progress
 // ============================================================================
 echo "=== Example 5: Monitor Transcode Progress ===\n";
 
@@ -120,7 +116,6 @@ try {
 
     // Poll job status
     for ($i = 0; $i < 5; $i++) {
-        /** @var TranscodeStatus $status */
         $status = $client->getTranscodeStatus($jobId);
 
         echo "Poll {$i}: {$status->state} - ";
@@ -145,7 +140,7 @@ try {
 }
 
 // ============================================================================
-// Example 6: List Active Transcodes with DTOs
+// Example 6: List Active Transcodes
 // ============================================================================
 echo "=== Example 6: List Active Transcodes ===\n";
 
@@ -168,7 +163,7 @@ try {
 }
 
 // ============================================================================
-// Example 7: Session Management with DTOs
+// Example 7: Session Management
 // ============================================================================
 echo "=== Example 7: Session Management ===\n";
 
@@ -196,7 +191,7 @@ try {
 }
 
 // ============================================================================
-// Example 8: Web Page Integration with DTOs
+// Example 8: Web Page Integration
 // ============================================================================
 echo "=== Example 8: Web Page Integration ===\n";
 
@@ -215,8 +210,7 @@ function getVideoStreamInfo(string $videoId): array
         $client->startTranscode($videoId);
     }
 
-    // Get metadata - now with proper type hints
-    /** @var VideoMetadata $metadata */
+    // Get metadata
     $metadata = $client->getVideoMetadata($videoId);
 
     // Get stream URL

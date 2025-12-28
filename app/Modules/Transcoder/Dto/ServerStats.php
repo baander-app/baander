@@ -2,10 +2,7 @@
 
 namespace App\Modules\Transcoder\Dto;
 
-/**
- * Server statistics value object
- */
-final readonly class ServerStats
+readonly class ServerStats
 {
     public function __construct(
         public int   $activeSessions,

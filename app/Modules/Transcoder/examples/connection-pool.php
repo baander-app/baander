@@ -30,7 +30,6 @@ try {
     );
 
     // All requests now reuse connections from the pool
-    /** @var HealthStatus $health */
     $health = $client->getHealth();
     echo "Health: {$health->status}\n";
 
@@ -100,7 +99,7 @@ try {
 echo "=== Example 3: Fluent Interface ===\n";
 
 try {
-    $client = (new ControlClient($socketPath))
+    $client = new ControlClient($socketPath)
         ->withConnectionPool(maxPoolSize: 5);
 
     $health = $client->getHealth();

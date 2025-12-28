@@ -6,7 +6,7 @@ namespace App\Modules\Transcoder\Logging;
  * Null logger that discards all log messages
  * Used as default when no logger is provided
  */
-final class NullLogger implements LoggerInterface
+class NullLogger implements LoggerInterface
 {
     public function debug(string $message, array $context = []): void
     {

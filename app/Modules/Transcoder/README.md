@@ -1,13 +1,10 @@
 # Transcoder Socket Control Client
 
-A PHP 8.1+ control client for the Node.js Transcoder Service using Unix domain sockets.
+Control client for the Node.js Transcoder Service using Unix domain sockets.
 
 **Features:**
 
-- Type-safe DTOs (Data Transfer Objects) for all responses
-- Modern PHP 8.1+ syntax with readonly properties
-- Comprehensive session management
-- Full HLS/DASH control support
+- Type-safe DTOs for all responses
 - **Connection pooling** for high-concurrency scenarios
 - **Request ID tracking** for debugging and tracing
 - **Structured logging** with PSR-3 support
@@ -20,38 +17,26 @@ A PHP 8.1+ control client for the Node.js Transcoder Service using Unix domain s
 │  (Control)  │   - playlists, metadata, status            │                      │
 │             │ <──────────────────────────────────────────│   (Media Server)     │
 └─────────────┘  returns stream URLs                       │                      │
-                                                         │                      │
-         ▲                                                 │
-         │   stream URL (returned by PHP)                  │
-┌─────────┴──────────┐  direct HTTP connection (media)     │
-│   Browser/Player   │ ─────────────────────────────────────>│
-│                    │    fetches .ts and .m4s segments     │
-└────────────────────┘    (high bandwidth video)            └──────────────────────┘
+          ^                                                │                      │
+          │                                                │                      │
+          │   stream URL (returned by PHP)                 │                      │
+┌─────────┴──────────┐  direct HTTP connection (media)     │                      │
+│   Browser/Player   │ ───────────────────────────────────>│                      │
+│                    │    fetches .ts and .m4s segments    │                      │
+└────────────────────┘    (high bandwidth video)           └──────────────────────┘
 ```
 
 **PHP handles control** - start/stop transcode, get playlists, query status
 **Browsers fetch media directly** - segments served by Node.js for performance
-
-## Requirements
-
-- PHP 8.1 or higher
-- Unix domain sockets support
-- Node.js Transcoder Service running
-
-## Installation
-
-```bash
-composer require transcoder/socket-client
-```
 
 ## Quick Start
 
 ```php
 <?php
 
-use TranscoderSocket\ControlClient;
-use TranscoderSocket\Dto\TranscodeJob;
-use TranscoderSocket\Dto\VideoMetadata;
+use App\Modules\Transcoder\ControlClient;
+use App\Modules\Transcoder\Dto\TranscodeJob;
+use App\Modules\Transcoder\Dto\VideoMetadata;
 
 $client = new ControlClient('/tmp/transcoder.sock');
 
@@ -94,8 +79,8 @@ All API responses return type-safe DTOs:
 ### Health & Status
 
 ```php
-use TranscoderSocket\Dto\HealthStatus;
-use TranscoderSocket\Dto\ServerStats;
+use App\Modules\Transcoder\Dto\HealthStatus;
+use App\Modules\Transcoder\Dto\ServerStats;
 
 // Check server health - returns HealthStatus DTO
 $health = $client->getHealth();
@@ -116,7 +101,7 @@ $alive = $client->ping();
 ### Video Metadata
 
 ```php
-use TranscoderSocket\Dto\VideoMetadata;
+use App\Modules\Transcoder\Dto\VideoMetadata;
 
 // Get video metadata - returns VideoMetadata DTO
 $metadata = $client->getVideoMetadata('video123');
@@ -134,8 +119,8 @@ $exists = $client->videoExists('video123');
 ### Transcode Control
 
 ```php
-use TranscoderSocket\Dto\TranscodeJob;
-use TranscoderSocket\Dto\TranscodeStatus;
+use App\Modules\Transcoder\Dto\TranscodeJob;
+use App\Modules\Transcoder\Dto\TranscodeStatus;
 
 // Start a transcode job - returns TranscodeJob DTO
 $job = $client->startTranscode('video123', [
@@ -177,13 +162,13 @@ foreach ($jobs as $job) {
 ### HLS Control
 
 ```php
-// Get HLS master playlist (PHP returns this to browser)
+// Get HLS master playlist (api returns this to the client)
 $masterPlaylist = $client->getHlsMasterPlaylist('video123');
 
 // Get HLS media playlist
 $playlist = $client->getHlsMediaPlaylist('video123', '1080p');
 
-// Get segment URL (browser fetches from Node.js)
+// Get segment URL (api fronts storage)
 $segmentUrl = $client->getHlsSegmentUrl('video123', '1080p', 0);
 // Returns: "http://localhost:3000/api/hls/segment/video123/1080p/0.ts"
 
@@ -204,7 +189,7 @@ $segmentUrl = $client->getDashSegmentUrl('video123', '1080p', 0);
 ### Session Management
 
 ```php
-use TranscoderSocket\Dto\SessionInfo;
+use App\Modules\Transcoder\Dto\SessionInfo;
 
 // Get all active sessions - returns array of SessionInfo
 $sessions = $client->getActiveSessions();
@@ -238,10 +223,10 @@ $result = $client->terminateSession($session_id);
 ```php
 <?php
 
-use TranscoderSocket\ControlClient;
-use TranscoderSocket\Dto\VideoMetadata;
-use TranscoderSocket\Dto\TranscodeJob;
-use TranscoderSocket\Exception\SocketException;
+use App\Modules\Transcoder\ControlClient;
+use App\Modules\Transcoder\Dto\VideoMetadata;
+use App\Modules\Transcoder\Dto\TranscodeJob;
+use App\Modules\Transcoder\Exception\SocketException;
 
 $client = new ControlClient('/tmp/transcoder.sock');
 
@@ -284,7 +269,7 @@ try {
 ## Error Handling
 
 ```php
-use TranscoderSocket\Exception\{
+use App\Modules\Transcoder\Exception\{
     SocketException,
     ConnectionException,
     ResponseException,
@@ -312,7 +297,7 @@ For high-concurrency scenarios (many simultaneous PHP processes), enable connect
 overhead:
 
 ```php
-use TranscoderSocket\ControlClient;
+use App\Modules\Transcoder\ControlClient;
 
 // Enable connection pooling
 $client = (new ControlClient('/tmp/transcoder.sock'))
@@ -383,8 +368,8 @@ Request IDs are:
 The client supports structured logging for debugging and tracing:
 
 ```php
-use TranscoderSocket\ControlClient;
-use TranscoderSocket\Logging\ConsoleLogger;
+use App\Modules\Transcoder\ControlClient;
+use App\Modules\Transcoder\Logging\ConsoleLogger;
 
 // Use console logger for development
 $logger = new ConsoleLogger();
@@ -411,7 +396,7 @@ $health = $client->getHealth();
 ```php
 use Monolog\Logger;
 use Monolog\Handler\StreamHandler;
-use TranscoderSocket\Logging\Psr3Logger;
+use App\Modules\Transcoder\Logging\Psr3Logger;
 
 $monolog = new Logger('transcoder');
 $monolog->pushHandler(new StreamHandler('php://stderr'));

@@ -5,18 +5,18 @@ namespace App\Modules\Transcoder\Protocol;
 use App\Modules\Transcoder\Exception\ResponseException;
 use JsonException;
 
-class HttpResponse
+readonly class HttpResponse
 {
     /**
      * @param array<string, string> $headers
      */
     public function __construct(
-        private readonly MessageType  $type,
-        private readonly MessageFlags $flags,
-        private readonly array        $headers,
-        private readonly ?string      $body,
-        private readonly int          $statusCode = 200,
-        private readonly string       $statusMessage = 'OK',
+        private MessageType  $type,
+        private MessageFlags $flags,
+        private array        $headers,
+        private ?string      $body,
+        private int          $statusCode = 200,
+        private string       $statusMessage = 'OK',
     )
     {
     }

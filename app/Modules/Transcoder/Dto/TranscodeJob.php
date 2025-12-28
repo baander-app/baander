@@ -2,10 +2,7 @@
 
 namespace App\Modules\Transcoder\Dto;
 
-/**
- * Transcode job value object
- */
-final readonly class TranscodeJob
+readonly class TranscodeJob
 {
     public function __construct(
         public string  $jobId,

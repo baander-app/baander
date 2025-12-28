@@ -2,11 +2,15 @@
 
 namespace App\Modules\Transcoder\Protocol;
 
+use App\Extensions\EnumExt;
+
 /**
  * Socket error codes from server
  */
 enum ErrorCode: int
 {
+    use EnumExt;
+
     case UNKNOWN_MESSAGE_TYPE = 1;
     case INVALID_REQUEST = 2;
     case INTERNAL_ERROR = 3;

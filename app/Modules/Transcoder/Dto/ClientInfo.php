@@ -2,10 +2,7 @@
 
 namespace App\Modules\Transcoder\Dto;
 
-/**
- * Client information value object
- */
-final readonly class ClientInfo
+readonly class ClientInfo
 {
     public function __construct(
         public ?string $userAgent = null,

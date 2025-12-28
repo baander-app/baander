@@ -4,17 +4,17 @@ namespace App\Modules\Transcoder\Protocol;
 
 use InvalidArgumentException;
 
-class HttpRequest
+readonly class HttpRequest
 {
     /**
      * @param array<string, string> $headers
      */
     private function __construct(
-        private readonly HttpMethod $method,
-        private readonly string     $path,
-        private readonly array      $headers,
-        private readonly ?string    $body = null,
-        private readonly ?string    $query = null,
+        private HttpMethod $method,
+        private string     $path,
+        private array      $headers,
+        private ?string    $body = null,
+        private ?string    $query = null,
     )
     {
         if ($path === '' || $path[0] !== '/') {

@@ -23,7 +23,7 @@ use LogicException;
  * Transcoder Control Client
  *
  * PHP-side control client for managing transcoding operations.
- * Does NOT handle media delivery - browsers/players connect directly to Node.js.
+ * Does NOT handle media delivery
  *
  * Typical usage:
  * - Start/stop transcode jobs

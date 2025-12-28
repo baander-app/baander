@@ -2,10 +2,7 @@
 
 namespace App\Modules\Transcoder\Dto;
 
-/**
- * Session information value object
- */
-final readonly class SessionInfo
+readonly class SessionInfo
 {
     /**
      * @param string $id Session ID

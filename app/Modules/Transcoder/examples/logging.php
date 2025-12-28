@@ -47,7 +47,7 @@ echo "=== Example 2: Connection Pooling with Logging ===\n\n";
 try {
     $logger = new ConsoleLogger();
 
-    $client = (new ControlClient($socketPath, logger: $logger))
+    $client = new ControlClient($socketPath, logger: $logger)
         ->withConnectionPool(maxPoolSize: 5);
 
     // Make multiple requests - watch the logs!

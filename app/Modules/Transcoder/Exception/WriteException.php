@@ -36,13 +36,13 @@ class WriteException extends SocketException
     /**
      * Write failure
      */
-    public static function failed(string $reason): self
+    public static function failed(string $reason, array $extra = []): self
     {
         return new self(
             "Failed to write to socket: {$reason}",
             0,
             null,
-            ['reason' => $reason],
+            ['reason' => $reason, 'extra' => $extra],
         );
     }
 }

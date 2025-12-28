@@ -9,7 +9,7 @@ use Psr\Log\LogLevel;
  * PSR-3 logger adapter
  * Wraps a PSR-3 compliant logger (like Monolog)
  */
-final class Psr3Logger implements LoggerInterface
+class Psr3Logger implements LoggerInterface
 {
     private const array LEVEL_MAP = [
         'debug'   => LogLevel::DEBUG,

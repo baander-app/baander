@@ -5,7 +5,7 @@ namespace App\Modules\Transcoder\Logging;
 /**
  * Console logger that outputs to stderr/stdout
  */
-final class ConsoleLogger implements LoggerInterface
+class ConsoleLogger implements LoggerInterface
 {
     private const string RESET = "\033[0m";
     private const string RED = "\033[31m";

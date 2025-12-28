@@ -166,7 +166,9 @@ class SocketClient
         if ($flags->hasHeaders() && $headers !== null) {
             $encoded = json_encode($headers);
             if ($encoded === false) {
-                throw WriteException::failed('Failed to encode headers JSON');
+                $encodeError = json_last_error_msg();
+
+                throw WriteException::failed('Failed to encode headers JSON', ['json_encode_error' => $encodeError]);
             }
             $headersJson = $encoded;
         }

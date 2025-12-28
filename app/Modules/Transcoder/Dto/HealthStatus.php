@@ -2,10 +2,7 @@
 
 namespace App\Modules\Transcoder\Dto;
 
-/**
- * Health status value object
- */
-final readonly class HealthStatus
+readonly class HealthStatus
 {
     public function __construct(
         public string  $status,
