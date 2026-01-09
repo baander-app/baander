@@ -45,7 +45,7 @@ const App = () => {
           accentColor="red"
           panelBackground="solid"
           radius="full"
-          appearance={theme}
+          appearance="dark"
         >
           <Router>
             <DeepLinkProvider>

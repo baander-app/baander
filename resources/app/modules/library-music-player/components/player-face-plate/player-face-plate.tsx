@@ -61,13 +61,13 @@ export function PlayerFacePlate({
           className={styles.progressContainer}
           align="center"
         >
-          <Text size="2" mr="2">
+          <Text size="2" mr="2" style={{ minWidth: '50px' }}>
             {elapsedDisplay}
           </Text>
 
           <ProgressBar />
 
-          <Text size="2" ml="2">
+          <Text size="2" ml="4" style={{ minWidth: '50px' }}>
             {durationDisplay}
           </Text>
         </Flex>

@@ -1,5 +1,5 @@
 /**
- * Simple logging service for debugging audio processing
+ * Simple logging service
  * Set ENABLED to false to disable all logs
  */
 const ENABLED = false;
@@ -26,14 +26,14 @@ export function setLogLevel(level: LogLevel) {
  * Enable or disable logging
  */
 export function setLoggingEnabled(enabled: boolean) {
-  (globalThis as any).__AUDIO_LOGGING_ENABLED__ = enabled;
+  (globalThis as any).__APPLICATION_LOGGING_ENABLED__ = enabled;
 }
 
 /**
  * Check if logging is enabled
  */
 function isLoggingEnabled(): boolean {
-  return (globalThis as any).__AUDIO_LOGGING_ENABLED__ ?? ENABLED;
+  return (globalThis as any).__APPLICATION_LOGGING_ENABLED__ ?? ENABLED;
 }
 
 /**

@@ -27,6 +27,12 @@ import EntypoControllerPaus from '~icons/entypo/controller-paus';
 import EvaAlertCircleOutline from '~icons/eva/alert-circle-outline';
 import EvaCheckmarkCircle2Outline from '~icons/eva/checkmark-circle-2-outline';
 import EvaRefreshFill from '~icons/eva/refresh-fill';
+import PhPencilSimple from '~icons/ph/pencil-simple';
+import PhTrash from '~icons/ph/trash';
+import PhPlayCircle from '~icons/ph/play-circle';
+import PhShuffle from '~icons/ph/shuffle';
+import PhDotsSixVerticalBold from '~icons/ph/dots-six-vertical-bold';
+import PhMusicNotesSimpleBold from '~icons/ph/music-notes-simple-bold';
 
 import { Env } from '@/app/common/env.ts';
 
@@ -56,6 +62,12 @@ const ICONS: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
   'eva:alert-circle-outline': EvaAlertCircleOutline,
   'eva:checkmark-circle-2-outline': EvaCheckmarkCircle2Outline,
   'eva:refresh-fill': EvaRefreshFill,
+  'ph:pencil-simple': PhPencilSimple,
+  'ph:trash': PhTrash,
+  'ph:play-circle': PhPlayCircle,
+  'ph:shuffle': PhShuffle,
+  'ph:dots-six-vertical-bold': PhDotsSixVerticalBold,
+  'ph:music-notes-simple-bold': PhMusicNotesSimpleBold
 };
 
 type NumOrStr = number | string;
@@ -77,7 +89,7 @@ export function Iconify({ icon, size, inline, width, height, style, preserveAspe
   if (!Comp) {
     if (Env.env() !== 'production') {
       // eslint-disable-next-line no-console
-      console.log(`[Iconify] Unknown icon "${icon}". Did you add it to ICONS and install its collection?`);
+      console.warn(`[Iconify] Unknown icon "${icon}". Did you add it to ICONS and install its collection?`);
     }
     return null;
   }
