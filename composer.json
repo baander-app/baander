@@ -61,8 +61,7 @@
         "tightenco/ziggy": "^v2.5.1",
         "tpetry/laravel-postgresql-enhanced": "^3.0",
         "web-auth/webauthn-lib": "^5.1.2",
-        "xenos/musicbrainz": "@dev",
-        "zend/php-reader": "@dev"
+        "xenos/musicbrainz": "@dev"
     },
     "require-dev": {
         "barryvdh/laravel-ide-helper": "^3.6",
@@ -149,13 +148,6 @@
     "minimum-stability": "resources/app/dev",
     "prefer-stable": true,
     "repositories": [
-        {
-            "type": "path",
-            "url": "./third_party/php-reader-1.8.1",
-            "options": {
-                "symlink": true
-            }
-        },
         {
             "type": "path",
             "url": "./third_party/music-brainz",

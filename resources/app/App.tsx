@@ -45,7 +45,11 @@ const App = () => {
           accentColor="red"
           panelBackground="solid"
           radius="full"
+<<<<<<< HEAD
           appearance={theme}
+=======
+          appearance="dark"
+>>>>>>> private/master
         >
           <Router>
             <DeepLinkProvider>

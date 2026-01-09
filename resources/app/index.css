@@ -39,6 +39,7 @@ html, body {
     height: 100vh;
     color: var(--color-text-primary);
     background-color: var(--color-background);
+    overflow: hidden;
 }
 
 body, html {

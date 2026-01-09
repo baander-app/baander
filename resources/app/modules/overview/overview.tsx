@@ -16,7 +16,7 @@ export function Overview({title}: OverviewProps) {
 
   useEffect(() => {
     if (data) {
-      const nodes = data.data.map(album => <Album key={album.slug} title={album.title} imgSrc={album.cover?.url} primaryArtist={album?.artists?.[0]?.name}/>);
+      const nodes = data.data.map(album => <Album key={album.publicId} title={album.title} imgSrc={album.cover?.url} primaryArtist={album?.artists?.[0]?.name}/>);
       setAlbums(nodes);
     }
   }, [data]);
@@ -26,6 +26,7 @@ export function Overview({title}: OverviewProps) {
       <Section title="Albums">
         <Heading mb="2">{title}</Heading>
 
+        <Carousel slides={albums} />
       </Section>
     </Flex>
   );

@@ -1,0 +1,958 @@
+Index: resources/app/modules/library-music-player/store/slices/queue-slice.ts
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>/**\n * Multi-Queue Slice\n * Refactored to support multiple queues (music, audiobook, podcast)\n * Maintains backward compatibility with existing selectors\n */\n\nimport { StateCreator } from 'zustand';\nimport {\n  MusicQueueItem,\n  AudiobookQueueItem,\n  PodcastQueueItem,\n  QueueItem,\n  QueueState,\n  QueueOperationResult,\n  QueueError,\n  getMediaType,\n  isMusicItem,\n  isAudiobookItem,\n  isPodcastItem,\n} from '../../services/queue';\nimport { PlaybackSource } from '@/app/models/playback-source';\nimport { QueueMode } from '@/app/store/settings/settings-types';\nimport { useSettingsStore } from '@/app/store/settings';\nimport { MediaType } from '@/app/models/media-type.ts';\n\n// ============================================================================\n// QUEUE SLICE INTERFACE\n// ============================================================================\n\nexport interface QueueSlice {\n  // State\n  activeQueueType: MediaType;\n  queues: {\n    [MediaType.MUSIC]: QueueState<MusicQueueItem>;\n    [MediaType.AUDIOBOOK]: QueueState<AudiobookQueueItem>;\n    [MediaType.PODCAST]: QueueState<PodcastQueueItem>;\n  };\n\n  // Actions - Queue switching\n  setActiveQueueType: (type: MediaType) => void;\n  switchQueueType: (type: MediaType) => void;\n\n  // Actions - Queue manipulation (works with active queue)\n  setQueue: <T extends QueueItem>(queue: T[]) => void;\n  addToQueue: <T extends QueueItem>(item: T) => void;\n  insertInQueue: <T extends QueueItem>(item: T) => void;\n  addManyToQueue: <T extends QueueItem>(items: T[]) => void;\n  removeFromQueue: (index: number) => void;\n  clearQueue: () => void;\n\n  // Actions - Playback navigation\n  playSongAtIndex: (index: number) => void;\n  playNext: () => void;\n  playPrevious: () => void;\n\n  // Actions - Special queue operations\n  setQueueAndPlay: <T extends QueueItem>(queue: T[], publicId: string) => void;\n  shuffleAndPlay: <T extends QueueItem>(songs: T[]) => void;\n  setPlaybackSource: (source: PlaybackSource) => void;\n}\n\n// ============================================================================\n// CREATE QUEUE SLICE\n// ============================================================================\n\nexport const createQueueSlice: StateCreator<QueueSlice> = (set, get) => ({\n  // =========================================================================\n  // INITIAL STATE\n  // =========================================================================\n  activeQueueType: MediaType.MUSIC,\n  queues: {\n    [MediaType.MUSIC]: {\n      items: [],\n      currentIndex: -1,\n      currentItemPublicId: null,\n      source: PlaybackSource.NONE,\n      lastUpdated: Date.now(),\n    },\n    [MediaType.AUDIOBOOK]: {\n      items: [],\n      currentIndex: -1,\n      currentItemPublicId: null,\n      source: PlaybackSource.NONE,\n      lastUpdated: Date.now(),\n    },\n    [MediaType.PODCAST]: {\n      items: [],\n      currentIndex: -1,\n      currentItemPublicId: null,\n      source: PlaybackSource.NONE,\n      lastUpdated: Date.now(),\n    },\n  },\n\n  // =========================================================================\n  // QUEUE SWITCHING\n  // =========================================================================\n\n  setActiveQueueType: (type) => set({ activeQueueType: type }),\n\n  switchQueueType: (type) => set((state) => {\n    if (type === state.activeQueueType) {\n      return {}; // No change needed\n    }\n\n    return {\n      activeQueueType: type,\n    };\n  }),\n\n  // =========================================================================\n  // QUEUE MANIPULATION\n  // =========================================================================\n\n  setQueue: <T extends QueueItem>(queue: T[]) => set((state) => {\n    const activeType = state.activeQueueType;\n\n    return {\n      queues: {\n        ...state.queues,\n        [activeType]: {\n          ...state.queues[activeType],\n          items: queue,\n          lastUpdated: Date.now(),\n        },\n      },\n      source: PlaybackSource.LIBRARY,\n    };\n  }),\n\n  addToQueue: <T extends QueueItem>(item: T) => set((state) => {\n    const activeType = state.activeQueueType;\n\n    return {\n      queues: {\n        ...state.queues,\n        [activeType]: {\n          ...state.queues[activeType],\n          items: [...state.queues[activeType].items, item],\n          lastUpdated: Date.now(),\n        },\n      },\n      source: PlaybackSource.LIBRARY,\n    };\n  }),\n\n  insertInQueue: <T extends QueueItem>(item: T) => set((state) => {\n    const activeType = state.activeQueueType;\n    const currentQueue = state.queues[activeType];\n    const insertIndex = currentQueue.currentIndex + 1;\n\n    const newItems = [...currentQueue.items];\n    newItems.splice(insertIndex, 0, item);\n\n    return {\n      queues: {\n        ...state.queues,\n        [activeType]: {\n          ...currentQueue,\n          items: newItems,\n          lastUpdated: Date.now(),\n        },\n      },\n      source: PlaybackSource.LIBRARY,\n    };\n  }),\n\n  addManyToQueue: <T extends QueueItem>(items: T[]) => set((state) => {\n    const activeType = state.activeQueueType;\n\n    return {\n      queues: {\n        ...state.queues,\n        [activeType]: {\n          ...state.queues[activeType],\n          items: [...state.queues[activeType].items, ...items],\n          lastUpdated: Date.now(),\n        },\n      },\n      source: PlaybackSource.LIBRARY,\n    };\n  }),\n\n  removeFromQueue: (index) => set((state) => {\n    const activeType = state.activeQueueType;\n    const currentQueue = state.queues[activeType];\n\n    const newItems = [...currentQueue.items];\n    newItems.splice(index, 1);\n\n    // Adjust current index if needed\n    let newIndex = currentQueue.currentIndex;\n    if (index < currentQueue.currentIndex) {\n      newIndex = currentQueue.currentIndex - 1;\n    } else if (index === currentQueue.currentIndex) {\n      // If removing current item, stay at same index (next item becomes current)\n      newIndex = Math.min(index, newItems.length - 1);\n    }\n\n    return {\n      queues: {\n        ...state.queues,\n        [activeType]: {\n          ...currentQueue,\n          items: newItems,\n          currentIndex: newIndex,\n          currentItemPublicId: newIndex >= 0 ? newItems[newIndex]?.publicId ?? null : null,\n          lastUpdated: Date.now(),\n        },\n      },\n    };\n  }),\n\n  clearQueue: () => set((state) => {\n    const activeType = state.activeQueueType;\n\n    return {\n      queues: {\n        ...state.queues,\n        [activeType]: {\n          items: [],\n          currentIndex: -1,\n          currentItemPublicId: null,\n          source: PlaybackSource.NONE,\n          lastUpdated: Date.now(),\n        },\n      },\n    };\n  }),\n\n  // =========================================================================\n  // PLAYBACK NAVIGATION\n  // =========================================================================\n\n  playSongAtIndex: (index) => set((state) => {\n    const activeType = state.activeQueueType;\n    const currentQueue = state.queues[activeType];\n\n    if (index < 0 || index >= currentQueue.items.length) {\n      return {};\n    }\n\n    const item = currentQueue.items[index];\n\n    return {\n      queues: {\n        ...state.queues,\n        [activeType]: {\n          ...currentQueue,\n          currentIndex: index,\n          currentItemPublicId: item.publicId,\n          lastUpdated: Date.now(),\n        },\n      },\n      song: { publicId: item.publicId, title: item.title },\n    };\n  }),\n\n  playNext: () => set((state) => {\n    const activeType = state.activeQueueType;\n    const currentQueue = state.queues[activeType];\n\n    if (currentQueue.items.length === 0) {\n      return {};\n    }\n\n    let nextIndex = currentQueue.currentIndex + 1;\n    if (nextIndex >= currentQueue.items.length) {\n      nextIndex = 0; // Loop back to start\n    }\n\n    const item = currentQueue.items[nextIndex];\n\n    return {\n      queues: {\n        ...state.queues,\n        [activeType]: {\n          ...currentQueue,\n          currentIndex: nextIndex,\n          currentItemPublicId: item.publicId,\n          lastUpdated: Date.now(),\n        },\n      },\n      song: { publicId: item.publicId, title: item.title },\n    };\n  }),\n\n  playPrevious: () => set((state) => {\n    const activeType = state.activeQueueType;\n    const currentQueue = state.queues[activeType];\n\n    if (currentQueue.items.length === 0) {\n      return {};\n    }\n\n    let prevIndex = currentQueue.currentIndex - 1;\n    if (prevIndex < 0) {\n      prevIndex = currentQueue.items.length - 1; // Loop to end\n    }\n\n    const item = currentQueue.items[prevIndex];\n\n    return {\n      queues: {\n        ...state.queues,\n        [activeType]: {\n          ...currentQueue,\n          currentIndex: prevIndex,\n          currentItemPublicId: item.publicId,\n          lastUpdated: Date.now(),\n        },\n      },\n      song: { publicId: item.publicId, title: item.title },\n    };\n  }),\n\n  // =========================================================================\n  // SPECIAL QUEUE OPERATIONS\n  // =========================================================================\n\n  setQueueAndPlay: <T extends QueueItem>(queue: T[], publicId: string) => set((state) => {\n    const activeType = state.activeQueueType;\n    const index = queue.findIndex(item => item.publicId === publicId);\n\n    return {\n      queues: {\n        ...state.queues,\n        [activeType]: {\n          items: queue,\n          currentIndex: index,\n          currentItemPublicId: publicId,\n          source: PlaybackSource.LIBRARY,\n          lastUpdated: Date.now(),\n        },\n      },\n    };\n  }),\n\n  shuffleAndPlay: <T extends QueueItem>(songs: T[]) => set(() => {\n    // Fisher-Yates shuffle\n    const shuffled = [...songs];\n    for (let i = shuffled.length - 1; i > 0; i--) {\n      const j = Math.floor(Math.random() * (i + 1));\n      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];\n    }\n\n    const activeType = MediaType.MUSIC; // Default to music for shuffle\n\n    return {\n      queues: {\n        [MediaType.MUSIC]: {\n          items: shuffled as any,\n          currentIndex: 0,\n          currentItemPublicId: shuffled.length > 0 ? shuffled[0].publicId : null,\n          source: PlaybackSource.LIBRARY,\n          lastUpdated: Date.now(),\n        },\n        [MediaType.AUDIOBOOK]: {\n          items: [],\n          currentIndex: -1,\n          currentItemPublicId: null,\n          source: PlaybackSource.NONE,\n          lastUpdated: Date.now(),\n        },\n        [MediaType.PODCAST]: {\n          items: [],\n          currentIndex: -1,\n          currentItemPublicId: null,\n          source: PlaybackSource.NONE,\n          lastUpdated: Date.now(),\n        },\n      },\n      activeQueueType: activeType,\n    };\n  }),\n\n  setPlaybackSource: (source) => set((state) => {\n    const activeType = state.activeQueueType;\n\n    return {\n      queues: {\n        ...state.queues,\n        [activeType]: {\n          ...state.queues[activeType],\n          source,\n        },\n      },\n    };\n  }),\n\n  // =========================================================================\n  // BACKWARD COMPATIBILITY - GETTERS\n  // =========================================================================\n\n  // Note: Getters removed as they cause initialization issues.\n  // Use selectors from utilities.ts instead:\n  // - usePlayerQueue() -> state.queues[state.activeQueueType].items\n  // - usePlayerCurrentSongIndex() -> state.queues[state.activeQueueType].currentIndex\n  // - usePlayerCurrentSongPublicId() -> state.queues[state.activeQueueType].currentItemPublicId\n});\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/resources/app/modules/library-music-player/store/slices/queue-slice.ts b/resources/app/modules/library-music-player/store/slices/queue-slice.ts
+--- a/resources/app/modules/library-music-player/store/slices/queue-slice.ts	(revision 0e05be9f52b83fa864fd1c19f1e26e1f490e7fc8)
++++ b/resources/app/modules/library-music-player/store/slices/queue-slice.ts	(date 1767548359156)
+@@ -13,6 +13,8 @@
+   QueueState,
+   QueueOperationResult,
+   QueueError,
++  QueueContext,
++  QueueContextType,
+   getMediaType,
+   isMusicItem,
+   isAudiobookItem,
+@@ -47,6 +49,7 @@
+   addManyToQueue: <T extends QueueItem>(items: T[]) => void;
+   removeFromQueue: (index: number) => void;
+   clearQueue: () => void;
++  clearBeforeIndex: (index: number) => void; // Clear all items before a specific index
+ 
+   // Actions - Playback navigation
+   playSongAtIndex: (index: number) => void;
+@@ -54,9 +57,10 @@
+   playPrevious: () => void;
+ 
+   // Actions - Special queue operations
+-  setQueueAndPlay: <T extends QueueItem>(queue: T[], publicId: string) => void;
++  setQueueAndPlay: <T extends QueueItem>(queue: T[], publicId: string, context?: QueueContext) => void;
+   shuffleAndPlay: <T extends QueueItem>(songs: T[]) => void;
+   setPlaybackSource: (source: PlaybackSource) => void;
++  setQueueContext: (context: QueueContext) => void; // Set/update queue context
+ }
+ 
+ // ============================================================================
+@@ -74,6 +78,7 @@
+       currentIndex: -1,
+       currentItemPublicId: null,
+       source: PlaybackSource.NONE,
++      context: undefined,
+       lastUpdated: Date.now(),
+     },
+     [MediaType.AUDIOBOOK]: {
+@@ -81,6 +86,7 @@
+       currentIndex: -1,
+       currentItemPublicId: null,
+       source: PlaybackSource.NONE,
++      context: undefined,
+       lastUpdated: Date.now(),
+     },
+     [MediaType.PODCAST]: {
+@@ -88,6 +94,7 @@
+       currentIndex: -1,
+       currentItemPublicId: null,
+       source: PlaybackSource.NONE,
++      context: undefined,
+       lastUpdated: Date.now(),
+     },
+   },
+@@ -130,13 +137,21 @@
+ 
+   addToQueue: <T extends QueueItem>(item: T) => set((state) => {
+     const activeType = state.activeQueueType;
++    const currentQueue = state.queues[activeType];
+ 
+     return {
+       queues: {
+         ...state.queues,
+         [activeType]: {
+-          ...state.queues[activeType],
+-          items: [...state.queues[activeType].items, item],
++          ...currentQueue,
++          items: [...currentQueue.items, item],
++          context: currentQueue.context ? {
++            ...currentQueue.context,
++            hasManualItems: true,
++          } : {
++            type: QueueContextType.MANUAL,
++            hasManualItems: true,
++          },
+           lastUpdated: Date.now(),
+         },
+       },
+@@ -158,6 +173,13 @@
+         [activeType]: {
+           ...currentQueue,
+           items: newItems,
++          context: currentQueue.context ? {
++            ...currentQueue.context,
++            hasManualItems: true,
++          } : {
++            type: QueueContextType.MANUAL,
++            hasManualItems: true,
++          },
+           lastUpdated: Date.now(),
+         },
+       },
+@@ -228,6 +250,31 @@
+     };
+   }),
+ 
++  clearBeforeIndex: (index) => set((state) => {
++    const activeType = state.activeQueueType;
++    const currentQueue = state.queues[activeType];
++
++    if (index <= 0 || index > currentQueue.items.length) {
++      return {}; // Invalid index or nothing to clear
++    }
++
++    const newItems = currentQueue.items.slice(index);
++    const newIndex = 0; // After clearing before index, the first item becomes index 0
++
++    return {
++      queues: {
++        ...state.queues,
++        [activeType]: {
++          ...currentQueue,
++          items: newItems,
++          currentIndex: newIndex,
++          currentItemPublicId: newItems[0]?.publicId ?? null,
++          lastUpdated: Date.now(),
++        },
++      },
++    };
++  }),
++
+   // =========================================================================
+   // PLAYBACK NAVIGATION
+   // =========================================================================
+@@ -318,7 +365,7 @@
+   // SPECIAL QUEUE OPERATIONS
+   // =========================================================================
+ 
+-  setQueueAndPlay: <T extends QueueItem>(queue: T[], publicId: string) => set((state) => {
++  setQueueAndPlay: <T extends QueueItem>(queue: T[], publicId: string, context?: QueueContext) => set((state) => {
+     const activeType = state.activeQueueType;
+     const index = queue.findIndex(item => item.publicId === publicId);
+ 
+@@ -330,6 +377,10 @@
+           currentIndex: index,
+           currentItemPublicId: publicId,
+           source: PlaybackSource.LIBRARY,
++          context: context ?? {
++            type: QueueContextType.MANUAL,
++            hasManualItems: false,
++          },
+           lastUpdated: Date.now(),
+         },
+       },
+@@ -388,6 +439,20 @@
+     };
+   }),
+ 
++  setQueueContext: (context) => set((state) => {
++    const activeType = state.activeQueueType;
++
++    return {
++      queues: {
++        ...state.queues,
++        [activeType]: {
++          ...state.queues[activeType],
++          context,
++        },
++      },
++    };
++  }),
++
+   // =========================================================================
+   // BACKWARD COMPATIBILITY - GETTERS
+   // =========================================================================
+Index: resources/app/modules/library-music-player/services/queue/queue-manager-service.ts
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>/**\n * Queue Manager Service\n * Facade for all queue operations with business logic and settings integration\n * This is the ONLY interface UI components should use for queue management\n */\n\nimport { createLogger } from '@/app/services/logger';\nimport { useMusicPlayerStore } from '../../store';\nimport { useSettingsStore } from '@/app/store/settings';\nimport {\n  MediaType,\n  QueueItem,\n  QueueState,\n  QueueOperationResult,\n  QueueError,\n  getMediaType,\n  isMusicItem,\n  songResourceToMusicQueueItem,\n  MultiQueueState,\n} from './queue-types';\nimport { queueStorageService } from './queue-storage-service';\nimport { SongResource } from '@/app/libs/api-client/gen/models';\nimport { QueueMode, QueueCompletionBehavior } from '@/app/store/settings/settings-types';\n\nconst logger = createLogger('QueueManagerService');\n\n// ============================================================================\n// QUEUE MANAGER SERVICE INTERFACE\n// ============================================================================\n\nexport interface IQueueManagerService {\n  // Queue switching\n  switchQueue(type: MediaType): QueueOperationResult<QueueState>;\n\n  // Queue manipulation\n  setQueue(items: QueueItem[], startIndex?: number): QueueOperationResult<void>;\n  setQueueAndPlay(items: QueueItem[], publicId: string): QueueOperationResult<void>;\n  addToQueue(item: QueueItem): QueueOperationResult<void>;\n  insertInQueue(item: QueueItem): QueueOperationResult<void>;\n  removeFromQueue(index: number): QueueOperationResult<void>;\n  clearQueue(): QueueOperationResult<void>;\n\n  // Playback navigation\n  playNext(): QueueOperationResult<QueueItem>;\n  playPrevious(): QueueOperationResult<QueueItem>;\n  playAtIndex(index: number): QueueOperationResult<QueueItem>;\n\n  // Queue state accessors\n  getCurrentQueue(): QueueState;\n  getCurrentItem(): QueueItem | null;\n  getQueueType(): MediaType;\n  getAllQueues(): MultiQueueState;\n\n  // Validation\n  canAddToQueue(item: QueueItem): boolean;\n  shouldWarnBeforeReplace(item: QueueItem): boolean;\n  canMixQueues(): boolean;\n}\n\n// ============================================================================\n// QUEUE MANAGER SERVICE IMPLEMENTATION\n// ============================================================================\n\nclass QueueManagerService implements IQueueManagerService {\n  private playerStore = useMusicPlayerStore;\n  private settingsStore = useSettingsStore;\n\n  // ==========================================================================\n  // QUEUE SWITCHING\n  // ==========================================================================\n\n  switchQueue(type: MediaType): QueueOperationResult<QueueState> {\n    try {\n      const state = this.playerStore.getState();\n      const currentType = state.activeQueueType;\n\n      if (currentType === type) {\n        return { success: true, data: state.queues[type] };\n      }\n\n      logger.debug(`Switching queue from ${currentType} to ${type}`);\n\n      // Update store\n      this.playerStore.getState().setActiveQueueType(type);\n\n      // Get the target queue\n      const targetQueue = state.queues[type];\n\n      // Update current playback state if queue has items\n      if (targetQueue.items.length > 0 && targetQueue.currentIndex >= 0) {\n        const item = targetQueue.items[targetQueue.currentIndex];\n        this.playerStore.getState().setSong({\n          publicId: item.publicId,\n          title: item.title,\n        });\n      }\n\n      // Persist to storage\n      this.saveToStorage();\n\n      return { success: true, data: targetQueue };\n    } catch (error) {\n      logger.error('Failed to switch queue:', error);\n      return { success: false, error: QueueError.STORAGE_ERROR };\n    }\n  }\n\n  // ==========================================================================\n  // QUEUE MANIPULATION\n  // ==========================================================================\n\n  setQueue(items: QueueItem[], startIndex = 0): QueueOperationResult<void> {\n    try {\n      if (items.length === 0) {\n        return { success: false, error: QueueError.QUEUE_EMPTY };\n      }\n\n      const firstItem = items[0];\n      const mediaType = getMediaType(firstItem);\n      const settings = this.settingsStore.getState();\n      const state = this.playerStore.getState();\n\n      // Validate all items are same type in simple mode\n      if (settings.preferences.queue.mode === QueueMode.SIMPLE) {\n        const allSameType = items.every(item => getMediaType(item) === mediaType);\n        if (!allSameType) {\n          return { success: false, error: QueueError.MODE_VIOLATION };\n        }\n      }\n\n      // Check if we should warn before replacing\n      const currentQueue = state.queues[state.activeQueueType];\n      if (settings.preferences.queue.warnOnQueueReplace && currentQueue.items.length > 0) {\n        // Different queue type with items - warn user\n        if (mediaType !== state.activeQueueType) {\n          return { success: false, error: QueueError.MODE_VIOLATION };\n        }\n      }\n\n      logger.debug(`Setting queue for ${mediaType} with ${items.length} items`);\n\n      // Update the specific queue\n      this.playerStore.getState().setQueue(items);\n      this.playerStore.getState().setActiveQueueType(mediaType);\n\n      // Start playback at specified index\n      this.playerStore.getState().playSongAtIndex(startIndex);\n\n      // Persist\n      this.saveToStorage();\n\n      return { success: true, data: undefined };\n    } catch (error) {\n      logger.error('Failed to set queue:', error);\n      return { success: false, error: QueueError.STORAGE_ERROR };\n    }\n  }\n\n  setQueueAndPlay(items: QueueItem[], publicId: string): QueueOperationResult<void> {\n    try {\n      if (items.length === 0) {\n        return { success: false, error: QueueError.QUEUE_EMPTY };\n      }\n\n      const index = items.findIndex(item => item.publicId === publicId);\n      if (index === -1) {\n        return { success: false, error: QueueError.INVALID_INDEX };\n      }\n\n      const mediaType = getMediaType(items[0]);\n      const settings = this.settingsStore.getState();\n\n      // Check mode compatibility\n      if (settings.preferences.queue.mode === QueueMode.SIMPLE) {\n        const allSameType = items.every(item => getMediaType(item) === mediaType);\n        if (!allSameType) {\n          return { success: false, error: QueueError.MODE_VIOLATION };\n        }\n      }\n\n      logger.debug(`Setting queue and playing: ${publicId}`);\n\n      // Update queue and play\n      this.playerStore.getState().setQueueAndPlay(items, publicId);\n      this.playerStore.getState().setActiveQueueType(mediaType);\n\n      // Persist\n      this.saveToStorage();\n\n      return { success: true, data: undefined };\n    } catch (error) {\n      logger.error('Failed to set queue and play:', error);\n      return { success: false, error: QueueError.STORAGE_ERROR };\n    }\n  }\n\n  addToQueue(item: QueueItem): QueueOperationResult<void> {\n    try {\n      const settings = this.settingsStore.getState();\n      const state = this.playerStore.getState();\n      const itemType = getMediaType(item);\n      const currentType = state.activeQueueType;\n\n      // Check mode compatibility\n      if (!this.canAddToQueue(item)) {\n        return { success: false, error: QueueError.MODE_VIOLATION };\n      }\n\n      logger.debug(`Adding item to ${currentType} queue`);\n\n      // Add to current queue\n      this.playerStore.getState().addToQueue(item);\n\n      // Persist\n      this.saveToStorage();\n\n      return { success: true, data: undefined };\n    } catch (error) {\n      logger.error('Failed to add to queue:', error);\n      return { success: false, error: QueueError.STORAGE_ERROR };\n    }\n  }\n\n  insertInQueue(item: QueueItem): QueueOperationResult<void> {\n    try {\n      const settings = this.settingsStore.getState();\n      const state = this.playerStore.getState();\n      const itemType = getMediaType(item);\n      const currentType = state.activeQueueType;\n\n      // Check mode compatibility\n      if (!this.canAddToQueue(item)) {\n        return { success: false, error: QueueError.MODE_VIOLATION };\n      }\n\n      logger.debug(`Inserting item into ${currentType} queue`);\n\n      // Insert after current track\n      this.playerStore.getState().insertInQueue(item);\n\n      // Persist\n      this.saveToStorage();\n\n      return { success: true, data: undefined };\n    } catch (error) {\n      logger.error('Failed to insert in queue:', error);\n      return { success: false, error: QueueError.STORAGE_ERROR };\n    }\n  }\n\n  removeFromQueue(index: number): QueueOperationResult<void> {\n    try {\n      const state = this.playerStore.getState();\n\n      if (index < 0 || index >= state.queues[state.activeQueueType].items.length) {\n        return { success: false, error: QueueError.INVALID_INDEX };\n      }\n\n      logger.debug(`Removing item at index ${index}`);\n\n      this.playerStore.getState().removeFromQueue(index);\n\n      // Persist\n      this.saveToStorage();\n\n      return { success: true, data: undefined };\n    } catch (error) {\n      logger.error('Failed to remove from queue:', error);\n      return { success: false, error: QueueError.STORAGE_ERROR };\n    }\n  }\n\n  clearQueue(): QueueOperationResult<void> {\n    try {\n      logger.debug('Clearing current queue');\n\n      this.playerStore.getState().clearQueue();\n\n      // Persist\n      this.saveToStorage();\n\n      return { success: true, data: undefined };\n    } catch (error) {\n      logger.error('Failed to clear queue:', error);\n      return { success: false, error: QueueError.STORAGE_ERROR };\n    }\n  }\n\n  // ==========================================================================\n  // PLAYBACK NAVIGATION\n  // ==========================================================================\n\n  playNext(): QueueOperationResult<QueueItem> {\n    try {\n      const state = this.playerStore.getState();\n      const currentQueue = state.queues[state.activeQueueType];\n\n      if (currentQueue.items.length === 0) {\n        return { success: false, error: QueueError.QUEUE_EMPTY };\n      }\n\n      let nextIndex = currentQueue.currentIndex + 1;\n      if (nextIndex >= currentQueue.items.length) {\n        // End of queue - check completion behavior\n        return this.handleQueueCompletion();\n      }\n\n      this.playerStore.getState().playNext();\n\n      const item = currentQueue.items[nextIndex];\n      return { success: true, data: item };\n    } catch (error) {\n      logger.error('Failed to play next:', error);\n      return { success: false, error: QueueError.STORAGE_ERROR };\n    }\n  }\n\n  playPrevious(): QueueOperationResult<QueueItem> {\n    try {\n      const state = this.playerStore.getState();\n      const currentQueue = state.queues[state.activeQueueType];\n\n      if (currentQueue.items.length === 0) {\n        return { success: false, error: QueueError.QUEUE_EMPTY };\n      }\n\n      this.playerStore.getState().playPrevious();\n\n      const prevIndex = currentQueue.currentIndex - 1;\n      const item = currentQueue.items[prevIndex < 0 ? currentQueue.items.length - 1 : prevIndex];\n\n      return { success: true, data: item };\n    } catch (error) {\n      logger.error('Failed to play previous:', error);\n      return { success: false, error: QueueError.STORAGE_ERROR };\n    }\n  }\n\n  playAtIndex(index: number): QueueOperationResult<QueueItem> {\n    try {\n      const state = this.playerStore.getState();\n      const currentQueue = state.queues[state.activeQueueType];\n\n      if (index < 0 || index >= currentQueue.items.length) {\n        return { success: false, error: QueueError.INVALID_INDEX };\n      }\n\n      this.playerStore.getState().playSongAtIndex(index);\n\n      const item = currentQueue.items[index];\n      return { success: true, data: item };\n    } catch (error) {\n      logger.error('Failed to play at index:', error);\n      return { success: false, error: QueueError.STORAGE_ERROR };\n    }\n  }\n\n  // ==========================================================================\n  // QUEUE STATE ACCESSORS\n  // ==========================================================================\n\n  getCurrentQueue(): QueueState {\n    const state = this.playerStore.getState();\n    return state.queues[state.activeQueueType];\n  }\n\n  getCurrentItem(): QueueItem | null {\n    const queue = this.getCurrentQueue();\n    if (queue.currentIndex < 0 || queue.currentIndex >= queue.items.length) {\n      return null;\n    }\n    return queue.items[queue.currentIndex];\n  }\n\n  getQueueType(): MediaType {\n    return this.playerStore.getState().activeQueueType;\n  }\n\n  getAllQueues(): MultiQueueState {\n    const state = this.playerStore.getState();\n    return {\n      activeQueueType: state.activeQueueType,\n      queues: state.queues,\n    };\n  }\n\n  // ==========================================================================\n  // VALIDATION\n  // ==========================================================================\n\n  canAddToQueue(item: QueueItem): boolean {\n    const settings = this.settingsStore.getState();\n    const state = this.playerStore.getState();\n\n    const itemType = getMediaType(item);\n    const currentType = state.activeQueueType;\n    const currentQueue = state.queues[currentType];\n\n    // Simple mode: strict type checking (unless queue is empty)\n    if (settings.preferences.queue.mode === QueueMode.SIMPLE) {\n      return itemType === currentType || currentQueue.items.length === 0;\n    }\n\n    // Advanced mode: allow mixing\n    return true;\n  }\n\n  shouldWarnBeforeReplace(item: QueueItem): boolean {\n    const settings = this.settingsStore.getState();\n    const state = this.playerStore.getState();\n\n    if (!settings.preferences.queue.warnOnQueueReplace) {\n      return false;\n    }\n\n    const itemType = getMediaType(item);\n    const currentType = state.activeQueueType;\n    const currentQueue = state.queues[currentType];\n\n    const hasItems = currentQueue.items.length > 0;\n    const isDifferentType = itemType !== currentType;\n\n    return hasItems && isDifferentType;\n  }\n\n  canMixQueues(): boolean {\n    const settings = this.settingsStore.getState();\n    return settings.preferences.queue.mode === QueueMode.ADVANCED;\n  }\n\n  // ==========================================================================\n  // PRIVATE METHODS\n  // ==========================================================================\n\n  private handleQueueCompletion(): QueueOperationResult<QueueItem> {\n    const settings = this.settingsStore.getState();\n    const behavior = settings.preferences.playback.queueCompletion;\n\n    logger.debug(`Queue completed, behavior: ${behavior}`);\n\n    switch (behavior) {\n      case QueueCompletionBehavior.STOP:\n        this.playerStore.getState().pause();\n        return { success: false, error: QueueError.QUEUE_EMPTY };\n\n      case QueueCompletionBehavior.SHUFFLE:\n        const currentQueue = this.getCurrentQueue();\n        const shuffled = [...currentQueue.items];\n        // Fisher-Yates shuffle\n        for (let i = shuffled.length - 1; i > 0; i--) {\n          const j = Math.floor(Math.random() * (i + 1));\n          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];\n        }\n        this.playerStore.getState().setQueueAndPlay(shuffled, shuffled[0].publicId);\n        return { success: true, data: shuffled[0] };\n\n      case QueueCompletionBehavior.PLAY_RANDOM:\n        // TODO: Implement random song from library\n        // For now, just stop\n        this.playerStore.getState().pause();\n        return { success: false, error: QueueError.QUEUE_EMPTY };\n\n      default:\n        return { success: false, error: QueueError.QUEUE_EMPTY };\n    }\n  }\n\n  private saveToStorage(): void {\n    const state = this.playerStore.getState();\n    const multiQueueState: MultiQueueState = {\n      activeQueueType: state.activeQueueType,\n      queues: state.queues,\n    };\n    queueStorageService.save(multiQueueState);\n  }\n}\n\n// ===========================================================================\n// CONVENIENCE FUNCTIONS FOR SONG RESOURCES\n// ===========================================================================\n\n/**\n * Set queue from SongResource array (converts to MusicQueueItem)\n */\nexport function setQueueFromSongs(songs: SongResource[], startIndex = 0): QueueOperationResult<void> {\n  const items = songs.map(songResourceToMusicQueueItem);\n  return queueManagerService.setQueue(items, startIndex);\n}\n\n/**\n * Set queue and play from SongResource array\n */\nexport function setQueueAndPlayFromSongs(songs: SongResource[], publicId: string): QueueOperationResult<void> {\n  const items = songs.map(songResourceToMusicQueueItem);\n  return queueManagerService.setQueueAndPlay(items, publicId);\n}\n\n// ===========================================================================\n// SINGLETON INSTANCE\n// ===========================================================================\n\nexport const queueManagerService = new QueueManagerService();\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/resources/app/modules/library-music-player/services/queue/queue-manager-service.ts b/resources/app/modules/library-music-player/services/queue/queue-manager-service.ts
+--- a/resources/app/modules/library-music-player/services/queue/queue-manager-service.ts	(revision 0e05be9f52b83fa864fd1c19f1e26e1f490e7fc8)
++++ b/resources/app/modules/library-music-player/services/queue/queue-manager-service.ts	(date 1767549500914)
+@@ -8,16 +8,16 @@
+ import { useMusicPlayerStore } from '../../store';
+ import { useSettingsStore } from '@/app/store/settings';
+ import {
+-  MediaType,
+   QueueItem,
+   QueueState,
+   QueueOperationResult,
+   QueueError,
++  QueueContext,
+   getMediaType,
+-  isMusicItem,
+   songResourceToMusicQueueItem,
+   MultiQueueState,
+ } from './queue-types';
++import { MediaType } from '@/app/models/media-type';
+ import { queueStorageService } from './queue-storage-service';
+ import { SongResource } from '@/app/libs/api-client/gen/models';
+ import { QueueMode, QueueCompletionBehavior } from '@/app/store/settings/settings-types';
+@@ -32,9 +32,9 @@
+   // Queue switching
+   switchQueue(type: MediaType): QueueOperationResult<QueueState>;
+ 
+-  // Queue manipulation
++  // Queue manipulation (works with QueueItem)
+   setQueue(items: QueueItem[], startIndex?: number): QueueOperationResult<void>;
+-  setQueueAndPlay(items: QueueItem[], publicId: string): QueueOperationResult<void>;
++  setQueueAndPlay(items: QueueItem[], publicId: string, context?: QueueContext): QueueOperationResult<void>;
+   addToQueue(item: QueueItem): QueueOperationResult<void>;
+   insertInQueue(item: QueueItem): QueueOperationResult<void>;
+   removeFromQueue(index: number): QueueOperationResult<void>;
+@@ -64,6 +64,7 @@
+ class QueueManagerService implements IQueueManagerService {
+   private playerStore = useMusicPlayerStore;
+   private settingsStore = useSettingsStore;
++  private clearQueueTimeout: ReturnType<typeof setTimeout> | null = null;
+ 
+   // ==========================================================================
+   // QUEUE SWITCHING
+@@ -156,7 +157,7 @@
+     }
+   }
+ 
+-  setQueueAndPlay(items: QueueItem[], publicId: string): QueueOperationResult<void> {
++  setQueueAndPlay(items: QueueItem[], publicId: string, context?: QueueContext): QueueOperationResult<void> {
+     try {
+       if (items.length === 0) {
+         return { success: false, error: QueueError.QUEUE_EMPTY };
+@@ -169,6 +170,8 @@
+ 
+       const mediaType = getMediaType(items[0]);
+       const settings = this.settingsStore.getState();
++      const state = this.playerStore.getState();
++      const currentQueue = state.queues[state.activeQueueType];
+ 
+       // Check mode compatibility
+       if (settings.preferences.queue.mode === QueueMode.SIMPLE) {
+@@ -178,10 +181,36 @@
+         }
+       }
+ 
+-      logger.debug(`Setting queue and playing: ${publicId}`);
++      logger.debug(`Setting queue and playing: ${publicId}`, context);
++
++      // Determine if we should replace the queue based on context
++      let shouldReplaceQueue = true;
+ 
+-      // Update queue and play
+-      this.playerStore.getState().setQueueAndPlay(items, publicId);
++      if (context && currentQueue.context) {
++        // If new context matches current context and no manual items, reuse the queue
++        if (context.type === currentQueue.context.type &&
++            context.id === currentQueue.context.id &&
++            !currentQueue.context.hasManualItems) {
++          shouldReplaceQueue = false;
++          logger.debug('Reusing existing queue (same context, no manual items)');
++        }
++      }
++
++      if (shouldReplaceQueue || !context) {
++        // Replace the queue entirely
++        this.playerStore.getState().setQueueAndPlay(items, publicId, context);
++      } else {
++        // Keep existing queue, just play the selected song
++        const existingIndex = currentQueue.items.findIndex(item => item.publicId === publicId);
++        if (existingIndex >= 0) {
++          // Song exists in current queue, just play it
++          this.playerStore.getState().playSongAtIndex(existingIndex);
++        } else {
++          // Song not in current queue, replace it
++          this.playerStore.getState().setQueueAndPlay(items, publicId, context);
++        }
++      }
++
+       this.playerStore.getState().setActiveQueueType(mediaType);
+ 
+       // Persist
+@@ -339,15 +368,43 @@
+   playAtIndex(index: number): QueueOperationResult<QueueItem> {
+     try {
+       const state = this.playerStore.getState();
++      const settings = this.settingsStore.getState();
+       const currentQueue = state.queues[state.activeQueueType];
+ 
+       if (index < 0 || index >= currentQueue.items.length) {
+         return { success: false, error: QueueError.INVALID_INDEX };
+       }
+ 
++      // Cancel any pending clear operation
++      if (this.clearQueueTimeout) {
++        clearTimeout(this.clearQueueTimeout);
++        this.clearQueueTimeout = null;
++      }
++
++      // Play the selected song
+       this.playerStore.getState().playSongAtIndex(index);
+ 
+       const item = currentQueue.items[index];
++
++      // If the clicked song is after the currently playing song, clear previous songs after delay
++      const delay = settings.preferences.queue.clearPreviousDelay;
++      if (delay > 0 && index > currentQueue.currentIndex) {
++        this.clearQueueTimeout = setTimeout(() => {
++          const currentState = this.playerStore.getState();
++          const activeType = currentState.activeQueueType;
++          const queue = currentState.queues[activeType];
++
++          // Only clear if we're still at the same song (user hasn't changed it again)
++          if (queue.currentIndex === index && queue.items.length > index) {
++            logger.debug(`Clearing queue before index ${index} after ${delay}s delay`);
++            this.playerStore.getState().clearBeforeIndex(index);
++            this.saveToStorage();
++          }
++
++          this.clearQueueTimeout = null;
++        }, delay * 1000);
++      }
++
+       return { success: true, data: item };
+     } catch (error) {
+       logger.error('Failed to play at index:', error);
+@@ -490,9 +547,25 @@
+ /**
+  * Set queue and play from SongResource array
+  */
+-export function setQueueAndPlayFromSongs(songs: SongResource[], publicId: string): QueueOperationResult<void> {
++export function setQueueAndPlayFromSongs(songs: SongResource[], publicId: string, context?: QueueContext): QueueOperationResult<void> {
+   const items = songs.map(songResourceToMusicQueueItem);
+-  return queueManagerService.setQueueAndPlay(items, publicId);
++  return queueManagerService.setQueueAndPlay(items, publicId, context);
++}
++
++/**
++ * Add a single song to queue from SongResource (converts to MusicQueueItem)
++ */
++export function addSongToQueue(song: SongResource): QueueOperationResult<void> {
++  const item = songResourceToMusicQueueItem(song);
++  return queueManagerService.addToQueue(item);
++}
++
++/**
++ * Insert a single song in queue from SongResource (converts to MusicQueueItem)
++ */
++export function insertSongInQueue(song: SongResource): QueueOperationResult<void> {
++  const item = songResourceToMusicQueueItem(song);
++  return queueManagerService.insertInQueue(item);
+ }
+ 
+ // ===========================================================================
+Index: resources/app/components/song-table/song-table.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import { memo, RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';\nimport { Iconify } from '@/app/ui/icons/iconify';\nimport { usePlayerActions, usePlayerCurrentSongPublicId } from '@/app/modules/library-music-player/store';\nimport { useAppDispatch } from '@/app/store/hooks';\nimport { createNotification } from '@/app/store/notifications/notifications-slice';\nimport {\n  ColumnDef,\n  flexRender,\n  getCoreRowModel,\n  getSortedRowModel,\n  Header,\n  Row, RowData,\n  SortingState,\n  Table,\n  useReactTable,\n} from '@tanstack/react-table';\nimport { useVirtualizer, VirtualItem, Virtualizer } from '@tanstack/react-virtual';\nimport { SpeakerLoudIcon } from '@radix-ui/react-icons';\nimport { ContextMenu } from '@radix-ui/themes';\nimport { DndContext, closestCenter, DragEndEvent, DragStartEvent, PointerSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core';\nimport { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';\nimport { CSS } from '@dnd-kit/utilities';\nimport styles from './song-table.module.scss';\nimport { SongResource } from '@/app/libs/api-client/gen/models';\nimport { AddToPlaylistMenu } from '@/app/components/add-to-playlist-menu/add-to-playlist-menu';\n\nexport interface SongTableProps {\n  songs: SongResource[];\n  title?: string | null;\n  description?: string | null;\n  onScrollToBottom?: () => void;\n  estimatedTotalCount?: number;\n  className?: string;\n  contextMenuActions?: {\n    onEdit?: (song: SongResource) => void;\n    onRemoveFromPlaylist?: (song: SongResource) => void;\n  };\n  reorderable?: boolean;\n  onReorder?: (oldIndex: number, newIndex: number) => void;\n}\n\ninterface TableHeaderProps {\n  title?: string | null;\n  description?: string | null;\n}\n\ninterface StickyHeaderProps {\n  table: Table<RowData>;\n}\n\ninterface HeaderCellProps {\n  key: string;\n  header: Header<RowData, unknown>;\n}\n\ninterface VirtualizedRowsProps {\n  visibleRows: VirtualizedRowData[];\n  onSongClick: (id: string) => void;\n  contextMenuActions?: SongTableProps['contextMenuActions'];\n  reorderable?: boolean;\n}\n\ninterface VirtualizedRowProps {\n  key: string;\n  virtualRow: VirtualItem;\n  row: Row<SongResource>;\n  onSongClick: (id: string) => void;\n  contextMenuActions?: SongTableProps['contextMenuActions'];\n  reorderable?: boolean;\n  index?: number;\n}\n\ninterface SongTitleCellProps {\n  song: SongResource;\n}\n\ninterface VirtualizedRowData {\n  virtualRow: VirtualItem;\n  row: Row<SongResource>;\n}\n\ninterface UseVirtualizedTableProps {\n  table: Table<RowData>;\n  parentRef: RefObject<HTMLDivElement | null>;\n  estimatedTotalCount?: number;\n  onScrollToBottom?: () => void;\n  lastScrollTime: RefObject<number>;\n  hasTriggered: RefObject<boolean>;\n}\n\ninterface UseVirtualizedTableReturn {\n  virtualizer: Virtualizer<HTMLDivElement, Element>;\n  visibleRows: VirtualizedRowData[];\n}\n\nconst createColumnDefinitions = (reorderable?: boolean): ColumnDef<SongResource>[] => {\n  const columns: ColumnDef<SongResource>[] = [];\n\n  if (reorderable) {\n    columns.push({\n      id: 'drag',\n      header: '',\n      cell: () => (\n        <div className={styles.dragHandle}>\n          <Iconify icon=\"ph:dots-six-vertical-bold\" width={16} height={16} />\n        </div>\n      ),\n      size: 40,\n      enableSorting: false,\n    });\n  }\n\n  columns.push(\n    {\n      header: 'Title',\n      cell: (info) => <SongTitleCell song={info.row.original}/>,\n    },\n    {\n      header: 'Lyrics',\n      accessorFn: (row) => !!row.lyrics,\n      cell: (info) => info.getValue() ? <Iconify icon=\"arcticons:quicklyric\"/> : null,\n      size: 60,\n    },\n    {\n      header: 'Artist',\n      accessorFn: (row) => row.artists?.map(x => x.name).join(', '),\n    },\n    {\n      header: 'Album',\n      accessorFn: (row) => row.album?.title,\n    },\n    {\n      header: 'Genre',\n      accessorFn: (row) => row.genres?.map(x => x.name).join(', '),\n    },\n    {\n      header: 'Duration',\n      accessorKey: 'durationHuman',\n      size: 80,\n    },\n    {\n      header: 'Track',\n      accessorKey: 'track',\n      size: 60,\n    }\n  );\n\n  return columns;\n};\n\nconst SongTitleCell = memo(({ song }: SongTitleCellProps) => {\n  const currentSongPublicId = usePlayerCurrentSongPublicId();\n  const isCurrentSong = currentSongPublicId === song.publicId;\n\n  return (\n    <div className={styles.titleCell}>\n      {isCurrentSong && <SpeakerLoudIcon className={styles.titleCellNowPlayingIcon}/>}\n      <div className={styles.titleCellTitle}>{song.title}</div>\n    </div>\n  );\n});\n\nSongTitleCell.displayName = 'SongTitleCell';\n\nexport function SongTable({\n                            songs,\n                            title,\n                            description,\n                            onScrollToBottom,\n                            estimatedTotalCount,\n                            className,\n                            contextMenuActions,\n                            reorderable,\n                            onReorder,\n                          }: SongTableProps) {\n  const { setQueueAndPlay } = usePlayerActions();\n  const [sorting, setSorting] = useState<SortingState>([]);\n  const [songsState, setSongsState] = useState(songs);\n  const [activeId, setActiveId] = useState<string | null>(null);\n  const parentRef = useRef<HTMLDivElement | null>(null);\n  const lastScrollTimeRef = useRef(0);\n  const hasTriggeredRef = useRef(false);\n\n  // Update songs state when prop changes\n  useEffect(() => {\n    if (!reorderable) {\n      setSongsState(songs);\n    }\n  }, [songs, reorderable]);\n\n  const sensors = useSensors(\n    useSensor(PointerSensor, {\n      activationConstraint: {\n        distance: 8,\n      },\n    })\n  );\n\n  const handleDragStart = useCallback((event: DragStartEvent) => {\n    setActiveId(event.active.id);\n  }, []);\n\n  const handleDragEnd = useCallback((event: DragEndEvent) => {\n    const { active, over } = event;\n    setActiveId(null);\n\n    if (over && active.id !== over.id) {\n      const oldIndex = songsState.findIndex((s) => s.publicId === active.id);\n      const newIndex = songsState.findIndex((s) => s.publicId === over.id);\n\n      if (oldIndex !== -1 && newIndex !== -1) {\n        const newSongs = arrayMove(songsState, oldIndex, newIndex);\n        setSongsState(newSongs);\n        onReorder?.(oldIndex, newIndex);\n      }\n    }\n  }, [songsState, onReorder]);\n\n  const handleSongClick = useCallback((publicId: string) => {\n    const newQueue = [...songs];\n    const index = newQueue.findIndex(x => x.publicId === publicId);\n    newQueue.splice(0, 0, newQueue.splice(index, 1)[0]);\n    setQueueAndPlay(newQueue, newQueue[0].publicId);\n  }, [setQueueAndPlay, songs]);\n\n\n  const table = useReactTable<SongResource>({\n    data: reorderable ? songsState : songs,\n    columns: createColumnDefinitions(reorderable),\n    state: { sorting },\n    onSortingChange: setSorting,\n    getCoreRowModel: getCoreRowModel(),\n    getSortedRowModel: getSortedRowModel(),\n    debugAll: false,\n    debugColumns: false,\n  });\n\n  const { virtualizer, visibleRows } = useVirtualizedTable({\n    table,\n    parentRef,\n    estimatedTotalCount,\n    onScrollToBottom,\n    lastScrollTime: lastScrollTimeRef,\n    hasTriggered: hasTriggeredRef,\n  });\n\n  const tableContent = (\n    <div className={`${styles.scrollList} ${className || ''}`}>\n      <TableHeader title={title} description={description}/>\n\n      <div className={styles.tableContainer}>\n        <StickyHeader table={table}/>\n\n        <div ref={parentRef} className={styles.scrollableContent}>\n          <div className={styles.virtualizedContainer} style={{ height: `${virtualizer.getTotalSize()}px` }}>\n            {reorderable ? (\n              <SortableContext\n                items={songsState.map(s => s.publicId)}\n                strategy={verticalListSortingStrategy}\n              >\n                <VirtualizedRows\n                  visibleRows={visibleRows}\n                  onSongClick={handleSongClick}\n                  contextMenuActions={contextMenuActions}\n                  reorderable={reorderable}\n                />\n              </SortableContext>\n            ) : (\n              <VirtualizedRows\n                visibleRows={visibleRows}\n                onSongClick={handleSongClick}\n                contextMenuActions={contextMenuActions}\n                reorderable={reorderable}\n              />\n            )}\n          </div>\n        </div>\n      </div>\n    </div>\n  );\n\n  if (!reorderable) {\n    return tableContent;\n  }\n\n  return (\n    <DndContext\n      sensors={sensors}\n      collisionDetection={closestCenter}\n      onDragStart={handleDragStart}\n      onDragEnd={handleDragEnd}\n    >\n      {tableContent}\n      <DragOverlay>\n        {activeId ? (\n          <div style={{ background: 'var(--gray-3)', padding: '8px', borderRadius: '4px', opacity: 0.8 }}>\n            {songsState.find(s => s.publicId === activeId)?.title}\n          </div>\n        ) : null}\n      </DragOverlay>\n    </DndContext>\n  );\n}\n\nconst TableHeader = memo(({ title, description }: TableHeaderProps) => {\n  if (!title && !description) return null;\n\n  return (\n    <div className={styles.header}>\n      {title && <h2 className={styles.title}>{title}</h2>}\n      {description && <p className={styles.description}>{description}</p>}\n    </div>\n  );\n});\n\nTableHeader.displayName = 'TableHeader';\n\nconst StickyHeader = memo(({ table }: StickyHeaderProps) => {\n  return (\n    <div className={styles.fixedHeader}>\n      <table>\n        <thead>\n        {table.getHeaderGroups().map((headerGroup) => (\n          <tr key={headerGroup.id}>\n            {headerGroup.headers.map((header) => (\n              <HeaderCell key={header.id} header={header}/>\n            ))}\n          </tr>\n        ))}\n        </thead>\n      </table>\n    </div>\n  );\n});\n\nStickyHeader.displayName = 'StickyHeader';\n\nconst HeaderCell = memo(({ header }: HeaderCellProps) => {\n  return (\n    <th style={{ width: header.getSize() }}>\n      {header.isPlaceholder ? null : (\n        <div\n          className={header.column.getCanSort() ? 'cursor-pointer select-none' : ''}\n          onClick={header.column.getToggleSortingHandler()}\n        >\n          {flexRender(header.column.columnDef.header, header.getContext())}\n        </div>\n      )}\n    </th>\n  );\n});\n\nHeaderCell.displayName = 'HeaderCell';\n\nconst VirtualizedRow = memo(({ virtualRow, row, onSongClick, contextMenuActions, reorderable }: VirtualizedRowProps) => {\n  const handleRowClick = useCallback(() => {\n    onSongClick(row.original.publicId);\n  }, [row.original.publicId, onSongClick]);\n\n  const {\n    attributes,\n    listeners,\n    setNodeRef,\n    transform,\n    transition,\n    isDragging,\n  } = useSortable({\n    id: row.original.publicId,\n    disabled: !reorderable,\n  });\n\n  const style = {\n    transform: CSS.Transform.toString(transform),\n    transition,\n    height: `${virtualRow.size}px`,\n    position: 'relative' as const,\n    top: 0,\n    left: 0,\n    width: '100%',\n    opacity: isDragging ? 0.5 : 1,\n  };\n\n  const rowStyle = reorderable ? style : {\n    height: `${virtualRow.size}px`,\n    transform: `translateY(${virtualRow.start}px)`,\n  };\n\n  const rowProps = reorderable ? {\n    ref: setNodeRef,\n    ...attributes,\n  } : {};\n\n  return (\n    <ContextMenu.Root key={row.id}>\n      <ContextMenu.Trigger>\n        <tr\n          {...rowProps}\n          onClick={handleRowClick}\n          className={`${styles.listItem} ${styles.virtualizedRow}`}\n          style={rowStyle as any}\n        >\n          {row.getVisibleCells().map((cell) => {\n            const isDragHandle = cell.column.id === 'drag';\n            const cellProps = isDragHandle && reorderable ? {\n              ...listeners,\n            } : {};\n\n            return (\n              <td key={cell.id} style={{ width: cell.column.getSize() }} {...cellProps}>\n                {flexRender(cell.column.columnDef.cell, cell.getContext())}\n              </td>\n            );\n          })}\n        </tr>\n      </ContextMenu.Trigger>\n\n      {contextMenuActions && (\n        <SongContextMenu\n          song={row.original}\n          onEdit={contextMenuActions.onEdit}\n          onRemoveFromPlaylist={contextMenuActions.onRemoveFromPlaylist}\n        />\n      )}\n    </ContextMenu.Root>\n  );\n});\n\nVirtualizedRow.displayName = 'VirtualizedRow';\n\nconst VirtualizedRows = memo(({ visibleRows, onSongClick, contextMenuActions, reorderable }: VirtualizedRowsProps) => {\n  return (\n    <table>\n      <tbody>\n      {visibleRows.map(({ virtualRow, row }, index) => (\n        <VirtualizedRow\n          key={row.id}\n          virtualRow={virtualRow}\n          row={row}\n          onSongClick={onSongClick}\n          contextMenuActions={contextMenuActions}\n          reorderable={reorderable}\n          index={index}\n        />\n      ))}\n      </tbody>\n    </table>\n  );\n});\n\nVirtualizedRows.displayName = 'VirtualizedRows';\n\ninterface SongContextMenuProps {\n  song: SongResource;\n  onEdit?: (song: SongResource) => void;\n  onRemoveFromPlaylist?: (song: SongResource) => void;\n}\n\nconst SongContextMenu = memo(({ song, onEdit, onRemoveFromPlaylist }: SongContextMenuProps) => {\n  const { setQueueAndPlay, insertInQueue, addToQueue } = usePlayerActions();\n  const dispatch = useAppDispatch();\n\n  const handleEditClick = useCallback(() => {\n    onEdit?.(song);\n  }, [onEdit, song]);\n\n  const handleRemoveClick = useCallback(() => {\n    onRemoveFromPlaylist?.(song);\n  }, [onRemoveFromPlaylist, song]);\n\n  const handlePlayNow = useCallback(() => {\n    // Find the song in the current songs array and play it\n    // This is a simple implementation that just plays the song\n    setQueueAndPlay([song], song.publicId);\n  }, [song, setQueueAndPlay]);\n\n  const handlePlayNext = useCallback(() => {\n    insertInQueue(song);\n    dispatch(\n      createNotification({\n        title: 'Added to queue',\n        message: `\"${song.title}\" will play next`,\n        type: 'success',\n        toast: true,\n      })\n    );\n  }, [song, insertInQueue, dispatch]);\n\n  const handleAddToQueue = useCallback(() => {\n    addToQueue(song);\n    dispatch(\n      createNotification({\n        title: 'Added to queue',\n        message: `\"${song.title}\" added to queue`,\n        type: 'success',\n        toast: true,\n      })\n    );\n  }, [song, addToQueue, dispatch]);\n\n  return (\n    <ContextMenu.Content>\n      <ContextMenu.Item onClick={handlePlayNow}>\n        Play Now\n      </ContextMenu.Item>\n      <ContextMenu.Item onClick={handlePlayNext}>\n        Play Next\n      </ContextMenu.Item>\n      <ContextMenu.Item onClick={handleAddToQueue}>\n        Add to Queue\n      </ContextMenu.Item>\n      <ContextMenu.Separator />\n      <AddToPlaylistMenu songPublicId={song.publicId} librarySlug={song.librarySlug || 'music'} />\n      {onEdit && <ContextMenu.Item onClick={handleEditClick}>Edit</ContextMenu.Item>}\n      {onRemoveFromPlaylist && (\n        <>\n          <ContextMenu.Separator />\n          <ContextMenu.Item color=\"red\" onClick={handleRemoveClick}>Remove from Playlist</ContextMenu.Item>\n        </>\n      )}\n    </ContextMenu.Content>\n  );\n});\n\nSongContextMenu.displayName = 'SongContextMenu';\n\nfunction useVirtualizedTable({\n                               table,\n                               parentRef,\n                               estimatedTotalCount,\n                               onScrollToBottom,\n                               lastScrollTime,\n                               hasTriggered,\n                             }: UseVirtualizedTableProps): UseVirtualizedTableReturn {\n  const { rows } = table.getRowModel();\n  const actualRowCount = rows.length;\n  const virtualizerCount = estimatedTotalCount && estimatedTotalCount > actualRowCount ? estimatedTotalCount : actualRowCount;\n\n  // Track previous row count to detect if this is new data or appended data\n  const previousRowCount = useRef(0);\n\n  const virtualizer = useVirtualizer({\n    count: virtualizerCount,\n    getScrollElement: () => parentRef.current,\n    estimateSize: () => 40,\n    overscan: 5,\n  });\n\n  useEffect(() => {\n    // Only scroll to top if we went from 0 rows to some rows (initial load)\n    // or if the row count decreased (new dataset)\n    if (rows.length > 0 && (previousRowCount.current === 0 || rows.length < previousRowCount.current)) {\n      virtualizer.scrollToIndex(0, { align: 'start' });\n    }\n    previousRowCount.current = rows.length;\n  }, [rows.length, virtualizer]);\n\n  useEffect(() => {\n    hasTriggered.current = false;\n  }, [rows.length, hasTriggered]);\n\n  useEffect(() => {\n    if (!onScrollToBottom) return;\n\n    const scrollElement = parentRef.current;\n    if (!scrollElement) return;\n\n    const handleScroll = () => {\n      const now = Date.now();\n      if (now - lastScrollTime.current < 200) return;\n      lastScrollTime.current = now;\n\n      const virtualItems = virtualizer.getVirtualItems();\n      if (virtualItems.length === 0) return;\n\n      const lastVirtualItem = virtualItems[virtualItems.length - 1];\n      const triggerThreshold = Math.max(5, Math.min(10, Math.floor(actualRowCount * 0.1)));\n      const isNearEnd = lastVirtualItem.index >= actualRowCount - triggerThreshold;\n\n      if (isNearEnd && !hasTriggered.current) {\n        hasTriggered.current = true;\n        onScrollToBottom();\n      }\n    };\n\n    scrollElement.addEventListener('scroll', handleScroll, { passive: true });\n    return () => scrollElement.removeEventListener('scroll', handleScroll);\n  }, [onScrollToBottom, virtualizer, actualRowCount, lastScrollTime, hasTriggered]);\n\n  const virtualItems = virtualizer.getVirtualItems();\n  const visibleRows = useMemo(() =>\n    virtualItems\n      .filter(virtualRow => virtualRow.index < actualRowCount)\n      .map(virtualRow => ({\n        virtualRow,\n        row: rows[virtualRow.index],\n      })),\n    [virtualItems, actualRowCount, rows]\n  );\n\n  return {virtualizer, visibleRows} as UseVirtualizedTableReturn;\n}\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/resources/app/components/song-table/song-table.tsx b/resources/app/components/song-table/song-table.tsx
+--- a/resources/app/components/song-table/song-table.tsx	(revision 0e05be9f52b83fa864fd1c19f1e26e1f490e7fc8)
++++ b/resources/app/components/song-table/song-table.tsx	(date 1767549122727)
+@@ -1,6 +1,8 @@
+ import { memo, RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+ import { Iconify } from '@/app/ui/icons/iconify';
+-import { usePlayerActions, usePlayerCurrentSongPublicId } from '@/app/modules/library-music-player/store';
++import { usePlayerCurrentSongPublicId } from '@/app/modules/library-music-player/store';
++import { useQueueManager } from '@/app/modules/library-music-player/hooks/use-queue-manager';
++import { QueueContext } from '@/app/modules/library-music-player/services/queue';
+ import { useAppDispatch } from '@/app/store/hooks';
+ import { createNotification } from '@/app/store/notifications/notifications-slice';
+ import {
+@@ -37,6 +39,7 @@
+   };
+   reorderable?: boolean;
+   onReorder?: (oldIndex: number, newIndex: number) => void;
++  queueContext?: QueueContext; // Queue context for playback
+ }
+ 
+ interface TableHeaderProps {
+@@ -172,8 +175,9 @@
+                             contextMenuActions,
+                             reorderable,
+                             onReorder,
++                            queueContext,
+                           }: SongTableProps) {
+-  const { setQueueAndPlay } = usePlayerActions();
++  const { setQueueAndPlaySongs } = useQueueManager();
+   const [sorting, setSorting] = useState<SortingState>([]);
+   const [songsState, setSongsState] = useState(songs);
+   const [activeId, setActiveId] = useState<string | null>(null);
+@@ -220,8 +224,8 @@
+     const newQueue = [...songs];
+     const index = newQueue.findIndex(x => x.publicId === publicId);
+     newQueue.splice(0, 0, newQueue.splice(index, 1)[0]);
+-    setQueueAndPlay(newQueue, newQueue[0].publicId);
+-  }, [setQueueAndPlay, songs]);
++    setQueueAndPlaySongs(newQueue, newQueue[0].publicId, queueContext);
++  }, [setQueueAndPlaySongs, songs, queueContext]);
+ 
+ 
+   const table = useReactTable<SongResource>({
+@@ -456,7 +460,7 @@
+ }
+ 
+ const SongContextMenu = memo(({ song, onEdit, onRemoveFromPlaylist }: SongContextMenuProps) => {
+-  const { setQueueAndPlay, insertInQueue, addToQueue } = usePlayerActions();
++  const { setQueueAndPlaySongs, insertSongInQueue, addSongToQueue } = useQueueManager();
+   const dispatch = useAppDispatch();
+ 
+   const handleEditClick = useCallback(() => {
+@@ -470,11 +474,11 @@
+   const handlePlayNow = useCallback(() => {
+     // Find the song in the current songs array and play it
+     // This is a simple implementation that just plays the song
+-    setQueueAndPlay([song], song.publicId);
+-  }, [song, setQueueAndPlay]);
++    setQueueAndPlaySongs([song], song.publicId);
++  }, [song, setQueueAndPlaySongs]);
+ 
+   const handlePlayNext = useCallback(() => {
+-    insertInQueue(song);
++    insertSongInQueue(song);
+     dispatch(
+       createNotification({
+         title: 'Added to queue',
+@@ -483,10 +487,10 @@
+         toast: true,
+       })
+     );
+-  }, [song, insertInQueue, dispatch]);
++  }, [song, insertSongInQueue, dispatch]);
+ 
+   const handleAddToQueue = useCallback(() => {
+-    addToQueue(song);
++    addSongToQueue(song);
+     dispatch(
+       createNotification({
+         title: 'Added to queue',
+@@ -495,7 +499,7 @@
+         toast: true,
+       })
+     );
+-  }, [song, addToQueue, dispatch]);
++  }, [song, addSongToQueue, dispatch]);
+ 
+   return (
+     <ContextMenu.Content>
+Index: resources/app/store/settings/migrations.ts
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import { AppSettings, QueueCompletionBehavior, QueueMode } from './settings-types';\nimport { DEFAULT_SETTINGS } from './defaults';\n\n/**\n * Migration function type\n * Transforms settings from one version to the next\n */\nexport type Migration = (settings: Partial<AppSettings>) => Partial<AppSettings>;\n\n/**\n * Settings version migrations\n * Add new migrations as the settings schema evolves\n */\nexport const migrations: Record<number, Migration> = {\n  // Version 1: Initial schema\n  1: (settings) => ({\n    ...settings,\n    version: 1,\n  }),\n\n  // Version 2: Add queue management settings\n  2: (settings) => ({\n    ...settings,\n    version: 2,\n    preferences: {\n      ...settings.preferences,\n      playback: {\n        ...settings.preferences?.playback,\n        queueCompletion: QueueCompletionBehavior.STOP,\n      },\n      queue: {\n        mode: QueueMode.SIMPLE,\n        rememberPosition: true,\n        autoSwitch: true,\n        warnOnQueueReplace: true,\n      },\n    },\n  }),\n};\n\n/**\n * Migrate settings from an older version to the current version\n * @param persistedSettings - Settings loaded from localStorage (may be outdated)\n * @returns Migrated settings merged with defaults\n */\nexport function migrateSettings(persistedSettings: unknown): AppSettings {\n  // Handle null/undefined\n  if (!persistedSettings || typeof persistedSettings !== 'object') {\n    return { ...DEFAULT_SETTINGS };\n  }\n\n  const settings = persistedSettings as Partial<AppSettings>;\n  const currentVersion = settings.version || 0;\n\n  // Start with a copy of the persisted settings\n  let migratedSettings = { ...settings } as Partial<AppSettings>;\n\n  // Apply migrations sequentially from current version to latest\n  const latestVersion = Math.max(...Object.keys(migrations).map(Number));\n  for (let version = currentVersion + 1; version <= latestVersion; version++) {\n    const migration = migrations[version];\n    if (migration) {\n      try {\n        migratedSettings = {\n          ...migratedSettings,\n          ...migration(migratedSettings),\n        };\n      } catch (error) {\n        console.error(`Settings migration failed for version ${version}:`, error);\n        // If migration fails, continue with current state\n        // Defaults will be merged in the next step\n      }\n    }\n  }\n\n  // Merge with defaults to fill in missing fields\n  // This ensures new settings added in future versions have default values\n  return deepMergeSettings(DEFAULT_SETTINGS, migratedSettings);\n}\n\n/**\n * Deep merge settings with defaults\n * Ensures nested objects are properly merged\n */\nfunction deepMergeSettings(defaults: AppSettings, settings: Partial<AppSettings>): AppSettings {\n  return {\n    ...defaults,\n    ...settings,\n    audio: {\n      ...defaults.audio,\n      ...settings.audio,\n      equalizer: {\n        ...defaults.audio.equalizer,\n        ...settings.audio?.equalizer,\n      },\n      volume: {\n        ...defaults.audio.volume,\n        ...settings.audio?.volume,\n        normalization: {\n          ...defaults.audio.volume.normalization,\n          ...settings.audio?.volume?.normalization,\n        },\n      },\n      effects: {\n        ...defaults.audio.effects,\n        ...settings.audio?.effects,\n        compression: {\n          ...defaults.audio.effects.compression,\n          ...settings.audio?.effects?.compression,\n        },\n      },\n    },\n    ui: {\n      ...defaults.ui,\n      ...settings.ui,\n      display: {\n        ...defaults.ui.display,\n        ...settings.ui?.display,\n      },\n    },\n    preferences: {\n      ...defaults.preferences,\n      ...settings.preferences,\n      playback: {\n        ...defaults.preferences.playback,\n        ...settings.preferences?.playback,\n      },\n      queue: {\n        ...defaults.preferences.queue,\n        ...settings.preferences?.queue,\n      },\n      library: {\n        ...defaults.preferences.library,\n        ...settings.preferences?.library,\n      },\n    },\n  };\n}\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/resources/app/store/settings/migrations.ts b/resources/app/store/settings/migrations.ts
+--- a/resources/app/store/settings/migrations.ts	(revision 0e05be9f52b83fa864fd1c19f1e26e1f490e7fc8)
++++ b/resources/app/store/settings/migrations.ts	(date 1767548105006)
+@@ -25,7 +25,8 @@
+     preferences: {
+       ...settings.preferences,
+       playback: {
+-        ...settings.preferences?.playback,
++        crossfadeDuration: settings.preferences?.playback?.crossfadeDuration ?? 0,
++        gaplessPlayback: settings.preferences?.playback?.gaplessPlayback ?? true,
+         queueCompletion: QueueCompletionBehavior.STOP,
+       },
+       queue: {
+@@ -33,6 +34,36 @@
+         rememberPosition: true,
+         autoSwitch: true,
+         warnOnQueueReplace: true,
++        clearPreviousDelay: 3,
++      },
++      library: settings.preferences?.library ?? {
++        defaultSort: 'title',
++        defaultView: 'grid',
++      },
++    },
++  }),
++
++  // Version 3: Add clearPreviousDelay setting (already added in defaults, this is for backward compatibility)
++  3: (settings) => ({
++    ...settings,
++    version: 3,
++    preferences: {
++      ...settings.preferences,
++      playback: settings.preferences?.playback ?? {
++        crossfadeDuration: 0,
++        gaplessPlayback: true,
++        queueCompletion: QueueCompletionBehavior.STOP,
++      },
++      queue: {
++        mode: settings.preferences?.queue?.mode ?? QueueMode.SIMPLE,
++        rememberPosition: settings.preferences?.queue?.rememberPosition ?? true,
++        autoSwitch: settings.preferences?.queue?.autoSwitch ?? true,
++        warnOnQueueReplace: settings.preferences?.queue?.warnOnQueueReplace ?? true,
++        clearPreviousDelay: settings.preferences?.queue?.clearPreviousDelay ?? 3,
++      },
++      library: settings.preferences?.library ?? {
++        defaultSort: 'title',
++        defaultView: 'grid',
+       },
+     },
+   }),
+Index: resources/app/store/settings/defaults.ts
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import { AppSettings, EQPreset, QueueMode, QueueCompletionBehavior } from './settings-types';\n\n/**\n * Default application settings\n * Used when initializing the store or when settings are missing/corrupted\n */\nexport const DEFAULT_SETTINGS: AppSettings = {\n  version: 2,\n  audio: {\n    equalizer: {\n      enabled: true,\n      preset: 'FLAT',\n      bands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],\n      customBands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],\n    },\n    volume: {\n      level: 100,\n      muted: false,\n      normalization: {\n        enabled: false,\n        targetLufs: -16,\n      },\n    },\n    effects: {\n      compression: {\n        enabled: true,\n        threshold: -24,\n        ratio: 3,\n      },\n      spatialEnhancement: false,\n      masterGain: 0,\n    },\n  },\n  ui: {\n    theme: 'light',\n    display: {\n      visualizerMode: 'spectrum',\n      visualizerQuality: 'medium',\n    },\n  },\n  preferences: {\n    playback: {\n      crossfadeDuration: 0,\n      gaplessPlayback: true,\n      queueCompletion: QueueCompletionBehavior.STOP,\n    },\n    queue: {\n      mode: QueueMode.SIMPLE,\n      rememberPosition: true,\n      autoSwitch: true,\n      warnOnQueueReplace: true,\n    },\n    library: {\n      defaultSort: 'title',\n      defaultView: 'grid',\n    },\n  },\n};\n\n/**\n * EQ Presets\n * 10-band EQ values for different music genres\n * Frequencies: 31.5, 63, 125, 250, 500, 1k, 2k, 4k, 8k, 16k Hz\n */\nexport const EQ_PRESETS: Record<EQPreset, [number, number, number, number, number, number, number, number, number, number]> = {\n  FLAT: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],\n  ROCK: [4, 3, -1, -2, -1, 2, 4, 5, 5, 5],\n  POP: [2, 3, 4, 3, 0, -1, -2, -1, 2, 3],\n  JAZZ: [3, 2, 1, 2, 3, 3, 2, 1, 2, 3],\n  CLASSICAL: [4, 3, 2, 1, 0, 0, 2, 3, 4, 5],\n  ELECTRONIC: [5, 4, 2, 0, -1, 2, 3, 4, 5, 6],\n  'HIP-HOP': [5, 4, 2, 3, -1, -1, 2, 3, 4, 5],\n  VOCAL: [2, 1, -1, 2, 4, 4, 3, 2, 1, -1],\n  ACOUSTIC: [3, 2, 1, 2, 3, 2, 3, 4, 3, 2],\n  BASS_BOOST: [7, 5, 3, 2, 0, 0, 0, 0, 0, 0],\n  TREBLE_BOOST: [0, 0, 0, 0, 0, 2, 4, 6, 8, 9],\n  CUSTOM: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],\n};\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/resources/app/store/settings/defaults.ts b/resources/app/store/settings/defaults.ts
+--- a/resources/app/store/settings/defaults.ts	(revision 0e05be9f52b83fa864fd1c19f1e26e1f490e7fc8)
++++ b/resources/app/store/settings/defaults.ts	(date 1767548042601)
+@@ -5,7 +5,7 @@
+  * Used when initializing the store or when settings are missing/corrupted
+  */
+ export const DEFAULT_SETTINGS: AppSettings = {
+-  version: 2,
++  version: 3,
+   audio: {
+     equalizer: {
+       enabled: true,
+@@ -49,6 +49,7 @@
+       rememberPosition: true,
+       autoSwitch: true,
+       warnOnQueueReplace: true,
++      clearPreviousDelay: 3, // Default 3 seconds
+     },
+     library: {
+       defaultSort: 'title',
+Index: resources/app/store/settings/settings-types.ts
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>/**\n * Global application settings types\n * All app settings are persisted to localStorage and managed by Zustand\n */\n\n// EQ Preset types\nexport type EQPreset =\n  | 'FLAT'\n  | 'ROCK'\n  | 'POP'\n  | 'JAZZ'\n  | 'CLASSICAL'\n  | 'ELECTRONIC'\n  | 'HIP-HOP'\n  | 'VOCAL'\n  | 'ACOUSTIC'\n  | 'BASS_BOOST'\n  | 'TREBLE_BOOST'\n  | 'CUSTOM';\n\n// Audio Settings\nexport interface AudioSettings {\n  // Equalizer\n  equalizer: {\n    enabled: boolean;\n    preset: EQPreset;\n    bands: [number, number, number, number, number, number, number, number, number, number]; // 10 bands: 31.5Hz to 16kHz\n    customBands: [number, number, number, number, number, number, number, number, number, number];\n  };\n\n  // Volume & Normalization\n  volume: {\n    level: number; // 0-100\n    muted: boolean;\n    normalization: {\n      enabled: boolean;\n      targetLufs: -14 | -16 | -18 | -23;\n    };\n  };\n\n  // Audio Effects\n  effects: {\n    compression: {\n      enabled: boolean;\n      threshold: number;\n      ratio: number;\n    };\n    spatialEnhancement: boolean;\n    masterGain: number; // dB\n  };\n}\n\n// UI Settings\nexport interface UISettings {\n  theme: 'light' | 'dark';\n  display: {\n    visualizerMode: 'spectrum' | 'meters' | 'phase';\n    visualizerQuality: 'low' | 'medium' | 'high';\n  };\n}\n\n// User Preferences\nexport interface UserPreferences {\n  playback: {\n    crossfadeDuration: number; // seconds\n    gaplessPlayback: boolean;\n    queueCompletion: QueueCompletionBehavior; // Queue completion behavior\n  };\n  queue: {\n    mode: QueueMode; // Simple or advanced queue mode\n    rememberPosition: boolean; // For audiobooks/podcasts\n    autoSwitch: boolean; // Auto-switch queues based on library type\n    warnOnQueueReplace: boolean; // Warn when replacing non-empty queue\n  };\n  library: {\n    defaultSort: string;\n    defaultView: 'grid' | 'list';\n  };\n}\n\n/**\n * Queue completion behavior\n */\nexport enum QueueCompletionBehavior {\n  STOP = 'stop', // Stop playback when queue ends\n  SHUFFLE = 'shuffle', // Shuffle and replay queue\n  PLAY_RANDOM = 'play-random', // Play random item from library\n}\n\n/**\n * Queue management mode\n */\nexport enum QueueMode {\n  SIMPLE = 'simple', // Queues are isolated, no mixing\n  ADVANCED = 'advanced', // Allow mixing with warnings\n}\n\n// Complete Settings State\nexport interface AppSettings {\n  version: number; // Settings schema version for migrations\n  audio: AudioSettings;\n  ui: UISettings;\n  preferences: UserPreferences;\n}\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/resources/app/store/settings/settings-types.ts b/resources/app/store/settings/settings-types.ts
+--- a/resources/app/store/settings/settings-types.ts	(revision 0e05be9f52b83fa864fd1c19f1e26e1f490e7fc8)
++++ b/resources/app/store/settings/settings-types.ts	(date 1767547948225)
+@@ -71,6 +71,7 @@
+     rememberPosition: boolean; // For audiobooks/podcasts
+     autoSwitch: boolean; // Auto-switch queues based on library type
+     warnOnQueueReplace: boolean; // Warn when replacing non-empty queue
++    clearPreviousDelay: number; // Delay in seconds before clearing previous songs when clicking ahead in queue
+   };
+   library: {
+     defaultSort: string;
+Index: resources/app/modules/library-music-player/services/queue/queue-types.ts
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>/**\n * Queue type definitions and interfaces\n * Provides type-safe polymorphism for different media types in queues\n */\n\nimport { SongResource } from '@/app/libs/api-client/gen/models';\nimport { MediaType } from '@/app/models/media-type';\nimport { PlaybackSource } from '@/app/models/playback-source';\n\n// ============================================================================\n// BASE QUEUE ITEM\n// ============================================================================\n\n/**\n * Base interface for all queue items\n * All media-specific queue items extend this\n */\nexport interface BaseQueueItem {\n  publicId: string;\n  title: string;\n  duration: number; // seconds\n  librarySlug: string;\n  mediaType: MediaType;\n}\n\n// ============================================================================\n// MEDIA-SPECIFIC QUEUE ITEMS\n// ============================================================================\n\n/**\n * Music queue item\n */\nexport interface MusicQueueItem extends BaseQueueItem {\n  mediaType: MediaType.MUSIC;\n  album?: string;\n  artist?: string;\n  trackNumber?: number;\n}\n\n/**\n * Audiobook queue item\n */\nexport interface AudiobookQueueItem extends BaseQueueItem {\n  mediaType: MediaType.AUDIOBOOK;\n  bookTitle: string;\n  author: string;\n  chapterNumber?: number;\n  progress: number; // 0-1, persists position\n}\n\n/**\n * Podcast queue item\n */\nexport interface PodcastQueueItem extends BaseQueueItem {\n  mediaType: MediaType.PODCAST;\n  podcastTitle: string;\n  episodeNumber: number;\n  publicationDate: string;\n  progress: number; // 0-1, persists position\n}\n\n/**\n * Union type for all queue items\n * Use discriminated union with mediaType for type narrowing\n */\nexport type QueueItem = MusicQueueItem | AudiobookQueueItem | PodcastQueueItem;\n\n// ============================================================================\n// TYPE GUARDS\n// ============================================================================\n\n/**\n * Get media type from queue item\n */\nexport function getMediaType(item: QueueItem): MediaType {\n  return item.mediaType;\n}\n\n/**\n * Check if item is music\n */\nexport function isMusicItem(item: QueueItem): item is MusicQueueItem {\n  return item.mediaType === MediaType.MUSIC;\n}\n\n/**\n * Check if item is audiobook\n */\nexport function isAudiobookItem(item: QueueItem): item is AudiobookQueueItem {\n  return item.mediaType === MediaType.AUDIOBOOK;\n}\n\n/**\n * Check if item is podcast\n */\nexport function isPodcastItem(item: QueueItem): item is PodcastQueueItem {\n  return item.mediaType === MediaType.PODCAST;\n}\n\n// ============================================================================\n// QUEUE STATE\n// ============================================================================\n\n/**\n * Generic queue state - shared across all queue types\n */\nexport interface QueueState<T extends QueueItem = QueueItem> {\n  items: T[];\n  currentIndex: number;\n  currentItemPublicId: string | null;\n  source: PlaybackSource;\n  lastUpdated: number; // timestamp\n}\n\n// ============================================================================\n// MULTI-QUEUE STATE\n// ============================================================================\n\n/**\n * Complete multi-queue state\n * Holds all queues and tracks which is currently active\n */\nexport interface MultiQueueState {\n  activeQueueType: MediaType;\n  queues: {\n    [MediaType.MUSIC]: QueueState<MusicQueueItem>;\n    [MediaType.AUDIOBOOK]: QueueState<AudiobookQueueItem>;\n    [MediaType.PODCAST]: QueueState<PodcastQueueItem>;\n  };\n}\n\n// ============================================================================\n// QUEUE OPERATION RESULTS\n// ============================================================================\n\n/**\n * Result type for queue operations\n */\nexport type QueueOperationResult<T> =\n  | { success: true; data: T }\n  | { success: false; error: QueueError };\n\n/**\n * Queue error types\n */\nexport enum QueueError {\n  QUEUE_TYPE_MISMATCH = 'queue_type_mismatch',\n  QUEUE_EMPTY = 'queue_empty',\n  INVALID_INDEX = 'invalid_index',\n  MODE_VIOLATION = 'mode_violation',\n  STORAGE_ERROR = 'storage_error',\n}\n\n// ============================================================================\n// CONVERSION UTILITIES\n// ============================================================================\n\n/**\n * Convert SongResource to MusicQueueItem\n * This will be the primary conversion for music playback\n */\nexport function songResourceToMusicQueueItem(song: SongResource): MusicQueueItem {\n  return {\n    publicId: song.publicId,\n    title: song.title,\n    duration: song.length ?? 0,\n    librarySlug: song.librarySlug,\n    mediaType: MediaType.MUSIC,\n    album: song.album?.title,\n    artist: song.artists?.[0]?.name,\n    trackNumber: song.track ?? 0,\n  };\n}\n\n/**\n * Check if queue item can be converted from SongResource\n * For now, all SongResources become MusicQueueItems\n */\nexport function canConvertSongResource(): boolean {\n  return true;\n}\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/resources/app/modules/library-music-player/services/queue/queue-types.ts b/resources/app/modules/library-music-player/services/queue/queue-types.ts
+--- a/resources/app/modules/library-music-player/services/queue/queue-types.ts	(revision 0e05be9f52b83fa864fd1c19f1e26e1f490e7fc8)
++++ b/resources/app/modules/library-music-player/services/queue/queue-types.ts	(date 1767548291521)
+@@ -7,6 +7,32 @@
+ import { MediaType } from '@/app/models/media-type';
+ import { PlaybackSource } from '@/app/models/playback-source';
+ 
++// ============================================================================
++// QUEUE CONTEXT
++// ============================================================================
++
++/**
++ * Queue context types - describes where the queue originated from
++ */
++export enum QueueContextType {
++  ALBUM = 'album',
++  PLAYLIST = 'playlist',
++  SONGS = 'songs', // Generic songs view (library, search results, etc.)
++  MANUAL = 'manual', // User manually built this queue
++}
++
++/**
++ * Queue context information
++ * Tracks the source of the queue to enable smart replacement behavior
++ */
++export interface QueueContext {
++  type: QueueContextType;
++  id?: string; // Album/playlist publicId, undefined for generic views
++  librarySlug?: string; // Library context
++  name?: string; // Human-readable name for display
++  hasManualItems: boolean; // True if user manually added items via "Add to Queue" or "Play Next"
++}
++
+ // ============================================================================
+ // BASE QUEUE ITEM
+ // ============================================================================
+@@ -109,6 +135,7 @@
+   currentIndex: number;
+   currentItemPublicId: string | null;
+   source: PlaybackSource;
++  context?: QueueContext; // Track where this queue came from
+   lastUpdated: number; // timestamp
+ }
+ 
+Index: resources/app/modules/library-music-player/store/utilities.ts
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import { useEffect, useRef, useState } from 'react';\nimport { createLogger } from '../../../services/logger';\nimport { globalAudioProcessor } from '../../../services/global-audio-processor-service';\nimport { useMusicPlayerStore } from './music-player-store';\n\nconst logger = createLogger('MusicPlayerUtilities');\n\n// Configuration for time update throttling\nexport const TIME_UPDATE_THROTTLE_MS = 250; // Update at most 4 times per second\n\n// Types for consumers\nexport type Song = { publicId: string; title?: string; } | null;\n\nexport type ProcessorApi = {\n  connect?: (el: HTMLAudioElement) => Promise<void> | void;\n  setPlayingState?: (playing: boolean) => void;\n  resumeContextIfNeeded?: () => Promise<void> | void;\n} | null;\n\nexport type PlayerEventHandlers = {\n  onLoadStart?: () => void;\n  onCanPlay?: () => void;\n  onCanPlayThrough?: (loadDurationMs: number) => void;\n  onPlay?: () => void;\n  onPause?: () => void;\n  onEnded?: () => void;\n  onError?: (error: MediaError | null) => void;\n  onBuffer?: (percentage: number) => void;\n};\n\n/**\n * Attach an HTMLAudioElement to the store and wire events.\n * Optional handlers let the app record metrics/telemetry without coupling the store.\n * Returns a cleanup function to detach listeners.\n */\nexport function attachAudioElement(el: HTMLAudioElement, handlers?: PlayerEventHandlers) {\n  const st = useMusicPlayerStore.getState();\n  st.setAudioEl(el);\n\n  // Initialize element from store\n  el.muted = st.isMuted;\n  el.volume = st.isMuted ? 0 : st.volumePercent / 100;\n\n  // If a source is already set in state, apply it\n  if (st.src) {\n    el.src = st.src;\n    el.preload = 'auto';\n  }\n\n  // Attempt to connect processor if available and element has a source\n  if (st.processor && !st.processorConnected && el.src) {\n    logger.debug('Connecting audio element to processor...');\n    Promise.resolve(st.processor.connect?.(el))\n      .then(() => {\n        logger.debug('Processor connected successfully');\n        useMusicPlayerStore.setState({ processorConnected: true });\n      })\n      .catch((err) => {\n        logger.error('Failed to connect processor:', err);\n        useMusicPlayerStore.setState({ processorConnected: false });\n      });\n  } else {\n    logger.debug('Skipping processor connection:', { hasProcessor: !!st.processor, isConnected: st.processorConnected, hasSource: !!el.src });\n  }\n\n  // Throttle currentTime updates\n  let rafId: number | null = null;\n  let pendingTime: number | null = null;\n\n  const onTimeUpdate = () => {\n    pendingTime = el.currentTime;\n\n    if (rafId == null) {\n      rafId = requestAnimationFrame(() => {\n        rafId = null;\n        if (pendingTime != null) {\n          const state = useMusicPlayerStore.getState();\n          const timeSinceLastUpdate = performance.now() - state.lastTimeUpdateMs;\n\n          if (timeSinceLastUpdate >= TIME_UPDATE_THROTTLE_MS ||\n            pendingTime < 0.1 ||\n            pendingTime >= (state.duration - 0.1) ||\n            Math.abs(pendingTime - state.currentTime) > 0.5) {\n\n            state.setCurrentTime(pendingTime);\n          }\n          pendingTime = null;\n        }\n      });\n    }\n  };\n\n  let loadStart = 0;\n  const onLoadStart = () => {\n    loadStart = performance.now();\n    handlers?.onLoadStart?.();\n  };\n  const onDurationChange = () => {\n    useMusicPlayerStore.getState().setDuration(Number.isFinite(el.duration) ? el.duration : 0);\n  };\n  const onCanPlay = () => {\n    useMusicPlayerStore.getState().setIsReady(true);\n    handlers?.onCanPlay?.();\n  };\n  const onCanPlayThrough = () => {\n    const dur = performance.now() - loadStart;\n    handlers?.onCanPlayThrough?.(dur);\n  };\n  const onProgress = () => {\n    try {\n      const dur = el.duration;\n      if (!Number.isFinite(dur) || dur <= 0 || el.buffered.length === 0) return;\n      for (let i = el.buffered.length - 1; i >= 0; i--) {\n        if (el.buffered.start(i) <= el.currentTime) {\n          const end = el.buffered.end(i);\n          useMusicPlayerStore.getState().setBuffered(end);\n          const pct = Math.max(0, Math.min(100, (end / dur) * 100));\n          handlers?.onBuffer?.(pct);\n          break;\n        }\n      }\n    } catch {\n      // ignore\n    }\n  };\n\n  const onPlay = () => {\n    useMusicPlayerStore.getState().setIsPlaying(true);\n    handlers?.onPlay?.();\n  };\n  const onPause = () => {\n    useMusicPlayerStore.getState().setIsPlaying(false);\n    handlers?.onPause?.();\n  };\n  const onEnded = () => {\n    useMusicPlayerStore.getState().setIsPlaying(false);\n    handlers?.onEnded?.();\n  };\n  const onError = () => handlers?.onError?.(el.error || null);\n\n  const onSeeking = () => {\n    useMusicPlayerStore.getState().setCurrentTime(el.currentTime);\n  };\n\n  el.addEventListener('loadstart', onLoadStart);\n  el.addEventListener('timeupdate', onTimeUpdate);\n  el.addEventListener('durationchange', onDurationChange);\n  el.addEventListener('canplay', onCanPlay);\n  el.addEventListener('canplaythrough', onCanPlayThrough);\n  el.addEventListener('progress', onProgress);\n  el.addEventListener('play', onPlay);\n  el.addEventListener('pause', onPause);\n  el.addEventListener('ended', onEnded);\n  el.addEventListener('error', onError);\n  el.addEventListener('seeking', onSeeking);\n\n  return () => {\n    if (rafId != null) cancelAnimationFrame(rafId);\n    el.removeEventListener('loadstart', onLoadStart);\n    el.removeEventListener('timeupdate', onTimeUpdate);\n    el.removeEventListener('durationchange', onDurationChange);\n    el.removeEventListener('canplay', onCanPlay);\n    el.removeEventListener('canplaythrough', onCanPlayThrough);\n    el.removeEventListener('progress', onProgress);\n    el.removeEventListener('play', onPlay);\n    el.removeEventListener('pause', onPause);\n    el.removeEventListener('ended', onEnded);\n    el.removeEventListener('error', onError);\n    el.removeEventListener('seeking', onSeeking);\n    useMusicPlayerStore.getState().setAudioEl(null);\n  };\n}\n\n/**\n * Convenience: autoplay if user has interacted and a source exists.\n */\nexport async function autoplayIfAllowed() {\n  const st = useMusicPlayerStore.getState();\n  if (!st.audioEl || !st.src) return;\n  if (!st.hasUserInteracted) return;\n  await st.play();\n}\n\n/**\n * Initialize and connect the global audio processor to the music player store\n */\nexport async function initializeGlobalAudioProcessor() {\n  logger.debug('initializeGlobalAudioProcessor: Starting...');\n  const store = useMusicPlayerStore.getState();\n\n  // Initialize the global processor\n  logger.debug('initializeGlobalAudioProcessor: Calling globalAudioProcessor.initialize()...');\n  globalAudioProcessor.initialize();\n\n  // Create the processor API that matches the expected interface\n  const processorApi: ProcessorApi = {\n    connect: async (el: HTMLAudioElement) => {\n      await globalAudioProcessor.connectAudioElement(el);\n    },\n    setPlayingState: (playing: boolean) => {\n      globalAudioProcessor.setPlayingState(playing);\n    },\n    resumeContextIfNeeded: async () => {\n      await globalAudioProcessor.resumeContextIfNeeded();\n    }\n  };\n\n  // Connect the processor API to the store\n  logger.debug('initializeGlobalAudioProcessor: Connecting processor to store...');\n  await store.connectAudioProcessor(processorApi);\n\n  logger.debug('initializeGlobalAudioProcessor: Completed!');\n  return processorApi;\n}\n\n/**\n * Reset the global audio processor connection\n */\nexport function resetGlobalAudioProcessor() {\n  globalAudioProcessor.reset();\n  const store = useMusicPlayerStore.getState();\n  store.connectAudioProcessor(null);\n}\n\n// Selector hooks\nexport const usePlayerDuration = () => useMusicPlayerStore(s => s.duration);\n\nexport function usePlayerCurrentTime() {\n  const currentTime = useMusicPlayerStore(s => s.currentTime);\n  const isPlaying = useMusicPlayerStore(s => s.isPlaying);\n\n  const [throttledTime, setThrottledTime] = useState(currentTime);\n  const lastUpdateRef = useRef(performance.now());\n  const currentTimeRef = useRef(currentTime);\n\n  currentTimeRef.current = currentTime;\n\n  useEffect(() => {\n    if (!isPlaying) {\n      setThrottledTime(currentTime);\n      return;\n    }\n\n    const updateInterval = setInterval(() => {\n      const now = performance.now();\n      if (now - lastUpdateRef.current >= TIME_UPDATE_THROTTLE_MS) {\n        setThrottledTime(currentTimeRef.current);\n        lastUpdateRef.current = now;\n      }\n    }, TIME_UPDATE_THROTTLE_MS);\n\n    return () => clearInterval(updateInterval);\n  }, [isPlaying, currentTime]);\n\n  useEffect(() => {\n    const diff = Math.abs(throttledTime - currentTime);\n    if (diff > 0.5) {\n      setThrottledTime(currentTime);\n      lastUpdateRef.current = performance.now();\n    }\n  }, [currentTime, throttledTime]);\n\n  return throttledTime;\n}\n\nexport const usePlayerBuffered = () => useMusicPlayerStore(s => s.buffered);\nexport const usePlayerIsPlaying = () => useMusicPlayerStore(s => s.isPlaying);\nexport const usePlayerIsReady = () => useMusicPlayerStore(s => s.isReady);\nexport const usePlayerVolumePercent = () => useMusicPlayerStore(s => s.volumePercent);\nexport const usePlayerIsMuted = () => useMusicPlayerStore(s => s.isMuted);\nexport const usePlayerSong = () => useMusicPlayerStore(s => s.song);\nexport const usePlayerAudioElement = () => useMusicPlayerStore(s => s.audioEl);\nexport const usePlayerHasUserInteracted = () => useMusicPlayerStore(s => s.hasUserInteracted);\n\n// Queue selectors\nexport const usePlayerQueue = () => useMusicPlayerStore(s => s.queues[s.activeQueueType].items);\nexport const usePlayerCurrentSongIndex = () => useMusicPlayerStore(s => s.queues[s.activeQueueType].currentIndex);\nexport const usePlayerCurrentSongPublicId = () => useMusicPlayerStore(s => s.queues[s.activeQueueType].currentItemPublicId);\n\nexport const usePlayerCurrentSong = () =>\n  useMusicPlayerStore(s => {\n    const activeQueue = s.queues[s.activeQueueType];\n    if (activeQueue.items.length === 0 || activeQueue.currentIndex < 0) return null;\n    return activeQueue.items[activeQueue.currentIndex] || null;\n  });\n\n// Playback mode selectors\nexport const usePlayerShuffleEnabled = () => useMusicPlayerStore(s => s.playbackMode.isShuffleEnabled);\nexport const usePlayerRepeatEnabled = () => useMusicPlayerStore(s => s.playbackMode.isRepeatEnabled);\n\n// Progress & source selectors\nexport const usePlayerProgress = () => useMusicPlayerStore(s => s.progress);\nexport const usePlayerSource = () => useMusicPlayerStore(s => s.streamUrl);\n\n// Lyrics selector\nexport const usePlayerLyricsOffset = () => useMusicPlayerStore(s => s.lyricsOffset);\n\n// Analysis data selectors\nexport const usePlayerAnalysis = () => useMusicPlayerStore(s => s.analysis);\nexport const usePlayerLufs = () => useMusicPlayerStore(s => s.analysis.lufs);\n\n// Action accessors\nexport function usePlayerActions() {\n  return {\n    seekTo: useMusicPlayerStore(s => s.seekTo),\n    play: useMusicPlayerStore(s => s.play),\n    pause: useMusicPlayerStore(s => s.pause),\n    togglePlayPause: useMusicPlayerStore(s => s.togglePlayPause),\n    setVolumePercent: useMusicPlayerStore(s => s.setVolumePercent),\n    setMuted: useMusicPlayerStore(s => s.setMuted),\n    toggleMute: useMusicPlayerStore(s => s.toggleMute),\n    setSong: useMusicPlayerStore(s => s.setSong),\n    setSource: useMusicPlayerStore(s => s.setSource),\n    setHasUserInteracted: useMusicPlayerStore(s => s.setHasUserInteracted),\n    connectAudioProcessor: useMusicPlayerStore(s => s.connectAudioProcessor),\n    resumeProcessorContext: useMusicPlayerStore(s => s.resumeProcessorContext),\n\n    // Queue management\n    setQueue: useMusicPlayerStore(s => s.setQueue),\n    addToQueue: useMusicPlayerStore(s => s.addToQueue),\n    insertInQueue: useMusicPlayerStore(s => s.insertInQueue),\n    addManyToQueue: useMusicPlayerStore(s => s.addManyToQueue),\n    removeFromQueue: useMusicPlayerStore(s => s.removeFromQueue),\n    playSongAtIndex: useMusicPlayerStore(s => s.playSongAtIndex),\n    playNext: useMusicPlayerStore(s => s.playNext),\n    playPrevious: useMusicPlayerStore(s => s.playPrevious),\n    setQueueAndPlay: useMusicPlayerStore(s => s.setQueueAndPlay),\n    shuffleAndPlay: useMusicPlayerStore(s => s.shuffleAndPlay),\n\n    // Playback mode\n    setShuffleEnabled: useMusicPlayerStore(s => s.setShuffleEnabled),\n    setRepeatEnabled: useMusicPlayerStore(s => s.setRepeatEnabled),\n\n    // Progress & source\n    setProgress: useMusicPlayerStore(s => s.setProgress),\n    setPlaybackSource: useMusicPlayerStore(s => s.setPlaybackSource),\n\n    // Lyrics\n    setLyricsOffset: useMusicPlayerStore(s => s.setLyricsOffset),\n\n    // Analysis\n    setLeftChannel: useMusicPlayerStore(s => s.setLeftChannel),\n    setRightChannel: useMusicPlayerStore(s => s.setRightChannel),\n    setFrequencies: useMusicPlayerStore(s => s.setFrequencies),\n    setLufs: useMusicPlayerStore(s => s.setLufs),\n    setBufferSize: useMusicPlayerStore(s => s.setBufferSize),\n\n    // Global processor functions\n    initializeGlobalAudioProcessor,\n    resetGlobalAudioProcessor,\n  };\n}\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/resources/app/modules/library-music-player/store/utilities.ts b/resources/app/modules/library-music-player/store/utilities.ts
+--- a/resources/app/modules/library-music-player/store/utilities.ts	(revision 0e05be9f52b83fa864fd1c19f1e26e1f490e7fc8)
++++ b/resources/app/modules/library-music-player/store/utilities.ts	(date 1767548761977)
+@@ -315,7 +315,7 @@
+     connectAudioProcessor: useMusicPlayerStore(s => s.connectAudioProcessor),
+     resumeProcessorContext: useMusicPlayerStore(s => s.resumeProcessorContext),
+ 
+-    // Queue management
++    // Queue management - these work with QueueItem[] (internal type)
+     setQueue: useMusicPlayerStore(s => s.setQueue),
+     addToQueue: useMusicPlayerStore(s => s.addToQueue),
+     insertInQueue: useMusicPlayerStore(s => s.insertInQueue),
+Index: resources/app/modules/library-music-playlists/components/playlist-detail/playlist-detail.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import { SongTable } from '@/app/components/song-table/song-table';\nimport { useAppDispatch } from '@/app/store/hooks';\nimport { createNotification } from '@/app/store/notifications/notifications-slice';\nimport { usePlayerActions } from '@/app/modules/library-music-player/store';\nimport { Iconify } from '@/app/ui/icons/iconify';\nimport { motion } from 'motion/react';\nimport { Badge, Box, Button, Dialog, Flex, Text } from '@radix-ui/themes';\nimport { useCallback, useState } from 'react';\nimport { SongResource } from '@/app/libs/api-client/gen/models';\nimport { PlaylistEditor } from '@/app/modules/library-music-playlists/components/playlist-editor/playlist-editor';\nimport { EditSmartPlaylistRules } from '@/app/modules/library-music-playlists/components/edit-smart-playlist-rules/edit-smart-playlist-rules';\nimport styles from './playlist-detail.module.scss';\nimport {\n  usePlaylistDestroy,\n  usePlaylistRemoveSong,\n  usePlaylistReorder,\n  usePlaylistShow,\n  usePlaylistSmartSync,\n} from '@/app/libs/api-client/gen/endpoints/playlist/playlist';\n\ninterface PlaylistDetailProps {\n  playlistId: string;\n  librarySlug: string;\n}\n\nexport function PlaylistDetail({ playlistId, librarySlug: _librarySlug }: PlaylistDetailProps) {\n  const dispatch = useAppDispatch();\n  const { setQueueAndPlay } = usePlayerActions();\n  const { data: playlist, isLoading, refetch } = usePlaylistShow(playlistId, {\n    relations: 'songs,songs.artists,songs.album,songs.genres,songs.cover,cover,statistics',\n  });\n  const removeMutation = usePlaylistRemoveSong();\n  const reorderMutation = usePlaylistReorder();\n  const syncMutation = usePlaylistSmartSync();\n  const destroyMutation = usePlaylistDestroy();\n\n  const [editDialogOpen, setEditDialogOpen] = useState(false);\n  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);\n  const [editRulesDialogOpen, setEditRulesDialogOpen] = useState(false);\n\n  const isSmart = playlist?.isSmart === \"1\";\n  const isOwner = true;\n  const songs = playlist?.songs ?? [];\n\n  const handlePlayAll = useCallback(() => {\n    if (songs.length === 0) return;\n    setQueueAndPlay(songs, songs[0].publicId);\n  }, [songs, setQueueAndPlay]);\n\n  const handleShuffle = useCallback(() => {\n    if (songs.length === 0) return;\n    const shuffled = [...songs].sort(() => Math.random() - 0.5);\n    setQueueAndPlay(shuffled, shuffled[0].publicId);\n  }, [songs, setQueueAndPlay]);\n\n  const handleRemoveSong = useCallback((song: SongResource) => {\n    if (!playlist) return;\n\n    removeMutation.mutate(\n      {\n        playlist: playlist.publicId,\n        song: song.publicId,\n      },\n      {\n        onSuccess: () => {\n          dispatch(\n            createNotification({\n              title: 'Success',\n              message: 'Song removed from playlist',\n              type: 'success',\n              toast: true,\n            })\n          );\n          refetch();\n        },\n        onError: (error: any) => {\n          dispatch(\n            createNotification({\n              title: 'Error',\n              message: error.response?.data?.message || 'Failed to remove song',\n              type: 'error',\n              toast: true,\n            })\n          );\n        },\n      }\n    );\n  }, [playlist, removeMutation, dispatch, refetch]);\n\n  const handleReorder = useCallback((oldIndex: number, newIndex: number) => {\n    if (!playlist) return;\n\n    // API expects number[] but we only have publicId (string)\n    // Type assertion used as the API might accept strings or this needs backend fix\n    const songIds = songs.map(s => s.publicId);\n    const reorderedIds = [...songIds];\n    const [moved] = reorderedIds.splice(oldIndex, 1);\n    reorderedIds.splice(newIndex, 0, moved);\n\n    reorderMutation.mutate(\n      {\n        playlist: playlist.publicId,\n        data: { song_ids: reorderedIds as any },\n      },\n      {\n        onSuccess: () => {\n          refetch();\n        },\n        onError: (error: any) => {\n          dispatch(\n            createNotification({\n              title: 'Error',\n              message: error.response?.data?.message || 'Failed to reorder playlist',\n              type: 'error',\n              toast: true,\n            })\n          );\n          refetch(); // Refetch to restore order\n        },\n      }\n    );\n  }, [playlist, reorderMutation, dispatch, refetch]);\n\n  const handleSyncSmart = useCallback(() => {\n    if (!playlist) return;\n\n    syncMutation.mutate(\n      { playlist: playlist.publicId },\n      {\n        onSuccess: () => {\n          dispatch(\n            createNotification({\n              title: 'Success',\n              message: 'Smart playlist synced',\n              type: 'success',\n              toast: true,\n            })\n          );\n          refetch();\n        },\n        onError: (error: any) => {\n          dispatch(\n            createNotification({\n              title: 'Error',\n              message: error.response?.data?.message || 'Failed to sync playlist',\n              type: 'error',\n              toast: true,\n            })\n          );\n        },\n      }\n    );\n  }, [playlist, syncMutation, dispatch, refetch]);\n\n  const handleDelete = useCallback(() => {\n    if (!playlist) return;\n\n    destroyMutation.mutate(\n      { playlist: playlist.publicId },\n      {\n        onSuccess: () => {\n          dispatch(\n            createNotification({\n              title: 'Success',\n              message: 'Playlist deleted successfully',\n              type: 'success',\n              toast: true,\n            })\n          );\n          setDeleteDialogOpen(false);\n          // TODO: Navigate back to playlists list\n          window.history.back();\n        },\n        onError: (error: any) => {\n          dispatch(\n            createNotification({\n              title: 'Error',\n              message: error.response?.data?.message || 'Failed to delete playlist',\n              type: 'error',\n              toast: true,\n            })\n          );\n        },\n      }\n    );\n  }, [playlist, destroyMutation, dispatch]);\n\n  if (isLoading) {\n    return (\n      <Box className={styles.detailPanel}>\n        <Text>Loading...</Text>\n      </Box>\n    );\n  }\n\n  if (!playlist) {\n    return (\n      <Box className={styles.detailPanel}>\n        <Text>Playlist not found</Text>\n      </Box>\n    );\n  }\n\n  return (\n    <motion.div\n      className={styles.detailPanel}\n      layout\n      initial={{ opacity: 0, scale: 0.3 }}\n      animate={{ opacity: 1, scale: 1 }}\n      transition={{\n        duration: 0.3,\n        ease: [0, 0.71, 0.2, 1.01],\n      }}\n    >\n      {/* Header */}\n      <Box className={styles.header}>\n        <Flex direction=\"column\" gap=\"4\">\n          <Flex align=\"center\" gap=\"2\">\n            <Text size=\"8\" weight=\"bold\">\n              {playlist.name}\n            </Text>\n            {isSmart && (\n              <Badge color=\"blue\">\n                <Iconify icon=\"carbon:rule\" width={14} height={14} />\n                Smart\n              </Badge>\n            )}\n            {playlist.isPublic === \"1\" && (\n              <Badge color=\"green\">Public</Badge>\n            )}\n            {playlist.isCollaborative === \"1\" && (\n              <Badge color=\"gray\">\n                <Iconify icon=\"ph:users\" width={14} height={14} />\n                Collaborative\n              </Badge>\n            )}\n            {isOwner && (\n              <Flex gap=\"2\" ml=\"auto\">\n                <Button size=\"1\" variant=\"soft\" onClick={() => setEditDialogOpen(true)}>\n                  <Iconify icon=\"ph:pencil-simple\" width={14} height={14} />\n                  Edit\n                </Button>\n                <Button size=\"1\" color=\"red\" variant=\"soft\" onClick={() => setDeleteDialogOpen(true)}>\n                  <Iconify icon=\"ph:trash\" width={14} height={14} />\n                  Delete\n                </Button>\n              </Flex>\n            )}\n          </Flex>\n\n          {playlist.description && (\n            <Text color=\"gray\" size=\"2\">\n              {playlist.description}\n            </Text>\n          )}\n\n          <Flex align=\"center\" gap=\"4\">\n            <Text size=\"1\" color=\"gray\">\n              {songs.length} songs\n            </Text>\n            <Text size=\"1\" color=\"gray\">\n              • Created by {playlist.owner?.name || 'Unknown'}\n            </Text>\n          </Flex>\n\n          {playlist.statistics && (\n            <Flex align=\"center\" gap=\"4\" mt=\"2\">\n              <Flex align=\"center\" gap=\"1\">\n                <Iconify icon=\"ph:eye\" width={14} height={14} />\n                <Text size=\"1\" color=\"gray\">\n                  {playlist.statistics.views}\n                </Text>\n              </Flex>\n              <Flex align=\"center\" gap=\"1\">\n                <Iconify icon=\"ph:play-circle\" width={14} height={14} />\n                <Text size=\"1\" color=\"gray\">\n                  {playlist.statistics.plays}\n                </Text>\n              </Flex>\n              <Flex align=\"center\" gap=\"1\">\n                <Iconify icon=\"ph:share-network\" width={14} height={14} />\n                <Text size=\"1\" color=\"gray\">\n                  {playlist.statistics.shares}\n                </Text>\n              </Flex>\n              <Flex align=\"center\" gap=\"1\">\n                <Iconify icon=\"ph:heart\" width={14} height={14} />\n                <Text size=\"1\" color=\"gray\">\n                  {playlist.statistics.favorites}\n                </Text>\n              </Flex>\n            </Flex>\n          )}\n        </Flex>\n      </Box>\n\n      {/* Action Buttons */}\n      <Flex gap=\"2\" className={styles.actions}>\n        <Button size=\"1\" onClick={handlePlayAll}>\n          <Iconify icon=\"ph:play-circle\" width={16} height={16} />\n          Play All\n        </Button>\n        <Button size=\"1\" variant=\"soft\" onClick={handleShuffle}>\n          <Iconify icon=\"ph:shuffle\" width={16} height={16} />\n          Shuffle\n        </Button>\n        {isSmart && (\n          <>\n            <Button size=\"1\" variant=\"soft\" onClick={handleSyncSmart} disabled={syncMutation.isPending}>\n              <Iconify icon=\"ph:arrows-clockwise\" width={16} height={16} />\n              {syncMutation.isPending ? 'Syncing...' : 'Sync Now'}\n            </Button>\n            {isOwner && (\n              <Button size=\"1\" variant=\"soft\" onClick={() => setEditRulesDialogOpen(true)}>\n                <Iconify icon=\"ph:sliders-horizontal\" width={16} height={16} />\n                Edit Rules\n              </Button>\n            )}\n          </>\n        )}\n      </Flex>\n\n      {/* Songs Table */}\n      <SongTable\n        songs={songs}\n        reorderable={!isSmart}\n        onReorder={handleReorder}\n        contextMenuActions={{\n          onRemoveFromPlaylist: handleRemoveSong,\n        }}\n        className={styles.songTable}\n      />\n\n      {/* Edit Dialog */}\n      <Dialog.Root open={editDialogOpen} onOpenChange={setEditDialogOpen}>\n        <Dialog.Content style={{ maxWidth: 500 }}>\n          <Dialog.Title>Edit Playlist</Dialog.Title>\n          <PlaylistEditor\n            playlist={playlist}\n            onSuccess={() => {\n              refetch();\n              setEditDialogOpen(false);\n            }}\n          />\n        </Dialog.Content>\n      </Dialog.Root>\n\n      {/* Edit Rules Dialog */}\n      {isSmart && (\n        <Dialog.Root open={editRulesDialogOpen} onOpenChange={setEditRulesDialogOpen}>\n          <Dialog.Content style={{ maxWidth: 700 }}>\n            <Dialog.Title>Edit Smart Playlist Rules</Dialog.Title>\n            <Dialog.Description size=\"2\" color=\"gray\" mb=\"4\">\n              Configure rules to automatically populate \"{playlist.name}\"\n            </Dialog.Description>\n            <EditSmartPlaylistRules\n              playlist={playlist}\n              onSuccess={() => {\n                refetch();\n                setEditRulesDialogOpen(false);\n              }}\n              onCancel={() => setEditRulesDialogOpen(false)}\n            />\n          </Dialog.Content>\n        </Dialog.Root>\n      )}\n\n      {/* Delete Confirmation Dialog */}\n      <Dialog.Root open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>\n        <Dialog.Content style={{ maxWidth: 400 }}>\n          <Dialog.Title>Delete Playlist</Dialog.Title>\n          <Dialog.Description size=\"2\" mb=\"4\">\n            Are you sure you want to delete \"{playlist.name}\"? This action cannot be undone.\n          </Dialog.Description>\n          <Flex gap=\"3\" mt=\"4\">\n            <Button variant=\"soft\" onClick={() => setDeleteDialogOpen(false)}>\n              Cancel\n            </Button>\n            <Button\n              color=\"red\"\n              onClick={handleDelete}\n              disabled={destroyMutation.isPending}\n            >\n              {destroyMutation.isPending ? 'Deleting...' : 'Delete Playlist'}\n            </Button>\n          </Flex>\n        </Dialog.Content>\n      </Dialog.Root>\n    </motion.div>\n  );\n}\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/resources/app/modules/library-music-playlists/components/playlist-detail/playlist-detail.tsx b/resources/app/modules/library-music-playlists/components/playlist-detail/playlist-detail.tsx
+--- a/resources/app/modules/library-music-playlists/components/playlist-detail/playlist-detail.tsx	(revision 0e05be9f52b83fa864fd1c19f1e26e1f490e7fc8)
++++ b/resources/app/modules/library-music-playlists/components/playlist-detail/playlist-detail.tsx	(date 1767549020332)
+@@ -1,7 +1,8 @@
+ import { SongTable } from '@/app/components/song-table/song-table';
+ import { useAppDispatch } from '@/app/store/hooks';
+ import { createNotification } from '@/app/store/notifications/notifications-slice';
+-import { usePlayerActions } from '@/app/modules/library-music-player/store';
++import { useQueueManager } from '@/app/modules/library-music-player/hooks/use-queue-manager';
++import { QueueContext, QueueContextType } from '@/app/modules/library-music-player/services/queue';
+ import { Iconify } from '@/app/ui/icons/iconify';
+ import { motion } from 'motion/react';
+ import { Badge, Box, Button, Dialog, Flex, Text } from '@radix-ui/themes';
+@@ -25,7 +26,7 @@
+ 
+ export function PlaylistDetail({ playlistId, librarySlug: _librarySlug }: PlaylistDetailProps) {
+   const dispatch = useAppDispatch();
+-  const { setQueueAndPlay } = usePlayerActions();
++  const { setQueueAndPlaySongs } = useQueueManager();
+   const { data: playlist, isLoading, refetch } = usePlaylistShow(playlistId, {
+     relations: 'songs,songs.artists,songs.album,songs.genres,songs.cover,cover,statistics',
+   });
+@@ -44,14 +45,32 @@
+ 
+   const handlePlayAll = useCallback(() => {
+     if (songs.length === 0) return;
+-    setQueueAndPlay(songs, songs[0].publicId);
+-  }, [songs, setQueueAndPlay]);
++
++    const context: QueueContext = {
++      type: QueueContextType.PLAYLIST,
++      id: playlistId,
++      librarySlug: _librarySlug,
++      name: playlist?.name,
++      hasManualItems: false,
++    };
++
++    setQueueAndPlaySongs(songs, songs[0].publicId, context);
++  }, [songs, setQueueAndPlaySongs, playlistId, _librarySlug, playlist?.name]);
+ 
+   const handleShuffle = useCallback(() => {
+     if (songs.length === 0) return;
+     const shuffled = [...songs].sort(() => Math.random() - 0.5);
+-    setQueueAndPlay(shuffled, shuffled[0].publicId);
+-  }, [songs, setQueueAndPlay]);
++
++    const context: QueueContext = {
++      type: QueueContextType.PLAYLIST,
++      id: playlistId,
++      librarySlug: _librarySlug,
++      name: playlist?.name,
++      hasManualItems: false,
++    };
++
++    setQueueAndPlaySongs(shuffled, shuffled[0].publicId, context);
++  }, [songs, setQueueAndPlaySongs, playlistId, _librarySlug, playlist?.name]);
+ 
+   const handleRemoveSong = useCallback((song: SongResource) => {
+     if (!playlist) return;
+@@ -325,6 +344,13 @@
+         songs={songs}
+         reorderable={!isSmart}
+         onReorder={handleReorder}
++        queueContext={{
++          type: QueueContextType.PLAYLIST,
++          id: playlistId,
++          librarySlug: _librarySlug,
++          name: playlist?.name,
++          hasManualItems: false,
++        }}
+         contextMenuActions={{
+           onRemoveFromPlaylist: handleRemoveSong,
+         }}
+Index: resources/app/modules/library-music-player/hooks/use-queue-manager.ts
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>/**\n * useQueueManager Hook\n * Provides easy access to QueueManagerService for React components\n */\n\nimport { useCallback } from 'react';\nimport { queueManagerService, songResourceToMusicQueueItem } from '../services/queue';\nimport { MediaType, QueueItem, QueueState, QueueOperationResult } from '../services/queue';\nimport { SongResource } from '@/app/libs/api-client/gen/models';\n\nexport function useQueueManager() {\n  // ==========================================================================\n  // QUEUE SWITCHING\n  // ==========================================================================\n\n  const switchQueue = useCallback((type: MediaType) => {\n    return queueManagerService.switchQueue(type);\n  }, []);\n\n  // ==========================================================================\n  // QUEUE MANIPULATION\n  // ==========================================================================\n\n  const setQueue = useCallback((items: QueueItem[], startIndex?: number) => {\n    return queueManagerService.setQueue(items, startIndex);\n  }, []);\n\n  const setQueueAndPlay = useCallback((items: QueueItem[], publicId: string) => {\n    return queueManagerService.setQueueAndPlay(items, publicId);\n  }, []);\n\n  const addToQueue = useCallback((item: QueueItem) => {\n    return queueManagerService.addToQueue(item);\n  }, []);\n\n  const insertInQueue = useCallback((item: QueueItem) => {\n    return queueManagerService.insertInQueue(item);\n  }, []);\n\n  const removeFromQueue = useCallback((index: number) => {\n    return queueManagerService.removeFromQueue(index);\n  }, []);\n\n  const clearQueue = useCallback(() => {\n    return queueManagerService.clearQueue();\n  }, []);\n\n  // ==========================================================================\n  // CONVENIENCE FUNCTIONS FOR SONG RESOURCES\n  // ==========================================================================\n\n  const setQueueFromSongs = useCallback((songs: SongResource[], startIndex?: number) => {\n    const items = songs.map(song => songResourceToMusicQueueItem(song));\n    return setQueue(items, startIndex);\n  }, [setQueue]);\n\n  const setQueueAndPlayFromSongs = useCallback((songs: SongResource[], publicId: string) => {\n    const items = songs.map(song => songResourceToMusicQueueItem(song));\n    return setQueueAndPlay(items, publicId);\n  }, [setQueueAndPlay]);\n\n  // ==========================================================================\n  // PLAYBACK NAVIGATION\n  // ==========================================================================\n\n  const playNext = useCallback(() => {\n    return queueManagerService.playNext();\n  }, []);\n\n  const playPrevious = useCallback(() => {\n    return queueManagerService.playPrevious();\n  }, []);\n\n  const playAtIndex = useCallback((index: number) => {\n    return queueManagerService.playAtIndex(index);\n  }, []);\n\n  // ==========================================================================\n  // QUEUE STATE ACCESSORS\n  // ==========================================================================\n\n  const getCurrentQueue = useCallback(() => {\n    return queueManagerService.getCurrentQueue();\n  }, []);\n\n  const getCurrentItem = useCallback(() => {\n    return queueManagerService.getCurrentItem();\n  }, []);\n\n  const getQueueType = useCallback(() => {\n    return queueManagerService.getQueueType();\n  }, []);\n\n  const getAllQueues = useCallback(() => {\n    return queueManagerService.getAllQueues();\n  }, []);\n\n  // ==========================================================================\n  // VALIDATION\n  // ==========================================================================\n\n  const canAddToQueue = useCallback((item: QueueItem) => {\n    return queueManagerService.canAddToQueue(item);\n  }, []);\n\n  const shouldWarnBeforeReplace = useCallback((item: QueueItem) => {\n    return queueManagerService.shouldWarnBeforeReplace(item);\n  }, []);\n\n  const canMixQueues = useCallback(() => {\n    return queueManagerService.canMixQueues();\n  }, []);\n\n  return {\n    // Queue switching\n    switchQueue,\n\n    // Queue manipulation\n    setQueue,\n    setQueueAndPlay,\n    addToQueue,\n    insertInQueue,\n    removeFromQueue,\n    clearQueue,\n\n    // Convenience functions\n    setQueueFromSongs,\n    setQueueAndPlayFromSongs,\n\n    // Playback navigation\n    playNext,\n    playPrevious,\n    playAtIndex,\n\n    // Queue state accessors\n    getCurrentQueue,\n    getCurrentItem,\n    getQueueType,\n    getAllQueues,\n\n    // Validation\n    canAddToQueue,\n    shouldWarnBeforeReplace,\n    canMixQueues,\n  };\n}\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/resources/app/modules/library-music-player/hooks/use-queue-manager.ts b/resources/app/modules/library-music-player/hooks/use-queue-manager.ts
+--- a/resources/app/modules/library-music-player/hooks/use-queue-manager.ts	(revision 0e05be9f52b83fa864fd1c19f1e26e1f490e7fc8)
++++ b/resources/app/modules/library-music-player/hooks/use-queue-manager.ts	(date 1767549600604)
+@@ -3,144 +3,43 @@
+  * Provides easy access to QueueManagerService for React components
+  */
+ 
+-import { useCallback } from 'react';
+-import { queueManagerService, songResourceToMusicQueueItem } from '../services/queue';
+-import { MediaType, QueueItem, QueueState, QueueOperationResult } from '../services/queue';
+-import { SongResource } from '@/app/libs/api-client/gen/models';
++import { queueManagerService, QueueContext } from '../services/queue';
++import { MediaType, QueueItem } from '../services/queue';
++import { setQueueFromSongs, setQueueAndPlayFromSongs, addSongToQueue, insertSongInQueue } from '../services/queue/queue-manager-service';
+ 
+ export function useQueueManager() {
+-  // ==========================================================================
+-  // QUEUE SWITCHING
+-  // ==========================================================================
+-
+-  const switchQueue = useCallback((type: MediaType) => {
+-    return queueManagerService.switchQueue(type);
+-  }, []);
+-
+-  // ==========================================================================
+-  // QUEUE MANIPULATION
+-  // ==========================================================================
+-
+-  const setQueue = useCallback((items: QueueItem[], startIndex?: number) => {
+-    return queueManagerService.setQueue(items, startIndex);
+-  }, []);
+-
+-  const setQueueAndPlay = useCallback((items: QueueItem[], publicId: string) => {
+-    return queueManagerService.setQueueAndPlay(items, publicId);
+-  }, []);
+-
+-  const addToQueue = useCallback((item: QueueItem) => {
+-    return queueManagerService.addToQueue(item);
+-  }, []);
+-
+-  const insertInQueue = useCallback((item: QueueItem) => {
+-    return queueManagerService.insertInQueue(item);
+-  }, []);
+-
+-  const removeFromQueue = useCallback((index: number) => {
+-    return queueManagerService.removeFromQueue(index);
+-  }, []);
+-
+-  const clearQueue = useCallback(() => {
+-    return queueManagerService.clearQueue();
+-  }, []);
+-
+-  // ==========================================================================
+-  // CONVENIENCE FUNCTIONS FOR SONG RESOURCES
+-  // ==========================================================================
+-
+-  const setQueueFromSongs = useCallback((songs: SongResource[], startIndex?: number) => {
+-    const items = songs.map(song => songResourceToMusicQueueItem(song));
+-    return setQueue(items, startIndex);
+-  }, [setQueue]);
+-
+-  const setQueueAndPlayFromSongs = useCallback((songs: SongResource[], publicId: string) => {
+-    const items = songs.map(song => songResourceToMusicQueueItem(song));
+-    return setQueueAndPlay(items, publicId);
+-  }, [setQueueAndPlay]);
+-
+-  // ==========================================================================
+-  // PLAYBACK NAVIGATION
+-  // ==========================================================================
+-
+-  const playNext = useCallback(() => {
+-    return queueManagerService.playNext();
+-  }, []);
+-
+-  const playPrevious = useCallback(() => {
+-    return queueManagerService.playPrevious();
+-  }, []);
+-
+-  const playAtIndex = useCallback((index: number) => {
+-    return queueManagerService.playAtIndex(index);
+-  }, []);
+-
+-  // ==========================================================================
+-  // QUEUE STATE ACCESSORS
+-  // ==========================================================================
+-
+-  const getCurrentQueue = useCallback(() => {
+-    return queueManagerService.getCurrentQueue();
+-  }, []);
+-
+-  const getCurrentItem = useCallback(() => {
+-    return queueManagerService.getCurrentItem();
+-  }, []);
+-
+-  const getQueueType = useCallback(() => {
+-    return queueManagerService.getQueueType();
+-  }, []);
+-
+-  const getAllQueues = useCallback(() => {
+-    return queueManagerService.getAllQueues();
+-  }, []);
+-
+-  // ==========================================================================
+-  // VALIDATION
+-  // ==========================================================================
+-
+-  const canAddToQueue = useCallback((item: QueueItem) => {
+-    return queueManagerService.canAddToQueue(item);
+-  }, []);
+-
+-  const shouldWarnBeforeReplace = useCallback((item: QueueItem) => {
+-    return queueManagerService.shouldWarnBeforeReplace(item);
+-  }, []);
+-
+-  const canMixQueues = useCallback(() => {
+-    return queueManagerService.canMixQueues();
+-  }, []);
+-
+   return {
+     // Queue switching
+-    switchQueue,
++    switchQueue: (type: MediaType) => queueManagerService.switchQueue(type),
+ 
+-    // Queue manipulation
+-    setQueue,
+-    setQueueAndPlay,
+-    addToQueue,
+-    insertInQueue,
+-    removeFromQueue,
+-    clearQueue,
++    // Queue manipulation (internal QueueItem methods)
++    setQueue: (items: QueueItem[], startIndex?: number) => queueManagerService.setQueue(items, startIndex),
++    setQueueAndPlay: (items: QueueItem[], publicId: string, context?: QueueContext) => queueManagerService.setQueueAndPlay(items, publicId, context),
++    addToQueue: (item: QueueItem) => queueManagerService.addToQueue(item),
++    insertInQueue: (item: QueueItem) => queueManagerService.insertInQueue(item),
++    removeFromQueue: (index: number) => queueManagerService.removeFromQueue(index),
++    clearQueue: () => queueManagerService.clearQueue(),
+ 
+-    // Convenience functions
++    // SongResource convenience functions (standalone functions, not service methods)
+     setQueueFromSongs,
+-    setQueueAndPlayFromSongs,
++    setQueueAndPlaySongs: setQueueAndPlayFromSongs, // Alias for simpler naming
++    addSongToQueue,
++    insertSongInQueue,
+ 
+     // Playback navigation
+-    playNext,
+-    playPrevious,
+-    playAtIndex,
++    playNext: () => queueManagerService.playNext(),
++    playPrevious: () => queueManagerService.playPrevious(),
++    playAtIndex: (index: number) => queueManagerService.playAtIndex(index),
+ 
+     // Queue state accessors
+-    getCurrentQueue,
+-    getCurrentItem,
+-    getQueueType,
+-    getAllQueues,
++    getCurrentQueue: () => queueManagerService.getCurrentQueue(),
++    getCurrentItem: () => queueManagerService.getCurrentItem(),
++    getQueueType: () => queueManagerService.getQueueType(),
++    getAllQueues: () => queueManagerService.getAllQueues(),
+ 
+     // Validation
+-    canAddToQueue,
+-    shouldWarnBeforeReplace,
+-    canMixQueues,
++    canAddToQueue: (item: QueueItem) => queueManagerService.canAddToQueue(item),
++    shouldWarnBeforeReplace: (item: QueueItem) => queueManagerService.shouldWarnBeforeReplace(item),
++    canMixQueues: () => queueManagerService.canMixQueues(),
+   };
+ }
+Index: resources/app/modules/user-settings/components/queue-settings-section/queue-settings-section.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>/**\n * Queue Settings Section Component\n * Allows users to configure queue behavior (simple/advanced mode, completion behavior, etc.)\n */\n\nimport {\n  Box,\n  Flex,\n  Text,\n  Select,\n  Switch,\n  Separator,\n} from '@radix-ui/themes';\nimport { useSettingsStore } from '@/app/store/settings';\nimport { QueueMode, QueueCompletionBehavior } from '@/app/store/settings/settings-types';\n\nexport function QueueSettingsSection() {\n  const settings = useSettingsStore();\n  const updateSettings = useSettingsStore((state) => state.updateSettings);\n\n  const queueSettings = settings.preferences.queue;\n  const playbackSettings = settings.preferences.playback;\n\n  const handleQueueModeChange = (value: string) => {\n    updateSettings({\n      ...settings,\n      preferences: {\n        ...settings.preferences,\n        queue: {\n          ...queueSettings,\n          mode: value as QueueMode,\n        },\n      },\n    });\n  };\n\n  const handleCompletionBehaviorChange = (value: string) => {\n    updateSettings({\n      ...settings,\n      preferences: {\n        ...settings.preferences,\n        playback: {\n          ...playbackSettings,\n          queueCompletion: value as QueueCompletionBehavior,\n        },\n      },\n    });\n  };\n\n  const handleAutoSwitchChange = (checked: boolean) => {\n    updateSettings({\n      ...settings,\n      preferences: {\n        ...settings.preferences,\n        queue: {\n          ...queueSettings,\n          autoSwitch: checked,\n        },\n      },\n    });\n  };\n\n  const handleRememberPositionChange = (checked: boolean) => {\n    updateSettings({\n      ...settings,\n      preferences: {\n        ...settings.preferences,\n        queue: {\n          ...queueSettings,\n          rememberPosition: checked,\n        },\n      },\n    });\n  };\n\n  const handleWarnOnReplaceChange = (checked: boolean) => {\n    updateSettings({\n      ...settings,\n      preferences: {\n        ...settings.preferences,\n        queue: {\n          ...queueSettings,\n          warnOnQueueReplace: checked,\n        },\n      },\n    });\n  };\n\n  return (\n    <Box>\n      <Text as=\"p\" size=\"5\" weight=\"bold\" mb=\"4\">\n        Queue Settings\n      </Text>\n\n      {/* Queue Mode */}\n      <Flex direction=\"column\" gap=\"2\" mb=\"6\">\n        <Text size=\"2\" weight=\"bold\" color=\"gray\">\n          Queue Mode\n        </Text>\n        <Select.Root\n          value={queueSettings.mode}\n          onValueChange={handleQueueModeChange}\n        >\n          <Select.Trigger aria-label=\"Queue mode\" />\n          <Select.Content>\n            <Select.Item value={QueueMode.SIMPLE}>\n              Simple Mode\n            </Select.Item>\n            <Select.Item value={QueueMode.ADVANCED}>\n              Advanced Mode\n            </Select.Item>\n          </Select.Content>\n        </Select.Root>\n        <Text size=\"1\" color=\"gray\">\n          {queueSettings.mode === QueueMode.SIMPLE\n            ? 'Simple: Queues are isolated by media type (no mixing)'\n            : 'Advanced: Allow mixing different media types with warnings'}\n        </Text>\n      </Flex>\n\n      {/* Queue Completion Behavior */}\n      <Flex direction=\"column\" gap=\"2\" mb=\"6\">\n        <Text size=\"2\" weight=\"bold\" color=\"gray\">\n          When Queue Ends\n        </Text>\n        <Select.Root\n          value={playbackSettings.queueCompletion}\n          onValueChange={handleCompletionBehaviorChange}\n        >\n          <Select.Trigger aria-label=\"Queue completion behavior\" />\n          <Select.Content>\n            <Select.Item value={QueueCompletionBehavior.STOP}>\n              Stop Playback\n            </Select.Item>\n            <Select.Item value={QueueCompletionBehavior.SHUFFLE}>\n              Shuffle and Replay\n            </Select.Item>\n            <Select.Item value={QueueCompletionBehavior.PLAY_RANDOM}>\n              Play Random Song\n            </Select.Item>\n          </Select.Content>\n        </Select.Root>\n        <Text size=\"1\" color=\"gray\">\n          What happens when the queue finishes playing\n        </Text>\n      </Flex>\n\n      <Separator size=\"1\" my=\"4\" style={{ backgroundColor: 'var(--gray-6)' }} />\n\n      {/* Auto-Switch Queues */}\n      <Flex justify=\"between\" align=\"center\" mb=\"4\">\n        <Flex direction=\"column\" gap=\"1\">\n          <Text size=\"2\" weight=\"medium\">\n            Auto-Switch Queues\n          </Text>\n          <Text size=\"1\" color=\"gray\">\n            Automatically switch queues when navigating between library types\n          </Text>\n        </Flex>\n        <Switch\n          checked={queueSettings.autoSwitch}\n          onCheckedChange={handleAutoSwitchChange}\n        />\n      </Flex>\n\n      {/* Remember Position */}\n      <Flex justify=\"between\" align=\"center\" mb=\"4\">\n        <Flex direction=\"column\" gap=\"1\">\n          <Text size=\"2\" weight=\"medium\">\n            Remember Position\n          </Text>\n          <Text size=\"1\" color=\"gray\">\n            Save playback position for audiobooks and podcasts\n          </Text>\n        </Flex>\n        <Switch\n          checked={queueSettings.rememberPosition}\n          onCheckedChange={handleRememberPositionChange}\n        />\n      </Flex>\n\n      {/* Warn on Queue Replace */}\n      <Flex justify=\"between\" align=\"center\">\n        <Flex direction=\"column\" gap=\"1\">\n          <Text size=\"2\" weight=\"medium\">\n            Warn Before Replacing Queue\n          </Text>\n          <Text size=\"1\" color=\"gray\">\n            Show confirmation before replacing a non-empty queue\n          </Text>\n        </Flex>\n        <Switch\n          checked={queueSettings.warnOnQueueReplace}\n          onCheckedChange={handleWarnOnReplaceChange}\n        />\n      </Flex>\n    </Box>\n  );\n}\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/resources/app/modules/user-settings/components/queue-settings-section/queue-settings-section.tsx b/resources/app/modules/user-settings/components/queue-settings-section/queue-settings-section.tsx
+--- a/resources/app/modules/user-settings/components/queue-settings-section/queue-settings-section.tsx	(revision 0e05be9f52b83fa864fd1c19f1e26e1f490e7fc8)
++++ b/resources/app/modules/user-settings/components/queue-settings-section/queue-settings-section.tsx	(date 1767548019686)
+@@ -10,6 +10,7 @@
+   Select,
+   Switch,
+   Separator,
++  TextField,
+ } from '@radix-ui/themes';
+ import { useSettingsStore } from '@/app/store/settings';
+ import { QueueMode, QueueCompletionBehavior } from '@/app/store/settings/settings-types';
+@@ -86,6 +87,22 @@
+     });
+   };
+ 
++  const handleClearPreviousDelayChange = (value: string) => {
++    const numValue = parseInt(value, 10);
++    if (!isNaN(numValue) && numValue >= 0) {
++      updateSettings({
++        ...settings,
++        preferences: {
++          ...settings.preferences,
++          queue: {
++            ...queueSettings,
++            clearPreviousDelay: numValue,
++          },
++        },
++      });
++    }
++  };
++
+   return (
+     <Box>
+       <Text as="p" size="5" weight="bold" mb="4">
+@@ -180,7 +197,7 @@
+       </Flex>
+ 
+       {/* Warn on Queue Replace */}
+-      <Flex justify="between" align="center">
++      <Flex justify="between" align="center" mb="4">
+         <Flex direction="column" gap="1">
+           <Text size="2" weight="medium">
+             Warn Before Replacing Queue
+@@ -194,6 +211,26 @@
+           onCheckedChange={handleWarnOnReplaceChange}
+         />
+       </Flex>
++
++      {/* Clear Previous Delay */}
++      <Flex direction="column" gap="2" mb="4">
++        <Text size="2" weight="bold" color="gray">
++          Queue Auto-Clear Delay
++        </Text>
++        <TextField.Root
++          type="number"
++          min="0"
++          max="60"
++          value={queueSettings.clearPreviousDelay.toString()}
++          onChange={(e) => handleClearPreviousDelayChange(e.target.value)}
++          style={{width: 120}}
++        >
++          <TextField.Slot>seconds</TextField.Slot>
++        </TextField.Root>
++        <Text size="1" color="gray">
++          When clicking a song ahead in the queue, clear previous songs after this delay (0 to disable)
++        </Text>
++      </Flex>
+     </Box>
+   );
+ }

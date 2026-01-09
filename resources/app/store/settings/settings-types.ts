@@ -16,7 +16,12 @@ export type EQPreset =
   | 'ACOUSTIC'
   | 'BASS_BOOST'
   | 'TREBLE_BOOST'
+<<<<<<< HEAD
   | 'CUSTOM';
+=======
+  | 'CUSTOM'
+  | 'CUSTOM_2';
+>>>>>>> private/master
 
 // Audio Settings
 export interface AudioSettings {

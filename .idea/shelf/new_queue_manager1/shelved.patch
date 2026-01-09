@@ -1,0 +1,67 @@
+Index: resources/app/modules/library-music/components/album-detail/album-detail.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import { Cover } from '@/app/modules/library-music/components/artwork/cover';\nimport { Box, Card, Flex, ScrollArea, Skeleton, Text } from '@radix-ui/themes';\nimport { AlertLoadingError } from '@/app/ui/alerts/alert-loading-error.tsx';\nimport { usePlayerActions } from '@/app/modules/library-music-player/store';\nimport { TrackRow } from '@/app/ui/music/track-row/track-row.tsx';\n\nimport styles from './album-detail.module.scss';\nimport { usePathParam } from '@/app/hooks/use-path-param.ts';\nimport { LibraryParams } from '@/app/modules/library-music/routes/_routes.tsx';\nimport { generateBlurhashBackgroundImage } from '@/app/libs/blurhash/generate-bg-image.ts';\nimport { useCallback } from 'react';\nimport { useAlbumsShow } from '@/app/libs/api-client/gen/endpoints/album/album.ts';\nimport { SongResource } from '@/app/libs/api-client/gen/models';\n\ninterface AlbumDetailProps extends React.HTMLAttributes<HTMLDivElement> {\n  albumSlug: string;\n}\n\nexport function AlbumDetail({ albumSlug, ...rest }: AlbumDetailProps) {\n  const { library } = usePathParam<LibraryParams>();\n  const { data, isLoadingError, refetch } = useAlbumsShow(library, albumSlug);\n\n  const genres = data?.genres?.map((genre) => genre.name).join(', ');\n  const blurhash = data?.cover && generateBlurhashBackgroundImage(data.cover.blurhash, 128, 128);\n\n  return (\n    <Box {...rest}>\n      {/*TODO: fix popin{isFetching && <AlbumDetailSkeleton/>}*/}\n      {isLoadingError && <AlertLoadingError retry={async () => {\n        await refetch();\n      }}/>}\n\n      {data && (\n        <Card className={styles.card}>\n          {blurhash && (\n            <div\n              className={styles.image}\n              style={{\n                backgroundImage: blurhash.backgroundUrl,\n              }}\n            />\n          )}\n\n          <div className={styles.content}>\n            <div>\n              <Flex align=\"stretch\">\n                <Box p=\"3\">\n                  <Cover imgSrc={data?.cover?.url} size={180}/>\n                </Box>\n\n                <Flex p=\"sm\" align=\"start\" direction=\"column\" justify=\"center\">\n                  <Text size=\"6\" weight=\"bold\">{data?.title}</Text>\n                  {data?.artists && (\n                    <Text>{data.artists.map(x => x.name).join(', ')}</Text>\n                  )}\n\n                  <Text>{genres} - {data?.year}</Text>\n                </Flex>\n\n                <Box></Box>\n              </Flex>\n\n              <Flex>\n                {data?.songs && <AlbumSongs title={data.title} coverUrl={data.cover?.url} songs={data.songs}/>}\n              </Flex>\n            </div>\n          </div>\n        </Card>\n      )}\n    </Box>\n  );\n}\n\ninterface AlbumSongProps {\n  title: string;\n  coverUrl?: string;\n  songs: SongResource[];\n}\n\nfunction AlbumSongs({ songs }: AlbumSongProps) {\n  const { setQueueAndPlay } = usePlayerActions();\n\n  const onSongClick = useCallback((song: SongResource, songs: SongResource[]) => {\n    console.group('onSongClick');\n    console.log('song', song);\n    console.log('songs', songs);\n    console.groupEnd();\n\n    const newQueue = [...songs];\n    const index = newQueue.findIndex(x => x.publicId === song.publicId);\n    newQueue.splice(0, 0, newQueue.splice(index, 1)[0]);\n\n    setQueueAndPlay(newQueue, song.publicId);\n  }, [setQueueAndPlay]);\n\n\n  const rows = songs.map((song) => (\n    <TrackRow\n      className={styles.trackRow}\n      song={song}\n      key={song.publicId}\n      onClick={() => {\n        onSongClick(song, songs);\n      }}\n    />\n  ));\n\n  return (\n    <>\n      <ScrollArea>\n        <table>\n          <thead>\n          <tr>\n            <th>Track</th>\n            <th>Title</th>\n            <th>Duration</th>\n          </tr>\n          </thead>\n          <tbody>{rows}</tbody>\n        </table>\n      </ScrollArea>\n    </>\n  );\n}\n\n// @ts-expect-error\nfunction AlbumDetailSkeleton() {\n  return (\n    <Card>\n      <Flex>\n        <Box p=\"sm\">\n          <Skeleton height=\"180px\" width=\"180px\"/>\n        </Box>\n\n        <Box p=\"sm\" width=\"100%\">\n          <Skeleton height=\"16px\" mt=\"sm\"/>\n          <Flex>\n            <Skeleton height=\"8px\" mt=\"sm\" width=\"50px\"/>\n            <Skeleton height=\"8px\" mt=\"sm\" ml=\"sm\" width=\"50px\"/>\n          </Flex>\n        </Box>\n      </Flex>\n\n      <Flex>\n        <Skeleton height=\"16px\"/>\n        <Skeleton height=\"16px\"/>\n        <Skeleton height=\"16px\"/>\n        <Skeleton height=\"16px\"/>\n        <Skeleton height=\"16px\"/>\n        <Skeleton height=\"16px\"/>\n        <Skeleton height=\"16px\"/>\n      </Flex>\n    </Card>\n  );\n}\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/resources/app/modules/library-music/components/album-detail/album-detail.tsx b/resources/app/modules/library-music/components/album-detail/album-detail.tsx
+--- a/resources/app/modules/library-music/components/album-detail/album-detail.tsx	(revision 0e05be9f52b83fa864fd1c19f1e26e1f490e7fc8)
++++ b/resources/app/modules/library-music/components/album-detail/album-detail.tsx	(date 1767549001956)
+@@ -1,8 +1,9 @@
+ import { Cover } from '@/app/modules/library-music/components/artwork/cover';
+ import { Box, Card, Flex, ScrollArea, Skeleton, Text } from '@radix-ui/themes';
+ import { AlertLoadingError } from '@/app/ui/alerts/alert-loading-error.tsx';
+-import { usePlayerActions } from '@/app/modules/library-music-player/store';
++import { useQueueManager } from '@/app/modules/library-music-player/hooks/use-queue-manager';
+ import { TrackRow } from '@/app/ui/music/track-row/track-row.tsx';
++import { QueueContext, QueueContextType } from '@/app/modules/library-music-player/services/queue';
+ 
+ import styles from './album-detail.module.scss';
+ import { usePathParam } from '@/app/hooks/use-path-param.ts';
+@@ -61,7 +62,7 @@
+               </Flex>
+ 
+               <Flex>
+-                {data?.songs && <AlbumSongs title={data.title} coverUrl={data.cover?.url} songs={data.songs}/>}
++                {data?.songs && <AlbumSongs albumSlug={albumSlug} title={data.title} coverUrl={data.cover?.url} songs={data.songs}/>}
+               </Flex>
+             </div>
+           </div>
+@@ -72,13 +73,15 @@
+ }
+ 
+ interface AlbumSongProps {
++  albumSlug: string;
+   title: string;
+   coverUrl?: string;
+   songs: SongResource[];
+ }
+ 
+-function AlbumSongs({ songs }: AlbumSongProps) {
+-  const { setQueueAndPlay } = usePlayerActions();
++function AlbumSongs({ albumSlug, title, songs }: AlbumSongProps) {
++  const { library } = usePathParam<LibraryParams>();
++  const { setQueueAndPlaySongs } = useQueueManager();
+ 
+   const onSongClick = useCallback((song: SongResource, songs: SongResource[]) => {
+     console.group('onSongClick');
+@@ -90,8 +93,16 @@
+     const index = newQueue.findIndex(x => x.publicId === song.publicId);
+     newQueue.splice(0, 0, newQueue.splice(index, 1)[0]);
+ 
+-    setQueueAndPlay(newQueue, song.publicId);
+-  }, [setQueueAndPlay]);
++    const context: QueueContext = {
++      type: QueueContextType.ALBUM,
++      id: albumSlug,
++      librarySlug: library,
++      name: title,
++      hasManualItems: false,
++    };
++
++    setQueueAndPlaySongs(newQueue, song.publicId, context);
++  }, [setQueueAndPlaySongs, albumSlug, library, title]);
+ 
+ 
+   const rows = songs.map((song) => (

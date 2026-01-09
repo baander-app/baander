@@ -1,7 +1,1160 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+<<<<<<< HEAD
   <component name="ComposerSettings">
     <execution />
   </component>
   <component name="PropertiesComponent">{}</component>
+=======
+  <component name="ChangeListManager">
+    <list default="true" id="e5ac086c-8369-4403-a0ee-18454c863945" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/composer.json" beforeDir="false" afterPath="$PROJECT_DIR$/composer.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/database/migrations/2025_08_05_000001_create_search_media_similarity.php" beforeDir="false" afterPath="$PROJECT_DIR$/database/migrations/2025_08_05_000001_create_search_media_similarity.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/resources/app/App.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/resources/app/App.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/resources/app/components/song-table/song-table.module.scss" beforeDir="false" afterPath="$PROJECT_DIR$/resources/app/components/song-table/song-table.module.scss" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/resources/app/components/song-table/song-table.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/resources/app/components/song-table/song-table.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/resources/app/index.css" beforeDir="false" afterPath="$PROJECT_DIR$/resources/app/index.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/resources/app/modules/library-music-player/components/player-face-plate/player-face-plate.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/resources/app/modules/library-music-player/components/player-face-plate/player-face-plate.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/resources/app/modules/library-music/components/song-list/song-list.module.scss" beforeDir="false" afterPath="$PROJECT_DIR$/resources/app/modules/library-music/components/song-list/song-list.module.scss" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/resources/app/modules/overview/overview.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/resources/app/modules/overview/overview.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/resources/app/services/logger.ts" beforeDir="false" afterPath="$PROJECT_DIR$/resources/app/services/logger.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/resources/app/store/settings/defaults.ts" beforeDir="false" afterPath="$PROJECT_DIR$/resources/app/store/settings/defaults.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/resources/app/store/settings/selectors.ts" beforeDir="false" afterPath="$PROJECT_DIR$/resources/app/store/settings/selectors.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/resources/app/store/settings/settings-types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/resources/app/store/settings/settings-types.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/resources/app/ui/icons/iconify.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/resources/app/ui/icons/iconify.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/composer.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend/Zend_Exception.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend/_Exception.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Bit/Zend_Bit_Twiddling.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Bit/_Bit---Twiddling.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Io/Zend_Io_Exception.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Io/Zend_Io_FileReader.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Io/Zend_Io_FileWriter.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Io/Zend_Io_Reader.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Io/Zend_Io_StringReader.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Io/Zend_Io_StringWriter.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Io/Zend_Io_Writer.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Io/_Io---Exception.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Io/_Io---FileReader.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Io/_Io---FileWriter.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Io/_Io---Reader.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Io/_Io---StringReader.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Io/_Io---StringWriter.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Io/_Io---Writer.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Exception.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_AdvancedContentEncryption.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_AdvancedMutualExclusion.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_BandwidthSharing.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_BitrateMutualExclusion.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_CodecList.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_Compatibility.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_Container.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_ContentBranding.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_ContentDescription.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_ContentEncryption.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_Data.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_DigitalSignature.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_ErrorCorrection.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_ExtendedContentDescription.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_ExtendedContentEncryption.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_ExtendedStreamProperties.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_FileProperties.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_GroupMutualExclusion.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_Header.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_HeaderExtension.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_Index.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_IndexParameters.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_LanguageList.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_Marker.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_MediaObjectIndex.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_MediaObjectIndexParameters.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_Metadata.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_MetadataLibrary.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_Padding.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_ScriptCommand.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_SimpleIndex.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_StreamBitrateProperties.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_StreamPrioritization.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_StreamProperties.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_TimecodeIndex.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_TimecodeIndexParameters.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/Zend_Media_Asf_Object_Unknown.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Exception.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---AdvancedContentEncryption.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---AdvancedMutualExclusion.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---BandwidthSharing.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---BitrateMutualExclusion.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---CodecList.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---Compatibility.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---Container.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---ContentBranding.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---ContentDescription.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---ContentEncryption.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---Data.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---DigitalSignature.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---ErrorCorrection.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---ExtendedContentDescription.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---ExtendedContentEncryption.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---ExtendedStreamProperties.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---FileProperties.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---GroupMutualExclusion.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---Header.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---HeaderExtension.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---Index.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---IndexParameters.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---LanguageList.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---Marker.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---MediaObjectIndex.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---MediaObjectIndexParameters.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---Metadata.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---MetadataLibrary.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---Padding.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---ScriptCommand.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---SimpleIndex.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---StreamBitrateProperties.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---StreamPrioritization.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---StreamProperties.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---TimecodeIndex.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---TimecodeIndexParameters.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object---Unknown.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf---Object.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ASF/_Media---Asf.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Exception.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_DateFrame.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Encoding.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Exception.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_ExtendedHeader.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Aenc.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Apic.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Aspi.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Comm.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Comr.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Encr.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Equ2.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Equa.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Etco.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Geob.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Grid.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Ipls.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Link.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Mcdi.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Mllt.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Owne.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Pcnt.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Popm.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Poss.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Priv.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Rbuf.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Rva2.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Rvad.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Rvrb.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_SYLT.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Seek.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Sign.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Sytc.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_TRSN.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_TRSO.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Talb.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tbpm.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tcmp.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tcom.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tcon.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tcop.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tdat.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tden.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tdly.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tdor.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tdrc.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tdrl.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tdtg.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tenc.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Text.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tflt.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Time.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tipl.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tit1.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tit2.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tit3.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tkey.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tlan.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tlen.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tmcl.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tmed.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tmoo.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Toal.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tofn.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Toly.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tope.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tory.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Town.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tpe1.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tpe2.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tpe3.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tpe4.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tpos.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tpro.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tpub.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Trck.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Trda.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tsiz.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tso2.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tsoa.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tsoc.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tsop.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tsot.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tsrc.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tsse.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tsst.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Txxx.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Tyer.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Ufid.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Unknown.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_User.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Uslt.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Wcom.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Wcop.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Woaf.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Woar.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Woas.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Wors.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Wpay.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Wpub.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Frame_Wxxx.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Header.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Language.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_LanguageTextFrame.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_LinkFrame.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_NumberFrame.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Object.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_TextFrame.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3_Timing.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3v1.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/Zend_Media_Id3v2.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Exception.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---DateFrame.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Encoding.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Exception.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---ExtendedHeader.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Aenc.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Apic.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Aspi.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Comm.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Comr.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Encr.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Equ2.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Equa.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Etco.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Geob.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Grid.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Ipls.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Link.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Mcdi.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Mllt.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Owne.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Pcnt.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Popm.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Poss.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Priv.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Rbuf.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Rva2.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Rvad.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Rvrb.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Seek.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Sign.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Sylt.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Sytc.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Talb.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tbpm.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tcmp.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tcom.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tcon.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tcop.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tdat.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tden.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tdly.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tdor.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tdrc.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tdrl.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tdtg.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tenc.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Text.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tflt.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Time.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tipl.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tit1.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tit2.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tit3.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tkey.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tlan.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tlen.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tmcl.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tmed.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tmoo.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Toal.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tofn.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Toly.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tope.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tory.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Town.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tpe1.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tpe2.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tpe3.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tpe4.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tpos.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tpro.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tpub.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Trck.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Trda.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Trsn.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Trso.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tsiz.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tso2.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tsoa.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tsoc.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tsop.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tsot.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tsrc.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tsse.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tsst.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Txxx.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Tyer.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Ufid.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Unknown.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---User.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Uslt.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Wcom.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Wcop.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Woaf.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Woar.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Woas.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Wors.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Wpay.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Wpub.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame---Wxxx.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Frame.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Header.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Language.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---LanguageTextFrame.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---LinkFrame.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---NumberFrame.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Object.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---TextFrame.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3---Timing.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3v1.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ID3/_Media---Id3v2.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Bxml.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Cdsc.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Chpl.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Co64.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Cprt.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Ctts.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Data.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Dinf.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Dref.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Edts.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Elst.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Free.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Frma.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Ftyp.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Hdlr.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Hint.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Hmhd.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Id32.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Iinf.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Iloc.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Ilst.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Imif.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Infe.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Ipro.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mdhd.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mdia.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mehd.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Meta.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mfhd.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mfra.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mfro.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Minf.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Moof.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Moov.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mvex.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Mvhd.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Ndrm.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Pdin.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Pitm.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Sbgp.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Schi.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Schm.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Sdtp.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Sinf.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Skip.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Smhd.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stbl.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stco.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stdp.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stsc.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stsd.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stsh.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stss.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stsz.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Stts.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Tfra.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Tkhd.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Traf.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Trak.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Tref.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Trex.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Udta.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Url.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Urn.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Vmhd.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Box_Xml.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_Exception.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/Zend_Media_Iso14496_FullBox.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Bxml.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Cdsc.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Chpl.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Co64.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Cprt.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Ctts.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Dinf.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Dref.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Edts.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Elst.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Free.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Frma.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Ftyp.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Hdlr.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Hint.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Hmhd.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Id32.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Iinf.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Iloc.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Ilst.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Imif.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Infe.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Ipro.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Mdhd.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Mdia.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Mehd.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Meta.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Mfhd.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Mfra.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Mfro.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Minf.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Moof.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Moov.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Mvex.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Mvhd.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Ndrm.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Pdin.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Pitm.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Sbgp.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Schi.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Schm.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Sdtp.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Sinf.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Skip.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Smhd.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Stbl.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Stco.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Stdp.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Stsc.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Stsd.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Stsh.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Stss.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Stsz.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Stts.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Tfra.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Tkhd.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Traf.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Trak.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Tref.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Trex.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Udta.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Url.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Urn.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Vmhd.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box---Xml.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Box.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---Exception.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496---FullBox.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/ISO14496/_Media---Iso14496.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/MPEG/Zend_Media_Mpeg_Abs.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Frame.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/MPEG/Zend_Media_Mpeg_Abs_LameHeader.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/MPEG/Zend_Media_Mpeg_Abs_Object.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/MPEG/Zend_Media_Mpeg_Abs_VbriHeader.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/MPEG/Zend_Media_Mpeg_Abs_XingHeader.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/MPEG/Zend_Media_Mpeg_Exception.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/MPEG/Zend_Media_Mpeg_Object.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/MPEG/Zend_Media_Mpeg_Ps.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/MPEG/_Media---Mpeg---Abs---Frame.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/MPEG/_Media---Mpeg---Abs---LameHeader.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/MPEG/_Media---Mpeg---Abs---Object.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/MPEG/_Media---Mpeg---Abs---VbriHeader.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/MPEG/_Media---Mpeg---Abs---XingHeader.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/MPEG/_Media---Mpeg---Abs.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/MPEG/_Media---Mpeg---Exception.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/MPEG/_Media---Mpeg---Object.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Media/MPEG/_Media---Mpeg---Ps.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Mime/Magic/Zend_Mime_Magic.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/Zend_Mime/Magic/_Mime---Magic.php.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/blank.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/classtrees_Zend.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/classtrees_Zend_Bit.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/classtrees_Zend_Io.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/classtrees_Zend_Media.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/classtrees_Zend_Mime.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/elementindex.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/elementindex_Zend.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/elementindex_Zend_Bit.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/elementindex_Zend_Io.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/elementindex_Zend_Media.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/elementindex_Zend_Mime.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/errors.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/index.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/li_Zend.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/li_Zend_Bit.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/li_Zend_Io.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/li_Zend_Media.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/li_Zend_Mime.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/banner.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/AbstractClass.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/AbstractClass_logo.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/AbstractMethod.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/AbstractPrivateClass.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/AbstractPrivateClass_logo.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/AbstractPrivateMethod.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/Class.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/Class_logo.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/Constant.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/Constructor.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/Destructor.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/Function.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/Global.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/I.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/Index.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/Interface.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/Interface_logo.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/L.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/Lminus.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/Lplus.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/Method.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/Page.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/Page_logo.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/PrivateClass.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/PrivateClass_logo.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/PrivateMethod.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/PrivateVariable.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/StaticMethod.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/StaticVariable.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/T.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/Tminus.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/Tplus.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/Variable.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/blank.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/class_folder.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/empty.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/file.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/folder.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/function_folder.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/next_button.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/next_button_disabled.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/package.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/package_folder.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/previous_button.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/previous_button_disabled.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/private_class_logo.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/tutorial.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/tutorial_folder.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/images/up_button.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/media/stylesheet.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/packages.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/docs/todolist.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Bit/Twiddling.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Exception.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Io/Exception.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Io/FileReader.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Io/FileWriter.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Io/Reader.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Io/StringReader.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Io/StringWriter.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Io/Writer.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Exception.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/AdvancedContentEncryption.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/AdvancedMutualExclusion.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/BandwidthSharing.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/BitrateMutualExclusion.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/CodecList.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/Compatibility.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/Container.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/ContentBranding.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/ContentDescription.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/ContentEncryption.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/Data.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/DigitalSignature.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/ErrorCorrection.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/ExtendedContentDescription.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/ExtendedContentEncryption.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/ExtendedStreamProperties.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/FileProperties.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/GroupMutualExclusion.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/Header.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/HeaderExtension.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/Index.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/IndexParameters.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/LanguageList.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/Marker.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/MediaObjectIndex.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/MediaObjectIndexParameters.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/Metadata.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/MetadataLibrary.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/Padding.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/ScriptCommand.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/SimpleIndex.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/StreamBitrateProperties.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/StreamPrioritization.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/StreamProperties.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/TimecodeIndex.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/TimecodeIndexParameters.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Asf/Object/Unknown.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Exception.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Flac.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Flac/Exception.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Flac/MetadataBlock.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Flac/MetadataBlock/Application.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Flac/MetadataBlock/Cuesheet.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Flac/MetadataBlock/Padding.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Flac/MetadataBlock/Picture.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Flac/MetadataBlock/Seektable.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Flac/MetadataBlock/Streaminfo.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Flac/MetadataBlock/VorbisComment.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/DateFrame.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Encoding.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Exception.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/ExtendedHeader.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Aenc.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Apic.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Aspi.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Comm.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Comr.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Encr.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Equ2.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Equa.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Etco.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Geob.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Grid.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Ipls.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Link.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Mcdi.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Mllt.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Owne.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Pcnt.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Popm.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Poss.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Priv.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Rbuf.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Rva2.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Rvad.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Rvrb.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Seek.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Sign.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Sylt.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Sytc.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Talb.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tbpm.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tcmp.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tcom.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tcon.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tcop.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tdat.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tden.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tdly.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tdor.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tdrc.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tdrl.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tdtg.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tenc.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Text.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tflt.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Time.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tipl.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tit1.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tit2.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tit3.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tkey.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tlan.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tlen.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tmcl.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tmed.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tmoo.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Toal.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tofn.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Toly.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tope.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tory.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Town.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tpe1.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tpe2.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tpe3.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tpe4.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tpos.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tpro.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tpub.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Trck.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Trda.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Trsn.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Trso.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tsiz.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tso2.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tsoa.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tsoc.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tsop.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tsot.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tsrc.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tsse.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tsst.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Txxx.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Tyer.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Ufid.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Unknown.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/User.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Uslt.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Wcom.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Wcop.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Woaf.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Woar.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Woas.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Wors.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Wpay.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Wpub.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Frame/Wxxx.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Header.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Language.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/LanguageTextFrame.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/LinkFrame.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/NumberFrame.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Object.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/TextFrame.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3/Timing.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3v1.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Id3v2.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Bxml.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Cdsc.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Chpl.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Co64.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Cprt.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Ctts.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Dinf.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Dref.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Edts.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Elst.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Free.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Frma.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Ftyp.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Hdlr.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Hint.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Hmhd.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Id32.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Iinf.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Iloc.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Ilst.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Imif.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Infe.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Ipro.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Mdhd.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Mdia.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Mehd.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Meta.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Mfhd.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Mfra.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Mfro.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Minf.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Moof.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Moov.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Mvex.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Mvhd.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Ndrm.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Pdin.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Pitm.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Sbgp.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Schi.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Schm.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Sdtp.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Sinf.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Skip.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Smhd.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Stbl.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Stco.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Stdp.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Stsc.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Stsd.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Stsh.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Stss.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Stsz.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Stts.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Tfra.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Tkhd.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Traf.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Trak.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Tref.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Trex.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Udta.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Url.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Urn.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Vmhd.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Box/Xml.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/Exception.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Iso14496/FullBox.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Mpeg/Abs.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Mpeg/Abs/Frame.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Mpeg/Abs/LameHeader.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Mpeg/Abs/Object.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Mpeg/Abs/VbriHeader.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Mpeg/Abs/XingHeader.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Mpeg/Exception.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Mpeg/Object.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Mpeg/Ps.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Ogg/Exception.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Ogg/Page.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Ogg/Reader.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Cgrp.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Cset.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Ctoc.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Iarl.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Iart.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Icms.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Icmt.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Icop.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Icrd.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Icrp.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Id3.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Idim.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Idpi.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Ieng.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Ignr.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Ikey.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Ilgt.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Imed.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Inam.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Iplt.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Iprd.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Isbj.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Isft.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Ishp.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Isrc.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Isrf.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Itch.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/Junk.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Chunk/List.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/ContainerChunk.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/Exception.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Riff/StringChunk.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Vorbis.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Vorbis/Exception.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Vorbis/Header.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Vorbis/Header/Comment.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Vorbis/Header/Identification.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Media/Vorbis/Header/Setup.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/lib/Zend/Mime/Magic.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/tests/Makefile" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/tests/TestAll.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/tests/TestID3Frame.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/tests/TestID3v1.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/php-reader-1.8.1/tests/TestID3v2.php" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ComposerConfigs">
+    <option name="configs">
+      <option value="$PROJECT_DIR$/packages/scout-redisearch/composer.json" />
+      <option value="$PROJECT_DIR$/third_party/php-reader-1.8.1/composer.json" />
+      <option value="$PROJECT_DIR$/third_party/music-brainz/composer.json" />
+      <option value="$PROJECT_DIR$/packages/redis-stack/composer.json" />
+    </option>
+  </component>
+  <component name="ComposerSettings" synchronizationState="SYNCHRONIZE">
+    <pharConfigPath>$PROJECT_DIR$/composer.json</pharConfigPath>
+    <execution />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="PhpWorkspaceProjectConfiguration" interpreter_name="app">
+    <include_path>
+      <path value="$PROJECT_DIR$/packages/redis-stack/vendor/composer" />
+      <path value="$PROJECT_DIR$/vendor/bacon/bacon-qr-code" />
+      <path value="$PROJECT_DIR$/vendor/barryvdh/laravel-ide-helper" />
+      <path value="$PROJECT_DIR$/vendor/barryvdh/reflection-docblock" />
+      <path value="$PROJECT_DIR$/vendor/brianium/paratest" />
+      <path value="$PROJECT_DIR$/vendor/brick/math" />
+      <path value="$PROJECT_DIR$/vendor/brick/varexporter" />
+      <path value="$PROJECT_DIR$/vendor/carbonphp/carbon-doctrine-types" />
+      <path value="$PROJECT_DIR$/vendor/composer" />
+      <path value="$PROJECT_DIR$/vendor/composer-unused/contracts" />
+      <path value="$PROJECT_DIR$/vendor/composer-unused/symbol-parser" />
+      <path value="$PROJECT_DIR$/vendor/cweagans/composer-patches" />
+      <path value="$PROJECT_DIR$/vendor/dasprid/enum" />
+      <path value="$PROJECT_DIR$/vendor/dedoc/scramble" />
+      <path value="$PROJECT_DIR$/vendor/defuse/php-encryption" />
+      <path value="$PROJECT_DIR$/vendor/dflydev/dot-access-data" />
+      <path value="$PROJECT_DIR$/vendor/doctrine/dbal" />
+      <path value="$PROJECT_DIR$/vendor/doctrine/deprecations" />
+      <path value="$PROJECT_DIR$/vendor/doctrine/inflector" />
+      <path value="$PROJECT_DIR$/vendor/doctrine/lexer" />
+      <path value="$PROJECT_DIR$/vendor/dragonmantank/cron-expression" />
+      <path value="$PROJECT_DIR$/vendor/egulias/email-validator" />
+      <path value="$PROJECT_DIR$/vendor/eliashaeussler/sse" />
+      <path value="$PROJECT_DIR$/vendor/ergebnis/clock" />
+      <path value="$PROJECT_DIR$/vendor/evenement/evenement" />
+      <path value="$PROJECT_DIR$/vendor/fakerphp/faker" />
+      <path value="$PROJECT_DIR$/vendor/fidry/cpu-core-counter" />
+      <path value="$PROJECT_DIR$/vendor/filp/whoops" />
+      <path value="$PROJECT_DIR$/vendor/fruitcake/php-cors" />
+      <path value="$PROJECT_DIR$/vendor/graham-campbell/result-type" />
+      <path value="$PROJECT_DIR$/vendor/guzzlehttp/guzzle" />
+      <path value="$PROJECT_DIR$/vendor/guzzlehttp/promises" />
+      <path value="$PROJECT_DIR$/vendor/guzzlehttp/psr7" />
+      <path value="$PROJECT_DIR$/vendor/guzzlehttp/uri-template" />
+      <path value="$PROJECT_DIR$/vendor/hamcrest/hamcrest-php" />
+      <path value="$PROJECT_DIR$/vendor/hidehalo/nanoid-php" />
+      <path value="$PROJECT_DIR$/vendor/icanhazstring/composer-unused" />
+      <path value="$PROJECT_DIR$/vendor/intervention/gif" />
+      <path value="$PROJECT_DIR$/vendor/intervention/image" />
+      <path value="$PROJECT_DIR$/vendor/itsgoingd/clockwork" />
+      <path value="$PROJECT_DIR$/vendor/jean85/pretty-package-versions" />
+      <path value="$PROJECT_DIR$/vendor/jfcherng/php-color-output" />
+      <path value="$PROJECT_DIR$/vendor/jfcherng/php-diff" />
+      <path value="$PROJECT_DIR$/vendor/jfcherng/php-mb-string" />
+      <path value="$PROJECT_DIR$/vendor/jfcherng/php-sequence-matcher" />
+      <path value="$PROJECT_DIR$/vendor/laminas/laminas-diactoros" />
+      <path value="$PROJECT_DIR$/vendor/laracraft-tech/laravel-schema-rules" />
+      <path value="$PROJECT_DIR$/vendor/laravel/framework" />
+      <path value="$PROJECT_DIR$/vendor/laravel/horizon" />
+      <path value="$PROJECT_DIR$/vendor/laravel/octane" />
+      <path value="$PROJECT_DIR$/vendor/laravel/prompts" />
+      <path value="$PROJECT_DIR$/vendor/laravel/serializable-closure" />
+      <path value="$PROJECT_DIR$/vendor/laravel/tinker" />
+      <path value="$PROJECT_DIR$/vendor/lcobucci/clock" />
+      <path value="$PROJECT_DIR$/vendor/lcobucci/jwt" />
+      <path value="$PROJECT_DIR$/vendor/league/commonmark" />
+      <path value="$PROJECT_DIR$/vendor/league/config" />
+      <path value="$PROJECT_DIR$/vendor/league/csv" />
+      <path value="$PROJECT_DIR$/vendor/league/event" />
+      <path value="$PROJECT_DIR$/vendor/league/flysystem" />
+      <path value="$PROJECT_DIR$/vendor/league/flysystem-local" />
+      <path value="$PROJECT_DIR$/vendor/league/flysystem-read-only" />
+      <path value="$PROJECT_DIR$/vendor/league/mime-type-detection" />
+      <path value="$PROJECT_DIR$/vendor/league/oauth2-server" />
+      <path value="$PROJECT_DIR$/vendor/league/uri" />
+      <path value="$PROJECT_DIR$/vendor/league/uri-interfaces" />
+      <path value="$PROJECT_DIR$/vendor/maennchen/zipstream-php" />
+      <path value="$PROJECT_DIR$/vendor/mockery/mockery" />
+      <path value="$PROJECT_DIR$/vendor/monolog/monolog" />
+      <path value="$PROJECT_DIR$/vendor/myclabs/deep-copy" />
+      <path value="$PROJECT_DIR$/vendor/nesbot/carbon" />
+      <path value="$PROJECT_DIR$/vendor/nette/schema" />
+      <path value="$PROJECT_DIR$/vendor/nette/utils" />
+      <path value="$PROJECT_DIR$/vendor/nikic/php-parser" />
+      <path value="$PROJECT_DIR$/vendor/nunomaduro/collision" />
+      <path value="$PROJECT_DIR$/vendor/nunomaduro/termwind" />
+      <path value="$PROJECT_DIR$/vendor/nyholm/psr7" />
+      <path value="$PROJECT_DIR$/vendor/ondram/ci-detector" />
+      <path value="$PROJECT_DIR$/vendor/overtrue/laravel-versionable" />
+      <path value="$PROJECT_DIR$/vendor/paragonie/constant_time_encoding" />
+      <path value="$PROJECT_DIR$/vendor/paragonie/random_compat" />
+      <path value="$PROJECT_DIR$/vendor/pdepend/pdepend" />
+      <path value="$PROJECT_DIR$/vendor/phar-io/manifest" />
+      <path value="$PROJECT_DIR$/vendor/phar-io/version" />
+      <path value="$PROJECT_DIR$/vendor/php-ffmpeg/php-ffmpeg" />
+      <path value="$PROJECT_DIR$/vendor/php-http/discovery" />
+      <path value="$PROJECT_DIR$/vendor/php-http/guzzle7-adapter" />
+      <path value="$PROJECT_DIR$/vendor/php-http/httplug" />
+      <path value="$PROJECT_DIR$/vendor/php-http/promise" />
+      <path value="$PROJECT_DIR$/vendor/phpdocumentor/reflection" />
+      <path value="$PROJECT_DIR$/vendor/phpdocumentor/reflection-common" />
+      <path value="$PROJECT_DIR$/vendor/phpdocumentor/reflection-docblock" />
+      <path value="$PROJECT_DIR$/vendor/phpdocumentor/type-resolver" />
+      <path value="$PROJECT_DIR$/vendor/phpmd/phpmd" />
+      <path value="$PROJECT_DIR$/vendor/phpoption/phpoption" />
+      <path value="$PROJECT_DIR$/vendor/phpstan/phpdoc-parser" />
+      <path value="$PROJECT_DIR$/vendor/phpstan/phpstan" />
+      <path value="$PROJECT_DIR$/vendor/phpunit/php-code-coverage" />
+      <path value="$PROJECT_DIR$/vendor/phpunit/php-file-iterator" />
+      <path value="$PROJECT_DIR$/vendor/phpunit/php-invoker" />
+      <path value="$PROJECT_DIR$/vendor/phpunit/php-text-template" />
+      <path value="$PROJECT_DIR$/vendor/phpunit/php-timer" />
+      <path value="$PROJECT_DIR$/vendor/phpunit/phpunit" />
+      <path value="$PROJECT_DIR$/vendor/psr/cache" />
+      <path value="$PROJECT_DIR$/vendor/psr/clock" />
+      <path value="$PROJECT_DIR$/vendor/psr/container" />
+      <path value="$PROJECT_DIR$/vendor/psr/event-dispatcher" />
+      <path value="$PROJECT_DIR$/vendor/psr/http-client" />
+      <path value="$PROJECT_DIR$/vendor/psr/http-factory" />
+      <path value="$PROJECT_DIR$/vendor/psr/http-message" />
+      <path value="$PROJECT_DIR$/vendor/psr/http-server-handler" />
+      <path value="$PROJECT_DIR$/vendor/psr/http-server-middleware" />
+      <path value="$PROJECT_DIR$/vendor/psr/log" />
+      <path value="$PROJECT_DIR$/vendor/psr/simple-cache" />
+      <path value="$PROJECT_DIR$/vendor/psy/psysh" />
+      <path value="$PROJECT_DIR$/vendor/ralouphie/getallheaders" />
+      <path value="$PROJECT_DIR$/vendor/ramsey/collection" />
+      <path value="$PROJECT_DIR$/vendor/ramsey/uuid" />
+      <path value="$PROJECT_DIR$/vendor/sebastian/cli-parser" />
+      <path value="$PROJECT_DIR$/vendor/sebastian/comparator" />
+      <path value="$PROJECT_DIR$/vendor/sebastian/complexity" />
+      <path value="$PROJECT_DIR$/vendor/sebastian/diff" />
+      <path value="$PROJECT_DIR$/vendor/sebastian/environment" />
+      <path value="$PROJECT_DIR$/vendor/sebastian/exporter" />
+      <path value="$PROJECT_DIR$/vendor/sebastian/global-state" />
+      <path value="$PROJECT_DIR$/vendor/sebastian/lines-of-code" />
+      <path value="$PROJECT_DIR$/vendor/sebastian/object-enumerator" />
+      <path value="$PROJECT_DIR$/vendor/sebastian/object-reflector" />
+      <path value="$PROJECT_DIR$/vendor/sebastian/recursion-context" />
+      <path value="$PROJECT_DIR$/vendor/sebastian/type" />
+      <path value="$PROJECT_DIR$/vendor/sebastian/version" />
+      <path value="$PROJECT_DIR$/vendor/spatie/backtrace" />
+      <path value="$PROJECT_DIR$/vendor/spatie/error-solutions" />
+      <path value="$PROJECT_DIR$/vendor/spatie/flare-client-php" />
+      <path value="$PROJECT_DIR$/vendor/spatie/ignition" />
+      <path value="$PROJECT_DIR$/vendor/spatie/image" />
+      <path value="$PROJECT_DIR$/vendor/spatie/image-optimizer" />
+      <path value="$PROJECT_DIR$/vendor/spatie/laravel-data" />
+      <path value="$PROJECT_DIR$/vendor/spatie/laravel-ignition" />
+      <path value="$PROJECT_DIR$/vendor/spatie/laravel-medialibrary" />
+      <path value="$PROJECT_DIR$/vendor/spatie/laravel-package-tools" />
+      <path value="$PROJECT_DIR$/vendor/spatie/laravel-permission" />
+      <path value="$PROJECT_DIR$/vendor/spatie/laravel-route-attributes" />
+      <path value="$PROJECT_DIR$/vendor/spatie/laravel-sluggable" />
+      <path value="$PROJECT_DIR$/vendor/spatie/php-structure-discoverer" />
+      <path value="$PROJECT_DIR$/vendor/spatie/regex" />
+      <path value="$PROJECT_DIR$/vendor/spatie/temporary-directory" />
+      <path value="$PROJECT_DIR$/vendor/spomky-labs/cbor-php" />
+      <path value="$PROJECT_DIR$/vendor/spomky-labs/otphp" />
+      <path value="$PROJECT_DIR$/vendor/spomky-labs/pki-framework" />
+      <path value="$PROJECT_DIR$/vendor/squizlabs/php_codesniffer" />
+      <path value="$PROJECT_DIR$/vendor/staabm/side-effects-detector" />
+      <path value="$PROJECT_DIR$/vendor/staudenmeir/eloquent-has-many-deep-contracts" />
+      <path value="$PROJECT_DIR$/vendor/staudenmeir/laravel-adjacency-list" />
+      <path value="$PROJECT_DIR$/vendor/staudenmeir/laravel-cte" />
+      <path value="$PROJECT_DIR$/vendor/stevebauman/unfinalize" />
+      <path value="$PROJECT_DIR$/vendor/symfony/cache" />
+      <path value="$PROJECT_DIR$/vendor/symfony/cache-contracts" />
+      <path value="$PROJECT_DIR$/vendor/symfony/clock" />
+      <path value="$PROJECT_DIR$/vendor/symfony/config" />
+      <path value="$PROJECT_DIR$/vendor/symfony/console" />
+      <path value="$PROJECT_DIR$/vendor/symfony/css-selector" />
+      <path value="$PROJECT_DIR$/vendor/symfony/dependency-injection" />
+      <path value="$PROJECT_DIR$/vendor/symfony/deprecation-contracts" />
+      <path value="$PROJECT_DIR$/vendor/symfony/error-handler" />
+      <path value="$PROJECT_DIR$/vendor/symfony/event-dispatcher" />
+      <path value="$PROJECT_DIR$/vendor/symfony/event-dispatcher-contracts" />
+      <path value="$PROJECT_DIR$/vendor/symfony/filesystem" />
+      <path value="$PROJECT_DIR$/vendor/symfony/finder" />
+      <path value="$PROJECT_DIR$/vendor/symfony/http-foundation" />
+      <path value="$PROJECT_DIR$/vendor/symfony/http-kernel" />
+      <path value="$PROJECT_DIR$/vendor/symfony/mailer" />
+      <path value="$PROJECT_DIR$/vendor/symfony/mime" />
+      <path value="$PROJECT_DIR$/vendor/symfony/polyfill-intl-grapheme" />
+      <path value="$PROJECT_DIR$/vendor/symfony/polyfill-intl-normalizer" />
+      <path value="$PROJECT_DIR$/vendor/symfony/polyfill-php83" />
+      <path value="$PROJECT_DIR$/vendor/symfony/polyfill-php84" />
+      <path value="$PROJECT_DIR$/vendor/symfony/polyfill-php85" />
+      <path value="$PROJECT_DIR$/vendor/symfony/polyfill-uuid" />
+      <path value="$PROJECT_DIR$/vendor/symfony/process" />
+      <path value="$PROJECT_DIR$/vendor/symfony/property-access" />
+      <path value="$PROJECT_DIR$/vendor/symfony/property-info" />
+      <path value="$PROJECT_DIR$/vendor/symfony/psr-http-message-bridge" />
+      <path value="$PROJECT_DIR$/vendor/symfony/routing" />
+      <path value="$PROJECT_DIR$/vendor/symfony/serializer" />
+      <path value="$PROJECT_DIR$/vendor/symfony/service-contracts" />
+      <path value="$PROJECT_DIR$/vendor/symfony/string" />
+      <path value="$PROJECT_DIR$/vendor/symfony/translation" />
+      <path value="$PROJECT_DIR$/vendor/symfony/translation-contracts" />
+      <path value="$PROJECT_DIR$/vendor/symfony/type-info" />
+      <path value="$PROJECT_DIR$/vendor/symfony/uid" />
+      <path value="$PROJECT_DIR$/vendor/symfony/var-dumper" />
+      <path value="$PROJECT_DIR$/vendor/symfony/var-exporter" />
+      <path value="$PROJECT_DIR$/vendor/symplify/vendor-patches" />
+      <path value="$PROJECT_DIR$/vendor/theseer/tokenizer" />
+      <path value="$PROJECT_DIR$/vendor/tightenco/ziggy" />
+      <path value="$PROJECT_DIR$/vendor/tijsverkoyen/css-to-inline-styles" />
+      <path value="$PROJECT_DIR$/vendor/tpetry/laravel-postgresql-enhanced" />
+      <path value="$PROJECT_DIR$/vendor/vlucas/phpdotenv" />
+      <path value="$PROJECT_DIR$/vendor/voku/portable-ascii" />
+      <path value="$PROJECT_DIR$/vendor/web-auth/cose-lib" />
+      <path value="$PROJECT_DIR$/vendor/web-auth/webauthn-lib" />
+      <path value="$PROJECT_DIR$/vendor/webmozart/assert" />
+      <path value="$PROJECT_DIR$/vendor/webmozart/glob" />
+      <path value="$PROJECT_DIR$/vendor/xammie/mailbook" />
+      <path value="$PROJECT_DIR$/vendor/xenos/asklucy" />
+      <path value="$PROJECT_DIR$/vendor/xenos/musicbrainz" />
+      <path value="$PROJECT_DIR$/vendor/zend/php-reader" />
+    </include_path>
+  </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "customColor": "",
+  "associatedIndex": 6
+}]]></component>
+  <component name="ProjectId" id="382GlwogrPVzcDHQazGGzeE7HLy" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "git-widget-placeholder": "master",
+    "nodejs_package_manager_path": "yarn",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="ReactDesignerToolWindowState">
+    <option name="myId2Visible">
+      <map>
+        <entry key="com.intellij.reactbuddy.reactComponents" value="false" />
+        <entry key="com.intellij.reactbuddy.reactInspector" value="false" />
+        <entry key="com.intellij.reactbuddy.storybook" value="false" />
+      </map>
+    </option>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-9b0f141eb926-JavaScript-PS-253.29346.257" />
+        <option value="bundled-php-predefined-a98d8de5180a-0e0d91225499-com.jetbrains.php.sharedIndexes-PS-253.29346.257" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="e5ac086c-8369-4403-a0ee-18454c863945" name="Changes" comment="" />
+      <created>1767990407390</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1767990407390</updated>
+      <workItem from="1767990408499" duration="35000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+>>>>>>> private/master
 </project>

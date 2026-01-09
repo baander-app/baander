@@ -9,7 +9,12 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   Header,
+<<<<<<< HEAD
   Row, RowData,
+=======
+  Row,
+  RowData,
+>>>>>>> private/master
   SortingState,
   Table,
   useReactTable,
@@ -17,8 +22,22 @@ import {
 import { useVirtualizer, VirtualItem, Virtualizer } from '@tanstack/react-virtual';
 import { SpeakerLoudIcon } from '@radix-ui/react-icons';
 import { ContextMenu } from '@radix-ui/themes';
+<<<<<<< HEAD
 import { DndContext, closestCenter, DragEndEvent, DragStartEvent, PointerSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+=======
+import {
+  closestCenter,
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+>>>>>>> private/master
 import { CSS } from '@dnd-kit/utilities';
 import styles from './song-table.module.scss';
 import { SongResource } from '@/app/libs/api-client/gen/models';
@@ -95,6 +114,7 @@ interface UseVirtualizedTableReturn {
 
 const createColumnDefinitions = (reorderable?: boolean): ColumnDef<SongResource>[] => {
   const columns: ColumnDef<SongResource>[] = [];
+<<<<<<< HEAD
 
   if (reorderable) {
     columns.push({
@@ -149,6 +169,62 @@ const createColumnDefinitions = (reorderable?: boolean): ColumnDef<SongResource>
 };
 
 const SongTitleCell = memo(({ song }: SongTitleCellProps) => {
+=======
+
+  if (reorderable) {
+    columns.push({
+      id: 'drag',
+      header: '',
+      cell: () => (
+        <div className={styles.dragHandle}>
+          <Iconify icon="ph:dots-six-vertical-bold" width={16} height={16}/>
+        </div>
+      ),
+      size: 40,
+      enableSorting: false,
+    });
+  }
+
+  columns.push(
+    {
+      header: 'Title',
+      cell: (info) => <SongTitleCell song={info.row.original}/>,
+    },
+    {
+      header: 'Lyrics',
+      accessorFn: (row) => !!row.lyrics,
+      cell: (info) => info.getValue() ? <Iconify icon="arcticons:quicklyric"/> : null,
+      size: 60,
+    },
+    {
+      header: 'Artist',
+      accessorFn: (row) => row.artists?.map(x => x.name).join(', '),
+    },
+    {
+      header: 'Album',
+      accessorFn: (row) => row.album?.title,
+    },
+    {
+      header: 'Genre',
+      accessorFn: (row) => row.genres?.map(x => x.name).join(', '),
+    },
+    {
+      header: 'Duration',
+      accessorKey: 'durationHuman',
+      size: 80,
+    },
+    {
+      header: 'Track',
+      accessorKey: 'track',
+      size: 60,
+    },
+  );
+
+  return columns;
+};
+
+const SongTitleCell = memo(({song}: SongTitleCellProps) => {
+>>>>>>> private/master
   const currentSongPublicId = usePlayerCurrentSongPublicId();
   const isCurrentSong = currentSongPublicId === song.publicId;
 
@@ -173,7 +249,11 @@ export function SongTable({
                             reorderable,
                             onReorder,
                           }: SongTableProps) {
+<<<<<<< HEAD
   const { setQueueAndPlay } = usePlayerActions();
+=======
+  const {setQueueAndPlay} = usePlayerActions();
+>>>>>>> private/master
   const [sorting, setSorting] = useState<SortingState>([]);
   const [songsState, setSongsState] = useState(songs);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -193,7 +273,11 @@ export function SongTable({
       activationConstraint: {
         distance: 8,
       },
+<<<<<<< HEAD
     })
+=======
+    }),
+>>>>>>> private/master
   );
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -201,7 +285,11 @@ export function SongTable({
   }, []);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
+<<<<<<< HEAD
     const { active, over } = event;
+=======
+    const {active, over} = event;
+>>>>>>> private/master
     setActiveId(null);
 
     if (over && active.id !== over.id) {
@@ -227,7 +315,11 @@ export function SongTable({
   const table = useReactTable<SongResource>({
     data: reorderable ? songsState : songs,
     columns: createColumnDefinitions(reorderable),
+<<<<<<< HEAD
     state: { sorting },
+=======
+    state: {sorting},
+>>>>>>> private/master
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -235,7 +327,7 @@ export function SongTable({
     debugColumns: false,
   });
 
-  const { virtualizer, visibleRows } = useVirtualizedTable({
+  const {virtualizer, visibleRows} = useVirtualizedTable({
     table,
     parentRef,
     estimatedTotalCount,
@@ -252,7 +344,11 @@ export function SongTable({
         <StickyHeader table={table}/>
 
         <div ref={parentRef} className={styles.scrollableContent}>
+<<<<<<< HEAD
           <div className={styles.virtualizedContainer} style={{ height: `${virtualizer.getTotalSize()}px` }}>
+=======
+          <div className={styles.virtualizedContainer} style={{height: `${virtualizer.getTotalSize()}px`}}>
+>>>>>>> private/master
             {reorderable ? (
               <SortableContext
                 items={songsState.map(s => s.publicId)}
@@ -293,7 +389,11 @@ export function SongTable({
       {tableContent}
       <DragOverlay>
         {activeId ? (
+<<<<<<< HEAD
           <div style={{ background: 'var(--gray-3)', padding: '8px', borderRadius: '4px', opacity: 0.8 }}>
+=======
+          <div style={{background: 'var(--gray-3)', padding: '8px', borderRadius: '4px', opacity: 0.8}}>
+>>>>>>> private/master
             {songsState.find(s => s.publicId === activeId)?.title}
           </div>
         ) : null}
@@ -302,7 +402,11 @@ export function SongTable({
   );
 }
 
+<<<<<<< HEAD
 const TableHeader = memo(({ title, description }: TableHeaderProps) => {
+=======
+const TableHeader = memo(({title, description}: TableHeaderProps) => {
+>>>>>>> private/master
   if (!title && !description) return null;
 
   return (
@@ -315,7 +419,11 @@ const TableHeader = memo(({ title, description }: TableHeaderProps) => {
 
 TableHeader.displayName = 'TableHeader';
 
+<<<<<<< HEAD
 const StickyHeader = memo(({ table }: StickyHeaderProps) => {
+=======
+const StickyHeader = memo(({table}: StickyHeaderProps) => {
+>>>>>>> private/master
   return (
     <div className={styles.fixedHeader}>
       <table>
@@ -335,9 +443,13 @@ const StickyHeader = memo(({ table }: StickyHeaderProps) => {
 
 StickyHeader.displayName = 'StickyHeader';
 
+<<<<<<< HEAD
 const HeaderCell = memo(({ header }: HeaderCellProps) => {
+=======
+const HeaderCell = memo(({header}: HeaderCellProps) => {
+>>>>>>> private/master
   return (
-    <th style={{ width: header.getSize() }}>
+    <th style={{width: header.getSize()}}>
       {header.isPlaceholder ? null : (
         <div
           className={header.column.getCanSort() ? 'cursor-pointer select-none' : ''}
@@ -352,7 +464,11 @@ const HeaderCell = memo(({ header }: HeaderCellProps) => {
 
 HeaderCell.displayName = 'HeaderCell';
 
+<<<<<<< HEAD
 const VirtualizedRow = memo(({ virtualRow, row, onSongClick, contextMenuActions, reorderable }: VirtualizedRowProps) => {
+=======
+const VirtualizedRow = memo(({virtualRow, row, onSongClick, contextMenuActions, reorderable}: VirtualizedRowProps) => {
+>>>>>>> private/master
   const handleRowClick = useCallback(() => {
     onSongClick(row.original.publicId);
   }, [row.original.publicId, onSongClick]);
@@ -406,7 +522,11 @@ const VirtualizedRow = memo(({ virtualRow, row, onSongClick, contextMenuActions,
             } : {};
 
             return (
+<<<<<<< HEAD
               <td key={cell.id} style={{ width: cell.column.getSize() }} {...cellProps}>
+=======
+              <td key={cell.id} style={{width: cell.column.getSize()}} {...cellProps}>
+>>>>>>> private/master
                 {flexRender(cell.column.columnDef.cell, cell.getContext())}
               </td>
             );
@@ -427,11 +547,19 @@ const VirtualizedRow = memo(({ virtualRow, row, onSongClick, contextMenuActions,
 
 VirtualizedRow.displayName = 'VirtualizedRow';
 
+<<<<<<< HEAD
 const VirtualizedRows = memo(({ visibleRows, onSongClick, contextMenuActions, reorderable }: VirtualizedRowsProps) => {
   return (
     <table>
       <tbody>
       {visibleRows.map(({ virtualRow, row }, index) => (
+=======
+const VirtualizedRows = memo(({visibleRows, onSongClick, contextMenuActions, reorderable}: VirtualizedRowsProps) => {
+  return (
+    <table>
+      <tbody>
+      {visibleRows.map(({virtualRow, row}, index) => (
+>>>>>>> private/master
         <VirtualizedRow
           key={row.id}
           virtualRow={virtualRow}
@@ -455,8 +583,13 @@ interface SongContextMenuProps {
   onRemoveFromPlaylist?: (song: SongResource) => void;
 }
 
+<<<<<<< HEAD
 const SongContextMenu = memo(({ song, onEdit, onRemoveFromPlaylist }: SongContextMenuProps) => {
   const { setQueueAndPlay, insertInQueue, addToQueue } = usePlayerActions();
+=======
+const SongContextMenu = memo(({song, onEdit, onRemoveFromPlaylist}: SongContextMenuProps) => {
+  const {setQueueAndPlay, insertInQueue, addToQueue} = usePlayerActions();
+>>>>>>> private/master
   const dispatch = useAppDispatch();
 
   const handleEditClick = useCallback(() => {
@@ -481,7 +614,11 @@ const SongContextMenu = memo(({ song, onEdit, onRemoveFromPlaylist }: SongContex
         message: `"${song.title}" will play next`,
         type: 'success',
         toast: true,
+<<<<<<< HEAD
       })
+=======
+      }),
+>>>>>>> private/master
     );
   }, [song, insertInQueue, dispatch]);
 
@@ -493,12 +630,17 @@ const SongContextMenu = memo(({ song, onEdit, onRemoveFromPlaylist }: SongContex
         message: `"${song.title}" added to queue`,
         type: 'success',
         toast: true,
+<<<<<<< HEAD
       })
+=======
+      }),
+>>>>>>> private/master
     );
   }, [song, addToQueue, dispatch]);
 
   return (
     <ContextMenu.Content>
+<<<<<<< HEAD
       <ContextMenu.Item onClick={handlePlayNow}>
         Play Now
       </ContextMenu.Item>
@@ -515,6 +657,27 @@ const SongContextMenu = memo(({ song, onEdit, onRemoveFromPlaylist }: SongContex
         <>
           <ContextMenu.Separator />
           <ContextMenu.Item color="red" onClick={handleRemoveClick}>Remove from Playlist</ContextMenu.Item>
+=======
+      <ContextMenu.Item className={styles.contentMenuItem} onClick={handlePlayNow}>
+        Play Now
+      </ContextMenu.Item>
+      <ContextMenu.Item className={styles.contentMenuItem} onClick={handlePlayNext}>
+        Play Next
+      </ContextMenu.Item>
+      <ContextMenu.Item className={styles.contentMenuItem} onClick={handleAddToQueue}>
+        Add to Queue
+      </ContextMenu.Item>
+
+      <ContextMenu.Separator/>
+
+      <AddToPlaylistMenu songPublicId={song.publicId} librarySlug={song.librarySlug || 'music'}/>
+      {onEdit && <ContextMenu.Item  className={styles.contentMenuItem} onClick={handleEditClick}>Edit</ContextMenu.Item>}
+      {onRemoveFromPlaylist && (
+        <>
+          <ContextMenu.Separator/>
+
+          <ContextMenu.Item  className={styles.contentMenuItem} color="red" onClick={handleRemoveClick}>Remove from Playlist</ContextMenu.Item>
+>>>>>>> private/master
         </>
       )}
     </ContextMenu.Content>
@@ -531,7 +694,7 @@ function useVirtualizedTable({
                                lastScrollTime,
                                hasTriggered,
                              }: UseVirtualizedTableProps): UseVirtualizedTableReturn {
-  const { rows } = table.getRowModel();
+  const {rows} = table.getRowModel();
   const actualRowCount = rows.length;
   const virtualizerCount = estimatedTotalCount && estimatedTotalCount > actualRowCount ? estimatedTotalCount : actualRowCount;
 
@@ -549,7 +712,7 @@ function useVirtualizedTable({
     // Only scroll to top if we went from 0 rows to some rows (initial load)
     // or if the row count decreased (new dataset)
     if (rows.length > 0 && (previousRowCount.current === 0 || rows.length < previousRowCount.current)) {
-      virtualizer.scrollToIndex(0, { align: 'start' });
+      virtualizer.scrollToIndex(0, {align: 'start'});
     }
     previousRowCount.current = rows.length;
   }, [rows.length, virtualizer]);
@@ -582,12 +745,13 @@ function useVirtualizedTable({
       }
     };
 
-    scrollElement.addEventListener('scroll', handleScroll, { passive: true });
+    scrollElement.addEventListener('scroll', handleScroll, {passive: true});
     return () => scrollElement.removeEventListener('scroll', handleScroll);
   }, [onScrollToBottom, virtualizer, actualRowCount, lastScrollTime, hasTriggered]);
 
   const virtualItems = virtualizer.getVirtualItems();
   const visibleRows = useMemo(() =>
+<<<<<<< HEAD
     virtualItems
       .filter(virtualRow => virtualRow.index < actualRowCount)
       .map(virtualRow => ({
@@ -595,6 +759,15 @@ function useVirtualizedTable({
         row: rows[virtualRow.index],
       })),
     [virtualItems, actualRowCount, rows]
+=======
+      virtualItems
+        .filter(virtualRow => virtualRow.index < actualRowCount)
+        .map(virtualRow => ({
+          virtualRow,
+          row: rows[virtualRow.index],
+        })),
+    [virtualItems, actualRowCount, rows],
+>>>>>>> private/master
   );
 
   return {virtualizer, visibleRows} as UseVirtualizedTableReturn;

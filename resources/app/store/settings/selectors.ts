@@ -1,5 +1,8 @@
 import { useSettingsStore, SettingsActions } from './settings-store';
+<<<<<<< HEAD
 import { shallow } from 'zustand/shallow';
+=======
+>>>>>>> private/master
 import { useMemo } from 'react';
 
 // ============================================================================

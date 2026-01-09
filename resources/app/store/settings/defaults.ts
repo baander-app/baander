@@ -74,5 +74,10 @@ export const EQ_PRESETS: Record<EQPreset, [number, number, number, number, numbe
   ACOUSTIC: [3, 2, 1, 2, 3, 2, 3, 4, 3, 2],
   BASS_BOOST: [7, 5, 3, 2, 0, 0, 0, 0, 0, 0],
   TREBLE_BOOST: [0, 0, 0, 0, 0, 2, 4, 6, 8, 9],
+<<<<<<< HEAD
   CUSTOM: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+=======
+  CUSTOM: [6, 4, 0.5, 2.5, 2.5, -0.5, 2.5, 7, 4, 4.5],
+  DT770Pro: [6, 5, 0.5, 2, 1, 0.5, 2.5, 2.5, 4, 4.5],
+>>>>>>> private/master
 };

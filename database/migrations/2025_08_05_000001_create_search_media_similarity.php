@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 use Tpetry\PostgresqlEnhanced\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
         // Ensure required extensions exist
@@ -20,23 +19,23 @@ return new class extends Migration
             language: 'sql:expression',
             body: 'uuid_generate_v4()',
             options: [
-                'parallel' => 'safe',
-                'volatility' => 'volatile'
-            ]
+                'parallel'   => 'safe',
+                'volatility' => 'volatile',
+            ],
         );
 
         // Create song similarity search function
         Schema::createFunctionOrReplace(
             name: 'search_songs_similarity',
             parameters: [
-                'search_term' => 'text',
-                'similarity_threshold' => 'real'
+                'search_term'          => 'text',
+                'similarity_threshold' => 'real',
             ],
             return: [
-                'id' => 'bigint',
-                'public_id' => 'varchar',
-                'title' => 'varchar',
-                'similarity_score' => 'real'
+                'id'               => 'bigint',
+                'public_id'        => 'varchar',
+                'title'            => 'varchar',
+                'similarity_score' => 'real',
             ],
             language: 'plpgsql',
             body: "
@@ -54,23 +53,23 @@ BEGIN
 END;
             ",
             options: [
-                'parallel' => 'safe',
-                'volatility' => 'stable'
-            ]
+                'parallel'   => 'safe',
+                'volatility' => 'stable',
+            ],
         );
 
         // Create artist similarity search function
         Schema::createFunctionOrReplace(
             name: 'search_artists_similarity',
             parameters: [
-                'search_term' => 'text',
-                'similarity_threshold' => 'real'
+                'search_term'          => 'text',
+                'similarity_threshold' => 'real',
             ],
             return: [
-                'id' => 'bigint',
-                'public_id' => 'varchar',
-                'name' => 'varchar',
-                'similarity_score' => 'real'
+                'id'               => 'bigint',
+                'public_id'        => 'varchar',
+                'name'             => 'varchar',
+                'similarity_score' => 'real',
             ],
             language: 'plpgsql',
             body: "
@@ -88,24 +87,24 @@ BEGIN
 END;
             ",
             options: [
-                'parallel' => 'safe',
-                'volatility' => 'stable'
-            ]
+                'parallel'   => 'safe',
+                'volatility' => 'stable',
+            ],
         );
 
         // Create album similarity search function
         Schema::createFunctionOrReplace(
             name: 'search_albums_similarity',
             parameters: [
-                'search_term' => 'text',
-                'similarity_threshold' => 'real'
+                'search_term'          => 'text',
+                'similarity_threshold' => 'real',
             ],
             return: [
-                'id' => 'bigint',
-                'public_id' => 'varchar',
-                'title' => 'varchar',
-                'year' => 'integer',
-                'similarity_score' => 'real'
+                'id'               => 'bigint',
+                'public_id'        => 'varchar',
+                'title'            => 'varchar',
+                'year'             => 'integer',
+                'similarity_score' => 'real',
             ],
             language: 'plpgsql',
             body: "
@@ -124,30 +123,30 @@ BEGIN
 END;
             ",
             options: [
-                'parallel' => 'safe',
-                'volatility' => 'stable'
-            ]
+                'parallel'   => 'safe',
+                'volatility' => 'stable',
+            ],
         );
 
         // Create comprehensive media search function
         Schema::createFunctionOrReplace(
             name: 'search_media_comprehensive',
             parameters: [
-                'song_term' => 'text',
-                'artist_term' => 'text',
-                'album_term' => 'text',
-                'min_similarity' => 'real'
+                'song_term'      => 'text',
+                'artist_term'    => 'text',
+                'album_term'     => 'text',
+                'min_similarity' => 'real',
             ],
             return: [
-                'song_id' => 'bigint',
-                'song_public_id' => 'varchar',
-                'song_title' => 'varchar',
-                'artist_name' => 'varchar',
-                'album_title' => 'varchar',
-                'song_similarity' => 'real',
+                'song_id'           => 'bigint',
+                'song_public_id'    => 'varchar',
+                'song_title'        => 'varchar',
+                'artist_name'       => 'varchar',
+                'album_title'       => 'varchar',
+                'song_similarity'   => 'real',
                 'artist_similarity' => 'real',
-                'album_similarity' => 'real',
-                'combined_score' => 'real'
+                'album_similarity'  => 'real',
+                'combined_score'    => 'real',
             ],
             language: 'plpgsql',
             body: "
@@ -178,16 +177,16 @@ BEGIN
 END;
             ",
             options: [
-                'parallel' => 'safe',
-                'volatility' => 'stable'
-            ]
+                'parallel'   => 'safe',
+                'volatility' => 'stable',
+            ],
         );
 
         // Create library statistics function
         Schema::createFunctionOrReplace(
             name: 'get_library_stats',
             parameters: [
-                'library_id' => 'bigint'
+                'library_id' => 'bigint',
             ],
             return: 'json',
             language: 'plpgsql',
@@ -219,9 +218,9 @@ BEGIN
 END;
             ",
             options: [
-                'parallel' => 'restricted',
-                'volatility' => 'stable'
-            ]
+                'parallel'   => 'restricted',
+                'volatility' => 'stable',
+            ],
         );
 
         // Create function to search songs by genre
@@ -229,15 +228,15 @@ END;
             name: 'search_songs_by_genre',
             parameters: [
                 'input_genre_names' => 'text[]',  // Changed parameter name
-                'limit_count' => 'integer'
+                'limit_count'       => 'integer',
             ],
             return: [
-                'song_id' => 'bigint',
+                'song_id'        => 'bigint',
                 'song_public_id' => 'varchar',
-                'title' => 'varchar',
-                'artist_names' => 'text',
-                'album_title' => 'varchar',
-                'genre_names' => 'text'  // Return column name stays the same
+                'title'          => 'varchar',
+                'artist_names'   => 'text',
+                'album_title'    => 'varchar',
+                'genre_names'    => 'text',  // Return column name stays the same
             ],
             language: 'plpgsql',
             body: "
@@ -263,9 +262,9 @@ BEGIN
 END;
             ",
             options: [
-                'parallel' => 'safe',
-                'volatility' => 'stable'
-            ]
+                'parallel'   => 'safe',
+                'volatility' => 'stable',
+            ],
         );
 
         // Create function to search songs by duration range
@@ -273,14 +272,14 @@ END;
             name: 'search_songs_by_duration',
             parameters: [
                 'min_duration' => 'integer',
-                'max_duration' => 'integer'
+                'max_duration' => 'integer',
             ],
             return: [
-                'id' => 'bigint',
-                'public_id' => 'varchar',
-                'title' => 'varchar',
-                'length' => 'integer',
-                'artist_names' => 'text'
+                'id'           => 'bigint',
+                'public_id'    => 'varchar',
+                'title'        => 'varchar',
+                'length'       => 'integer',
+                'artist_names' => 'text',
             ],
             language: 'plpgsql',
             body: "
@@ -301,29 +300,29 @@ BEGIN
 END;
             ",
             options: [
-                'parallel' => 'safe',
-                'volatility' => 'stable'
-            ]
+                'parallel'   => 'safe',
+                'volatility' => 'stable',
+            ],
         );
 
         Schema::createFunctionOrReplace(
             name: 'search_songs_by_content',
             parameters: [
-                'genre_ids' => 'integer[]',
-                'artist_ids' => 'integer[]',
+                'genre_ids'       => 'integer[]',
+                'artist_ids'      => 'integer[]',
                 'target_duration' => 'integer',
-                'target_year' => 'integer',
-                'limit_count' => 'integer'
+                'target_year'     => 'integer',
+                'limit_count'     => 'integer',
             ],
             return: [
-                'song_id' => 'bigint',
-                'song_public_id' => 'varchar',
-                'title' => 'varchar',
-                'similarity_score' => 'real',
-                'genre_matches' => 'integer',
-                'artist_matches' => 'integer',
+                'song_id'             => 'bigint',
+                'song_public_id'      => 'varchar',
+                'title'               => 'varchar',
+                'similarity_score'    => 'real',
+                'genre_matches'       => 'integer',
+                'artist_matches'      => 'integer',
                 'duration_similarity' => 'real',
-                'year_proximity' => 'integer'
+                'year_proximity'      => 'integer',
             ],
             language: 'plpgsql',
             body: "
@@ -396,23 +395,23 @@ BEGIN
 END;
             ",
             options: [
-                'parallel' => 'safe',
-                'volatility' => 'stable'
-            ]
+                'parallel'   => 'safe',
+                'volatility' => 'stable',
+            ],
         );
 
         // Create function to find songs by genre clustering
         Schema::createFunctionOrReplace(
             name: 'find_songs_by_genre_cluster',
             parameters: [
-                'song_id' => 'bigint',
-                'limit_count' => 'integer'
+                'song_id'     => 'bigint',
+                'limit_count' => 'integer',
             ],
             return: [
-                'similar_song_id' => 'bigint',
-                'similar_song_title' => 'varchar',
-                'shared_genres' => 'text',
-                'genre_similarity_score' => 'real'
+                'similar_song_id'        => 'bigint',
+                'similar_song_title'     => 'varchar',
+                'shared_genres'          => 'text',
+                'genre_similarity_score' => 'real',
             ],
             language: 'plpgsql',
             body: "
@@ -451,9 +450,9 @@ BEGIN
 END;
             ",
             options: [
-                'parallel' => 'safe',
-                'volatility' => 'stable'
-            ]
+                'parallel'   => 'safe',
+                'volatility' => 'stable',
+            ],
         );
     }
 
