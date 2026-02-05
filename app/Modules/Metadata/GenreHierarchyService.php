@@ -20,7 +20,7 @@ class GenreHierarchyService
     )]
     private LoggerInterface $logger;
 
-    private LastFmClient $lastFmClient;
+    private LastFmClient|null $lastFmClient = null;
 
     public function __construct(
         private readonly DiscogsClient $discogsClient,
@@ -28,8 +28,6 @@ class GenreHierarchyService
         private readonly TextSimilarity $textSimilarity,
     )
     {
-        $user = User::first();
-        $this->lastFmClient = $user ? $lastFmClient->forUser($user) : $lastFmClient;
     }
 
     /**
@@ -48,7 +46,7 @@ class GenreHierarchyService
 
                 // Get LastFM data
                 try {
-                    $tagInfo = $this->lastFmClient->tags->getTagInfo($genre);
+                    $tagInfo = $this->getLastFmClient()->tags->getTagInfo($genre);
                 } catch (Exception $e) {
                     $this->logger->warning("LastFM failed for $genre", ['error' => $e->getMessage()]);
                     $tagInfo = [];
@@ -478,7 +476,7 @@ class GenreHierarchyService
 
             // Get LastFM data only
             try {
-                $tagInfo = $this->lastFmClient->tags->getTagInfo($genre);
+                $tagInfo = $this->getLastFmClient()->tags->getTagInfo($genre);
             } catch (Exception $e) {
                 $this->logger->warning("LastFM failed for {$genre}", ['error' => $e->getMessage()]);
                 $tagInfo = [];
@@ -514,10 +512,21 @@ class GenreHierarchyService
         if ($genre1 === $genre2) {
             return 1.0;
         }
-
         // Check the similarity matrix first
         return $hierarchyData['similarity_matrix'][$genre1][$genre2]
             ?? $hierarchyData['similarity_matrix'][$genre2][$genre1]
             ?? $this->calculateStringSimilarity($genre1, $genre2);
+    }
+
+    private function getLastFmClient()
+    {
+        if ($this->lastFmClient) {
+            return $this->lastFmClient;
+        }
+
+        $user = User::first();
+        $this->lastFmClient = $user ? $this->lastFmClient->forUser($user) : $this->lastFmClient;
+
+        return $this->lastFmClient;
     }
 }

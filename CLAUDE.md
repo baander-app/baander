@@ -2,130 +2,46 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+Always use Context7 MCP when I need library/API documentation, code generation, setup or configuration steps without me having to explicitly ask.
+
 ## Project Overview
 
-**Bånder** is a self-hosted media server application for music and movie library management. It consists of:
-
-- **Backend API**: Laravel 12 with PHP 8.4, powered by Octane/Swoole
-- **Frontend**: React 19 + TypeScript with Vite
-- **Desktop Client**: Electron-based cross-platform application
-- **Transcoding Service**: Node.js service for on-the-fly media transcoding
-
-The application uses a modular monolith architecture with advanced features like OAuth 2.0, WebAuthn authentication, intelligent metadata extraction, and recommendation algorithms.
-
-## When to Update This Document
-
-Update CLAUDE.md when you make changes to:
-
-- **Architecture**: New modules, major structural patterns, routing approach
-- **Development workflow**: New docker services, fundamental command changes
-- **Key conventions**: State management, API client patterns, data layer
-- **Testing approach**: Framework changes, test organization
-- **Directory structure**: Major reorganizations
-
-**Do NOT update for**:
-- Bug fixes and small feature additions
-- Configuration tweaks
-- Minor dependency updates
-- Transient implementation details
-
-This document should focus on **enduring architecture** and patterns, not exhaustive implementation details. When in doubt, ask: "Will this still be relevant 6 months from now?"
+**Bånder** is a self-hosted media server for music/movie libraries. Stack: Laravel 12 (PHP 8.4, Octane/Swoole), React 19 + TypeScript + Vite, Electron desktop client, Node.js transcoding service. Modular monolith with OAuth 2.0, WebAuthn, metadata extraction, and recommendations.
 
 ## Development Commands
 
-### Docker Environment
-
-**IMPORTANT**: This project uses Docker directly via `docker-compose` and **NOT** Laravel Sail. Laravel Sail is not installed.
+**Uses Docker directly (NOT Laravel Sail). Commands use `make exec` for consistency.**
 
 ```bash
-# Build and start all services
-make build
-make start
+# Docker
+make build && make start         # Build and start
+make stop                        # Stop
+make ssh / make ssh-root         # Access container
+make logs / make logs-nginx      # View logs
 
-# Stop services
-make stop
+# Backend
+make composer-install            # Install dependencies
+make exec cmd="php artisan setup:dev --fresh"  # Initial setup
+make exec cmd="php artisan migrate:fresh"      # Reset DB
+make exec cmd="php artisan make:migration"     # Create migration
+make ziggy-routes                # Generate Ziggy routes
+make phpunit                     # Run tests
+make exec cmd="php artisan dev:server"         # Start dev server
+make exec cmd="php artisan reverb:start"       # Start WebSocket
 
-# Access application container
-make ssh              # as www-data user
-make ssh-root         # as root user
+# Frontend
+yarn dev                        # Vite dev server
+yarn build                      # Production build
+yarn generate-api-client        # Generate from OpenAPI spec
 
-# View logs
-make logs             # app container logs
-make logs-nginx       # nginx logs
+# API Client Generation (after ANY API change)
+make exec cmd="php artisan scramble:export" && yarn generate-api-client
 ```
 
-### Backend (Laravel/PHP)
-
-**Use `docker exec baander-app` to run commands in the Laravel container:**
-
-```bash
-# Install dependencies
-docker exec baander-app composer install
-
-# Initial development setup
-docker exec baander-app php artisan setup:dev --fresh    # Drops DB, runs migrations, seeds test users
-
-# Database operations
-docker exec baander-app php artisan migrate:fresh        # Drop and recreate all tables
-docker exec baander-app php artisan migrate              # Run pending migrations
-docker exec baander-app php artisan db:seed              # Seed database
-
-# Code generation
-docker exec baander-app php artisan make:migration       # Create migration
-docker exec baander-app php artisan make:log-channel     # Create logging channels
-
-# Type generation for frontend
-docker exec baander-app php artisan ziggy:generate       # Generate Ziggy route definitions
-
-# Testing
-docker exec baander-app php artisan -p test                 # Run all tests
-docker exec baander-app php vendor/bin/phpunit              # Run PHPUnit directly
-
-# Development server
-docker exec baander-app php artisan dev:server           # Start dev server, queue worker, and scheduler
-docker exec baander-app php artisan reverb:start         # Start WebSocket server (in separate terminal)
-
-# API Client Generation
-docker exec baander-app php artisan scramble:export && yarn generate-api-client
-```
-
-### Frontend (React/TypeScript)
-
-```bash
-# Development
-yarn dev                         # Start Vite dev server (https://baander.test)
-
-# Build
-yarn build                       # Production build
-yarn tsc                         # Type check only
-
-# API Client Generation
-yarn generate-api-client         # Generate API client from OpenAPI spec
-
-# Electron Desktop Client
-yarn dev:electron                # Start Electron in dev mode
-yarn build:electron              # Build Electron for production
-yarn dist:all                    # Package Electron for all platforms
-```
-
-## Architecture
-
-### Modular Structure
-
-The application uses a **modular monolith** architecture. Core business logic is organized into self-contained modules in `app/Modules/`:
-
-- **Auth**: OAuth 2.0 server, WebAuthn (Passkeys), token management
-- **Metadata**: Pluggable metadata readers (ID3, FLAC, OGG), MusicBrainz/Discogs integration
-- **Transcoder**: Control client for Node.js transcoding service (Unix socket communication)
-- **Recommendation**: Content-based and behavior-based recommendation algorithms
-- **FFmpeg**: Custom FFmpeg wrapper for media processing and HLS/DASH generation
-- **Essentia**: FFI bridge to Python Essentia library for audio feature extraction
-- **BlurHash**: Perceptual image hash generation for fast loading previews
-- **Queue**: Job monitoring and metrics collection
+## Critical Patterns
 
 ### Routing with Attributes
-
-**Critical**: Routes are NOT defined in `routes/api.php`. All API routes use PHP 8 attributes directly on controllers:
+**CRITICAL**: Routes are NOT in `routes/api.php`. Use PHP 8 attributes on controllers:
 
 ```php
 #[Middleware(['force.json'])]
@@ -140,300 +56,146 @@ class SongController extends Controller
 }
 ```
 
-When adding new routes:
-1. Add the route attribute to the controller method
-2. Run `docker exec baander-app php artisan typescript:transform` and `php artisan ziggy:generate` for frontend
-3. API documentation is auto-generated by Scramble from these attributes
-
-### Job Queue System
-
-All queued jobs extend `BaseJob` which provides monitoring, logging, and metrics:
-
-```php
-class ScanDirectoryJob extends BaseJob
-{
-    // Automatic queue monitoring and dedicated logger
-}
-```
-
-Key job categories:
-- **Library Scanning** (`app/Jobs/Library/Music/`): Batch file scanning, metadata extraction, cover art
-- **Recommendations** (`app/Jobs/Recommendation/`): Background similarity calculations
-- **Metadata Sync** (`app/Jobs/Library/Music/`): External API integration with rate limiting
-
-Jobs are monitored via **Laravel Horizon** at `/-/horizon`.
-
-### Data Layer
-
-**Models** use several key traits:
-- `HasNanoPublicId`: URL-safe, non-sequential public IDs (not UUIDs)
-- `HasLibraryAccess`: Automatic scoping to user-accessible libraries
-- `HasMusicMetadata`: Common music fields and scopes
-- `HasContentSimilarity`: Content-based similarity for recommendations
-
-**Important Relationships**:
-- `ArtistSong` pivot table with `role` field (Primary, Featured, Producer, etc.)
-- Custom `BelongsToManyThrough` relationship for complex queries
-- Artists are related to Songs, not Albums (album artists come through songs)
-
-**Model Conventions**:
-- Use `public_id` (Nanoid) as the route key for public-facing URLs
-- Use integer `id` for internal/foreign key relationships
-- Store JSONB metadata in `*_metadata` columns (e.g., `album_metadata`)
-- Store locked fields in `locked_fields` JSONB column
-
-### Frontend State Management
-
-- **Redux Toolkit**: Client state (music player, UI, notifications)
-- **TanStack Query**: Server state with auto-generated hooks from API
-- **Redux Persist**: Persistent state storage
-- **IndexedDB**: TanStack Query persistence
+After adding routes: `make typescript-transform && make ziggy-routes`
 
 ### API Client Generation
+**CRITICAL**: Frontend API client is fully auto-generated. Never use `axios` directly.
 
-The frontend API client is **fully auto-generated** using Orval:
-
-1. Backend: Scramble generates `api.json` OpenAPI spec from route attributes
-2. Frontend: Orval generates TypeScript client from `api.json`
-3. Result: Type-safe API calls with React Query hooks
-
-**Workflow after API changes**:
-```bash
-# 1. Make backend changes
-# 2. Export OpenAPI spec and regenerate client
-docker exec baander-app php artisan scramble:export
-yarn generate-api-client
-```
-
-**IMPORTANT**: Never use `axios` directly. Always use the auto-generated React Query hooks:
 ```typescript
-// ✅ CORRECT - Use generated hooks
+// ✅ CORRECT
 import { useAlbumsIndex } from '@/app/libs/api-client/gen/endpoints';
+const { data: albums } = useAlbumsIndex({ library: 'my-library' });
 
-function MyComponent() {
-  const { data: albums } = useAlbumsIndex({ library: 'my-library' });
-}
-
-// ❌ WRONG - Don't use axios directly
+// ❌ WRONG
 import axios from 'axios';
 axios.get('/api/albums');
 ```
 
-### Transcoding Architecture
+Workflow: Backend changes → Scramble generates `api.json` → Orval generates TypeScript hooks → Type-safe React Query
 
-The Node.js transcoding service operates independently:
-- **PHP**: Control client via Unix socket (starts/stops transcodes)
-- **Node.js**: Handles FFmpeg processes and media streaming
-- **Browser**: Connects directly to Node.js for media streams (not through PHP)
+### Frontend Path Aliases
+```typescript
+// ✅ Use aliases
+import { BrowseTab } from '@/app/modules/dashboard/music/components/browse-tab';
+// ❌ No relative imports
+import { BrowseTab } from '../../../../dashboard/music/...';
+```
+`@/app/*` → `resources/app/*`, `@/docs/*` → `resources/docs/*`
+
+## Architecture
+
+### Backend Modules (`app/Modules/`)
+- **Auth**: OAuth 2.0, WebAuthn, token management
+- **Metadata**: Pluggable readers (ID3, FLAC, OGG), MusicBrainz/Discogs
+- **Transcoder**: Unix socket control client for Node.js transcoding service
+- **Recommendation**: Content-based and behavior-based algorithms
+- **FFmpeg**: Media processing, HLS/DASH generation
+- **Essentia**: FFI bridge to Python Essentia for audio features
+- **BlurHash**: Perceptual image hashes
+- **Queue**: Job monitoring and metrics
+
+### State Management
+- **Redux Toolkit**: Client state (player, UI, notifications)
+- **TanStack Query**: Server state (auto-generated hooks)
+- **Redux Persist + IndexedDB**: Persistence
+
+### Key Traits & Patterns
+- `HasNanoPublicId`: URL-safe, non-sequential public IDs (use for public-facing URLs)
+- `HasLibraryAccess`: Automatic scoping to user-accessible libraries
+- `HasMusicMetadata`: Common music fields and scopes
+- `HasContentSimilarity`: Content-based similarity for recommendations
+- **Jobs extend `BaseJob`**: Automatic monitoring, logging, metrics
+- **Artists relate to Songs**, not Albums (album artists come through songs)
 
 ## Code Organization
 
 ### Backend Decision Framework
-
-When deciding where to place new backend code:
-
-1. **Is it a Controller?** → `app/Http/Controllers/`
-2. **Is it an Eloquent Model?** → `app/Models/`
-3. **Is it Middleware?** → `app/Http/Middleware/`
-4. **Is it a migration/seeder/factory?** → `database/`
-5. **Is it business logic/domain services?** → `app/Modules/`
-6. **Is it a background job?** → `app/Jobs/`
-7. **Is it an API resource/transformer?** → `app/Http/Resources/`
-8. **Is it form validation?** → `app/Http/Requests/`
+1. Controller → `app/Http/Controllers/`
+2. Eloquent Model → `app/Models/`
+3. Middleware → `app/Http/Middleware/`
+4. Migration/seeder/factory → `database/`
+5. Business logic/domain services → `app/Modules/`
+6. Background job → `app/Jobs/`
+7. API resource/transformer → `app/Http/Resources/`
+8. Form validation → `app/Http/Requests/`
 
 ### Frontend Decision Framework
-
-When deciding where to place new frontend code:
-
-1. **Is it a page/route?** → `resources/app/modules/feature-name/routes/`
-2. **Is it feature-specific?** → `resources/app/modules/feature-name/components/`
-3. **Is it reusable across features?** → `resources/app/ui/`
-4. **Is it a layout?** → `resources/app/layouts/`
-5. **Is it global state?** → `resources/app/store/`
-6. **Is it a custom hook?** → `resources/app/hooks/`
-7. **Is it API-related?** → Use generated hooks in `libs/api-client/gen/`
-8. **Is it a utility?** → `resources/app/utils/`
+1. Page/route → `resources/app/modules/feature-name/routes/`
+2. Feature-specific → `resources/app/modules/feature-name/components/`
+3. Reusable → `resources/app/ui/`
+4. Layout → `resources/app/layouts/`
+5. Global state → `resources/app/store/`
+6. Custom hook → `resources/app/hooks/`
+7. API-related → Use generated hooks in `libs/api-client/gen/`
+8. Utility → `resources/app/utils/`
 
 ### Directory Structure
-
 ```
 app/
-├── Actions/              # Single-action classes
-├── Auth/                 # Authentication logic
-├── Console/              # Artisan commands
-├── Events/               # Event definitions
-├── Exceptions/           # Custom exceptions
-├── Extensions/           # Extended framework classes
-├── Format/               # Formatting utilities (Bytes, Duration, LocaleString)
-├── Http/
-│   ├── Controllers/Api/  # API controllers with route attributes
-│   ├── Integrations/     # External API clients (Discogs, MusicBrainz, etc.)
-│   ├── Middleware/       # HTTP middleware
-│   ├── Requests/         # Form request validation
-│   └── Resources/        # API resource transformers
-├── Jobs/                 # Queue jobs
-├── Listeners/            # Event listeners
-├── Mail/                 # Email templates
-├── Models/               # Eloquent models
-├── Modules/              # Self-contained modules (Auth, Metadata, Transcoder, etc.)
-├── Observers/            # Model observers
-├── Octane/               # Octane-specific code
-├── Policies/             # Authorization policies
-├── Providers/            # Service providers
-├── Repositories/         # Data access layer
-└── Services/             # Business logic services
+├── Http/Controllers/Api/    # API controllers with route attributes
+├── Http/Integrations/        # External API clients
+├── Http/Requests/            # Form request validation
+├── Http/Resources/           # API resource transformers
+├── Jobs/                     # Queue jobs
+├── Models/                   # Eloquent models
+├── Modules/                  # Self-contained modules
+└── Services/                 # Business logic
 
 resources/app/
-├── components/           # Reusable UI components
-├── libs/                 # Third-party library integrations
-│   └── api-client/       # Auto-generated API client
-│       ├── gen/          # Generated endpoints and models
-│       └── axios-instance.ts
-├── modules/              # Feature modules
-│   ├── auth/             # Authentication flows
-│   ├── library-music/    # Music library browsing and management
-│   ├── library-music-player/  # Audio player with queue management
-│   ├── dashboard/        # Dashboard pages
-│   └── user-settings/    # User preferences
-├── store/                # Redux store
-├── hooks/                # Custom React hooks
-└── utils/                # Utility functions
+├── libs/api-client/gen/      # Auto-generated API client
+├── modules/                  # Feature modules (auth, library-music, etc.)
+├── store/                    # Redux store
+└── hooks/                    # Custom React hooks
 ```
 
-## Key Development Patterns
+## Conventions
 
-### Adding New API Endpoints
+### Naming
+**PHP**: Classes `PascalCase`, methods/variables `camelCase`, constants `UPPER_SNAKE_CASE`, DB columns `snake_case`, JSON keys `camelCase`
+**TypeScript**: Components `PascalCase`, functions/variables `camelCase`, types `PascalCase`, files `kebab-case`
 
-1. Create Form Request class in `app/Http/Requests/` for validation
-2. Create Resource class in `app/Http/Resources/` for response transformation
-3. Add controller method with route attributes
-4. Run `docker exec baander-app php artisan typescript:transform` and `php artisan ziggy:generate`
-5. Regenerate API client: `docker exec baander-app php artisan scramble:export && yarn generate-api-client`
-
-### Working with Metadata
-
-The `MetadataReader` facade provides format-agnostic access:
-```php
-use App\Modules\Metadata\Facades\MetadataReader;
-
-$metadata = MetadataReader::read($filePath);
-```
-
-Metadata readers are pluggable - add new formats in `app/Modules/Metadata/Readers/`.
-
-### Library Scanning
-
-Scanner configuration in `config/scanner.php`:
-- Batch sizes for file processing
-- Rate limiting for external APIs
-- Delimiter detection rules for multi-value fields
-- Unknown entity handling (localized "Unknown Artist"/"Unknown Album")
-
-### Testing
-
-- **PHPUnit**: Feature and Unit tests in `tests/`
-- **Test Database**: Separate PostgreSQL instance configured in `.env.testing`
-- **Factories**: Database factories in `database/factories/`
-- **Seeders**: Database seeders in `database/seeders/`
-
-### Naming Conventions
-
-**Backend (PHP):**
-- Classes: `PascalCase` (`AlbumController`, `MetadataSyncService`)
-- Methods: `camelCase` (`getAlbum`, `syncMetadata`)
-- Variables: `camelCase` (`$albumId`, `$metadata`)
-- Constants: `UPPER_SNAKE_CASE` (`MAX_RETRIES`)
-- Database columns: `snake_case` (`public_id`, `locked_fields`)
-- JSON API keys: `camelCase` (`publicId`, `lockedFields`)
-
-**Frontend (TypeScript/React):**
-- Components: `PascalCase` (`AlbumEditor`, `BrowseTab`)
-- Functions/variables: `camelCase` (`useAlbums`, `handleClick`)
-- Types/interfaces: `PascalCase` (`AlbumResource`, `BrowseTabProps`)
-- Files: `kebab-case` (`album-editor.tsx`, `browse-tab.module.scss`)
-- SCSS classes: `camelCase` (`.albumEditor`, `.container`)
-
-### Path Aliases
-
-**Frontend TypeScript Configuration:**
-- `@/app/*` → `resources/app/*`
-- `@/docs/*` → `resources/docs/*`
-
-```typescript
-// ✅ CORRECT
-import { Button } from '@radix-ui/themes';
-import { BrowseTab } from '@/app/modules/dashboard/music/components/browse-tab';
-import { useAlbumsIndex } from '@/app/libs/api-client/gen/endpoints';
-
-// ❌ WRONG - No relative imports for feature code
-import { BrowseTab } from '../../../../dashboard/music/components/browse-tab';
-```
-
-## Environment & Configuration
-
-### Docker Services
-
-- **nginx**: Reverse proxy (ports 80/443)
-- **baander-app**: PHP 8.4 with Swoole (Laravel Octane)
-- **postgres**: PostgreSQL 18 with PgROONGA extension
-- **redis**: Redis Stack for cache/queue
-
-### Key Configuration Files
-
-- `config/scanner.php`: Music scanning behavior, rate limits
-- `config/octane.php`: Swoole server configuration
-- `config/horizon.php`: Queue monitoring
-- `config/recommendation.php`: Algorithm settings
-- `orval.config.cjs`: Frontend API client generation
-
-### Development URLs
-
-- Application: `https://baander.test`
-- API Documentation: `https://baander.test/api/docs`
-- Horizon (Queue): `https://baander.test/-/horizon`
-- OpenAPI Spec: `https://baander.test/api/docs.json`
-
-## Important Notes
-
-### Performance
-
-- **Swoole**: Keep workers stateless - no state should be stored in memory
-- **Connection Pooling**: Transcoder connections are pooled for reuse
-- **Batch Operations**: Scanner processes files in batches (default: 50)
-- **Lazy Collections**: Use for memory-intensive file operations
-
-### Security
-
-- **OAuth Scopes**: Enforce with `['scope:access-api']` middleware
-- **Library Access**: Always scope queries with `HasLibraryAccess` trait
-- **CORS**: Configured per route
-- **Rate Limiting**: Applied to token endpoints and external APIs
+### Model Conventions
+- Use `public_id` (Nanoid) for public-facing URLs
+- Use integer `id` for internal/foreign key relationships
+- Store JSONB metadata in `*_metadata` columns (e.g., `album_metadata`)
+- Store locked fields in `locked_fields` JSONB column
+- `ArtistSong` pivot has `role` field (Primary, Featured, Producer, etc.)
 
 ### Common Pitfalls
-
-1. **Missing Route Registration**: Routes use attributes - no registration needed in routes file
+1. **Missing Route Registration**: Routes use attributes - no registration needed
 2. **Stale API Client**: Always regenerate after API changes
-3. **Swoole State**: Don't store state in memory between requests (except via cache)
-4. **External API Rate Limits**: Scanner respects Discogs/MusicBrainz rate limits automatically
-5. **Artist-Song vs Album-Artist**: Artists are related to Songs, not Albums directly
-6. **php cli asks for PEM passphrase**: Either missing/incorrect password for oauth config or improperly generated private keypair
+3. **Swoole State**: Don't store state in memory between requests (use cache, or `make restart-app`)
+4. **Artist-Song vs Album-Artist**: Artists relate to Songs, not Albums
+5. **External API Rate Limits**: Scanner respects Discogs/MusicBrainz limits automatically
 
-## Database
+## Testing
 
-- **PostgreSQL 18** with PgROONGA for full-text search
-- **Migrations**: `database/migrations/`
-- **Model Factories**: `database/factories/`
-- **Seeders**: `database/seeders/`
+- **Feature tests**: `tests/Feature/` - API endpoints, integration
+- **Unit tests**: `tests/Unit/` - Individual components
+- Use `RefreshDatabase` trait to reset DB between tests
+- Use factories in `database/factories/` for test data
+- Test database: `.env.testing` with separate PostgreSQL instance
 
-## Test Users
+## Environment
 
-See `docs/dev_users.md` for available test user credentials after running `php artisan setup:dev`.
+**Docker Services**: nginx (reverse proxy), baander-app (PHP 8.4 + Swoole), postgres (PostgreSQL 18 + PgROONGA), redis (Redis Stack)
+
+**Key Config**: `config/scanner.php`, `config/octane.php`, `config/horizon.php`, `config/recommendation.php`, `orval.config.cjs`
+
+**First-time Setup**: `cp .env.example .env && make build && make start && make composer-install && make exec cmd="php artisan setup:dev --fresh" && yarn install`
+
+**Dev URLs**: https://baander.test, API docs at `/api/docs`, Horizon at `/-/horizon`
+
+## Troubleshooting
+
+- **"php cli asks for PEM passphrase"**: Check `config/oauth.php` credentials or regenerate keys
+- **API client out of date / TypeScript errors**: `make exec cmd="php artisan scramble:export" && yarn generate-api-client`
+- **Swoole state issues / Changes not reflected**: `make restart-app` (Octane caches in memory)
+- **Routes return 404**: Check route attributes, run `make typescript-transform && make ziggy-routes`, verify middleware/scopes
+- **Tests fail with DB errors**: Check `.env.testing` exists, run `make exec cmd="php artisan migrate:fresh --env=test"`
 
 ## Additional Documentation
 
-- `README.md`: Project overview and screenshots
-- `docs/dev_workflow.md`: Detailed development workflow
-- `docs/dev_artisan_commands.md`: Development-specific artisan commands
-- `docs/dev_docker_services.md`: Docker service details
-- `docs/xdebug.md`: XDebug configuration for debugging
-- `docs/phpstorm.md`: IDE setup recommendations
+- `README.md`: Project overview
+- `docs/dev_workflow.md`: Detailed workflow
+- `docs/dev_users.md`: Test user credentials after setup

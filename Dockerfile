@@ -1,5 +1,5 @@
 # Base stage with common dependencies
-FROM php:8.4.16-zts-bookworm AS base
+FROM php:8.5.2-zts-bookworm AS base
 
 # Build arguments and environment variables
 ARG BUILD_ARGUMENT_ENV=dev
@@ -7,6 +7,7 @@ ARG HOST_UID=1000
 ARG HOST_GID=1000
 ARG INSIDE_DOCKER_CONTAINER=1
 ARG ESSENTIA_VERSION=2.1_beta5
+ARG LIBURING_VERSION=2.13
 
 ARG XDEBUG_CONFIG=main
 ARG XDEBUG_VERSION=3.5.0
@@ -31,6 +32,7 @@ RUN set -xe && \
         python3 \
         python3-pip \
         libeigen3-dev \
+        liburing-dev \
         libyaml-dev \
         libfftw3-dev \
         libavcodec-dev \
@@ -49,6 +51,7 @@ RUN set -xe && \
         nodejs \
         procps \
         sudo \
+        gnupg \
         supervisor \
         unzip \
         iputils-ping \
@@ -82,8 +85,7 @@ RUN set -xe && \
     rm -rf /var/lib/apt/lists/* && \
     apt-get clean
 
-# Download & verify
-RUN pip install --break-system-packages essentia
+COPY --from=ghcr.io/php/pie:bin /pie /bin/pie
 
 # Configure PHP extensions
 RUN set -xe && \
@@ -99,9 +101,7 @@ RUN set -xe && \
       gd \
       gettext \
       intl \
-      opcache \
       pcntl \
-      pdo \
       pdo_pgsql \
       pgsql \
       sockets \
@@ -109,25 +109,31 @@ RUN set -xe && \
       shmop \
       sysvmsg
 
+RUN set -xe && \
+    wget https://github.com/axboe/liburing/archive/refs/tags/liburing-${LIBURING_VERSION}.tar.gz && \
+    tar zxf liburing-${LIBURING_VERSION}.tar.gz && \
+    cd liburing-liburing-${LIBURING_VERSION} && \
+    ./configure && \
+    make -j$(cat /proc/cpuinfo | grep processor | wc -l) install  && \
+    cd .. \
+    rm -rf liburing-${LIBURING_VERSION} && rm -f liburing-${LIBURING_VERSION}.tar.gz
+
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+RUN chmod +x /usr/bin/composer
+
+RUN set -xe && \
+    pie install swoole/swoole:dev-master -vvv --enable-swoole-thread --enable-sockets --enable-swoole-curl --enable-cares --enable-swoole-pgsql --enable-iouring --enable-zstd || ( \
+        cat /tmp/pie_make_output_* && \
+        php -v && \
+        echo "=== PHP Version ===" && \
+        php-config --version && \
+        exit 1 \
+    )
+
 RUN set -xe \
     && pecl channel-update pecl.php.net \
     && mkdir -p /usr/local/src/pecl \
-    # protobuf
-    && pecl bundle -d /usr/local/src/pecl protobuf \
-    && docker-php-ext-configure /usr/local/src/pecl/protobuf \
-    && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/protobuf \
-    # grpc
-    && pecl bundle -d /usr/local/src/pecl grpc \
-    && docker-php-ext-configure /usr/local/src/pecl/grpc \
-    && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/grpc \
-    # jsonpath
-    && pecl bundle -d /usr/local/src/pecl jsonpath \
-    && docker-php-ext-configure /usr/local/src/pecl/jsonpath \
-    && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/jsonpath \
-    # ssh2
-    && pecl bundle -d /usr/local/src/pecl ssh2 \
-    && docker-php-ext-configure /usr/local/src/pecl/ssh2 \
-    && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/ssh2 \
     # imagick
     && pecl bundle -d /usr/local/src/pecl imagick \
     && docker-php-ext-configure /usr/local/src/pecl/imagick \
@@ -165,14 +171,16 @@ RUN set -xe \
     && docker-php-ext-configure /usr/local/src/pecl/uv \
     && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/uv \
     # swoole
-    && pecl bundle -d /usr/local/src/pecl swoole \
-    && docker-php-ext-configure /usr/local/src/pecl/swoole --enable-swoole-thread --enable-sockets --enable-swoole-curl --enable-cares --enable-swoole-pgsql \
-    && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/swoole \
+#    && pecl bundle -d /usr/local/src/pecl swoole \
+#    && docker-php-ext-configure /usr/local/src/pecl/swoole --enable-swoole-thread --enable-sockets --enable-swoole-curl --enable-cares --enable-swoole-pgsql \
+#    && docker-php-ext-install -j$(nproc) /usr/local/src/pecl/swoole \
     && rm -rf /usr/local/src/pecl \
     && rm -rf /tmp/* \
     && rm -rf /var/list/apt/* \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
+
+RUN pip install --break-system-packages essentia
 
 # Setup user permissions
 RUN set -xe && \
@@ -188,10 +196,6 @@ COPY ./docker/dev/ca.crt /usr/local/share/ca-certificates/ca-self.crt
 COPY ./docker/dev/juul.localdomain.crt /usr/local/share/ca-certificates/juul.localdomain.crt
 RUN update-ca-certificates
 
-# Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-RUN chmod +x /usr/bin/composer
-
 # Setup supervisor and cron
 RUN mkdir -p /var/log/supervisor
 COPY --chown=root:root ./docker/general/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
@@ -202,12 +206,14 @@ RUN chmod 0600 /var/spool/cron/crontabs/root
 WORKDIR ${APP_HOME}
 
 # Copy and configure Xdebug
-COPY /docker/dev/xdebug-main.ini /docker/dev/xdebug.ini
-RUN mv /docker/dev/xdebug.ini /usr/local/etc/php/conf.d/
+
 
 RUN set -xe && \
-    pecl install xdebug-${XDEBUG_VERSION} && \
-    docker-php-ext-enable xdebug
+    pecl install xdebug-${XDEBUG_VERSION}
+
+COPY /docker/dev/xdebug-main.ini /docker/dev/xdebug.ini
+RUN set -xe && \
+    mv /docker/dev/xdebug.ini /usr/local/etc/php/conf.d/
 
 # Switch to app user
 USER ${USERNAME}
