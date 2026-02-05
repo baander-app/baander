@@ -14,7 +14,7 @@ export class Env {
   }
 
   static version() {
-    return window.BaanderAppConfig.version ?? fallback;
+    return window.BaanderAppConfig?.version ?? fallback;
   }
 
   static isProduction() {
