@@ -82,6 +82,7 @@ async function ensureWasmModulesBuilt(): Promise<void> {
 export function copyAssets(): Plugin {
   const packagesDspDir = resolve(rootDir, 'packages/dsp');
   const publicWorkletsDir = resolve(rootDir, 'public/audio-worklets');
+  const ziggyJsPath = resolve(rootDir, 'resources/app/ziggy.js');
 
   return {
     name: 'copy-electron-assets',
@@ -130,6 +131,21 @@ export function copyAssets(): Plugin {
             return;
           } catch (err) {
             console.error(`[copy-assets] Failed to serve ${filename}:`, err);
+          }
+        }
+
+        // Handle ziggy.js
+        if (req.url === '/ziggy.js') {
+          try {
+            const content = await readFile(ziggyJsPath, 'utf-8');
+
+            res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+            res.setHeader('Content-Length', Buffer.byteLength(content));
+            res.setHeader('Cache-Control', 'no-cache');
+            res.end(content);
+            return;
+          } catch (err) {
+            console.error('[copy-assets] Failed to serve ziggy.js:', err);
           }
         }
 
@@ -183,6 +199,15 @@ export function copyAssets(): Plugin {
         const dst = resolve(workletsOutDir, file);
         await copyFile(src, dst);
         console.log(`✓ Copied audio-worklet/${file}`);
+      }
+
+      // Copy ziggy.js
+      try {
+        const ziggyDst = resolve(outDir, 'ziggy.js');
+        await copyFile(ziggyJsPath, ziggyDst);
+        console.log('✓ Copied ziggy.js');
+      } catch (err) {
+        console.warn('  ⚠ Skipping ziggy.js (not found)');
       }
 
       console.log('\n✓ Electron assets copied successfully');
