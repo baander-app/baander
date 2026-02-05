@@ -247,6 +247,10 @@
       <path value="$PROJECT_DIR$/vendor/xenos/musicbrainz" />
       <path value="$PROJECT_DIR$/vendor/zend/php-reader" />
       <path value="$PROJECT_DIR$/vendor/_laravel_idea" />
+      <path value="$PROJECT_DIR$/vendor/symfony/yaml" />
+      <path value="$PROJECT_DIR$/vendor/laravel/boost" />
+      <path value="$PROJECT_DIR$/vendor/laravel/roster" />
+      <path value="$PROJECT_DIR$/vendor/laravel/mcp" />
     </include_path>
   </component>
   <component name="PhpInterpreters">

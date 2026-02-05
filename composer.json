@@ -71,6 +71,7 @@
         "icanhazstring/composer-unused": "^0.9.3",
         "itsgoingd/clockwork": "^5.3",
         "laracraft-tech/laravel-schema-rules": "^v1.5.0",
+        "laravel/boost": "^2.1",
         "mockery/mockery": "^1.6.12",
         "nikic/php-parser": "^v5.4.0",
         "nunomaduro/collision": "^v8.6",
@@ -108,7 +109,8 @@
             "@php artisan package:discover --ansi"
         ],
         "post-update-cmd": [
-            "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
+            "@php artisan vendor:publish --tag=laravel-assets --ansi --force",
+            "@php artisan boost:update --ansi"
         ],
         "post-root-package-install": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""

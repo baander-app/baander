@@ -1,13 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="e5ac086c-8369-4403-a0ee-18454c863945" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+    <list default="true" id="e5ac086c-8369-4403-a0ee-18454c863945" name="Changes" comment="chore: bump deps">
+      <change afterPath="$PROJECT_DIR$/.mcp.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/boost.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/settings.local.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/baander.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/baander.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/php.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/php.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/phpunit.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/phpunit.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/yarn.lock" beforeDir="false" afterPath="$PROJECT_DIR$/yarn.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CLAUDE.md" beforeDir="false" afterPath="$PROJECT_DIR$/CLAUDE.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/composer.json" beforeDir="false" afterPath="$PROJECT_DIR$/composer.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/composer.lock" beforeDir="false" afterPath="$PROJECT_DIR$/composer.lock" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -242,6 +245,10 @@
       <path value="$PROJECT_DIR$/vendor/xenos/musicbrainz" />
       <path value="$PROJECT_DIR$/vendor/zend/php-reader" />
       <path value="$PROJECT_DIR$/vendor/_laravel_idea" />
+      <path value="$PROJECT_DIR$/vendor/symfony/yaml" />
+      <path value="$PROJECT_DIR$/vendor/laravel/boost" />
+      <path value="$PROJECT_DIR$/vendor/laravel/roster" />
+      <path value="$PROJECT_DIR$/vendor/laravel/mcp" />
     </include_path>
   </component>
   <component name="ProjectColorInfo">{
@@ -307,12 +314,43 @@
       <workItem from="1770307756357" duration="4963000" />
       <workItem from="1770314709702" duration="13000" />
       <workItem from="1770314784782" duration="9782000" />
-      <workItem from="1770325218800" duration="36000" />
+      <workItem from="1770325218800" duration="2543000" />
     </task>
+    <task id="LOCAL-00001" summary="update">
+      <option name="closed" value="true" />
+      <created>1770325266390</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1770325266390</updated>
+    </task>
+    <task id="LOCAL-00002" summary="fix undefiend in electron">
+      <option name="closed" value="true" />
+      <created>1770327296168</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1770327296168</updated>
+    </task>
+    <task id="LOCAL-00003" summary="chore: bump deps">
+      <option name="closed" value="true" />
+      <created>1770327310032</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1770327310032</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="update" />
+    <MESSAGE value="fix undefiend in electron" />
+    <MESSAGE value="chore: bump deps" />
+    <option name="LAST_COMMIT_MESSAGE" value="chore: bump deps" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />

@@ -232,6 +232,10 @@
       <excludeFolder url="file://$MODULE_DIR$/vendor/xenos/musicbrainz" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/zend/php-reader" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/_laravel_idea" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/laravel/boost" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/laravel/mcp" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/laravel/roster" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/symfony/yaml" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
