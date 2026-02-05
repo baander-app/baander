@@ -1,11 +1,17 @@
 import { DspLoader, DspModuleType } from './dsp-loader.interface';
 
-export class WebDspLoader implements DspLoader {
-  private readonly jsBasePath = '/dsp/';
-  private readonly wasmBasePath = '/dsp/';
+/**
+ * Universal DSP loader for both Web and Electron
+ *
+ * Uses relative paths that work in both contexts:
+ * - Web: /dsp/* (Vite handles the path resolution)
+ * - Electron: ./dsp/* (works with file:// protocol)
+ */
+export class UniversalDspLoader implements DspLoader {
+  private readonly basePath = './dsp/';
 
   async loadJsModule<T>(module: DspModuleType): Promise<T> {
-    const url = `${this.jsBasePath}${module}.js`;
+    const url = `${this.basePath}${module}.js`;
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -25,6 +31,6 @@ export class WebDspLoader implements DspLoader {
   }
 
   getWasmUrl(module: DspModuleType): string {
-    return `${this.wasmBasePath}${module}.wasm`;
+    return `${this.basePath}${module}.wasm`;
   }
 }

@@ -19,7 +19,7 @@ yarn-error.log
 bundle-visualization.html
 *.cer
 *.Identifier
-
+.yarn
 # Project exclude paths
 /storage/testlibrary/
 /storage/framework/

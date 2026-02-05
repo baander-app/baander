@@ -6,6 +6,7 @@ import electron from 'vite-plugin-electron/simple';
 import Info from 'unplugin-info/vite';
 import richSvg from 'vite-plugin-react-rich-svg';
 import Icons from 'unplugin-icons/vite';
+import { copyAssets } from './vite-plugin-copy-assets';
 
 const ReactCompilerConfig = {};
 const mainEntry = resolve(process.cwd(), 'electron/src/main/index.ts');
@@ -89,6 +90,7 @@ export default defineConfig(({ mode }) => {
         defaultClass: 'icon',
         // defaultStyle: 'vertical-align: -0.125em;', // handy for baseline alignment
       }),
+      copyAssets(),
       electron({
         main: {
           entry: mainEntry,

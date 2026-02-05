@@ -1,32 +1,20 @@
-import { isElectron } from '@/app/utils/platform';
 import { DspLoader } from './dsp-loader.interface';
-import { WebDspLoader } from './web-dsp-loader';
-import { ElectronDspLoader } from './electron-dsp-loader';
+import { UniversalDspLoader } from './universal-dsp-loader';
 
-// Singleton instances
-let webLoader: WebDspLoader | null = null;
-let electronLoader: ElectronDspLoader | null = null;
+// Singleton instance
+let loader: UniversalDspLoader | null = null;
 
 /**
- * Resolve the appropriate DSP loader for the current platform
- * Follows the established pattern from credentialStore.ts
+ * Get the universal DSP loader (works for both Web and Electron)
  */
 export function resolveDspLoader(): DspLoader {
-  if (isElectron()) {
-    if (!electronLoader) {
-      electronLoader = new ElectronDspLoader();
-    }
-    return electronLoader;
+  if (!loader) {
+    loader = new UniversalDspLoader();
   }
-
-  if (!webLoader) {
-    webLoader = new WebDspLoader();
-  }
-  return webLoader;
+  return loader;
 }
 
 // Export for testing
-export function resetLoaders(): void {
-  webLoader = null;
-  electronLoader = null;
+export function resetLoader(): void {
+  loader = null;
 }

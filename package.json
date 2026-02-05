@@ -25,7 +25,8 @@
     "dist:win": "yarn build:electron && electron-builder -c electron-builder.yml --win",
     "dist:linux": "yarn build:electron && electron-builder -c electron-builder.yml --linux",
     "dist:mac": "yarn build:electron && electron-builder -c electron-builder.yml --mac",
-    "dist:all": "yarn build:electron && electron-builder -c electron-builder.yml -w -l -m"
+    "dist:all": "yarn build:electron && electron-builder -c electron-builder.yml -w -l -m",
+    "build:wasm": "tsx scripts/build-wasm.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -67,7 +68,7 @@
     "@tanstack/react-query-persist-client": "^5.90.14",
     "@tanstack/react-table": "^8.20.6",
     "@tanstack/react-virtual": "^3.13.8",
-    "@types/node": "^22.12.0",
+    "@types/node": "^25.2.1",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
     "@types/react-helmet": "^6.1.11",

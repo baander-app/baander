@@ -9,4 +9,3 @@ export function enableCrossOriginIsolation(win: BrowserWindow) {
     callback({ responseHeaders: headers });
   });
 }
-

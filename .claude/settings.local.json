@@ -8,7 +8,9 @@
       "Bash(Select-Object:*)",
       "Bash(rm:*)",
       "Bash(yarn build:*)",
-      "Bash(yarn tsc:*)"
+      "Bash(yarn tsc:*)",
+      "Bash(git add:*)",
+      "Bash(git reset:*)"
     ]
   }
 }

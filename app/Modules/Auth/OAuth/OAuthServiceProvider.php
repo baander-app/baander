@@ -103,7 +103,7 @@ class OAuthServiceProvider extends ServiceProvider
         );
         $authCodeGrant->setRefreshTokenTTL($refreshTokenTTL);
         if (!config('oauth.require_code_challenge_for_public_clients', true)) {
-            $authCodeGrant->disableRequireCodeChallengeForPublicClients();;
+            $authCodeGrant->disableRequireCodeChallengeForPublicClients();
         }
         $server->enableGrantType($authCodeGrant, $accessTokenTTL);
 
