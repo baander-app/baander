@@ -51,6 +51,9 @@ class SetupDevCommand extends DevelopmentCommand
         }
 
         $this->call('key:generate');
+        $this->call('storage:link');
+
+        $this->oauthKeys();
     }
 
     private function database()
@@ -77,5 +80,14 @@ class SetupDevCommand extends DevelopmentCommand
             '--device'      => true,
             '--first-party' => true,
         ]);
+    }
+
+    private function oauthKeys()
+    {
+        if (File::exists(storage_path('oauth-private.key'))) {
+            return;
+        }
+
+        $this->call('oauth:keypair');
     }
 }

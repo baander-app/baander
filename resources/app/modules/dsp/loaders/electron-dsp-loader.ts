@@ -14,7 +14,7 @@ export class ElectronDspLoader implements DspLoader {
     const url = `@/dsp/${module}.js`;
 
     try {
-      const mod = await import(url);
+      const mod = await import(/* @vite-ignore */url);
       return mod as T;
     } catch (error) {
       throw new Error(

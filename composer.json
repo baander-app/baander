@@ -16,6 +16,7 @@
         "ext-igbinary": "*",
         "ext-imagick": "*",
         "ext-inotify": "*",
+        "ext-swoole": "*",
         "ext-intl": "*",
         "ext-json": "*",
         "ext-libxml": "*",
