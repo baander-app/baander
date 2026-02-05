@@ -1,0 +1,8 @@
+{
+    "agents": [
+        "claude_code"
+    ],
+    "herd_mcp": false,
+    "mcp": true,
+    "sail": false
+}
