@@ -2,6 +2,7 @@
 
 import { getDynamics, getLoudness, getSpectralFeatures } from '@/app/modules/dsp/dsp-repository.ts';
 import { createLogger } from '@/app/services/logger';
+import { getWasmUrl, getAudioWorkletUrl } from '@/app/utils/resource-url';
 
 const logger = createLogger('AudioProcessor');
 
@@ -146,7 +147,7 @@ export class AudioProcessor {
       }
 
       // Load the WASM spectrum processor
-      await this.audioContext.audioWorklet.addModule('/audio-worklets/wasm-spectrum.js');
+      await this.audioContext.audioWorklet.addModule(getAudioWorkletUrl('wasm-spectrum.js'));
 
       this.wasmSpectrumNode = new AudioWorkletNode(
         this.audioContext,
@@ -161,7 +162,7 @@ export class AudioProcessor {
       ) as WasmSpectrumNode;
 
       // Load and send the WASM binary
-      const wasmBytes = await fetch('/dsp/fft2048.wasm').then(r => r.arrayBuffer());
+      const wasmBytes = await fetch(getWasmUrl('fft2048.wasm')).then(r => r.arrayBuffer());
       this.wasmSpectrumNode.port.postMessage({ type: 'wasm', bytes: wasmBytes });
 
       // Handle messages from the processor
@@ -304,7 +305,7 @@ export class AudioProcessor {
 
   private initializeWorker() {
     try {
-      this.analysisWorker = new Worker('/audio-worklets/audio-analysis-worker.js');
+      this.analysisWorker = new Worker(getAudioWorkletUrl('audio-analysis-worker.js'));
 
       this.analysisWorker.onmessage = (e: MessageEvent) => {
         const data = e.data as { type: string } & WorkerAnalysisData;
@@ -344,7 +345,7 @@ export class AudioProcessor {
 
   private async sendSpectralWasmToWorker() {
     try {
-      const spectralWasm = await fetch('/dsp/spectral_features.wasm').then(r => r.arrayBuffer());
+      const spectralWasm = await fetch(getWasmUrl('spectral_features.wasm')).then(r => r.arrayBuffer());
 
       if (this.analysisWorker) {
         this.analysisWorker.postMessage({
@@ -425,7 +426,9 @@ export class AudioProcessor {
       // WASM spectrum processor handles this automatically
       return;
     } else if (this.analyzerNode) {
+      // @ts-expect-error
       this.analyzerNode.getByteFrequencyData(this.tempFrequencyData);
+      // @ts-expect-error
       this.analyzerNode.getByteTimeDomainData(this.tempTimeDomainData);
 
       // Check if we're actually getting data
@@ -488,7 +491,7 @@ export class AudioProcessor {
       }
 
       if (!this.audioWorkletNode) {
-        await this.audioContext.audioWorklet.addModule('/audio-worklets/magic-soup-processor.js');
+        await this.audioContext.audioWorklet.addModule(getAudioWorkletUrl('magic-soup-processor.js'));
         this.audioWorkletNode = new AudioWorkletNode(this.audioContext, 'magic-soup-processor', {
           numberOfInputs: 1,
           numberOfOutputs: 1,
@@ -528,8 +531,8 @@ export class AudioProcessor {
     try {
       // Fetch WASM binaries
       const [loudnessWasm, dynamicsWasm] = await Promise.all([
-        fetch('/dsp/loudness_r128.wasm').then(r => r.arrayBuffer()),
-        fetch('/dsp/dynamics_meter.wasm').then(r => r.arrayBuffer())
+        fetch(getWasmUrl('loudness_r128.wasm')).then(r => r.arrayBuffer()),
+        fetch(getWasmUrl('dynamics_meter.wasm')).then(r => r.arrayBuffer())
       ]);
 
       // Send to worklet
@@ -845,7 +848,9 @@ export class AudioProcessor {
 
     if (this.analyzerNode) {
       // Reuse temp arrays, then copy into recycled arrays
+      // @ts-expect-error
       this.analyzerNode.getByteFrequencyData(this.tempFrequencyData);
+      // @ts-expect-error
       this.analyzerNode.getByteTimeDomainData(this.tempTimeDomainData);
 
       // Check if we're getting real audio data

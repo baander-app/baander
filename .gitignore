@@ -39,3 +39,4 @@ repomix-output.xml
 dist/
 electron/dist-*
 .idea/
+/electron/src/main/wasm-hashes.json

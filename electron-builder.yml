@@ -2,7 +2,7 @@ appId: app.baander.desktop
 productName: "Baander"
 
 # Displayed in app metadata and installers
-copyright: "© 2026 Martin Christiansen"
+copyright: "© 2025-2026 Martin Christiansen"
 
 afterPack: "electron/build/afterPack.cjs"
 
@@ -24,8 +24,6 @@ files:
 extraResources:
   - from: "electron/public/dsp"
     to: "dsp"
-  - from: "electron/public/audio-worklets"
-    to: "audio-worklets"
 
 extraMetadata:
   main: index.js

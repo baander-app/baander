@@ -18,9 +18,10 @@ function injectCSP(apiServer: string) {
     script-src 'self' 'unsafe-eval' blob: http://localhost:5173 ws://localhost:5173;
     style-src 'self' 'unsafe-inline' http://localhost:5173;
     img-src 'self' data: http://localhost:5173 ${apiServer};
-    connect-src 'self' blob: ws://localhost:5173 ws://127.0.0.1:5173 http://localhost:5173 http://localhost:5173 ${apiServer};
+    connect-src 'self' blob: ws://localhost:5173 ws://127.0.0.1:5173 http://localhost:5173 http://localhost:5173 ${apiServer} baander:;
     font-src 'self' data: http://localhost:5173;
     media-src 'self' blob: http://localhost:5173 ${apiServer};
+    worker-src 'self' blob: baander:;
     object-src 'none';
     frame-src 'none';
   `;

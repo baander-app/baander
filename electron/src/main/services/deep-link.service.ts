@@ -40,7 +40,7 @@ export class DeepLinkService {
    */
   setupEventListeners() {
     // Handle the protocol on Windows/Linux
-    app.on('second-instance', (event, commandLine, workingDirectory) => {
+    app.on('second-instance', (_event, commandLine, _workingDirectory) => {
       const url = this.findUrlInCommandLine(commandLine);
       if (url) {
         this.handleDeepLink(url);

@@ -1,16 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="e5ac086c-8369-4403-a0ee-18454c863945" name="Changes" comment="chore: bump deps">
-      <change afterPath="$PROJECT_DIR$/.mcp.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/boost.json" afterDir="false" />
+    <list default="true" id="e5ac086c-8369-4403-a0ee-18454c863945" name="Changes" comment="update">
+      <change afterPath="$PROJECT_DIR$/codemods/tsconfig.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/electron/config/vite-plugin-copy-wasm-hashes.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/electron/src/main/protocols/index.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/electron/src/main/protocols/resource-protocol.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/electron/src/shared/wasm-modules.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/electron/src/shared/wasm-modules.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/resources/app/utils/resource-url.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scripts/generate-wasm-hashes.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/settings.local.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/baander.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/baander.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/php.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/php.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CLAUDE.md" beforeDir="false" afterPath="$PROJECT_DIR$/CLAUDE.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/composer.json" beforeDir="false" afterPath="$PROJECT_DIR$/composer.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/composer.lock" beforeDir="false" afterPath="$PROJECT_DIR$/composer.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/Development/Console/Commands/SetupDevCommand.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/Development/Console/Commands/SetupDevCommand.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/codemods/orvalAwaitedFix.ts" beforeDir="false" afterPath="$PROJECT_DIR$/codemods/orvalAwaitedFix.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/electron-builder.yml" beforeDir="false" afterPath="$PROJECT_DIR$/electron-builder.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/electron/config/vite-plugin-copy-assets.ts" beforeDir="false" afterPath="$PROJECT_DIR$/electron/config/vite-plugin-copy-assets.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/electron/config/vite.config.mts" beforeDir="false" afterPath="$PROJECT_DIR$/electron/config/vite.config.mts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/electron/src/main/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/electron/src/main/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/electron/src/main/services/deep-link.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/electron/src/main/services/deep-link.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/electron/src/renderer/config/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/electron/src/renderer/config/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/electron/src/renderer/index.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/electron/src/renderer/index.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/electron/src/typings/electron-env.d.ts" beforeDir="false" afterPath="$PROJECT_DIR$/electron/src/typings/electron-env.d.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/electron/tsconfig.base.json" beforeDir="false" afterPath="$PROJECT_DIR$/electron/tsconfig.base.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/resources/app/services/audio-processor.ts" beforeDir="false" afterPath="$PROJECT_DIR$/resources/app/services/audio-processor.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/resources/app/services/volume-normalization.ts" beforeDir="false" afterPath="$PROJECT_DIR$/resources/app/services/volume-normalization.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -260,24 +276,24 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
-    &quot;credentialsType com.jetbrains.php.remote.interpreter.ui.PhpCreateRemoteSdkForm&quot;: &quot;Docker Compose&quot;,
-    &quot;credentialsType com.jetbrains.php.remote.interpreter.ui.PhpInplaceEditRemoteSdkForm&quot;: &quot;Docker Compose&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;javascript.preferred.runtime.type.id&quot;: &quot;node&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/Users/martin/dev/baander&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;yarn&quot;,
-    &quot;prettierjs.PrettierConfiguration.Package&quot;: &quot;/Users/martin/dev/baander/node_modules/prettier&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
-    &quot;ts.external.directory.path&quot;: &quot;/Users/martin/dev/baander/node_modules/typescript/lib&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "credentialsType com.jetbrains.php.remote.interpreter.ui.PhpCreateRemoteSdkForm": "Docker Compose",
+    "credentialsType com.jetbrains.php.remote.interpreter.ui.PhpInplaceEditRemoteSdkForm": "Docker Compose",
+    "git-widget-placeholder": "master",
+    "javascript.preferred.runtime.type.id": "node",
+    "last_opened_file_path": "/Users/martin/dev/baander/codemods",
+    "nodejs_package_manager_path": "yarn",
+    "prettierjs.PrettierConfiguration.Package": "/Users/martin/dev/baander/node_modules/prettier",
+    "settings.editor.selected.configurable": "editor.preferences.appearance",
+    "ts.external.directory.path": "/Users/martin/dev/baander/node_modules/typescript/lib",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
+}]]></component>
   <component name="ReactDesignerToolWindowState">
     <option name="myId2Visible">
       <map>
@@ -286,6 +302,11 @@
         <entry key="com.intellij.reactbuddy.storybook" value="false" />
       </map>
     </option>
+  </component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/codemods" />
+    </key>
   </component>
   <component name="RunManager">
     <configuration name="Main" type="PHPUnitRunConfigurationType" factoryName="PHPUnit">
@@ -314,7 +335,7 @@
       <workItem from="1770307756357" duration="4963000" />
       <workItem from="1770314709702" duration="13000" />
       <workItem from="1770314784782" duration="9782000" />
-      <workItem from="1770325218800" duration="2543000" />
+      <workItem from="1770325218800" duration="9208000" />
     </task>
     <task id="LOCAL-00001" summary="update">
       <option name="closed" value="true" />
@@ -340,17 +361,28 @@
       <option name="project" value="LOCAL" />
       <updated>1770327310032</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="update">
+      <option name="closed" value="true" />
+      <created>1770327800449</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1770327800449</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="update" />
+    <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
+    <option name="CHECK_NEW_TODO" value="false" />
     <MESSAGE value="fix undefiend in electron" />
     <MESSAGE value="chore: bump deps" />
-    <option name="LAST_COMMIT_MESSAGE" value="chore: bump deps" />
+    <MESSAGE value="update" />
+    <option name="LAST_COMMIT_MESSAGE" value="update" />
+    <option name="NON_MODAL_COMMIT_POSTPONE_SLOW_CHECKS" value="false" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />

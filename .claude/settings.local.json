@@ -10,11 +10,13 @@
       "Bash(yarn build:*)",
       "Bash(yarn tsc:*)",
       "Bash(git add:*)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(yarn build:electron:*)",
+      "Bash(yarn dist:mac:*)"
     ]
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "laravel-boost"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }

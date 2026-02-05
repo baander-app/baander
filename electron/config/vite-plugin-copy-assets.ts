@@ -1,20 +1,16 @@
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdir, copyFile, readFile, access, constants } from 'node:fs/promises';
-import { execSync } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 import type { Plugin } from 'vite';
+import { readFileSync } from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(__dirname, '../..');
 
-const modules = [
-  'spectral_features',
-  'dynamics_meter',
-  'fft2048',
-  'loudness_r128',
-  'partitioned_convolver',
-  'resampler_hq',
-] as const;
+// Read WASM modules from shared JSON file
+const wasmModulesJson = readFileSync(resolve(rootDir, 'electron/src/shared/wasm-modules.json'), 'utf-8');
+const WASM_MODULES = JSON.parse(wasmModulesJson) as readonly ['spectral_features', 'dynamics_meter', 'fft2048', 'loudness_r128', 'partitioned_convolver', 'resampler_hq'];
 
 /**
  * Check if a file exists
@@ -43,12 +39,12 @@ async function buildModule(module: string): Promise<void> {
 }
 
 /**
- * Ensure all WASM modules are built
+ * Ensure all WASM WASM_MODULES are built
  */
 async function ensureWasmModulesBuilt(): Promise<void> {
   const needsBuild: string[] = [];
 
-  for (const module of modules) {
+  for (const module of WASM_MODULES) {
     const wasmPath = resolve(rootDir, 'packages/dsp', module, `${module}.wasm`);
     if (!(await fileExists(wasmPath))) {
       needsBuild.push(module);
@@ -59,11 +55,11 @@ async function ensureWasmModulesBuilt(): Promise<void> {
     return;
   }
 
-  console.log(`[copy-assets] Building missing WASM modules: ${needsBuild.join(', ')}`);
+  console.log(`[copy-assets] Building missing WASM WASM_MODULES: ${needsBuild.join(', ')}`);
 
   // Check if emcc is available
   try {
-    execSync('emcc --version', { stdio: 'pipe' });
+    spawnSync('emcc', ['--version'], { stdio: 'pipe' });
   } catch {
     throw new Error('Emscripten (emcc) is not installed. Run: brew install emscripten');
   }
@@ -72,11 +68,11 @@ async function ensureWasmModulesBuilt(): Promise<void> {
     await buildModule(module);
   }
 
-  console.log('[copy-assets] All WASM modules built');
+  console.log('[copy-assets] All WASM WASM_MODULES built');
 }
 
 /**
- * Vite plugin to serve WASM modules and audio worklets in dev
+ * Vite plugin to serve WASM WASM_MODULES and audio worklets in dev
  * and copy them to the build output in production
  */
 export function copyAssets(): Plugin {
@@ -89,7 +85,7 @@ export function copyAssets(): Plugin {
 
     // In dev mode, serve the files via middleware
     async configureServer(server) {
-      // Ensure WASM modules are built before starting server
+      // Ensure WASM WASM_MODULES are built before starting server
       await ensureWasmModulesBuilt();
 
       // Add middleware to serve files
@@ -97,7 +93,7 @@ export function copyAssets(): Plugin {
         // Handle DSP files (/dsp/*.wasm and /dsp/*.js)
         if (req.url?.startsWith('/dsp/')) {
           const filename = req.url.slice(5); // Remove '/dsp/'
-          const module = modules.find(m => filename === `${m}.wasm` || filename === `${m}.js`);
+          const module = WASM_MODULES.find(m => filename === `${m}.wasm` || filename === `${m}.js`);
 
           if (module) {
             try {
@@ -155,7 +151,7 @@ export function copyAssets(): Plugin {
 
     // In production, copy files to build output
     async closeBundle() {
-      // Ensure WASM modules are built before copying
+      // Ensure WASM WASM_MODULES are built before copying
       await ensureWasmModulesBuilt();
 
       const outDir = resolve(rootDir, 'electron/dist-electron/renderer');
@@ -166,7 +162,7 @@ export function copyAssets(): Plugin {
       await mkdir(workletsOutDir, { recursive: true });
 
       // Copy WASM and JS files from packages/dsp
-      for (const module of modules) {
+      for (const module of WASM_MODULES) {
         const moduleDir = resolve(packagesDspDir, module);
 
         try {
@@ -184,7 +180,7 @@ export function copyAssets(): Plugin {
           await copyFile(jsSrc, jsDst);
           console.log(`✓ Copied ${module}.js`);
         } catch (err) {
-          // Some modules might not have a .js file, that's okay
+          // Some WASM_MODULES might not have a .js file, that's okay
         }
       }
 

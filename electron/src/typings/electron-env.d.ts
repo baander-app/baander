@@ -20,6 +20,9 @@ declare global {
       params?: string | number | boolean | Record<string, unknown> | null,
       absolute?: boolean
     ) => string;
+    process?: {
+      type: 'renderer' | 'browser';
+    };
   }
 }
 
