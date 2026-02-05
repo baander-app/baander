@@ -38,3 +38,4 @@ repomix-output.xml
 /packages/dsp/**/*.wasm
 dist/
 electron/dist-*
+.idea/
