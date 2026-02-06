@@ -57,7 +57,7 @@ $timerTable = require $octanePath . '/bin/createSwooleTimerTable.php';
 
 $discoveryProcess = new Process(function () {
     // Create and bootstrap Laravel application
-    $app = (new ApplicationFactory(__DIR__))->createApplication();
+    $app = new ApplicationFactory(__DIR__)->createApplication();
 
     // Start discovery service
     $discovery = new DiscoveryService();

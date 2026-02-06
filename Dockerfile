@@ -32,7 +32,6 @@ RUN set -xe && \
         python3 \
         python3-pip \
         libeigen3-dev \
-        liburing-dev \
         libyaml-dev \
         libfftw3-dev \
         libavcodec-dev \
@@ -114,7 +113,7 @@ RUN set -xe && \
     tar zxf liburing-${LIBURING_VERSION}.tar.gz && \
     cd liburing-liburing-${LIBURING_VERSION} && \
     ./configure && \
-    make -j$(cat /proc/cpuinfo | grep processor | wc -l) install  && \
+    make -j$(nproc) install  && \
     cd .. \
     rm -rf liburing-${LIBURING_VERSION} && rm -f liburing-${LIBURING_VERSION}.tar.gz
 
@@ -123,13 +122,7 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 RUN chmod +x /usr/bin/composer
 
 RUN set -xe && \
-    pie install swoole/swoole:dev-master -vvv --enable-swoole-thread --enable-sockets --enable-swoole-curl --enable-cares --enable-swoole-pgsql --enable-iouring --enable-zstd || ( \
-        cat /tmp/pie_make_output_* && \
-        php -v && \
-        echo "=== PHP Version ===" && \
-        php-config --version && \
-        exit 1 \
-    )
+    pie install swoole/swoole:dev-master --enable-swoole-thread --enable-sockets --enable-swoole-curl --enable-cares --enable-swoole-pgsql --enable-iouring --enable-zstd
 
 RUN set -xe \
     && pecl channel-update pecl.php.net \
