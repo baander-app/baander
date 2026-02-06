@@ -16,11 +16,66 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Configure Server</title>
     <style>
-        body { font-family: system-ui, sans-serif; margin: 24px; }
+        body {
+            font-family: system-ui, sans-serif;
+            margin: 24px;
+            max-width: 500px;
+        }
         .row { margin-bottom: 12px; }
-        input[type='url'] { width: 100%; padding: 8px; }
-        button { padding: 8px 12px; }
-        .hint { color: #666; font-size: 12px; }
+        .row-discover { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+        input[type='url'] { width: 100%; padding: 8px; box-sizing: border-box; }
+        button {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            background: #f0f0f0;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover { background: #e0e0e0; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        button.primary { background: #007bff; color: white; border-color: #007bff; }
+        button.primary:hover { background: #0056b3; }
+        .hint { color: #666; font-size: 12px; margin-top: 4px; }
+        .discovered-servers {
+            margin-top: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        .discovered-servers.has-servers { display: block; }
+        .server-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .server-item:hover { background: #f5f5f5; }
+        .server-item:last-child { border-bottom: none; }
+        .server-name { font-weight: 500; }
+        .server-url { font-size: 12px; color: #666; }
+        .server-meta { font-size: 11px; color: #999; }
+        .scanning-status { font-size: 12px; color: #666; margin-left: auto; }
+        .spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .no-servers {
+            padding: 12px;
+            text-align: center;
+            color: #999;
+            font-size: 13px;
+        }
     </style>
 </head>
 <body>
@@ -30,13 +85,27 @@
     <input id="serverUrl" type="url" placeholder="https://your-domain.example" required />
     <div class="hint">Use HTTPS. Example: https://baander.test</div>
 </div>
-<div class="row">
-    <button id="saveBtn">Save</button>
+<div class="row-discover">
+    <button id="discoverBtn">🔍 Discover Servers</button>
+    <span id="scanningStatus" class="scanning-status"></span>
+</div>
+<div id="discoveredServers" class="discovered-servers">
+    <div id="serversList"></div>
+</div>
+<div class="row" style="margin-top: 16px;">
+    <button id="saveBtn" class="primary">Save</button>
 </div>
 
 <script type="module">
   const input = document.getElementById('serverUrl');
-  const btn = document.getElementById('saveBtn');
+  const discoverBtn = document.getElementById('discoverBtn');
+  const saveBtn = document.getElementById('saveBtn');
+  const scanningStatus = document.getElementById('scanningStatus');
+  const discoveredServers = document.getElementById('discoveredServers');
+  const serversList = document.getElementById('serversList');
+
+  let isScanning = false;
+  let discoveredServersData = [];
 
   // Load current value if any
   window.BaanderElectron.config.getServerUrl().then(v => { if (v) input.value = v; });
@@ -50,7 +119,80 @@
     }
   }
 
-  btn.addEventListener('click', async () => {
+  // Discover servers button handler
+  discoverBtn.addEventListener('click', async () => {
+    if (isScanning) {
+      // Stop scanning
+      await window.BaanderElectron.discovery.stopScan();
+      return;
+    }
+
+    // Clear previous results
+    discoveredServersData = [];
+    renderServers();
+
+    // Start scanning
+    await window.BaanderElectron.discovery.startScan();
+  });
+
+  // Listen for scan started
+  window.BaanderElectron.discovery.onScanStarted(() => {
+    isScanning = true;
+    discoverBtn.textContent = '⏹ Stop Scanning';
+    scanningStatus.innerHTML = '<span class="spinner"></span> Scanning...';
+  });
+
+  // Listen for server found
+  window.BaanderElectron.discovery.onServerFound((server) => {
+    // Avoid duplicates
+    if (!discoveredServersData.some(s => s.url === server.url)) {
+      discoveredServersData.push(server);
+      renderServers();
+    }
+  });
+
+  // Listen for scan stopped
+  window.BaanderElectron.discovery.onScanStopped((servers) => {
+    isScanning = false;
+    discoverBtn.textContent = '🔍 Discover Servers';
+    scanningStatus.textContent = servers.length > 0
+        ? `Found ${servers.length} server${servers.length > 1 ? 's' : ''}`
+        : 'No servers found';
+  });
+
+  // Render discovered servers
+  function renderServers() {
+    if (discoveredServersData.length === 0) {
+      discoveredServers.classList.remove('has-servers');
+      serversList.innerHTML = '<div class="no-servers">No servers found on your network</div>';
+      return;
+    }
+
+    discoveredServers.classList.add('has-servers');
+    serversList.innerHTML = discoveredServersData.map(server => `
+      <div class="server-item" data-url="${server.url}">
+        <div class="server-name">${escapeHtml(server.name)}</div>
+        <div class="server-url">${escapeHtml(server.url)}</div>
+        <div class="server-meta">v${server.version}</div>
+      </div>
+    `).join('');
+
+    // Add click handlers
+    document.querySelectorAll('.server-item').forEach(item => {
+      item.addEventListener('click', () => {
+        input.value = item.getAttribute('data-url');
+      });
+    });
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // Save button handler
+  saveBtn.addEventListener('click', async () => {
     const val = normalize(input.value.trim());
     if (!val) {
       alert('Please enter a valid URL (e.g., https://baander.test)');
@@ -61,8 +203,9 @@
     await window.BaanderElectron.config.finishSetup();
   });
 
+  // Enter key handler
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') btn.click();
+    if (e.key === 'Enter') saveBtn.click();
   });
 </script>
 </body>

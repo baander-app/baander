@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { deepLinkBridge } from './bridges/deep-link.bridge';
+import { discoveryBridge } from './bridges/discovery.bridge';
 import { systemBridge } from './bridges/system.bridge';
 
 contextBridge.exposeInMainWorld('electron', {
@@ -28,4 +29,5 @@ contextBridge.exposeInMainWorld('BaanderElectron', {
       return ipcRenderer.invoke('baander:config:finish');
     },
   },
+  discovery: discoveryBridge,
 });

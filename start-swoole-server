@@ -2,10 +2,13 @@
 <?php
 
 use App\Octane\OnWorkerStart;
+use App\Services\DiscoveryService;
+use Laravel\Octane\ApplicationFactory;
 use Laravel\Octane\RequestContext;
 use Laravel\Octane\Swoole\{ServerStateFile, SwooleExtension, WorkerState};
 use Laravel\Octane\Swoole\Handlers\{OnManagerStart, OnServerStart};
-use Swoole\Http\Server;
+use Swoole\HTTP\Server;
+use Swoole\Process;
 use Swoole\Timer;
 
 ini_set('display_errors', 'stderr');
@@ -40,6 +43,28 @@ $serverState = json_decode(file_get_contents(
 $server = require $octanePath . '/bin/createSwooleServer.php';
 
 $timerTable = require $octanePath . '/bin/createSwooleTimerTable.php';
+
+/*
+|--------------------------------------------------------------------------
+| Add Discovery Service Process
+|--------------------------------------------------------------------------
+|
+| Add a custom process to handle local network discovery via UDP. This
+| allows Electron clients to automatically discover the server on the
+| local network without manual configuration.
+|
+*/
+
+$discoveryProcess = new Process(function () {
+    // Create and bootstrap Laravel application
+    $app = (new ApplicationFactory(__DIR__))->createApplication();
+
+    // Start discovery service
+    $discovery = new DiscoveryService();
+    $discovery->start();
+}, false, 1, true);
+
+$server->addProcess($discoveryProcess);
 
 /*
 |--------------------------------------------------------------------------
