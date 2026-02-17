@@ -236,6 +236,7 @@
       <excludeFolder url="file://$MODULE_DIR$/vendor/laravel/mcp" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/laravel/roster" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/symfony/yaml" />
+      <excludeFolder url="file://$MODULE_DIR$/storage/test_library" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
