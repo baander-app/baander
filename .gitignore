@@ -40,3 +40,4 @@ dist/
 electron/dist-*
 .idea/
 /electron/src/main/wasm-hashes.json
+.DS_Store

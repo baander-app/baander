@@ -9,6 +9,8 @@ use App\Modules\Logging\Attributes\LogChannel;
 use App\Modules\Logging\Channel;
 use App\Modules\Lyrics\Lrc;
 use App\Modules\Metadata\Readers\MetadataReader;
+use App\Modules\Security\MagicByteValidator;
+use App\Modules\Security\Exceptions\FileValidationException;
 use App\Services\Metadata\MetadataDelimiterService;
 use App\Format\LocaleString;
 use Arr;
@@ -30,6 +32,10 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
     )]
     private LoggerInterface $logger;
 
+    private array $securityConfig;
+
+    private MagicByteValidator $magicByteValidator;
+
     /**
      * Default options for delimiter detection.
      */
@@ -44,6 +50,8 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         private Library $library,
         private array $options = self::DEFAULT_OPTIONS,
     ) {
+        $this->securityConfig = config('scanner.security', []);
+        $this->magicByteValidator = app(MagicByteValidator::class);
     }
 
     /**
@@ -82,8 +90,17 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         $songs = [];
         $processedFiles = 0;
         $fileCount = $files->count();
+        $maxTotalFiles = $this->securityConfig['max_total_files'] ?? 100000;
 
-        $files->each(function (SplFileInfo $file) use (&$songs, &$coverJobs, &$lyrics, &$processedFiles, &$fileCount) {
+        $files->each(function (SplFileInfo $file) use (&$songs, &$coverJobs, &$lyrics, &$processedFiles, &$fileCount, $maxTotalFiles) {
+            // Check total file limit
+            if ($processedFiles >= $maxTotalFiles) {
+                $this->getLogger()->warning('Maximum file limit reached', [
+                    'limit' => $maxTotalFiles,
+                ]);
+                return false; // Stop processing
+            }
+
             $metadataReader = new MetadataReader($file->getRealPath());
             $this->processFile($metadataReader, $file, $songs, $coverJobs);
 
@@ -92,6 +109,8 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
                 $songs = [];
                 $this->queueProgressChunk($fileCount, self::BATCH_SIZE);
             }
+
+            $processedFiles++;
         });
 
 
@@ -137,6 +156,33 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         try {
             $filePath = $file->getRealPath();
 
+            // Security: Check file size
+            if (!$this->validateFileSize($file, $filePath)) {
+                return;
+            }
+
+            // Security: Validate magic bytes if enabled
+            if ($this->shouldValidateMagicBytes()) {
+                if (!$this->magicByteValidator->isValidAudioFile($filePath)) {
+                    $this->getLogger()->warning('File failed magic byte validation', [
+                        'path' => $filePath,
+                    ]);
+                    return;
+                }
+
+                // Security: Check MIME consistency if enabled
+                if (!$this->allowMimeMismatch()) {
+                    $declaredMime = $metadataReader->getMimeType();
+                    if (!$this->magicByteValidator->validateAgainstMime($filePath, $declaredMime)) {
+                        $this->getLogger()->warning('MIME type mismatch detected', [
+                            'path' => $filePath,
+                            'declared_mime' => $declaredMime,
+                        ]);
+                        return;
+                    }
+                }
+            }
+
             $hash = hash('xxh3', $filePath);
 
             if (!$metadataReader->isAudioFile() || Song::whereHash($hash)->exists()) {
@@ -177,10 +223,20 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
                 $delimiterService = new MetadataDelimiterService($this->options);
 
                 // Split artists with smart detection
-                $artists = $delimiterService->splitArtists($metadataReader->getArtist());
+                $rawArtists = $delimiterService->splitArtists($metadataReader->getArtist());
+
+                // Sanitize artist names if enabled
+                $artists = $this->sanitizeMetadata()
+                    ? $this->sanitizeArrayOfStrings($rawArtists, 'artist')
+                    : $rawArtists;
 
                 // Split genres with smart detection
-                $genres = $delimiterService->splitGenres($metadataReader->getGenre());
+                $rawGenres = $delimiterService->splitGenres($metadataReader->getGenre());
+
+                // Sanitize genre names if enabled
+                $genres = $this->sanitizeMetadata()
+                    ? $this->sanitizeArrayOfStrings($rawGenres, 'genre')
+                    : $rawGenres;
 
                 return [
                     'attributes' => $songAttributes,
@@ -255,16 +311,31 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
             $trackNumber = $this->extractTrackNumberFromFilename($file->getBasename());
         }
 
+        // Get raw metadata values
+        $rawTitle = $metadataReader->getTitle() ?? $file->getBasename() ?? LocaleString::delimit('library.song.unknown');
+        $rawComment = $metadataReader->getComment();
+
+        // Sanitize metadata if enabled
+        $title = $this->sanitizeMetadata() ? StrExt::sanitizeMetadata($rawTitle) : $rawTitle;
+        $comment = $rawComment !== null && $this->sanitizeMetadata() ? StrExt::sanitize($rawComment) : $rawComment;
+
+        // Truncate to max length
+        $maxLength = $this->getMaxMetadataLength('title');
+        $title = mb_substr($title, 0, $maxLength);
+
+        // Sanitize lyrics separately (preserve formatting)
+        $lyrics = $lyric ? ($this->sanitizeMetadata() ? StrExt::sanitizeLyrics($lyric) : StrExt::convertToUtf8($lyric)) : null;
+
         return [
-            'title'     => $metadataReader->getTitle() ?? $file->getBasename() ?? LocaleString::delimit('library.song.unknown'),
+            'title'     => $title,
             'track'     => $trackNumber,
             'length'    => $metadataReader->probeLength(),
-            'lyrics'    => $lyric ? StrExt::convertToUtf8($lyric) : null,
+            'lyrics'    => $lyrics,
             'path'      => $file->getRealPath(),
             'mime_type' => $metadataReader->getMimeType(),
             'size'      => is_int($file->getSize()) ? $file->getSize() : 0,
             'hash'      => $hash,
-            'comment'   => $metadataReader->getComment(),
+            'comment'   => $comment,
         ];
     }
 
@@ -333,5 +404,67 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         $relativePath = str_replace($baseDirectory, '', $path);
 
         return $relativePath[0] !== DIRECTORY_SEPARATOR;
+    }
+
+    private function validateFileSize(SplFileInfo $file, string $filePath): bool
+    {
+        $size = $file->getSize();
+
+        if ($size === false) {
+            return true;
+        }
+
+        // Convert MB limit to bytes
+        $maxSizeMb = $this->securityConfig['max_file_size_mb']['audio'] ?? 500;
+        $maxSizeBytes = $maxSizeMb * 1024 * 1024;
+
+        if ($size > $maxSizeBytes) {
+            $this->getLogger()->warning('File exceeds maximum size', [
+                'path' => $filePath,
+                'size' => $size,
+                'max_size' => $maxSizeBytes,
+            ]);
+            return false;
+        }
+
+        return true;
+    }
+
+    private function shouldValidateMagicBytes(): bool
+    {
+        return $this->securityConfig['validate_magic_bytes'] ?? true;
+    }
+
+    private function allowMimeMismatch(): bool
+    {
+        return $this->securityConfig['allow_mime_mismatch'] ?? false;
+    }
+
+    private function sanitizeMetadata(): bool
+    {
+        return $this->securityConfig['sanitize_metadata'] ?? true;
+    }
+
+    private function getMaxMetadataLength(string $field): int
+    {
+        return $this->securityConfig['max_metadata_length'][$field] ?? 255;
+    }
+
+    private function sanitizeArrayOfStrings(array $strings, string $field): array
+    {
+        $maxLength = $this->getMaxMetadataLength($field);
+        $sanitized = [];
+
+        foreach ($strings as $string) {
+            $sanitizedValue = match ($field) {
+                'artist' => StrExt::sanitizeMetadata($string),
+                'genre' => StrExt::sanitizeMetadata($string),
+                default => StrExt::sanitize($string),
+            };
+
+            $sanitized[] = mb_substr($sanitizedValue, 0, $maxLength);
+        }
+
+        return array_filter($sanitized, fn($s) => !empty($s));
     }
 }

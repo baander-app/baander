@@ -135,4 +135,40 @@ return [
             ],
         ],
     ],
+
+    'security' => [
+        // Path validation
+        'allowed_base_paths' => env('SCANNER_ALLOWED_PATHS', '/home,/media,/mnt,/Users,/Volumes'),
+
+        // File size limits (separate by type) - in MB (converted to bytes)
+        'max_file_size_mb' => [
+            'audio' => (int) env('SCANNER_MAX_AUDIO_SIZE_MB', 500),
+            'video' => (int) env('SCANNER_MAX_VIDEO_SIZE_MB', 5000),
+            'lyrics' => (int) env('SCANNER_MAX_LYRICS_SIZE_MB', 1),
+            'image' => (int) env('SCANNER_MAX_IMAGE_SIZE_MB', 10),
+            'subtitle' => (int) env('SCANNER_MAX_SUBTITLE_SIZE_MB', 1),
+        ],
+        'max_total_files' => (int) env('SCANNER_MAX_TOTAL_FILES', 100000),
+        'max_directory_depth' => (int) env('SCANNER_MAX_DIRECTORY_DEPTH', 20),
+
+        // Timeout protection (seconds)
+        'file_processing_timeout' => (int) env('SCANNER_FILE_TIMEOUT', 30),
+        'directory_scan_timeout' => (int) env('SCANNER_DIR_TIMEOUT', 300),
+
+        // Magic byte validation
+        'validate_magic_bytes' => (bool) env('SCANNER_VALIDATE_MAGIC_BYTES', true),
+        'allow_mime_mismatch' => (bool) env('SCANNER_ALLOW_MIME_MISMATCH', false),
+
+        // Metadata sanitization
+        'sanitize_metadata' => (bool) env('SCANNER_SANITIZE_METADATA', true),
+        'allowed_html_tags' => [],
+        'max_metadata_length' => [
+            'title' => (int) env('SCANNER_MAX_TITLE_LENGTH', 255),
+            'artist' => (int) env('SCANNER_MAX_ARTIST_LENGTH', 255),
+            'album' => (int) env('SCANNER_MAX_ALBUM_LENGTH', 255),
+            'genre' => (int) env('SCANNER_MAX_GENRE_LENGTH', 100),
+            'comment' => (int) env('SCANNER_MAX_COMMENT_LENGTH', 1000),
+            'lyrics' => (int) env('SCANNER_MAX_LYRICS_LENGTH', 50000),
+        ],
+    ],
 ];

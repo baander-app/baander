@@ -12,7 +12,20 @@
       "Bash(git add:*)",
       "Bash(git reset:*)",
       "Bash(yarn build:electron:*)",
-      "Bash(yarn dist:mac:*)"
+      "Bash(yarn dist:mac:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(wc:*)",
+      "mcp__plugin_compound-engineering_context7__resolve-library-id",
+      "mcp__plugin_compound-engineering_context7__query-docs",
+      "mcp__web-search-prime__webSearchPrime",
+      "mcp__web-reader__webReader",
+      "mcp__zread__search_doc",
+      "mcp__laravel-boost__list-routes",
+      "mcp__laravel-boost__application-info",
+      "mcp__laravel-boost__database-schema",
+      "mcp__laravel-boost__list-artisan-commands",
+      "WebSearch"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -14,7 +14,13 @@ use Illuminate\Support\Facades\Log;
  */
 class DiscoveryService
 {
-    protected bool $running = false;
+    protected bool $running = false {
+        get {
+            return $this->running;
+        }
+    }
+
+    /** @var resource|null */
     protected $socket = null;
 
     /**
@@ -159,14 +165,6 @@ class DiscoveryService
         }
 
         return $json;
-    }
-
-    /**
-     * Check if discovery service is running
-     */
-    public function isRunning(): bool
-    {
-        return $this->running;
     }
 
     /**

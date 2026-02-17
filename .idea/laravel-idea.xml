@@ -17,6 +17,11 @@
       </LaravelCodeGeneration>
     </option>
     <option name="frameworkFound" value="true" />
+    <option name="routing">
+      <LaravelRouting>
+        <option name="serverAddress" value="FromConfig" />
+      </LaravelRouting>
+    </option>
     <option name="translation">
       <LaravelTranslation>
         <option name="defaultPath" value="lang" />
