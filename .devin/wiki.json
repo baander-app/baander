@@ -1,0 +1,292 @@
+{
+  "repo_notes": [
+    {
+      "content": ""
+    }
+  ],
+  "pages": [
+    {
+      "title": "Overview",
+      "purpose": "Introduce the Bånder media server, explaining its purpose as a self-hosted music and movie server with desktop and web clients",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Architecture Overview",
+      "purpose": "High-level system architecture showing how backend Laravel API, frontend React/Electron app, and media processing components interact",
+      "parent": "Overview",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Getting Started",
+      "purpose": "Guide for setting up the development environment and running the application locally",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Prerequisites & Installation",
+      "purpose": "Required software, Docker setup, dependency installation via Composer and Yarn",
+      "parent": "Getting Started",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Development Server",
+      "purpose": "Using the DevServerCommand to run Octane, queue worker, and scheduler with hot-reloading",
+      "parent": "Getting Started",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Development Workflow",
+      "purpose": "Common development tasks, artisan commands, and testing procedures",
+      "parent": "Getting Started",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Electron",
+      "purpose": "Desktop cross platform applications, architecture, menu system",
+      "parent": "Electron",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Backend Architecture",
+      "purpose": "Overview of the Laravel backend structure, services, and data layer",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "HTTP Kernel & Middleware Pipeline",
+      "purpose": "Middleware stack, CORS configuration, OpenTelemetry instrumentation, and request lifecycle",
+      "parent": "Backend Architecture",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Authentication System",
+      "purpose": "Authentication guards, OAuth2 with PKCE, token management, Sanctum configuration, and token binding security",
+      "parent": "Backend Architecture",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "API Controllers",
+      "purpose": "REST API endpoints for authentication, media resources, job management, queue monitoring, and logs",
+      "parent": "Backend Architecture",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Background Jobs & Queue System",
+      "purpose": "Laravel Horizon queue monitoring, job dispatching, library scanning jobs, and queue metrics",
+      "parent": "Backend Architecture",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Media Processing Pipeline",
+      "purpose": "Music and movie library scanning, metadata extraction from MusicBrainz/Discogs, and BlurHash image generation",
+      "parent": "Backend Architecture",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Database Schema & Models",
+      "purpose": "PostgreSQL schema, Eloquent models, relationships, and data persistence patterns",
+      "parent": "Backend Architecture",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Frontend Architecture",
+      "purpose": "Overview of the React/TypeScript frontend structure, state management, and API integration",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Application Entry Point",
+      "purpose": "App.tsx structure, routing (HashRouter vs BrowserRouter), theme provider, and initialization",
+      "parent": "Frontend Architecture",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "State Management",
+      "purpose": "Zustand store architecture, slices (musicPlayer, equalizer, notifications, ui), and persistence",
+      "parent": "Frontend Architecture",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Event Bridge System",
+      "purpose": "Pub/sub event system for cross-component communication and coordination with Redux middleware",
+      "parent": "Frontend Architecture",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "API Client Integration",
+      "purpose": "Orval-generated API client, React Query hooks, Axios configuration, and type-safe backend communication",
+      "parent": "Frontend Architecture",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Build System & Configuration",
+      "purpose": "Vite configuration, TypeScript setup, path aliases, asset processing, and dependency management",
+      "parent": "Frontend Architecture",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Authentication & Security",
+      "purpose": "Client-side authentication flow, OAuth PKCE implementation, and session management",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "OAuth Client Implementation",
+      "purpose": "BaanderOAuthClient class, PKCE flow, token exchange, and storage mechanisms",
+      "parent": "Authentication & Security",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Music Player System",
+      "purpose": "Complete music playback system including UI, audio processing, and queue management",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Inline Player Component",
+      "purpose": "Player UI, audio element management, stream token handling, and playback controls",
+      "parent": "Music Player System",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Audio Processing Engine",
+      "purpose": "AudioProcessor service, Web Audio API graph, WASM DSP modules, and multi-threaded analysis",
+      "parent": "Music Player System",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "WASM Audio Analysis",
+      "purpose": "AudioWorklets, Web Workers, loudness (LUFS), dynamics (RMS, true peak), and spectral features",
+      "parent": "Music Player System",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Equalizer & Effects",
+      "purpose": "10-band EQ, dynamics compression, spatial enhancement, and volume normalization",
+      "parent": "Music Player System",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Library & Media UI",
+      "purpose": "User interfaces for browsing and managing media libraries",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Song List & Virtualization",
+      "purpose": "Infinite scrolling song list, React Table integration, virtualization for performance, and sorting",
+      "parent": "Library & Media UI",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    }
+  ]
+}
