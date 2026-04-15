@@ -56,16 +56,16 @@ class OAuthServiceProvider extends ServiceProvider
     {
         $this->app->bind(AuthorizationServer::class, function () {
             $privateKeyPath = config('oauth.private_key');
-            $keyPassphrase = config('oauth.encryption_key');
+            $encryptionKey = config('oauth.encryption_key');
 
-            $privateKey = new CryptKey($privateKeyPath, $keyPassphrase);
+            $privateKey = new CryptKey($privateKeyPath);
 
             $server = new AuthorizationServer(
                 $this->app->make(ClientRepositoryInterface::class),
                 $this->app->make(AccessTokenRepositoryInterface::class),
                 $this->app->make(ScopeRepositoryInterface::class),
                 $privateKey,
-                $keyPassphrase,
+                $encryptionKey,
             );
 
             // Enable grants
@@ -103,7 +103,7 @@ class OAuthServiceProvider extends ServiceProvider
         );
         $authCodeGrant->setRefreshTokenTTL($refreshTokenTTL);
         if (!config('oauth.require_code_challenge_for_public_clients', true)) {
-            $authCodeGrant->disableRequireCodeChallengeForPublicClients();;
+            $authCodeGrant->disableRequireCodeChallengeForPublicClients();
         }
         $server->enableGrantType($authCodeGrant, $accessTokenTTL);
 

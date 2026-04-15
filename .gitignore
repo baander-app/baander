@@ -19,7 +19,7 @@ yarn-error.log
 bundle-visualization.html
 *.cer
 *.Identifier
-
+.yarn
 # Project exclude paths
 /storage/testlibrary/
 /storage/framework/
@@ -38,3 +38,6 @@ repomix-output.xml
 /packages/dsp/**/*.wasm
 dist/
 electron/dist-*
+.idea/
+/electron/src/main/wasm-hashes.json
+.DS_Store

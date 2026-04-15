@@ -2,11 +2,12 @@
 
 namespace App\Listeners;
 
+use App\Events\IntegrationCache\CacheCleared;
 use App\Events\IntegrationCache\CacheHit;
 use App\Events\IntegrationCache\CacheMiss;
-use App\Events\IntegrationCache\CacheStore;
 use App\Events\IntegrationCache\CacheSkip;
-use App\Events\IntegrationCache\CacheCleared;
+use App\Events\IntegrationCache\CacheStore;
+use Illuminate\Events\Dispatcher;
 use Illuminate\Support\Facades\Log;
 
 class LogIntegrationCacheEvents
@@ -18,8 +19,8 @@ class LogIntegrationCacheEvents
     {
         Log::debug('Integration cache hit', [
             'integration' => $event->integration,
-            'endpoint' => $event->endpoint,
-            'cache_key' => $event->cacheKey,
+            'endpoint'    => $event->endpoint,
+            'cache_key'   => $event->cacheKey,
         ]);
     }
 
@@ -30,8 +31,8 @@ class LogIntegrationCacheEvents
     {
         Log::debug('Integration cache miss', [
             'integration' => $event->integration,
-            'endpoint' => $event->endpoint,
-            'cache_key' => $event->cacheKey,
+            'endpoint'    => $event->endpoint,
+            'cache_key'   => $event->cacheKey,
         ]);
     }
 
@@ -42,9 +43,9 @@ class LogIntegrationCacheEvents
     {
         Log::debug('Integration cache store', [
             'integration' => $event->integration,
-            'endpoint' => $event->endpoint,
-            'cache_key' => $event->cacheKey,
-            'ttl' => $event->ttl,
+            'endpoint'    => $event->endpoint,
+            'cache_key'   => $event->cacheKey,
+            'ttl'         => $event->ttl,
         ]);
     }
 
@@ -54,9 +55,9 @@ class LogIntegrationCacheEvents
     public function handleCacheSkip(CacheSkip $event): void
     {
         Log::debug('Integration cache skip (failed response)', [
-            'integration' => $event->integration,
-            'endpoint' => $event->endpoint,
-            'cache_key' => $event->cacheKey,
+            'integration'   => $event->integration,
+            'endpoint'      => $event->endpoint,
+            'cache_key'     => $event->cacheKey,
             'response_type' => gettype($event->response),
         ]);
     }
@@ -68,23 +69,23 @@ class LogIntegrationCacheEvents
     {
         Log::info('Integration cache cleared', [
             'integration' => $event->integration,
-            'tags' => $event->tags,
+            'tags'        => $event->tags,
         ]);
     }
 
     /**
      * Register the listeners for the subscriber.
      *
-     * @param \Illuminate\Events\Dispatcher $events
+     * @param Dispatcher $events
      * @return array
      */
     public function subscribe($events): array
     {
         return [
-            CacheHit::class => 'handleCacheHit',
-            CacheMiss::class => 'handleCacheMiss',
-            CacheStore::class => 'handleCacheStore',
-            CacheSkip::class => 'handleCacheSkip',
+            CacheHit::class     => 'handleCacheHit',
+            CacheMiss::class    => 'handleCacheMiss',
+            CacheStore::class   => 'handleCacheStore',
+            CacheSkip::class    => 'handleCacheSkip',
             CacheCleared::class => 'handleCacheCleared',
         ];
     }

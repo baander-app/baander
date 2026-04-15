@@ -3,8 +3,8 @@
  * AST-based codemod that replaces Awaited<ReturnType<typeof fn>> with the actual return type.
  */
 
-import { readdirSync, readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import ts from 'typescript';
 
 const args = process.argv.slice(2);

@@ -4,6 +4,8 @@ namespace App\Jobs\Movies;
 
 use App\Jobs\BaseJob;
 use App\Models\{Library, Movie, Video};
+use App\Modules\Security\MagicByteValidator;
+use App\Modules\Security\Exceptions\FileValidationException;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -20,12 +22,17 @@ class ScanMovieLibraryJob extends BaseJob implements ShouldQueue
 
     private array $movieCache = [];
 
+    private array $securityConfig;
+
+    private MagicByteValidator $magicByteValidator;
+
     /**
      * Create a new job instance.
      */
     public function __construct(public Library $library)
     {
-        //
+        $this->securityConfig = config('scanner.security', []);
+        $this->magicByteValidator = app(MagicByteValidator::class);
     }
 
     public function middleware(): array
@@ -84,6 +91,18 @@ class ScanMovieLibraryJob extends BaseJob implements ShouldQueue
     {
         try {
             $files = LazyCollection::make(File::files($directory));
+
+            // Security: Check file limit
+            $maxTotalFiles = $this->securityConfig['max_total_files'] ?? 100000;
+            $currentFileCount = Video::whereHas('movies')->count() ?? 0;
+
+            if ($currentFileCount >= $maxTotalFiles) {
+                Log::channel('stdout')->warning('Maximum file limit reached', [
+                    'limit' => $maxTotalFiles,
+                ]);
+                return;
+            }
+
             Log::channel('stdout')->info('Found ' . $files->count() . ' files in ' . $directory);
 
             $movieInfo = $this->parseMovieFromDirectoryName($directory);
@@ -110,7 +129,24 @@ class ScanMovieLibraryJob extends BaseJob implements ShouldQueue
             });
             $videoFiles = $files->filter(function (\SplFileInfo $file) {
                 try {
-                    $mimeType = mime_content_type($file->getRealPath());
+                    $filePath = $file->getRealPath();
+
+                    // Security: Check file size
+                    if (!$this->validateVideoFileSize($file, $filePath)) {
+                        return false;
+                    }
+
+                    // Security: Validate magic bytes if enabled
+                    if ($this->shouldValidateMagicBytes()) {
+                        if (!$this->magicByteValidator->isValidVideoFile($filePath)) {
+                            Log::channel('stdout')->warning('File failed magic byte validation', [
+                                'path' => $filePath,
+                            ]);
+                            return false;
+                        }
+                    }
+
+                    $mimeType = mime_content_type($filePath);
                     return explode('/', $mimeType)[0] === 'video';
                 } catch (\Exception $e) {
                     Log::channel('stdout')->error('Failed to get mime type for file: ' . $file->getFilename(), [
@@ -252,6 +288,11 @@ class ScanMovieLibraryJob extends BaseJob implements ShouldQueue
     {
         $directoryName = basename($directory);
 
+        // Security: Sanitize movie title from directory name
+        if ($this->securityConfig['sanitize_metadata'] ?? true) {
+            $directoryName = \App\Extensions\StrExt::sanitizeMetadata($directoryName);
+        }
+
         // Pattern to match the "Title (Year)" format
         $pattern = '/^(.+?)\s*\((\d{4})\)\s*$/';
 
@@ -324,5 +365,34 @@ class ScanMovieLibraryJob extends BaseJob implements ShouldQueue
         $this->movieCache[$cacheKey] = $movie;
 
         return $movie;
+    }
+
+    private function validateVideoFileSize(\SplFileInfo $file, string $filePath): bool
+    {
+        $size = $file->getSize();
+
+        if ($size === false) {
+            return true;
+        }
+
+        // Convert MB limit to bytes
+        $maxSizeMb = $this->securityConfig['max_file_size_mb']['video'] ?? 5000;
+        $maxSizeBytes = $maxSizeMb * 1024 * 1024;
+
+        if ($size > $maxSizeBytes) {
+            Log::channel('stdout')->warning('Video file exceeds maximum size', [
+                'path' => $filePath,
+                'size' => $size,
+                'max_size' => $maxSizeBytes,
+            ]);
+            return false;
+        }
+
+        return true;
+    }
+
+    private function shouldValidateMagicBytes(): bool
+    {
+        return $this->securityConfig['validate_magic_bytes'] ?? true;
     }
 }

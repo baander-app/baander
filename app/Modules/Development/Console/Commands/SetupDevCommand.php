@@ -34,6 +34,13 @@ class SetupDevCommand extends DevelopmentCommand
         $this->envFile();
         $this->database();
 
+        $this->call('key:generate');
+        $this->call('storage:link');
+
+        $this->oauthKeys();
+
+        $this->call('ziggy:generate');
+
         return Command::SUCCESS;
     }
 
@@ -49,8 +56,6 @@ class SetupDevCommand extends DevelopmentCommand
         } else {
             $this->warn('.env already exists.');
         }
-
-        $this->call('key:generate');
     }
 
     private function database()
@@ -77,5 +82,14 @@ class SetupDevCommand extends DevelopmentCommand
             '--device'      => true,
             '--first-party' => true,
         ]);
+    }
+
+    private function oauthKeys()
+    {
+        if (File::exists(storage_path('oauth-private.key'))) {
+            return;
+        }
+
+        $this->call('oauth:keypair');
     }
 }

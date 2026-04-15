@@ -38,7 +38,7 @@ class MakeKeyPairCommand extends Command
         if (!$res) throw new \RuntimeException(openssl_error_string());
 
 
-        openssl_pkey_export($res, $privatePem, config('oauth.encryption_key'), $config);
+        openssl_pkey_export($res, $privatePem, null, $config);
         $publicPem = openssl_pkey_get_details($res)['key'];
 
         \File::put(storage_path('oauth-private.key'), $privatePem);

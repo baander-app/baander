@@ -1,3 +1,5 @@
+import { getAudioWorkletUrl } from '@/app/utils/resource-url';
+
 export class VolumeNormalizationService {
   private audioContext: AudioContext;
   private analyzerNode: AnalyserNode;
@@ -24,7 +26,7 @@ export class VolumeNormalizationService {
   private async setupAudioWorklet() {
     try {
       // Register the audio worklet for LUFS calculation
-      await this.audioContext.audioWorklet.addModule('/audio-worklets/lufs-processor.js');
+      await this.audioContext.audioWorklet.addModule(getAudioWorkletUrl('lufs-processor.js'));
 
       this.audioWorkletNode = new AudioWorkletNode(this.audioContext, 'lufs-processor');
 

@@ -12,6 +12,7 @@ import { DeepLinkService } from './services/deep-link.service';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { setCliFlags } from './flags';
+import { registerWasmProtocol } from './protocols/resource-protocol';
 
 if(process.platform === 'win32') {
   process.env.FONTCONFIG_FILE = path.join(import.meta.url, 'fonts.conf');
@@ -43,6 +44,9 @@ function getRendererOrigin() {
 }
 
 app.whenReady().then(async () => {
+  // Register custom protocol for serving WASM files (before creating windows)
+  registerWasmProtocol();
+
   const primary = screen.getPrimaryDisplay();
   if (primary.scaleFactor !== 1) {
     app.commandLine.appendSwitch('high-dpi-support', '1');

@@ -39,6 +39,8 @@ services:
         hard: 10000
     extra_hosts:
       - 'host.docker.internal:host-gateway'
+    ports:
+      - "41234:41234/udp"
     volumes:
       - /mnt/c/baander-library:/storage/baander-library
       - ./:/var/www/html:cached

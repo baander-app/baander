@@ -29,12 +29,23 @@ $config = [
 
     'max_age' => 0,
 
-    'supports_credentials' => false,
+    'supports_credentials' => true,
 
 ];
 
 if (env('APP_ENV') === 'local' || env('APP_ENV') === 'testing') {
-    $config['allowed_origins'][] = '*';
+    // Allow Vite dev server (common ports)
+    $config['allowed_origins'] = [
+        env('APP_URL'),
+        'http://localhost:3000',
+        'http://localhost:5173',
+        'http://localhost:5174',
+        'http://localhost:5175',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:5173',
+        'http://127.0.0.1:5174',
+        'http://127.0.0.1:5175',
+    ];
 } else {
     $config['allowed_origins'][] = env('APP_URL');
 }

@@ -32,5 +32,8 @@ export const appSection: SectionFactory = ({ t, platform }) => {
     { role: 'quit', label: t('menu.app.quit') },
   ];
 
-  return items;
+  // Return as a proper top-level menu with submenu
+  return [
+    { label: 'Bånder', submenu: items },
+  ];
 };

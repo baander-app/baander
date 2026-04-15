@@ -14,6 +14,7 @@
       <sourceFolder url="file://$MODULE_DIR$/third_party/music-brainz/tests/specification" isTestSource="false" packagePrefix="MusicBrainz\SpecificationTest\" />
       <sourceFolder url="file://$MODULE_DIR$/third_party/music-brainz/tests/unit" isTestSource="false" packagePrefix="MusicBrainz\Test\" />
       <sourceFolder url="file://$MODULE_DIR$/third_party/php-reader-1.8.1/lib" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/third_party/music-brainz/tests" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/packages/redis-stack/vendor/composer" />
       <excludeFolder url="file://$MODULE_DIR$/storage/app" />
       <excludeFolder url="file://$MODULE_DIR$/storage/assets" />
@@ -230,6 +231,12 @@
       <excludeFolder url="file://$MODULE_DIR$/vendor/xenos/asklucy" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/xenos/musicbrainz" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/zend/php-reader" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/_laravel_idea" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/laravel/boost" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/laravel/mcp" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/laravel/roster" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/symfony/yaml" />
+      <excludeFolder url="file://$MODULE_DIR$/storage/test_library" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

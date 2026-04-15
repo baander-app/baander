@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Library;
 
 use App\Models\LibraryType;
+use App\Rules\SecureLibraryPathRule;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -26,7 +27,7 @@ class CreateLibraryRequest extends FormRequest
     {
         return [
             'name'  => 'required|string:min:1|max:100',
-            'path'  => 'required|string:min:1|max:1000',
+            'path'  => ['required', 'string', 'min:1', 'max:1000', new SecureLibraryPathRule()],
             'type'  => ['required', Rule::enum(LibraryType::class)],
             'order' => 'required|integer',
         ];
