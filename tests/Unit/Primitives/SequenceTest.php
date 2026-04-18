@@ -205,10 +205,10 @@ class SequenceTest extends TestCase
             ['name' => 'Charlie', 'age' => 30],
         ];
 
-        $result = Sequence::where($data, 'age', 30);
+        $result = Sequence::where($data, 'age', 30)->values()->value();
         $this->assertCount(2, $result);
         $this->assertSame('Alice', $result[0]['name']);
-        $this->assertSame('Charlie', $result[2]['name']);
+        $this->assertSame('Charlie', $result[1]['name']);
     }
 
     #[Test]
@@ -220,7 +220,7 @@ class SequenceTest extends TestCase
             ['name' => 'Charlie', 'age' => 20],
         ];
 
-        $result = Sequence::where($data, 'age', '>', 25);
+        $result = Sequence::where($data, 'age', '>', 25)->value();
         $this->assertCount(1, $result);
         $this->assertSame('Alice', $result[0]['name']);
     }
@@ -234,7 +234,7 @@ class SequenceTest extends TestCase
             ['value' => 10],
         ];
 
-        $result = Sequence::where($data, 'value', '<=', 5);
+        $result = Sequence::where($data, 'value', '<=', 5)->value();
         $this->assertCount(2, $result);
     }
 
@@ -247,16 +247,63 @@ class SequenceTest extends TestCase
             ['status' => 'active'],
         ];
 
-        $result = Sequence::where($data, 'status', '!=', 'active');
+        $result = Sequence::where($data, 'status', '!=', 'active')->values()->value();
         $this->assertCount(1, $result);
-        $this->assertSame('inactive', $result[1]['status']);
+        $this->assertSame('inactive', $result[0]['status']);
     }
 
     #[Test]
     public function where_returns_empty_for_no_matches(): void
     {
-        $result = Sequence::where([['a' => 1]], 'a', 99);
+        $result = Sequence::where([['a' => 1]], 'a', 99)->value();
         $this->assertSame([], $result);
+    }
+
+    #[Test]
+    public function where_filters_with_callback(): void
+    {
+        $data = ['foo', 'bar', '-vf', 'baz', '-filter:v'];
+
+        $result = Sequence::where($data, fn ($item) => !str_starts_with($item, '-'))->values()->value();
+        $this->assertSame(['foo', 'bar', 'baz'], $result);
+    }
+
+    #[Test]
+    public function where_callback_returns_sequence(): void
+    {
+        $data = [3, 1, 2, 4, 5];
+
+        $result = Sequence::where($data, fn ($item) => $item > 2);
+        $this->assertInstanceOf(Sequence::class, $result);
+        $this->assertSame([3, 4, 5], $result->values()->value());
+    }
+
+    // =========================================================================
+    // Static: values()
+    // =========================================================================
+
+    #[Test]
+    public function values_reindexes_keys(): void
+    {
+        $result = Sequence::make([0 => 'a', 5 => 'b', 10 => 'c'])->values()->value();
+        $this->assertSame([0 => 'a', 1 => 'b', 2 => 'c'], $result);
+    }
+
+    #[Test]
+    public function values_on_empty_sequence(): void
+    {
+        $this->assertSame([], Sequence::make()->values()->value());
+    }
+
+    #[Test]
+    public function values_is_immutable(): void
+    {
+        $original = Sequence::make([5 => 'a', 10 => 'b']);
+        $reindexed = $original->values();
+
+        $this->assertNotSame($original, $reindexed);
+        $this->assertSame([5 => 'a', 10 => 'b'], $original->value());
+        $this->assertSame([0 => 'a', 1 => 'b'], $reindexed->value());
     }
 
     // =========================================================================
@@ -370,7 +417,7 @@ class SequenceTest extends TestCase
         ];
 
         $result = Sequence::make($data)->pluck('name');
-        $this->assertSame(['Alice', 'Bob'], $result->value());
+        $this->assertSame(['Alice', 'Bob'], $result);
     }
 
     #[Test]
@@ -382,7 +429,7 @@ class SequenceTest extends TestCase
         ];
 
         $result = Sequence::make($data)->pluck('name', 'id');
-        $this->assertSame([1 => 'Alice', 2 => 'Bob'], $result->value());
+        $this->assertSame([1 => 'Alice', 2 => 'Bob'], $result);
     }
 
     #[Test]

@@ -8,7 +8,7 @@ use App\Modules\FFmpeg\Filesystem\MediaCollection;
 use FFMpeg\Coordinate\TimeCode;
 use Illuminate\Container\Container;
 use Illuminate\Filesystem\FilesystemManager;
-use Illuminate\Support\Arr;
+use App\Primitives\Sequence;
 use Illuminate\Support\Traits\ForwardsCalls;
 
 /**
@@ -93,7 +93,7 @@ class MediaOpener
      */
     public function open($paths): self
     {
-        foreach (Arr::wrap($paths) as $path) {
+        foreach (Sequence::wrap($paths) as $path) {
             if ($path instanceof UploadFile) {
                 $disk = static::makeLocalDiskFromPath($path->getPath());
 
@@ -129,7 +129,7 @@ class MediaOpener
      */
     public function openUrl($paths, array $headers = []): self
     {
-        foreach (Arr::wrap($paths) as $path) {
+        foreach (Sequence::wrap($paths) as $path) {
             $this->collection->push(MediaOnNetwork::make($path, $headers));
         }
 

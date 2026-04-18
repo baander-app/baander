@@ -2,12 +2,12 @@
 
 namespace App\Http;
 
-use App\Extensions\EnumExt;
+use App\Primitives\Traits\EnumExtensions;
 use App\Modules\Auth\TokenBindingService;
 
 enum HeaderExt : string
 {
-    use EnumExt;
+    use EnumExtensions;
 
     /**
      * This header is used for the token binding session id

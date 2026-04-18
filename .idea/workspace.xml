@@ -1,23 +1,84 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="e5ac086c-8369-4403-a0ee-18454c863945" name="Changes" comment="update">
+    <list default="true" id="e5ac086c-8369-4403-a0ee-18454c863945" name="Changes" comment="remove stdoutlogger">
+      <change afterPath="$PROJECT_DIR$/app/Primitives/Date.php" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/Primitives/Number.php" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/Primitives/Path.php" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/Primitives/Traits/ForwardsCalls.php" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/plans/2026-04-15-001-refactor-primitive-helpers-plan.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/reports/junit.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/Unit/Primitives/DateTest.php" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/Unit/Primitives/NumberTest.php" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/Unit/Primitives/PathTest.php" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/settings.local.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.env.example" beforeDir="false" afterPath="$PROJECT_DIR$/.env.example" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.env.testing" beforeDir="false" afterPath="$PROJECT_DIR$/.env.testing" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/laravel-idea.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/laravel-idea.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/php-test-framework.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/php-test-framework.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/baander.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/baander.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/php.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/php.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/phpunit.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/phpunit.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/Extensions/StrExt.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Extensions/StrExt.php" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/Http/Requests/Library/CreateLibraryRequest.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Http/Requests/Library/CreateLibraryRequest.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Auth/Role.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Auth/Role.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Console/Commands/Auth/PruneExpiredTokensCommand.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Console/Commands/Auth/PruneExpiredTokensCommand.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Console/Commands/GenerateMbModels.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Console/Commands/GenerateMbModels.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Extensions/ArrExt.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Extensions/EnumExt.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Extensions/GeneratorCollection.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Extensions/StrExt.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Http/Controllers/Api/Auth/ClientController.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Http/Controllers/Api/Auth/ClientController.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Http/Controllers/Api/Services/LastFmController.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Http/Controllers/Api/Services/LastFmController.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Http/Controllers/Api/Services/SpotifyController.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Http/Controllers/Api/Services/SpotifyController.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Http/Controllers/Web/PasskeyController.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Http/Controllers/Web/PasskeyController.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Http/HeaderExt.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Http/HeaderExt.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Http/Middleware/AddContentSecurityPolicyHeaders.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Http/Middleware/AddContentSecurityPolicyHeaders.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Http/Middleware/SecurityHeadersMiddleware.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Http/Middleware/SecurityHeadersMiddleware.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Jobs/Library/Music/SaveAlbumCoverJob.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Jobs/Library/Music/SaveAlbumCoverJob.php" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/Jobs/Library/Music/ScanDirectoryJob.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Jobs/Library/Music/ScanDirectoryJob.php" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/Jobs/Movies/ScanMovieLibraryJob.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Jobs/Movies/ScanMovieLibraryJob.php" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/Services/DiscoveryService.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Services/DiscoveryService.php" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config/scanner.php" beforeDir="false" afterPath="$PROJECT_DIR$/config/scanner.php" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/resources/app/ziggy.js" beforeDir="false" afterPath="$PROJECT_DIR$/resources/app/ziggy.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Jobs/SyncMusicBrainzGenres.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Jobs/SyncMusicBrainzGenres.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Models/AlbumRole.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Models/AlbumRole.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Models/AlbumType.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Models/AlbumType.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Models/BaseModel.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Models/BaseModel.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Models/BasePivot.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Models/BasePivot.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Models/LibraryType.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Models/LibraryType.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Models/QueueMonitor.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Models/QueueMonitor.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/Auth/OAuth/Commands/CreateClientCommand.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/Auth/OAuth/Commands/CreateClientCommand.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/Auth/TokenBindingService.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/Auth/TokenBindingService.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/Auth/TokenChainService.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/Auth/TokenChainService.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/Auth/Webauthn/Actions/GeneratePasskeyAuthenticationOptionsAction.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/Auth/Webauthn/Actions/GeneratePasskeyAuthenticationOptionsAction.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/Auth/Webauthn/Actions/GeneratePasskeyRegisterOptionsAction.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/Auth/Webauthn/Actions/GeneratePasskeyRegisterOptionsAction.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/Blade/directives.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/Blade/directives.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/Development/Console/Commands/BuildGenreHierarchyCommand.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/Development/Console/Commands/BuildGenreHierarchyCommand.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/Development/Console/Commands/MakeLogChannelCommand.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/Development/Console/Commands/MakeLogChannelCommand.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/FFmpeg/Drivers/InteractsWithMediaStreams.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/FFmpeg/Drivers/InteractsWithMediaStreams.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/FFmpeg/Drivers/PHPFFMpeg.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/FFmpeg/Drivers/PHPFFMpeg.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/FFmpeg/Exporters/HLSVideoFilters.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/FFmpeg/Exporters/HLSVideoFilters.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/FFmpeg/FFMpeg/AdvancedMedia.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/FFmpeg/FFMpeg/AdvancedMedia.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/FFmpeg/FFMpeg/LegacyFilterMapping.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/FFmpeg/FFMpeg/LegacyFilterMapping.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/FFmpeg/Http/DynamicHLSPlaylist.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/FFmpeg/Http/DynamicHLSPlaylist.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/FFmpeg/MediaOpener.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/FFmpeg/MediaOpener.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/FFmpeg/Support/StreamParser.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/FFmpeg/Support/StreamParser.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/Logging/Channel.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/Logging/Channel.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/MediaLibrary/SmartPlaylistService.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/MediaLibrary/SmartPlaylistService.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/Metadata/GenrePersister.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/Metadata/GenrePersister.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/Metadata/Readers/MetadataReader.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/Metadata/Readers/MetadataReader.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/PhpInfoParser/Models/Config.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/PhpInfoParser/Models/Config.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/PhpInfoParser/Models/Group.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/PhpInfoParser/Models/Group.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/PhpInfoParser/Models/Module.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/PhpInfoParser/Models/Module.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/PhpInfoParser/Result.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/PhpInfoParser/Result.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/Queue/QueueMonitor/MonitorStatus.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/Queue/QueueMonitor/MonitorStatus.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/Transcoder/Protocol/ErrorCode.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/Transcoder/Protocol/ErrorCode.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/Transcoder/Protocol/HttpMethod.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/Transcoder/Protocol/HttpMethod.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Modules/Transcoder/Protocol/MessageType.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Modules/Transcoder/Protocol/MessageType.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Primitives/Sequence.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Primitives/Sequence.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Primitives/Text.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Primitives/Text.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/Providers/ScrambleServiceProvider.php" beforeDir="false" afterPath="$PROJECT_DIR$/app/Providers/ScrambleServiceProvider.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config/horizon.php" beforeDir="false" afterPath="$PROJECT_DIR$/config/horizon.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config/session.php" beforeDir="false" afterPath="$PROJECT_DIR$/config/session.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/database/factories/UserFactory.php" beforeDir="false" afterPath="$PROJECT_DIR$/database/factories/UserFactory.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/database/seeders/OAuthSeeder.php" beforeDir="false" afterPath="$PROJECT_DIR$/database/seeders/OAuthSeeder.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Feature/Security/LibraryScanningSecurityTest.php" beforeDir="false" afterPath="$PROJECT_DIR$/tests/Feature/Security/LibraryScanningSecurityTest.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Unit/Extensions/StrExtTest.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Unit/Primitives/SequenceTest.php" beforeDir="false" afterPath="$PROJECT_DIR$/tests/Unit/Primitives/SequenceTest.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Unit/Primitives/TextTest.php" beforeDir="false" afterPath="$PROJECT_DIR$/tests/Unit/Primitives/TextTest.php" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -34,9 +95,7 @@
   </component>
   <component name="ComposerSettings" synchronizationState="SYNCHRONIZE">
     <pharConfigPath>$PROJECT_DIR$/composer.json</pharConfigPath>
-    <execution>
-      <interpreter name="app" composer="composer" />
-    </execution>
+    <execution />
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -251,11 +310,6 @@
       <path value="$PROJECT_DIR$/vendor/xenos/asklucy" />
       <path value="$PROJECT_DIR$/vendor/xenos/musicbrainz" />
       <path value="$PROJECT_DIR$/vendor/zend/php-reader" />
-      <path value="$PROJECT_DIR$/vendor/_laravel_idea" />
-      <path value="$PROJECT_DIR$/vendor/symfony/yaml" />
-      <path value="$PROJECT_DIR$/vendor/laravel/boost" />
-      <path value="$PROJECT_DIR$/vendor/laravel/roster" />
-      <path value="$PROJECT_DIR$/vendor/laravel/mcp" />
     </include_path>
   </component>
   <component name="ProjectColorInfo">{
@@ -269,25 +323,14 @@
   </component>
   <component name="PropertiesComponent">{
   &quot;keyToString&quot;: {
-    &quot;PHPUnit.LibraryScanningSecurityTest.executor&quot;: &quot;Run&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
-    &quot;SHELLCHECK.PATH&quot;: &quot;/Users/martin/Library/Application Support/JetBrains/PhpStorm2025.3/plugins/Shell Script/shellcheck&quot;,
-    &quot;credentialsType com.jetbrains.php.remote.interpreter.ui.PhpCreateRemoteSdkForm&quot;: &quot;Docker Compose&quot;,
-    &quot;credentialsType com.jetbrains.php.remote.interpreter.ui.PhpInplaceEditRemoteSdkForm&quot;: &quot;Docker Compose&quot;,
+    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
     &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;javascript.preferred.runtime.type.id&quot;: &quot;node&quot;,
-    &quot;laravel_idea.dialogs.helper_code_generation.width&quot;: &quot;354&quot;,
-    &quot;laravel_idea.dialogs.helper_code_generation.x&quot;: &quot;1103&quot;,
-    &quot;laravel_idea.dialogs.helper_code_generation.y&quot;: &quot;564&quot;,
-    &quot;laravel_routing.server_address&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/Users/martin/dev/baander&quot;,
     &quot;nodejs_package_manager_path&quot;: &quot;yarn&quot;,
-    &quot;prettierjs.PrettierConfiguration.Package&quot;: &quot;/Users/martin/dev/baander/node_modules/prettier&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;terminal&quot;,
-    &quot;ts.external.directory.path&quot;: &quot;/Users/martin/dev/baander/node_modules/typescript/lib&quot;,
+    &quot;prettierjs.PrettierConfiguration.Package&quot;: &quot;\\\\wsl.localhost\\Ubuntu\\home\\martin\\dev\\baander\\node_modules\\prettier&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;reference.webide.settings.project.settings.php&quot;,
+    &quot;ts.external.directory.path&quot;: &quot;\\\\wsl.localhost\\Ubuntu\\home\\martin\\dev\\baander\\node_modules\\typescript\\lib&quot;,
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
 }</component>
@@ -300,31 +343,11 @@
       </map>
     </option>
   </component>
-  <component name="RecentsManager">
-    <key name="CopyFile.RECENT_KEYS">
-      <recent name="$PROJECT_DIR$/codemods" />
-    </key>
-  </component>
-  <component name="RunManager" selected="PHPUnit.LibraryScanningSecurityTest">
-    <configuration name="LibraryScanningSecurityTest" type="PHPUnitRunConfigurationType" factoryName="PHPUnit" temporary="true">
-      <TestRunner class="Tests\Feature\Security\LibraryScanningSecurityTest" configuration_file="/var/www/html/phpunit.xml" file="$PROJECT_DIR$/tests/Feature/Security/LibraryScanningSecurityTest.php" paratest_binary_path="$PROJECT_DIR$/vendor/bin/paratest_for_phpstorm" scope="Class" />
-      <method v="2" />
-    </configuration>
-    <configuration name="Main" type="PHPUnitRunConfigurationType" factoryName="PHPUnit">
-      <TestRunner configuration_file="$PROJECT_DIR$/phpunit.xml" scope="XML" use_alternative_configuration_file="true" />
-      <method v="2" />
-    </configuration>
-    <recent_temporary>
-      <list>
-        <item itemvalue="PHPUnit.LibraryScanningSecurityTest" />
-      </list>
-    </recent_temporary>
-  </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-js-predefined-d6986cc7102b-9b0f141eb926-JavaScript-PS-253.30387.85" />
-        <option value="bundled-php-predefined-a98d8de5180a-0e0d91225499-com.jetbrains.php.sharedIndexes-PS-253.30387.85" />
+        <option value="bundled-js-predefined-d6986cc7102b-3bd3a6803838-JavaScript-PS-261.22158.283" />
+        <option value="bundled-php-predefined-a98d8de5180a-a9a4ea3ee0f4-com.jetbrains.php.sharedIndexes-PS-261.22158.283" />
       </set>
     </attachedChunks>
   </component>
@@ -335,54 +358,44 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1767990407390</updated>
-      <workItem from="1767990408499" duration="35000" />
-      <workItem from="1770303713161" duration="2318000" />
-      <workItem from="1770306492454" duration="1244000" />
-      <workItem from="1770307756357" duration="4963000" />
-      <workItem from="1770314709702" duration="13000" />
-      <workItem from="1770314784782" duration="9782000" />
-      <workItem from="1770325218800" duration="9208000" />
-      <workItem from="1770380642945" duration="916000" />
-      <workItem from="1770381690323" duration="192000" />
-      <workItem from="1770381902520" duration="1851000" />
-      <workItem from="1770384691820" duration="13964000" />
-      <workItem from="1770481543489" duration="13000" />
-      <workItem from="1770740590809" duration="231000" />
-      <workItem from="1770831477878" duration="634000" />
-      <workItem from="1770832193499" duration="367000" />
-      <workItem from="1770832925327" duration="2787000" />
+      <workItem from="1767990408499" duration="592000" />
+      <workItem from="1773503258602" duration="3331000" />
+      <workItem from="1776266390230" duration="684000" />
+      <workItem from="1776267099284" duration="23000" />
+      <workItem from="1776267134487" duration="13326000" />
+      <workItem from="1776517146316" duration="1118000" />
     </task>
-    <task id="LOCAL-00001" summary="update">
+    <task id="LOCAL-00001" summary="chore: remove php-reader">
       <option name="closed" value="true" />
-      <created>1770325266390</created>
+      <created>1767990602320</created>
       <option name="number" value="00001" />
       <option name="presentableId" value="LOCAL-00001" />
       <option name="project" value="LOCAL" />
-      <updated>1770325266390</updated>
+      <updated>1767990602320</updated>
     </task>
-    <task id="LOCAL-00002" summary="fix undefiend in electron">
+    <task id="LOCAL-00002" summary="sync lockfile">
       <option name="closed" value="true" />
-      <created>1770327296168</created>
+      <created>1767990640112</created>
       <option name="number" value="00002" />
       <option name="presentableId" value="LOCAL-00002" />
       <option name="project" value="LOCAL" />
-      <updated>1770327296168</updated>
+      <updated>1767990640112</updated>
     </task>
-    <task id="LOCAL-00003" summary="chore: bump deps">
+    <task id="LOCAL-00003" summary="rearrange examples">
       <option name="closed" value="true" />
-      <created>1770327310032</created>
+      <created>1776268251121</created>
       <option name="number" value="00003" />
       <option name="presentableId" value="LOCAL-00003" />
       <option name="project" value="LOCAL" />
-      <updated>1770327310032</updated>
+      <updated>1776268251121</updated>
     </task>
-    <task id="LOCAL-00004" summary="update">
+    <task id="LOCAL-00004" summary="remove stdoutlogger">
       <option name="closed" value="true" />
-      <created>1770327800449</created>
+      <created>1776268263777</created>
       <option name="number" value="00004" />
       <option name="presentableId" value="LOCAL-00004" />
       <option name="project" value="LOCAL" />
-      <updated>1770327800449</updated>
+      <updated>1776268263777</updated>
     </task>
     <option name="localTasksCounter" value="5" />
     <servers />
@@ -404,14 +417,11 @@
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
     <option name="CHECK_NEW_TODO" value="false" />
-    <MESSAGE value="fix undefiend in electron" />
-    <MESSAGE value="chore: bump deps" />
-    <MESSAGE value="update" />
-    <option name="LAST_COMMIT_MESSAGE" value="update" />
+    <MESSAGE value="chore: remove php-reader" />
+    <MESSAGE value="sync lockfile" />
+    <MESSAGE value="rearrange examples" />
+    <MESSAGE value="remove stdoutlogger" />
+    <option name="LAST_COMMIT_MESSAGE" value="remove stdoutlogger" />
     <option name="NON_MODAL_COMMIT_POSTPONE_SLOW_CHECKS" value="false" />
-  </component>
-  <component name="XSLT-Support.FileAssociations.UIState">
-    <expand />
-    <select />
   </component>
 </project>

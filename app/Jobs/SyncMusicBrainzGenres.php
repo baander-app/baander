@@ -8,7 +8,7 @@ use App\Modules\Logging\Attributes\LogChannel;
 use App\Modules\Logging\Channel;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 use Psr\Log\LoggerInterface;
 
 class SyncMusicBrainzGenres extends BaseJob
@@ -82,7 +82,7 @@ class SyncMusicBrainzGenres extends BaseJob
                     // Create new genre
                     $genre = Genre::create([
                         'name' => $mbGenre['name'],
-                        'slug' => Str::slug($mbGenre['name']),
+                        'slug' => Text::slug($mbGenre['name'])->value(),
                         'mbid' => $mbGenre['id'],
                     ]);
                     $totalCreated++;
@@ -94,7 +94,7 @@ class SyncMusicBrainzGenres extends BaseJob
                     // Update existing genre (name might have changed)
                     $genre->update([
                         'name' => $mbGenre['name'],
-                        'slug' => Str::slug($mbGenre['name']),
+                        'slug' => Text::slug($mbGenre['name'])->value(),
                     ]);
                     $totalUpdated++;
                 }

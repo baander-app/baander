@@ -13,35 +13,35 @@ class TextTest extends TestCase
     #[Test]
     public function slug_converts_string(): void
     {
-        $this->assertSame('hello-world', Text::slug('Hello World'));
-        $this->assertSame('hello-world', Text::slug('hello world'));
-        $this->assertSame('foo-bar-baz', Text::slug('foo bar baz'));
+        $this->assertSame('hello-world', Text::slug('Hello World')->value());
+        $this->assertSame('hello-world', Text::slug('hello world')->value());
+        $this->assertSame('foo-bar-baz', Text::slug('foo bar baz')->value());
     }
 
     #[Test]
     public function slug_handles_special_characters(): void
     {
-        $this->assertSame('cafe', Text::slug('café'));
-        $this->assertSame('naive', Text::slug('naïve'));
+        $this->assertSame('cafe', Text::slug('café')->value());
+        $this->assertSame('naive', Text::slug('naïve')->value());
     }
 
     #[Test]
     public function slug_uses_custom_separator(): void
     {
-        $this->assertSame('hello_world', Text::slug('hello world', '_'));
-        $this->assertSame('hello.world', Text::slug('hello world', '.'));
+        $this->assertSame('hello_world', Text::slug('hello world', '_')->value());
+        $this->assertSame('hello.world', Text::slug('hello world', '.')->value());
     }
 
     #[Test]
     public function slug_returns_empty_for_empty_string(): void
     {
-        $this->assertSame('', Text::slug(''));
+        $this->assertSame('', Text::slug('')->value());
     }
 
     #[Test]
     public function slug_handles_multibyte(): void
     {
-        $this->assertSame('uber-alles', Text::slug('Über Alles'));
+        $this->assertSame('uber-alles', Text::slug('Über Alles')->value());
     }
 
     // ─── Static: random ─────────────────────────────────────────────────────
@@ -186,27 +186,27 @@ class TextTest extends TestCase
     #[Test]
     public function studly_converts_to_pascal_case(): void
     {
-        $this->assertSame('HelloWorld', Text::studly('hello_world'));
-        $this->assertSame('HelloWorld', Text::studly('hello-world'));
-        $this->assertSame('HelloWorld', Text::studly('hello world'));
+        $this->assertSame('HelloWorld', Text::studly('hello_world')->value());
+        $this->assertSame('HelloWorld', Text::studly('hello-world')->value());
+        $this->assertSame('HelloWorld', Text::studly('hello world')->value());
     }
 
     #[Test]
     public function studly_handles_empty_string(): void
     {
-        $this->assertSame('', Text::studly(''));
+        $this->assertSame('', Text::studly('')->value());
     }
 
     #[Test]
     public function studly_handles_single_word(): void
     {
-        $this->assertSame('Hello', Text::studly('hello'));
+        $this->assertSame('Hello', Text::studly('hello')->value());
     }
 
     #[Test]
     public function studly_handles_already_studly(): void
     {
-        $this->assertSame('HelloWorld', Text::studly('HelloWorld'));
+        $this->assertSame('HelloWorld', Text::studly('HelloWorld')->value());
     }
 
     // ─── Static: snake ──────────────────────────────────────────────────────
@@ -214,34 +214,34 @@ class TextTest extends TestCase
     #[Test]
     public function snake_converts_to_snake_case(): void
     {
-        $this->assertSame('hello_world', Text::snake('HelloWorld'));
-        $this->assertSame('hello_world', Text::snake('helloWorld'));
+        $this->assertSame('hello_world', Text::snake('HelloWorld')->value());
+        $this->assertSame('hello_world', Text::snake('helloWorld')->value());
     }
 
     #[Test]
     public function snake_uses_custom_delimiter(): void
     {
-        $this->assertSame('hello-world', Text::snake('HelloWorld', '-'));
-        $this->assertSame('hello.world', Text::snake('HelloWorld', '.'));
+        $this->assertSame('hello-world', Text::snake('HelloWorld', '-')->value());
+        $this->assertSame('hello.world', Text::snake('HelloWorld', '.')->value());
     }
 
     #[Test]
     public function snake_handles_empty_string(): void
     {
-        $this->assertSame('', Text::snake(''));
+        $this->assertSame('', Text::snake('')->value());
     }
 
     #[Test]
     public function snake_converts_spaces(): void
     {
-        $this->assertSame('hello_world', Text::snake('hello world'));
-        $this->assertSame('hello_world_foo', Text::snake('hello  world  foo'));
+        $this->assertSame('hello_world', Text::snake('hello world')->value());
+        $this->assertSame('hello_world_foo', Text::snake('hello  world  foo')->value());
     }
 
     #[Test]
     public function snake_handles_already_snake(): void
     {
-        $this->assertSame('hello_world', Text::snake('hello_world'));
+        $this->assertSame('hello_world', Text::snake('hello_world')->value());
     }
 
     // ─── Static: replaceFirst ───────────────────────────────────────────────
@@ -249,38 +249,38 @@ class TextTest extends TestCase
     #[Test]
     public function replaceFirst_replaces_first_occurrence(): void
     {
-        $this->assertSame('foo bar baz', Text::replaceFirst('qux', 'bar', 'foo qux baz'));
-        $this->assertSame('bar qux baz', Text::replaceFirst('foo', 'bar', 'foo qux baz'));
+        $this->assertSame('foo bar baz', Text::replaceFirst('foo qux baz', 'qux', 'bar')->value());
+        $this->assertSame('bar qux baz', Text::replaceFirst('foo qux baz', 'foo', 'bar')->value());
     }
 
     #[Test]
     public function replaceFirst_only_replaces_first(): void
     {
-        $this->assertSame('bar-foo-foo', Text::replaceFirst('foo', 'bar', 'foo-foo-foo'));
+        $this->assertSame('bar-foo-foo', Text::replaceFirst('foo-foo-foo', 'foo', 'bar')->value());
     }
 
     #[Test]
     public function replaceFirst_returns_subject_when_not_found(): void
     {
-        $this->assertSame('hello world', Text::replaceFirst('foo', 'bar', 'hello world'));
+        $this->assertSame('hello world', Text::replaceFirst('hello world', 'foo', 'bar')->value());
     }
 
     #[Test]
     public function replaceFirst_returns_subject_when_search_empty(): void
     {
-        $this->assertSame('hello', Text::replaceFirst('', 'bar', 'hello'));
+        $this->assertSame('hello', Text::replaceFirst('hello', '', 'bar')->value());
     }
 
     #[Test]
     public function replaceFirst_handles_empty_subject(): void
     {
-        $this->assertSame('', Text::replaceFirst('foo', 'bar', ''));
+        $this->assertSame('', Text::replaceFirst('', 'foo', 'bar')->value());
     }
 
     #[Test]
     public function replaceFirst_handles_multibyte(): void
     {
-        $this->assertSame('bar-world', Text::replaceFirst('héllo', 'bar', 'héllo-world'));
+        $this->assertSame('bar-world', Text::replaceFirst('héllo-world', 'héllo', 'bar')->value());
     }
 
     // ─── Static: before ─────────────────────────────────────────────────────
@@ -288,26 +288,26 @@ class TextTest extends TestCase
     #[Test]
     public function before_returns_string_before_search(): void
     {
-        $this->assertSame('hello', Text::before('hello world', ' '));
-        $this->assertSame('foo', Text::before('foo@bar.com', '@'));
+        $this->assertSame('hello', Text::before('hello world', ' ')->value());
+        $this->assertSame('foo', Text::before('foo@bar.com', '@')->value());
     }
 
     #[Test]
     public function before_returns_subject_when_not_found(): void
     {
-        $this->assertSame('hello world', Text::before('hello world', 'xyz'));
+        $this->assertSame('hello world', Text::before('hello world', 'xyz')->value());
     }
 
     #[Test]
     public function before_handles_empty_string(): void
     {
-        $this->assertSame('', Text::before('', '@'));
+        $this->assertSame('', Text::before('', '@')->value());
     }
 
     #[Test]
     public function before_handles_multibyte(): void
     {
-        $this->assertSame('café', Text::before('café au lait', ' '));
+        $this->assertSame('café', Text::before('café au lait', ' ')->value());
     }
 
     // ─── Static: ascii ──────────────────────────────────────────────────────
@@ -315,25 +315,25 @@ class TextTest extends TestCase
     #[Test]
     public function ascii_transliterates_latin(): void
     {
-        $this->assertSame('Ae', Text::ascii('Äé'));
-        $this->assertSame('AE', Text::ascii('ÄÉ'));
-        $this->assertSame('cafe', Text::ascii('café'));
-        $this->assertSame('naive', Text::ascii('naïve'));
+        $this->assertSame('Ae', Text::ascii('Äé')->value());
+        $this->assertSame('AE', Text::ascii('ÄÉ')->value());
+        $this->assertSame('cafe', Text::ascii('café')->value());
+        $this->assertSame('naive', Text::ascii('naïve')->value());
     }
 
     #[Test]
     public function ascii_handles_german(): void
     {
-        $this->assertSame('UEber', Text::ascii('Über', 'de'));
-        $this->assertSame('Fussball', Text::ascii('Fußball', 'de'));
-        $this->assertSame('aeoeue', Text::ascii('äöü', 'de'));
+        $this->assertSame('UEber', Text::ascii('Über', 'de')->value());
+        $this->assertSame('Fussball', Text::ascii('Fußball', 'de')->value());
+        $this->assertSame('aeoeue', Text::ascii('äöü', 'de')->value());
     }
 
     #[Test]
     public function ascii_removes_non_ascii(): void
     {
-        $this->assertSame('hello', Text::ascii('hello'));
-        $this->assertSame('', Text::ascii(''));
+        $this->assertSame('hello', Text::ascii('hello')->value());
+        $this->assertSame('', Text::ascii('')->value());
     }
 
     // ─── Static: between ────────────────────────────────────────────────────
@@ -346,22 +346,9 @@ class TextTest extends TestCase
     }
 
     #[Test]
-    public function between_returns_null_for_null(): void
-    {
-        $this->assertNull(Text::between(null, '[', ']'));
-    }
-
-    #[Test]
     public function between_returns_null_for_empty_string(): void
     {
         $this->assertNull(Text::between('', '[', ']'));
-    }
-
-    #[Test]
-    public function between_returns_null_for_non_string(): void
-    {
-        $this->assertNull(Text::between(123, '[', ']'));
-        $this->assertNull(Text::between([], '[', ']'));
     }
 
     #[Test]
@@ -406,22 +393,9 @@ class TextTest extends TestCase
     }
 
     #[Test]
-    public function safe_returns_null_for_null(): void
-    {
-        $this->assertNull(Text::safe(null));
-    }
-
-    #[Test]
     public function safe_returns_null_for_empty_string(): void
     {
         $this->assertNull(Text::safe(''));
-    }
-
-    #[Test]
-    public function safe_returns_null_for_non_string(): void
-    {
-        $this->assertNull(Text::safe(123));
-        $this->assertNull(Text::safe([]));
     }
 
     // ─── Static: convertToUtf8 ──────────────────────────────────────────────
@@ -443,22 +417,9 @@ class TextTest extends TestCase
     }
 
     #[Test]
-    public function convertToUtf8_returns_null_for_null(): void
-    {
-        $this->assertNull(Text::convertToUtf8(null));
-    }
-
-    #[Test]
     public function convertToUtf8_returns_null_for_empty_string(): void
     {
         $this->assertNull(Text::convertToUtf8(''));
-    }
-
-    #[Test]
-    public function convertToUtf8_returns_null_for_non_string(): void
-    {
-        $this->assertNull(Text::convertToUtf8(123));
-        $this->assertNull(Text::convertToUtf8([]));
     }
 
     // ─── Builder: factory and value access ──────────────────────────────────

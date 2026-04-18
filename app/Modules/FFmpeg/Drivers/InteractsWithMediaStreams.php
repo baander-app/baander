@@ -3,7 +3,7 @@
 namespace App\Modules\FFmpeg\Drivers;
 
 use FFMpeg\FFProbe\DataMapping\Stream;
-use Illuminate\Support\Arr;
+use App\Primitives\Sequence;
 use App\Modules\FFmpeg\Filesystem\MediaCollection;
 
 trait InteractsWithMediaStreams
@@ -29,7 +29,7 @@ trait InteractsWithMediaStreams
      */
     public function getDurationInMiliseconds(): int
     {
-        $stream = Arr::first($this->getStreams());
+        $stream = Sequence::first($this->getStreams());
 
         if ($stream->has('duration')) {
             return intval(round($stream->get('duration') * 1000));
@@ -54,7 +54,7 @@ trait InteractsWithMediaStreams
      */
     public function getAudioStream(): ?Stream
     {
-        return Arr::first($this->getStreams(), function (Stream $stream) {
+        return Sequence::first($this->getStreams(), function (Stream $stream) {
             return $stream->isAudio();
         });
     }
@@ -64,7 +64,7 @@ trait InteractsWithMediaStreams
      */
     public function getVideoStream(): ?Stream
     {
-        return Arr::first($this->getStreams(), function (Stream $stream) {
+        return Sequence::first($this->getStreams(), function (Stream $stream) {
             return $stream->isVideo();
         });
     }

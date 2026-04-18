@@ -10,7 +10,7 @@ use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 use Spatie\RouteAttributes\Attributes\{Get, Post, Prefix};
 
 #[Prefix('services/spotify')]
@@ -37,8 +37,8 @@ class SpotifyController extends Controller
         }
 
         // Generate state and nonce for security
-        $state = Str::random(40);
-        $nonce = Str::random(32);
+        $state = Text::random(40);
+        $nonce = Text::random(32);
 
         // Store the state with user information and validation data
         Cache::put("spotify_auth_state_{$state}", [

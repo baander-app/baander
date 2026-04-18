@@ -17,7 +17,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Support\Facades\{Auth, Cache, Event, Log, Session};
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 use Illuminate\Validation\ValidationException;
 use Spatie\RouteAttributes\Attributes\{Get, Post, Prefix};
 use Throwable;
@@ -71,7 +71,7 @@ class PasskeyController extends Controller
         $options = $action->execute($request->user());
 
         // Generate a unique challenge ID and store options in cache
-        $challengeId = Str::random(40);
+        $challengeId = Text::random(40);
         Cache::put("passkey_challenge:{$challengeId}", json_encode($options), now()->addMinutes(5));
 
         // Store options in session for backward compatibility with web flow

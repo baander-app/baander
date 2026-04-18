@@ -9,7 +9,7 @@
   </component>
   <component name="MessDetector">
     <phpmd_settings>
-      <MessDetectorConfiguration tool_path="$PROJECT_DIR$/vendor/bin/phpmd" />
+      <phpmd_by_interpreter asDefaultInterpreter="true" interpreter_id="19bc4d5e-a706-40cf-a8f7-0236b1bd03ea" timeout="30000" />
     </phpmd_settings>
   </component>
   <component name="MessDetectorOptionsConfiguration">
@@ -19,8 +19,6 @@
     <option name="transferred" value="true" />
   </component>
   <component name="PHPCodeSnifferOptionsConfiguration">
-    <option name="codingStandard" value="Custom" />
-    <option name="customRuleset" value="$PROJECT_DIR$/phpcs.xml" />
     <option name="highlightLevel" value="WARNING" />
     <option name="transferred" value="true" />
   </component>
@@ -31,7 +29,7 @@
   </component>
   <component name="PhpCodeSniffer">
     <phpcs_settings>
-      <PhpCSConfiguration beautifier_path="$PROJECT_DIR$/vendor/bin/phpcbf" tool_path="$PROJECT_DIR$/vendor/bin/phpcs" />
+      <phpcs_by_interpreter asDefaultInterpreter="true" interpreter_id="19bc4d5e-a706-40cf-a8f7-0236b1bd03ea" timeout="30000" />
     </phpcs_settings>
   </component>
   <component name="PhpIncludePathManager">
@@ -244,16 +242,11 @@
       <path value="$PROJECT_DIR$/vendor/xenos/asklucy" />
       <path value="$PROJECT_DIR$/vendor/xenos/musicbrainz" />
       <path value="$PROJECT_DIR$/vendor/zend/php-reader" />
-      <path value="$PROJECT_DIR$/vendor/_laravel_idea" />
-      <path value="$PROJECT_DIR$/vendor/symfony/yaml" />
-      <path value="$PROJECT_DIR$/vendor/laravel/boost" />
-      <path value="$PROJECT_DIR$/vendor/laravel/roster" />
-      <path value="$PROJECT_DIR$/vendor/laravel/mcp" />
     </include_path>
   </component>
   <component name="PhpInterpreters">
     <interpreters>
-      <interpreter id="0213aa1c-b35f-4b89-a6b2-ee72973ffe5a" name="app" home="docker-compose://DATA" auto="false" debugger_id="php.debugger.XDebug">
+      <interpreter id="19bc4d5e-a706-40cf-a8f7-0236b1bd03ea" name="app" home="docker-compose://DATA" auto="false" debugger_id="php.debugger.XDebug">
         <remote_data INTERPRETER_PATH="php" HELPERS_PATH="/opt/.phpstorm_helpers" VALID="true" RUN_AS_ROOT_VIA_SUDO="false" DOCKER_ACCOUNT_NAME="Docker" DOCKER_COMPOSE_SERVICE_NAME="app" DOCKER_REMOTE_PROJECT_PATH="/opt/project">
           <type_data command="EXEC" />
           <dockerComposeConfigurationPaths>
@@ -267,8 +260,8 @@
   <component name="PhpInterpretersPhpInfoCache">
     <phpInfoCache>
       <interpreter name="app">
-        <phpinfo binary_type="PHP" php_cgi="/usr/local/bin/php-cgi" php_cli="/usr/local/bin/php" path_separator=":" version="8.5.2">
-          <additional_php_ini>/usr/local/etc/php/conf.d/docker-php-ext-excimer.ini, /usr/local/etc/php/conf.d/docker-php-ext-exif.ini, /usr/local/etc/php/conf.d/docker-php-ext-ffi.ini, /usr/local/etc/php/conf.d/docker-php-ext-gd.ini, /usr/local/etc/php/conf.d/docker-php-ext-gettext.ini, /usr/local/etc/php/conf.d/docker-php-ext-igbinary.ini, /usr/local/etc/php/conf.d/docker-php-ext-imagick.ini, /usr/local/etc/php/conf.d/docker-php-ext-inotify.ini, /usr/local/etc/php/conf.d/docker-php-ext-intl.ini, /usr/local/etc/php/conf.d/docker-php-ext-mailparse.ini, /usr/local/etc/php/conf.d/docker-php-ext-pcntl.ini, /usr/local/etc/php/conf.d/docker-php-ext-pdo_pgsql.ini, /usr/local/etc/php/conf.d/docker-php-ext-pgsql.ini, /usr/local/etc/php/conf.d/docker-php-ext-redis.ini, /usr/local/etc/php/conf.d/docker-php-ext-shmop.ini, /usr/local/etc/php/conf.d/docker-php-ext-sockets.ini, /usr/local/etc/php/conf.d/docker-php-ext-sodium.ini, /usr/local/etc/php/conf.d/docker-php-ext-swoole.ini, /usr/local/etc/php/conf.d/docker-php-ext-sysvmsg.ini, /usr/local/etc/php/conf.d/docker-php-ext-uv.ini, /usr/local/etc/php/conf.d/docker-php-ext-yaml.ini, /usr/local/etc/php/conf.d/docker-php-ext-zip.ini, /usr/local/etc/php/conf.d/xdebug.ini</additional_php_ini>
+        <phpinfo binary_type="PHP" php_cgi="/usr/local/bin/php-cgi" php_cli="/usr/local/bin/php" path_separator=":" version="8.4.16">
+          <additional_php_ini>/usr/local/etc/php/conf.d/docker-php-ext-excimer.ini, /usr/local/etc/php/conf.d/docker-php-ext-exif.ini, /usr/local/etc/php/conf.d/docker-php-ext-ffi.ini, /usr/local/etc/php/conf.d/docker-php-ext-gd.ini, /usr/local/etc/php/conf.d/docker-php-ext-gettext.ini, /usr/local/etc/php/conf.d/docker-php-ext-grpc.ini, /usr/local/etc/php/conf.d/docker-php-ext-igbinary.ini, /usr/local/etc/php/conf.d/docker-php-ext-imagick.ini, /usr/local/etc/php/conf.d/docker-php-ext-inotify.ini, /usr/local/etc/php/conf.d/docker-php-ext-intl.ini, /usr/local/etc/php/conf.d/docker-php-ext-jsonpath.ini, /usr/local/etc/php/conf.d/docker-php-ext-mailparse.ini, /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini, /usr/local/etc/php/conf.d/docker-php-ext-pcntl.ini, /usr/local/etc/php/conf.d/docker-php-ext-pdo_pgsql.ini, /usr/local/etc/php/conf.d/docker-php-ext-pgsql.ini, /usr/local/etc/php/conf.d/docker-php-ext-protobuf.ini, /usr/local/etc/php/conf.d/docker-php-ext-redis.ini, /usr/local/etc/php/conf.d/docker-php-ext-shmop.ini, /usr/local/etc/php/conf.d/docker-php-ext-sockets.ini, /usr/local/etc/php/conf.d/docker-php-ext-sodium.ini, /usr/local/etc/php/conf.d/docker-php-ext-ssh2.ini, /usr/local/etc/php/conf.d/docker-php-ext-swoole.ini, /usr/local/etc/php/conf.d/docker-php-ext-sysvmsg.ini, /usr/local/etc/php/conf.d/docker-php-ext-uv.ini, /usr/local/etc/php/conf.d/docker-php-ext-yaml.ini, /usr/local/etc/php/conf.d/docker-php-ext-zip.ini, /usr/local/etc/php/conf.d/xdebug.ini</additional_php_ini>
           <configuration_file />
           <configuration_options>
             <configuration_option name="include_path" value=".:/usr/local/lib/php" />
@@ -297,6 +290,7 @@
             <extension name="filter" />
             <extension name="gd" />
             <extension name="gettext" />
+            <extension name="grpc" />
             <extension name="hash" />
             <extension name="iconv" />
             <extension name="igbinary" />
@@ -304,7 +298,7 @@
             <extension name="inotify" />
             <extension name="intl" />
             <extension name="json" />
-            <extension name="lexbor" />
+            <extension name="jsonpath" />
             <extension name="libxml" />
             <extension name="mailparse" />
             <extension name="mbstring" />
@@ -316,6 +310,7 @@
             <extension name="pdo_sqlite" />
             <extension name="pgsql" />
             <extension name="posix" />
+            <extension name="protobuf" />
             <extension name="random" />
             <extension name="readline" />
             <extension name="redis" />
@@ -324,11 +319,11 @@
             <extension name="sockets" />
             <extension name="sodium" />
             <extension name="sqlite3" />
+            <extension name="ssh2" />
             <extension name="standard" />
             <extension name="swoole" />
             <extension name="sysvmsg" />
             <extension name="tokenizer" />
-            <extension name="uri" />
             <extension name="uv" />
             <extension name="xdebug" />
             <extension name="xml" />
@@ -378,12 +373,10 @@
       <extension name="gmagick" enabled="false" />
       <extension name="gmp" enabled="false" />
       <extension name="gnupg" enabled="false" />
-      <extension name="grpc" enabled="false" />
       <extension name="http" enabled="false" />
       <extension name="ibm_db2" enabled="false" />
       <extension name="imap" enabled="false" />
       <extension name="interbase" enabled="false" />
-      <extension name="jsonpath" enabled="false" />
       <extension name="judy" enabled="false" />
       <extension name="ldap" enabled="false" />
       <extension name="libevent" enabled="false" />
@@ -417,7 +410,6 @@
       <extension name="snmp" enabled="false" />
       <extension name="soap" enabled="false" />
       <extension name="sqlsrv" enabled="false" />
-      <extension name="ssh2" enabled="false" />
       <extension name="suhosin" enabled="false" />
       <extension name="svn" enabled="false" />
       <extension name="swoole" enabled="true" />
@@ -425,6 +417,7 @@
       <extension name="sysvsem" enabled="false" />
       <extension name="sysvshm" enabled="false" />
       <extension name="tidy" enabled="false" />
+      <extension name="uri" enabled="false" />
       <extension name="uv" enabled="true" />
       <extension name="v8js" enabled="false" />
       <extension name="wddx" enabled="false" />
@@ -441,17 +434,15 @@
   <component name="PhpStan">
     <PhpStan_settings>
       <phpstan_by_interpreter asDefaultInterpreter="true" interpreter_id="19bc4d5e-a706-40cf-a8f7-0236b1bd03ea" timeout="60000" />
-      <PhpStanConfiguration tool_path="$PROJECT_DIR$/vendor/bin/phpstan" />
     </PhpStan_settings>
   </component>
   <component name="PhpStanOptionsConfiguration">
-    <option name="config" value="$PROJECT_DIR$/phpstan.neon" />
     <option name="transferred" value="true" />
   </component>
   <component name="PhpUnit">
     <phpunit_settings>
       <phpunit_by_interpreter interpreter_id="19bc4d5e-a706-40cf-a8f7-0236b1bd03ea" configuration_file_path="/var/www/html/phpunit.xml" custom_loader_path="/var/www/html/vendor/autoload.php" paratest_path="/var/www/html/vendor/bin/paratest_for_phpstorm" phpunit_phar_path="" use_configuration_file="true" />
-      <PhpUnitSettings configuration_file_path="$PROJECT_DIR$/phpunit.xml" custom_loader_path="$PROJECT_DIR$/vendor/autoload.php" paratest_path="$PROJECT_DIR$/vendor/bin/paratest_for_phpstorm" phpunit_phar_path="" use_configuration_file="true" />
+      <PhpUnitSettings configuration_file_path="$PROJECT_DIR$/phpunit.xml" custom_loader_path="$PROJECT_DIR$/vendor/autoload.php" paratest_path="$PROJECT_DIR$/vendor/bin/paratest_for_phpstorm" use_configuration_file="true" />
     </phpunit_settings>
   </component>
   <component name="Psalm">

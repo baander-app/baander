@@ -8,7 +8,7 @@ use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecurityScheme;
 use Illuminate\Routing\Route;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 
 class ScrambleServiceProvider extends ServiceProvider
 {
@@ -47,12 +47,12 @@ DESC;
             $blacklist = [];
 
             // Exclude OAuth and Sanctum routes from documentation
-            if (array_any($blacklist, fn($str) => Str::contains($route->uri, $str))) {
+            if (array_any($blacklist, fn($str) => Text::contains($route->uri, $str))) {
                 return false;
             }
 
             // Include only whitelisted routes
-            return array_any($whitelist, fn($str) => Str::contains($route->uri, $str));
+            return array_any($whitelist, fn($str) => Text::contains($route->uri, $str));
         });
 
         Scramble::ignoreDefaultRoutes();

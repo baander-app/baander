@@ -9,7 +9,7 @@ use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 use Spatie\RouteAttributes\Attributes\{Get, Post, Prefix};
 
 
@@ -36,8 +36,8 @@ class LastFmController extends Controller
         }
 
         // Generate state and nonce
-        $state = Str::random(40);
-        $nonce = Str::random(32);
+        $state = Text::random(40);
+        $nonce = Text::random(32);
 
         // Store the state with user information and validation data
         Cache::put("lastfm_auth_state_{$state}", [

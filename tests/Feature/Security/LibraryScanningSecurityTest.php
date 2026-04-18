@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Security;
 
-use App\Extensions\StrExt;
+use App\Primitives\Text;
 use App\Models\{Album, Library, Song};
 use App\Modules\Security\Exceptions\FileValidationException;
 use App\Modules\Security\MagicByteValidator;
@@ -120,7 +120,7 @@ class LibraryScanningSecurityTest extends TestCase
 
         // Test XSS in title
         $xssTitle = '<script>alert("xss")</script>Song Title';
-        $sanitizedTitle = StrExt::sanitizeMetadata($xssTitle);
+        $sanitizedTitle = Text::sanitizeMetadata($xssTitle);
 
         $song = Song::factory()->for($album)->create([
             'title' => $sanitizedTitle,
@@ -145,7 +145,7 @@ class LibraryScanningSecurityTest extends TestCase
 
         // Test event handler in comment
         $xssComment = 'Comment with onload="alert(1)" content';
-        $sanitizedComment = StrExt::sanitize($xssComment);
+        $sanitizedComment = Text::sanitize($xssComment);
 
         $song = Song::factory()->for($album)->create([
             'title' => 'Test Song',
@@ -171,7 +171,7 @@ class LibraryScanningSecurityTest extends TestCase
 
         // Create a title longer than max (255)
         $longTitle = str_repeat('A', 300);
-        $sanitizedTitle = StrExt::sanitizeMetadata($longTitle);
+        $sanitizedTitle = Text::sanitizeMetadata($longTitle);
         $truncatedTitle = mb_substr($sanitizedTitle, 0, 255);
 
         $song = Song::factory()->for($album)->create([
@@ -295,7 +295,7 @@ class LibraryScanningSecurityTest extends TestCase
     public function it_preserves_lyrics_formatting(): void
     {
         $input = "[Verse 1]\nLyrics line 1\nLine 2\n\n[Chorus]\nChorus text";
-        $result = StrExt::sanitizeLyrics($input);
+        $result = Text::sanitizeLyrics($input);
 
         // Should preserve newlines and markers
         $this->assertStringContainsString("\n", $result);

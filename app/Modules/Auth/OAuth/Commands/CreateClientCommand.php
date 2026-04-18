@@ -7,7 +7,7 @@ namespace App\Modules\Auth\OAuth\Commands;
 
 use App\Models\Auth\OAuth\Client;
 use Illuminate\Console\Command;
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 
 class CreateClientCommand extends Command
 {
@@ -52,7 +52,7 @@ class CreateClientCommand extends Command
 
         $client = Client::create([
             'name'                   => $name,
-            'secret'                 => $confidential ? Str::random(40) : null,
+            'secret'                 => $confidential ? Text::random(40) : null,
             'redirect'               => $redirect,
             'personal_access_client' => $isPersonal,
             'password_client'        => $isPassword,

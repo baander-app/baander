@@ -5,7 +5,7 @@ namespace App\Modules\Auth\Webauthn\Actions;
 use App\Modules\Auth\Webauthn\PasskeyService;
 use App\Modules\Auth\Webauthn\WebauthnService;
 use Illuminate\Support\Facades\Session;
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 use Webauthn\PublicKeyCredentialRequestOptions;
 
 class GeneratePasskeyAuthenticationOptionsAction
@@ -16,7 +16,7 @@ class GeneratePasskeyAuthenticationOptionsAction
         $allowedCredentials = $service->getAllowedCredentials($email);
 
         $options = new PublicKeyCredentialRequestOptions(
-            challenge: Str::random(),
+            challenge: Text::random(),
             rpId: parse_url(config('app.url'), PHP_URL_HOST),
             allowCredentials: $allowedCredentials,
         );

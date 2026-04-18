@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 use SimpleXMLElement;
 
 class GenerateMbModels extends Command
@@ -182,7 +182,7 @@ class GenerateMbModels extends Command
      */
     private function formatElementName(string $elementName): string
     {
-        return Str::studly(str_replace(['_', '-'], ' ', $elementName));
+        return Text::studly(str_replace(['_', '-'], ' ', $elementName))->value();
     }
 
     /**
@@ -193,7 +193,7 @@ class GenerateMbModels extends Command
      */
     private function removeDefPrefix(string $className): string
     {
-        return Str::startsWith($className, 'Def') ? Str::replaceFirst('Def', '', $className) : $className;
+        return Text::startsWith($className, 'Def') ? Text::replaceFirst($className, 'Def', '')->value() : $className;
     }
 
     /**

@@ -9,7 +9,7 @@ use App\Models\Auth\OAuth\Client;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 use Spatie\RouteAttributes\Attributes\Delete;
 use Spatie\RouteAttributes\Attributes\Get;
 use Spatie\RouteAttributes\Attributes\Middleware;
@@ -98,7 +98,7 @@ class ClientController extends Controller
 
         $client = Client::create([
             'name'                   => $validated['name'],
-            'secret'                 => $validated['confidential'] ?? true ? Str::random(40) : null,
+            'secret'                 => $validated['confidential'] ?? true ? Text::random(40) : null,
             'redirect'               => $validated['redirect'],
             'personal_access_client' => $validated['personal_access_client'] ?? false,
             'password_client'        => $validated['password_client'] ?? false,
@@ -215,7 +215,7 @@ class ClientController extends Controller
         }
 
         $client->update([
-            'secret' => Str::random(40),
+            'secret' => Text::random(40),
         ]);
 
         return response()->json([

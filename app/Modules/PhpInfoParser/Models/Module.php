@@ -2,7 +2,8 @@
 
 namespace App\Modules\PhpInfoParser\Models;
 
-use Illuminate\Support\{Collection, Str};
+use App\Primitives\Text;
+use Illuminate\Support\Collection;
 use JsonSerializable;
 
 class Module implements JsonSerializable
@@ -13,7 +14,7 @@ class Module implements JsonSerializable
 
     public function key(): string
     {
-        return 'module_' . Str::slug($this->name);
+        return 'module_' . Text::slug($this->name)->value();
     }
 
     public function combinedKeyFor(Config $config): string
@@ -34,14 +35,14 @@ class Module implements JsonSerializable
     public function hasConfig($key): bool
     {
         return $this->configs()->first(function (Config $config) use ($key) {
-                return $config->key() === 'config_' . Str::slug($key);
+                return $config->key() === 'config_' . Text::slug($key)->value();
             }) !== null;
     }
 
     public function config($key, $which = "local"): string|null
     {
         return $this->configs()->first(function (Config $config) use ($key) {
-            return $config->key() === 'config_' . Str::slug($key);
+            return $config->key() === 'config_' . Text::slug($key);
         })?->value($which);
     }
 

@@ -8,7 +8,8 @@ use FFMpeg\Coordinate\TimeCode;
 use FFMpeg\Driver\FFMpegDriver;
 use FFMpeg\FFMpeg;
 use FFMpeg\Media\{AbstractMediaType, AdvancedMedia as BaseAdvancedMedia, Audio, Concat, Frame, Video};
-use Illuminate\Support\{Arr, Collection, Traits\ForwardsCalls};
+use App\Primitives\Sequence;
+use Illuminate\Support\{Collection, Traits\ForwardsCalls};
 use App\Modules\FFmpeg\FFMpeg\{AdvancedMedia, AudioMedia, FFProbe, VideoMedia};
 use App\Modules\FFmpeg\Filesystem\MediaCollection;
 
@@ -101,7 +102,7 @@ class PHPFFMpeg
         $this->mediaCollection = $mediaCollection;
 
         if ($mediaCollection->count() === 1 && !$this->forceAdvanced) {
-            $media = Arr::first($mediaCollection->collection());
+            $media = Sequence::first($mediaCollection->collection());
 
             $this->ffmpeg->setFFProbe(
                 FFProbe::make($this->ffmpeg->getFFProbe())->setMedia($media),
@@ -119,7 +120,7 @@ class PHPFFMpeg
             }
 
             if (method_exists($this->media, 'setHeaders')) {
-                $this->media->setHeaders(Arr::first($mediaCollection->getHeaders()) ?: []);
+                $this->media->setHeaders(Sequence::first($mediaCollection->getHeaders()) ?: []);
             }
         } else {
             $ffmpegMedia = $this->ffmpeg->openAdvanced($mediaCollection->getLocalPaths());
@@ -148,7 +149,7 @@ class PHPFFMpeg
     {
         $localPaths = $this->mediaCollection->getLocalPaths();
 
-        $this->media = $this->ffmpeg->open(Arr::first($localPaths))
+        $this->media = $this->ffmpeg->open(Sequence::first($localPaths))
             ->concat($localPaths);
 
         return $this;

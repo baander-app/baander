@@ -3,7 +3,7 @@
 namespace App\Modules\Development\Console\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 
 class MakeLogChannelCommand extends Command
 {
@@ -155,7 +155,7 @@ PHP;
 
     private function generateEnumCase(string $channelName): string
     {
-        $caseName = Str::studly($channelName);
+        $caseName = Text::studly($channelName)->value();
         return "    case {$caseName} = '{$channelName}';";
     }
 }

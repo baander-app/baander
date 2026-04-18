@@ -2,11 +2,11 @@
 
 namespace App\Models;
 
-use App\Extensions\EnumExt;
+use App\Primitives\Traits\EnumExtensions;
 
 enum AlbumRole: string
 {
-    use EnumExt;
+    use EnumExtensions;
 
     case Primary = 'primary';
     case Featured = 'featured';

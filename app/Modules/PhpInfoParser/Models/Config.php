@@ -2,7 +2,8 @@
 
 namespace App\Modules\PhpInfoParser\Models;
 
-use Illuminate\Support\{Collection, Str};
+use App\Primitives\Text;
+use Illuminate\Support\Collection;
 use JsonSerializable;
 
 class Config implements JsonSerializable
@@ -22,7 +23,7 @@ class Config implements JsonSerializable
 
     public function key(): string
     {
-        return $this->name == "Names" ? "config_names_" . md5($this->value()) : 'config_' . Str::slug($this->name);
+        return $this->name == "Names" ? "config_names_" . md5($this->value()) : 'config_' . Text::slug($this->name)->value();
     }
 
     public function name(): string

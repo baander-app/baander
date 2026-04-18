@@ -230,7 +230,7 @@
       <excludeFolder url="file://$MODULE_DIR$/vendor/xammie/mailbook" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/xenos/asklucy" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/xenos/musicbrainz" />
-      <excludeFolder url="file://$MODULE_DIR$/vendor/zend/php-reader" />
+      <excludeFolder url="file://$MODULE_DIR$/bootstrap/cache" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/_laravel_idea" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/laravel/boost" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/laravel/mcp" />

@@ -7,7 +7,7 @@ namespace Database\Seeders;
 use App\Models\Auth\OAuth\Client;
 use App\Models\Auth\OAuth\Scope;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 
 class OAuthSeeder extends Seeder
 {
@@ -37,7 +37,7 @@ class OAuthSeeder extends Seeder
         Client::firstOrCreate(
             ['name' => 'Bånder Web Application'],
             [
-                'secret' => Str::random(40),
+                'secret' => Text::random(40),
                 'redirect' => config('app.url') . '/auth/callback',
                 'personal_access_client' => false,
                 'password_client' => false,
@@ -51,7 +51,7 @@ class OAuthSeeder extends Seeder
         Client::firstOrCreate(
             ['name' => 'Bånder Device Client'],
             [
-                'id' => Str::uuid(),
+                'id' => Text::uuid(),
                 'secret' => null,
                 'redirect' => 'urn:ietf:wg:oauth:2.0:oob',
                 'personal_access_client' => false,

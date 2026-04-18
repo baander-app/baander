@@ -1,6 +1,6 @@
 <?php
 
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 
 return [
 
@@ -128,7 +128,7 @@ return [
 
     'cookie' => env(
         'SESSION_COOKIE',
-        Str::slug(env('APP_NAME', 'baander'), '_') . '_session',
+        Text::slug(env('APP_NAME', 'baander'), '_')->value() . '_session',
     ),
 
     /*

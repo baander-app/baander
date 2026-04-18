@@ -5,7 +5,7 @@ namespace App\Modules\FFmpeg\Http;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Response;
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 use App\Modules\FFmpeg\Filesystem\Disk;
 use App\Modules\FFmpeg\Filesystem\Media;
 
@@ -168,7 +168,7 @@ class DynamicHLSPlaylist implements Responsable
      */
     private static function lineHasMediaFilename(string $line): bool
     {
-        return !Str::startsWith($line, '#') && Str::endsWith($line, ['.m3u8', '.ts']);
+        return !Text::startsWith($line, '#') && Text::endsWith($line, ['.m3u8', '.ts']);
     }
 
     /**
@@ -224,7 +224,7 @@ class DynamicHLSPlaylist implements Responsable
     {
         return static::parseLines($this->disk->get($playlistPath))->map(function (string $line) {
             if (static::lineHasMediaFilename($line)) {
-                return Str::endsWith($line, '.m3u8')
+                return Text::endsWith($line, '.m3u8')
                     ? $this->resolvePlaylistFilename($line)
                     : $this->resolveMediaFilename($line);
             }

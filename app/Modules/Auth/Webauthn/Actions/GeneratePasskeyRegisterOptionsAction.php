@@ -5,7 +5,7 @@ namespace App\Modules\Auth\Webauthn\Actions;
 use App\Modules\Auth\Webauthn\Concerns\HasPasskeys;
 use App\Modules\Auth\Webauthn\Models\PublicKeyCredentialCreationOptionsData;
 use App\Modules\Auth\Webauthn\WebauthnService;
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 use Webauthn\AuthenticatorSelectionCriteria;
 use Webauthn\PublicKeyCredentialCreationOptions;
 use Webauthn\PublicKeyCredentialRpEntity;
@@ -63,7 +63,7 @@ class GeneratePasskeyRegisterOptionsAction
 
     protected function challenge(): string
     {
-        return Str::random();
+        return Text::random();
     }
 
 }

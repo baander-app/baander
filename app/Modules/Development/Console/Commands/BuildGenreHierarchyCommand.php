@@ -263,7 +263,7 @@ class BuildGenreHierarchyCommand extends Command
                     // Create new child genre if not found
                     $child = Genre::create([
                         'name' => $childName,
-                        'slug' => \Illuminate\Support\Str::slug($childName),
+                        'slug' => \App\Primitives\Text::slug($childName)->value(),
                     ]);
                     $stats['created']++;
                 } else {
@@ -277,7 +277,7 @@ class BuildGenreHierarchyCommand extends Command
                     // Create new parent genre if not found
                     $parent = Genre::create([
                         'name' => $parentName,
-                        'slug' => \Illuminate\Support\Str::slug($parentName),
+                        'slug' => \App\Primitives\Text::slug($parentName)->value(),
                     ]);
                     $stats['created']++;
                 } else {

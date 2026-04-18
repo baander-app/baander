@@ -5,7 +5,7 @@ namespace App\Console\Commands\Auth;
 use App\Actions\Tokens\PruneExpiredTokens;
 use App\Modules\Auth\AccessTokenService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Arr;
+use App\Primitives\Sequence;
 
 class PruneExpiredTokensCommand extends Command
 {
@@ -31,7 +31,7 @@ class PruneExpiredTokensCommand extends Command
         $authTokenManager = app(AccessTokenService::class);
         $result = new PruneExpiredTokens($authTokenManager)->run();
 
-        $count = Arr::get($result, 'removed', 0);
+        $count = Sequence::get($result, 'removed', 0);
         $this->warn("Pruned {$count} expired tokens.");
 
         if (app()->isLocal()) {

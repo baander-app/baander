@@ -2,11 +2,11 @@
 
 namespace App\Modules\Queue\QueueMonitor;
 
-use App\Extensions\EnumExt;
+use App\Primitives\Traits\EnumExtensions;
 
 enum MonitorStatus: string
 {
-    use EnumExt;
+    use EnumExtensions;
 
     case Running = 'running';
     case Succeeded = 'succeeded';

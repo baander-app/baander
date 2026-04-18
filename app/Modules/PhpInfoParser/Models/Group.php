@@ -2,7 +2,8 @@
 
 namespace App\Modules\PhpInfoParser\Models;
 
-use Illuminate\Support\{Collection, Str};
+use App\Primitives\Text;
+use Illuminate\Support\Collection;
 use JsonSerializable;
 
 class Group implements JsonSerializable
@@ -31,7 +32,7 @@ class Group implements JsonSerializable
     public function key(): string
     {
         return $this->name()
-            ? 'group_' . Str::slug($this->name())
+            ? 'group_' . Text::slug($this->name())->value()
             : 'group_' . md5($this->configs()->map->name()
                 ->implode(','));
     }

@@ -3,7 +3,7 @@
 namespace App\Modules\FFmpeg\FFMpeg;
 
 use FFMpeg\Media\AdvancedMedia as MediaAdvancedMedia;
-use Illuminate\Support\Arr;
+use App\Primitives\Sequence;
 
 class AdvancedMedia extends MediaAdvancedMedia
 {
@@ -31,7 +31,7 @@ class AdvancedMedia extends MediaAdvancedMedia
     {
         $command = parent::buildCommand();
 
-        $inputKey = array_search(Arr::first($this->getInputs()), $command) - 1;
+        $inputKey = array_search(Sequence::first($this->getInputs()), $command) - 1;
 
         foreach ($this->getInputs() as $key => $path) {
             $headers = $this->headers[$key];

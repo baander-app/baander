@@ -4,7 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\IsBaseModel;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 
 abstract class BaseModel extends Model
 {
@@ -16,7 +16,7 @@ abstract class BaseModel extends Model
     {
         $snakeCasedAttributes = [];
         foreach ($attributes as $key => $value) {
-            $snakeCasedAttributes[Str::snake($key)] = $value;
+            $snakeCasedAttributes[Text::snake($key)->value()] = $value;
         }
 
         return parent::update($snakeCasedAttributes, $options);

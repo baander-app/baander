@@ -2,11 +2,11 @@
 
 namespace App\Auth;
 
-use App\Extensions\EnumExt;
+use App\Primitives\Traits\EnumExtensions;
 
 enum Role: string
 {
-    use EnumExt;
+    use EnumExtensions;
 
     case Admin = 'admin';
     case User = 'user';

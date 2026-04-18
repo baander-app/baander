@@ -4,7 +4,7 @@ namespace App\Models;
 
 use App\Modules\Eloquent\BaseBuilder;
 use Illuminate\Database\Eloquent\Relations\Pivot;
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 
 abstract class BasePivot extends Pivot
 {
@@ -20,7 +20,7 @@ abstract class BasePivot extends Pivot
     {
         $snakeCasedAttributes = [];
         foreach ($attributes as $key => $value) {
-            $snakeCasedAttributes[Str::snake($key)] = $value;
+            $snakeCasedAttributes[Text::snake($key)->value()] = $value;
         }
 
         return parent::update($snakeCasedAttributes, $options);

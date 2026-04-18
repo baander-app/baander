@@ -4,6 +4,7 @@ namespace App\Jobs\Movies;
 
 use App\Jobs\BaseJob;
 use App\Models\{Library, Movie, Video};
+use App\Primitives\Text;
 use App\Modules\Security\MagicByteValidator;
 use App\Modules\Security\Exceptions\FileValidationException;
 use Illuminate\Bus\Queueable;
@@ -290,7 +291,7 @@ class ScanMovieLibraryJob extends BaseJob implements ShouldQueue
 
         // Security: Sanitize movie title from directory name
         if ($this->securityConfig['sanitize_metadata'] ?? true) {
-            $directoryName = \App\Extensions\StrExt::sanitizeMetadata($directoryName);
+            $directoryName = Text::sanitizeMetadata($directoryName);
         }
 
         // Pattern to match the "Title (Year)" format

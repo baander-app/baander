@@ -2,7 +2,7 @@
 
 namespace App\Jobs\Library\Music;
 
-use App\Extensions\StrExt;
+use App\Primitives\Text;
 use App\Jobs\BaseJob;
 use App\Models\{Album, AlbumRole, Artist, Genre, Library, Song};
 use App\Modules\Logging\Attributes\LogChannel;
@@ -13,7 +13,7 @@ use App\Modules\Security\MagicByteValidator;
 use App\Modules\Security\Exceptions\FileValidationException;
 use App\Services\Metadata\MetadataDelimiterService;
 use App\Format\LocaleString;
-use Arr;
+use App\Primitives\Sequence;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\{DB, File};
@@ -316,15 +316,15 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
         $rawComment = $metadataReader->getComment();
 
         // Sanitize metadata if enabled
-        $title = $this->sanitizeMetadata() ? StrExt::sanitizeMetadata($rawTitle) : $rawTitle;
-        $comment = $rawComment !== null && $this->sanitizeMetadata() ? StrExt::sanitize($rawComment) : $rawComment;
+        $title = $this->sanitizeMetadata() ? Text::sanitizeMetadata($rawTitle) : $rawTitle;
+        $comment = $rawComment !== null && $this->sanitizeMetadata() ? Text::sanitize($rawComment) : $rawComment;
 
         // Truncate to max length
         $maxLength = $this->getMaxMetadataLength('title');
         $title = mb_substr($title, 0, $maxLength);
 
         // Sanitize lyrics separately (preserve formatting)
-        $lyrics = $lyric ? ($this->sanitizeMetadata() ? StrExt::sanitizeLyrics($lyric) : StrExt::convertToUtf8($lyric)) : null;
+        $lyrics = $lyric ? ($this->sanitizeMetadata() ? Text::sanitizeLyrics($lyric) : Text::convertToUtf8($lyric)) : null;
 
         return [
             'title'     => $title,
@@ -395,7 +395,7 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
 
     private function isCoverJobQueued(Album $album, array $coverJobs): bool
     {
-        return Arr::has($coverJobs, $album->id);
+        return Sequence::has($coverJobs, $album->id);
     }
 
     private function isSongInBaseDirectory(string $path): bool
@@ -457,9 +457,9 @@ class ScanDirectoryJob extends BaseJob implements ShouldQueue
 
         foreach ($strings as $string) {
             $sanitizedValue = match ($field) {
-                'artist' => StrExt::sanitizeMetadata($string),
-                'genre' => StrExt::sanitizeMetadata($string),
-                default => StrExt::sanitize($string),
+                'artist' => Text::sanitizeMetadata($string),
+                'genre' => Text::sanitizeMetadata($string),
+                default => Text::sanitize($string),
             };
 
             $sanitized[] = mb_substr($sanitizedValue, 0, $maxLength);

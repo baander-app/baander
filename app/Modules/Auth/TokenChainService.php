@@ -8,7 +8,7 @@ use App\Models\Auth\OAuth\RefreshToken;
 use App\Models\Auth\OAuth\Token;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 use RuntimeException;
 
 /**
@@ -26,7 +26,7 @@ class TokenChainService
      */
     public function generateChainId(): string
     {
-        return (string) Str::uuid();
+        return (string) Text::uuid();
     }
 
     /**

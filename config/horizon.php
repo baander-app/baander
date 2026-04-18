@@ -1,6 +1,6 @@
 <?php
 
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 
 return [
 
@@ -56,7 +56,7 @@ return [
 
     'prefix' => env(
         'HORIZON_PREFIX',
-        Str::slug(env('APP_NAME', 'baander'), '_') . '_horizon:'
+        Text::slug(env('APP_NAME', 'baander'), '_')->value() . '_horizon:'
     ),
 
     /*

@@ -24,8 +24,7 @@
       "mcp__laravel-boost__list-routes",
       "mcp__laravel-boost__application-info",
       "mcp__laravel-boost__database-schema",
-      "mcp__laravel-boost__list-artisan-commands",
-      "WebSearch"
+      "mcp__laravel-boost__list-artisan-commands"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -5,7 +5,7 @@ namespace App\Modules\FFmpeg\Exporters;
 use FFMpeg\Coordinate\Dimension;
 use FFMpeg\Filters\AdvancedMedia\ComplexFilters;
 use FFMpeg\Filters\Video\ResizeFilter;
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 use App\Modules\FFmpeg\Drivers\PHPFFMpeg;
 use App\Modules\FFmpeg\Filters\WatermarkFactory;
 
@@ -148,6 +148,6 @@ class HLSVideoFilters
 
     public static function beforeGlue($input): string
     {
-        return Str::before($input, static::MAPPING_GLUE);
+        return Text::before($input, static::MAPPING_GLUE)->value();
     }
 }

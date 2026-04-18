@@ -10,7 +10,7 @@ use App\Modules\Metadata\Exceptions\UnsupportedFormatException;
 use FFMpeg\FFMpeg;
 use FFMpeg\FFProbe\DataMapping\StreamCollection;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 
 /**
  * Unified metadata reader facade
@@ -324,7 +324,7 @@ class MetadataReader implements MetadataReaderInterface
 
     public function isAudioFile(): bool
     {
-        return Str::startsWith($this->getMimeType(), 'audio/');
+        return Text::startsWith($this->getMimeType(), 'audio/');
     }
 
     private function getStreams()

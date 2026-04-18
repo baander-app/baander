@@ -7,7 +7,7 @@ namespace App\Modules\Metadata;
 use App\Models\Genre;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -71,7 +71,7 @@ class GenrePersister
                 if (!$genre) {
                     $genre = Genre::create([
                         'name' => $genreName,
-                        'slug' => Str::slug($genreName),
+                        'slug' => Text::slug($genreName)->value(),
                         'mbid' => $details['musicbrainz']['mbid'] ?? null,
                     ]);
                     $stats['created']++;

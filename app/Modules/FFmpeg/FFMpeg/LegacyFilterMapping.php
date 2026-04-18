@@ -2,7 +2,7 @@
 
 namespace App\Modules\FFmpeg\FFMpeg;
 
-use Illuminate\Support\Arr;
+use App\Primitives\Sequence;
 use Illuminate\Support\Collection;
 use App\Modules\FFmpeg\Drivers\PHPFFMpeg;
 use App\Modules\FFmpeg\Exporters\HLSVideoFilters;
@@ -58,9 +58,9 @@ class LegacyFilterMapping
         Collection::make($freshDriver->getFilters())->map(function ($filter) use ($freshDriver, $format) {
             $parameters = $filter->apply($freshDriver->get(), $format);
 
-            $parameters = Arr::where($parameters, function ($parameter) {
+            $parameters = Sequence::where($parameters, function ($parameter) {
                 return !in_array($parameter, ['-vf', '-filter:v', '-filter_complex']);
-            });
+            })->values()->value();
 
             return implode(' ', $parameters);
         })->each(function ($customCompiledFilter) use ($driver) {

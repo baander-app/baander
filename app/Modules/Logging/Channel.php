@@ -2,11 +2,11 @@
 
 namespace App\Modules\Logging;
 
-use App\Extensions\EnumExt;
+use App\Primitives\Traits\EnumExtensions;
 
 enum Channel: string
 {
-    use EnumExt;
+    use EnumExtensions;
 
     case Daily = 'daily';
     case Emergency = 'emergency';

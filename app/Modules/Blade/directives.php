@@ -1,6 +1,6 @@
 <?php
 
-use App\Extensions\ArrExt;
+use App\Primitives\Sequence;
 use App\Format\Bytes;
 use App\Format\Duration;
 
@@ -11,7 +11,7 @@ return [
         }
 
         if (is_array($value)) {
-            return implode(PHP_EOL, ArrExt::dotKeys($value));
+            return implode(PHP_EOL, Sequence::dotKeys($value));
         }
 
         return $value;

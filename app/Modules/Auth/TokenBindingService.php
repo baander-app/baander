@@ -13,7 +13,7 @@ use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 use Psr\Log\LoggerInterface;
 
 class TokenBindingService
@@ -40,7 +40,7 @@ class TokenBindingService
 
     public function generateSessionId(): string
     {
-        return Str::random(40);
+        return Text::random(40);
     }
 
     /**

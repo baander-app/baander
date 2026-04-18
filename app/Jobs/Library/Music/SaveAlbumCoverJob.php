@@ -13,7 +13,7 @@ use App\Modules\Metadata\Readers\MetadataReader;
 use Exception;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 use Psr\Log\LoggerInterface;
 
 class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
@@ -106,7 +106,7 @@ class SaveAlbumCoverJob extends BaseJob implements ShouldQueue
     private function createImage(PictureInterface $artwork): array
     {
         $extension = $this->detectFileExtension($artwork->getImageData());
-        $fileName = Str::replace(['/', '\\'], '', Str::ascii($this->album->title)) . '_' . 'cover';
+        $fileName = Text::make($this->album->title)->ascii()->replace(['/', '\\'], '')->value() . '_' . 'cover';
         $destination = config('image.storage.covers') . DIRECTORY_SEPARATOR . $fileName . '.' . $extension;
 
         \File::put($destination, $artwork->getImageData());

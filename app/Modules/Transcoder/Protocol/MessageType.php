@@ -2,11 +2,11 @@
 
 namespace App\Modules\Transcoder\Protocol;
 
-use App\Extensions\EnumExt;
+use App\Primitives\Traits\EnumExtensions;
 
 enum MessageType: int
 {
-    use EnumExt;
+    use EnumExtensions;
 
     /** Client -> Server: HTTP request */
     case HTTP_REQUEST = 0x01;

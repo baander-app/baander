@@ -5,7 +5,7 @@ namespace App\Models;
 use App\Modules\Queue\QueueMonitor\MonitorStatus;
 use Carbon\CarbonInterval;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Arr;
+use App\Primitives\Sequence;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Throwable;
@@ -166,7 +166,7 @@ class QueueMonitor extends BaseModel
             return null;
         }
 
-        return Arr::last(explode('\\', $this->name));
+        return Sequence::last(explode('\\', $this->name));
     }
 
     /**

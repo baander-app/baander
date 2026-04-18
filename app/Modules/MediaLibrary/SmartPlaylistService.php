@@ -4,7 +4,7 @@ namespace App\Modules\MediaLibrary;
 
 use App\Models\Song;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Arr;
+use App\Primitives\Sequence;
 
 class SmartPlaylistService
 {
@@ -56,13 +56,13 @@ class SmartPlaylistService
 
         if ($operator === 'is') {
             return $query->whereHas('genres', function (Builder $q) use ($value) {
-                return $q->whereIn('name', Arr::wrap($value));
+                return $q->whereIn('name', Sequence::wrap($value));
             });
         }
 
         if ($operator === 'isNot') {
             return $query->whereDoesntHave('genres', function ($q) use ($value) {
-                $q->whereIn('name', Arr::wrap($value));
+                $q->whereIn('name', Sequence::wrap($value));
             });
         }
     }
@@ -71,13 +71,13 @@ class SmartPlaylistService
     {
         if ($operator === 'is') {
             return $query->whereHas('artists', function ($q) use ($value) {
-                $q->whereIn('name', Arr::wrap($value));
+                $q->whereIn('name', Sequence::wrap($value));
             });
         }
 
         if ($operator === 'isNot') {
             return $query->whereDoesntHave('artists', function ($q) use ($value) {
-                $q->whereIn('name', Arr::wrap($value));
+                $q->whereIn('name', Sequence::wrap($value));
             });
         }
     }

@@ -3,7 +3,7 @@
 namespace App\Modules\FFmpeg\Support;
 
 use FFMpeg\FFProbe\DataMapping\Stream;
-use Illuminate\Support\Str;
+use App\Primitives\Text;
 
 class StreamParser
 {
@@ -23,11 +23,11 @@ class StreamParser
     {
         $frameRate = trim(optional($this->stream)->get('avg_frame_rate'));
 
-        if (!$frameRate || Str::endsWith($frameRate, '/0')) {
+        if (!$frameRate || Text::endsWith($frameRate, '/0')) {
             return null;
         }
 
-        if (Str::contains($frameRate, '/')) {
+        if (Text::contains($frameRate, '/')) {
             [$numerator, $denominator] = explode('/', $frameRate);
 
             $frameRate = $numerator / $denominator;

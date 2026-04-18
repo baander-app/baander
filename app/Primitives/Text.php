@@ -2,21 +2,78 @@
 
 namespace App\Primitives;
 
+use App\Primitives\Traits\ForwardsCalls;
 use App\Primitives\Traits\ImmutableBuilder;
 use JsonSerializable;
+use Normalizer;
 use Stringable;
 
+/**
+ * Immutable string manipulation with fluent builder pattern.
+ *
+ * All dynamic methods can be called statically where the first
+ * argument becomes the string value: Text::upper('hello') → Text('HELLO')
+ *
+ * @method self upper() Uppercase
+ * @method self lower() Lowercase
+ * @method self title() Title case
+ * @method self trim(string $characters = " \t\n\r\0\x0B") Trim characters
+ * @method self ltrim(string $characters = " \t\n\r\0\x0B") Trim left
+ * @method self rtrim(string $characters = " \t\n\r\0\x0B") Trim right
+ * @method self replace(string|array $search, string|array $replace) Replace all
+ * @method self replaceFirst(string $search, string $replace) Replace first
+ * @method self replaceLast(string $search, string $replace) Replace last
+ * @method self after(string $search) Part after search
+ * @method self before(string $search) Part before search
+ * @method self substr(int $start, int|null $length = null) Substring
+ * @method self prepend(string ...$values) Prepend values
+ * @method self append(string ...$values) Append values
+ * @method self camel() camelCase
+ * @method self kebab() kebab-case
+ * @method self studly() StudlyCase
+ * @method self snake(string $delimiter = '_') snake_case
+ * @method self slug(string $separator = '-') URL-friendly slug
+ * @method self ascii(string $language = 'en') Transliterate to ASCII
+ * @method bool contains(string|array $needles) Contains substring
+ * @method bool endsWith(string|array $needles) Ends with
+ * @method bool startsWith(string|array $needles) Starts with
+ * @method string|null between(string $start, string $end) Extract between
+ * @method string|null safe() Strip HTML tags
+ * @method string|null convertToUtf8() Convert to UTF-8
+ *
+ * @method static self upper(string $value) Uppercase
+ * @method static self lower(string $value) Lowercase
+ * @method static self title(string $value) Title case
+ * @method static self trim(string $value, string $characters = " \t\n\r\0\x0B") Trim characters
+ * @method static self ltrim(string $value, string $characters = " \t\n\r\0\x0B") Trim left
+ * @method static self rtrim(string $value, string $characters = " \t\n\r\0\x0B") Trim right
+ * @method static self replace(string $value, string|array $search, string|array $replace) Replace all
+ * @method static self replaceFirst(string $value, string $search, string $replace) Replace first
+ * @method static self replaceLast(string $value, string $search, string $replace) Replace last
+ * @method static self after(string $value, string $search) Part after search
+ * @method static self before(string $value, string $search) Part before search
+ * @method static self substr(string $value, int $start, int|null $length = null) Substring
+ * @method static self prepend(string $value, string ...$values) Prepend values
+ * @method static self append(string $value, string ...$values) Append values
+ * @method static self camel(string $value) camelCase
+ * @method static self kebab(string $value) kebab-case
+ * @method static self studly(string $value) StudlyCase
+ * @method static self snake(string $value, string $delimiter = '_') snake_case
+ * @method static self slug(string $value, string $separator = '-') URL-friendly slug
+ * @method static self ascii(string $value, string $language = 'en') Transliterate to ASCII
+ * @method static bool contains(string $value, string|array $needles) Contains substring
+ * @method static bool endsWith(string $value, string|array $needles) Ends with
+ * @method static bool startsWith(string $value, string|array $needles) Starts with
+ * @method static string|null between(string $value, string $start, string $end) Extract between
+ * @method static string|null safe(string $value) Strip HTML tags
+ * @method static string|null convertToUtf8(string $value) Convert to UTF-8
+ */
 class Text implements Stringable, JsonSerializable
 {
+    use ForwardsCalls;
     use ImmutableBuilder;
 
-    /**
-     * Methods where builder calls delegate to private do* implementations.
-     * PHP won't invoke __call when a public static method with the same name exists.
-     */
-    private const array STATIC_DELEGATES = ['studly', 'snake', 'before'];
-
-    protected function __construct(private string $value)
+    protected function __construct(protected string $value)
     {
     }
 
@@ -25,152 +82,7 @@ class Text implements Stringable, JsonSerializable
         return new static($string);
     }
 
-    public function value(): string
-    {
-        return $this->value;
-    }
-
-    public function __toString(): string
-    {
-        return $this->value;
-    }
-
-    public function jsonSerialize(): string
-    {
-        return $this->value;
-    }
-
-    /**
-     * Delegate instance calls to private do* implementations for overlapping method names.
-     */
-    public function __call(string $method, array $parameters): static
-    {
-        if (in_array($method, self::STATIC_DELEGATES, true)) {
-            $impl = 'do' . ucfirst($method);
-
-            return $this->clone()->withValue(self::$impl($this->value, ...$parameters));
-        }
-
-        throw new \BadMethodCallException("Method $method does not exist on " . static::class);
-    }
-
-    /**
-     * Delegate static calls to private do* implementations for overlapping method names.
-     */
-    public static function __callStatic(string $method, array $parameters): mixed
-    {
-        if (in_array($method, self::STATIC_DELEGATES, true)) {
-            $impl = 'do' . ucfirst($method);
-
-            return self::$impl(...$parameters);
-        }
-
-        throw new \BadMethodCallException("Method $method does not exist on " . static::class);
-    }
-
-    // ─── Builder Methods (all return new instances) ─────────────────────────
-
-    public function lower(): static
-    {
-        return $this->clone()->withValue(mb_strtolower($this->value));
-    }
-
-    public function upper(): static
-    {
-        return $this->clone()->withValue(mb_strtoupper($this->value));
-    }
-
-    public function title(): static
-    {
-        return $this->clone()->withValue(mb_convert_case($this->value, MB_CASE_TITLE, 'UTF-8'));
-    }
-
-    public function trim(string $characters = " \t\n\r\0\x0B"): static
-    {
-        return $this->clone()->withValue(trim($this->value, $characters));
-    }
-
-    public function ltrim(string $characters = " \t\n\r\0\x0B"): static
-    {
-        return $this->clone()->withValue(ltrim($this->value, $characters));
-    }
-
-    public function rtrim(string $characters = " \t\n\r\0\x0B"): static
-    {
-        return $this->clone()->withValue(rtrim($this->value, $characters));
-    }
-
-    public function replace(string $search, string $replace): static
-    {
-        return $this->clone()->withValue(str_replace($search, $replace, $this->value));
-    }
-
-    public function replaceLast(string $search, string $replace): static
-    {
-        if ($search === '') {
-            return $this->clone();
-        }
-
-        $position = mb_strrpos($this->value, $search);
-
-        if ($position === false) {
-            return $this->clone();
-        }
-
-        return $this->clone()->withValue(
-            mb_substr($this->value, 0, $position) . $replace . mb_substr($this->value, $position + mb_strlen($search))
-        );
-    }
-
-    public function after(string $search): static
-    {
-        return $this->clone()->withValue(
-            str_contains($this->value, $search)
-                ? mb_substr($this->value, mb_strpos($this->value, $search) + mb_strlen($search))
-                : $this->value
-        );
-    }
-
-    public function substr(int $start, ?int $length = null): static
-    {
-        return $this->clone()->withValue(
-            $length === null
-                ? mb_substr($this->value, $start)
-                : mb_substr($this->value, $start, $length)
-        );
-    }
-
-    public function prepend(string ...$values): static
-    {
-        return $this->clone()->withValue(implode('', $values) . $this->value);
-    }
-
-    public function append(string ...$values): static
-    {
-        return $this->clone()->withValue($this->value . implode('', $values));
-    }
-
-    public function camel(): static
-    {
-        return $this->clone()->withValue(self::studlyToCamel(self::doStudly($this->value)));
-    }
-
-    public function kebab(): static
-    {
-        return $this->clone()->withValue(self::doSnake($this->value, '-'));
-    }
-
-    // ─── Static Methods ─────────────────────────────────────────────────────
-
-    public static function slug(string $string, string $separator = '-'): string
-    {
-        $string = self::ascii($string);
-        $string = preg_replace('/[^a-zA-Z0-9\s-]/', '', $string);
-        $string = preg_replace('/[\s-]+/', ' ', $string);
-        $string = trim($string);
-
-        return $string === '' ? '' : str_replace(' ', $separator, mb_strtolower($string));
-    }
+    // ─── Static-Only ────────────────────────────────────────────────────────────
 
     public static function random(int $length = 16): string
     {
@@ -183,22 +95,6 @@ class Text implements Stringable, JsonSerializable
         }
 
         return $result;
-    }
-
-    public static function contains(string $haystack, string|array $needles): bool
-    {
-        return array_any((array)$needles, fn($needle) => $needle !== '' && str_contains($haystack, $needle));
-    }
-
-    public static function endsWith(string $haystack, string|array $needles): bool
-    {
-        return array_any((array)$needles, fn($needle) => $needle !== '' && str_ends_with($haystack, $needle));
-
-    }
-
-    public static function startsWith(string $haystack, string|array $needles): bool
-    {
-        return array_any((array)$needles, fn($needle) => $needle !== '' && str_starts_with($haystack, $needle));
     }
 
     public static function uuid(): string
@@ -218,22 +114,353 @@ class Text implements Stringable, JsonSerializable
         return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
     }
 
-    public static function replaceFirst(string $search, string $replace, string $subject): string
+    // ─── Accessors ───────────────────────────────────────────────────────────────
+
+    public function value(): string
     {
-        if ($search === '') {
-            return $subject;
-        }
-
-        $position = mb_strpos($subject, $search);
-
-        if ($position === false) {
-            return $subject;
-        }
-
-        return mb_substr($subject, 0, $position) . $replace . mb_substr($subject, $position + mb_strlen($search));
+        return $this->value;
     }
 
-    public static function ascii(string $value, string $language = 'en'): string
+    public function isEmpty(): bool
+    {
+        return $this->value === '';
+    }
+
+    public function isNotEmpty(): bool
+    {
+        return $this->value !== '';
+    }
+
+    // ─── Interfaces ─────────────────────────────────────────────────────────────
+
+    public function __toString(): string
+    {
+        return $this->value;
+    }
+
+    public function jsonSerialize(): string
+    {
+        return $this->value;
+    }
+
+    // ─── Magic Methods ──────────────────────────────────────────────────────────
+
+    public static function __callStatic(string $method, array $parameters): mixed
+    {
+        if (count($parameters) === 0) {
+            throw new \BadMethodCallException("Method {$method}() requires at least one argument on " . static::class);
+        }
+
+        return static::make(array_shift($parameters))->{$method}(...$parameters);
+    }
+
+    public function __call(string $method, array $parameters): mixed
+    {
+        $impl = 'do' . ucfirst($method);
+
+        if (! method_exists($this, $impl)) {
+            static::throwBadMethodCallException($method);
+        }
+
+        return $this->$impl(...$parameters);
+    }
+
+    // ─── Private Implementation ──────────────────────────────────────────────────
+
+    private function doUpper(): static
+    {
+        return $this->clone()->withValue(mb_strtoupper($this->value));
+    }
+
+    private function doLower(): static
+    {
+        return $this->clone()->withValue(mb_strtolower($this->value));
+    }
+
+    private function doTitle(): static
+    {
+        return $this->clone()->withValue(mb_convert_case($this->value, MB_CASE_TITLE, 'UTF-8'));
+    }
+
+    private function doTrim(string $characters = " \t\n\r\0\x0B"): static
+    {
+        return $this->clone()->withValue(trim($this->value, $characters));
+    }
+
+    private function doLtrim(string $characters = " \t\n\r\0\x0B"): static
+    {
+        return $this->clone()->withValue(ltrim($this->value, $characters));
+    }
+
+    private function doRtrim(string $characters = " \t\n\r\0\x0B"): static
+    {
+        return $this->clone()->withValue(rtrim($this->value, $characters));
+    }
+
+    private function doReplace(string|array $search, string|array $replace): static
+    {
+        return $this->clone()->withValue(str_replace($search, $replace, $this->value));
+    }
+
+    private function doReplaceFirst(string $search, string $replace): static
+    {
+        if ($search === '') {
+            return $this->clone();
+        }
+
+        $position = mb_strpos($this->value, $search);
+
+        if ($position === false) {
+            return $this->clone();
+        }
+
+        return $this->clone()->withValue(
+            mb_substr($this->value, 0, $position) . $replace . mb_substr($this->value, $position + mb_strlen($search))
+        );
+    }
+
+    private function doReplaceLast(string $search, string $replace): static
+    {
+        if ($search === '') {
+            return $this->clone();
+        }
+
+        $position = mb_strrpos($this->value, $search);
+
+        if ($position === false) {
+            return $this->clone();
+        }
+
+        return $this->clone()->withValue(
+            mb_substr($this->value, 0, $position) . $replace . mb_substr($this->value, $position + mb_strlen($search))
+        );
+    }
+
+    private function doAfter(string $search): static
+    {
+        return str_contains($this->value, $search)
+            ? $this->clone()->withValue(mb_substr($this->value, mb_strpos($this->value, $search) + mb_strlen($search)))
+            : $this->clone();
+    }
+
+    private function doBefore(string $search): static
+    {
+        return str_contains($this->value, $search)
+            ? $this->clone()->withValue(mb_substr($this->value, 0, mb_strpos($this->value, $search)))
+            : $this->clone();
+    }
+
+    private function doSubstr(int $start, ?int $length = null): static
+    {
+        return $this->clone()->withValue(
+            $length === null
+                ? mb_substr($this->value, $start)
+                : mb_substr($this->value, $start, $length)
+        );
+    }
+
+    private function doPrepend(string ...$values): static
+    {
+        return $this->clone()->withValue(implode('', $values) . $this->value);
+    }
+
+    private function doAppend(string ...$values): static
+    {
+        return $this->clone()->withValue($this->value . implode('', $values));
+    }
+
+    private function doCamel(): static
+    {
+        return $this->clone()->withValue(self::studlyToCamel(self::computeStudly($this->value)));
+    }
+
+    private function doKebab(): static
+    {
+        return $this->clone()->withValue(self::computeSnake($this->value, '-'));
+    }
+
+    private function doStudly(): static
+    {
+        return $this->clone()->withValue(self::computeStudly($this->value));
+    }
+
+    private function doSnake(string $delimiter = '_'): static
+    {
+        return $this->clone()->withValue(self::computeSnake($this->value, $delimiter));
+    }
+
+    private function doSlug(string $separator = '-'): static
+    {
+        $value = self::computeAscii($this->value);
+        $value = preg_replace('/[^a-zA-Z0-9\s-]/', '', $value);
+        $value = preg_replace('/[\s-]+/', ' ', $value);
+        $value = trim($value);
+
+        return $this->clone()->withValue(
+            $value === '' ? '' : str_replace(' ', $separator, mb_strtolower($value))
+        );
+    }
+
+    private function doAscii(string $language = 'en'): static
+    {
+        return $this->clone()->withValue(self::computeAscii($this->value, $language));
+    }
+
+    private function doContains(string|array $needles): bool
+    {
+        return array_any((array) $needles, fn ($needle) => $needle !== '' && str_contains($this->value, $needle));
+    }
+
+    private function doEndsWith(string|array $needles): bool
+    {
+        return array_any((array) $needles, fn ($needle) => $needle !== '' && str_ends_with($this->value, $needle));
+    }
+
+    private function doStartsWith(string|array $needles): bool
+    {
+        return array_any((array) $needles, fn ($needle) => $needle !== '' && str_starts_with($this->value, $needle));
+    }
+
+    private function doBetween(string $startingWord, string $endingWord): ?string
+    {
+        if ($this->value === '') {
+            return null;
+        }
+
+        try {
+            $substringStart = mb_strpos($this->value, $startingWord);
+            if ($substringStart === false || $substringStart <= 0) {
+                return null;
+            }
+
+            $substringStart += mb_strlen($startingWord);
+            $size = mb_strpos($this->value, $endingWord, $substringStart);
+
+            if ($size === false) {
+                return null;
+            }
+
+            $size -= $substringStart;
+
+            if ($size <= 0) {
+                return null;
+            }
+
+            return mb_substr($this->value, $substringStart, $size);
+        } catch (\Exception) {
+            return null;
+        }
+    }
+
+    private function doSafe(): ?string
+    {
+        if ($this->value === '') {
+            return null;
+        }
+
+        return strip_tags(str_replace("\x00", '', $this->value));
+    }
+
+    /**
+     * Comprehensive sanitization for user-provided text.
+     * Removes HTML tags, XSS patterns, and normalizes Unicode.
+     */
+    public static function sanitize(?string $str): ?string
+    {
+        if (! $str) {
+            return null;
+        }
+
+        $str = str_replace("\0", '', $str);
+        $str = Normalizer::normalize($str, Normalizer::FORM_C);
+        $str = htmlentities($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $str = strip_tags($str);
+
+        $xssPatterns = [
+            '/javascript:/i',
+            '/data:text\/html/i',
+            '/vbscript:/i',
+            '/onload\s*=/i',
+            '/onerror\s*=/i',
+            '/onclick\s*=/i',
+            '/onmouseover\s*=/i',
+            '/<script\b/i',
+            '/<iframe\b/i',
+            '/<object\b/i',
+            '/<embed\b/i',
+        ];
+
+        foreach ($xssPatterns as $pattern) {
+            $str = preg_replace($pattern, '', $str);
+        }
+
+        return trim($str);
+    }
+
+    /**
+     * Strict sanitization for metadata fields (title, artist, album, genre).
+     * Removes HTML, XSS, and normalizes whitespace.
+     */
+    public static function sanitizeMetadata(?string $str): ?string
+    {
+        if (! $str) {
+            return null;
+        }
+
+        $str = self::sanitize($str);
+        $str = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $str);
+        $str = preg_replace('/\s+/', ' ', $str);
+
+        return $str;
+    }
+
+    /**
+     * Sanitization for lyrics — preserves formatting while removing scripts.
+     * Keeps newlines, verse markers, and section headers.
+     */
+    public static function sanitizeLyrics(?string $str): ?string
+    {
+        if (! $str) {
+            return null;
+        }
+
+        $str = str_replace("\0", '', $str);
+        $str = Normalizer::normalize($str, Normalizer::FORM_C);
+        $str = htmlentities($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        $dangerousPatterns = [
+            '/<script\b[^>]*>.*?<\/script>/is',
+            '/javascript:/i',
+            '/vbscript:/i',
+            '/on(load|error|click|mouseover)\s*=/i',
+            '/<iframe\b/i',
+            '/<object\b/i',
+            '/<embed\b/i',
+        ];
+
+        foreach ($dangerousPatterns as $pattern) {
+            $str = preg_replace($pattern, '', $str);
+        }
+
+        $str = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $str);
+
+        return $str;
+    }
+
+    private function doConvertToUtf8(): ?string
+    {
+        if ($this->value === '') {
+            return null;
+        }
+
+        $encoding = mb_detect_encoding($this->value);
+
+        return mb_convert_encoding($this->value, 'UTF-8', $encoding);
+    }
+
+    // ─── Private Helpers ────────────────────────────────────────────────────────
+
+    private static function computeAscii(string $value, string $language = 'en'): string
     {
         $transliterations = [
             'latin' => [
@@ -261,106 +488,36 @@ class Text implements Stringable, JsonSerializable
 
         if (isset($transliterations[$language])) {
             $value = strtr($value, $transliterations[$language]);
-            // Remove language-overridden keys from Latin fallback
             $latinTable = array_diff_key($transliterations['latin'], $transliterations[$language]);
         } else {
             $latinTable = $transliterations['latin'];
         }
 
         $value = strtr($value, $latinTable);
+
         return preg_replace('/[^\x20-\x7E]/u', '', $value) ?? $value;
     }
 
-    public static function between(mixed $str, string $startingWord, string $endingWord): ?string
-    {
-        if (!is_string($str) || $str === '') {
-            return null;
-        }
-
-        try {
-            $substringStart = mb_strpos($str, $startingWord);
-            if ($substringStart === false || $substringStart <= 0) {
-                return null;
-            }
-
-            $substringStart += mb_strlen($startingWord);
-            $size = mb_strpos($str, $endingWord, $substringStart);
-
-            if ($size === false) {
-                return null;
-            }
-
-            $size -= $substringStart;
-
-            if ($size <= 0) {
-                return null;
-            }
-
-            return mb_substr($str, $substringStart, $size);
-        } catch (\Exception) {
-            return null;
-        }
-    }
-
-    public static function safe(mixed $str): ?string
-    {
-        if (!is_string($str) || $str === '') {
-            return null;
-        }
-
-        return strip_tags(str_replace("\x00", '', $str));
-    }
-
-    public static function convertToUtf8(mixed $str): ?string
-    {
-        if (!is_string($str) || $str === '') {
-            return null;
-        }
-
-        $encoding = mb_detect_encoding($str);
-
-        return mb_convert_encoding($str, 'UTF-8', $encoding);
-    }
-
-    // ─── Private Helpers ─────────────────────────────────────────────────────
-
-    private static function doStudly(string $value): string
+    private static function computeStudly(string $value): string
     {
         $value = ucwords(str_replace(['-', '_'], ' ', $value));
 
         return str_replace(' ', '', $value);
     }
 
-    private static function doSnake(string $value, string $delimiter = '_'): string
+    private static function computeSnake(string $value, string $delimiter = '_'): string
     {
-        // Normalize existing separators to spaces
         $value = str_replace(['-', '_'], ' ', $value);
         $value = preg_replace('/\s+/u', ' ', $value);
 
-        // Insert space before uppercase letters (camelCase/studlyCase handling)
         if (preg_match('/[A-Z]/u', $value)) {
             $value = preg_replace('/(.)(?=[A-Z])/u', '$1 ', $value);
             $value = preg_replace('/\s+/u', ' ', $value);
         }
 
-        // Replace spaces with delimiter and lowercase
         $value = str_replace(' ', $delimiter, $value);
 
         return mb_strtolower($value, 'UTF-8');
-    }
-
-    private static function doBefore(string $subject, string $search): string
-    {
-        return str_contains($subject, $search)
-            ? mb_substr($subject, 0, mb_strpos($subject, $search))
-            : $subject;
-    }
-
-    protected function withValue(string $value): static
-    {
-        $this->value = $value;
-
-        return $this;
     }
 
     private static function studlyToCamel(string $value): string
@@ -370,5 +527,12 @@ class Text implements Stringable, JsonSerializable
         }
 
         return mb_strtolower(mb_substr($value, 0, 1)) . mb_substr($value, 1);
+    }
+
+    protected function withValue(string $value): static
+    {
+        $this->value = $value;
+
+        return $this;
     }
 }

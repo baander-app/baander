@@ -6,7 +6,8 @@ use InvalidArgumentException;
 use JsonSerializable;
 use App\Modules\PhpInfoParser\Concerns\ConfigAliases;
 use App\Modules\PhpInfoParser\Models\{Config, Module};
-use Illuminate\Support\{Collection, Str};
+use App\Primitives\Text;
+use Illuminate\Support\Collection;
 
 abstract class Result implements JsonSerializable
 {
@@ -37,7 +38,7 @@ abstract class Result implements JsonSerializable
     public function module($key): Module|null
     {
         return $this->modules()->first(function (Module $module) use ($key) {
-            return $module->key() === 'module_' . Str::slug($key);
+            return $module->key() === 'module_' . Text::slug($key)->value();
         });
     }
 
@@ -54,7 +55,7 @@ abstract class Result implements JsonSerializable
     public function hasConfig($key): bool
     {
         return $this->configs()->first(function ($config) use ($key) {
-                return $config->key() === 'config_' . Str::slug($key);
+                return $config->key() === 'config_' . Text::slug($key)->value();
             }) !== null;
     }
 
@@ -67,7 +68,7 @@ abstract class Result implements JsonSerializable
         }
 
         return $this->configs()->first(function (Config $config) use ($key) {
-            return $config->key() === 'config_' . Str::slug($key);
+            return $config->key() === 'config_' . Text::slug($key);
         })?->value($which);
     }
 

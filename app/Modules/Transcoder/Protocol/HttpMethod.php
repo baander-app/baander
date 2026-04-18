@@ -2,14 +2,14 @@
 
 namespace App\Modules\Transcoder\Protocol;
 
-use App\Extensions\EnumExt;
+use App\Primitives\Traits\EnumExtensions;
 
 /**
  * HTTP methods
  */
 enum HttpMethod: string
 {
-    use EnumExt;
+    use EnumExtensions;
 
     case GET = 'GET';
     case POST = 'POST';

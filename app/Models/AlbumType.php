@@ -2,11 +2,11 @@
 
 namespace App\Models;
 
-use App\Extensions\EnumExt;
+use App\Primitives\Traits\EnumExtensions;
 
 enum AlbumType: string
 {
-    use EnumExt;
+    use EnumExtensions;
 
     case Studio      = 'studio';
     case Live        = 'live';
