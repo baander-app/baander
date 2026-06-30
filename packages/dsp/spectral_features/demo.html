@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>spectral_features.wasm demo</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 20px; background: #111; color: #eee; }
+        #bands { display: grid; grid-template-columns: repeat(20, 1fr); gap: 2px; height: 120px; margin-top: 10px; }
+        #bands div { background:#4ade80; width:100%; align-self: end; }
+        .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+        button { padding:8px 12px; }
+        pre { background:#000; padding:10px; border-radius:6px; }
+    </style>
+</head>
+<body>
+<div class="row">
+    <button id="start">Start synthetic sweep</button>
+    <small>Build: make build — Serve: make serve-demo</small>
+</div>
+<pre id="out">Waiting…</pre>
+<div id="bands"></div>
+
+<script type="module">
+  import { loadSpectralFeatures } from './spectral_features.js';
+
+  const api = await loadSpectralFeatures('./spectral_features.wasm');
+  const heapU8 = new Uint8Array(api.memory.buffer);
+
+  // Prepare a synthetic magnitude spectrum buffer (1024 bins in wasm memory)
+  const magPtr = api.malloc(1024);
+  const bands = 20;
+  const bandsPtr = api.malloc(bands);
+
+  api.init(2048, 48000);
+
+  // UI
+  const out = document.getElementById('out');
+  const bandsEl = document.getElementById('bands');
+  bandsEl.innerHTML = Array.from({ length: bands }, () => '<div style="height:1px"></div>').join('');
+  const bars = Array.from(bandsEl.children);
+
+  function makeSpectrum(t) {
+    // Gaussian-ish peak sweeping across bins
+    const center = Math.floor((Math.sin(t * 0.001) * 0.5 + 0.5) * 900 + 60);
+    const width = 30;
+    for (let k = 0; k < 1024; k++) {
+      const d = (k - center) / width;
+      const v = Math.exp(-0.5 * d * d) * 255;
+      heapU8[magPtr + k] = v;
+    }
+  }
+
+  let running = false;
+  document.getElementById('start').onclick = () => { running = true; };
+
+  function loop(ts) {
+    if (running) {
+      makeSpectrum(ts);
+      api.computeFromMag(magPtr);
+      const centroid = api.getCentroidHz();
+      const rolloff  = api.getRolloffHz(0.85);
+      const flux     = api.getFlux();
+      const flatness = api.getFlatness();
+      const peakIdx  = api.getPeakIndex();
+
+      // Bands
+      api.getBandEnergies(bandsPtr, bands);
+      const bandVals = heapU8.subarray(bandsPtr, bandsPtr + bands);
+      for (let i = 0; i < bands; i++) {
+        bars[i].style.height = Math.max(1, (bandVals[i] / 255) * 120) + 'px';
+      }
+
+      out.textContent =
+        `centroid: ${centroid.toFixed(1)} Hz\n` +
+        `rolloff:  ${rolloff.toFixed(1)} Hz @ 85%\n` +
+        `flux:     ${flux.toFixed(4)}\n` +
+        `flatness: ${flatness.toFixed(4)}\n` +
+        `peakBin:  ${peakIdx}`;
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+</script>
+</body>
+</html>

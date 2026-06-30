@@ -1,0 +1,7 @@
+errors:
+  invalid_type: "Invalid library type."
+  invalid_type_with_allowed: 'Invalid library type "{type}". Must be one of: {allowed}'
+  slug_exists: "A library with this slug already exists."
+  invalid_id: "Invalid library ID."
+  not_found: "Library not found."
+  scan_in_progress: "A scan is already in progress for this library."

@@ -1,0 +1,13 @@
+errors:
+  invalid_public_id: รูปแบบรหัสสาธารณะไม่ถูกต้อง
+  invalid_song_id_format: รูปแบบ song_id ไม่ถูกต้อง
+  invalid_song_id: รูปแบบรหัสเพลงไม่ถูกต้อง
+  invalid_song_ids_format: รหัสเพลงหนึ่งรายการหรือมากกว่ามีรูปแบบไม่ถูกต้อง
+  validation:
+    failed: การตรวจสอบล้มเหลว
+  not_found:
+    resource: ไม่พบทรัพยากร
+  unauthorized:
+    default: จำเป็นต้องยืนยันตัวตน
+  forbidden:
+    default: ห้ามเข้าถึง

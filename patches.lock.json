@@ -1,0 +1,17 @@
+{
+    "_hash": "c054570b57a192469f6961451485faa6fdbe62bb520e5af1ebdee7f8170e0f38",
+    "patches": {
+        "swoole-bundle/z-engine": [
+            {
+                "package": "swoole-bundle/z-engine",
+                "description": "PHP 8.5 ZTS init + typed properties",
+                "url": "patches/swoole-bundle-z-engine-php85-zts-init.patch",
+                "sha256": "c5ea2f3a02812957987c96ced35f2b0088ac7627286c234227ecdc10a0bed426",
+                "depth": 1,
+                "extra": {
+                    "provenance": "root"
+                }
+            }
+        ]
+    }
+}

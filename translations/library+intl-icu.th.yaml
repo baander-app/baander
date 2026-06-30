@@ -1,0 +1,7 @@
+errors:
+  invalid_type: ประเภทไลบรารีไม่ถูกต้อง
+  invalid_type_with_allowed: "ประเภทไลบรารี \"{type}\" ไม่ถูกต้อง ต้องเป็นค่าหนึ่งใน: {allowed}"
+  slug_exists: มีไลบรารีที่ใช้ slug นี้อยู่แล้ว
+  invalid_id: รหัสไลบรารีไม่ถูกต้อง
+  not_found: ไม่พบไลบรารี
+  scan_in_progress: มีการสแกนอยู่แล้วสำหรับไลบรารีนี้

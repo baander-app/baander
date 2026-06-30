@@ -1,0 +1,8 @@
+{
+  "duration": {
+    "hover":  { "value": "60ms",  "type": "duration" },
+    "fast":   { "value": "150ms", "type": "duration" },
+    "normal": { "value": "200ms", "type": "duration" },
+    "slow":   { "value": "350ms", "type": "duration" }
+  }
+}

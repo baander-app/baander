@@ -1,0 +1,57 @@
+appId: app.baander.desktop
+productName: "Baander"
+
+# Displayed in app metadata and installers
+copyright: "© 2025-2026 Martin Christiansen"
+
+afterPack: "ui/electron/build/afterPack.cjs"
+
+directories:
+    output: dist/electron/release
+    buildResources: ui/electron/build
+
+files:
+    -   from: "ui/electron/dist-electron/renderer"
+        to: "."
+    -   from: "ui/electron/dist-electron/main"
+        to: "."
+    -   from: "ui/electron/public"
+        to: "public"
+    -   from: "ui/electron/dist-electron/preload"
+        to: "."
+    - package.json
+
+extraResources:
+    -   from: "ui/electron/public/dsp"
+        to: "dsp"
+
+extraMetadata:
+    main: index.js
+
+win:
+    target:
+        - nsis
+        - zip
+    icon: ui/electron/build/app-icons/icon.ico
+
+nsis:
+    oneClick: false                       # show wizard UI
+    perMachine: false                     # set to true to default to "Install for all users"
+    allowToChangeInstallationDirectory: true
+    createDesktopShortcut: true
+    createStartMenuShortcut: true
+    artifactName: "${name}-${version}-Setup.${ext}"
+    displayLanguageSelector: false
+    deleteAppDataOnUninstall: true
+
+mac:
+    target:
+        - dmg
+        - zip
+    icon: ui/electron/build/app-icons/icon.icns
+
+linux:
+    target:
+        - AppImage
+        - deb
+    icon: ui/electron/build/app-icons/icon.png

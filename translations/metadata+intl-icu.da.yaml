@@ -1,0 +1,7 @@
+errors:
+  query_required: 'Forespørgselsparameteren "q" er påkrævet.'
+  artist_not_found: "Kunstner ikke fundet i MusicBrainz."
+  release_group_not_found: "Udgivelsesgruppe ikke fundet i MusicBrainz."
+  valid_path_required: 'Gyldig "path" til en eksisterende fil er påkrævet.'
+  unsupported_format: "Lydformatet understøttes ikke."
+  valid_path: 'Gyldig "path" er påkrævet.'

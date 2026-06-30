@@ -1,0 +1,30 @@
+{
+    "name": "baander/phpstan-rules",
+    "description": "Custom PHPStan rules for the Bånder project",
+    "type": "phpstan-extension",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.4",
+        "phpstan/phpstan": "^2.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Baander\\PHPStan\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Baander\\PHPStan\\Tests\\": "tests/"
+        }
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^12.0"
+    },
+    "extra": {
+        "phpstan": {
+            "includes": [
+                "extension.neon"
+            ]
+        }
+    }
+}

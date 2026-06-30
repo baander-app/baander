@@ -1,0 +1,151 @@
+--- a/src/Core.php	2026-04-20 16:52:11.178079673 +0200
++++ b/src/Core.php	2026-04-20 16:34:38.278337021 +0200
+@@ -203,17 +203,17 @@
+     /**
+      * Provides an access to the executor global state
+      */
+-    public static Executor $executor;
++    public static ?Executor $executor = null;
+ 
+     /**
+      * Provides an access to the compiler global state
+      */
+-    public static Compiler $compiler;
++    public static ?Compiler $compiler = null;
+ 
+     /**
+      * Contains the list of loaded modules (extensions)
+      */
+-    public static HashTable $modules;
++    public static ?HashTable $modules = null;
+ 
+     /**
+      * Stores an internal instance of low-level FFI binding
+@@ -221,6 +221,11 @@
+     private static FFI $engine;
+ 
+     /**
++     * Keeps the ZTS helper FFI instance alive to prevent CData chain invalidation
++     */
++    private static FFI $ztsHelper;
++
++    /**
+      * Performs Z-engine core initialization
+      */
+     public static function init()
+@@ -229,9 +234,8 @@
+         $isWindowsPlatform = stripos(PHP_OS, 'WIN') === 0;
+         $is64BitPlatform   = PHP_INT_SIZE === 8;
+ 
+-        // TODO: support ts/nts x86/x64 combination
+-        if ($isThreadSafe || !$is64BitPlatform) {
+-            throw new \RuntimeException('Only x64 non thread-safe versions of PHP are supported');
++        if (!$is64BitPlatform) {
++            throw new \RuntimeException('Only x64 versions of PHP are supported');
+         }
+ 
+         try {
+@@ -253,15 +257,76 @@
+         }
+         self::$engine = $engine;
+ 
+-        assert(!$isThreadSafe, 'Following properties available only for non thread-safe version');
+-        self::$executor = new Executor($engine->executor_globals);
+-        self::$compiler = new Compiler($engine->compiler_globals);
+-        self::$modules  = new HashTable(Core::addr($engine->module_registry));
++        if ($isThreadSafe) {
++            self::initZts($engine);
++        } else {
++            self::$executor = new Executor($engine->executor_globals);
++            self::$compiler = new Compiler($engine->compiler_globals);
++            self::$modules  = new HashTable(Core::addr($engine->module_registry));
++        }
+ 
+         self::preloadFrameworkClasses();
+     }
+ 
+     /**
++     * Initializes executor/compiler globals from thread-local storage (ZTS builds).
++     *
++     * In ZTS PHP, executor_globals and compiler_globals are stored in thread-local
++     * storage accessed via tsrm_get_ls_cache() + an offset. The struct layouts are
++     * identical to NTS — only the access path differs.
++     */
++    private static function initZts(FFI $engine): void
++    {
++        // In ZTS builds, executor/compiler globals are stored directly in
++        // thread-local storage at byte offsets accessed via tsrm_get_ls_cache().
++        // ZEND_TSRMG_FAST(offset, type, element) = ((type*)((char*)tls + offset))->element
++
++        $zts = FFI::cdef('
++            typedef unsigned long size_t;
++            void *dlopen(const char *filename, int flags);
++            void *dlsym(void *handle, const char *symbol);
++        ');
++
++        $rtldDefault = $zts->dlopen(null, 0);
++
++        // Load tsrm_get_ls_cache function pointer
++        $getLsCacheFn = $zts->cast('void *(*)(void)', $zts->dlsym($rtldDefault, 'tsrm_get_ls_cache'));
++        $tls = $getLsCacheFn();
++        if ($tls === null) {
++            throw new \RuntimeException('tsrm_get_ls_cache() returned null.');
++        }
++
++        // Extract the TLS pointer value as a PHP integer.
++        // We use a struct holder to bridge cross-FFI CData extraction (PHP 8.5 issue).
++        $holder = $zts->new('struct { void *ptr; }');
++        $holder->ptr = $tls;
++        $tlsAddress = (int)$zts->cast('size_t *', FFI::addr($holder->ptr))[0];
++
++        // Read the byte offsets from the PHP binary's exported symbols
++        $egOffset = (int)$zts->cast('size_t *', $zts->dlsym($rtldDefault, 'executor_globals_offset'))[0];
++        $cgOffset = (int)$zts->cast('size_t *', $zts->dlsym($rtldDefault, 'compiler_globals_offset'))[0];
++
++        // The EG/CG structs are stored directly at tls + offset (no indirection)
++        $egAddress = $tlsAddress + $egOffset;
++        $cgAddress = $tlsAddress + $cgOffset;
++
++        // Cast integer addresses to typed struct pointers in the engine FFI scope
++        $egPtr = $engine->cast('zend_executor_globals *', $egAddress);
++        $cgPtr = $engine->cast('zend_compiler_globals *', $cgAddress);
++
++        self::$executor = new Executor($egPtr);
++        self::$compiler = new Compiler($cgPtr);
++
++        // module_registry is a separate global (not part of EG in PHP 8.5)
++        $moduleRegistryAddr = $zts->dlsym($rtldDefault, 'module_registry');
++        $moduleRegistryPtr = $zts->cast('void **', $moduleRegistryAddr);
++        self::$modules = new HashTable(Core::addr($moduleRegistryPtr[0]));
++
++        // Keep $zts alive to prevent CData chain invalidation
++        self::$ztsHelper = $zts;
++    }
++
++    /**
+      * Preloads definition and Core for ffi.preload mode, should be called during preload stage for better performance
+      */
+     public static function preload()
+
+--- a/src/Macro/DefinitionLoader.php	2026-04-20 16:52:11.178079673 +0200
++++ b/src/Macro/DefinitionLoader.php	2026-04-20 16:34:38.278337021 +0200
+@@ -100,9 +100,8 @@
+         $isWindowsPlatform = stripos(PHP_OS, 'WIN') === 0;
+         $is64BitPlatform   = PHP_INT_SIZE === 8;
+ 
+-        // TODO: support ts/nts x86/x64 combination
+-        if ($isThreadSafe || !$is64BitPlatform) {
+-            throw new \RuntimeException('Only x64 non thread-safe versions of PHP are supported');
++        if (!$is64BitPlatform) {
++            throw new \RuntimeException('Only x64 versions of PHP are supported');
+         }
+ 
+         $macros = [
+@@ -119,6 +118,7 @@
+ 
+         if ($isThreadSafe) {
+             $macros['ZTS'] = '1';
++            $macros['ts_rsrc_id'] = 'int';
+         }
+ 
+         return $macros;

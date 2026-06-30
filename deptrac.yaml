@@ -1,0 +1,736 @@
+# deptrac.yaml — Deptrac v4 configuration for Bånder DDD modular monolith
+#
+# Enforces:
+#   1. Layer ordering within each context (Domain → Application → Infrastructure / Interface)
+#   2. Context isolation (no direct cross-context references except through Shared)
+#   3. Infrastructure leak prevention (Domain/Application never depend on Infrastructure)
+#
+# Existing violations are baselined in deptrac.baseline.yaml.
+# To regenerate: vendor/bin/deptrac analyse --formatter=baseline --output=deptrac.baseline.yaml
+
+imports:
+  - deptrac.baseline.yaml
+
+deptrac:
+  paths:
+    - src/
+
+  exclude_files:
+    - '#.*vendor/.*#'
+
+  analyser:
+    types:
+      - class
+      - use
+
+  ignore_uncovered_internal_classes: true
+
+  formatters:
+    graphviz:
+      groups:
+        Shared: ['Shared Domain', 'Shared Application', 'Shared Infrastructure', 'Shared Interface']
+        Activity: ['Activity Domain', 'Activity Application', 'Activity Infrastructure', 'Activity Interface']
+        Auth: ['Auth Domain', 'Auth Application', 'Auth Infrastructure', 'Auth Interface']
+        Catalog: ['Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Interface']
+        Filesystem: ['Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
+        Library: ['Library Domain', 'Library Application', 'Library Infrastructure', 'Library Interface']
+        Lyrics: ['Lyrics Domain', 'Lyrics Infrastructure']
+        Media: ['Media Domain', 'Media Application', 'Media Infrastructure', 'Media Interface']
+        Metadata: ['Metadata Domain', 'Metadata Application', 'Metadata Infrastructure', 'Metadata Interface']
+        Notification: ['Notification Domain', 'Notification Application', 'Notification Infrastructure', 'Notification Interface']
+        Party: ['Party Domain', 'Party Application', 'Party Infrastructure', 'Party Interface']
+        Playlist: ['Playlist Domain', 'Playlist Application', 'Playlist Infrastructure', 'Playlist Interface']
+        Recommendation: ['Recommendation Domain', 'Recommendation Application', 'Recommendation Infrastructure', 'Recommendation Interface']
+        Transcode: ['Transcode Domain', 'Transcode Application', 'Transcode Infrastructure', 'Transcode Interface']
+        UserPreference: ['UserPreference Domain', 'UserPreference Application', 'UserPreference Infrastructure', 'UserPreference Interface']
+        Discovery: ['Discovery Domain', 'Discovery Application', 'Discovery Infrastructure', 'Discovery Interface']
+        Favorites: ['Favorites Domain', 'Favorites Application', 'Favorites Infrastructure', 'Favorites Interface']
+        Command: ['Command Utility']
+
+  layers:
+    # =============================================
+    # Shared kernel
+    # =============================================
+    - name: 'Shared Domain'
+      collectors:
+        - type: classLike
+          value: '^App\\Shared\\Domain\\'
+
+    - name: 'Shared Application'
+      collectors:
+        - type: classLike
+          value: '^App\\Shared\\Application\\'
+
+    - name: 'Shared Infrastructure'
+      collectors:
+        - type: classLike
+          value: '^App\\Shared\\Infrastructure\\'
+
+    - name: 'Shared Interface'
+      collectors:
+        - type: classLike
+          value: '^App\\Shared\\Interface\\'
+
+    # =============================================
+    # Activity
+    # =============================================
+    - name: 'Activity Domain'
+      collectors:
+        - type: classLike
+          value: '^App\\Activity\\Domain\\'
+
+    - name: 'Activity Application'
+      collectors:
+        - type: classLike
+          value: '^App\\Activity\\Application\\'
+
+    - name: 'Activity Infrastructure'
+      collectors:
+        - type: classLike
+          value: '^App\\Activity\\Infrastructure\\'
+
+    - name: 'Activity Interface'
+      collectors:
+        - type: classLike
+          value: '^App\\Activity\\Interface\\'
+
+    # =============================================
+    # Auth
+    # =============================================
+    - name: 'Auth Domain'
+      collectors:
+        - type: classLike
+          value: '^App\\Auth\\Domain\\'
+
+    - name: 'Auth Application'
+      collectors:
+        - type: classLike
+          value: '^App\\Auth\\Application\\'
+
+    - name: 'Auth Infrastructure'
+      collectors:
+        - type: classLike
+          value: '^App\\Auth\\Infrastructure\\'
+
+    - name: 'Auth Interface'
+      collectors:
+        - type: classLike
+          value: '^App\\Auth\\Interface\\'
+
+    # =============================================
+    # Catalog
+    # =============================================
+    - name: 'Catalog Domain'
+      collectors:
+        - type: classLike
+          value: '^App\\Catalog\\Domain\\'
+
+    - name: 'Catalog Application'
+      collectors:
+        - type: classLike
+          value: '^App\\Catalog\\Application\\'
+
+    - name: 'Catalog Infrastructure'
+      collectors:
+        - type: classLike
+          value: '^App\\Catalog\\Infrastructure\\'
+
+    - name: 'Catalog Interface'
+      collectors:
+        - type: classLike
+          value: '^App\\Catalog\\Interface\\'
+
+    # =============================================
+    # Filesystem (utility context, non-standard layers)
+    # =============================================
+    - name: 'Filesystem Application'
+      collectors:
+        - type: classLike
+          value: '^App\\Filesystem\\Application\\'
+
+    - name: 'Filesystem Command'
+      collectors:
+        - type: classLike
+          value: '^App\\Filesystem\\Command\\'
+
+    - name: 'Filesystem Mime'
+      collectors:
+        - type: classLike
+          value: '^App\\Filesystem\\Mime\\'
+
+    - name: 'Filesystem Watcher'
+      collectors:
+        - type: classLike
+          value: '^App\\Filesystem\\Watcher\\'
+
+    # =============================================
+    # Library
+    # =============================================
+    - name: 'Library Domain'
+      collectors:
+        - type: classLike
+          value: '^App\\Library\\Domain\\'
+
+    - name: 'Library Application'
+      collectors:
+        - type: classLike
+          value: '^App\\Library\\Application\\'
+
+    - name: 'Library Infrastructure'
+      collectors:
+        - type: classLike
+          value: '^App\\Library\\Infrastructure\\'
+
+    - name: 'Library Interface'
+      collectors:
+        - type: classLike
+          value: '^App\\Library\\Interface\\'
+
+    # =============================================
+    # Lyrics (Domain + Infrastructure only)
+    # =============================================
+    - name: 'Lyrics Domain'
+      collectors:
+        - type: classLike
+          value: '^App\\Lyrics\\Domain\\'
+
+    - name: 'Lyrics Infrastructure'
+      collectors:
+        - type: classLike
+          value: '^App\\Lyrics\\Infrastructure\\'
+
+    # =============================================
+    # Media
+    # =============================================
+    - name: 'Media Domain'
+      collectors:
+        - type: classLike
+          value: '^App\\Media\\Domain\\'
+
+    - name: 'Media Application'
+      collectors:
+        - type: classLike
+          value: '^App\\Media\\Application\\'
+
+    - name: 'Media Infrastructure'
+      collectors:
+        - type: classLike
+          value: '^App\\Media\\Infrastructure\\'
+
+    - name: 'Media Interface'
+      collectors:
+        - type: classLike
+          value: '^App\\Media\\Interface\\'
+
+    # =============================================
+    # Metadata
+    # =============================================
+    - name: 'Metadata Domain'
+      collectors:
+        - type: classLike
+          value: '^App\\Metadata\\Domain\\'
+
+    - name: 'Metadata Application'
+      collectors:
+        - type: classLike
+          value: '^App\\Metadata\\Application\\'
+
+    - name: 'Metadata Infrastructure'
+      collectors:
+        - type: classLike
+          value: '^App\\Metadata\\Infrastructure\\'
+
+    - name: 'Metadata Interface'
+      collectors:
+        - type: classLike
+          value: '^App\\Metadata\\Interface\\'
+
+    # =============================================
+    # Notification
+    # =============================================
+    - name: 'Notification Domain'
+      collectors:
+        - type: classLike
+          value: '^App\\Notification\\Domain\\'
+
+    - name: 'Notification Application'
+      collectors:
+        - type: classLike
+          value: '^App\\Notification\\Application\\'
+
+    - name: 'Notification Infrastructure'
+      collectors:
+        - type: classLike
+          value: '^App\\Notification\\Infrastructure\\'
+
+    - name: 'Notification Interface'
+      collectors:
+        - type: classLike
+          value: '^App\\Notification\\Interface\\'
+
+    # =============================================
+    # Party
+    # =============================================
+    - name: 'Party Domain'
+      collectors:
+        - type: classLike
+          value: '^App\\Party\\Domain\\'
+
+    - name: 'Party Application'
+      collectors:
+        - type: classLike
+          value: '^App\\Party\\Application\\'
+
+    - name: 'Party Infrastructure'
+      collectors:
+        - type: classLike
+          value: '^App\\Party\\Infrastructure\\'
+
+    - name: 'Party Interface'
+      collectors:
+        - type: classLike
+          value: '^App\\Party\\Interface\\'
+
+    # =============================================
+    # Playlist
+    # =============================================
+    - name: 'Playlist Domain'
+      collectors:
+        - type: classLike
+          value: '^App\\Playlist\\Domain\\'
+
+    - name: 'Playlist Application'
+      collectors:
+        - type: classLike
+          value: '^App\\Playlist\\Application\\'
+
+    - name: 'Playlist Infrastructure'
+      collectors:
+        - type: classLike
+          value: '^App\\Playlist\\Infrastructure\\'
+
+    - name: 'Playlist Interface'
+      collectors:
+        - type: classLike
+          value: '^App\\Playlist\\Interface\\'
+
+    # =============================================
+    # Recommendation
+    # =============================================
+    - name: 'Recommendation Domain'
+      collectors:
+        - type: classLike
+          value: '^App\\Recommendation\\Domain\\'
+
+    - name: 'Recommendation Application'
+      collectors:
+        - type: classLike
+          value: '^App\\Recommendation\\Application\\'
+
+    - name: 'Recommendation Infrastructure'
+      collectors:
+        - type: classLike
+          value: '^App\\Recommendation\\Infrastructure\\'
+
+    - name: 'Recommendation Interface'
+      collectors:
+        - type: classLike
+          value: '^App\\Recommendation\\Interface\\'
+
+    # =============================================
+    # Transcode
+    # =============================================
+    - name: 'Transcode Domain'
+      collectors:
+        - type: classLike
+          value: '^App\\Transcode\\Domain\\'
+
+    - name: 'Transcode Application'
+      collectors:
+        - type: classLike
+          value: '^App\\Transcode\\Application\\'
+
+    - name: 'Transcode Infrastructure'
+      collectors:
+        - type: classLike
+          value: '^App\\Transcode\\Infrastructure\\'
+
+    - name: 'Transcode Interface'
+      collectors:
+        - type: classLike
+          value: '^App\\Transcode\\Interface\\'
+
+    # =============================================
+    # UserPreference
+    # =============================================
+    - name: 'UserPreference Domain'
+      collectors:
+        - type: classLike
+          value: '^App\\UserPreference\\Domain\\'
+
+    - name: 'UserPreference Application'
+      collectors:
+        - type: classLike
+          value: '^App\\UserPreference\\Application\\'
+
+    - name: 'UserPreference Infrastructure'
+      collectors:
+        - type: classLike
+          value: '^App\\UserPreference\\Infrastructure\\'
+
+    - name: 'UserPreference Interface'
+      collectors:
+        - type: classLike
+          value: '^App\\UserPreference\\Interface\\'
+
+    # =============================================
+    # Command (flat utility context)
+    # =============================================
+    - name: 'Command Utility'
+      collectors:
+        - type: classLike
+          value: '^App\\Command\\'
+
+    # =============================================
+    # Discovery bounded context
+    # =============================================
+    - name: 'Discovery Domain'
+      collectors:
+        - type: classLike
+          value: '^App\\Discovery\\Domain\\'
+
+    - name: 'Discovery Application'
+      collectors:
+        - type: classLike
+          value: '^App\\Discovery\\Application\\'
+
+    - name: 'Discovery Infrastructure'
+      collectors:
+        - type: classLike
+          value: '^App\\Discovery\\Infrastructure\\'
+
+    - name: 'Discovery Interface'
+      collectors:
+        - type: classLike
+          value: '^App\\Discovery\\Interface\\'
+
+    # =============================================
+    # Favorites bounded context
+    # =============================================
+    - name: 'Favorites Domain'
+      collectors:
+        - type: classLike
+          value: '^App\\Favorites\\Domain\\'
+
+    - name: 'Favorites Application'
+      collectors:
+        - type: classLike
+          value: '^App\\Favorites\\Application\\'
+
+    - name: 'Favorites Infrastructure'
+      collectors:
+        - type: classLike
+          value: '^App\\Favorites\\Infrastructure\\'
+
+    - name: 'Favorites Interface'
+      collectors:
+        - type: classLike
+          value: '^App\\Favorites\\Interface\\'
+
+  ruleset:
+    # =============================================
+    # IDEAL RULES — these define the target architecture.
+    # Existing violations are baselined in deptrac.baseline.yaml.
+    #
+    # Standard pattern for each context:
+    #   Domain       → Shared Domain
+    #   Application  → own Domain, Shared Domain, Shared Application
+    #   Infrastructure → own Domain, own Application, Shared Domain, Shared Infrastructure
+    #   Interface    → own Application, Shared Domain, Shared Application, Shared Interface
+    # =============================================
+
+    # --- Shared ---
+    'Shared Domain': ~
+    'Shared Application':
+      - 'Shared Domain'
+    'Shared Infrastructure':
+      - 'Shared Domain'
+      - 'Shared Application'
+    'Shared Interface':
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Infrastructure'
+
+    # --- Activity ---
+    'Activity Domain':
+      - 'Shared Domain'
+    'Activity Application':
+      - 'Activity Domain'
+      - 'Shared Domain'
+      - 'Shared Application'
+    'Activity Infrastructure':
+      - 'Activity Domain'
+      - 'Activity Application'
+      - 'Shared Domain'
+      - 'Shared Infrastructure'
+    'Activity Interface':
+      - 'Activity Application'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Interface'
+
+    # --- Auth ---
+    'Auth Domain':
+      - 'Shared Domain'
+    'Auth Application':
+      - 'Auth Domain'
+      - 'Shared Domain'
+      - 'Shared Application'
+    'Auth Infrastructure':
+      - 'Auth Domain'
+      - 'Auth Application'
+      - 'Shared Domain'
+      - 'Shared Infrastructure'
+    'Auth Interface':
+      - 'Auth Application'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Interface'
+
+    # --- Catalog ---
+    'Catalog Domain':
+      - 'Shared Domain'
+    'Catalog Application':
+      - 'Catalog Domain'
+      - 'Shared Domain'
+      - 'Shared Application'
+    'Catalog Infrastructure':
+      - 'Catalog Domain'
+      - 'Catalog Application'
+      - 'Shared Domain'
+      - 'Shared Infrastructure'
+    'Catalog Interface':
+      - 'Catalog Application'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Interface'
+
+    # --- Filesystem (utility) ---
+    'Filesystem Application':
+      - 'Shared Domain'
+    'Filesystem Command':
+      - 'Filesystem Application'
+      - 'Shared Domain'
+    'Filesystem Mime':
+      - 'Shared Domain'
+    'Filesystem Watcher':
+      - 'Filesystem Application'
+      - 'Shared Domain'
+
+    # --- Library ---
+    'Library Domain':
+      - 'Shared Domain'
+    'Library Application':
+      - 'Library Domain'
+      - 'Shared Domain'
+      - 'Shared Application'
+    'Library Infrastructure':
+      - 'Library Domain'
+      - 'Library Application'
+      - 'Shared Domain'
+      - 'Shared Infrastructure'
+    'Library Interface':
+      - 'Library Application'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Interface'
+
+    # --- Lyrics ---
+    'Lyrics Domain':
+      - 'Shared Domain'
+    'Lyrics Infrastructure':
+      - 'Lyrics Domain'
+      - 'Shared Domain'
+      - 'Shared Infrastructure'
+
+    # --- Media ---
+    'Media Domain':
+      - 'Shared Domain'
+    'Media Application':
+      - 'Media Domain'
+      - 'Shared Domain'
+      - 'Shared Application'
+    'Media Infrastructure':
+      - 'Media Domain'
+      - 'Media Application'
+      - 'Shared Domain'
+      - 'Shared Infrastructure'
+    'Media Interface':
+      - 'Media Application'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Interface'
+
+    # --- Metadata ---
+    'Metadata Domain':
+      - 'Shared Domain'
+    'Metadata Application':
+      - 'Metadata Domain'
+      - 'Shared Domain'
+      - 'Shared Application'
+    'Metadata Infrastructure':
+      - 'Metadata Domain'
+      - 'Metadata Application'
+      - 'Shared Domain'
+      - 'Shared Infrastructure'
+    'Metadata Interface':
+      - 'Metadata Application'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Interface'
+
+    # --- Notification ---
+    'Notification Domain':
+      - 'Shared Domain'
+    'Notification Application':
+      - 'Notification Domain'
+      - 'Shared Domain'
+      - 'Shared Application'
+    'Notification Infrastructure':
+      - 'Notification Domain'
+      - 'Notification Application'
+      - 'Shared Domain'
+      - 'Shared Infrastructure'
+    'Notification Interface':
+      - 'Notification Application'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Interface'
+
+    # --- Party ---
+    'Party Domain':
+      - 'Shared Domain'
+    'Party Application':
+      - 'Party Domain'
+      - 'Shared Domain'
+      - 'Shared Application'
+    'Party Infrastructure':
+      - 'Party Domain'
+      - 'Party Application'
+      - 'Shared Domain'
+      - 'Shared Infrastructure'
+    'Party Interface':
+      - 'Party Application'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Interface'
+
+    # --- Playlist ---
+    'Playlist Domain':
+      - 'Shared Domain'
+    'Playlist Application':
+      - 'Playlist Domain'
+      - 'Shared Domain'
+      - 'Shared Application'
+    'Playlist Infrastructure':
+      - 'Playlist Domain'
+      - 'Playlist Application'
+      - 'Shared Domain'
+      - 'Shared Infrastructure'
+    'Playlist Interface':
+      - 'Playlist Application'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Interface'
+
+    # --- Recommendation ---
+    'Recommendation Domain':
+      - 'Shared Domain'
+    'Recommendation Application':
+      - 'Recommendation Domain'
+      - 'Shared Domain'
+      - 'Shared Application'
+    'Recommendation Infrastructure':
+      - 'Recommendation Domain'
+      - 'Recommendation Application'
+      - 'Shared Domain'
+      - 'Shared Infrastructure'
+    'Recommendation Interface':
+      - 'Recommendation Application'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Interface'
+
+    # --- Transcode ---
+    'Transcode Domain':
+      - 'Shared Domain'
+    'Transcode Application':
+      - 'Transcode Domain'
+      - 'Shared Domain'
+      - 'Shared Application'
+    'Transcode Infrastructure':
+      - 'Transcode Domain'
+      - 'Transcode Application'
+      - 'Shared Domain'
+      - 'Shared Infrastructure'
+    'Transcode Interface':
+      - 'Transcode Application'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Interface'
+
+    # --- UserPreference ---
+    'UserPreference Domain':
+      - 'Shared Domain'
+    'UserPreference Application':
+      - 'UserPreference Domain'
+      - 'Shared Domain'
+      - 'Shared Application'
+    'UserPreference Infrastructure':
+      - 'UserPreference Domain'
+      - 'UserPreference Application'
+      - 'Shared Domain'
+      - 'Shared Infrastructure'
+    'UserPreference Interface':
+      - 'UserPreference Application'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Interface'
+
+    # --- Discovery ---
+    'Discovery Domain':
+      - 'Shared Domain'
+    'Discovery Application':
+      - 'Discovery Domain'
+      - 'Shared Domain'
+    'Discovery Infrastructure':
+      - 'Discovery Application'
+      - 'Discovery Domain'
+      - 'Shared Domain'
+      - 'Shared Infrastructure'
+    'Discovery Interface':
+      - 'Discovery Application'
+      - 'Discovery Domain'
+      - 'Shared Domain'
+      - 'Shared Interface'
+
+    # --- Favorites ---
+    'Favorites Domain':
+      - 'Shared Domain'
+    'Favorites Application':
+      - 'Favorites Domain'
+      - 'Shared Domain'
+    'Favorites Infrastructure':
+      - 'Favorites Application'
+      - 'Favorites Domain'
+      - 'Shared Domain'
+      - 'Shared Infrastructure'
+    'Favorites Interface':
+      - 'Favorites Application'
+      - 'Favorites Domain'
+      - 'Shared Domain'
+      - 'Shared Interface'
+
+    # --- Command (flat utility) ---
+    'Command Utility':
+      - 'Shared Domain'

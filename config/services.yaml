@@ -1,0 +1,1067 @@
+imports:
+    - { resource: 'services_baander_navigator.yaml' }
+
+# yaml-language-server: $schema=../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
+
+parameters:
+    app.domain: '%env(APP_DOMAIN)%'
+    app.name: '%env(APP_NAME)%'
+    swoole_bundle.cache_dir: '%kernel.cache_dir%/swoole_bundle'
+    app.swoole.dbal.ping_interval: 10
+    app.swoole.dbal.check_active_transactions: true
+    app.websocket.allowed_origins: [ ]
+    app.result_stamp_classes:
+        - App\Shared\Infrastructure\Messenger\Stamp\PlaylistResultStamp
+        - App\Shared\Infrastructure\Messenger\Stamp\PartyMemberResultStamp
+        - App\Shared\Infrastructure\Messenger\Stamp\SyncedPartySessionResultStamp
+        - App\Shared\Infrastructure\Messenger\Stamp\TokenResponseResultStamp
+        - App\Shared\Infrastructure\Messenger\Stamp\UserResultStamp
+        - App\Shared\Infrastructure\Messenger\Stamp\PasskeyResultStamp
+        - App\Shared\Infrastructure\Messenger\Stamp\MediaActivityResultStamp
+        - App\Shared\Infrastructure\Messenger\Stamp\LibraryResultStamp
+        - App\Shared\Infrastructure\Messenger\Stamp\TranscodeSessionResultStamp
+        - App\Shared\Infrastructure\Messenger\Stamp\RecommendationResultStamp
+        - App\Shared\Infrastructure\Messenger\Stamp\IntResultStamp
+        - App\Shared\Infrastructure\Messenger\Stamp\FloatResultStamp
+        - App\Shared\Infrastructure\Messenger\Stamp\StringResultStamp
+        - App\Shared\Infrastructure\Messenger\Stamp\RadioSourceResultStamp
+        - App\Shared\Infrastructure\Messenger\Stamp\RadioStationResultStamp
+        - App\Shared\Infrastructure\Messenger\Stamp\RadioSessionResultStamp
+        - App\Shared\Infrastructure\Messenger\Stamp\CountrySubscriptionResultStamp
+        - App\Shared\Infrastructure\Messenger\Stamp\StarredStationResultStamp
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+        bind:
+            Symfony\Component\Serializer\Encoder\JsonEncoder $jsonEncoder: '@json_encoder'
+            string $resourceServerUri: '%auth.oauth.issuer%'
+            $oauthKeysPrivateKeyPath: '%auth.private_key_path%'
+            $oauthKeysPublicKeyPath: '%auth.public_key_path%'
+            string $projectDir: '%kernel.project_dir%'
+            string $databaseUrl: '%env(DATABASE_URL)%'
+
+    json_encoder:
+        class: Symfony\Component\Serializer\Encoder\JsonEncoder
+        arguments:
+            $defaultContext:
+                json_encode_options: 4194304
+                json_decode_options: 4194304
+
+    # Register all classes in src/ as services
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/Kernel.php'
+            - '../src/**/Entity/'
+            - '../src/**/ValueObject/'
+            - '../src/Shared/Infrastructure/Messenger/AllowedClassNormalizer.php'
+
+    _instanceof:
+        App\Scheduler\Domain\Model\SchedulableCommandInterface:
+            tags: ['scheduler.messenger_command']
+        App\Scheduler\Domain\Model\SchedulableConsoleCommandInterface:
+            tags: ['scheduler.console_command']
+
+    # --- Swoole DBAL Alive Keepers ---
+    # Replaces swoole-bundle/resetter-bundle. Wired by DBALAliveKeeperCompilerPass
+    # into the coroutine service pool via DBALPlatformAliveKeeper.
+    # --- WebSocket Connection Registry ---
+    # Tables must be created via WebSocketConnectionRegistry::create() in a
+    # Configurator BEFORE the server starts (not in a bootable service),
+    # because Swoole Tables use shared memory that must exist before fork.
+    App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry:
+        factory: [ 'App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry', 'create' ]
+
+    # --- WebSocket Handler ---
+    # Registers onHandshake/onOpen/onMessage/onClose on the WebSocket server.
+    # Required because HttpServerFactory creates a Swoole\WebSocket\Server which
+    # demands an onMessage callback before start().
+    App\Shared\Infrastructure\Swoole\ReconnectionTokenService:
+        factory: [ 'App\Shared\Infrastructure\Swoole\ReconnectionTokenService', 'create' ]
+        arguments:
+            $logger: '@monolog.logger.swoole'
+
+    App\Shared\Interface\Controller\WebSocketController:
+        tags:
+            - { name: 'monolog.logger', channel: 'swoole' }
+
+    SwooleBundle\SwooleBundle\Server\Configurator\WithWebSocketHandler:
+        arguments:
+            $controller: '@App\Shared\Interface\Controller\WebSocketController'
+            $coWrapper: '@SwooleBundle\SwooleBundle\Bridge\Symfony\Container\CoWrapper'
+            $authenticator: '@App\Shared\Infrastructure\Security\WsQueryTokenAuthenticator'
+        tags:
+            - { name: 'swoole_bundle.server_configurator' }
+
+    # --- Swoole WebProfiler ---
+
+    App\Shared\Infrastructure\Swoole\SwooleDataCollector:
+        # Disable autoconfigure to prevent kernel.reset tag, which triggers
+        # Swoole service-pool proxification. The proxy cannot be deserialized
+        # by the Symfony profiler, breaking _wdt requests.
+        autoconfigure: false
+        arguments:
+            $cpuProcessPoolLocator: !service_locator
+                App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool: '@App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool'
+            $serverConfiguration: '@?SwooleBundle\SwooleBundle\Server\HttpServerConfiguration'
+        tags:
+            - { name: 'data_collector', template: 'profiler/Collector/swoole.html.twig', id: 'swoole' }
+
+    App\Shared\Infrastructure\Swoole\SwooleWorkerEventSubscriber:
+        arguments:
+            $cpuProcessPoolLocator: !service_locator
+                App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool: '@App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool'
+            $logger: '@monolog.logger.swoole'
+            $qolServicesLocator: !service_locator
+                App\QoL\Infrastructure\Swoole\CpuGpuSampler: '@App\QoL\Infrastructure\Swoole\CpuGpuSampler'
+                App\QoL\Infrastructure\Swoole\MidStreamMonitor: '@App\QoL\Infrastructure\Swoole\MidStreamMonitor'
+                App\QoL\Infrastructure\Swoole\LearningDataPersister: '@App\QoL\Infrastructure\Swoole\LearningDataPersister'
+                App\QoL\Domain\Service\StreamGovernor: '@App\QoL\Domain\Service\StreamGovernor'
+                App\Transcode\Infrastructure\FFmpeg\HardwareCapabilitiesProber: '@App\Transcode\Infrastructure\FFmpeg\HardwareCapabilitiesProber'
+        tags:
+            - { name: 'kernel.event_subscriber' }
+
+    # Coroutine stats provider — collects from all tagged channel providers
+    App\Shared\Infrastructure\Swoole\CoroutineStatsProvider:
+        arguments:
+            $channelProviders: !tagged_iterator app.swoole.channel_provider
+
+    # --- Swoole DBAL Alive Keepers ---
+
+    App\Shared\Infrastructure\Swoole\DBAL\OptimizedDBALAliveKeeper:
+        abstract: true
+        arguments:
+            $decorated: null
+
+    App\Shared\Infrastructure\Swoole\DBAL\TransactionFinalizingDBALAliveKeeper:
+        abstract: true
+        arguments:
+            $decorated: null
+            $logger: '@monolog.logger.swoole'
+
+    App\Shared\Infrastructure\Swoole\DBAL\PassiveIgnoringDBALAliveKeeper:
+        abstract: true
+        arguments:
+            $decorated: null
+
+    # --- Shared Kernel ---
+    App\Shared\Infrastructure\Doctrine\Type\CitextType:
+        tags: [ 'doctrine.dbal.type' ]
+    App\Shared\Infrastructure\Doctrine\Type\JobStatusType:
+        tags: [ 'doctrine.dbal.type' ]
+    App\Recommendation\Infrastructure\Doctrine\Type\RecommendationJobStatusType:
+        tags: [ 'doctrine.dbal.type' ]
+    App\Shared\Infrastructure\Doctrine\Type\PublicIdType:
+        tags: [ 'doctrine.dbal.type' ]
+    App\Shared\Infrastructure\Doctrine\Type\UuidType:
+        tags: [ 'doctrine.dbal.type' ]
+
+    App\Shared\Infrastructure\Doctrine\EventListener\GeneratePublicIdListener:
+        tags: [ { name: 'doctrine.event_listener', event: 'prePersist' } ]
+
+    # --- Doctrine Platform Extensions ---
+
+    # --- PSR-7 / HTTP Message Bridge ---
+    Symfony\Bridge\PsrHttpMessage\Factory\PsrHttpFactory: ~
+    Symfony\Bridge\PsrHttpMessage\Factory\HttpFoundationFactory: ~
+
+    Symfony\Bridge\PsrHttpMessage\HttpMessageFactoryInterface:
+        alias: Symfony\Bridge\PsrHttpMessage\Factory\PsrHttpFactory
+    Symfony\Bridge\PsrHttpMessage\HttpFoundationFactoryInterface:
+        alias: Symfony\Bridge\PsrHttpMessage\Factory\HttpFoundationFactory
+
+    # --- WebAuthn ---
+    Webauthn\Counter\CounterChecker:
+        alias: App\Auth\Infrastructure\Security\Passkey\AuthenticatorCounterChecker
+
+    App\Auth\Infrastructure\Security\Passkey\PasskeyService:
+        arguments:
+            $appDomain: '%app.domain%'
+            $appName: '%app.name%'
+            $timeout: '%auth.passkey.timeout%'
+            $authenticatorAttachment: '%auth.passkey.authenticator_attachment%'
+            $userVerification: '%auth.passkey.user_verification%'
+            $residentKey: '%auth.passkey.resident_key%'
+            $attestation: '%auth.passkey.attestation%'
+            $cache: '@cache.tags'
+            $supportedAlgorithmIds: '%auth.passkey.algorithms%'
+            $jsonEncoder: '@json_encoder'
+
+    App\Auth\Application\Port\PasskeyVerifierInterface:
+        alias: App\Auth\Infrastructure\Security\Passkey\PasskeyService
+
+    # --- Health Check ---
+    App\Shared\Infrastructure\Health\HealthCheckService:
+        arguments:
+            $appEnv: '%env(APP_ENV)%'
+            $appSecret: '%env(APP_SECRET)%'
+            $appUrl: '%env(APP_URL)%'
+            $oauthEncryptionKey: '%auth.encryption_key%'
+            $oauthPrivateKeyPath: '%auth.private_key_path%'
+            $oauthPublicKeyPath: '%auth.public_key_path%'
+            $vapidPublicKey: '%env(VAPID_PUBLIC_KEY)%'
+            $vapidPrivateKey: '%env(VAPID_PRIVATE_KEY)%'
+            $apiKeys:
+                Discogs: '%env(DISCOGS_TOKEN)%'
+                Last.fm: '%env(LASTFM_API_KEY)%'
+                Spotify: '%env(SPOTIFY_CLIENT_ID)%'
+
+    App\Shared\Interface\Controller\ConfigCheckController:
+        arguments:
+            $configCheckLimiter: '@limiter.config_check'
+
+    # --- Redis Client Factory ---
+    # Creates standalone Redis connections for controllers that need raw Redis access.
+    # Avoids connection leaks in Swoole's long-lived worker processes by producing
+    # fresh connections via a factory instead of calling new Redis() inline.
+    App\Shared\Infrastructure\Redis\RedisClientFactory:
+        arguments:
+            $dsn: '%env(REDIS_URL)%'
+
+    App\Shared\Interface\Controller\JobMonitorController:
+        arguments:
+            $redisClientFactory: '@App\Shared\Infrastructure\Redis\RedisClientFactory'
+
+    # --- Transport Management ---
+    App\Shared\Interface\Controller\TransportController:
+        arguments:
+            $redisClientFactory: '@App\Shared\Infrastructure\Redis\RedisClientFactory'
+            $consumerName: '%env(MESSENGER_CONSUMER_NAME)%'
+
+    # --- Rate Limiter Monitoring ---
+    App\Shared\Interface\Controller\RateLimiterMonitorController:
+        arguments:
+            $rateLimiterCache: '@cache.rate_limiter'
+
+    # --- TOTP ---
+    App\Auth\Infrastructure\Security\Totp\TotpService:
+        arguments:
+            $issuer: '%auth.totp.issuer%'
+            $window: '%auth.totp.window%'
+
+    App\Auth\Application\Port\UserPortInterface:
+        alias: App\Auth\Infrastructure\UserService
+
+    App\Auth\Application\Port\TotpVerifierInterface:
+        alias: App\Auth\Infrastructure\Security\Totp\TotpVerifier
+
+    # --- DPoP (RFC 9449) ---
+    App\Auth\Application\Port\DpopJtiCacheInterface:
+        alias: App\Auth\Infrastructure\Cache\RedisDpopJtiCache
+
+    App\Auth\Infrastructure\Cache\RedisDpopJtiCache:
+        arguments:
+            $redisClientFactory: '@App\Shared\Infrastructure\Redis\RedisClientFactory'
+
+    App\Auth\Infrastructure\Security\OAuth\DpopProofValidator:
+        arguments:
+            $clockSkewSeconds: '%auth.dpop.clock_skew%'
+            $jtiTtlSeconds: '%auth.access_token.ttl%'
+
+    App\Auth\Infrastructure\Security\OAuth\DpopNonceManager:
+        arguments:
+            $nonceTtlSeconds: '%auth.dpop.nonce_ttl%'
+            $redisClientFactory: '@App\Shared\Infrastructure\Redis\RedisClientFactory'
+
+    App\Auth\Infrastructure\Security\OAuth\DpopBindingListener: ~
+
+    App\Shared\Infrastructure\EventListener\DpopNonceResponseListener: ~
+
+    App\Auth\Application\CommandHandler\Totp\EnableTotpHandler:
+        arguments:
+            $cache: '@cache.tags'
+
+    App\Auth\Interface\Controller\Totp\TotpController:
+        arguments:
+            $cache: '@cache.tags'
+
+    App\Auth\Interface\Controller\OAuth\AuthorizationServerMetadataController:
+        arguments:
+            $issuer: '%auth.oauth.issuer%'
+
+    App\Auth\Interface\Controller\OAuth\JwksController:
+        arguments:
+            $publicKeyPath: '%auth.public_key_path%'
+
+    App\Auth\Application\Port\PasswordResetTokenRepositoryInterface:
+        alias: App\Auth\Infrastructure\Repository\OAuth\PasswordResetTokenRepository
+
+    # --- Auth Rate Limiting ---
+    App\Auth\Infrastructure\Security\RateLimitListener:
+        arguments:
+            $authLoginIpLimiter: '@limiter.auth_login_ip'
+            $authLoginIpEmailLimiter: '@limiter.auth_login_ip_email'
+            $authRegisterIpLimiter: '@limiter.auth_register_ip'
+            $authPasswordResetIpLimiter: '@limiter.auth_password_reset_ip'
+            $authRefreshClientLimiter: '@limiter.auth_refresh_client'
+            $environment: '%kernel.environment%'
+
+    # --- Admin Rate Limiting ---
+    App\Catalog\Infrastructure\EventListener\AdminRateLimitListener:
+        arguments:
+            $batchCoverExtractLimiter: '@limiter.batch_cover_extract'
+            $environment: '%kernel.environment%'
+
+    # --- OAuth 2.0 Servers ---
+    App\Auth\Infrastructure\Security\OAuth\AuthorizationServerFactory:
+        arguments:
+            $privateKeyPath: '%auth.private_key_path%'
+            $encryptionKey: '%auth.encryption_key%'
+            $verificationUri: '%auth.device.verification_uri%'
+            $accessTokenTtl: '%auth.access_token.ttl%'
+            $refreshTokenTtl: '%auth.refresh_token.ttl%'
+            $authCodeTtl: '%auth.auth_code.ttl%'
+            $deviceCodeTtl: '%auth.device_code.ttl%'
+
+    App\Auth\Infrastructure\Security\OAuth\ResourceServerFactory:
+        arguments:
+            $publicKeyPath: '%auth.public_key_path%'
+            $resourceServerUri: '%auth.oauth.issuer%'
+
+    App\Auth\Interface\Console\RotateSecretsCommand:
+        arguments:
+            $privateKeyPath: '%auth.private_key_path%'
+            $publicKeyPath: '%auth.public_key_path%'
+
+    # --- Scope Allowlist ---
+    App\Auth\Application\ScopeAllowlist:
+        arguments:
+            $userGrants: '%auth.scopes.user_grants%'
+            $clientCredentials: '%auth.scopes.client_credentials%'
+
+    # --- JWT Generation ---
+    App\Auth\Application\Port\JwtGeneratorInterface:
+        class: App\Auth\Infrastructure\Security\OAuth\JwtGenerator
+        arguments:
+            $privateKeyPath: '%auth.private_key_path%'
+            $resourceServerUri: '%auth.oauth.issuer%'
+
+    # --- Token Handlers ---
+    App\Auth\Application\CommandHandler\OAuth\IssueTokenHandler:
+        arguments:
+            $accessTokenTtl: '%auth.access_token.ttl%'
+            $refreshTokenTtl: '%auth.refresh_token.ttl%'
+
+    App\Auth\Application\CommandHandler\OAuth\RefreshTokenHandler:
+        arguments:
+            $accessTokenTtl: '%auth.access_token.ttl%'
+            $refreshTokenTtl: '%auth.refresh_token.ttl%'
+
+    # --- Login Controllers ---
+    App\Auth\Interface\Controller\User\LoginController:
+        arguments:
+            $spaClientId: '%auth.spa_client_id%'
+
+    App\Auth\Interface\Controller\Passkey\PasskeyLoginController:
+        arguments:
+            $spaClientId: '%auth.spa_client_id%'
+
+    # --- OAuth League Interface Aliases (Anti-Corruption Layer) ---
+    League\OAuth2\Server\Repositories\AccessTokenRepositoryInterface:
+        alias: App\Auth\Infrastructure\Adapter\OAuth\AccessTokenRepository
+    League\OAuth2\Server\Repositories\RefreshTokenRepositoryInterface:
+        alias: App\Auth\Infrastructure\Adapter\OAuth\RefreshTokenRepository
+    League\OAuth2\Server\Repositories\AuthCodeRepositoryInterface:
+        alias: App\Auth\Infrastructure\Adapter\OAuth\AuthCodeRepository
+    League\OAuth2\Server\Repositories\ClientRepositoryInterface:
+        alias: App\Auth\Infrastructure\Adapter\OAuth\ClientRepository
+    League\OAuth2\Server\Repositories\DeviceCodeRepositoryInterface:
+        alias: App\Auth\Infrastructure\Adapter\OAuth\DeviceCodeRepository
+    League\OAuth2\Server\Repositories\ScopeRepositoryInterface:
+        alias: App\Auth\Infrastructure\Adapter\OAuth\ScopeRepository
+
+    # --- OAuth Servers (shared singletons, built once per Swoole worker) ---
+    League\OAuth2\Server\AuthorizationServer:
+        factory: [ '@App\Auth\Infrastructure\Security\OAuth\AuthorizationServerFactory', 'create' ]
+
+    League\OAuth2\Server\ResourceServer:
+        factory: [ '@App\Auth\Infrastructure\Security\OAuth\ResourceServerFactory', 'create' ]
+
+    # --- Domain Repository Aliases ---
+    App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface:
+        alias: App\Auth\Infrastructure\Cache\CachedAccessTokenRepository
+
+    App\Auth\Infrastructure\Cache\CachedAccessTokenRepository:
+        decorates: App\Auth\Infrastructure\Repository\OAuth\AccessTokenRepository
+        arguments:
+            $cache: '@cache.tags'
+    App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface:
+        alias: App\Auth\Infrastructure\Repository\OAuth\RefreshTokenRepository
+    App\Auth\Domain\Repository\OAuth\AuthCodeRepositoryInterface:
+        alias: App\Auth\Infrastructure\Repository\OAuth\AuthCodeRepository
+    App\Auth\Domain\Repository\OAuth\DeviceCodeRepositoryInterface:
+        alias: App\Auth\Infrastructure\Repository\OAuth\DeviceCodeRepository
+    App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface:
+        alias: App\Auth\Infrastructure\Repository\OAuth\ClientRepository
+    App\Auth\Domain\Repository\Credential\ThirdPartyCredentialRepositoryInterface:
+        alias: App\Auth\Infrastructure\Repository\Credential\ThirdPartyCredentialRepository
+    App\Auth\Domain\Repository\LoginBlockRepositoryInterface:
+        alias: App\Auth\Infrastructure\Doctrine\Repository\LoginBlockRepository
+
+    # --- Catalog Domain Repository Aliases ---
+    App\Catalog\Domain\Repository\AlbumRepositoryInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\AlbumRepository
+    App\Catalog\Domain\Repository\SongRepositoryInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\SongRepository
+    App\Catalog\Domain\Repository\ArtistRepositoryInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\ArtistRepository
+    App\Catalog\Domain\Repository\GenreRepositoryInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\GenreRepository
+    App\Catalog\Domain\Repository\MovieRepositoryInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\MovieRepository
+    App\Catalog\Domain\Repository\VideoRepositoryInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\VideoRepository
+
+    # --- Catalog Application Port Aliases ---
+    App\Catalog\Application\Port\ArtistPortInterface:
+        alias: App\Catalog\Infrastructure\ArtistService
+    App\Catalog\Application\Port\AlbumPortInterface:
+        alias: App\Catalog\Infrastructure\AlbumService
+    App\Catalog\Application\Port\SongPortInterface:
+        alias: App\Catalog\Infrastructure\SongService
+    App\Catalog\Application\Port\GenrePortInterface:
+        alias: App\Catalog\Infrastructure\GenreService
+    App\Catalog\Application\Port\MoviePortInterface:
+        alias: App\Catalog\Infrastructure\MovieService
+    App\Catalog\Application\Port\AlbumDuplicatePortInterface:
+        alias: App\Catalog\Infrastructure\AlbumDuplicateService
+    App\Catalog\Application\Port\AlbumMergePortInterface:
+        alias: App\Catalog\Infrastructure\AlbumMergeService
+
+    # --- Library Domain Repository Aliases ---
+    App\Library\Domain\Repository\LibraryRepositoryInterface:
+        alias: App\Library\Infrastructure\Doctrine\Repository\LibraryRepository
+
+    # --- Library Ports ---
+    App\Library\Application\Port\LibraryPortInterface:
+        alias: App\Library\Infrastructure\LibraryService
+
+    App\Library\Application\Port\LibraryAccessPortInterface:
+        alias: App\Library\Infrastructure\Doctrine\Repository\LibraryAccessRepository
+        public: true
+    App\Library\Application\Port\DirectoryScannerPortInterface:
+        alias: App\Library\Infrastructure\Scanner\DirectoryScanner
+
+    App\Library\Domain\Repository\LibraryFileIndexRepositoryInterface:
+        alias: App\Library\Infrastructure\Doctrine\Repository\LibraryFileIndexRepository
+
+    App\Library\Application\Port\LibraryContentStatsInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Query\CatalogStatsQuery
+
+    App\Catalog\Application\Port\MetadataContentReaderPortInterface:
+        alias: App\Metadata\Infrastructure\Reader\MetadataContentReader
+
+    App\Catalog\Application\Port\CatalogStatsQueryPortInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Query\CatalogStatsQuery
+
+    # --- Library Cross-Context Queries ---
+    App\Library\Application\Query\LibraryMembershipQueryPort:
+        alias: App\Library\Infrastructure\Doctrine\Query\LibraryMembershipQuery
+    App\Library\Application\Query\LibraryStatsQueryPort:
+        alias: App\Library\Infrastructure\Doctrine\Query\LibraryStatsQuery
+
+    # --- Library Application Services ---
+    App\Library\Application\PathValidator: ~
+
+    # --- Media Domain Repository Aliases ---
+    App\Media\Domain\Repository\ImageRepositoryInterface:
+        alias: App\Media\Infrastructure\Doctrine\Repository\ImageRepository
+
+    # --- Media Ports ---
+    App\Media\Application\Port\ImagePortInterface:
+        alias: App\Media\Infrastructure\ImageService
+
+    App\Media\Application\Port\ImageConversionPortInterface:
+        alias: App\Media\Infrastructure\Converter\GdImageConverter
+
+    App\Media\Application\Port\MediaAdminPortInterface:
+        alias: App\Media\Infrastructure\Admin\MediaAdminService
+
+    # --- Media Storage ---
+    App\Media\Infrastructure\Storage\FlysystemStorage:
+        arguments:
+            $basePath: '%kernel.project_dir%/storage'
+
+    App\Media\Application\Port\StoragePortInterface:
+        alias: App\Media\Infrastructure\Storage\FlysystemStorage
+
+    App\Filesystem\Application\Port\MimeDetectorPortInterface:
+        alias: App\Filesystem\Mime\MimeDetector
+
+    # --- Filesystem ---
+    App\Filesystem\Application\Port\LocalFilesystemPortInterface:
+        alias: App\Filesystem\Infrastructure\Service\LocalFilesystem
+
+    App\Filesystem\Infrastructure\Service\LocalFilesystem:
+        arguments:
+            $basePath: '%kernel.project_dir%/storage/media'
+
+    # --- Media Stream ---
+    App\Media\Application\Port\StreamPortInterface:
+        alias: App\Media\Infrastructure\Service\StreamService
+
+    App\Media\Interface\Controller\StreamController:
+        arguments:
+            $mediaBasePath: '%kernel.project_dir%/storage/media'
+
+    # --- Recommendation Domain Repository Aliases ---
+    App\Recommendation\Domain\Repository\RecommendationRepositoryInterface:
+        alias: App\Recommendation\Infrastructure\Doctrine\Repository\RecommendationRepository
+    App\Recommendation\Domain\Repository\RecommendationJobRepositoryInterface:
+        alias: App\Recommendation\Infrastructure\Doctrine\Repository\RecommendationJobRepository
+
+    # --- Recommendation Application Ports ---
+    App\Recommendation\Application\Port\RecommendationInsightsPortInterface:
+        alias: App\Recommendation\Infrastructure\Doctrine\Repository\RecommendationInsightsRepository
+    App\Recommendation\Application\Port\RecommendationJobPortInterface:
+        alias: App\Recommendation\Infrastructure\RecommendationJobService
+
+    # --- CPU Process Pool Worker ---
+    App\Recommendation\Infrastructure\Swoole\RecommendationPoolWorker:
+        tags:
+            - { name: 'swoole.cpu_pool_worker' }
+
+    # --- Playlist Domain Repository Aliases ---
+    App\Playlist\Domain\Repository\PlaylistRepositoryInterface:
+        alias: App\Playlist\Infrastructure\Doctrine\Repository\PlaylistRepository
+
+    # --- Activity Domain Repository Aliases ---
+    App\Activity\Domain\Repository\MediaActivityRepositoryInterface:
+        alias: App\Activity\Infrastructure\Doctrine\Repository\MediaActivityRepository
+
+    # --- Activity Application Ports ---
+    App\Activity\Application\Port\ActivityPortInterface:
+        alias: App\Activity\Infrastructure\ActivityService
+
+    App\Activity\Application\Port\ActivityAnalyticsPortInterface:
+        alias: App\Activity\Infrastructure\Doctrine\Repository\ActivityAnalyticsRepository
+
+    # --- Playlist Application Ports ---
+    App\Playlist\Application\Port\PlaylistPortInterface:
+        alias: App\Playlist\Infrastructure\PlaylistService
+
+    # --- Notification Domain Repository Aliases ---
+    App\Notification\Domain\Repository\NotificationRepositoryInterface:
+        alias: App\Notification\Infrastructure\Doctrine\Repository\NotificationRepository
+    App\Notification\Domain\Repository\NotificationPreferenceRepositoryInterface:
+        alias: App\Notification\Infrastructure\Doctrine\Repository\NotificationPreferenceRepository
+
+    # --- Notification Email ---
+    App\Notification\Application\Handler\SendEmailHandler:
+        arguments:
+            $appDomain: '%app.domain%'
+            $appName: '%app.name%'
+
+    # --- Notification Push ---
+    App\Notification\Infrastructure\Push\PushSubscriptionRepositoryInterface:
+        alias: App\Notification\Infrastructure\Push\PushSubscriptionRepository
+
+    Minishlink\WebPush\WebPush:
+        arguments:
+            $auth:
+                VAPID:
+                    subject: 'mailto:admin@example.com'
+                    publicKey: '%env(VAPID_PUBLIC_KEY)%'
+                    privateKey: '%env(VAPID_PRIVATE_KEY)%'
+
+    App\Notification\Application\Handler\SendPushHandler:
+        arguments:
+            $appDomain: '%app.domain%'
+
+    # --- Notification Webhook ---
+    App\Notification\Infrastructure\Webhook\WebhookDeliveryService: ~
+
+    # --- UserPreference Application Ports ---
+    App\UserPreference\Application\Port\SidebarConfigPortInterface:
+        alias: App\UserPreference\Infrastructure\SidebarConfigAdapter
+    App\UserPreference\Application\Port\AccentColorPortInterface:
+        alias: App\UserPreference\Infrastructure\AccentColorAdapter
+    App\UserPreference\Application\Port\ThemeMoodPortInterface:
+        alias: App\UserPreference\Infrastructure\ThemeMoodAdapter
+    App\UserPreference\Application\Port\AudioPreferencesPortInterface:
+        alias: App\UserPreference\Infrastructure\AudioPreferencesAdapter
+    App\UserPreference\Application\Port\PlayerPreferencesPortInterface:
+        alias: App\UserPreference\Infrastructure\PlayerPreferencesAdapter
+    App\UserPreference\Application\Port\LayoutPreferencesPortInterface:
+        alias: App\UserPreference\Infrastructure\LayoutPreferencesAdapter
+
+    # --- UserPreference Domain Repository Aliases ---
+    App\UserPreference\Domain\Repository\SidebarConfigRepositoryInterface:
+        alias: App\UserPreference\Infrastructure\Doctrine\Repository\SidebarConfigDoctrineRepository
+    App\UserPreference\Domain\Repository\AccentColorRepositoryInterface:
+        alias: App\UserPreference\Infrastructure\Doctrine\Repository\AccentColorDoctrineRepository
+    App\UserPreference\Domain\Repository\ThemeMoodRepositoryInterface:
+        alias: App\UserPreference\Infrastructure\Doctrine\Repository\ThemeMoodDoctrineRepository
+    App\UserPreference\Domain\Repository\AudioPreferencesRepositoryInterface:
+        alias: App\UserPreference\Infrastructure\Doctrine\Repository\AudioPreferencesDoctrineRepository
+    App\UserPreference\Domain\Repository\PlayerPreferencesRepositoryInterface:
+        alias: App\UserPreference\Infrastructure\Doctrine\Repository\PlayerPreferencesDoctrineRepository
+    App\UserPreference\Domain\Repository\LayoutPreferencesRepositoryInterface:
+        alias: App\UserPreference\Infrastructure\Doctrine\Repository\LayoutPreferencesDoctrineRepository
+    App\UserPreference\Domain\Repository\PreferenceHistoryRepositoryInterface:
+        alias: App\UserPreference\Infrastructure\Doctrine\Repository\PreferenceHistoryDoctrineRepository
+
+    App\UserPreference\Domain\Repository\EqDeviceProfileRepositoryInterface:
+        alias: App\UserPreference\Infrastructure\Doctrine\Repository\EqDeviceProfileDoctrineRepository
+
+    App\UserPreference\Application\Port\EqDeviceProfilePortInterface:
+        alias: App\UserPreference\Infrastructure\EqDeviceProfileAdapter
+
+    # --- Session Domain Repository Aliases ---
+    App\Session\Domain\Repository\ListeningSession\ListeningSessionRepositoryInterface:
+        alias: App\Session\Infrastructure\Doctrine\Repository\ListeningSessionDoctrineRepository
+
+    App\Session\Domain\Repository\Device\DeviceRepositoryInterface:
+        alias: App\Session\Infrastructure\Doctrine\Repository\DeviceDoctrineRepository
+
+    # --- Session Application Port Aliases ---
+    App\Session\Application\Port\SessionPortInterface:
+        alias: App\Session\Infrastructure\SessionAdapter
+
+    # --- Session WebSocket Events ---
+    App\Session\Infrastructure\Swoole\SessionEventSubscriber:
+        tags:
+            - { name: 'kernel.event_subscriber' }
+
+    # --- Metadata API Adapters ---
+    App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter:
+        arguments:
+            $token: '%env(DISCOGS_TOKEN)%'
+
+    App\Metadata\Infrastructure\Api\LastFm\LastFmAdapter:
+        arguments:
+            $apiKey: '%env(LASTFM_API_KEY)%'
+            $jsonEncoder: '@json_encoder'
+
+    App\Metadata\Infrastructure\Api\Spotify\SpotifyAdapter:
+        arguments:
+            $clientId: '%env(SPOTIFY_CLIENT_ID)%'
+            $clientSecret: '%env(SPOTIFY_CLIENT_SECRET)%'
+            $jsonEncoder: '@json_encoder'
+
+    App\Metadata\Infrastructure\Api\TasteDive\TasteDiveAdapter:
+        arguments:
+            $apiKey: '%env(TASTE_DIVE_API_KEY)%'
+            $jsonEncoder: '@json_encoder'
+
+    App\Metadata\Infrastructure\Admin\MetadataAdminService:
+        arguments:
+            $discogsToken: '%env(DISCOGS_TOKEN)%'
+            $lastFmApiKey: '%env(LASTFM_API_KEY)%'
+            $spotifyClientId: '%env(SPOTIFY_CLIENT_ID)%'
+            $spotifyClientSecret: '%env(SPOTIFY_CLIENT_SECRET)%'
+            $tasteDiveApiKey: '%env(TASTE_DIVE_API_KEY)%'
+
+    # --- Swoole Task Worker Fallback Sender ---
+    # Wraps SwooleServerTaskSender to fall back to Redis when the task queue is full
+    # or the server is shutting down. Uses SwooleTaskDispatcherInterface to
+    # decouple from the Swoole bundle's HttpServer class.
+    App\Shared\Infrastructure\Messenger\HttpServerTaskDispatcher:
+        arguments:
+            $httpServer: '@SwooleBundle\SwooleBundle\Server\HttpServer'
+
+    App\Shared\Infrastructure\Messenger\SwooleTaskDispatcherInterface:
+        alias: App\Shared\Infrastructure\Messenger\HttpServerTaskDispatcher
+
+    App\Shared\Infrastructure\Messenger\SwooleTaskWithRedisFallbackSender:
+        decorates: 'SwooleBundle\SwooleBundle\Bridge\Symfony\Messenger\SwooleServerTaskSender'
+        arguments:
+            $dispatcher: '@App\Shared\Infrastructure\Messenger\HttpServerTaskDispatcher'
+            $redisFallback: '@messenger.transport.async'
+            $logger: '@logger'
+
+    # --- Swoole Task Job Monitor ---
+    # Decorates the Swoole TaskHandler to track async jobs in job_monitors.
+    # Priority -5 places it just inside SwooleServerTaskTransportHandler (-10),
+    # so it wraps bus->dispatch() but stays outside the service-reset handlers.
+    App\Shared\Infrastructure\Messenger\SwooleTaskJobMonitorDecorator:
+        decorates: 'SwooleBundle\SwooleBundle\Bridge\Symfony\Messenger\SwooleServerTaskTransportHandler'
+        arguments:
+            $decorated: '@.inner'
+
+    # --- Messenger Middleware ---
+    App\Shared\Infrastructure\Messenger\CorrelationIdMiddleware:
+        tags: [ 'messenger.middleware' ]
+
+    App\Shared\Infrastructure\Messenger\JobMonitoringMiddleware:
+        tags: [ 'messenger.middleware' ]
+
+    App\Shared\Infrastructure\Messenger\ResultStampMiddleware:
+        arguments:
+            $stampClasses: '%app.result_stamp_classes%'
+        tags: [ 'messenger.middleware' ]
+
+    # --- Job Monitor Worker Events ---
+    App\Shared\Infrastructure\Messenger\WorkerJobMonitorSubscriber:
+        tags:
+            - { name: 'kernel.event_listener', event: 'Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent', method: 'onMessageReceived' }
+            - { name: 'kernel.event_listener', event: 'Symfony\Component\Messenger\Event\WorkerMessageHandledEvent', method: 'onMessageHandled' }
+            - { name: 'kernel.event_listener', event: 'Symfony\Component\Messenger\Event\WorkerMessageFailedEvent', method: 'onMessageFailed' }
+
+    App\Shared\Infrastructure\Messenger\JobMessageSerializer:
+        arguments:
+            $serializer: '@job_monitor.serializer'
+            $maxPayloadSize: '%env(int:JOB_MONITOR_MAX_PAYLOAD_SIZE)%'
+
+    job_monitor.serializer:
+        class: Symfony\Component\Serializer\Serializer
+        factory: [ 'App\Shared\Infrastructure\Messenger\JobMessageSerializerFactory', 'create' ]
+        arguments:
+            $propertyAccessor: '@property_accessor'
+            $uuidNormalizer: '@App\Shared\Infrastructure\Messenger\UuidNormalizer'
+            $publicIdNormalizer: '@App\Shared\Infrastructure\Messenger\PublicIdNormalizer'
+
+    App\Shared\Infrastructure\Messenger\UuidNormalizer: ~
+    App\Shared\Infrastructure\Messenger\PublicIdNormalizer: ~
+
+    # --- Cache Bindings ---
+    Psr\Cache\CacheItemPoolInterface $tokenCache: '@cache.tags'
+
+    # --- Logging Processors ---
+    App\Shared\Infrastructure\Logging\CorrelationIdProcessor:
+        tags:
+            - { name: 'monolog.processor' }
+            - { name: 'kernel.reset', method: 'reset' }
+
+    App\Shared\Infrastructure\Logging\BoundedContextProcessor:
+        tags: [ 'monolog.processor' ]
+
+    Symfony\Bridge\Monolog\Processor\WebProcessor:
+        tags: [ 'monolog.processor' ]
+
+    # --- Per-Context Logger Channel Bindings ---
+    # Handled by BoundedContextLoggerPass (registers automatically via Kernel)
+
+    App\Shared\Infrastructure\EventListener\ConfigBootCheckListener:
+        arguments:
+            $appEnv: '%env(APP_ENV)%'
+
+    # --- OpenAPI ---
+    Nelmio\ApiDocBundle\OpenApiGenerator:
+        alias: nelmio_api_doc.open_api.generator
+    Nelmio\ApiDocBundle\Render\RenderOpenApi:
+        alias: nelmio_api_doc.render_docs
+
+    # SeekSignalBroker channel stats — one of potentially many channel providers
+    App\Transcode\Infrastructure\Swoole\SeekSignalChannelStats:
+        tags: [ 'app.swoole.channel_provider' ]
+
+    # --- Transcode Domain Repository Aliases ---
+    App\Transcode\Domain\Repository\TranscodeJobRepositoryInterface:
+        alias: App\Transcode\Infrastructure\Doctrine\Repository\TranscodeJobRepository
+    App\Transcode\Domain\Repository\TranscodeSessionRepositoryInterface:
+        alias: App\Transcode\Infrastructure\Doctrine\Repository\TranscodeSessionRepository
+
+    # --- Transcode CQRS Query Port Aliases ---
+    App\Transcode\Application\Query\TranscodeJobQueryPort:
+        alias: App\Transcode\Infrastructure\Doctrine\Query\TranscodeJobQuery
+    App\Transcode\Application\Query\TranscodeSessionQueryPort:
+        alias: App\Transcode\Infrastructure\Doctrine\Query\TranscodeSessionQuery
+
+    # --- Transcode Application Port Aliases ---
+    App\Transcode\Application\Port\TranscodeSessionPortInterface:
+        alias: App\Transcode\Infrastructure\Transcode\TranscodeSessionService
+    App\Transcode\Application\Port\TranscodeJobPortInterface:
+        alias: App\Transcode\Infrastructure\Transcode\TranscodeJobService
+    App\Transcode\Application\Port\TranscodeStreamingPortInterface:
+        alias: App\Transcode\Infrastructure\Transcode\CachedTranscodeStreamingService
+
+    App\Transcode\Application\Port\StreamAuthPortInterface:
+        alias: App\Transcode\Infrastructure\Auth\HmacStreamAuthAdapter
+    App\Transcode\Application\Port\FFmpegPortInterface:
+        alias: App\Transcode\Infrastructure\FFmpeg\FFmpegAdapter
+    App\Transcode\Application\Port\TranscodeStoragePortInterface:
+        alias: App\Transcode\Infrastructure\Storage\TranscodeFileStorage
+    App\Transcode\Application\Port\SegmentCachePortInterface:
+        alias: App\Transcode\Infrastructure\Cache\InMemorySegmentCache
+
+    # --- Transcode Auth ---
+    App\Transcode\Infrastructure\Auth\HmacStreamAuthAdapter:
+        arguments:
+            $hmacSecret: '%env(STREAM_URL_HMAC_SECRET)%'
+
+    # --- Transcode Cache Decorator ---
+    App\Transcode\Infrastructure\Transcode\CachedTranscodeStreamingService:
+        decorates: App\QoL\Infrastructure\Swoole\QualityFilteringStreamingDecorator
+        arguments:
+            $inner: '@.inner'
+
+    # --- Transcode Infrastructure ---
+    App\Transcode\Infrastructure\Storage\SegmentFileResolver:
+        arguments:
+            $basePath: '%env(CONVERT_STORAGE_PATH)%'
+
+    App\Transcode\Infrastructure\Storage\TranscodeFileStorage:
+        arguments:
+            $resolver: '@App\Transcode\Infrastructure\Storage\SegmentFileResolver'
+
+    App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter:
+        arguments:
+            $ffprobePath: '%env(FFPROBE_PATH)%'
+
+    App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter:
+        arguments:
+            $bearerToken: '%env(TMDB_BEARER_TOKEN)%'
+
+    # --- Hardware Acceleration Prober ---
+    App\Transcode\Infrastructure\FFmpeg\HardwareCapabilitiesProber:
+        arguments:
+            $ffmpegPath: '%env(FFMPEG_PATH)%'
+            $preferredEncoder: '%env(VIDEO_ENCODER)%'
+            $hwAccelDevice: '%env(HW_ACCEL_DEVICE)%'
+            $bitrateMultiplier: '%env(float:HW_BITRATE_MULTIPLIER)%'
+        tags:
+            - { name: 'swoole_bundle.bootable_service' }
+
+    App\Transcode\Infrastructure\HLS\FMP4SegmentWriter:
+        arguments:
+            $ffmpegPath: '%env(FFMPEG_PATH)%'
+            $encoderProfile: '@=service("App\\Transcode\\Infrastructure\\FFmpeg\\HardwareCapabilitiesProber").getProfile()'
+
+    App\Transcode\Infrastructure\FFmpeg\FFmpegAdapter:
+        arguments:
+            $ffmpegPath: '%env(FFMPEG_PATH)%'
+            $encoderProfile: '@=service("App\\Transcode\\Infrastructure\\FFmpeg\\HardwareCapabilitiesProber").getProfile()'
+            $ffprobeAdapter: '@App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter'
+            $fmp4Writer: '@App\Transcode\Infrastructure\HLS\FMP4SegmentWriter'
+
+    # --- CPU Process Pool ---
+    # Generic pool infrastructure — tagged handlers auto-discovered at boot.
+    # Workers run in isolated processes with SWOOLE_IPC_UNIXSOCK.
+    App\Transcode\Infrastructure\Swoole\TranscodePoolWorker:
+        tags:
+            - { name: 'swoole.cpu_pool_worker' }
+
+    App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool:
+        arguments:
+            $handlers: !tagged_iterator 'swoole.cpu_pool_worker'
+            $workerCount: 2
+            $resultTableSize: 8192
+        tags:
+            - { name: 'swoole_bundle.bootable_service' }
+
+    App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPoolShutdownHandler:
+        arguments:
+            $cpuProcessPoolLocator: !service_locator
+                App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool: '@App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool'
+
+    SwooleBundle\SwooleBundle\Server\LifecycleHandler\ServerShutdownHandler:
+        class: App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPoolShutdownHandler
+        arguments:
+            $cpuProcessPoolLocator: !service_locator
+                App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool: '@App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool'
+
+    App\Transcode\Infrastructure\Swoole\TranscodeProcessPool:
+        arguments:
+            $pool: '@App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool'
+            $encoderProfile: '@=service("App\\Transcode\\Infrastructure\\FFmpeg\\HardwareCapabilitiesProber").getProfile()'
+
+    App\Transcode\Infrastructure\FFmpeg\SegmentEncoder:
+        arguments:
+            $encoderProfile: '@=service("App\\Transcode\\Infrastructure\\FFmpeg\\HardwareCapabilitiesProber").getProfile()'
+            $bitrateMultiplier: '@=service("App\\Transcode\\Infrastructure\\FFmpeg\\HardwareCapabilitiesProber").getBitrateMultiplier()'
+
+    App\Transcode\Infrastructure\Swoole\JobStatePersister:
+        arguments:
+            $stateDir: '%kernel.project_dir%/var/transcode_state'
+            $jsonEncoder: '@json_encoder'
+
+    App\Transcode\Infrastructure\Swoole\TranscodeSessionSubscriber:
+        arguments:
+            $videoRepository: '@App\Catalog\Domain\Repository\VideoRepositoryInterface'
+            $jsonEncoder: '@json_encoder'
+            $bookingTable: '@App\Transcode\Infrastructure\Swoole\SegmentBookingTable'
+        tags:
+            - { name: 'kernel.event_listener', event: 'App\Transcode\Domain\Event\TranscodeSessionAttached' }
+
+    App\Transcode\Infrastructure\Swoole\SegmentBookingTable: ~
+
+    App\Transcode\Infrastructure\Swoole\SeekAwarePrefetcher:
+        arguments:
+            $bookingTable: '@App\Transcode\Infrastructure\Swoole\SegmentBookingTable'
+            $cache: '@App\Transcode\Application\Port\SegmentCachePortInterface'
+            $processPool: '@App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool'
+
+    App\Transcode\Infrastructure\Swoole\PrefetchPositionListener:
+        tags:
+            - { name: 'kernel.event_listener', event: 'App\Transcode\Domain\Event\PlaybackPositionChanged' }
+
+    App\Transcode\Infrastructure\Swoole\GracefulRestartHandler:
+        arguments:
+            $processPool: '@App\Transcode\Infrastructure\Swoole\TranscodeProcessPool'
+            $eventDispatcher: '@event_dispatcher'
+
+    App\Transcode\Infrastructure\Swoole\PlaybackPositionChangedListener:
+        tags:
+            - { name: 'kernel.event_listener', event: 'App\Transcode\Domain\Event\PlaybackPositionChanged' }
+
+    # --- Party Domain Repository Aliases ---
+    App\Party\Domain\Repository\SyncedPartySessionRepositoryInterface:
+        alias: App\Party\Infrastructure\Doctrine\Repository\SyncedPartySessionRepository
+    App\Party\Domain\Repository\PartyMemberRepositoryInterface:
+        alias: App\Party\Infrastructure\Doctrine\Repository\PartyMemberRepository
+
+    # --- Party Application Port Aliases ---
+    App\Party\Application\Port\PartySessionPortInterface:
+        alias: App\Party\Infrastructure\PartySessionService
+    App\Party\Application\Port\PartyMemberPortInterface:
+        alias: App\Party\Infrastructure\PartyMemberService
+
+    # --- Party Infrastructure ---
+    App\Party\Infrastructure\Doctrine\Repository\PartyEventRepository:
+        autowire: true
+
+    # --- Radio Domain Repository Aliases ---
+    App\Radio\Domain\Repository\RadioSource\RadioSourceRepositoryInterface:
+        alias: App\Radio\Infrastructure\Doctrine\Repository\RadioSourceDoctrineRepository
+    App\Radio\Domain\Repository\RadioStation\RadioStationRepositoryInterface:
+        alias: App\Radio\Infrastructure\Doctrine\Repository\RadioStationDoctrineRepository
+    App\Radio\Domain\Repository\CountrySubscription\CountrySubscriptionRepositoryInterface:
+        alias: App\Radio\Infrastructure\Doctrine\Repository\CountrySubscriptionDoctrineRepository
+    App\Radio\Domain\Repository\StarredStation\StarredStationRepositoryInterface:
+        alias: App\Radio\Infrastructure\Doctrine\Repository\StarredStationDoctrineRepository
+    App\Radio\Domain\Repository\RadioSession\RadioSessionRepositoryInterface:
+        alias: App\Radio\Infrastructure\Doctrine\Repository\RadioSessionDoctrineRepository
+
+    # --- Radio Application Port Aliases ---
+    App\Radio\Application\Port\RadioSourcePortInterface:
+        alias: App\Radio\Infrastructure\RadioSourceService
+    App\Radio\Application\Port\RadioStationPortInterface:
+        alias: App\Radio\Infrastructure\RadioStationService
+    App\Radio\Application\Port\CountrySubscriptionPortInterface:
+        alias: App\Radio\Infrastructure\CountrySubscriptionService
+    App\Radio\Application\Port\StarredStationPortInterface:
+        alias: App\Radio\Infrastructure\StarredStationService
+    App\Radio\Application\Port\RadioSessionPortInterface:
+        alias: App\Radio\Infrastructure\RadioSessionService
+    App\Radio\Application\Port\StationSyncPortInterface:
+        alias: App\Radio\Infrastructure\Sync\IprdStationSyncAdapter
+
+    # --- Lyrics ---
+    App\Lyrics\Domain\Repository\LyricsRepositoryInterface:
+        alias: App\Lyrics\Infrastructure\Doctrine\Repository\LyricsRepository
+        public: true
+
+    App\Lyrics\Application\Port\LyricsPortInterface:
+        alias: App\Lyrics\Infrastructure\Service\LyricsService
+
+    App\Lyrics\Application\Port\LyricsAdminPortInterface:
+        alias: App\Lyrics\Infrastructure\Doctrine\Repository\LyricsAdminRepository
+        public: true
+
+    App\Lyrics\Application\Port\LrclibClientInterface:
+        alias: App\Lyrics\Infrastructure\Api\LrclibClient
+
+    App\Lyrics\Infrastructure\Api\LrclibClient:
+        arguments:
+            $baseUrl: '%env(LRCLIB_BASE_URL)%'
+
+    App\Shared\Application\Port\SystemSettingsPortInterface:
+        alias: App\Shared\Infrastructure\Doctrine\Repository\SystemSettingRepository
+    App\Shared\Application\Port\AdminAlertPortInterface:
+        alias: App\Shared\Infrastructure\Event\AdminAlertService
+
+    # --- Scheduler Domain Repository Aliases ---
+    App\Scheduler\Domain\Repository\ScheduledJobRepositoryInterface:
+        alias: App\Scheduler\Infrastructure\Doctrine\Repository\ScheduledJobRepository
+
+    # --- Scheduler Application Port Aliases ---
+    App\Scheduler\Application\Port\ScheduledJobPortInterface:
+        alias: App\Scheduler\Infrastructure\Service\ScheduledJobService
+
+    # --- Scheduler Registry ---
+    App\Scheduler\Domain\Service\SchedulerRegistry:
+        arguments:
+            $messengerCommandProviders: !tagged_iterator 'scheduler.messenger_command'
+            $consoleCommandProviders: !tagged_iterator 'scheduler.console_command'
+
+    # --- Scheduler CPU Pool Worker (console execution) ---
+    App\Scheduler\Infrastructure\Swoole\SchedulerConsolePoolWorker:
+        tags:
+            - { name: 'swoole.cpu_pool_worker' }
+
+    # --- Scheduler Swoole Process (single timer) ---
+    App\Scheduler\Infrastructure\Swoole\SchedulerProcess:
+        tags:
+            - { name: 'swoole_bundle.bootable_service' }
+
+    App\Scheduler\Infrastructure\Swoole\SchedulerProcessShutdownHandler:
+        arguments:
+            $schedulerProcessLocator: !service_locator
+                App\Scheduler\Infrastructure\Swoole\SchedulerProcess: '@App\Scheduler\Infrastructure\Swoole\SchedulerProcess'
+        tags:
+            - { name: 'swoole_bundle.server_shutdown_handler' }
+
+    # --- Discovery Domain Repository Aliases ---
+    App\Discovery\Domain\Repository\ServerInstanceRepositoryInterface:
+        alias: App\Discovery\Infrastructure\Doctrine\Repository\ServerInstanceRepository
+    App\Discovery\Domain\Repository\PairingSessionRepositoryInterface:
+        alias: App\Discovery\Infrastructure\Doctrine\Repository\PairingSessionRepository
+
+    # --- Discovery Application Port Aliases ---
+    App\Discovery\Application\Port\DiscoveryPortInterface:
+        alias: App\Discovery\Infrastructure\DiscoveryService
+    App\Discovery\Application\Port\ServerInstancePortInterface:
+        alias: App\Discovery\Infrastructure\ServerInstanceService
+
+    # --- Favorites Domain Repository Aliases ---
+    App\Favorites\Domain\Repository\UserFavoriteRepositoryInterface:
+        alias: App\Favorites\Infrastructure\Doctrine\Repository\UserFavoriteRepository
+
+    # --- Favorites Application Port Aliases ---
+    App\Favorites\Application\Port\FavoritesPortInterface:
+        alias: App\Favorites\Infrastructure\FavoritesService
+
+    # --- Outbox Wiring ---
+    App\Shared\Domain\Event\Outbox\OutboxRepository: ~
+    App\Shared\Domain\Event\Outbox\OutboxSubscriber: ~
+    App\Shared\Domain\Event\Outbox\RelayOutboxHandler: ~
+
+    # --- QoL Governor ---
+    App\QoL\Domain\Service\StreamGovernor:
+        arguments:
+            $model: '@App\QoL\Domain\Service\LearningModel'
+
+    App\QoL\Domain\Service\LearningModel: ~
+
+    # QoL CPU/GPU sampler — Bootable (Table created before fork)
+    App\QoL\Infrastructure\Swoole\CpuGpuSampler:
+        tags:
+            - { name: 'swoole_bundle.bootable_service' }
+
+    # QoL Learning Engine
+    App\QoL\Infrastructure\Swoole\LearningDataPersister:
+        arguments:
+            $prober: '@App\Transcode\Infrastructure\FFmpeg\HardwareCapabilitiesProber'
+            $stateDir: '%kernel.project_dir%/var/qol_state'
+            $jsonEncoder: '@json_encoder'
+
+    App\QoL\Infrastructure\Swoole\LearningEngineSubscriber: ~
+
+    # QoL Capacity Enforcement
+    App\QoL\Infrastructure\Swoole\SessionBudgetSubscriber: ~
+
+    # BudgetGuard injected into TranscodeSessionSubscriber via autowiring
+    App\Transcode\Application\Port\BudgetGuardInterface:
+        alias: App\QoL\Infrastructure\Transcode\BudgetGuard
+
+    App\QoL\Infrastructure\Transcode\BudgetGuard: ~
+
+    # QoL Manifest Filtering Decorator
+    # Chain: alias → CachedTranscodeStreamingService → QualityFilteringStreamingDecorator → TranscodeStreamingService
+    App\QoL\Infrastructure\Swoole\QualityFilteringStreamingDecorator:
+        decorates: App\Transcode\Infrastructure\Transcode\TranscodeStreamingService
+        decoration_priority: -1
+        arguments:
+            $inner: '@.inner'
+
+    # QoL Mid-Stream Monitor
+    App\QoL\Infrastructure\Swoole\MidStreamMonitor: ~
+
+    # QoL Admin
+    App\QoL\Application\Port\QoLAdminPortInterface:
+        alias: App\QoL\Infrastructure\QoLAdminService
+
+    App\QoL\Infrastructure\QoLAdminService: ~

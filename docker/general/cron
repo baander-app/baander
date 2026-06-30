@@ -1,0 +1,3 @@
+# Cron use www-data with sudo, because we need to redirect logs into /dev/stdout /dev/stderr for container
+# Symfony Messenger workers are managed by supervisord (docker/general/supervisord.conf).
+# No scheduled tasks are currently configured — add entries here as needed.

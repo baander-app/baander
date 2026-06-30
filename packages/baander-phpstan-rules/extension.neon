@@ -1,0 +1,5 @@
+services:
+  - class: Baander\PHPStan\Rules\MapRequestPayloadObjectTypeRule
+    tags: [ phpstan.rules.rule ]
+  - class: Baander\PHPStan\Rules\ConsistentOpenApiTagDescriptionRule
+    tags: [ phpstan.rules.rule ]

@@ -1,0 +1,60 @@
+# see https://symfony.com/doc/current/security.html
+security:
+    password_hashers:
+        App\Auth\Infrastructure\Security\SecurityUser:
+            algorithm: argon2id
+            memory_cost: 65536
+            time_cost: 4
+        Symfony\Component\Security\Core\User\PasswordHasherAwareInterface:
+            algorithm: argon2id
+            memory_cost: 65536
+            time_cost: 4
+
+    providers:
+        # User provider will be defined in Auth context
+        app_user_provider:
+            id: App\Auth\Infrastructure\Security\UserProvider
+
+    firewalls:
+        dev:
+            pattern: ^/(_profiler|_wdt)
+            security: false
+
+        # OAuth 2.0 Resource Server
+        api:
+            pattern: ^/api/
+            stateless: true
+            custom_authenticators:
+                - App\Auth\Infrastructure\Security\User\PasswordAuthenticator
+                - App\Auth\Infrastructure\Security\OAuth\OAuth2Authenticator
+            provider: app_user_provider
+
+        # Public endpoints
+        public:
+            pattern: ^/
+            stateless: false
+            security: false
+
+    access_control:
+        # API endpoints require authentication
+        - { path: '^/api/docs', roles: PUBLIC_ACCESS, methods: [GET] }
+        - { path: '^/api/admin', roles: ROLE_ADMIN }
+        - { path: '^/api/debug', roles: ROLE_ADMIN }
+        - { path: '^/api/auth/', roles: PUBLIC_ACCESS }
+        - { path: '^/api/discovery/', roles: PUBLIC_ACCESS }
+        - { path: '^/api/monitor', roles: ROLE_ADMIN }
+        - { path: '^/api/ws', roles: IS_AUTHENTICATED_FULLY }
+        - { path: '^/api/', roles: IS_AUTHENTICATED_FULLY }
+
+    role_hierarchy:
+        ROLE_SUPER_ADMIN: ROLE_ADMIN
+        ROLE_ADMIN: ROLE_USER
+
+when@test:
+    security:
+        password_hashers:
+            # Use lower cost for tests
+            Symfony\Component\Security\Core\User\PasswordHasherAwareInterface:
+                algorithm: argon2id
+                memory_cost: 1024
+                time_cost: 1

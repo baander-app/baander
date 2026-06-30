@@ -1,0 +1,25 @@
+errors:
+  invalid_email: "Invalid email address."
+  invalid_challenge: "Invalid or expired challenge."
+  passkey_registration_failed: "Passkey registration verification failed: {details}"
+  passkey_auth_failed: "Passkey authentication failed: {details}"
+  no_passkey_found: "No passkey found for the given credential ID."
+  cannot_resolve_user: "Unable to resolve user for the given credential ID."
+  failed_delete_passkey: "Failed to delete passkey."
+  user_not_found: "User not found."
+  client_auth_failed: "Client authentication failed."
+  user_code_required: 'The "user_code" parameter is required.'
+  invalid_user_code: "Invalid or expired user code."
+  device_already_processed: "Device code already processed."
+  internal: "Internal server error."
+
+success:
+  token_revoked: "Token revoked successfully."
+  password_reset_sent: "If the email exists, a password reset link has been sent."
+  email_not_implemented: "Email verification is not yet implemented."
+  totp_enabled: "TOTP enabled successfully."
+  totp_disable_not_implemented: "TOTP disable is not yet fully implemented."
+  client_revoked: "Client revoked successfully."
+  device_approved: "Device approved successfully."
+  device_denied: "Device access denied."
+  passkey_deleted: "Passkey deleted successfully."

@@ -1,0 +1,558 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ── Configuration ──────────────────────────────────────────────────────────
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+RELI_DIR="${REPO_ROOT}/.reli"
+CONTAINER_WORKDIR="/var/www/html"
+PROFILER_CONTAINER="baander-profiler"
+APP_CONTAINER="baander-app"
+DEFAULT_DURATION=30
+
+# ── Colors ─────────────────────────────────────────────────────────────────
+RED='\033[31m'; GREEN='\033[32m'; YELLOW='\033[33m'; CYAN='\033[36m'
+BOLD='\033[1m'; DIM='\033[2m'; RESET='\033[0m'
+
+die()    { echo -e "${RED}Error: $*${RESET}" >&2; exit 1; }
+info()   { echo -e "${CYAN}▸ $*${RESET}" >&2; }
+ok()     { echo -e "${GREEN}✓ $*${RESET}" >&2; }
+
+# ── Helpers ────────────────────────────────────────────────────────────────
+
+check_profiler() {
+    docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^${PROFILER_CONTAINER}$" \
+        || die "Profiler not running. Run: make prof-up (or: bin/reli up)"
+}
+
+reli_exec()    { docker exec -i  "${PROFILER_CONTAINER}" /app/reli "$@"; }
+reli_exec_tty(){ docker exec -it "${PROFILER_CONTAINER}" /app/reli "$@"; }
+
+to_container_path() {
+    local host="$1"
+    echo "${host}" | sed "s|^${REPO_ROOT}|${CONTAINER_WORKDIR}|"
+}
+
+# Source .env for docker compose (env var substitutions in docker-compose.yml)
+run_compose() {
+    (
+        [ -f "${REPO_ROOT}/.env" ] && { set -a; . "${REPO_ROOT}/.env"; set +a; }
+        docker compose "$@"
+    )
+}
+
+make_capture_dir() {
+    local type="$1"
+    local ts
+    ts=$(date '+%Y-%m-%dT%H-%M-%S')
+    local dir="${RELI_DIR}/${ts}_${type}"
+    mkdir -p "${dir}"
+    echo "${dir}"
+}
+
+update_latest() {
+    local dir="$1"
+    rm -f "${RELI_DIR}/latest" 2>/dev/null
+    ln -s "$(basename "${dir}")" "${RELI_DIR}/latest"
+}
+
+write_manifest() {
+    local dir="$1" type="$2" pid="${3:-}" pattern="${4:-}" duration="${5:-}"
+
+    # Build files listing from actual files in the directory
+    local files_entries=""
+    for f in "${dir}"/*; do
+        [ -f "$f" ] || continue
+        local bn
+        bn=$(basename "$f")
+        [ "$bn" = "manifest.json" ] && continue
+        [ -n "$files_entries" ] && files_entries+=",\n"
+        files_entries+="    \"${bn}\": \"${bn}\""
+    done
+
+    cat > "${dir}/manifest.json" <<MANIFEST
+{
+  "type": "${type}",
+  "timestamp": "$(date -Iseconds)",
+  "pid": ${pid:-null},
+  "pattern": "${pattern:-}",
+  "duration_seconds": ${duration:-null},
+  "files": {
+$(echo -e "${files_entries}")
+  }
+}
+MANIFEST
+}
+
+# ── PID resolution ─────────────────────────────────────────────────────────
+
+classify_role() {
+    local args="$1"
+    case "$args" in
+        *supervisord*)       echo "supervisord" ;;
+        *task-worker*)       echo "swoole-task" ;;
+        *messenger:consume*) echo "messenger" ;;
+        *bin/console*)       echo "console" ;;
+        *phpunit*)           echo "phpunit" ;;
+        *paratest*)          echo "paratest" ;;
+        *php-fpm*)           echo "php-fpm" ;;
+        *swoole:server:run*) echo "swoole" ;;
+        *swoole*)            echo "swoole-worker" ;;
+        *php*)               echo "php" ;;
+        *)                   echo "other" ;;
+    esac
+}
+
+find_pids() {
+    local pattern="${1:-}"
+    if [ -z "$pattern" ]; then
+        docker top "${APP_CONTAINER}" -o pid 2>/dev/null | tail -n +2
+    else
+        # Match against full args
+        docker top "${APP_CONTAINER}" -o pid,args 2>/dev/null | tail -n +2 \
+            | grep -i "$pattern" | awk '{print $1}'
+    fi
+}
+
+resolve_pid() {
+    if [ -n "${OPT_PID:-}" ]; then
+        echo "${OPT_PID}"
+        return
+    fi
+
+    if [ -n "${OPT_PATTERN:-}" ]; then
+        local found
+        found=$(find_pids "${OPT_PATTERN}" | head -1)
+        [ -z "$found" ] && die "No process matching: ${OPT_PATTERN}"
+        echo "$found"
+        return
+    fi
+
+    # Interactive — show process table and prompt
+    info "No PID specified. Running processes:"
+    cmd_ps >&2
+    echo "" >&2
+    read -rp "Enter PID: " pid < /dev/tty
+    [ -z "$pid" ] && die "No PID selected"
+    echo "$pid"
+}
+
+# ── Option parsing ─────────────────────────────────────────────────────────
+
+OPT_PID="" OPT_PATTERN="" OPT_DURATION="${DEFAULT_DURATION}"
+
+parse_opts() {
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -p) OPT_PID="$2";       shift 2 ;;
+            -P) OPT_PATTERN="$2";   shift 2 ;;
+            -d) OPT_DURATION="$2";  shift 2 ;;
+            --) shift; break ;;
+            *)  break ;;
+        esac
+    done
+}
+
+# ── Subcommands ────────────────────────────────────────────────────────────
+
+cmd_up() {
+    info "Starting profiler sidecar..."
+    run_compose --profile profiling up profiler -d
+    ok "Profiler sidecar started."
+}
+
+cmd_down() {
+    info "Stopping profiler sidecar..."
+    run_compose --profile profiling down profiler
+    ok "Profiler sidecar stopped."
+}
+
+cmd_ps() {
+    printf "${BOLD}%-8s %-6s %-6s %-18s %s${RESET}\n" "PID" "%CPU" "%MEM" "ROLE" "COMMAND"
+
+    # Collect PID/PPID/args to classify Swoole roles via the process tree.
+    # Swoole layout: master → manager → workers (all share the same command line).
+    local ppid_data
+    ppid_data=$(docker top "${APP_CONTAINER}" -o pid,ppid,args 2>/dev/null | tail -n +2)
+
+    # Find the Swoole master PID: the swoole:server:run process whose PPID is NOT also swoole:server:run
+    local master_pid=""
+    local swoole_pids=""
+    while IFS= read -r line; do
+        local pid ppid args
+        pid=$(echo "$line" | awk '{print $1}')
+        ppid=$(echo "$line" | awk '{print $2}')
+        args=$(echo "$line" | awk '{$1=$2=""; print substr($0,3)}')
+        case "$args" in
+            *swoole:server:run*)
+                swoole_pids+=" $pid"
+                # Master: parent is not a swoole:server:run process
+                if [ -z "$master_pid" ]; then
+                    local parent_args
+                    parent_args=$(echo "$ppid_data" | awk -v p="$ppid" '$1==p{$1=$2=""; print substr($0,3)}')
+                    case "$parent_args" in
+                        *swoole:server:run*) ;; # skip — this is manager or worker
+                        *) master_pid="$pid" ;;
+                    esac
+                fi
+                ;;
+        esac
+    done <<< "$ppid_data"
+
+    # Find the manager PID (child of master)
+    local manager_pid=""
+    [ -n "$master_pid" ] && manager_pid=$(echo "$ppid_data" | awk -v p="$master_pid" '$2==p && /swoole:server:run/{print $1; exit}')
+
+    # Render the table with %CPU and %MEM
+    docker top "${APP_CONTAINER}" -o pid,%cpu,%mem,args 2>/dev/null \
+        | tail -n +2 \
+        | while read -r pid cpu mem args; do
+              local role
+              role=$(classify_role "$args")
+              # Override for Swoole processes using PPID tree
+              case "$args" in
+                  *swoole:server:run*)
+                      if [ "$pid" = "$master_pid" ]; then
+                          role="swoole-master"
+                      elif [ "$pid" = "$manager_pid" ]; then
+                          role="swoole-manager"
+                      else
+                          role="swoole-worker"
+                      fi
+                      ;;
+              esac
+              printf "${DIM}%-8s %-6s %-6s${RESET} ${CYAN}%-18s${RESET} ${DIM}%s${RESET}\n" \
+                  "$pid" "$cpu" "$mem" "[${role}]" "$args"
+          done
+}
+
+cmd_ls() {
+    [ ! -d "${RELI_DIR}" ] && { info "No captures found."; return; }
+
+    local found=0
+    for dir in "${RELI_DIR}"/*/; do
+        [ -d "$dir" ] || continue
+        local name
+        name=$(basename "$dir")
+        local type="?" pid="?"
+        if [ -f "${dir}/manifest.json" ]; then
+            type=$(sed -n 's/.*"type"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "${dir}/manifest.json" | head -1)
+            pid=$(sed -n 's/.*"pid"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p' "${dir}/manifest.json" | head -1)
+        fi
+        local mark=""
+        [ -L "${RELI_DIR}/latest" ] && [ "$(readlink "${RELI_DIR}/latest")" = "$name" ] && mark=" ← latest"
+        printf "${BOLD}%s${RESET}  type=%s  pid=%s%s\n" "$name" "${type:-?}" "${pid:-?}" "$mark"
+        found=1
+    done
+    [ "$found" -eq 0 ] && info "No captures found."
+}
+
+cmd_clean() {
+    [ ! -d "${RELI_DIR}" ] && { info "Nothing to clean."; return; }
+
+    if [ "${1:-}" = "--all" ]; then
+        rm -rf "${RELI_DIR}"
+        ok "Removed all captures."
+    else
+        local count=0
+        for dir in "${RELI_DIR}"/*/; do
+            [ -d "$dir" ] || continue
+            local name
+            name=$(basename "$dir")
+            [ -L "${RELI_DIR}/latest" ] && [ "$(readlink "${RELI_DIR}/latest")" = "$name" ] && continue
+            rm -rf "$dir"
+            count=$((count + 1))
+        done
+        ok "Removed ${count} old capture(s). Kept latest."
+    fi
+}
+
+cmd_top() {
+    check_profiler
+    parse_opts "$@"
+    local args=(inspector:top)
+    [ -n "${OPT_PATTERN:-}" ] && args+=(-P "${OPT_PATTERN}")
+    reli_exec_tty "${args[@]}"
+}
+
+cmd_trace() {
+    check_profiler
+    parse_opts "$@"
+    local pid duration dir
+    pid=$(resolve_pid)
+    duration="${OPT_DURATION}"
+    dir=$(make_capture_dir "trace")
+
+    info "Tracing PID ${pid} for ${duration}s..."
+    reli_exec inspector:trace \
+        -p "$pid" \
+        -o "$(to_container_path "${dir}/trace.rbt")" \
+        -f rbt &
+    local trace_pid=$!
+    sleep "$duration"
+    kill "$trace_pid" 2>/dev/null || true
+    wait "$trace_pid" 2>/dev/null || true
+
+    write_manifest "$dir" "trace" "$pid" "${OPT_PATTERN:-}" "$duration"
+    update_latest "$dir"
+    ok "Trace saved to ${dir}/"
+}
+
+cmd_flamegraph() {
+    check_profiler
+    parse_opts "$@"
+    local pid duration dir
+    pid=$(resolve_pid)
+    duration="${OPT_DURATION}"
+    dir=$(make_capture_dir "flamegraph")
+
+    local container_trace
+    container_trace=$(to_container_path "${dir}/trace.rbt")
+
+    info "Tracing PID ${pid} for ${duration}s..."
+    reli_exec inspector:trace \
+        -p "$pid" -o "$container_trace" -f rbt &
+    local trace_pid=$!
+    sleep "$duration"
+    kill "$trace_pid" 2>/dev/null || true
+    wait "$trace_pid" 2>/dev/null || true
+
+    info "Converting to flamegraph..."
+    docker exec -i "${PROFILER_CONTAINER}" \
+        sh -c "/app/reli converter:flamegraph < '${container_trace}'" \
+        > "${dir}/flamegraph.svg" 2>/dev/null || true
+
+    write_manifest "$dir" "flamegraph" "$pid" "${OPT_PATTERN:-}" "$duration"
+    update_latest "$dir"
+    ok "Flamegraph saved to ${dir}/flamegraph.svg"
+}
+
+cmd_memory() {
+    check_profiler
+    parse_opts "$@"
+    local pid dir
+    pid=$(resolve_pid)
+    dir=$(make_capture_dir "memory")
+
+    local container_dump container_rmem
+    container_dump=$(to_container_path "${dir}/snapshot.rdump")
+    container_rmem=$(to_container_path "${dir}/snapshot.rmem")
+
+    info "Dumping memory from PID ${pid}..."
+    reli_exec inspector:memory:dump -p "$pid" -o "$container_dump"
+
+    info "Analyzing..."
+    reli_exec inspector:memory:analyze "$container_dump" -f rmem -o "$container_rmem"
+
+    info "Generating report..."
+    reli_exec inspector:memory:report "$container_rmem" > "${dir}/report.txt" 2>&1 || true
+
+    rm -f "${dir}/snapshot.rdump" 2>/dev/null || true
+
+    write_manifest "$dir" "memory" "$pid" "${OPT_PATTERN:-}"
+    update_latest "$dir"
+    ok "Memory snapshot saved to ${dir}/"
+}
+
+cmd_leak_detect() {
+    check_profiler
+    parse_opts "$@"
+    local pid duration dir
+    pid=$(resolve_pid)
+    duration="${OPT_DURATION}"
+    dir=$(make_capture_dir "leak-detect")
+
+    # --- Snapshot 1 ---
+    local c_dump1 c_rmem1
+    c_dump1=$(to_container_path "${dir}/before.rdump")
+    c_rmem1=$(to_container_path "${dir}/before.rmem")
+
+    info "Snapshot 1 (PID ${pid})..."
+    reli_exec inspector:memory:dump -p "$pid" -o "$c_dump1"
+    reli_exec inspector:memory:analyze "$c_dump1" -f rmem -o "$c_rmem1"
+    rm -f "${dir}/before.rdump" 2>/dev/null || true
+
+    info "Waiting ${duration}s before snapshot 2..."
+    sleep "$duration"
+
+    # --- Snapshot 2 ---
+    local c_dump2 c_rmem2
+    c_dump2=$(to_container_path "${dir}/after.rdump")
+    c_rmem2=$(to_container_path "${dir}/after.rmem")
+
+    info "Snapshot 2..."
+    reli_exec inspector:memory:dump -p "$pid" -o "$c_dump2"
+    reli_exec inspector:memory:analyze "$c_dump2" -f rmem -o "$c_rmem2"
+    rm -f "${dir}/after.rdump" 2>/dev/null || true
+
+    info "Comparing snapshots..."
+    reli_exec inspector:memory:compare "$c_rmem1" "$c_rmem2" > "${dir}/compare.txt" 2>&1 || true
+
+    write_manifest "$dir" "leak-detect" "$pid" "${OPT_PATTERN:-}" "$duration"
+    update_latest "$dir"
+    ok "Leak detection saved to ${dir}/"
+    echo ""
+    cat "${dir}/compare.txt"
+}
+
+cmd_capture() {
+    check_profiler
+    parse_opts "$@"
+    local pid duration dir
+    pid=$(resolve_pid)
+    duration="${OPT_DURATION}"
+    dir=$(make_capture_dir "capture")
+
+    local container_trace container_rmem
+    container_trace=$(to_container_path "${dir}/trace.rbt")
+    container_rmem=$(to_container_path "${dir}/snapshot.rmem")
+
+    # --- Trace + Flamegraph ---
+    info "Tracing PID ${pid} for ${duration}s..."
+    reli_exec inspector:trace \
+        -p "$pid" -o "$container_trace" -f rbt &
+    local trace_pid=$!
+    sleep "$duration"
+    kill "$trace_pid" 2>/dev/null || true
+    wait "$trace_pid" 2>/dev/null || true
+
+    info "Generating flamegraph..."
+    docker exec -i "${PROFILER_CONTAINER}" \
+        sh -c "/app/reli converter:flamegraph < '${container_trace}'" \
+        > "${dir}/flamegraph.svg" 2>/dev/null || true
+
+    # --- Memory ---
+    info "Taking memory snapshot..."
+    local container_dump
+    container_dump=$(to_container_path "${dir}/snapshot.rdump")
+    reli_exec inspector:memory:dump -p "$pid" -o "$container_dump"
+    reli_exec inspector:memory:analyze "$container_dump" -f rmem -o "$container_rmem"
+    reli_exec inspector:memory:report "$container_rmem" > "${dir}/report.txt" 2>&1 || true
+    rm -f "${dir}/snapshot.rdump" 2>/dev/null || true
+
+    write_manifest "$dir" "capture" "$pid" "${OPT_PATTERN:-}" "$duration"
+    update_latest "$dir"
+    ok "Full capture saved to ${dir}/"
+}
+
+cmd_peek() {
+    check_profiler
+    [ $# -lt 1 ] && die "Usage: reli peek <var-expr> [-p PID] [-P pattern]"
+    local var_expr="$1"; shift
+    parse_opts "$@"
+    local pid
+    pid=$(resolve_pid)
+    reli_exec inspector:peek-var -p "$pid" --var="${var_expr}"
+}
+
+cmd_report() {
+    check_profiler
+    local capture_dir="${1:-${RELI_DIR}/latest}"
+    [ -L "${capture_dir}" ] && capture_dir="${RELI_DIR}/$(readlink "${capture_dir}")"
+
+    local rmem=""
+    for f in "${capture_dir}"/*.rmem; do
+        [ -f "$f" ] && rmem="$f" && break
+    done
+    [ -z "$rmem" ] && die "No .rmem found in ${capture_dir}. Run 'reli memory' first."
+
+    reli_exec inspector:memory:report "$(to_container_path "$rmem")"
+}
+
+cmd_explore() {
+    check_profiler
+    local capture_dir="${1:-${RELI_DIR}/latest}"
+    [ -L "${capture_dir}" ] && capture_dir="${RELI_DIR}/$(readlink "${capture_dir}")"
+
+    local rbt="" rmem=""
+    for f in "${capture_dir}"/*.rbt; do [ -f "$f" ] && rbt="$f" && break; done
+    for f in "${capture_dir}"/*.rmem; do [ -f "$f" ] && rmem="$f" && break; done
+
+    if [ -n "$rbt" ]; then
+        info "Opening trace TUI..."
+        reli_exec_tty rbt:explore "$(to_container_path "$rbt")"
+    elif [ -n "$rmem" ]; then
+        info "Opening memory TUI..."
+        reli_exec_tty rmem:explore "$(to_container_path "$rmem")"
+    else
+        die "No .rbt or .rmem found in ${capture_dir}"
+    fi
+}
+
+# ── Usage ──────────────────────────────────────────────────────────────────
+
+usage() {
+    cat <<EOF
+${BOLD}reli${RESET} — Reli profiler wrapper for Baander
+
+${BOLD}Usage:${RESET} reli <command> [options]
+
+${BOLD}Sidecar:${RESET}
+  up                         Start profiler sidecar
+  down                       Stop profiler sidecar
+
+${BOLD}Discovery:${RESET}
+  ps                         List Baander PHP processes with roles
+  ls                         List captures in .reli/
+
+${BOLD}Profiling:${RESET}
+  top      [-P pattern]               Real-time top view (interactive)
+  trace    [-p PID] [-P pattern] [-d 30]   Capture trace (.rbt)
+  flamegraph [-p PID] [-P pattern] [-d 30] Trace + flamegraph SVG
+
+${BOLD}Memory:${RESET}
+  memory   [-p PID] [-P pattern]            Dump + analyze + report
+  leak-detect [-p PID] [-P pattern] [-d 30] Two snapshots + compare
+  report   [<capture-dir>]                  Memory report on snapshot
+
+${BOLD}Combo:${RESET}
+  capture  [-p PID] [-P pattern] [-d 30]   Trace + flamegraph + memory
+
+${BOLD}Inspection:${RESET}
+  peek     <var-expr> [-p PID]             Read variable from process
+  explore  [<capture-dir>]                 Open TUI explorer
+
+${BOLD}Housekeeping:${RESET}
+  clean    [--all]                         Remove captures (keeps latest)
+  help                                 This help
+
+${BOLD}Options:${RESET}
+  -p PID       Target process ID
+  -P pattern   Auto-discover PID by process pattern
+  -d seconds   Duration in seconds (default: ${DEFAULT_DURATION})
+
+${BOLD}Examples:${RESET}
+  reli up
+  reli ps
+  reli trace -P swoole -d 10
+  reli capture -P swoole -d 30
+  reli leak-detect -P messenger -d 60
+  reli peek 'global::\$container' -p 1234
+  reli report
+  reli explore
+  reli clean --all
+EOF
+}
+
+# ── Main ───────────────────────────────────────────────────────────────────
+
+cmd="${1:-help}"
+shift 2>/dev/null || true
+
+case "$cmd" in
+    up|start)         cmd_up ;;
+    down|stop)        cmd_down ;;
+    ps)               cmd_ps ;;
+    ls|list)          cmd_ls ;;
+    clean)            cmd_clean "$@" ;;
+    top)              cmd_top "$@" ;;
+    trace)            cmd_trace "$@" ;;
+    flamegraph|flame) cmd_flamegraph "$@" ;;
+    memory|mem)       cmd_memory "$@" ;;
+    leak-detect|leak) cmd_leak_detect "$@" ;;
+    capture)          cmd_capture "$@" ;;
+    peek)             cmd_peek "$@" ;;
+    report)           cmd_report "$@" ;;
+    explore)          cmd_explore "$@" ;;
+    help|--help|-h)   usage ;;
+    *)                die "Unknown command: ${cmd}. Run 'reli help' for usage." ;;
+esac

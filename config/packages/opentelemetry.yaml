@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=../../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
+# config/packages/opentelemetry.yaml
+# Baander Navigator — OpenTelemetry integration
+# Requires: composer require open-telemetry/opentelemetry open-telemetry/exporter-otlp
+# Add to .env.local: OTEL_ENABLED=true, OTEL_EXPORTER_OTLP_ENDPOINT, OTEL_SERVICE_NAME
+
+parameters:
+    app.otel.enabled: '%env(bool:OTEL_ENABLED)%'
+    app.otel.exporter_url: '%env(OTEL_EXPORTER_OTLP_ENDPOINT)%'
+    app.otel.service_name: '%env(default:baander:OTEL_SERVICE_NAME)%'
+
+services:
+    # SpanBridge — shared ring buffer for the debug endpoint
+    App\Shared\Infrastructure\OpenTelemetry\SpanBridge: ~
+
+    # InMemorySpanProcessor — captures spans and pushes to the bridge
+    App\Shared\Infrastructure\OpenTelemetry\InMemorySpanProcessor:
+        calls:
+            - [ setBridge, [ '@App\Shared\Infrastructure\OpenTelemetry\SpanBridge' ] ]
+
+    # SpanDebugController — exposes /api/debug/spans
+    App\Shared\Interface\Controller\SpanDebugController:
+        arguments:
+            $spanBridge: '@App\Shared\Infrastructure\OpenTelemetry\SpanBridge'
+        tags: [ 'controller.service_arguments' ]

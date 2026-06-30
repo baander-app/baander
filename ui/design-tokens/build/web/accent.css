@@ -1,0 +1,32 @@
+[data-accent="white"] {
+  --color-primary: #e4e4e7;
+  --color-ring: #e4e4e7;
+}
+[data-accent="blue"] {
+  --color-primary: #60a5fa;
+  --color-ring: #60a5fa;
+}
+[data-accent="violet"] {
+  --color-primary: #a78bfa;
+  --color-ring: #a78bfa;
+}
+[data-accent="rose"] {
+  --color-primary: #fb7185;
+  --color-ring: #fb7185;
+}
+[data-accent="amber"] {
+  --color-primary: #fbbf24;
+  --color-ring: #fbbf24;
+}
+[data-accent="emerald"] {
+  --color-primary: #34d399;
+  --color-ring: #34d399;
+}
+[data-accent="cyan"] {
+  --color-primary: #22d3ee;
+  --color-ring: #22d3ee;
+}
+[data-accent="pink"] {
+  --color-primary: #f0abfc;
+  --color-ring: #f0abfc;
+}

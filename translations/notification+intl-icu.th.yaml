@@ -1,0 +1,29 @@
+user:
+  password_changed:
+    title: เปลี่ยนรหัสผ่านแล้ว
+    body: รหัสผ่านบัญชีของคุณถูกเปลี่ยนแล้ว
+  passkey_registered:
+    title: ลงทะเบียน Passkey แล้ว
+    body: มีการลงทะเบียน Passkey "{name}" ใหม่ในบัญชีของคุณ
+  passkey_deleted:
+    title: ลบ Passkey แล้ว
+    body: มีการลบ Passkey ออกจากบัญชีของคุณ
+  registered:
+    title: สร้างบัญชีแล้ว
+    body: ยินดีต้อนรับ, {name}! บัญชีของคุณถูกสร้างแล้ว
+token:
+  revoked:
+    title: เพิกถอน Token แล้ว
+    body: มีการเพิกถอน Token {tokenType}
+device_code:
+  approved:
+    title: อนุมัติอุปกรณ์แล้ว
+    body: มีการอนุมัติอุปกรณ์ใหม่เพื่อเข้าถึงบัญชีของคุณ
+library:
+  scan_completed:
+    title: สแกนไลบรารีเสร็จสิ้น
+    body: "สแกนเสร็จสิ้น: พบไฟล์ {filesDiscovered} ไฟล์, ประมวลผลแล้ว {filesProcessed} ไฟล์"
+album:
+  created:
+    title: อัลบัมใหม่ในไลบรารี
+    body: มีการเพิ่มอัลบัมใหม่ในไลบรารีของคุณ

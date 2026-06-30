@@ -1,0 +1,10 @@
+/* Generated design tokens (CSS custom properties) */
+@import "../../design-tokens/build/web/tokens.css";
+@import "../../design-tokens/build/web/mood-dark.css";
+@import "../../design-tokens/build/web/mood-warm.css";
+@import "../../design-tokens/build/web/mood-cool.css";
+@import "../../design-tokens/build/web/mood-balanced.css";
+@import "../../design-tokens/build/web/accent.css";
+
+/* NOTE: Body, scrollbar, reduced-motion, interactive elements, theme-transitioning
+   are now handled by styled-components GlobalStyles (ThemeProvider). */

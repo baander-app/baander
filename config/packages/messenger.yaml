@@ -1,0 +1,72 @@
+framework:
+    messenger:
+        transports:
+            # Swoole task workers — primary async transport
+            swoole_task:
+                dsn: 'swoole://task'
+
+            # Redis transport — fallback only when Swoole task queue is full
+            async:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    stream: messages
+                    group: baander
+                    consumer: '%env(MESSENGER_CONSUMER_NAME)%'
+                    delete_after_ack: true
+                    stream_max_entries: 100000
+                    redeliver_timeout: 3600
+                    claim_interval: 60000
+                retry_strategy:
+                    max_retries: 3
+                    delay: 1000
+                    multiplier: 2
+                    max_delay: 60000
+
+            failed:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%/failed'
+
+        failure_transport: failed
+
+        routing:
+            # Library
+            'App\Library\Application\Command\ScanLibraryCommand': swoole_task
+            'App\Library\Application\Message\FilesDiscovered': swoole_task
+
+            # Metadata
+            'App\Metadata\Application\Command\ExtractAlbumCoverCommand': async
+            'App\Metadata\Application\Message\SyncSongMessage': swoole_task
+            'App\Metadata\Application\Message\SyncAlbumMessage': swoole_task
+            'App\Metadata\Application\Message\SyncLibraryMessage': swoole_task
+
+            # Notification
+            'App\Notification\Application\DTO\SendEmailCommand': swoole_task
+            'App\Notification\Application\DTO\SendPushCommand': swoole_task
+
+            # Media
+            'App\Media\Application\Command\PruneMissingImagesCommand': swoole_task
+
+            # Radio
+            'App\Radio\Application\Command\SyncCountryStationsCommand': swoole_task
+
+            # Scheduler
+            'App\Scheduler\Application\Command\ExecuteScheduledJobCommand': swoole_task
+
+            # Outbox
+            'App\Shared\Domain\Event\Outbox\RelayOutboxCommand': swoole_task
+
+            # Transcode
+            'App\Transcode\Application\Command\UpdateTranscodePositionCommand': swoole_task
+
+        buses:
+            messenger.bus.default:
+                middleware:
+                    - { id: 'App\Shared\Infrastructure\Messenger\CorrelationIdMiddleware' }
+
+when@test:
+    framework:
+        messenger:
+            transports:
+                # Override to use in-memory transport for tests
+                swoole_task: 'in-memory://'
+                async: 'in-memory://'
+                failed: 'in-memory://'

@@ -1,0 +1,25 @@
+errors:
+  invalid_email: "Ugyldig e-mailadresse."
+  invalid_challenge: "Ugyldig eller udløbet challenge."
+  passkey_registration_failed: "Registrering af passkey mislykkedes: {details}"
+  passkey_auth_failed: "Godkendelse med passkey mislykkedes: {details}"
+  no_passkey_found: "Ingen passkey fundet for det angivne passkey."
+  cannot_resolve_user: "Kan ikke finde brugeren for det angivne passkey."
+  failed_delete_passkey: "Kunne ikke slette passkey."
+  user_not_found: "Bruger ikke fundet."
+  client_auth_failed: "Klientgodkendelse mislykkedes."
+  user_code_required: 'Parameteren "user_code" er påkrævet.'
+  invalid_user_code: "Ugyldig eller udløbet brugerkode."
+  device_already_processed: "Enhedskode er allerede behandlet."
+  internal: "Intern serverfejl."
+
+success:
+  token_revoked: "Token tilbagekaldt."
+  password_reset_sent: "Hvis e-mailadressen findes, er der sendt et link til nulstilling af adgangskode."
+  email_not_implemented: "E-mailbekræftelse er endnu ikke implementeret."
+  totp_enabled: "TOTP aktiveret."
+  totp_disable_not_implemented: "TOTP-deaktivering er endnu ikke fuldt implementeret."
+  client_revoked: "Klient tilbagekaldt."
+  device_approved: "Enhed godkendt."
+  device_denied: "Enhedsadgang nægtet."
+  passkey_deleted: "passkey slettet."

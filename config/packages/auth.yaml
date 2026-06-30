@@ -1,0 +1,123 @@
+# yaml-language-server: $schema=../../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
+# Authentication & OAuth 2.0 configuration
+#
+# Override any parameter per-environment in config/packages/<env>/auth.yaml
+# or via environment variables (e.g. AUTH_ACCESS_TOKEN_TTL=7200).
+
+parameters:
+    # --- OAuth 2.0 Scope Allowlists ---
+
+    # Scopes allowed for user grant types (authorization_code, device_code, refresh_token, direct_grant).
+    # Requested scopes outside this list are silently dropped.
+    auth.scopes.user_grants:
+        - profile
+        - email
+        - library
+        - playlist
+
+    # Scopes allowed for the client_credentials grant type.
+    auth.scopes.client_credentials:
+        - admin
+
+    # --- OAuth 2.0 Token Lifetimes (seconds) ---
+
+    # Access token time-to-live. Default: 1 hour.
+    auth.access_token.ttl: 3600
+
+    # Refresh token time-to-live. Default: 30 days.
+    auth.refresh_token.ttl: 2592000
+
+    # Authorization code time-to-live (used in auth code + PKCE flow). Default: 10 minutes.
+    auth.auth_code.ttl: 600
+
+    # Device code time-to-live (RFC 8628). Default: 15 minutes.
+    auth.device_code.ttl: 900
+
+    # --- OAuth 2.0 Direct Grant Clients ---
+    # Public IDs of pre-registered clients for direct login flows.
+    # Run `php bin/console app:auth:setup-clients` to create them.
+    auth.spa_client_id: '%env(AUTH_SPA_CLIENT_ID)%'
+    auth.electron_client_id: '%env(AUTH_ELECTRON_CLIENT_ID)%'
+
+    # --- OAuth 2.0 Authorization Server Metadata (RFC 8414) ---
+
+    # Canonical issuer URI for the authorization server.
+    # Used in Authorization Server Metadata, RFC 9207 iss parameter,
+    # and as the basis for the resource server audience claim.
+    auth.oauth.issuer: '%env(APP_URL)%'
+
+    # --- OAuth 2.0 Key Paths ---
+
+    # Path to the private key used for signing JWT access tokens.
+    auth.private_key_path: '%kernel.project_dir%/config/secrets/oauth/private.key'
+
+    # Path to the public key used for verifying JWT access tokens.
+    auth.public_key_path: '%kernel.project_dir%/config/secrets/oauth/public.key'
+
+    # Encryption key for authorization codes (defuse/php-encryption ASCII-safe string).
+    # Leave empty to generate a random key per Swoole worker (not suitable for multi-worker setups).
+    auth.encryption_key: ''
+
+    # --- Device Authorization (RFC 8628) ---
+
+    # URI shown to the user for device code verification.
+    auth.device.verification_uri: '/device/verify'
+
+    # --- WebAuthn / Passkeys ---
+
+    # Timeout for WebAuthn ceremonies in milliseconds. Default: 5 minutes.
+    auth.passkey.timeout: 300000
+
+    # Authenticator attachment: "platform", "cross-platform", or empty string (no preference).
+    auth.passkey.authenticator_attachment: 'platform'
+
+    # User verification requirement: "required", "preferred", or "discouraged".
+    auth.passkey.user_verification: 'preferred'
+
+    # Resident key (discoverable credential) requirement: "required", "preferred", or "discouraged".
+    auth.passkey.resident_key: 'preferred'
+
+    # Attestation conveyance preference: "none", "indirect", "direct", or "enterprise".
+    auth.passkey.attestation: 'none'
+
+    # COSE algorithm identifiers to advertise during registration.
+    # Common values: ES256 (-7), ES384 (-35), ES512 (-36), RS256 (-257),
+    # RS384 (-258), RS512 (-259), PS256 (-37), EdDSA (-8).
+    auth.passkey.algorithms: [-7, -35, -36, -257, -258, -259, -37, -8]
+
+    # --- TOTP (Two-Factor Authentication) ---
+
+    # Issuer name displayed in authenticator apps.
+    auth.totp.issuer: 'Baander'
+
+    # Number of 30-second periods to allow for clock skew (0 = exact match only).
+    auth.totp.window: 1
+
+    # --- DPoP (RFC 9449) ---
+
+    # Clock skew tolerance in seconds for DPoP proof iat validation.
+    auth.dpop.clock_skew: 60
+
+    # DPoP nonce TTL in seconds. Default: 5 minutes.
+    auth.dpop.nonce_ttl: 300
+
+    # --- Rate Limiting (Brute-Force Protection) ---
+
+    # Maximum login attempts per IP within the window. Default: 20 per 5 minutes.
+    auth.rate_limit.login.max_attempts: 20
+    auth.rate_limit.login.window: 300
+
+    # Maximum login attempts per IP+email within the window (prevents distributed brute force). Default: 10 per 5 minutes.
+    auth.rate_limit.login_per_email.max_attempts: 10
+
+    # Maximum registration attempts per IP within the window. Default: 10 per 15 minutes.
+    auth.rate_limit.register.max_attempts: 10
+    auth.rate_limit.register.window: 900
+
+    # Maximum password reset requests per IP within the window. Default: 10 per 15 minutes.
+    auth.rate_limit.password_reset.max_attempts: 10
+    auth.rate_limit.password_reset.window: 900
+
+    # Maximum token refresh requests per client within the window. Default: 60 per minute.
+    auth.rate_limit.refresh.max_attempts: 60
+    auth.rate_limit.refresh.window: 60

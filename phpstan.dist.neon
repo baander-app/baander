@@ -1,0 +1,37 @@
+includes:
+  - vendor/phpstan/phpstan-symfony/extension.neon
+  - vendor/phpstan/phpstan-doctrine/extension.neon
+  - phpstan-baseline.neon
+  - vendor/baander/phpstan-rules/extension.neon
+
+parameters:
+  level: 6
+  paths:
+    - src/
+    - tests/
+
+  excludePaths:
+    - migrations/
+
+  bootstrapFiles:
+    - vendor/autoload.php
+
+  # Universal object crates — classes that accept any property access
+  universalObjectCratesClasses:
+    - stdClass
+    - Symfony\Component\Console\Input\ArgvInput
+    - Symfony\Component\Console\Input\InputInterface
+    - Symfony\Component\Console\Input\ArrayInput
+    - Symfony\Component\Console\Style\SymfonyStyle
+    - Symfony\Component\HttpFoundation\InputBag
+    - Symfony\Component\HttpFoundation\ParameterBag
+    - Symfony\Component\HttpFoundation\FileBag
+    - Symfony\Component\HttpFoundation\ServerBag
+    - Symfony\Component\HttpFoundation\HeaderBag
+
+  symfony:
+    containerXmlPath: null
+    consoleApplicationLoader: bin/console-application-loader.php
+
+  doctrine:
+    objectManagerLoader: bin/doctrine-orm-mapping-loader.php

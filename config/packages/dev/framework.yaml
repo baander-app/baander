@@ -1,0 +1,8 @@
+when@dev:
+    framework:
+        php_errors:
+            log: true
+
+        # Trusted proxies for development (Docker network)
+        trusted_proxies: '172.18.0.0/16'
+        trusted_headers: ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-forwarded-port']

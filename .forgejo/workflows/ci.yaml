@@ -1,0 +1,259 @@
+name: CI
+
+on:
+    push:
+        branches:
+            - master
+    pull_request:
+        types: [ opened, synchronize, reopened ]
+
+env:
+    REGISTRY: ${{ vars.REGISTRY_URL }}
+    IMAGE_NAME: ${{ vars.REGISTRY_OWNER }}/baander
+    POSTGRES_IMAGE: ${{ vars.REGISTRY_OWNER }}/baander-postgres
+    COVERAGE_PACKAGE: coverage-backend
+    BUILDKIT_CACHE_PACKAGE: buildkit-cache-backend
+
+jobs:
+    quality-gate:
+        runs-on: docker-cli
+        container:
+            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+        steps:
+            -   name: Checkout
+                run: |
+                    git init -q
+                    git remote add origin ${{ forgejo.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin ${{ forgejo.ref }}
+                    git checkout -q FETCH_HEAD
+
+            -   name: Login to Container Registry
+                run: echo "${{ secrets.REGISTRY_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ forgejo.actor }} --password-stdin
+
+            -   name: Pull PostgreSQL image
+                run: docker pull ${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest
+
+            -   name: Cleanup previous run
+                run: docker rm -f database redis 2>/dev/null || true
+
+            -   name: Create CI network
+                run: docker network create ci-net 2>/dev/null || true
+
+            -   name: Start PostgreSQL
+                run: |
+                    docker run -d --name database --network ci-net \
+                      -e POSTGRES_USER=baander \
+                      -e POSTGRES_PASSWORD=baander \
+                      -e POSTGRES_DB=baander \
+                      ${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest
+
+            -   name: Start Redis
+                run: docker run -d --name redis --network ci-net redis/redis-stack-server:edge
+
+            -   name: Wait for services
+                run: |
+                    for i in $(seq 1 30); do
+                      docker exec database pg_isready -U baander && break
+                      sleep 1
+                    done
+                    for i in $(seq 1 30); do
+                      docker exec redis redis-cli ping | grep -q PONG && break
+                      sleep 1
+                    done
+
+            -   name: Restore BuildKit cache
+                env:
+                    FORGEJO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                run: |
+                    API="$GITHUB_API_URL"
+                    OWNER="${GITHUB_REPOSITORY%%/*}"
+                    HTTP=$(curl -sf -o buildkit-cache.tar.zst -w '%{http_code}' \
+                      "$API/packages/$OWNER/generic/$BUILDKIT_CACHE_PACKAGE/latest/buildkit-cache.tar.zst" \
+                      -H "Authorization: token $FORGEJO_TOKEN" 2>/dev/null || echo '000')
+                    if [ "$HTTP" = "200" ]; then
+                      mkdir -p /tmp/buildkit-cache
+                      tar -xf buildkit-cache.tar.zst -C /tmp/buildkit-cache || true
+                      rm -f buildkit-cache.tar.zst
+                      echo "Restored BuildKit cache"
+                    else
+                      rm -f buildkit-cache.tar.zst
+                      mkdir -p /tmp/buildkit-cache
+                      echo "No BuildKit cache found, starting fresh"
+                    fi
+
+            -   name: Build CI image
+                run: |
+                    docker buildx build \
+                      --target ci \
+                      -t baander-ci \
+                      --load \
+                      --cache-to=type=local,dest=/tmp/buildkit-cache,mode=max \
+                      --cache-from=type=local,src=/tmp/buildkit-cache \
+                      .
+
+            -   name: PHPStan
+                continue-on-error: true
+                run: |
+                    docker run --rm -e XDEBUG_MODE=off \
+                      baander-ci \
+                      php ./vendor/bin/phpstan analyse --memory-limit=512M --no-progress
+
+            -   name: Deptrac
+                run: |
+                    docker run --rm baander-ci vendor/bin/deptrac analyse --no-cache --no-progress
+
+            -   name: Doctrine migrations (test DB)
+                run: |
+                    docker exec database createdb -U baander baander_test 2>/dev/null || true
+                    docker run --rm --network ci-net \
+                      -e DATABASE_URL="postgresql://baander:baander@database:5432/baander_test?serverVersion=18&charset=utf8" \
+                      baander-ci \
+                      php bin/console doctrine:migrations:migrate --no-interaction --env=test
+
+            -   name: PHPUnit with coverage
+                continue-on-error: true
+                run: |
+                    mkdir -p coverage
+                    docker run --rm --network ci-net \
+                      -e XDEBUG_MODE=coverage \
+                      -e DATABASE_URL="postgresql://baander:baander@database:5432/baander_test?serverVersion=18&charset=utf8" \
+                      -e REDIS_URL="redis://default:baander@redis:6379" \
+                      -v "$(pwd)/coverage:/var/www/html/coverage" \
+                      baander-ci \
+                      ./vendor/bin/phpunit -c phpunit.xml.dist --no-progress --coverage-text=coverage/report.txt --coverage-clover=coverage/clover.xml
+
+            -   name: Extract coverage metrics
+                continue-on-error: true
+                run: |
+                    LINE_PCT=$(grep -oP '^\s*Lines:\s+\K[0-9.]+' coverage/report.txt || echo '0.00')
+                    METHOD_PCT=$(grep -oP '^\s*Methods:\s+\K[0-9.]+' coverage/report.txt || echo '0.00')
+                    CLASS_PCT=$(grep -oP '^\s*Classes:\s+\K[0-9.]+' coverage/report.txt || echo '0.00')
+                    printf '{"lines":%s,"methods":%s,"classes":%s}' "$LINE_PCT" "$METHOD_PCT" "$CLASS_PCT" > coverage/metrics.json
+                    echo "Lines:   ${LINE_PCT}%"
+                    echo "Methods: ${METHOD_PCT}%"
+                    echo "Classes: ${CLASS_PCT}%"
+
+            -   name: Store baseline (master only)
+                if: forgejo.ref == 'refs/heads/master'
+                continue-on-error: true
+                env:
+                    FORGEJO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                run: |
+                    API="$GITHUB_API_URL"
+                    OWNER="${GITHUB_REPOSITORY%%/*}"
+                    if [ ! -f coverage/metrics.json ]; then
+                      echo "⚠️ coverage/metrics.json not found — skipping baseline upload"
+                      exit 0
+                    fi
+                    curl -sf -o /dev/null -X DELETE \
+                      "$API/packages/$OWNER/generic/$COVERAGE_PACKAGE/latest/metrics.json" \
+                      -H "Authorization: token $FORGEJO_TOKEN" || true
+                    HTTP=$(curl -s -o /dev/null -w '%{http_code}' -X PUT \
+                      "$API/packages/$OWNER/generic/$COVERAGE_PACKAGE/latest/metrics.json" \
+                      -H "Authorization: token $FORGEJO_TOKEN" \
+                      -H "Content-Type: application/json" \
+                      --data-binary @coverage/metrics.json)
+                    if [ "$HTTP" -ge 200 ] && [ "$HTTP" -lt 300 ]; then
+                      echo "Stored backend baseline (HTTP $HTTP)"
+                    else
+                      echo "⚠️ Failed to store baseline (HTTP $HTTP)"
+                    fi
+
+            -   name: Save BuildKit cache (master only)
+                if: forgejo.ref == 'refs/heads/master'
+                env:
+                    FORGEJO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                run: |
+                    API="$GITHUB_API_URL"
+                    OWNER="${GITHUB_REPOSITORY%%/*}"
+
+                    tar -cf - -C / tmp/buildkit-cache | zstd -o buildkit-cache.tar.zst
+
+                    curl -sf -o /dev/null -X DELETE \
+                      "$API/packages/$OWNER/generic/$BUILDKIT_CACHE_PACKAGE/latest/buildkit-cache.tar.zst" \
+                      -H "Authorization: token $FORGEJO_TOKEN" || true
+
+                    HTTP=$(curl -sf -o /dev/null -w '%{http_code}' -X PUT \
+                      "$API/packages/$OWNER/generic/$BUILDKIT_CACHE_PACKAGE/latest/buildkit-cache.tar.zst" \
+                      -H "Authorization: token $FORGEJO_TOKEN" \
+                      -H "Content-Type: application/zstd" \
+                      --data-binary @buildkit-cache.tar.zst)
+                    echo "Stored BuildKit cache (HTTP $HTTP)"
+
+            -   name: Post coverage comment (PR only)
+                if: forgejo.event_name == 'pull_request'
+                env:
+                    FORGEJO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                    PR_NUMBER: ${{ forgejo.event.number }}
+                run: |
+                    API="$GITHUB_API_URL"
+                    OWNER="${GITHUB_REPOSITORY%%/*}"
+
+                    MASTER_JSON=$(curl -sf \
+                      "$API/packages/$OWNER/generic/$COVERAGE_PACKAGE/latest/metrics.json" \
+                      -H "Authorization: token $FORGEJO_TOKEN" 2>/dev/null || echo '{}')
+
+                    COMMENT=$(node -e "
+                      const cur = require('./coverage/metrics.json');
+                      const mas = $MASTER_JSON;
+
+                      function delta(k) {
+                        if (mas[k] === undefined) return '';
+                        const d = cur[k] - mas[k];
+                        const s = d >= 0 ? '+' : '';
+                        const i = d > 0 ? '🟢' : d < 0 ? '🔴' : '⚪';
+                        return ' | ' + i + ' ' + s + d.toFixed(1) + '%';
+                      }
+
+                      let c = '## 📊 Backend Coverage\n\n';
+                      c += '| Metric | Coverage | Baseline | Change |\n';
+                      c += '|--------|----------|----------|--------|\n';
+                      for (const k of ['lines','methods','classes']) {
+                        const l = k[0].toUpperCase() + k.slice(1);
+                        const b = mas[k] !== undefined ? mas[k].toFixed(1) + '%' : '—';
+                        c += '| ' + l + ' | **' + cur[k].toFixed(1) + '%** | ' + b + delta(k) + ' |\n';
+                      }
+                      process.stdout.write(c);
+                    ")
+
+                    ESCAPED=$(node -e "process.stdout.write(JSON.stringify(process.argv[1]))" "$COMMENT")
+                    HTTP=$(curl -sf -o /dev/null -w '%{http_code}' -X POST \
+                      "$API/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
+                      -H "Authorization: token $FORGEJO_TOKEN" \
+                      -H "Content-Type: application/json" \
+                      -d "{\"body\": $ESCAPED}")
+                    echo "Posted backend coverage comment (HTTP $HTTP)"
+
+    build-and-push:
+        runs-on: docker-cli
+        needs: quality-gate
+        container:
+            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+        steps:
+            -   name: Checkout
+                run: |
+                    git init -q
+                    git remote add origin ${{ forgejo.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin ${{ forgejo.ref }}
+                    git checkout -q FETCH_HEAD
+
+            -   name: Login to Container Registry
+                run: echo "${{ secrets.REGISTRY_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ forgejo.actor }} --password-stdin
+
+            -   name: Build and push production image
+                if: forgejo.ref == 'refs/heads/master'
+                run: |
+                    docker buildx build \
+                      --target production \
+                      --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ forgejo.sha }} \
+                      --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+                      --push \
+                      .
+
+            -   name: Build production image (PR verification)
+                if: forgejo.ref != 'refs/heads/master'
+                run: |
+                    docker build \
+                      --target production \
+                      -t baander-production \
+                      .

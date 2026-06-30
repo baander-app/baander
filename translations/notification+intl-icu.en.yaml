@@ -1,0 +1,33 @@
+user:
+  password_changed:
+    title: "Password changed"
+    body: "Your account password was changed."
+  passkey_registered:
+    title: "Passkey registered"
+    body: "A new passkey \"{name}\" was registered on your account."
+  passkey_deleted:
+    title: "Passkey removed"
+    body: "A passkey was removed from your account."
+  registered:
+    title: "Account created"
+    body: "Welcome, {name}! Your account has been created."
+
+token:
+  revoked:
+    title: "Token revoked"
+    body: "A {tokenType} token was revoked."
+
+device_code:
+  approved:
+    title: "Device approved"
+    body: "A new device was authorized to access your account."
+
+library:
+  scan_completed:
+    title: "Library scan completed"
+    body: "Scan completed: {filesDiscovered} files discovered, {filesProcessed} processed."
+
+album:
+  created:
+    title: "New album in library"
+    body: "A new album was added to your library."

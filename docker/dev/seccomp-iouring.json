@@ -1,0 +1,17 @@
+{
+  "defaultAction": "SCMP_ACT_ERRNO",
+  "architectures": ["SCMP_ARCH_X86_64"],
+  "syscalls": [
+    {
+      "names": [
+        "io_uring_setup",
+        "io_uring_enter",
+        "io_uring_register",
+        "io_uring_fdinfo"
+      ],
+      "action": "SCMP_ACT_ALLOW",
+      "args": [],
+      "comment": "Allow io_uring syscalls for Swoole"
+    }
+  ]
+}

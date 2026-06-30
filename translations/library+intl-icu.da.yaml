@@ -1,0 +1,7 @@
+errors:
+  invalid_type: "Ugyldig type."
+  invalid_type_with_allowed: 'Ugyldig type "{type}". Skal være en af: {allowed}'
+  slug_exists: "Et bibliotek med dette slug findes allerede."
+  invalid_id: "Ugyldigt ID."
+  not_found: "Bibliotek ikke fundet."
+  scan_in_progress: "En scanning er allerede i gang for dette bibliotek."

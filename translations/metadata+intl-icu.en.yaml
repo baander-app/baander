@@ -1,0 +1,7 @@
+errors:
+  query_required: 'The "q" query parameter is required.'
+  artist_not_found: "Artist not found in MusicBrainz."
+  release_group_not_found: "Release group not found in MusicBrainz."
+  valid_path_required: 'Valid "path" to an existing file is required.'
+  unsupported_format: "Unsupported audio format."
+  valid_path: 'Valid "path" is required.'

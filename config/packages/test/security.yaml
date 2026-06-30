@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=../../../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
+# Test environment security: replace OAuth2 with simple test authenticator
+services:
+    App\Tests\Functional\Security\TestAuthenticator:
+        arguments:
+            - '@App\Auth\Domain\Repository\UserRepositoryInterface'
+
+security:
+    firewalls:
+        dev:
+            pattern: ^/(_profiler|_wdt)
+            security: false
+
+        api:
+            pattern: ^/api/
+            stateless: true
+            custom_authenticators:
+                - App\Tests\Functional\Security\TestAuthenticator
+            provider: app_user_provider
+
+        public:
+            pattern: ^/
+            stateless: false
+            security: false

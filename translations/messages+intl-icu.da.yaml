@@ -1,0 +1,13 @@
+errors:
+  invalid_public_id: "Ugyldigt public ID-format."
+  invalid_song_id_format: "Ugyldigt song_id-format."
+  invalid_song_id: "Ugyldigt sang-ID-format."
+  invalid_song_ids_format: "En eller flere sang-ID'er har et ugyldigt format."
+  validation:
+    failed: "Validering mislykkedes."
+  not_found:
+    resource: "Ressource ikke fundet."
+  unauthorized:
+    default: "Godkendelse påkrævet."
+  forbidden:
+    default: "Forbudt."

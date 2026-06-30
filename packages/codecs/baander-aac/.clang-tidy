@@ -1,0 +1,53 @@
+# Baander AAC — clang-tidy configuration
+#
+# Run:  clang-tidy -p build src/*.cpp src/simd/*.cpp tests/*.cpp
+#
+# This is a C-style DSP codec — intentionally uses:
+#   - C APIs (extern "C", typedef, unscoped enums, short param names)
+#   - C-style arrays, pointer arithmetic, manual memory management
+#   - SIMD intrinsics with platform-specific code paths
+#
+# Checks are tuned to catch real bugs without fighting the style.
+
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  clang-analyzer-*,
+  concurrency-*,
+  cppcoreguidelines-init-variables,
+  cppcoreguidelines-prefer-member-initializer,
+  cppcoreguidelines-pro-type-static-cast-downcast,
+  google-build-using-namespace,
+  misc-redundant-expression,
+  misc-unused-parameters,
+  misc-unused-using-decls,
+  modernize-deprecated-headers,
+  modernize-redundant-void-arg,
+  modernize-use-auto,
+  -modernize-use-trailing-return-type,
+  modernize-use-nullptr,
+  modernize-use-override,
+  modernize-use-using,
+  performance-*,
+  -performance-enum-size,
+  -performance-no-int-to-ptr,
+  readability-braces-around-statements,
+  readability-const-return-type,
+  readability-duplicate-include,
+  readability-redundant-control-flow,
+  readability-redundant-declaration,
+  readability-redundant-string-cstr,
+  readability-simplify-boolean-expr,
+  readability-uniqueptr-delete-release
+
+WarningsAsErrors: ''
+
+HeaderFilterRegex: 'include/.*\.h$'
+
+CheckOptions:
+  # Allow short parameter names — this is a C DSP library (r, w, n, s, etc.)
+  readability-identifier-length.MinimumParameterNameLength: 1
+  readability-identifier-length.MinimumVariableNameLength: 1
+  readability-identifier-length.MinimumLoopVariableNameLength: 1

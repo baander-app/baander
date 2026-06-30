@@ -1,0 +1,13 @@
+errors:
+  invalid_public_id: "Invalid public ID format."
+  invalid_song_id_format: "Invalid song_id format."
+  invalid_song_id: "Invalid song ID format."
+  invalid_song_ids_format: "One or more song IDs have an invalid format."
+  validation:
+    failed: "Validation failed."
+  not_found:
+    resource: "Resource not found."
+  unauthorized:
+    default: "Authentication required."
+  forbidden:
+    default: "Forbidden."

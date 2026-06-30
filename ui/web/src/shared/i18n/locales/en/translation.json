@@ -1,0 +1,55 @@
+{
+  "common": {
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "retry": "Retry",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "search": "Search",
+    "noResults": "No results found"
+  },
+  "nav": {
+    "albums": "Albums",
+    "artists": "Artists",
+    "songs": "Songs",
+    "genres": "Genres",
+    "search": "Search",
+    "settings": "Settings"
+  },
+  "auth": {
+    "login": "Log in",
+    "register": "Register",
+    "logout": "Log out",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm password",
+    "totpCode": "Authentication code",
+    "passkey": "Passkey"
+  },
+  "player": {
+    "play": "Play",
+    "pause": "Pause",
+    "next": "Next",
+    "previous": "Previous",
+    "shuffle": "Shuffle",
+    "repeat": "Repeat",
+    "volume": "Volume",
+    "queue": "Queue",
+    "nowPlaying": "Now playing"
+  },
+  "catalog": {
+    "albums": "Albums",
+    "artists": "Artists",
+    "songs": "Songs",
+    "genres": "Genres",
+    "byArtist": "by {{artist}}",
+    "trackCount": "{{count}} track",
+    "trackCount_other": "{{count}} tracks",
+    "noAlbums": "No albums yet",
+    "noArtists": "No artists yet",
+    "noSongs": "No songs yet",
+    "noGenres": "No genres yet"
+  }
+}

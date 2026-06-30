@@ -1,0 +1,116 @@
+swoole:
+    http_server:
+        host: 0.0.0.0
+        port: 9501
+        trusted_hosts: [ ]
+        trusted_proxies: [ '*' ]
+        running_mode: process # One of "process"; "reactor"
+        socket_type: tcp # One of "tcp"; "tcp_ipv6"; "udp"; "udp_ipv6"; "unix_dgram"; "unix_stream"
+        ssl_enabled: false
+        hmr:
+            enabled: 'inotify' # One of "off"; "auto"; "inotify"; "external"
+            file_path: '%swoole_bundle.cache_dir%'
+        api:
+            enabled: true
+            host: 127.0.0.1
+            port: 9200
+        static:
+            strategy: 'advanced' # "advanced" uses sendfile + mmap for zero-copy static file serving
+            public_dir: '%kernel.project_dir%/public'
+
+            # File extensions to mime types map.
+            mime_types: [ ]
+        exception_handler:
+            type: auto # One of "json"; "production"; "symfony"; "custom"; "auto"
+            verbosity: auto # One of "trace"; "verbose"; "default"; "auto"
+            handler_id: null
+        services:
+            trust_all_proxies_handler: true
+            cloudfront_proto_header_handler: false
+            access_log:
+                enabled: true
+                format: null
+                register_monolog_formatter_service: null
+                monolog_formatter_service_name: null
+                monolog_formatter_format: null
+        settings:
+            log_file: '%kernel.logs_dir%/swoole_%kernel.environment%.log'
+            log_level: warning
+            pid_file: null
+            # 2MB output buffer — balance between memory and streaming throughput
+            buffer_output_size: 8388608
+            # 16MB max request body
+            package_max_length: 16777216
+            # Explicitly set 4 workers — the bundle defaults to 2 * cpuCores but
+            # the container only sees 1 CPU, yielding just 1 worker. With coroutines
+            # enabled, 4 workers give enough headroom for concurrent SSE + API traffic.
+            worker_count: 4
+            reactor_count: 2
+            # Restart workers every 500 requests to reclaim memory from Doctrine EM
+            # identity map growth and leaked SSE/WebSocket state.
+            # 5000 was too high — EM accumulated tens of thousands of entities,
+            # causing GC storms and memory exhaustion under sustained load.
+            worker_max_request: 500
+            # Grace period — workers drain in-flight requests before recycling
+            # (up to 30 extra requests beyond worker_max_request).
+            worker_max_request_grace: 30
+            # Heartbeat — detect and close stuck connections every 60s,
+            # close idle connections after 300s (5 min).
+            heartbeat_check_interval: 60
+            heartbeat_idle_time: 300
+            # Max time (seconds) master waits for workers to exit on shutdown.
+            max_wait_time: 5
+            # Fixed dispatch — all requests from the same client FD go to the
+            # same worker. Best for stateful SSE/WebSocket connections.
+            dispatch_mode: 2
+            # Reload workers without interrupting in-flight requests.
+            reload_async: true
+            # Restart task workers every 500 requests (mirrors worker_max_request).
+            task_max_request: 500
+            upload_tmp_dir: /tmp
+            user: ~
+            group: ~
+            # Enable gzip — compresses API JSON well.
+            http_compression: true
+            http_compression_level: 3
+            # Only compress text-based responses — media streams are already encoded.
+            http_compression_min_length: 1024
+            http_compression_types:
+                - text/html
+                - text/plain
+                - text/css
+                - text/javascript
+                - application/javascript
+                - application/json
+                - application/xml
+                - application/manifest+json
+                - image/svg+xml
+    task_worker:
+        services:
+            reset_handler: true
+        settings:
+            # 2 task workers — one for metadata enrichment (heavy I/O), one for
+            # notifications and lighter tasks. Prevents blocking between job types.
+            worker_count: 2
+    platform:
+        fiber_context:
+            enabled: auto # One of "auto"; "off"; "on"
+        coroutines:
+            enabled: true
+            # 10k coroutines — plenty for a modest server. ~80MB virtual memory.
+            # Scale up if you regularly have many concurrent SSE + streaming clients.
+            max_coroutines: 10000
+            max_concurrency: null
+            # Per-pool instance limit. Each pooled service (Logger, EM, etc.)
+            # gets its own pool with this limit. With coroutines, each concurrent
+            # coroutine touching a pooled service consumes a slot. WebSocket
+            # connections, audio streams, and API requests all compete for slots.
+            # 100 was too low — browsing + streaming easily exhausted it.
+            # 2x the coroutine limit per worker (10k / 4 workers = 2500) is safe.
+            max_service_instances: 2500
+            stateful_services: [ ]
+            compile_processors:
+                - App\Shared\Infrastructure\Swoole\TagInterfaceServicesProcessor
+            doctrine_processor_config:
+                global_limit: 10
+                limits: [ ]

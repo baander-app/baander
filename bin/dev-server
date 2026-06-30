@@ -1,0 +1,6 @@
+#!/bin/sh
+
+rm -rf /var/www/html/var/cache
+rm -rf /var/www/html/var/logs/*.log
+/var/www/html/bin/console cache:clear
+/var/www/html/bin/console swoole:server:run

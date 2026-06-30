@@ -1,0 +1,158 @@
+services:
+    nginx:
+        image: martinjuul/baander-nginx:latest
+        container_name: baander-nginx
+        build:
+            context: ./docker/
+            args:
+                BUILD_ARGUMENT_ENV: dev
+            dockerfile: ./nginx/Dockerfile
+        restart: unless-stopped
+        ports:
+            - "${WEB_PORT_HTTP:-80}:80"
+            - "${WEB_PORT_TLS:-443}:443"
+        networks:
+            - baander-backtier
+        environment:
+            SERVER_NAME: ${SERVER_NAME:-baander.test}
+        volumes:
+            - ./:/var/www/html:ro,cached
+        depends_on:
+            - app
+
+    app:
+        image: martinjuul/baander-app:latest
+        privileged: true
+        container_name: baander-app
+        build:
+            context: .
+            target: dev
+            args:
+                GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+                HOST_UID: ${HOST_UID:-1000}
+                HOST_GID: ${HOST_GID:-1000}
+                XDEBUG_CONFIG: ${XDEBUG_CONFIG:-main}
+                XDEBUG_VERSION: ${XDEBUG_VERSION:-3.5.0}
+            dockerfile: ./Dockerfile
+        ulimits:
+            nofile:
+                soft: 10000
+                hard: 10000
+            memlock:
+                soft: -1
+                hard: -1
+        cap_add:
+            - SYS_NICE
+            - IPC_LOCK
+        # NVIDIA GPU passthrough for NVENC/NVDEC hardware transcoding
+        # Requires: NVIDIA Container Toolkit (nvidia-container-toolkit) installed on host
+        #        deploy:
+        #            resources:
+        #                reservations:
+        #                    devices:
+        #                        - driver: nvidia
+        #                          count: all
+        #                          capabilities: [gpu]
+        # Intel iGPU passthrough for QSV/VAAPI hardware transcoding
+        #        devices:
+        #            - /dev/dri:/dev/dri
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'
+        ports:
+            - "41234:41234/udp"
+            - "127.0.0.1:9501:9501"
+            - "9200:9200"
+        volumes:
+            - /home/martin/dev/baander-musik:/home/martin/dev/baander-musik:ro
+            - ./:/var/www/html:cached
+            - ./docker/general/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf:ro
+            - ./docker/dev/php.ini:/usr/local/etc/php/php.ini:ro
+            - ./docker/dev/swoole.ini:/usr/local/etc/php/conf.d/docker-php-ext-swoole.ini:ro
+            - /home/martin/Music:/home/martin/Music
+        healthcheck:
+            test: [ "CMD", "php", "bin/console", "app:health:check" ]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+            start_period: 15s
+        networks:
+            - baander-backtier
+
+    database:
+        container_name: baander-postgres
+        build:
+            context: ./docker/
+            dockerfile: ./postgres/Dockerfile
+            args:
+                PGROONGA_VERSION: 4.0.5-1
+                POSTGRESQL_VERSION: 18
+        restart: unless-stopped
+        networks:
+            - baander-backtier
+        ports:
+            - "5432:5432"
+        shm_size: 256mb
+        environment:
+            POSTGRES_USER: ${DB_USERNAME:-baander}
+            POSTGRES_PASSWORD: ${DB_PASSWORD:-baander}
+            POSTGRES_DB: ${DB_DATABASE:-baander}
+            PGDATA: /var/lib/postgresql/data/baanderdev
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        command: >
+            postgres
+            -c logging_collector=on
+            -c log_directory=/var/log/postgresql
+            -c log_filename=postgresql-%Y-%m-%d_%H%M%S.log
+        healthcheck:
+            test: [ "CMD-SHELL", "pg_isready -U ${DB_USERNAME:-baander} -d ${DB_DATABASE:-baander}" ]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+
+    redis:
+        image: redis/redis-stack-server:edge
+        container_name: baander-redis
+        restart: unless-stopped
+        # noeviction is required by RedisTagAwareAdapter (tag-aware cache pool).
+        # Do not change to allkeys-lru or Redis tag invalidation will silently stop working.
+        command: redis-server --maxmemory-policy noeviction --requirepass $REDIS_PASSWORD
+        environment:
+            REDIS_PASSWORD: ${REDIS_PASSWORD}
+        networks:
+            - baander-backtier
+        ports:
+            - "127.0.0.1:6379:6379"
+
+    profiler:
+        image: reliforp/reli-prof
+        container_name: baander-profiler
+        entrypoint: [ "sleep", "infinity" ]
+        pid: host
+        security_opt:
+            - apparmor:unconfined
+        cap_add:
+            - SYS_PTRACE
+        stdin_open: true
+        tty: true
+        volumes:
+            - ./:/var/www/html:cached
+        working_dir: /var/www/html
+        networks:
+            - baander-backtier
+        profiles:
+            - profiling
+
+volumes:
+    postgres_data:
+
+    ###> doctrine/doctrine-bundle ###
+    database_data:
+        ###< doctrine/doctrine-bundle ###
+        driver: local
+
+networks:
+    baander-backtier:
+        name: baander-backtier
+        external: true

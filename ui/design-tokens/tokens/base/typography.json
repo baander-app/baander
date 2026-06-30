@@ -1,0 +1,7 @@
+{
+  "font": {
+    "sans":    { "value": "\"Inter\", system-ui, -apple-system, BlinkMacSystemFont, sans-serif", "type": "fontFamily" },
+    "mono":    { "value": "\"JetBrains Mono\", ui-monospace, monospace", "type": "fontFamily" },
+    "heading": { "value": "{font.sans}", "type": "fontFamily" }
+  }
+}

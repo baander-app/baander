@@ -1,0 +1,75 @@
+nelmio_cors:
+    defaults:
+        origin_regex: true
+        allow_origin: ['%env(APP_URL)%']
+        allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
+        allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'Accept', 'Origin']
+        expose_headers: ['Link', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'DPoP-Nonce']
+        max_age: 3600
+    paths:
+        # RFC 9700 §2.6: Authorization endpoint MUST NOT have CORS
+        '^/api/oauth/authorize$':
+            allow_origin: []
+            allow_methods: []
+            allow_headers: []
+
+        # OAuth endpoints: allow configured origins
+        '^/api/oauth/token$':
+            allow_origin: ['*']
+            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'Accept', 'Origin']
+            allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
+            expose_headers: ['Link', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'DPoP-Nonce']
+            max_age: 3600
+
+        '^/api/oauth/introspect$':
+            allow_origin: ['*']
+            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'Accept', 'Origin']
+            allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
+            expose_headers: ['Link', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'DPoP-Nonce']
+            max_age: 3600
+
+        '^/api/oauth/revoke$':
+            allow_origin: ['*']
+            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'Accept', 'Origin']
+            allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
+            expose_headers: ['Link', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'DPoP-Nonce']
+            max_age: 3600
+
+        '^/api/oauth/device/':
+            allow_origin: ['*']
+            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'Accept', 'Origin']
+            allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
+            expose_headers: ['Link', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'DPoP-Nonce']
+            max_age: 3600
+
+        # RFC 8414: Metadata and JWKS endpoints — public, allow all origins
+        '^/\.well-known/':
+            allow_origin: ['*']
+            allow_methods: ['GET', 'OPTIONS']
+            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'Accept', 'Origin']
+            expose_headers: ['DPoP-Nonce']
+            max_age: 3600
+
+        # Discovery endpoints: public (no auth required for registration/pairing)
+        '^/api/discovery/':
+            allow_origin: ['*']
+            allow_methods: ['GET', 'OPTIONS', 'POST']
+            allow_headers: ['Content-Type', 'X-Requested-With', 'Accept', 'Origin']
+            expose_headers: ['Link']
+            max_age: 3600
+
+        # Favorites endpoints: restricted (requires auth)
+        '^/api/favorites':
+            allow_origin: ['%env(APP_URL)%']
+            allow_methods: ['GET', 'OPTIONS', 'POST', 'DELETE']
+            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'Accept', 'Origin']
+            expose_headers: ['Link', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'DPoP-Nonce']
+            max_age: 3600
+
+        # Catch-all for all other API routes (SPA, auth, etc.)
+        '^/api/':
+            allow_origin: ['%env(APP_URL)%']
+            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'Accept', 'Origin']
+            allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
+            expose_headers: ['Link', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'DPoP-Nonce']
+            max_age: 3600

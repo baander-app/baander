@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ── reli-mcp-bridge ────────────────────────────────────────────────────────
+# Bridges pi's MCP stdio to reli's rmem:mcp server running inside the
+# profiler container. Pi spawns this script as a stdio MCP server.
+#
+# Usage:
+#   bin/reli-mcp-bridge                         # uses latest .rmem
+#   bin/reli-mcp-bridge .reli/xxx/snapshot.rmem  # explicit path
+# ───────────────────────────────────────────────────────────────────────────
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+RELI_DIR="${REPO_ROOT}/.reli"
+CONTAINER_WORKDIR="/var/www/html"
+PROFILER_CONTAINER="baander-profiler"
+
+die() { echo "Error: $*" >&2; exit 1; }
+
+# Check profiler is running
+docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^${PROFILER_CONTAINER}$" \
+    || die "Profiler not running. Run: make prof-up"
+
+# Find the .rmem file
+rmem_path="${1:-}"
+
+if [ -z "$rmem_path" ]; then
+    # Try latest symlink
+    if [ -L "${RELI_DIR}/latest" ]; then
+        latest_dir="${RELI_DIR}/$(readlink "${RELI_DIR}/latest")"
+        for f in "${latest_dir}"/*.rmem; do
+            [ -f "$f" ] && rmem_path="$f" && break
+        done
+    fi
+fi
+
+if [ -z "$rmem_path" ]; then
+    # Fall back to most recent capture with a .rmem
+    for dir in $(ls -td "${RELI_DIR}"/*/ 2>/dev/null); do
+        for f in "${dir}"/*.rmem; do
+            [ -f "$f" ] && rmem_path="$f" && break 2
+        done
+    done
+fi
+
+[ -z "$rmem_path" ] && die "No .rmem snapshot found. Run 'bin/reli memory' first."
+
+# Convert host path to container path
+container_path="${rmem_path/${REPO_ROOT}/${CONTAINER_WORKDIR}}"
+
+echo "# reli-mcp-bridge: using ${container_path}" >&2
+
+# Bridge stdio to the MCP server inside the container
+exec docker exec -i "${PROFILER_CONTAINER}" ./reli rmem:mcp --rmem="${container_path}"

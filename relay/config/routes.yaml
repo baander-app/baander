@@ -1,0 +1,11 @@
+controllers:
+    resource:
+        path: ../src/Controller/
+        namespace: App\Controller
+    type: attribute
+
+# Health check at root level (outside /api/servers prefix)
+health:
+    path: /health
+    controller: App\Controller\ServerController::health
+    methods: [GET]

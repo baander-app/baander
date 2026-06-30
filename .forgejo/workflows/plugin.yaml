@@ -1,0 +1,45 @@
+name: Plugin CI
+
+on:
+    push:
+        branches:
+            - master
+        paths:
+            - 'packages/baander-navigator/**'
+    pull_request:
+        types: [ opened, synchronize, reopened ]
+        paths:
+            - 'packages/baander-navigator/**'
+
+jobs:
+    build:
+        runs-on: docker-cli
+        container:
+            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+        steps:
+            -   name: Checkout
+                run: |
+                    git init -q
+                    git remote add origin ${{ forgejo.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin ${{ forgejo.ref }}
+                    git checkout -q FETCH_HEAD
+
+            -   name: Setup Gradle
+                working-directory: packages/baander-navigator
+                run: chmod +x gradlew
+
+            -   name: Build plugin
+                working-directory: packages/baander-navigator
+                run: ./gradlew buildPlugin
+
+            -   name: Verify plugin
+                working-directory: packages/baander-navigator
+                run: ./gradlew verifyPlugin
+
+            -   name: Upload plugin artifact
+                if: forgejo.ref == 'refs/heads/master'
+                uses: https://data.forgejo.org/actions/upload-artifact@v4
+                with:
+                    name: baander-ddd-navigator
+                    path: packages/baander-navigator/build/distributions/*.zip
+                    retention-days: 30

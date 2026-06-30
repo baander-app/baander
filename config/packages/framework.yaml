@@ -1,0 +1,120 @@
+# see https://symfony.com/doc/current/reference/configuration/framework.html
+framework:
+    secret: '%env(APP_SECRET)%'
+    http_method_override: false
+    handle_all_throwables: true
+
+    # Trust X-Forwarded-* headers from nginx
+    trusted_proxies: '172.18.0.0/16'  # Docker network
+    trusted_headers: [X-Forwarded-For, X-Forwarded-Host, X-Forwarded-Proto, X-Forwarded-Port]
+
+    # PHP session configuration
+    session:
+        handler_id: session.handler.redis
+        cookie_secure: auto
+        cookie_samesite: lax
+        storage_factory_id: session.storage.factory.native
+
+    # CSRF protection
+    csrf_protection: true
+
+    # PHP serializer
+    php_errors:
+        log: true
+
+    router:
+        utf8: true
+
+    assets:
+        version_strategy: 'Pentatrion\ViteBundle\Asset\ViteAssetVersionStrategy'
+
+    # Rate limiting (uses Redis via cache)
+    rate_limiter:
+        anonymous_api:
+            policy: sliding_window
+            limit: 360
+            interval: '60 seconds'
+            cache_pool: cache.rate_limiter
+        authenticated_api:
+            policy: sliding_window
+            limit: 1800
+            interval: '60 seconds'
+            cache_pool: cache.rate_limiter
+        oauth_token:
+            policy: fixed_window
+            limit: 60
+            interval: '60 seconds'
+            cache_pool: cache.rate_limiter
+        password_reset:
+            policy: fixed_window
+            limit: 10
+            interval: '15 minutes'
+            cache_pool: cache.rate_limiter
+
+        # Auth endpoint-specific rate limiters (brute-force protection)
+        auth_login_ip:
+            policy: fixed_window
+            limit: '%auth.rate_limit.login.max_attempts%'
+            interval: '%auth.rate_limit.login.window% seconds'
+            cache_pool: cache.rate_limiter
+        auth_login_ip_email:
+            policy: fixed_window
+            limit: '%auth.rate_limit.login_per_email.max_attempts%'
+            interval: '%auth.rate_limit.login.window% seconds'
+            cache_pool: cache.rate_limiter
+        auth_register_ip:
+            policy: fixed_window
+            limit: '%auth.rate_limit.register.max_attempts%'
+            interval: '%auth.rate_limit.register.window% seconds'
+            cache_pool: cache.rate_limiter
+        auth_password_reset_ip:
+            policy: fixed_window
+            limit: '%auth.rate_limit.password_reset.max_attempts%'
+            interval: '%auth.rate_limit.password_reset.window% seconds'
+            cache_pool: cache.rate_limiter
+        auth_refresh_client:
+            policy: fixed_window
+            limit: '%auth.rate_limit.refresh.max_attempts%'
+            interval: '%auth.rate_limit.refresh.window% seconds'
+            cache_pool: cache.rate_limiter
+
+        # Admin endpoint-specific rate limiters
+        config_check:
+            policy: fixed_window
+            limit: 10
+            interval: '60 seconds'
+            cache_pool: cache.rate_limiter
+        batch_cover_extract:
+            policy: sliding_window
+            limit: 10
+            interval: '60 seconds'
+            cache_pool: cache.rate_limiter
+
+when@test:
+    framework:
+        test: true
+        session:
+            storage_factory_id: session.storage.factory.mock_file
+        rate_limiter:
+            anonymous_api:
+                limit: 10000
+            authenticated_api:
+                limit: 10000
+            oauth_token:
+                limit: 10000
+            password_reset:
+                limit: 10000
+            auth_login_ip:
+                limit: 10000
+            auth_login_ip_email:
+                limit: 10000
+            auth_register_ip:
+                limit: 10000
+            auth_password_reset_ip:
+                limit: 10000
+            auth_refresh_client:
+                limit: 10000
+            batch_cover_extract:
+                limit: 10000
+            config_check:
+                limit: 10000

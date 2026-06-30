@@ -1,0 +1,31 @@
+{
+  "color": {
+    "background":       { "value": "#000000", "type": "color" },
+    "card":             { "value": "#0a0a0b", "type": "color" },
+    "cardForeground":   { "value": "#f3f4f6", "type": "color" },
+    "popover":          { "value": "#0a0a0b", "type": "color" },
+    "popoverForeground":{ "value": "#f3f4f6", "type": "color" },
+    "foreground":       { "value": "#f0f0f2", "type": "color" },
+    "mutedForeground":  { "value": "#8b8d97", "type": "color" },
+    "primary":          { "value": "#e4e4e7", "type": "color" },
+    "primaryForeground":{ "value": "#000000", "type": "color" },
+    "ring":             { "value": "#e4e4e7", "type": "color" },
+    "secondary":        { "value": "#141514", "type": "color" },
+    "secondaryForeground": { "value": "#f0f0f2", "type": "color" },
+    "muted":            { "value": "#141514", "type": "color" },
+    "highlight":        { "value": "#141514", "type": "color" },
+    "highlightForeground": { "value": "#f0f0f2", "type": "color" },
+    "destructive":      { "value": "#ef4444", "type": "color" },
+    "destructiveForeground": { "value": "#f0f0f2", "type": "color" },
+    "sidebar":          { "value": "#080809", "type": "color" },
+    "sidebarForeground":{ "value": "#f0f0f2", "type": "color" },
+    "sidebarBorder":    { "value": "transparent", "type": "color" },
+    "border":           { "value": "#1a1a1f", "type": "color" },
+    "input":            { "value": "#1a1a1f", "type": "color" },
+    "chart1":           { "value": "#e4e4e7", "type": "color" },
+    "chart2":           { "value": "#8b8d97", "type": "color" },
+    "chart3":           { "value": "#60a5fa", "type": "color" },
+    "chart4":           { "value": "#a78bfa", "type": "color" },
+    "chart5":           { "value": "#fb7185", "type": "color" }
+  }
+}

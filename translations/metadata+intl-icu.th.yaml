@@ -1,0 +1,7 @@
+errors:
+  query_required: ต้องระบุพารามิเตอร์คำค้นหา "q"
+  artist_not_found: ไม่พบศิลปินใน MusicBrainz
+  release_group_not_found: ไม่พบกลุ่มวางจำหน่ายใน MusicBrainz
+  valid_path_required: ต้องระบุ "path" ที่ถูกต้องไปยังไฟล์ที่มีอยู่
+  unsupported_format: รูปแบบเสียงที่ไม่รองรับ
+  valid_path: ต้องระบุ "path" ที่ถูกต้อง
