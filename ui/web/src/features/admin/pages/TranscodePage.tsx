@@ -4,9 +4,9 @@ import { Cpu, CheckCircle2, XCircle, Clock, Loader2 } from 'lucide-react'
 import { StatCard } from '@/shared/components/stat-card'
 import { ProgressBar } from '@/shared/components/progress-bar'
 import { formatDurationHuman } from '@/shared/utils/format-human'
-import type { ComponentType } from 'react'
+import type { ComponentType, CSSProperties } from 'react'
 
-const statusIcon: Record<string, ComponentType<{ size?: number; strokeWidth?: number; className?: string }>> = {
+const statusIcon: Record<string, ComponentType<{ size?: number; strokeWidth?: number; className?: string; style?: CSSProperties }>> = {
   queued: Clock,
   processing: Loader2,
   completed: CheckCircle2,

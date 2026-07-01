@@ -1,4 +1,4 @@
-import styled, { css } from 'styled-components'
+import styled from 'styled-components'
 import { useRef, useState } from 'react'
 import { Camera, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'

@@ -1,14 +1,16 @@
-export enum ShortcutCategory {
-  Transport = 'Transport',
-  Volume = 'Volume',
-  Navigation = 'Navigation',
-  Search = 'Search',
-  MediaType = 'Media Type',
-  ViewMode = 'View Mode',
-  Queue = 'Queue & Panel',
-  General = 'General',
-  ListNav = 'List Navigation',
-}
+export const ShortcutCategory = {
+  Transport: 'Transport',
+  Volume: 'Volume',
+  Navigation: 'Navigation',
+  Search: 'Search',
+  MediaType: 'Media Type',
+  ViewMode: 'View Mode',
+  Queue: 'Queue & Panel',
+  General: 'General',
+  ListNav: 'List Navigation',
+} as const
+
+export type ShortcutCategory = (typeof ShortcutCategory)[keyof typeof ShortcutCategory]
 
 export interface PlatformKeys {
   mac: string

@@ -1,7 +1,7 @@
 import * as React from "react"
 import { Select as SelectPrimitive } from "radix-ui"
-import styled, { css, keyframes } from "styled-components"
-import { focusVisibleRing, interactiveTransition, ariaInvalidRing, disabledStyle, darkMode } from "@/shared/theme"
+import styled, { css, keyframes, type DataAttributes } from "styled-components"
+import { focusVisibleRing, interactiveTransition, ariaInvalidRing, darkMode } from "@/shared/theme"
 
 const Select = SelectPrimitive.Root
 const SelectValue = SelectPrimitive.Value
@@ -57,7 +57,7 @@ const svgStyles = css`
   }
 `
 
-const StyledTrigger = styled(SelectPrimitive.Trigger).attrs({ 'data-slot': 'select-trigger' })`
+const StyledTrigger = styled(SelectPrimitive.Trigger).attrs<DataAttributes>({ 'data-slot': 'select-trigger' })`
   display: flex;
   height: 2rem;
   width: 100%;
@@ -114,7 +114,7 @@ const popperOffsets = css`
   &[data-side="top"] { transform: translateY(-0.25rem); }
 `
 
-const StyledContent = styled(SelectPrimitive.Content).attrs({ 'data-slot': 'select-content' })<{
+const StyledContent = styled(SelectPrimitive.Content).attrs<DataAttributes>({ 'data-slot': 'select-content' })<{
   $position?: "popper" | "item-aligned"
 }>`
   position: relative;
@@ -177,7 +177,7 @@ const SelectContent = React.forwardRef<
   </SelectPrimitive.Portal>
 ))
 
-const StyledItem = styled(SelectPrimitive.Item).attrs({ 'data-slot': 'select-item' })`
+const StyledItem = styled(SelectPrimitive.Item).attrs<DataAttributes>({ 'data-slot': 'select-item' })`
   position: relative;
   display: flex;
   width: 100%;

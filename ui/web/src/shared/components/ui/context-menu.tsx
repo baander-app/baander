@@ -1,7 +1,7 @@
 import * as React from "react"
 import { ContextMenu as ContextMenuPrimitive } from "radix-ui"
-import styled, { css } from "styled-components"
-import { focusVisibleRing, darkMode } from "@/shared/theme"
+import styled, { css, type DataAttributes } from "styled-components"
+import { darkMode } from "@/shared/theme"
 import { ChevronRightIcon, CheckIcon } from "lucide-react"
 
 /* ── Shared menu animation mixin ─────────────────────────────────────── */
@@ -73,7 +73,7 @@ const disabledStyles = css`
 
 /* ── Styled primitives ───────────────────────────────────────────────── */
 
-const ContentStyled = styled(ContextMenuPrimitive.Content).attrs({
+const ContentStyled = styled(ContextMenuPrimitive.Content).attrs<DataAttributes>({
   "data-slot": "context-menu-content",
 })`
   z-index: 50;
@@ -94,7 +94,7 @@ const ContentStyled = styled(ContextMenuPrimitive.Content).attrs({
   ${menuAnimation}
 `
 
-const ItemStyled = styled(ContextMenuPrimitive.Item).attrs<{
+const ItemStyled = styled(ContextMenuPrimitive.Item).attrs<DataAttributes & {
   inset?: boolean
   variant?: "default" | "destructive"
 }>((p) => ({
@@ -147,7 +147,7 @@ const ItemStyled = styled(ContextMenuPrimitive.Item).attrs<{
   ${svgDefaults}
 `
 
-const SubTriggerStyled = styled(ContextMenuPrimitive.SubTrigger).attrs<{
+const SubTriggerStyled = styled(ContextMenuPrimitive.SubTrigger).attrs<DataAttributes & {
   inset?: boolean
 }>((p) => ({
   "data-slot": "context-menu-sub-trigger",
@@ -181,7 +181,7 @@ const SubTriggerStyled = styled(ContextMenuPrimitive.SubTrigger).attrs<{
   ${svgDefaults}
 `
 
-const SubContentStyled = styled(ContextMenuPrimitive.SubContent).attrs({
+const SubContentStyled = styled(ContextMenuPrimitive.SubContent).attrs<DataAttributes>({
   "data-slot": "context-menu-sub-content",
 })`
   z-index: 50;
@@ -198,7 +198,7 @@ const SubContentStyled = styled(ContextMenuPrimitive.SubContent).attrs({
   ${subMenuAnimation}
 `
 
-const CheckboxItemStyled = styled(ContextMenuPrimitive.CheckboxItem).attrs<{
+const CheckboxItemStyled = styled(ContextMenuPrimitive.CheckboxItem).attrs<DataAttributes & {
   inset?: boolean
 }>((p) => ({
   "data-slot": "context-menu-checkbox-item",
@@ -229,7 +229,7 @@ const CheckboxItemStyled = styled(ContextMenuPrimitive.CheckboxItem).attrs<{
   ${svgDefaults}
 `
 
-const RadioItemStyled = styled(ContextMenuPrimitive.RadioItem).attrs<{
+const RadioItemStyled = styled(ContextMenuPrimitive.RadioItem).attrs<DataAttributes & {
   inset?: boolean
 }>((p) => ({
   "data-slot": "context-menu-radio-item",
@@ -271,7 +271,7 @@ const IndicatorSpan = styled.span`
   pointer-events: none;
 `
 
-const LabelStyled = styled(ContextMenuPrimitive.Label).attrs<{
+const LabelStyled = styled(ContextMenuPrimitive.Label).attrs<DataAttributes & {
   inset?: boolean
 }>((p) => ({
   "data-slot": "context-menu-label",
@@ -287,7 +287,7 @@ const LabelStyled = styled(ContextMenuPrimitive.Label).attrs<{
   }
 `
 
-const SeparatorStyled = styled(ContextMenuPrimitive.Separator).attrs({
+const SeparatorStyled = styled(ContextMenuPrimitive.Separator).attrs<DataAttributes>({
   "data-slot": "context-menu-separator",
 })`
   margin: 0.25rem -0.25rem;
@@ -295,7 +295,7 @@ const SeparatorStyled = styled(ContextMenuPrimitive.Separator).attrs({
   background-color: var(--color-border);
 `
 
-const ShortcutStyled = styled.span.attrs({
+const ShortcutStyled = styled.span.attrs<DataAttributes>({
   "data-slot": "context-menu-shortcut",
 })`
   margin-left: auto;

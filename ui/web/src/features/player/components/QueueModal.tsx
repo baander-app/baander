@@ -1,4 +1,4 @@
-import styled, { css } from 'styled-components'
+import styled from 'styled-components'
 import { X, Play } from 'lucide-react'
 import { usePlayerStore, type Track } from '@/features/player/stores/player-store'
 

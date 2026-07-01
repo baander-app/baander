@@ -6,7 +6,6 @@ import { usePlayerStore, type Track } from '@/features/player/stores/player-stor
 import { useSelectionStore } from '../stores/selection-store'
 import { SongContextMenu } from './menus/SongContextMenu'
 import { formatDuration } from '@/shared/utils/format-duration'
-import { focusVisibleRing, interactiveTransition } from '@/shared/theme'
 
 const EmptyContainer = styled.div`
   display: flex;

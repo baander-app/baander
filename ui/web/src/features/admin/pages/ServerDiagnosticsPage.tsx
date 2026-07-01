@@ -1,4 +1,4 @@
-import styled, { css } from 'styled-components'
+import styled from 'styled-components'
 import { useServerStats } from '../hooks/use-server-stats'
 import { useCoroutineStats, useWorkerStats, useSpans, useClearSpans } from '../hooks/use-debug-stats'
 import { LiveHealthBar } from '../components/dashboard/LiveHealthBar'

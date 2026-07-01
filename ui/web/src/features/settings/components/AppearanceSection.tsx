@@ -1,5 +1,4 @@
 import styled from 'styled-components'
-import { css } from 'styled-components'
 import { Card, CardContent } from '@/shared/components/ui/card'
 import { useThemeMood, type ThemeMood } from '../hooks/use-theme-mood'
 import { useAccentColor, type AccentColor } from '../hooks/use-accent-color'

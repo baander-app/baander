@@ -1,5 +1,5 @@
 import * as React from 'react';
-import styled, { css } from 'styled-components';
+import styled from 'styled-components';
 import { Slider as SliderPrimitive } from 'radix-ui';
 import { focusVisibleRing } from '@/shared/theme';
 

@@ -1,9 +1,9 @@
 import * as React from "react"
 import { Tabs as TabsPrimitive } from "radix-ui"
-import styled, { css } from "styled-components"
-import { focusVisibleRing, interactiveTransition, disabledStyle, darkMode } from "@/shared/theme"
+import styled, { css, type DataAttributes } from "styled-components"
+import { focusVisibleRing, interactiveTransition, darkMode } from "@/shared/theme"
 
-const StyledTabs = styled(TabsPrimitive.Root).attrs((p) => ({
+const StyledTabs = styled(TabsPrimitive.Root).attrs<DataAttributes>((p) => ({
   'data-slot': 'tabs',
   'data-orientation': p.orientation ?? 'horizontal',
 }))`
@@ -57,7 +57,7 @@ const tabsListLine = css`
   background: transparent;
 `
 
-const StyledTabsList = styled(TabsPrimitive.List).attrs((p) => ({
+const StyledTabsList = styled(TabsPrimitive.List).attrs<DataAttributes>((p) => ({
   'data-slot': 'tabs-list',
   'data-variant': (p as any).$variant ?? 'default',
 }))<{ $variant?: "default" | "line" }>`
@@ -83,7 +83,7 @@ const TabsList = React.forwardRef<
   <StyledTabsList ref={ref} $variant={variant} {...props} />
 ))
 
-const StyledTabsTrigger = styled(TabsPrimitive.Trigger).attrs({ 'data-slot': 'tabs-trigger' })`
+const StyledTabsTrigger = styled(TabsPrimitive.Trigger).attrs<DataAttributes>({ 'data-slot': 'tabs-trigger' })`
   position: relative;
   display: inline-flex;
   height: calc(100% - 1px);
@@ -203,7 +203,7 @@ const TabsTrigger = React.forwardRef<
   <StyledTabsTrigger ref={ref} {...props} />
 ))
 
-const StyledTabsContent = styled(TabsPrimitive.Content).attrs({ 'data-slot': 'tabs-content' })`
+const StyledTabsContent = styled(TabsPrimitive.Content).attrs<DataAttributes>({ 'data-slot': 'tabs-content' })`
   flex: 1;
   font-size: 0.875rem;
   outline: none;

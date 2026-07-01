@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { useTransportStatus, useFlushFailedQueue } from '../../hooks/use-job-monitor'
-import { interactiveTransition } from '@/shared/theme'
 
 const pulse = keyframes`
   0%, 100% { opacity: 1; }

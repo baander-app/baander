@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import styled, { keyframes, css } from 'styled-components'
+import styled, { keyframes } from 'styled-components'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { Activity, Loader, Music, RefreshCw, Stethoscope } from 'lucide-react'

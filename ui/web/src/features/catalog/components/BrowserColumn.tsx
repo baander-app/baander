@@ -1,7 +1,6 @@
 import styled, { css } from 'styled-components'
 import { useRef, useEffect, useCallback } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { focusVisibleRing, interactiveTransition } from '@/shared/theme'
 import { useImageBlob } from '@/shared/hooks/use-image-blob'
 import { Music } from 'lucide-react'
 

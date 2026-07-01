@@ -63,11 +63,6 @@ const BodyRow = styled.tr`
   }
 `
 
-const Td = styled.td`
-  padding: 0.5rem 0;
-  padding-right: 1rem;
-`
-
 const TdLast = styled.td`
   padding: 0.5rem 0;
 `

@@ -63,19 +63,10 @@ const ToggleKnob = styled.span<{ $checked: boolean }>`
   ring: 0;
 `
 
-const DirtyInput = styled(Input)`
-  ${({ $isDirty }: { $isDirty: boolean }) =>
+const DirtyInput = styled(Input)<{ $isDirty?: boolean; $isReadOnly?: boolean }>`
+  ${({ $isDirty }) =>
     $isDirty &&
     css`border-color: color-mix(in srgb, var(--color-primary) 50%, transparent);`}
-`
-
-const ReadOnlyInput = styled(Input)`
-  ${({ $isReadOnly }: { $isReadOnly: boolean }) =>
-    $isReadOnly &&
-    css`
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-    `}
 `
 
 const DirtyTextarea = styled(Textarea)`

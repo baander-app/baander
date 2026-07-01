@@ -1,7 +1,7 @@
-import styled, { css } from 'styled-components';
+import styled, { type DataAttributes } from 'styled-components';
 import { focusVisibleRing, interactiveTransition } from '@/shared/theme';
 
-export const Textarea = styled.textarea.attrs({ 'data-slot': 'textarea' })`
+export const Textarea = styled.textarea.attrs<DataAttributes>({ 'data-slot': 'textarea' })`
   display: flex;
   width: 100%;
   min-height: 5rem;

@@ -1,6 +1,6 @@
 import * as React from "react"
 import { Dialog as DialogPrimitive } from "radix-ui"
-import styled, { keyframes } from "styled-components"
+import styled, { keyframes, type DataAttributes } from "styled-components"
 
 import { Button } from "@/shared/components/ui/button"
 import { XIcon } from "lucide-react"
@@ -59,7 +59,7 @@ function DialogClose({ ...props }: React.ComponentProps<typeof DialogPrimitive.C
 
 /* ─── Styled Overlay ─── */
 
-const Overlay = styled(DialogPrimitive.Overlay).attrs({
+const Overlay = styled(DialogPrimitive.Overlay).attrs<DataAttributes>({
   'data-slot': 'dialog-overlay',
 })`
   position: fixed;
@@ -84,7 +84,7 @@ const Overlay = styled(DialogPrimitive.Overlay).attrs({
 
 /* ─── Styled Content ─── */
 
-const StyledContent = styled(DialogPrimitive.Content).attrs({
+const StyledContent = styled(DialogPrimitive.Content).attrs<DataAttributes>({
   'data-slot': 'dialog-content',
 })`
   position: fixed;
@@ -120,7 +120,7 @@ const StyledContent = styled(DialogPrimitive.Content).attrs({
 
 /* ─── Styled Close Button ─── */
 
-const CloseButtonWrapper = styled(DialogPrimitive.Close).attrs({
+const CloseButtonWrapper = styled(DialogPrimitive.Close).attrs<DataAttributes>({
   'data-slot': 'dialog-close',
 })`
   position: absolute;
@@ -130,13 +130,13 @@ const CloseButtonWrapper = styled(DialogPrimitive.Close).attrs({
 
 /* ─── Styled Header / Footer ─── */
 
-const StyledHeader = styled.div.attrs({ 'data-slot': 'dialog-header' })`
+const StyledHeader = styled.div.attrs<DataAttributes>({ 'data-slot': 'dialog-header' })`
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 `
 
-const StyledFooter = styled.div.attrs({ 'data-slot': 'dialog-footer' })`
+const StyledFooter = styled.div.attrs<DataAttributes>({ 'data-slot': 'dialog-footer' })`
   display: flex;
   flex-direction: column-reverse;
   gap: 0.5rem;
@@ -156,7 +156,7 @@ const StyledFooter = styled.div.attrs({ 'data-slot': 'dialog-footer' })`
 
 /* ─── Styled Title / Description ─── */
 
-const StyledTitle = styled(DialogPrimitive.Title).attrs({
+const StyledTitle = styled(DialogPrimitive.Title).attrs<DataAttributes>({
   'data-slot': 'dialog-title',
 })`
   font-family: var(--font-heading);
@@ -165,7 +165,7 @@ const StyledTitle = styled(DialogPrimitive.Title).attrs({
   font-weight: 500;
 `
 
-const StyledDescription = styled(DialogPrimitive.Description).attrs({
+const StyledDescription = styled(DialogPrimitive.Description).attrs<DataAttributes>({
   'data-slot': 'dialog-description',
 })`
   font-size: 0.875rem;

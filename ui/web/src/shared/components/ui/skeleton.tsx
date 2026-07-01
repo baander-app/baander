@@ -1,6 +1,6 @@
-import styled from 'styled-components';
+import styled, { type DataAttributes } from 'styled-components';
 
-export const Skeleton = styled.div.attrs({ 'data-slot': 'skeleton' })`
+export const Skeleton = styled.div.attrs<DataAttributes>({ 'data-slot': 'skeleton' })`
   display: inline-block;
   width: 100%;
   border-radius: ${({ theme }) => theme.radii.md};

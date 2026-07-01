@@ -32,12 +32,6 @@ const TrackCount = styled.span`
   color: var(--color-muted-foreground);
 `
 
-const SortableList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-`
-
 const EmptyState = styled.div`
   display: flex;
   flex-direction: column;

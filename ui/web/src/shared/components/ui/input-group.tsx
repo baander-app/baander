@@ -105,12 +105,11 @@ function InputGroupButton({
   type = 'button',
   variant = 'ghost',
   ...props
-}: Omit<React.ComponentProps<typeof Button>, 'size'> & { size?: string }) {
+}: React.ComponentProps<typeof Button>) {
   return (
     <Button
       type={type}
       variant={variant}
-      data-slot="input-group-button"
       {...props}
     />
   );

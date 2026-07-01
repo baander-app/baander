@@ -1,4 +1,4 @@
-import styled, { css } from 'styled-components'
+import styled from 'styled-components'
 import { useState } from 'react'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { useSidebarStore, type SidebarItemData } from '../stores/sidebar-store'

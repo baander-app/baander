@@ -1,7 +1,7 @@
-import styled, { css } from 'styled-components';
+import styled, { type DataAttributes } from 'styled-components';
 import { focusVisibleRing, interactiveTransition } from '@/shared/theme';
 
-export const Input = styled.input.attrs({ 'data-slot': 'input' })`
+export const Input = styled.input.attrs<DataAttributes>({ 'data-slot': 'input' })`
   display: flex;
   width: 100%;
   height: 2rem;

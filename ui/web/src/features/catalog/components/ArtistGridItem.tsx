@@ -3,7 +3,7 @@ import { useCallback } from 'react'
 import { useContextPanelStore } from '@/features/layout/stores/context-panel-store'
 import { ArtistContextMenu } from './menus/ArtistContextMenu'
 import { usePlayArtist } from '../hooks/use-play-artist'
-import { focusVisibleRing, interactiveTransition } from '@/shared/theme'
+import { focusVisibleRing } from '@/shared/theme'
 
 const CardButton = styled.button`
   overflow: hidden;

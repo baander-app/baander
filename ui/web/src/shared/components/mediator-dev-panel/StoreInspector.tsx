@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import styled, { css } from 'styled-components'
+import styled from 'styled-components'
 import { STORE_REGISTRY } from '@/shared/lib/mediator/store-registry'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/shared/components/ui/select'
 

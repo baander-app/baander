@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import styled, { css } from 'styled-components'
+import styled from 'styled-components'
 import { focusVisibleRing } from '@/shared/theme'
 import { filterActionLog } from '@/shared/lib/mediator/devtools'
 import type { ActionLogEntry } from '@/shared/lib/mediator/types'

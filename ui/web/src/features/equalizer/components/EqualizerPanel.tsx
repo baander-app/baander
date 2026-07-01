@@ -14,7 +14,7 @@ import { ProfileSelector } from './ProfileSelector'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card'
 import { Button } from '@/shared/components/ui/button'
 import { Slider } from '@/shared/components/ui/slider'
-import styled, { css } from 'styled-components'
+import styled from 'styled-components'
 
 interface DisplayData {
   leftChannel: number

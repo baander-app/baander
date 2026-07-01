@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { ThemeProvider as SCTypedThemeProvider } from 'styled-components';
-import type { Theme, ThemeMood, AccentColor } from './theme.types';
+import type { ThemeMood, AccentColor } from './theme.types';
 import { resolveTheme } from './resolve-theme';
 import { GlobalStyles } from './GlobalStyles';
 

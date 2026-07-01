@@ -1,7 +1,7 @@
 import * as React from "react"
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
-import styled, { css } from "styled-components"
-import { focusVisibleRing, darkMode } from "@/shared/theme"
+import styled, { css, type DataAttributes } from "styled-components"
+import { darkMode } from "@/shared/theme"
 import { CheckIcon, ChevronRightIcon } from "lucide-react"
 
 /* ── Shared menu animation mixin ─────────────────────────────────────── */
@@ -74,7 +74,7 @@ const disabledStyles = css`
 
 /* ── Styled primitives ───────────────────────────────────────────────── */
 
-const ContentStyled = styled(DropdownMenuPrimitive.Content).attrs({
+const ContentStyled = styled(DropdownMenuPrimitive.Content).attrs<DataAttributes>({
   "data-slot": "dropdown-menu-content",
 })`
   z-index: 50;
@@ -97,7 +97,7 @@ const ContentStyled = styled(DropdownMenuPrimitive.Content).attrs({
   ${menuAnimation}
 `
 
-const ItemStyled = styled(DropdownMenuPrimitive.Item).attrs<{
+const ItemStyled = styled(DropdownMenuPrimitive.Item).attrs<DataAttributes & {
   inset?: boolean
   variant?: "default" | "destructive"
 }>((p) => ({
@@ -154,7 +154,7 @@ const ItemStyled = styled(DropdownMenuPrimitive.Item).attrs<{
   ${svgDefaults}
 `
 
-const SubTriggerStyled = styled(DropdownMenuPrimitive.SubTrigger).attrs<{
+const SubTriggerStyled = styled(DropdownMenuPrimitive.SubTrigger).attrs<DataAttributes & {
   inset?: boolean
 }>((p) => ({
   "data-slot": "dropdown-menu-sub-trigger",
@@ -192,7 +192,7 @@ const SubTriggerStyled = styled(DropdownMenuPrimitive.SubTrigger).attrs<{
   ${svgDefaults}
 `
 
-const SubContentStyled = styled(DropdownMenuPrimitive.SubContent).attrs({
+const SubContentStyled = styled(DropdownMenuPrimitive.SubContent).attrs<DataAttributes>({
   "data-slot": "dropdown-menu-sub-content",
 })`
   z-index: 50;
@@ -212,7 +212,7 @@ const SubContentStyled = styled(DropdownMenuPrimitive.SubContent).attrs({
   ${subMenuAnimation}
 `
 
-const CheckboxItemStyled = styled(DropdownMenuPrimitive.CheckboxItem).attrs<{
+const CheckboxItemStyled = styled(DropdownMenuPrimitive.CheckboxItem).attrs<DataAttributes & {
   inset?: boolean
 }>((p) => ({
   "data-slot": "dropdown-menu-checkbox-item",
@@ -247,7 +247,7 @@ const CheckboxItemStyled = styled(DropdownMenuPrimitive.CheckboxItem).attrs<{
   ${svgDefaults}
 `
 
-const RadioItemStyled = styled(DropdownMenuPrimitive.RadioItem).attrs<{
+const RadioItemStyled = styled(DropdownMenuPrimitive.RadioItem).attrs<DataAttributes & {
   inset?: boolean
 }>((p) => ({
   "data-slot": "dropdown-menu-radio-item",
@@ -282,7 +282,7 @@ const RadioItemStyled = styled(DropdownMenuPrimitive.RadioItem).attrs<{
   ${svgDefaults}
 `
 
-const IndicatorSpan = styled.span.attrs({
+const IndicatorSpan = styled.span.attrs<DataAttributes>({
   "data-slot": "dropdown-menu-item-indicator",
 })`
   position: absolute;
@@ -295,7 +295,7 @@ const IndicatorSpan = styled.span.attrs({
   pointer-events: none;
 `
 
-const LabelStyled = styled(DropdownMenuPrimitive.Label).attrs<{
+const LabelStyled = styled(DropdownMenuPrimitive.Label).attrs<DataAttributes & {
   inset?: boolean
 }>((p) => ({
   "data-slot": "dropdown-menu-label",
@@ -311,7 +311,7 @@ const LabelStyled = styled(DropdownMenuPrimitive.Label).attrs<{
   }
 `
 
-const SeparatorStyled = styled(DropdownMenuPrimitive.Separator).attrs({
+const SeparatorStyled = styled(DropdownMenuPrimitive.Separator).attrs<DataAttributes>({
   "data-slot": "dropdown-menu-separator",
 })`
   margin: 0.25rem -0.25rem;
@@ -319,7 +319,7 @@ const SeparatorStyled = styled(DropdownMenuPrimitive.Separator).attrs({
   background-color: var(--color-border);
 `
 
-const ShortcutStyled = styled.span.attrs({
+const ShortcutStyled = styled.span.attrs<DataAttributes>({
   "data-slot": "dropdown-menu-shortcut",
 })`
   margin-left: auto;

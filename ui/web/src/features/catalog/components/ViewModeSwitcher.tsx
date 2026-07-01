@@ -47,7 +47,7 @@ interface ViewModeOption {
   mode: ViewMode
   label: string
   shortcut: string
-  icon: React.ComponentType<{ className?: string }>
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>
 }
 
 const OPTIONS: ViewModeOption[] = [

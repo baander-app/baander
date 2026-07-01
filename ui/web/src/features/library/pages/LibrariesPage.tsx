@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import styled, { css } from 'styled-components'
+import styled from 'styled-components'
 import { Button } from '@/shared/components/ui/button'
 import { useLibraries } from '../hooks/use-libraries'
 import { useCreateLibrary, useUpdateLibrary, useDeleteLibrary, useScanLibrary, useScanAllLibraries } from '../hooks/use-library-mutations'

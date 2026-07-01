@@ -1,4 +1,4 @@
-import styled, { css } from 'styled-components'
+import styled from 'styled-components'
 import { useEffect, useState, useCallback } from 'react'
 import { Play } from 'lucide-react'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
@@ -6,7 +6,7 @@ import { useContextPanelStore } from '@/features/layout/stores/context-panel-sto
 import { AlbumContextMenu } from './menus/AlbumContextMenu'
 import { usePlayAlbum } from '../hooks/use-play-album'
 import { createLogger } from '@/shared/lib/logger'
-import { focusVisibleRing, interactiveTransition } from '@/shared/theme'
+import { focusVisibleRing } from '@/shared/theme'
 
 const logger = createLogger('AlbumGridItem')
 

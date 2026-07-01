@@ -143,10 +143,10 @@ const EmptyText = styled.p`
   color: var(--color-muted-foreground);
 `
 
-const SkeletonStack = styled.div`
+const SkeletonStack = styled.div<{ $gap?: string }>`
   display: flex;
   flex-direction: column;
-  gap: ${({ $gap }: { $gap?: string }) => $gap ?? '0.25rem'};
+  gap: ${({ $gap }) => $gap ?? '0.25rem'};
 `
 
 export function RecommendationsPage() {

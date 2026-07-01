@@ -1,7 +1,7 @@
-import styled from 'styled-components';
+import styled, { type DataAttributes } from 'styled-components';
 import * as SeparatorPrimitive from '@radix-ui/react-separator';
 
-export const Separator = styled(SeparatorPrimitive.Root).attrs({ 'data-slot': 'separator' })`
+export const Separator = styled(SeparatorPrimitive.Root).attrs<DataAttributes>({ 'data-slot': 'separator' })`
   flex-shrink: 0;
   background-color: var(--color-border);
 

@@ -1,5 +1,5 @@
 import { type LufsTarget, useEqProcessingStore } from '@/features/equalizer/stores/eq-processing-store';
-import styled, { css } from 'styled-components';
+import styled from 'styled-components';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent } from '@/shared/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';

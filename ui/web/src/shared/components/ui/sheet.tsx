@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { Dialog as SheetPrimitive } from "radix-ui"
-import styled, { keyframes, css } from "styled-components"
+import styled, { keyframes, type DataAttributes } from "styled-components"
 
 import { Button } from "@/shared/components/ui/button"
 import { XIcon } from "lucide-react"
@@ -85,7 +85,7 @@ function SheetPortal({
 
 /* ─── Styled Overlay ─── */
 
-const Overlay = styled(SheetPrimitive.Overlay).attrs({
+const Overlay = styled(SheetPrimitive.Overlay).attrs<DataAttributes>({
   'data-slot': 'sheet-overlay',
 })`
   position: fixed;
@@ -107,31 +107,9 @@ const Overlay = styled(SheetPrimitive.Overlay).attrs({
   }
 `
 
-/* ─── Slide animation per side ─── */
-
-const slideInFor = (side: string) => {
-  switch (side) {
-    case "top": return slideInFromTop
-    case "bottom": return slideInFromBottom
-    case "left": return slideInFromLeft
-    case "right": return slideInFromRight
-    default: return slideInFromRight
-  }
-}
-
-const slideOutFor = (side: string) => {
-  switch (side) {
-    case "top": return slideOutToTop
-    case "bottom": return slideOutToBottom
-    case "left": return slideOutToLeft
-    case "right": return slideOutToRight
-    default: return slideOutToRight
-  }
-}
-
 /* ─── Styled Content ─── */
 
-const StyledContent = styled(SheetPrimitive.Content).attrs({
+const StyledContent = styled(SheetPrimitive.Content).attrs<DataAttributes>({
   'data-slot': 'sheet-content',
 })`
   position: fixed;
@@ -215,7 +193,7 @@ const StyledContent = styled(SheetPrimitive.Content).attrs({
 
 /* ─── Styled Close Button ─── */
 
-const CloseButtonWrapper = styled(SheetPrimitive.Close).attrs({
+const CloseButtonWrapper = styled(SheetPrimitive.Close).attrs<DataAttributes>({
   'data-slot': 'sheet-close',
 })`
   position: absolute;
@@ -225,14 +203,14 @@ const CloseButtonWrapper = styled(SheetPrimitive.Close).attrs({
 
 /* ─── Styled Header / Footer ─── */
 
-const StyledHeader = styled.div.attrs({ 'data-slot': 'sheet-header' })`
+const StyledHeader = styled.div.attrs<DataAttributes>({ 'data-slot': 'sheet-header' })`
   display: flex;
   flex-direction: column;
   gap: 0.125rem;
   padding: 1rem;
 `
 
-const StyledFooter = styled.div.attrs({ 'data-slot': 'sheet-footer' })`
+const StyledFooter = styled.div.attrs<DataAttributes>({ 'data-slot': 'sheet-footer' })`
   margin-top: auto;
   display: flex;
   flex-direction: column;
@@ -242,7 +220,7 @@ const StyledFooter = styled.div.attrs({ 'data-slot': 'sheet-footer' })`
 
 /* ─── Styled Title / Description ─── */
 
-const StyledTitle = styled(SheetPrimitive.Title).attrs({
+const StyledTitle = styled(SheetPrimitive.Title).attrs<DataAttributes>({
   'data-slot': 'sheet-title',
 })`
   font-family: var(--font-heading);
@@ -252,7 +230,7 @@ const StyledTitle = styled(SheetPrimitive.Title).attrs({
   color: var(--color-foreground);
 `
 
-const StyledDescription = styled(SheetPrimitive.Description).attrs({
+const StyledDescription = styled(SheetPrimitive.Description).attrs<DataAttributes>({
   'data-slot': 'sheet-description',
 })`
   font-size: 0.875rem;

@@ -17,7 +17,7 @@ import {
   useDeleteDeviceForget,
   getGetDeviceListQueryKey,
 } from '@/shared/api-client/gen/endpoints'
-import styled, { css, keyframes } from 'styled-components'
+import styled, { keyframes } from 'styled-components'
 
 type Device = {
   id?: string

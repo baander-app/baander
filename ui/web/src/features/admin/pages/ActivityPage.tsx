@@ -1,4 +1,4 @@
-import styled, { css } from 'styled-components'
+import styled from 'styled-components'
 import { useState } from 'react'
 import {
   useActivitySummary,
@@ -132,11 +132,6 @@ const TdNum = styled.td`
   padding: 0.375rem 0;
   font-variant-numeric: tabular-nums;
   color: var(--color-muted-foreground);
-`
-
-const Td = styled.td`
-  padding: 0.375rem 0;
-  padding-right: 0.75rem;
 `
 
 const TdBold = styled.td`

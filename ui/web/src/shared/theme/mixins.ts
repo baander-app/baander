@@ -38,6 +38,6 @@ export const ariaInvalidRing = css`
   }
 `;
 
-export const darkMode = (styles: string) => css`
+export const darkMode = (styles: string | ReturnType<typeof css>) => css`
   [data-theme="dark"] & { ${styles} }
 `;

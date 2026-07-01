@@ -137,14 +137,6 @@ const TabContentZone = styled.div`
   flex-direction: column;
 `
 
-const TabContentInner = styled.div`
-  margin-top: 0;
-  min-height: 0;
-  flex: 1;
-  overflow-y: auto;
-  padding: 0.75rem;
-`
-
 const MIN_WIDTH = 240
 const MAX_WIDTH = 600
 const SIDEBAR_WIDTH = 224 // w-56 = 14rem = 224px
@@ -198,7 +190,6 @@ export function ContextPanel() {
   const activeTab = useContextPanelStore((s) => s.activeTab)
   const isOpen = useContextPanelStore((s) => s.isOpen)
   const width = useContextPanelStore((s) => s.width)
-  const toggleMode = useContextPanelStore((s) => s.toggleMode)
   const setActiveTab = useContextPanelStore((s) => s.setActiveTab)
   const setWidth = useContextPanelStore((s) => s.setWidth)
 

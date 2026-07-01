@@ -3,8 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { ListHeader, type SortState } from '../ListHeader'
 import { useListColumnStore } from '../../stores/list-column-store'
 
-import React from 'react'
-
 // Mock @dnd-kit to avoid complex drag setup in jsdom
 vi.mock('@dnd-kit/sortable', () => ({
   SortableContext: ({ children }: any) => children,

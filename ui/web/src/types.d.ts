@@ -1,5 +1,8 @@
 declare module '@fontsource/inter' {}
 declare module '@fontsource/jetbrains-mono' {}
+declare module '@fontsource/kanit' {}
+declare module '@fontsource/noto-sans-jp' {}
+declare module '@fontsource/pretendard' {}
 
 interface BaanderWindow {
   minimize: () => Promise<void>;

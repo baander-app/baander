@@ -80,12 +80,6 @@ const PlaceholderIcon = styled.svg`
 `
 
 // Skeleton styles
-const SkeletonBlock = styled.div`
-  animation: ${pulse} 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  background-color: var(--color-muted);
-  border-radius: var(--radius-md);
-`
-
 const SkeletonSection = styled.div`
   margin-bottom: 0.75rem;
   height: 1rem;

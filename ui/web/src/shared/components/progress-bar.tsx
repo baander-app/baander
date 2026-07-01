@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import type { CSSProperties } from 'react'
 
 interface ProgressBarProps {
   value: number
@@ -6,6 +7,7 @@ interface ProgressBarProps {
   className?: string
   color?: string
   size?: 'sm' | 'md'
+  style?: CSSProperties
 }
 
 const Container = styled.div``
@@ -43,12 +45,13 @@ export function ProgressBar({
   className,
   color = 'var(--color-primary)',
   size = 'sm',
+  style,
 }: ProgressBarProps) {
   const clamped = Math.max(0, Math.min(100, value))
   const height = size === 'sm' ? '0.25rem' : '0.5rem'
 
   return (
-    <Container className={className}>
+    <Container className={className} style={style}>
       {label && (
         <LabelRow>
           <span>{label}</span>
