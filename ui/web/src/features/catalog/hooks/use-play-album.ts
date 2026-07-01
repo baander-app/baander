@@ -36,7 +36,7 @@ export function usePlayAlbum() {
     async (albumPublicId: string, albumTitle: string) => {
       try {
         const response = await getAlbumShow(albumPublicId)
-        const songs = response.data?.data?.songs
+        const songs = response.status === 200 ? response.data.data?.songs : undefined
         if (!songs || songs.length === 0) {
           logger.warn('No songs found for album', albumPublicId)
           return
