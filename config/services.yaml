@@ -448,7 +448,7 @@ services:
         alias: App\Library\Infrastructure\Doctrine\Repository\LibraryFileIndexRepository
 
     App\Library\Application\Port\LibraryContentStatsInterface:
-        alias: App\Catalog\Infrastructure\Doctrine\Query\CatalogStatsQuery
+        alias: App\Library\Infrastructure\Doctrine\Query\CatalogContentStatsAdapter
 
     App\Catalog\Application\Port\MetadataContentReaderPortInterface:
         alias: App\Metadata\Infrastructure\Reader\MetadataContentReader
