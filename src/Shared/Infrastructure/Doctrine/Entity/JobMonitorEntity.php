@@ -29,7 +29,7 @@ class JobMonitorEntity
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $queue = null;
 
-    #[ORM\Column(type: 'text', options: ['default' => 'queued'])]
+    #[ORM\Column(type: 'job_status', options: ['default' => 'queued'])]
     private JobStatus $status = JobStatus::Queued;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
