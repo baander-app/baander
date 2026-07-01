@@ -296,7 +296,8 @@ final class LibraryController
             );
         }
 
-        $rescan = $request->request->getBoolean('rescan', false);
+        // Read from payload so it works for both JSON bodies (axios) and form data.
+        $rescan = $request->getPayload()->getBoolean('rescan', false);
 
         $library->markDiscoveryStarted();
         $this->libraryService->save($library);

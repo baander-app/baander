@@ -22,15 +22,18 @@ framework:
                     multiplier: 2
                     max_delay: 60000
 
+            # Failure transport — separate stream so it does not create a second
+            # consumer group on "messages" (which would block delete_after_ack).
+            # DSN path is parsed as /stream/group: stream=failed_messages, group=failed.
             failed:
-                dsn: '%env(MESSENGER_TRANSPORT_DSN)%/failed'
+                dsn: '%env(REDIS_URL)%/failed_messages/failed'
 
         failure_transport: failed
 
         routing:
             # Library
             'App\Library\Application\Command\ScanLibraryCommand': swoole_task
-            'App\Library\Application\Message\FilesDiscovered': swoole_task
+            'App\Library\Application\Message\FilesDiscovered': async
 
             # Metadata
             'App\Metadata\Application\Command\ExtractAlbumCoverCommand': async
