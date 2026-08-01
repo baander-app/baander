@@ -1,0 +1,23 @@
+[data-theme="warm"] {
+  --color-background: #faf5ee;
+  --color-card: #f5ede0;
+  --color-card-foreground: #3d3225;
+  --color-popover: #f5ede0;
+  --color-popover-foreground: #3d3225;
+  --color-foreground: #3d3225;
+  --color-muted-foreground: #8a7e70;
+  --color-primary: #8b6914;
+  --color-primary-foreground: #faf5ee;
+  --color-ring: #8b6914;
+  --color-secondary: #efe5d5;
+  --color-secondary-foreground: #3d3225;
+  --color-muted: #efe5d5;
+  --color-highlight: #efe5d5;
+  --color-highlight-foreground: #3d3225;
+  --color-destructive: #c53030;
+  --color-destructive-foreground: #faf5ee;
+  --color-sidebar: #f2e8d8;
+  --color-sidebar-foreground: #3d3225;
+  --color-border: #e0d5c5;
+  --color-input: #e0d5c5;
+}

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Baander DASH Transcode E2E</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    video { width: 640px; height: 360px; background: #000; }
+    #log { white-space: pre-wrap; font-family: monospace; background: #f4f4f4; padding: 10px; max-height: 300px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <h1>Baander DASH Transcode E2E</h1>
+  <video id="video" controls muted></video>
+  <div id="status">Loading...</div>
+  <div id="log"></div>
+  <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
+  <script>
+    const video = document.getElementById('video');
+    const status = document.getElementById('status');
+    const logEl = document.getElementById('log');
+    window.errors = [];
+    window.events = [];
+    window.qualitySwitches = [];
+
+    function log(msg) {
+      const line = `[${new Date().toISOString()}] ${msg}`;
+      window.events.push(line);
+      logEl.textContent += line + '\n';
+      console.log(line);
+    }
+
+    const videoId = '019f66d8-d5a4-7f46-b7ad-34560b35bc2b';
+    const src = `/api/transcode/${videoId}/manifest.mpd`;
+
+    const player = dashjs.MediaPlayer().create();
+    window.dashPlayer = player;
+    player.initialize(video, src, true);
+
+    player.on(dashjs.MediaPlayer.events.MANIFEST_LOADED, (e) => {
+      log('Manifest loaded');
+      window.manifestLoaded = true;
+      try {
+        const manifest = player.getDashManifest();
+        let count = 0;
+        const periods = Array.isArray(manifest.Period) ? manifest.Period : [manifest.Period];
+        periods.forEach(period => {
+          const sets = Array.isArray(period.AdaptationSet) ? period.AdaptationSet : [period.AdaptationSet];
+          sets.forEach(as => {
+            if (as.mimeType === 'video/mp4' || as.contentType === 'video') {
+              const reps = Array.isArray(as.Representation) ? as.Representation : [as.Representation];
+              count += reps.length;
+            }
+          });
+        });
+        window.videoRepresentationCount = count;
+        log(`Video representations: ${count}`);
+      } catch (err) {
+        log('Could not count representations: ' + err.message);
+        window.videoRepresentationCount = 0;
+      }
+    });
+
+    player.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED, (e) => {
+      const info = player.getCurrentTrackFor('video');
+      log('Stream initialized');
+      window.streamInitialized = true;
+    });
+
+    // Mark first-segment readiness once the media element has decoded at least
+    // one frame (HAVE_CURRENT_DATA). This gates playback assertions on actual
+    // segment delivery rather than only manifest parse, decoupling the test
+    // from the 2–5s cold-start encoding latency.
+    const markFirstSegmentReady = () => {
+      if (!window.firstSegmentReady && video.readyState >= 2) {
+        window.firstSegmentReady = true;
+        log(`First segment ready (readyState=${video.readyState})`);
+      }
+    };
+    video.addEventListener('loadeddata', markFirstSegmentReady);
+    video.addEventListener('canplay', markFirstSegmentReady);
+    video.addEventListener('progress', markFirstSegmentReady);
+
+    player.on(dashjs.MediaPlayer.events.QUALITY_CHANGE_RENDERED, (e) => {
+      const quality = e.newQuality;
+      log(`Quality changed to ${quality}`);
+      window.qualitySwitches.push(quality);
+    });
+
+    player.on(dashjs.MediaPlayer.events.ERROR, (e) => {
+      const msg = `DASH error: ${e.error}`;
+      window.errors.push(msg);
+      log(msg);
+    });
+
+    video.addEventListener('timeupdate', () => {
+      status.textContent = `Playing at ${video.currentTime.toFixed(2)}s, paused=${video.paused}`;
+    });
+
+    video.addEventListener('error', () => {
+      const msg = `Video element error: ${video.error?.code} ${video.error?.message}`;
+      window.errors.push(msg);
+      log(msg);
+    });
+  </script>
+</body>
+</html>

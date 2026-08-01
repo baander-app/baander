@@ -1,0 +1,8 @@
+[
+  "spectral_features",
+  "dynamics_meter",
+  "fft2048",
+  "loudness_r128",
+  "partitioned_convolver",
+  "resampler_hq"
+]

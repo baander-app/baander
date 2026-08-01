@@ -1,0 +1,6 @@
+errors:
+  image_not_found: "Billede ikke fundet."
+  image_file_not_found: "Billedfil ikke fundet."
+  missing_path: 'Mangler "path"-parameter.'
+  invalid_file_path: "Ugyldig filsti."
+  file_not_found: "Fil ikke fundet."

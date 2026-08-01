@@ -1,0 +1,171 @@
+<?php
+
+declare(strict_types=1);
+
+namespace SwooleBundle\SwooleBundle\Server\RequestHandler;
+
+use Assert\AssertionFailedException;
+use RuntimeException;
+use Swoole\Http\Request;
+use Swoole\Http\Response;
+use SwooleBundle\SwooleBundle\Server\HttpServerConfiguration;
+use SwooleBundle\SwooleBundle\Server\Runtime\Bootable;
+
+/**
+ * Advanced static files server simplifies serving static content directly by swoole server.
+ *
+ * Code mostly ported from `zendframework/zend-expressive-swoole` package.
+ *
+ * @see https://github.com/zendframework/zend-expressive-swoole/blob/8b33edb50732961cce9e980c10a5948636b98e4e/src/RequestHandlerSwooleRunner.php
+ */
+final class AdvancedStaticFilesServer implements RequestHandler, Bootable
+{
+    private const string MIME_TYPE_APPLICATION_OCTET_STREAM = 'application/octet-stream';
+
+    /**
+     * Default static file extensions supported.
+     *
+     * @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Complete_list_of_MIME_types
+     */
+    private const array FILE_EXTENSION_MIME_TYPE_DEFAULT_MAP = [
+        // fallback for other file types
+        '*' => self::MIME_TYPE_APPLICATION_OCTET_STREAM,
+        // default list
+        '7z' => 'application/x-7z-compressed',
+        'aac' => 'audio/aac',
+        'arc' => self::MIME_TYPE_APPLICATION_OCTET_STREAM,
+        'avi' => 'video/x-msvideo',
+        'azw' => 'application/vnd.amazon.ebook',
+        'bin' => self::MIME_TYPE_APPLICATION_OCTET_STREAM,
+        'bmp' => 'image/bmp',
+        'bz' => 'application/x-bzip',
+        'bz2' => 'application/x-bzip2',
+        'css' => 'text/css',
+        'csv' => 'text/csv',
+        'doc' => 'application/msword',
+        'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'eot' => 'application/vnd.ms-fontobject',
+        'epub' => 'application/epub+zip',
+        'es' => 'application/ecmascript',
+        'gif' => 'image/gif',
+        'htm' => 'text/html',
+        'html' => 'text/html',
+        'ico' => 'image/x-icon',
+        'jpeg' => 'image/jpg',
+        'jpg' => 'image/jpg',
+        'js' => 'text/javascript',
+        'json' => 'application/json',
+        'mp4' => 'video/mp4',
+        'mpeg' => 'video/mpeg',
+        'odp' => 'application/vnd.oasis.opendocument.presentation',
+        'ods' => 'application/vnd.oasis.opendocument.spreadsheet',
+        'odt' => 'application/vnd.oasis.opendocument.text',
+        'oga' => 'audio/ogg',
+        'ogv' => 'video/ogg',
+        'ogx' => 'application/ogg',
+        'otf' => 'font/otf',
+        'pdf' => 'application/pdf',
+        'png' => 'image/png',
+        'ppt' => 'application/vnd.ms-powerpoint',
+        'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'rar' => 'application/x-rar-compressed',
+        'rtf' => 'application/rtf',
+        'svg' => 'image/svg+xml',
+        'swf' => 'application/x-shockwave-flash',
+        'tar' => 'application/x-tar',
+        'tif' => 'image/tiff',
+        'tiff' => 'image/tiff',
+        'ts' => 'application/typescript',
+        'ttf' => 'font/ttf',
+        'txt' => 'text/plain',
+        'wav' => 'audio/wav',
+        'weba' => 'audio/webm',
+        'webm' => 'video/webm',
+        'webp' => 'image/webp',
+        'woff' => 'font/woff',
+        'woff2' => 'font/woff2',
+        'xhtml' => 'application/xhtml+xml',
+        'xls' => 'application/vnd.ms-excel',
+        'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'xml' => 'application/xml',
+        'xul' => 'application/vnd.mozilla.xul+xml',
+        'zip' => 'application/zip',
+    ];
+
+    /**
+     * @var array<string,string>
+     */
+    private array $cachedMimeTypes = [];
+
+    private string $publicDir;
+
+    /**
+     * @var array<string, string>
+     */
+    private array $fileExtensionMimeTypeMap;
+
+    /**
+     * @param array<string, string> $customMimeTypes
+     */
+    public function __construct(
+        private readonly RequestHandler $decorated,
+        private readonly HttpServerConfiguration $configuration,
+        array $customMimeTypes = [],
+    ) {
+        $this->fileExtensionMimeTypeMap = array_merge(self::FILE_EXTENSION_MIME_TYPE_DEFAULT_MAP, $customMimeTypes);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @throws AssertionFailedException
+     */
+    public function boot(array $runtimeConfiguration = []): void
+    {
+        if (!$this->configuration->hasPublicDir()) {
+            throw new RuntimeException(
+                'AdvancedStaticFilesHandler requires setting "public_dir", which is unavailable. '
+                . 'Either disable driver or fill "public_dir" setting.'
+            );
+        }
+
+        $this->publicDir = $this->configuration->getPublicDir();
+    }
+
+    public function handle(Request $request, Response $response): void
+    {
+        if ($request->server['request_method'] === 'GET') {
+            $path = $this->publicDir . $request->server['request_uri'];
+            if (isset($this->cachedMimeTypes[$path]) || $this->checkPath($path)) {
+                $response->header('Content-Type', $this->cachedMimeTypes[$path]);
+                $response->sendfile($path);
+
+                return;
+            }
+        }
+
+        $this->decorated->handle($request, $response);
+    }
+
+    private function checkPath(string $path): bool
+    {
+        $extension = pathinfo($path, PATHINFO_EXTENSION);
+
+        // eg. "file.js.map"
+        if ($extension === 'map') {
+            $extension = pathinfo(pathinfo($path, PATHINFO_FILENAME), PATHINFO_EXTENSION);
+        }
+
+        if (!file_exists($path) || is_dir($path)) {
+            return false;
+        }
+
+        if (!isset($this->fileExtensionMimeTypeMap[$extension])) {
+            $extension = '*';
+        }
+
+        $this->cachedMimeTypes[$path] = $this->fileExtensionMimeTypeMap[$extension];
+
+        return true;
+    }
+}

@@ -1,0 +1,33 @@
+user:
+  password_changed:
+    title: "Adgangskode ændret"
+    body: "Din kontoadgangskode blev ændret."
+  passkey_registered:
+    title: "Adgangsnøgle registreret"
+    body: "En ny adgangsnøgle \"{name}\" blev registreret på din konto."
+  passkey_deleted:
+    title: "Adgangsnøgle fjernet"
+    body: "En adgangsnøgle blev fjernet fra din konto."
+  registered:
+    title: "Konto oprettet"
+    body: "Velkommen, {name}! Din konto er blevet oprettet."
+
+token:
+  revoked:
+    title: "Token tilbagekaldt"
+    body: "Et {tokenType}-token blev tilbagekaldt."
+
+device_code:
+  approved:
+    title: "Enhed godkendt"
+    body: "En ny enhed blev godkendt til at få adgang til din konto."
+
+library:
+  scan_completed:
+    title: "Biblioteksscannering fuldført"
+    body: "Scannering fuldført: {filesDiscovered} filer fundet, {filesProcessed} behandlet."
+
+album:
+  created:
+    title: "Nyt album i biblioteket"
+    body: "Et nyt album blev tilføjet til dit bibliotek."

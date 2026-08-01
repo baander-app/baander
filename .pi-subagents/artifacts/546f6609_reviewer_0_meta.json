@@ -1,0 +1,37 @@
+{
+  "runId": "546f6609",
+  "agent": "reviewer",
+  "task": "Review the long-process-segmenter refactor on branch feat/long-process-segmenter.\n\nRepo: /home/martin/dev/baander. You are on branch feat/long-process-segmenter.\n\nSCOPE: Review the 9 refactor commits (exclude the baseline commit e9d68d63 which carries pre-existing uncommitted work). Get them with: git log --oneline master..HEAD -- src/Transcode config/services.yaml src/QoL tests  (the baseline commit touched many unrelated files too; focus on these paths).\n\nThe refactor shifts the on-the-fly video transcoder from N independent per-segment FFmpeg invocations to ONE long-lived FFmpeg process per (job, tier) managed by a new TranscodeStreamManager (\\Swoole\\Process direct, outside the CpuProcessPool which is kept for short jobs + shared with Recommendation/Scheduler).\n\nKey files to review:\n- src/Transcode/Infrastructure/Swoole/TranscodeStreamManager.php (NEW — the core: spawn/poll/stop/pause/resume/restart lifecycle)\n- src/Transcode/Infrastructure/Swoole/TranscodeSessionSubscriber.php (REWRITTEN — dispatchLongStream replaces dispatchSegments; seek=kill+restart+headroom, throttle=SIGSTOP/SIGCONT)\n- src/Transcode/Infrastructure/Swoole/SegmentAvailabilityTable.php (NEW — Swoole Table signaling)\n- src/Transcode/Interface/Controller/StreamSegmentController.php (U5 — table-first fast-path)\n- src/Transcode/Infrastructure/Transcode/TranscodeStreamingService.php (new resolve*Availability methods)\n- SegmentBookingTable DELETED (U6)\n- config/services.yaml wiring changes\n\nWHAT TO LOOK FOR:\n1. Correctness bugs: race conditions in the manager's poll loop, FD/process leaks on error paths, SIGSTOP/SIGCONT safety, the seek clearJob+restart sequence\n2. The dispatchLongStream throttle logic — is lastProducedSegment (via glob) computed correctly vs playback position? Are the high/low watermarks (12/6) sane?\n3. Resource cleanup: does the finally block reliably stop the stream on every exit path? What if startStream throws?\n4. The availability table fast-path in the controller — does the fallback (waitForFilePath) correctly handle table misses/stale rows?\n5. DI wiring correctness (the QualityFilteringStreamingDecorator already needed a followup fix — are there other interface implementors I missed?)\n6. Security: the manager builds FFmpeg args via SegmentEncoder::buildStreamArgs (array form, no shell) — confirm no injection surface\n7. Anything that would break under concurrency (multiple viewers = multiple segment requests against one stream)\n\nAll e2e tests pass (HLS, DASH, concurrent, seek) and 345 unit/integration tests are green. The review is for latent bugs and quality, not whether it works (it does).\n\nOutput: a prioritized findings list (P0/P1/P2/P3). For each: file, line, the issue, and the fix. Do NOT edit files — review only.",
+  "exitCode": 0,
+  "usage": {
+    "input": 76675,
+    "output": 16476,
+    "cacheRead": 757824,
+    "cacheWrite": 0,
+    "cost": 0,
+    "turns": 26
+  },
+  "model": "zai/glm-5.2:high",
+  "attemptedModels": [
+    "zai/glm-5.2:high"
+  ],
+  "modelAttempts": [
+    {
+      "model": "zai/glm-5.2:high",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 76675,
+        "output": 16476,
+        "cacheRead": 757824,
+        "cacheWrite": 0,
+        "cost": 0,
+        "turns": 26
+      }
+    }
+  ],
+  "durationMs": 367496,
+  "toolCount": 37,
+  "transcriptPath": "/home/martin/dev/baander/.pi-subagents/artifacts/546f6609_reviewer_0_transcript.jsonl",
+  "timestamp": 1784236817896
+}

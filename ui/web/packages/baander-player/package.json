@@ -1,0 +1,46 @@
+{
+  "name": "@baander/player",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "yarn@4.14.1",
+  "type": "module",
+  "description": "Zero-dependency immersive video player for Baander — replaces hls.js/dash.js/Shaka",
+  "main": "dist/baander-player.cjs",
+  "module": "dist/baander-player.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/baander-player.js",
+      "require": "./dist/baander-player.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/three": "^0.184.1",
+    "three": "^0.184.0",
+    "typescript": "^5.5.0",
+    "vite": "^6.0.0",
+    "vitest": "^3.0.0"
+  },
+  "peerDependencies": {
+    "three": ">=0.160.0"
+  },
+  "peerDependenciesMeta": {
+    "three": {
+      "optional": true
+    }
+  }
+}

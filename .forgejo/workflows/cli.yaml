@@ -1,0 +1,77 @@
+name: Build CLI
+
+on:
+    push:
+        branches:
+            - master
+        paths:
+            - cli/**
+            - .forgejo/workflows/cli.yaml
+    pull_request:
+        paths:
+            - cli/**
+            - .forgejo/workflows/cli.yaml
+
+env:
+    REGISTRY: ${{ vars.REGISTRY_URL }}
+    PACKAGE: baander-cli
+
+jobs:
+    build:
+        runs-on: docker-cli
+        container:
+            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+        steps:
+            -   name: Checkout
+                run: |
+                    git init -q
+                    git remote add origin ${{ forgejo.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin ${{ forgejo.ref }}
+                    git checkout -q FETCH_HEAD
+
+            -   name: Install Bun
+                run: |
+                    curl -fsSL https://bun.sh/install | bash
+                    echo "$HOME/.bun/bin" >> $GITHUB_PATH
+
+            -   name: Install dependencies
+                run: |
+                    cd cli
+                    ~/.bun/bin/bun install
+
+            -   name: Build binary
+                run: |
+                    cd cli
+                    ~/.bun/bin/bun run build
+                    chmod +x ../bin/baander
+                    file ../bin/baander
+
+            -   name: Verify binary runs
+                run: |
+                    ./bin/baander --version
+                    ./bin/baander --help
+
+            -   name: Publish binary (master only)
+                if: forgejo.ref == 'refs/heads/master'
+                env:
+                    FORGEJO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                run: |
+                    API="$GITHUB_API_URL"
+                    OWNER="${GITHUB_REPOSITORY%%/*}"
+                    SHA="${{ forgejo.sha }}"
+
+                    # Push versioned
+                    HTTP=$(curl -sf -o /dev/null -w '%{http_code}' -X PUT \
+                      "$API/packages/$OWNER/generic/$PACKAGE/$SHA/baander" \
+                      -H "Authorization: token $FORGEJO_TOKEN" \
+                      -H "Content-Type: application/octet-stream" \
+                      --data-binary @bin/baander)
+                    echo "Published $SHA (HTTP $HTTP)"
+
+                    # Push latest
+                    HTTP=$(curl -sf -o /dev/null -w '%{http_code}' -X PUT \
+                      "$API/packages/$OWNER/generic/$PACKAGE/latest/baander" \
+                      -H "Authorization: token $FORGEJO_TOKEN" \
+                      -H "Content-Type: application/octet-stream" \
+                      --data-binary @bin/baander)
+                    echo "Published latest (HTTP $HTTP)"

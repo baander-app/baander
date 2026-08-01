@@ -1,0 +1,197 @@
+{% extends '@WebProfiler/Profiler/layout.html.twig' %}
+
+{% block toolbar %}
+    {% set icon %}
+        <span class="sf-toolbar-status sf-toolbar-status-green">Swoole</span>
+    {% endset %}
+
+    {% set text %}
+        <div class="sf-toolbar-info-piece">
+            <b>Worker</b> #{{ collector.workerId }}
+        </div>
+        <div class="sf-toolbar-info-piece">
+            <b>Coroutine</b> #{{ collector.coroutineId }}
+        </div>
+        <div class="sf-toolbar-info-piece">
+            <b>Connections</b>
+            {% set stats = collector.vmStatus %}
+            {{ stats.connection_num|default(0) }}
+        </div>
+    {% endset %}
+
+    {{ include('@WebProfiler/Profiler/toolbar_item.html.twig', { link: true }) }}
+{% endblock %}
+
+{% block menu %}
+    <span class="label">
+        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg></span>
+        <strong>Swoole</strong>
+    </span>
+{% endblock %}
+
+{% block panel %}
+    <h2>Swoole Worker State</h2>
+
+    <div class="sf-tabs">
+        <div class="tab">
+            <h3 class="tab-title">Process</h3>
+            <div class="tab-content">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Worker ID</td>
+                            <td>{{ collector.workerId }}</td>
+                        </tr>
+                        <tr>
+                            <td>Coroutine ID</td>
+                            <td>{{ collector.coroutineId }}</td>
+                        </tr>
+                        {% for key, value in collector.vmStatus %}
+                            <tr>
+                                <td>{{ key }}</td>
+                                <td>{{ value }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="tab">
+            <h3 class="tab-title">Connection Pools</h3>
+            <div class="tab-content">
+                {% if collector.poolStats is empty %}
+                    <p class="text-muted">No proxied service pools detected.</p>
+                {% else %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Pool</th>
+                                <th>Active</th>
+                                <th>Free</th>
+                                <th>Limit</th>
+                                <th>Utilization</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stat in collector.poolStats %}
+                                {% set utilization = stat.limit > 0 ? (stat.active / stat.limit * 100)|round(1) : 0 %}
+                                {% set color = utilization > 95 ? '#e74c3c' : (utilization > 80 ? '#f39c12' : '#27ae60') %}
+                                <tr>
+                                    <td>#{{ loop.index }}</td>
+                                    <td>{{ stat.active }}</td>
+                                    <td>{{ stat.free }}</td>
+                                    <td>{{ stat.limit }}</td>
+                                    <td>
+                                        <span style="color: {{ color }}; font-weight: bold;">{{ utilization }}%</span>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="tab">
+            <h3 class="tab-title">Server Settings</h3>
+            <div class="tab-content">
+                {% if collector.serverSettings is empty %}
+                    <p class="text-muted">No Swoole server configuration available.</p>
+                {% else %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Setting</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for key, value in collector.serverSettings %}
+                                <tr>
+                                    <td>{{ key }}</td>
+                                    <td>{{ value is same as(true) ? 'true' : (value is same as(false) ? 'false' : value) }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="tab">
+            <h3 class="tab-title">Worker Events</h3>
+            <div class="tab-content">
+                {% if collector.workerEvents is empty %}
+                    <p class="text-muted">No worker events recorded yet.</p>
+                {% else %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Worker ID</th>
+                                <th>Timestamp</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in collector.workerEvents|reverse %}
+                                {% set typeColor = event.type == 'error' ? '#e74c3c' : (event.type == 'stopped' ? '#f39c12' : '#27ae60') %}
+                                <tr>
+                                    <td>
+                                        <span style="color: {{ typeColor }}; font-weight: bold;">{{ event.type }}</span>
+                                    </td>
+                                    <td>#{{ event.workerId }}</td>
+                                    <td>{{ event.timestamp|date('H:i:s.u') }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="tab">
+            <h3 class="tab-title">CPU Process Pool</h3>
+            <div class="tab-content">
+                {% if not collector.cpuPool.available %}
+                    <p class="text-muted">CPU process pool is not configured.</p>
+                {% else %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Status</td>
+                                <td>
+                                    {% if collector.cpuPool.running %}
+                                        <span style="color: #27ae60; font-weight: bold;">Running</span>
+                                    {% else %}
+                                        <span style="color: #e74c3c; font-weight: bold;">Stopped</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Workers</td>
+                                <td>{{ collector.cpuPool.worker_count }}</td>
+                            </tr>
+                            <tr>
+                                <td>Pending Results</td>
+                                <td>{{ collector.cpuPool.result_table_size }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

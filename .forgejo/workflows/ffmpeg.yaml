@@ -1,0 +1,34 @@
+name: Build FFmpeg Image
+
+on:
+    workflow_dispatch:
+
+env:
+    REGISTRY: ${{ vars.REGISTRY_URL }}
+    IMAGE_NAME: ${{ vars.REGISTRY_OWNER }}/ffmpeg-baander-static
+
+jobs:
+    build:
+        runs-on: docker-cli
+        container:
+            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+        steps:
+            -   name: Checkout
+                run: |
+                    git init -q
+                    git remote add origin ${{ forgejo.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin ${{ forgejo.ref }}
+                    git checkout -q FETCH_HEAD
+
+            -   name: Login to Container Registry
+                run: echo "${{ secrets.REGISTRY_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ forgejo.actor }} --password-stdin
+
+            -   name: Build and push FFmpeg image
+                run: |
+                    docker buildx build \
+                      --progress=plain \
+                      --file docker/ffmpeg/Dockerfile \
+                      --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+                      --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ forgejo.sha }} \
+                      --push \
+                      docker/ffmpeg/

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Baander cassette favicon — simplified for 16-32px -->
+  <rect x="56" y="96" width="400" height="320" rx="28" fill="#3b82f6"/>
+  <circle cx="156" cy="240" r="60" fill="#1e40af"/>
+  <circle cx="356" cy="240" r="60" fill="#1e40af"/>
+  <circle cx="156" cy="240" r="18" fill="#0f172a"/>
+  <circle cx="356" cy="240" r="18" fill="#0f172a"/>
+  <rect x="140" y="318" width="232" height="42" rx="8" fill="#1e40af"/>
+</svg>

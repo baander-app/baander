@@ -1,0 +1,3 @@
+pentatrion_vite:
+    build_directory: '.'
+    proxy_origin: 'http://localhost:5174'

@@ -1,0 +1,226 @@
+{
+    "name": "swoole-bundle/swoole-bundle",
+    "type": "library",
+    "description": "Open/Swoole Symfony Bundle",
+    "keywords": [
+        "PHP",
+        "Bundle",
+        "Swoole",
+        "OpenSwoole",
+        "Async",
+        "HTTP",
+        "Server"
+    ],
+    "license": "MIT",
+    "homepage": "https://github.com/symfony-swoole/swoole-bundle",
+    "authors": [
+        {
+            "name": "Martin Fris",
+            "email": "rasta@lj.sk",
+            "homepage": "https://github.com/Rastusik"
+        },
+        {
+            "name": "Konrad Obal",
+            "email": "konrad.obal@gmail.com",
+            "homepage": "https://github.com/k911"
+        }
+    ],
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/Rastusik/swoole-reflection.git"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "ext-json": "*",
+        "beberlei/assert": "^3.3.3",
+        "laminas/laminas-code": "^4.7||^4.8",
+        "monolog/monolog": "^3.6",
+        "symfony/cache": "^7.4|^8.0",
+        "symfony/config": "^7.4|^8.0",
+        "symfony/console": "^7.4|^8.0",
+        "symfony/dependency-injection": "^7.4|^8.0",
+        "symfony/filesystem": "^7.4|^8.0",
+        "symfony/http-foundation": "^7.4|^8.0",
+        "symfony/http-kernel": "^7.4|^8.0",
+        "symfony/process": "^7.4|^8.0",
+        "friendsofphp/proxy-manager-lts": "^1.0.19",
+        "upscale/ext-swoole": "6.2.0",
+        "upscale/swoole-reflection": "dev-reflection-fix as 3.3.0"
+    },
+    "require-dev": {
+        "ext-ffi": "^8.3",
+        "ext-intl": "*",
+        "doctrine/dbal": "^3.7 || ^4.0",
+        "doctrine/doctrine-bundle": "^3.2.2",
+        "doctrine/doctrine-migrations-bundle": "^4.0.0",
+        "doctrine/migrations": "^3.5",
+        "doctrine/orm": "^3.6.3",
+        "doctrine/persistence": "^3.2 || ^4.0",
+        "friendsofphp/php-cs-fixer": "^3.94",
+        "jangregor/phpstan-prophecy": "^2.3",
+        "phpro/grumphp": "^2.19",
+        "phpspec/prophecy": "^1.26",
+        "phpspec/prophecy-phpunit": "^2.5",
+        "phpstan/extension-installer": "^1.4",
+        "phpstan/phpstan": "^2.1",
+        "phpstan/phpstan-beberlei-assert": "^2.0",
+        "phpstan/phpstan-doctrine": "^2.0",
+        "phpstan/phpstan-phpunit": "^2.0",
+        "phpunit/php-code-coverage": "^12.0",
+        "phpunit/phpcov": "^11.0",
+        "phpunit/phpunit": "^12.5",
+        "ramsey/uuid": "^4.7",
+        "rector/rector": "^2.3",
+        "slevomat/coding-standard": "^8.22",
+        "squizlabs/php_codesniffer": "^4.0",
+        "swoole-bundle/z-engine": "8.3.1|8.4.1|8.5.1",
+        "swoole/ide-helper": "^6.0.0",
+        "symfony/debug-bundle": "^7.4|^8.0",
+        "symfony/doctrine-messenger": "^7.4|^8.0",
+        "symfony/error-handler": "^7.4|^8.0",
+        "symfony/flex": "^2.4.7",
+        "symfony/framework-bundle": "^7.4|^8.0",
+        "symfony/messenger": "^7.4|^8.0",
+        "symfony/monolog-bridge": "^7.4|^8.0",
+        "symfony/monolog-bundle": "^3.10 || ^4.0",
+        "symfony/stopwatch": "^7.4|^8.0",
+        "symfony/twig-bridge": "^7.4|^8.0",
+        "symfony/twig-bundle": "^7.4|^8.0",
+        "symfony/var-dumper": "^7.4|^8.0",
+        "symfony/var-exporter": "^7.4|^8.0",
+        "symfony/web-profiler-bundle": "^7.4|^8.0",
+        "symfony/yaml": "^7.4|^8.0",
+        "twig/twig": "^3.24"
+    },
+    "suggest": {
+        "ext-inotify": "To enable HMR",
+        "doctrine/orm": "For using Entity Manager Handler",
+        "symfony/messenger": "For using Symfony Messenger Swoole Task Transport.",
+        "symfony/error-handler": "To use Symfony Error Handler",
+        "swoole-bundle/z-engine": "To be able to use coroutines."
+    },
+    "conflict": {
+        "amphp/amp": "<3.1.1",
+        "amphp/cache": "<2.0.1",
+        "amphp/dns": "<2.4.0",
+        "amphp/parallel": "<2.3.3",
+        "amphp/process": "<2.0.3",
+        "amphp/socket": "<2.3.1",
+        "doctrine/persistence": "<3.4.3",
+        "laravel/serializable-closure": "<2.0.9",
+        "revolt/event-loop": "<1.0.8",
+        "symfony/cache": "<6.4.33",
+        "symfony/cache-contracts": "<3.5.1",
+        "symfony/clock": "<6.4.30",
+        "symfony/config": "<6.4.32",
+        "symfony/console": "<6.4.24",
+        "symfony/dependency-injection": "<6.4.32",
+        "symfony/doctrine-bridge": "<6.4.32",
+        "symfony/dotenv": "<6.4.30",
+        "symfony/error-handler": "<6.4.32",
+        "symfony/event-dispatcher": "<6.4.24",
+        "symfony/event-dispatcher-contracts": "<3.5.1",
+        "symfony/expression-language": "<6.4.32",
+        "symfony/filesystem": "<6.4.24",
+        "symfony/framework-bundle": "<6.4.33",
+        "symfony/http-foundation": "<6.4.33",
+        "symfony/http-kernel": "<6.4.33",
+        "symfony/messenger": "<6.4.32",
+        "symfony/monolog-bridge": "<6.4.32",
+        "symfony/process": "<6.4.33",
+        "symfony/polyfill-php83": "<1.31.0",
+        "symfony/routing": "<6.4.32",
+        "symfony/stopwatch": "<6.4.24",
+        "symfony/string": "<6.4.30",
+        "symfony/translation-contracts": "<3.5.1",
+        "symfony/twig-bridge": "<6.4.32",
+        "symfony/twig-bundle": "<6.4.32",
+        "symfony/var-dumper": "<6.4.32",
+        "symfony/var-exporter": "<6.4.26",
+        "symfony/yaml": "<6.4.30"
+    },
+    "autoload": {
+        "files": [
+            "src/functions_include.php"
+        ],
+        "psr-4": {
+            "SwooleBundle\\SwooleBundle\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "SwooleBundle\\SwooleBundle\\Tests\\": "tests"
+        }
+    },
+    "scripts": {
+        "console": [
+            "php tests/Fixtures/Symfony/app/console --ansi"
+        ],
+        "static-analyse-src": [
+            "phpstan analyze -c phpstan.neon --ansi --memory-limit=512M"
+        ],
+        "static-analyse-tests": [
+            "phpstan analyze -c phpstan.tests.neon --ansi --memory-limit=512M"
+        ],
+        "cs-analyse": [
+            "php-cs-fixer fix -v --dry-run --diff --stop-on-violation --ansi"
+        ],
+        "cs-fix": [
+            "php-cs-fixer fix -v --diff --ansi"
+        ],
+        "analyse": [
+            "@static-analyse-src",
+            "@static-analyse-tests",
+            "@cs-analyse"
+        ],
+        "test": [
+            "@analyse",
+            "@unit-tests"
+        ],
+        "feature-tests": [
+            "phpunit tests/Feature --process-isolation --colors=always"
+        ],
+        "feature-tests-junit": [
+            "phpunit tests/Feature --process-isolation --colors=always --log-junit phpunit/junit.xml"
+        ],
+        "unit-code-coverage": [
+            "phpunit tests/Unit --coverage-php cov/unit-tests-${SWOOLE:-unknown}.cov --colors=always"
+        ],
+        "feature-code-coverage": [
+            "COVERAGE=1 phpunit tests/Feature --coverage-php cov/feature-tests-${SWOOLE:-unknown}.cov --colors=always --process-isolation"
+        ],
+        "merge-code-coverage": [
+            "php -dmemory_limit=512M ./vendor/bin/phpcov merge cov --clover=clover.xml"
+        ],
+        "unit-tests": [
+            "phpunit tests/Unit --colors=always"
+        ],
+        "unit-tests-junit": [
+            "phpunit tests/Unit --colors=always --log-junit phpunit/junit.xml"
+        ],
+        "grumphp_complete": "grumphp run --testsuite=complete",
+        "grumphp_tests": "grumphp run --testsuite=tests",
+        "phpcs": "phpcs --standard=phpcs.xml --extensions=php --tab-width=4 -sp src tests",
+        "phpcbf": "phpcbf --standard=phpcs.xml --extensions=php --tab-width=4 -sp src tests"
+    },
+    "extra": {
+        "symfony": {
+            "require": "7.4.*"
+        }
+    },
+    "config": {
+        "process-timeout": 1200,
+        "sort-packages": true,
+        "platform": {
+            "ext-swoole": "6.2.0"
+        },
+        "allow-plugins": {
+            "phpstan/extension-installer": true,
+            "phpro/grumphp": false,
+            "symfony/flex": true,
+            "dealerdirect/phpcodesniffer-composer-installer": false
+        }
+    }
+}

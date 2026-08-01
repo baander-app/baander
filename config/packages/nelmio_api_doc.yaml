@@ -1,0 +1,37 @@
+nelmio_api_doc:
+    use_validation_groups: true
+    documentation:
+        info:
+            title: Bånder API
+            description: Self-hosted media server API
+            version: 2.0.0
+        components:
+            securitySchemes:
+                bearerAuth:
+                    type: http
+                    scheme: bearer
+                    bearerFormat: JWT
+                    description: 'OAuth 2.0 access token (JWT). Obtain via `/api/auth/refresh` or the OAuth 2.0 authorize flow.'
+                oauth2AuthCode:
+                    type: oauth2
+                    description: 'OAuth 2.0 Authorization Code flow'
+                    flows:
+                        authorizationCode:
+                            authorizationUrl: /api/oauth/authorize
+                            tokenUrl: /api/oauth/token
+                            scopes: {}
+            parameters:
+                Accept-Language:
+                    name: Accept-Language
+                    in: header
+                    description: 'Locale for response messages. Supported: `en` (default), `da`.'
+                    required: false
+                    schema:
+                        type: string
+                        default: en
+                        enum: [en, da]
+        security:
+            - bearerAuth: []
+    areas:
+        path_patterns:
+            - ^/api(?!/doc$)

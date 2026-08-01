@@ -1,0 +1,125 @@
+monolog:
+    channels:
+        - deprecation
+        - security
+        - messenger
+        - activity
+        - auth
+        - catalog
+        - command
+        - discovery
+        - favorites
+        - filesystem
+        - library
+        - lyrics
+        - media
+        - metadata
+        - notification
+        - party
+        - playlist
+        - radio
+        - recommendation
+        - session
+        - transcode
+        - user_preferences
+        - qol
+
+when@dev:
+    monolog:
+        handlers:
+            file:
+                type: stream
+                path: "%kernel.logs_dir%/%kernel.environment%.log"
+                level: debug
+                channels: [ '!events' ]
+                formatter: monolog.formatter.line
+            error:
+                type: stream
+                path: "%kernel.logs_dir%/error.log"
+                level: warning
+                channels: [ '!events' ]
+                formatter: monolog.formatter.line
+            stdout:
+                type: stream
+                path: php://stdout
+                level: warning
+                channels: [ '!events' ]
+                formatter: monolog.formatter.line
+            console:
+                type: console
+                process_psr_3_messages: false
+                channels: [ '!events', '!deprecation' ]
+                formatter: monolog.formatter.line
+            deprecation:
+                type: stream
+                channels: [ deprecation ]
+                path: "%kernel.logs_dir%/deprecation.log"
+                formatter: monolog.formatter.line
+            security:
+                type: stream
+                path: php://stdout
+                level: warning
+                channels: [ security ]
+                formatter: monolog.formatter.line
+            messenger:
+                type: stream
+                path: php://stdout
+                level: info
+                channels: [ messenger ]
+                formatter: monolog.formatter.line
+
+
+when@test:
+    monolog:
+        handlers:
+            deprecation:
+                type: null
+                channels: [ deprecation ]
+            file:
+                type: null
+                level: debug
+                channels: [ '!events' ]
+
+when@prod:
+    monolog:
+        handlers:
+            file:
+                type: stream
+                path: "%kernel.logs_dir%/%kernel.environment%.log"
+                level: debug
+                channels: [ '!events' ]
+                formatter: monolog.formatter.json
+            error:
+                type: stream
+                path: "%kernel.logs_dir%/error.log"
+                level: warning
+                channels: [ '!events' ]
+                formatter: monolog.formatter.json
+            stdout:
+                type: stream
+                path: php://stdout
+                level: warning
+                channels: [ '!events' ]
+                formatter: monolog.formatter.json
+            console:
+                type: console
+                process_psr_3_messages: false
+                channels: [ '!events', '!deprecation' ]
+                formatter: monolog.formatter.json
+            deprecation:
+                type: stream
+                channels: [ deprecation ]
+                path: "%kernel.logs_dir%/deprecation.log"
+                formatter: monolog.formatter.json
+            security:
+                type: stream
+                path: php://stdout
+                level: warning
+                channels: [ security ]
+                formatter: monolog.formatter.json
+            messenger:
+                type: stream
+                path: php://stdout
+                level: info
+                channels: [ messenger ]
+                formatter: monolog.formatter.json

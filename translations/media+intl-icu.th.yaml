@@ -1,0 +1,9 @@
+errors:
+  image_not_found: ไม่พบรูปภาพ
+  image_file_not_found: ไม่พบไฟล์รูปภาพ
+  missing_path: ไม่พบพารามิเตอร์ "path"
+  invalid_file_path: พาธไฟล์ไม่ถูกต้อง
+  file_not_found: ไม่พบไฟล์
+  missing_track_id: ไม่พบพารามิเตอร์ "id"
+  invalid_track_id_format: รูปแบบรหัสแทร็กไม่ถูกต้อง
+  track_not_found: ไม่พบแทร็ก

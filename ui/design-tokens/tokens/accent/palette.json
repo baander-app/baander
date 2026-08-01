@@ -1,0 +1,12 @@
+{
+  "accent": {
+    "white":   { "value": "#e4e4e7", "type": "color" },
+    "blue":    { "value": "#60a5fa", "type": "color" },
+    "violet":  { "value": "#a78bfa", "type": "color" },
+    "rose":    { "value": "#fb7185", "type": "color" },
+    "amber":   { "value": "#fbbf24", "type": "color" },
+    "emerald": { "value": "#34d399", "type": "color" },
+    "cyan":    { "value": "#22d3ee", "type": "color" },
+    "pink":    { "value": "#f0abfc", "type": "color" }
+  }
+}

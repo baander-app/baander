@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node", "electron"],
+    "lib": ["dom", "es2023"],
+    "noEmit": true
+  },
+  "include": [
+    "src/preload/**/*.ts",
+    "src/preload/**/*.d.ts",
+    "src/preload/types/**/*.d.ts",
+    "typings/**/*.d.ts",
+    "src/shared/**/*.ts"
+  ],
+  "exclude": [
+    "dist",
+    "release"
+  ]
+}

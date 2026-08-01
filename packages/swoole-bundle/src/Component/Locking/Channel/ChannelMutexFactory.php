@@ -1,0 +1,20 @@
+<?php
+
+declare(strict_types=1);
+
+namespace SwooleBundle\SwooleBundle\Component\Locking\Channel;
+
+use SwooleBundle\SwooleBundle\Component\Locking\MutexFactory;
+
+final class ChannelMutexFactory implements MutexFactory
+{
+    public function __construct(
+        private readonly ?ChannelPool $channelPool = null,
+        private readonly float $acquireTimeout = 30,
+    ) {}
+
+    public function newMutex(): ChannelMutex
+    {
+        return new ChannelMutex($this->channelPool, $this->acquireTimeout);
+    }
+}

@@ -1,0 +1,38 @@
+# Node / Yarn
+node_modules/
+*.log
+.npm/
+
+# macOS
+.DS_Store
+
+# Android / Gradle (build artifacts + machine-local SDK path)
+android/.gradle/
+android/cxx/
+android/.cxx/
+android/**/build/
+android/app/.cxx/
+android/local.properties
+android/.idea/
+*.iml
+# Release signing keys are never committed; the debug keystore is safe to share
+*.keystore
+!debug.keystore
+
+# iOS / Xcode
+ios/Pods/
+ios/build/
+ios/**/build/
+DerivedData/
+*.xcuserstate
+*.xcuserstate?
+xcuserdata/
+*.hmap
+*.ipa
+*.dSYM
+*.dSYM.zip
+
+# Metro / Expo / bundler local caches
+.expo/
+.webpack/
+.bundle/

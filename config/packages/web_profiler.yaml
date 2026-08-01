@@ -1,0 +1,18 @@
+when@dev:
+    web_profiler:
+        toolbar: false
+        intercept_redirects: false
+        excluded_ajax_paths: '^/(_wdt|_profiler)'
+
+    framework:
+        profiler:
+            enabled: false
+            collect: true
+            collect_serializer_data: true
+            only_exceptions: false
+            only_main_requests: false
+
+when@test:
+    framework:
+        profiler:
+            collect: false

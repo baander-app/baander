@@ -1,0 +1,44 @@
+name: Build Runner Image
+
+on:
+    push:
+        branches:
+            - master
+        paths:
+            - 'docker/runner/**'
+            - '.forgejo/workflows/runner.yaml'
+    workflow_dispatch:
+
+env:
+    REGISTRY: ${{ vars.REGISTRY_URL }}
+    IMAGE_NAME: ${{ vars.REGISTRY_OWNER }}/baander-runner
+
+permissions:
+    packages: write
+
+jobs:
+    build:
+        runs-on: docker-cli
+        container:
+            image: docker:cli
+        steps:
+            -   name: Checkout
+                run: |
+                    git init -q
+                    git remote add origin ${{ forgejo.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin ${{ forgejo.ref }}
+                    git checkout -q FETCH_HEAD
+
+            -   name: Login to Container Registry
+                run: echo "${{ secrets.REGISTRY_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ forgejo.actor }} --password-stdin
+
+            -   name: Build runner image
+                run: |
+                    docker build \
+                      --file docker/runner/Dockerfile \
+                      -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+                      -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ forgejo.sha }} \
+                      docker/runner
+
+            -   name: Push runner image
+                run: docker push --all-tags ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}

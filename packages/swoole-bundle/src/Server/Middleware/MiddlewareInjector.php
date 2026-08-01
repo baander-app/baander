@@ -1,0 +1,61 @@
+<?php
+
+declare(strict_types=1);
+
+namespace SwooleBundle\SwooleBundle\Server\Middleware;
+
+use Assert\Assertion;
+use ReflectionException;
+use ReflectionProperty;
+use Swoole\Server;
+use Swoole\Server\Port;
+use UnexpectedValueException;
+
+final class MiddlewareInjector
+{
+    public function injectMiddleware(Server $server, MiddlewareFactory $factory, string $eventName = 'request'): void
+    {
+        $middleware = $this->getCallback($server, $eventName)
+            ?: $this->getCallback($this->getPrimaryPort($server), $eventName);
+
+        if (!is_callable($middleware)) {
+            throw new UnexpectedValueException('Server middleware has not been detected.');
+        }
+
+        $server->on($eventName, $factory->createMiddleware($middleware));
+    }
+
+    /**
+     * Retrieve a callback subscribed to a given event.
+     */
+    private function getCallback(Port|Server $observer, string $eventName): ?callable
+    {
+        try {
+            $propertyName = 'on' . ucfirst($eventName);
+            $property = new ReflectionProperty($observer, $propertyName);
+
+            $toReturn = $property->getValue($observer);
+            Assertion::isCallable($toReturn);
+
+            return $toReturn;
+        } catch (ReflectionException) {
+            return null;
+        }
+    }
+
+    /**
+     * Retrieve the primary port listened by the server.
+     *
+     * @throws UnexpectedValueException
+     */
+    public function getPrimaryPort(Server $server): Port
+    {
+        foreach ((array)$server->ports as $port) {
+            if ($port->host === $server->host && $port->port === $server->port) {
+                return $port;
+            }
+        }
+
+        throw new UnexpectedValueException('Primary server port was not found.');
+    }
+}

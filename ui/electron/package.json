@@ -1,0 +1,53 @@
+{
+  "name": "@baander/desktop",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "yarn@4.14.1",
+  "description": "Baander Desktop — a fast, privacy-respecting music player for your self-hosted Baander server.",
+  "author": "Martin Christiansen <code@juul.xyz>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/baander-app/baander.git"
+  },
+  "homepage": "https://github.com/baander-app/",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "tsc": "tsc --noEmit --skipLibCheck -p tsconfig.all.json",
+    "clean": "rimraf dist",
+    "dev": "yarn clean && vite --config config/vite.config.mts",
+    "build": "yarn clean && yarn tsc && vite build --config config/vite.config.mts",
+    "dist": "yarn build && electron-builder",
+    "dist:win": "yarn build && electron-builder --win",
+    "dist:linux": "yarn build && electron-builder --linux",
+    "dist:mac": "yarn build && electron-builder --mac",
+    "dist:all": "yarn build && electron-builder -w -l -m",
+    "electron-rebuild": "electron-rebuild -f -w @napi-rs/keyring",
+    "build:wasm": "tsx scripts/build-wasm.ts"
+  },
+  "dependencies": {
+    "@napi-rs/keyring": "^1.3.0"
+  },
+  "devDependencies": {
+    "@electron/fuses": "^2.1.1",
+    "@electron/rebuild": "^4.0.4",
+    "@types/node": "^25.2.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "electron": "^42.0.1",
+    "electron-builder": "^26.8.1",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "rimraf": "^6.1.3",
+    "sass-embedded": "^1.97.3",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3",
+    "unplugin-info": "^1.3.2",
+    "vite": "^8.0.12",
+    "vite-plugin-electron": "^0.29.1",
+    "vite-plugin-electron-renderer": "^0.14.7",
+    "vite-plugin-react-rich-svg": "^1.3.0"
+  }
+}

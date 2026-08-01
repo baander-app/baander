@@ -1,0 +1,11 @@
+# Build artifacts
+build/
+
+# Object files (from accidental in-tree builds)
+*.o
+*.a
+*.so
+
+# IDE / tool config
+.clang-format
+.idea/

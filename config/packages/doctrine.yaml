@@ -1,0 +1,69 @@
+doctrine:
+    dbal:
+        url: '%env(DATABASE_URL)%'
+        schema_filter: '/^(?!domain_event_outbox).*$/'
+        schema_manager_factory: App\Shared\Infrastructure\Doctrine\Platform\BaanderSchemaManagerFactory
+        types:
+            citext: App\Shared\Infrastructure\Doctrine\Type\CitextType
+            job_status: App\Shared\Infrastructure\Doctrine\Type\JobStatusType
+            public_id: App\Shared\Infrastructure\Doctrine\Type\PublicIdType
+            uuid: App\Shared\Infrastructure\Doctrine\Type\UuidType
+        mapping_types:
+            timestamptz: datetime_immutable
+            cidr: string
+            macaddr: string
+            macaddr8: string
+            bit: string
+            varbit: string
+            xml: text
+            point: string
+            line: string
+            lseg: string
+            box: string
+            path: string
+            polygon: string
+            circle: string
+
+        # Important: disable for production, enable for dev
+        profiling_collect_backtrace: '%kernel.debug%'
+    orm:
+        naming_strategy: doctrine.orm.naming_strategy.underscore_number_aware
+        auto_mapping: true
+        mappings:
+            App:
+                is_bundle: false
+                type: attribute
+                dir: '%kernel.project_dir%/src'
+                prefix: 'App\'
+                alias: App
+        dql:
+            string_functions:
+                pgroonga_match: App\Shared\Infrastructure\Doctrine\DQL\PgroongaMatch
+                trigram_similarity: App\Shared\Infrastructure\Doctrine\DQL\TrigramSimilarity
+
+when@dev:
+    doctrine:
+        dbal:
+            logging: true
+            profiling_collect_backtrace: true
+
+when@test:
+    doctrine:
+        dbal:
+            # "TEST" suffix ensures a separate database for tests
+            url: '%env(resolve:DATABASE_URL)%'
+            # Uncomment to use a separate test database
+            #dbname_suffix: '_test'
+
+when@prod:
+    doctrine:
+        orm:
+            metadata_cache_driver:
+                type: pool
+                pool: doctrine.system_cache_pool
+            query_cache_driver:
+                type: pool
+                pool: doctrine.system_cache_pool
+            result_cache_driver:
+                type: pool
+                pool: doctrine.result_cache_pool

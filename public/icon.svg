@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Baander cassette icon — medium detail, 64-128px -->
+  <style>
+    .body { fill: #3b82f6 }
+    .panel { fill: #2d6ae0 }
+    .reel { fill: #1e40af }
+    .hub { fill: #0f172a }
+    .spoke { fill: #0f172a }
+    .window { fill: #1e40af }
+    .tape { fill: #93c5fd; opacity: .6 }
+    @media (prefers-color-scheme: dark) {
+      .body { fill: #f8fafc }
+      .panel { fill: #e2e8f0 }
+      .reel { fill: #cbd5e1 }
+      .hub { fill: #0f172a }
+      .spoke { fill: #0f172a }
+      .window { fill: #cbd5e1 }
+      .tape { fill: #3b82f6; opacity: .7 }
+    }
+  </style>
+
+  <!-- Body -->
+  <rect class="body" x="56" y="96" width="400" height="320" rx="28"/>
+
+  <!-- Inner panel -->
+  <rect class="panel" x="72" y="136" width="368" height="248" rx="16"/>
+
+  <!-- Left reel -->
+  <circle class="reel" cx="156" cy="240" r="62"/>
+  <circle class="hub" cx="156" cy="240" r="20"/>
+  <circle class="spoke" cx="156" cy="200" r="7"/>
+  <circle class="spoke" cx="189" cy="260" r="7"/>
+  <circle class="spoke" cx="123" cy="260" r="7"/>
+
+  <!-- Right reel -->
+  <circle class="reel" cx="356" cy="240" r="62"/>
+  <circle class="hub" cx="356" cy="240" r="20"/>
+  <circle class="spoke" cx="356" cy="200" r="7"/>
+  <circle class="spoke" cx="389" cy="260" r="7"/>
+  <circle class="spoke" cx="323" cy="260" r="7"/>
+
+  <!-- Tape window -->
+  <rect class="window" x="140" y="318" width="232" height="44" rx="8"/>
+
+  <!-- Tape -->
+  <rect class="tape" x="166" y="336" width="180" height="4" rx="2"/>
+</svg>

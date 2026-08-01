@@ -1,0 +1,9 @@
+errors:
+  image_not_found: "Image not found."
+  image_file_not_found: "Image file not found."
+  missing_path: 'Missing "path" parameter.'
+  invalid_file_path: "Invalid file path."
+  file_not_found: "File not found."
+  missing_track_id: 'Missing "id" parameter.'
+  invalid_track_id_format: "Invalid track ID format."
+  track_not_found: "Track not found."

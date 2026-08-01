@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
+
+parameters:
+    relay.db_path: '%kernel.project_dir%/data/relay.db'
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    # Register all classes in src/ as services
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/Kernel.php'
+
+    # Explicit wiring for repository (needs db path parameter)
+    App\Repository\ServerRegistryRepository:
+        arguments:
+            $dbPath: '%relay.db_path%'

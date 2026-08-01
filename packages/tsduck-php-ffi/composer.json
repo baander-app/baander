@@ -1,0 +1,32 @@
+{
+    "name": "tsduck/php",
+    "description": "PHP FFI bindings for TSDuck - The MPEG Transport Stream Toolkit",
+    "type": "library",
+    "keywords": ["tsduck", "mpeg", "transport-stream", "dvb", "atsc", "isdb", "ffi"],
+    "license": "BSD-2-Clause",
+    "require": {
+        "php": ">=8.0",
+        "ext-ffi": "*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.5 || ^10.0 || ^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Tsduck\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tsduck\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit"
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

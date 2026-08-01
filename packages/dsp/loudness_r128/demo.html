@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>loudness_r128.wasm demo</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+        :root { color-scheme: dark; }
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 20px; background: #111; color: #eee; }
+        .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        button { padding: 8px 12px; border-radius: 6px; border: 0; background: #2563eb; color: white; cursor: pointer; }
+        button:disabled { opacity: .6; cursor: default; }
+        pre { background: #000; padding: 12px; border-radius: 8px; margin-top: 12px; }
+        .hint { opacity: .7; font-size: 12px; }
+        audio { width: 100%; margin-top: 8px; }
+    </style>
+</head>
+<body>
+<div class="row">
+    <button id="play">Play pleasant glide & analyze</button>
+    <button id="stop" disabled>Stop</button>
+    <span class="hint">Build: make build — Serve: make serve-demo</span>
+</div>
+
+<audio id="player" controls></audio>
+
+<pre id="out">Waiting…</pre>
+
+<script type="module">
+  import { loadLoudness } from './loudness_r128.js';
+
+  // Utility: build a small, pleasant mono WAV (sine glide 220 Hz -> 440 Hz)
+  function makeGlideWavDataURI({
+                                 sr = 48000,
+                                 durationSec = 4.0,
+                                 f0 = 220,
+                                 f1 = 440,
+                                 gain = 0.18,
+                               } = {}) {
+    const n = Math.floor(sr * durationSec);
+    const fade = Math.min(0.1 * durationSec, 0.3); // seconds of fade in/out
+    const fadeN = Math.floor(fade * sr);
+    const data = new Int16Array(n);
+
+    // Linear frequency glide; apply gentle envelope
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      const f = f0 + (f1 - f0) * (t / durationSec);
+      const x = Math.sin(2 * Math.PI * f * t);
+      let g = gain;
+      if (i < fadeN) g *= i / fadeN;
+      if (i > n - fadeN) g *= (n - i) / fadeN;
+      const s = Math.max(-1, Math.min(1, x * g));
+      data[i] = (s * 32767) | 0;
+    }
+
+    // Build minimal PCM16 WAV (mono)
+    const bytesPerSample = 2;
+    const numChannels = 1;
+    const byteRate = sr * numChannels * bytesPerSample;
+    const blockAlign = numChannels * bytesPerSample;
+    const dataSize = data.length * bytesPerSample;
+    const buffer = new ArrayBuffer(44 + dataSize);
+    const dv = new DataView(buffer);
+
+    const writeStr = (off, str) => { for (let i = 0; i < str.length; i++) dv.setUint8(off + i, str.charCodeAt(i)); };
+
+    // RIFF header
+    writeStr(0, 'RIFF');
+    dv.setUint32(4, 36 + dataSize, true);
+    writeStr(8, 'WAVE');
+
+    // fmt chunk
+    writeStr(12, 'fmt ');
+    dv.setUint32(16, 16, true);        // PCM chunk size
+    dv.setUint16(20, 1, true);         // PCM format
+    dv.setUint16(22, numChannels, true);
+    dv.setUint32(24, sr, true);
+    dv.setUint32(28, byteRate, true);
+    dv.setUint16(32, blockAlign, true);
+    dv.setUint16(34, 16, true);        // bits per sample
+
+    // data chunk
+    writeStr(36, 'data');
+    dv.setUint32(40, dataSize, true);
+
+    // samples
+    let off = 44;
+    for (let i = 0; i < data.length; i++, off += 2) {
+      dv.setInt16(off, data[i], true);
+    }
+
+    // Base64 encode
+    let bin = '';
+    const bytes = new Uint8Array(buffer);
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    const b64 = btoa(bin);
+    return 'data:audio/wav;base64,' + b64;
+  }
+
+  // Prepare a pleasant sample
+  const AUDIO_URL = makeGlideWavDataURI({ sr: 48000, durationSec: 6, f0: 196, f1: 392, gain: 0.16 });
+
+  // UI
+  const out = document.getElementById('out');
+  const btnPlay = document.getElementById('play');
+  const btnStop = document.getElementById('stop');
+  const audioEl = document.getElementById('player');
+
+  // Load WASM loudness module
+  const api = await loadLoudness();
+  console.log(api);
+  const sr = 48000;
+  api.init(sr, 4); // true-peak oversample x4
+
+  // Worklet to capture frames and send interleaved Float32 to main
+  const workletCode = `
+        class CaptureNode extends AudioWorkletProcessor {
+          process(inputs, outputs) {
+            const input = inputs[0];
+            const output = outputs[0];
+            if (!input || input.length === 0) return true;
+
+            const L = input[0] || [];
+            const R = input[1] || L;
+            const frames = L.length;
+
+            // Interleave into transferable buffer
+            const ab = new ArrayBuffer(frames * 2 * 4);
+            const f32 = new Float32Array(ab);
+            for (let i = 0; i < frames; i++) {
+              f32[i*2]   = L[i] || 0;
+              f32[i*2+1] = R[i] || L[i] || 0;
+            }
+            this.port.postMessage(ab, [ab]);
+
+            // pass-through audio
+            for (let ch = 0; ch < output.length; ch++) {
+              if (input[ch]) output[ch].set(input[ch]);
+            }
+            return true;
+          }
+        }
+        registerProcessor('capture-node', CaptureNode);
+      `;
+  const blob = new Blob([workletCode], { type: 'text/javascript' });
+  const workletURL = URL.createObjectURL(blob);
+
+  const ac = new (window.AudioContext || window.webkitAudioContext)();
+  await ac.audioWorklet.addModule(workletURL);
+
+  let srcNode = null;
+  let capNode = null;
+
+  function updateUI() {
+    const m = api.lufsM().toFixed(2);
+    const s = api.lufsS().toFixed(2);
+    const i = api.lufsI().toFixed(2);
+    const lra = api.lra().toFixed(2);
+    const tp  = api.truePkDbfs().toFixed(2);
+    out.textContent =
+      `LUFS (Momentary 400ms): ${m}\n` +
+      `LUFS (Short-term 3s):  ${s}\n` +
+      `LUFS (Integrated):     ${i}\n` +
+      `LRA:                    ${lra}\n` +
+      `True Peak:              ${tp} dBFS`;
+  }
+
+  // Allocate a small scratch region in WASM memory
+  const heapF32 = new Float32Array(api.memory.buffer);
+  const scratchPtr = 1 << 20; // 1 MB offset is fine for demo
+  const frames = 128;
+  const channels = 2;
+
+  function onWorkletMessage(e) {
+    const ab = e.data;
+    if (!ab) return;
+    const f32 = new Float32Array(ab);
+    // Copy to WASM and process
+    heapF32.set(f32, scratchPtr >> 2);
+    api.process(scratchPtr, frames, channels);
+    updateUI();
+  }
+
+  // Wire up buttons
+  btnPlay.onclick = async () => {
+    try {
+      if (ac.state === 'suspended') await ac.resume();
+
+      // Load base64 sample into <audio>
+      audioEl.src = AUDIO_URL;
+      await audioEl.play().catch(() => {}); // let graph drive playback
+
+      // Stop previous nodes if any
+      if (srcNode) { try { srcNode.stop(); } catch {} try { srcNode.disconnect(); } catch {} }
+      if (capNode) { try { capNode.port.onmessage = null; capNode.disconnect(); } catch {} }
+
+      // Build graph: <audio> -> MediaElementSource -> capture worklet -> destination
+      srcNode = ac.createMediaElementSource(audioEl);
+      capNode = new AudioWorkletNode(ac, 'capture-node', { numberOfInputs: 1, numberOfOutputs: 1, channelCount: 2 });
+      capNode.port.onmessage = onWorkletMessage;
+
+      srcNode.connect(capNode).connect(ac.destination);
+
+      btnPlay.disabled = true;
+      btnStop.disabled = false;
+    } catch (e) {
+      console.error('Failed to start:', e);
+    }
+  };
+
+  btnStop.onclick = () => {
+    try {
+      if (audioEl) { audioEl.pause(); audioEl.currentTime = 0; }
+      if (srcNode) { try { srcNode.disconnect(); } catch {} srcNode = null; }
+      if (capNode) { try { capNode.port.onmessage = null; capNode.disconnect(); } catch {} capNode = null; }
+
+      btnPlay.disabled = false;
+      btnStop.disabled = true;
+    } catch {}
+  };
+
+  // Initialize UI values
+  updateUI();
+</script>
+</body>
+</html>

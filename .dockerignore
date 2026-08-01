@@ -1,0 +1,11 @@
+.github
+.claude
+.git
+config/secrets/
+auth.json
+docs
+node_modules
+vendor
+storage/muzak
+storage/logs/*.{log,json}
+qodana.yaml

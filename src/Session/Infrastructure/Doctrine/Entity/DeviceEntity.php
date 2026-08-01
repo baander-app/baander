@@ -1,0 +1,56 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Session\Infrastructure\Doctrine\Entity;
+
+use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Shared\Domain\Model\Uuid;
+use Doctrine\ORM\Mapping as ORM;
+
+#[ORM\Entity]
+#[ORM\Table(name: 'devices')]
+#[ORM\UniqueConstraint(name: 'devices_user_id_device_id_key', columns: ['user_id', 'device_id'])]
+class DeviceEntity
+{
+    #[ORM\Id]
+    #[ORM\Column(type: 'uuid')]
+    #[ORM\GeneratedValue(strategy: 'NONE')]
+    private Uuid $id;
+
+    #[ORM\ManyToOne(targetEntity: UserEntity::class)]
+    #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
+    private UserEntity $user;
+
+    #[ORM\Column(type: 'uuid')]
+    private Uuid $deviceId;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $name = null;
+
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $lastSeenAt = null;
+
+    #[ORM\Column(type: 'datetime_immutable')]
+    private \DateTimeImmutable $createdAt;
+
+    public function __construct(
+        UserEntity $user,
+        Uuid $deviceId,
+        ?Uuid $id = null,
+    ) {
+        $this->id = $id ?? new Uuid();
+        $this->user = $user;
+        $this->deviceId = $deviceId;
+        $this->createdAt = new \DateTimeImmutable();
+    }
+
+    public function getId(): Uuid { return $this->id; }
+    public function getUserId(): Uuid { return $this->user->getId(); }
+    public function getDeviceId(): Uuid { return $this->deviceId; }
+    public function getName(): ?string { return $this->name; }
+    public function setName(?string $name): void { $this->name = $name; }
+    public function getLastSeenAt(): ?\DateTimeImmutable { return $this->lastSeenAt; }
+    public function setLastSeenAt(?\DateTimeImmutable $lastSeenAt): void { $this->lastSeenAt = $lastSeenAt; }
+    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
+}

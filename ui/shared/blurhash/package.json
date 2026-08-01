@@ -1,0 +1,26 @@
+{
+  "name": "@baander/blurhash",
+  "version": "0.0.1",
+  "description": "BlurHash encoding/decoding for Baander apps",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "tsup": "8.3.5",
+    "typescript": "5.7.3"
+  }
+}

@@ -1,0 +1,256 @@
+name: Frontend CI
+
+on:
+    push:
+        branches:
+            - master
+        paths:
+            - 'ui/web/**'
+            - '.forgejo/workflows/frontend.yaml'
+    pull_request:
+        types: [ opened, synchronize, reopened ]
+        paths:
+            - 'ui/web/**'
+            - '.forgejo/workflows/frontend.yaml'
+
+env:
+    COVERAGE_PACKAGE: coverage-frontend
+    CACHE_PACKAGE_YARN: yarn-cache-frontend
+
+jobs:
+    quality:
+        runs-on: docker-cli
+        container:
+            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+        steps:
+            -   name: Checkout
+                run: |
+                    git init -q
+                    git remote add origin ${{ forgejo.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin ${{ forgejo.ref }}
+                    git checkout -q FETCH_HEAD
+
+            -   name: Restore yarn cache
+                working-directory: ui/web
+                env:
+                    FORGEJO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                run: |
+                    API="$GITHUB_API_URL"
+                    OWNER="${GITHUB_REPOSITORY%%/*}"
+                    HTTP=$(curl -sf -o yarn-cache.tar.zst -w '%{http_code}' \
+                      "$API/packages/$OWNER/generic/$CACHE_PACKAGE_YARN/latest/yarn-cache.tar.zst" \
+                      -H "Authorization: token $FORGEJO_TOKEN" 2>/dev/null || echo '000')
+                    if [ "$HTTP" = "200" ]; then
+                      tar -xf yarn-cache.tar.zst -C / || true
+                      rm -f yarn-cache.tar.zst
+                      echo "Restored yarn cache"
+                    else
+                      rm -f yarn-cache.tar.zst
+                      echo "No yarn cache found, starting fresh"
+                    fi
+
+            -   name: Install dependencies
+                working-directory: ui/web
+                run: yarn install --immutable
+
+            -   name: Typecheck
+                working-directory: ui/web
+                run: yarn typecheck
+
+            -   name: Lint
+                working-directory: ui/web
+                run: yarn lint
+
+    test:
+        runs-on: docker-cli
+        container:
+            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+        steps:
+            -   name: Checkout
+                run: |
+                    git init -q
+                    git remote add origin ${{ forgejo.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin ${{ forgejo.ref }}
+                    git checkout -q FETCH_HEAD
+
+            -   name: Restore yarn cache
+                working-directory: ui/web
+                env:
+                    FORGEJO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                run: |
+                    API="$GITHUB_API_URL"
+                    OWNER="${GITHUB_REPOSITORY%%/*}"
+                    HTTP=$(curl -sf -o yarn-cache.tar.zst -w '%{http_code}' \
+                      "$API/packages/$OWNER/generic/$CACHE_PACKAGE_YARN/latest/yarn-cache.tar.zst" \
+                      -H "Authorization: token $FORGEJO_TOKEN" 2>/dev/null || echo '000')
+                    if [ "$HTTP" = "200" ]; then
+                      tar -xf yarn-cache.tar.zst -C / || true
+                      rm -f yarn-cache.tar.zst
+                      echo "Restored yarn cache"
+                    else
+                      rm -f yarn-cache.tar.zst
+                      echo "No yarn cache found, starting fresh"
+                    fi
+
+            -   name: Install dependencies
+                working-directory: ui/web
+                run: yarn install --immutable
+
+            -   name: Run tests with coverage
+                working-directory: ui/web
+                run: yarn test:coverage
+
+            -   name: Extract coverage metrics
+                working-directory: ui/web
+                run: |
+                    node -e "
+                      const s = require('./coverage/coverage-summary.json');
+                      const t = s.total;
+                      const m = {
+                        lines: t.lines.pct,
+                        statements: t.statements.pct,
+                        branches: t.branches.pct,
+                        functions: t.functions.pct
+                      };
+                      require('fs').writeFileSync('coverage/metrics.json', JSON.stringify(m));
+                      console.log('Lines:      ' + m.lines.toFixed(1) + '%');
+                      console.log('Statements: ' + m.statements.toFixed(1) + '%');
+                      console.log('Branches:   ' + m.branches.toFixed(1) + '%');
+                      console.log('Functions:  ' + m.functions.toFixed(1) + '%');
+                    "
+
+            -   name: Store baseline (master only)
+                if: forgejo.ref == 'refs/heads/master'
+                working-directory: ui/web
+                env:
+                    FORGEJO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                run: |
+                    API="$GITHUB_API_URL"
+                    OWNER="${GITHUB_REPOSITORY%%/*}"
+
+                    # Delete old baseline (ignore 404)
+                    curl -sf -o /dev/null -X DELETE \
+                      "$API/packages/$OWNER/generic/$COVERAGE_PACKAGE/latest/metrics.json" \
+                      -H "Authorization: token $FORGEJO_TOKEN" || true
+
+                    # Upload new baseline
+                    HTTP=$(curl -sf -o /dev/null -w '%{http_code}' -X PUT \
+                      "$API/packages/$OWNER/generic/$COVERAGE_PACKAGE/latest/metrics.json" \
+                      -H "Authorization: token $FORGEJO_TOKEN" \
+                      -H "Content-Type: application/json" \
+                      --data-binary @coverage/metrics.json)
+                    echo "Stored baseline (HTTP $HTTP)"
+
+            -   name: Post coverage comment (PR only)
+                if: forgejo.event_name == 'pull_request'
+                working-directory: ui/web
+                env:
+                    FORGEJO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                    PR_NUMBER: ${{ forgejo.event.number }}
+                run: |
+                    API="$GITHUB_API_URL"
+                    OWNER="${GITHUB_REPOSITORY%%/*}"
+
+                    # Download master baseline (ignore failure = no baseline yet)
+                    MASTER_JSON=$(curl -sf \
+                      "$API/packages/$OWNER/generic/$COVERAGE_PACKAGE/latest/metrics.json" \
+                      -H "Authorization: token $FORGEJO_TOKEN" 2>/dev/null || echo '{}')
+
+                    # Generate comment body
+                    COMMENT=$(node -e "
+                      const cur = require('./coverage/metrics.json');
+                      const mas = $MASTER_JSON;
+
+                      function delta(k) {
+                        if (mas[k] === undefined) return '';
+                        const d = cur[k] - mas[k];
+                        const s = d >= 0 ? '+' : '';
+                        const i = d > 0 ? '🟢' : d < 0 ? '🔴' : '⚪';
+                        return ' | ' + i + ' ' + s + d.toFixed(1) + '%';
+                      }
+
+                      let c = '## 📊 Frontend Coverage\n\n';
+                      c += '| Metric | Coverage | Baseline | Change |\n';
+                      c += '|--------|----------|----------|--------|\n';
+                      for (const k of ['lines','statements','branches','functions']) {
+                        const l = k[0].toUpperCase() + k.slice(1);
+                        const b = mas[k] !== undefined ? mas[k].toFixed(1) + '%' : '—';
+                        c += '| ' + l + ' | **' + cur[k].toFixed(1) + '%** | ' + b + delta(k) + ' |\n';
+                      }
+                      process.stdout.write(c);
+                    ")
+
+                    # Post PR comment
+                    ESCAPED=$(node -e "process.stdout.write(JSON.stringify(process.argv[1]))" "$COMMENT")
+                    HTTP=$(curl -sf -o /dev/null -w '%{http_code}' -X POST \
+                      "$API/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
+                      -H "Authorization: token $FORGEJO_TOKEN" \
+                      -H "Content-Type: application/json" \
+                      -d "{\"body\": $ESCAPED}")
+                    echo "Posted coverage comment (HTTP $HTTP)"
+
+            -   name: Update yarn cache (master only)
+                if: forgejo.ref == 'refs/heads/master'
+                working-directory: ui/web
+                env:
+                    FORGEJO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                run: |
+                    API="$GITHUB_API_URL"
+                    OWNER="${GITHUB_REPOSITORY%%/*}"
+
+                    tar -cf - /home/*/\.local/share/yarn/berry/cache 2>/dev/null | zstd -o yarn-cache.tar.zst
+
+                    curl -sf -o /dev/null -X DELETE \
+                      "$API/packages/$OWNER/generic/$CACHE_PACKAGE_YARN/latest/yarn-cache.tar.zst" \
+                      -H "Authorization: token $FORGEJO_TOKEN" || true
+
+                    HTTP=$(curl -sf -o /dev/null -w '%{http_code}' -X PUT \
+                      "$API/packages/$OWNER/generic/$CACHE_PACKAGE_YARN/latest/yarn-cache.tar.zst" \
+                      -H "Authorization: token $FORGEJO_TOKEN" \
+                      -H "Content-Type: application/zstd" \
+                      --data-binary @yarn-cache.tar.zst)
+                    echo "Stored yarn cache (HTTP $HTTP)"
+
+    build:
+        runs-on: docker-cli
+        needs: [ quality, test ]
+        container:
+            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+        steps:
+            -   name: Checkout
+                run: |
+                    git init -q
+                    git remote add origin ${{ forgejo.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin ${{ forgejo.ref }}
+                    git checkout -q FETCH_HEAD
+
+            -   name: Restore yarn cache
+                working-directory: ui/web
+                env:
+                    FORGEJO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                run: |
+                    API="$GITHUB_API_URL"
+                    OWNER="${GITHUB_REPOSITORY%%/*}"
+                    HTTP=$(curl -sf -o yarn-cache.tar.zst -w '%{http_code}' \
+                      "$API/packages/$OWNER/generic/$CACHE_PACKAGE_YARN/latest/yarn-cache.tar.zst" \
+                      -H "Authorization: token $FORGEJO_TOKEN" 2>/dev/null || echo '000')
+                    if [ "$HTTP" = "200" ]; then
+                      tar -xf yarn-cache.tar.zst -C / || true
+                      rm -f yarn-cache.tar.zst
+                      echo "Restored yarn cache"
+                    else
+                      rm -f yarn-cache.tar.zst
+                      echo "No yarn cache found, starting fresh"
+                    fi
+
+            -   name: Install dependencies
+                working-directory: ui/web
+                run: yarn install --immutable
+
+            -   name: Build
+                working-directory: ui/web
+                run: yarn build
+
+            -   name: Verify output
+                working-directory: ui/web
+                run: ls -la dist/ && test -f dist/index.html

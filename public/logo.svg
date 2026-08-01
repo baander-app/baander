@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Baander cassette logo — full detail, 256px+ -->
+  <defs>
+    <linearGradient id="bg" x1="256" y1="96" x2="256" y2="416" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#60a5fa"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="bg-d" x1="256" y1="96" x2="256" y2="416" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+  </defs>
+  <style>
+    .body { fill: url(#bg) }
+    .panel { fill: #3b82f6 }
+    .drive { fill: #1e40af }
+    .reel { fill: #1e40af }
+    .hub { fill: #0f172a }
+    .spoke { fill: #0f172a }
+    .window { fill: #1e40af }
+    .tape { fill: #93c5fd; opacity: .65 }
+    .label { fill: #60a5fa }
+    .notch { fill: #1e40af }
+    @media (prefers-color-scheme: dark) {
+      .body { fill: url(#bg-d) }
+      .panel { fill: #f1f5f9 }
+      .drive { fill: #94a3b8 }
+      .reel { fill: #cbd5e1 }
+      .hub { fill: #0f172a }
+      .spoke { fill: #0f172a }
+      .window { fill: #cbd5e1 }
+      .tape { fill: #3b82f6; opacity: .7 }
+      .label { fill: #94a3b8 }
+      .notch { fill: #94a3b8 }
+    }
+  </style>
+
+  <!-- Body -->
+  <rect class="body" x="56" y="96" width="400" height="320" rx="28"/>
+
+  <!-- Inner panel -->
+  <rect class="panel" x="72" y="136" width="368" height="248" rx="16"/>
+
+  <!-- Drive mechanism holes -->
+  <circle class="drive" cx="156" cy="124" r="11"/>
+  <circle class="drive" cx="356" cy="124" r="11"/>
+
+  <!-- Left reel -->
+  <circle class="reel" cx="156" cy="240" r="62"/>
+  <circle class="hub" cx="156" cy="240" r="20"/>
+  <circle class="spoke" cx="156" cy="198" r="7"/>
+  <circle class="spoke" cx="190" cy="260" r="7"/>
+  <circle class="spoke" cx="122" cy="260" r="7"/>
+
+  <!-- Right reel -->
+  <circle class="reel" cx="356" cy="240" r="62"/>
+  <circle class="hub" cx="356" cy="240" r="20"/>
+  <circle class="spoke" cx="356" cy="198" r="7"/>
+  <circle class="spoke" cx="390" cy="260" r="7"/>
+  <circle class="spoke" cx="322" cy="260" r="7"/>
+
+  <!-- Tape window -->
+  <rect class="window" x="140" y="318" width="232" height="44" rx="8"/>
+
+  <!-- Tape -->
+  <rect class="tape" x="166" y="336" width="180" height="4" rx="2"/>
+
+  <!-- Label area lines -->
+  <rect class="label" x="172" y="374" width="168" height="2" rx="1" opacity=".4"/>
+  <rect class="label" x="196" y="382" width="120" height="2" rx="1" opacity=".25"/>
+
+  <!-- Corner notches -->
+  <rect class="notch" x="68" y="400" width="18" height="10" rx="3"/>
+  <rect class="notch" x="426" y="400" width="18" height="10" rx="3"/>
+</svg>

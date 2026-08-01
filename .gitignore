@@ -1,0 +1,101 @@
+
+/home/
+
+phpdoc.dist.xml
+phpDocumentor.phar
+.phpdoc
+docs/html/
+.rpiv
+.pi
+.claude
+
+###> symfony/framework-bundle ###
+/.env.local
+/.env.local.php
+/.env.*.local
+/config/secrets/
+/public/bundles/
+/var/
+/vendor/
+###< symfony/framework-bundle ###
+
+###> symfony/phpunit-bridge ###
+.phpunit.result.cache
+/phpunit.xml
+###< symfony/phpunit-bridge ###
+
+###> IDE ###
+.vscode/
+.idea/**/workspace.xml
+.idea/**/tasks.xml
+.idea/**/usage.statistics.xml
+.idea/**/dictionaries
+.idea/**/shelf
+.idea/**/misc.xml
+.idea/**/modules.xml
+.idea/**/php.xml
+.idea/**/dataSources*
+.idea/**/session.sql
+.idea/**/laravel-idea.xml
+.idea/**/vcs.xml
+###< IDE ###
+
+###> OS ###
+.DS_Store
+Thumbs.db
+###< OS ###
+
+###> Docker ###
+/cert.pem
+/key.pem
+/node_modules/
+###< Docker ###
+
+###> Storage ###
+/storage/
+/resources/app/node_modules/
+/resources/app/build/
+/resources/app/.vite/
+###< Storage ###
+
+###> phpunit/phpunit ###
+/phpunit.xml
+/.phpunit.cache/
+###< phpunit/phpunit ###
+
+auth.json
+
+###> phpstan/phpstan ###
+phpstan.neon
+###< phpstan/phpstan ###
+
+###> pentatrion/vite-bundle ###
+/node_modules/
+/public/build/
+###< pentatrion/vite-bundle ###
+
+###> Yarn 4 ###
+/**/.yarn/install-state.gz
+###< Yarn 4 ###
+
+###> Profiling ###
+.reli/
+###< Profiling ###
+
+public/assets/
+public/dsp/
+/public/.vite/
+bin/baander
+/.idea/prettier.xml
+.deptrac.cache
+
+###> Pi ###
+.pi/
+###< Pi ###
+
+###> rpiv ###
+.rpiv/
+###< rpiv ###
+
+ui/web/playwright-report
+ui/web/tests/e2e/__screenshots__

@@ -1,0 +1,109 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Method App\\UserPreference\\Application\\Port\\EqDeviceProfilePortInterface\:\:createProfile\(\) has parameter \$payload with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/UserPreference/Application/Port/EqDeviceProfilePortInterface.php
+
+		-
+			message: '#^Method App\\UserPreference\\Application\\Port\\EqDeviceProfilePortInterface\:\:createProfile\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/UserPreference/Application/Port/EqDeviceProfilePortInterface.php
+
+		-
+			message: '#^Method App\\UserPreference\\Application\\Port\\EqDeviceProfilePortInterface\:\:findProfileByDeviceId\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/UserPreference/Application/Port/EqDeviceProfilePortInterface.php
+
+		-
+			message: '#^Method App\\UserPreference\\Application\\Port\\EqDeviceProfilePortInterface\:\:getProfile\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/UserPreference/Application/Port/EqDeviceProfilePortInterface.php
+
+		-
+			message: '#^Method App\\UserPreference\\Application\\Port\\EqDeviceProfilePortInterface\:\:listProfiles\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/UserPreference/Application/Port/EqDeviceProfilePortInterface.php
+
+		-
+			message: '#^Method App\\UserPreference\\Application\\Port\\EqDeviceProfilePortInterface\:\:updateProfile\(\) has parameter \$payload with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/UserPreference/Application/Port/EqDeviceProfilePortInterface.php
+
+		-
+			message: '#^Method App\\UserPreference\\Application\\Port\\EqDeviceProfilePortInterface\:\:updateProfile\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/UserPreference/Application/Port/EqDeviceProfilePortInterface.php
+
+		-
+			message: '#^Method App\\UserPreference\\Infrastructure\\Doctrine\\Entity\\EqDeviceProfileEntity\:\:getPayload\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/UserPreference/Infrastructure/Doctrine/Entity/EqDeviceProfileEntity.php
+
+		-
+			message: '#^Method App\\UserPreference\\Infrastructure\\Doctrine\\Entity\\EqDeviceProfileEntity\:\:setPayload\(\) has parameter \$payload with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/UserPreference/Infrastructure/Doctrine/Entity/EqDeviceProfileEntity.php
+
+		-
+			message: '#^Property App\\UserPreference\\Infrastructure\\Doctrine\\Entity\\EqDeviceProfileEntity\:\:\$payload type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/UserPreference/Infrastructure/Doctrine/Entity/EqDeviceProfileEntity.php
+
+		-
+			message: '#^Method App\\UserPreference\\Infrastructure\\EqDeviceProfileAdapter\:\:createProfile\(\) has parameter \$payload with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/UserPreference/Infrastructure/EqDeviceProfileAdapter.php
+
+		-
+			message: '#^Method App\\UserPreference\\Infrastructure\\EqDeviceProfileAdapter\:\:createProfile\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/UserPreference/Infrastructure/EqDeviceProfileAdapter.php
+
+		-
+			message: '#^Method App\\UserPreference\\Infrastructure\\EqDeviceProfileAdapter\:\:findProfileByDeviceId\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/UserPreference/Infrastructure/EqDeviceProfileAdapter.php
+
+		-
+			message: '#^Method App\\UserPreference\\Infrastructure\\EqDeviceProfileAdapter\:\:getProfile\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/UserPreference/Infrastructure/EqDeviceProfileAdapter.php
+
+		-
+			message: '#^Method App\\UserPreference\\Infrastructure\\EqDeviceProfileAdapter\:\:listProfiles\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/UserPreference/Infrastructure/EqDeviceProfileAdapter.php
+
+		-
+			message: '#^Method App\\UserPreference\\Infrastructure\\EqDeviceProfileAdapter\:\:toArray\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/UserPreference/Infrastructure/EqDeviceProfileAdapter.php
+
+		-
+			message: '#^Method App\\UserPreference\\Infrastructure\\EqDeviceProfileAdapter\:\:updateProfile\(\) has parameter \$payload with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/UserPreference/Infrastructure/EqDeviceProfileAdapter.php
+
+		-
+			message: '#^Method App\\UserPreference\\Infrastructure\\EqDeviceProfileAdapter\:\:updateProfile\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/UserPreference/Infrastructure/EqDeviceProfileAdapter.php

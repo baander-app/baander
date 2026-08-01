@@ -1,0 +1,40 @@
+name: Build Nginx Image
+
+on:
+    push:
+        branches:
+            - master
+        paths:
+            - 'docker/nginx/**'
+            - '.forgejo/workflows/nginx.yaml'
+    workflow_dispatch:
+
+env:
+    REGISTRY: ${{ vars.REGISTRY_URL }}
+    IMAGE_NAME: ${{ vars.REGISTRY_OWNER }}/baander-nginx
+
+jobs:
+    build:
+        runs-on: docker-cli
+        container:
+            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+        steps:
+            -   name: Checkout
+                run: |
+                    git init -q
+                    git remote add origin ${{ forgejo.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin ${{ forgejo.ref }}
+                    git checkout -q FETCH_HEAD
+
+            -   name: Login to Container Registry
+                run: echo "${{ secrets.REGISTRY_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ forgejo.actor }} --password-stdin
+
+            -   name: Build and push Nginx image
+                run: |
+                    docker buildx build \
+                      --file docker/nginx/Dockerfile \
+                      --build-arg BUILD_ARGUMENT_ENV=dev \
+                      --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+                      --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ forgejo.sha }} \
+                      --push \
+                      docker/

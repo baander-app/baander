@@ -1,0 +1,58 @@
+{
+    "name": "baander/cloud-relay",
+    "description": "Baander Cloud Relay — lightweight server discovery service",
+    "type": "project",
+    "license": "GPL-3.0-only",
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "require": {
+        "php": ">=8.4",
+        "ext-pdo": "*",
+        "ext-pdo_sqlite": "*",
+        "ext-swoole": "*",
+        "doctrine/dbal": "^4.2",
+        "nyholm/psr7": "^1.8",
+        "symfony/console": "7.2.*",
+        "symfony/dotenv": "7.2.*",
+        "symfony/flex": "^2.4",
+        "symfony/framework-bundle": "7.2.*",
+        "symfony/runtime": "7.2.*",
+        "symfony/yaml": "7.2.*",
+        "swoole-bundle/swoole-bundle": "^7.0"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^2.1"
+    },
+    "config": {
+        "allow-plugins": {
+            "symfony/flex": true,
+            "symfony/runtime": true
+        },
+        "sort-packages": true
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    },
+    "replace": {
+        "symfony/polyfill-php84": "*"
+    },
+    "scripts": {
+        "auto-scripts": {
+            "cache:clear": "symfony-cmd"
+        },
+        "post-install-cmd": [
+            "@auto-scripts"
+        ],
+        "post-update-cmd": [
+            "@auto-scripts"
+        ]
+    },
+    "extra": {
+        "symfony": {
+            "allow-contrib": false,
+            "require": "7.2.*"
+        }
+    }
+}

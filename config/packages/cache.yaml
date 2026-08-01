@@ -1,0 +1,54 @@
+framework:
+    cache:
+        # Default Redis provider for all pools
+        default_redis_provider: 'redis://default:%env(REDIS_PASSWORD)%@redis:6379'
+
+        # Redis-backed cache pools for Swoole workers
+        app: cache.adapter.redis
+        system: cache.adapter.redis
+
+        pools:
+            # Existing rate limiter pool
+            cache.rate_limiter:
+                adapter: cache.adapter.redis
+                provider: 'redis://default:%env(REDIS_PASSWORD)%@redis:6379'
+                default_lifetime: 3600
+
+            # Doctrine system cache (metadata, query) — indefinite, cleared on deploy
+            doctrine.system_cache_pool:
+                adapter: cache.adapter.redis
+                provider: 'redis://default:%env(REDIS_PASSWORD)%@redis:6379'
+                default_lifetime: 0
+
+            # Doctrine result cache — 1 hour default, overridable per-query
+            doctrine.result_cache_pool:
+                adapter: cache.adapter.redis
+                provider: 'redis://default:%env(REDIS_PASSWORD)%@redis:6379'
+                default_lifetime: 3600
+
+            # Tag-aware cache for application-level invalidation (RedisTagAwareAdapter)
+            # Requires Redis maxmemory-policy of noeviction or volatile-*
+            cache.tags:
+                tags: true
+                adapter: cache.adapter.redis
+                provider: 'redis://default:%env(REDIS_PASSWORD)%@redis:6379'
+                default_lifetime: 3600
+
+services:
+    # Redis-backed session handler
+    session.handler.redis:
+        class: Symfony\Component\HttpFoundation\Session\Storage\Handler\RedisSessionHandler
+        arguments:
+            - '@redis.session.client'
+
+    redis.session.client:
+        class: Redis
+        calls:
+            - [connect, ['redis', 6379]]
+            - [auth, ['%env(REDIS_PASSWORD)%']]
+
+when@test:
+    framework:
+        cache:
+            app: cache.adapter.filesystem
+            system: cache.adapter.filesystem

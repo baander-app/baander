@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "sourceMap": true,
+    "jsx": "react-jsx",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@baander/shared": ["../shared/index.ts"],
+      "@baander/shared/*": ["../shared/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "index.js", "app.json"],
+  "exclude": ["node_modules", "android", "ios", "macos", "windows", "tvos"]
+}

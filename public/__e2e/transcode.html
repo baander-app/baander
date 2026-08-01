@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Baander Transcode E2E</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    video { width: 640px; height: 360px; background: #000; }
+    #log { white-space: pre-wrap; font-family: monospace; background: #f4f4f4; padding: 10px; max-height: 300px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <h1>Baander Transcode E2E</h1>
+  <video id="video" controls muted></video>
+  <div id="status">Loading...</div>
+  <div id="log"></div>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script>
+    const video = document.getElementById('video');
+    const status = document.getElementById('status');
+    const logEl = document.getElementById('log');
+    window.errors = [];
+    window.events = [];
+    window.levelSwitches = [];
+
+    function log(msg) {
+      const line = `[${new Date().toISOString()}] ${msg}`;
+      window.events.push(line);
+      logEl.textContent += line + '\n';
+      console.log(line);
+    }
+
+    const videoId = '019f66d8-d5a4-7f46-b7ad-34560b35bc2b';
+    const src = `/api/transcode/${videoId}/master.m3u8`;
+
+    if (!Hls.isSupported()) {
+      status.textContent = 'Hls.js not supported';
+      window.errors.push('Hls.js not supported');
+      throw new Error('Hls.js not supported');
+    }
+
+    const hls = new Hls({
+      debug: true,
+      enableWorker: true,
+      maxBufferLength: 30,
+      // The stream manager needs ~2–5s (cold start) to produce segment 0
+      // after the manifest request triggers session creation. The signed
+      // segment endpoint waits up to 60s server-side, so raise hls.js's own
+      // fragment-load timeout above that to avoid fragLoadTimeOut racing the
+      // encoder (KTD-2).
+      fragLoadingTimeOut: 70000,
+      manifestLoadingTimeOut: 30000,
+    });
+    window.hls = hls;
+
+    hls.on(Hls.Events.ERROR, (event, data) => {
+      const msg = `HLS error: ${data.type} - ${data.details}`;
+      window.errors.push(msg);
+      log(msg);
+      if (data.fatal) {
+        log('FATAL HLS error');
+      }
+    });
+
+    hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+      log(`Manifest parsed: ${data.levels.length} levels`);
+      window.manifestParsed = true;
+      window.levelCount = data.levels.length;
+      video.play().catch(e => log('play() failed: ' + e.message));
+    });
+
+    // First media fragment finished buffering — this is the true "segment is
+    // available and playable" signal. It fires only after the stream manager
+    // has produced segment 0 and hls.js has demuxed+appended it, so tests that
+    // gate on it are decoupled from the 2–5s cold-start encoding latency.
+    hls.on(Hls.Events.FRAG_BUFFERED, (event, data) => {
+      if (!window.firstSegmentBuffered) {
+        window.firstSegmentBuffered = true;
+        log(`First segment buffered (sn=${data.frag?.sn})`);
+      }
+    });
+
+    hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+      const level = hls.levels[data.level];
+      const label = level ? `${level.width}x${level.height}` : 'unknown';
+      log(`Switched to level ${data.level}: ${label}`);
+      window.levelSwitches.push({ level: data.level, label });
+    });
+
+    hls.loadSource(src);
+    hls.attachMedia(video);
+
+    video.addEventListener('timeupdate', () => {
+      status.textContent = `Playing at ${video.currentTime.toFixed(2)}s, paused=${video.paused}`;
+    });
+
+    video.addEventListener('error', () => {
+      const msg = `Video element error: ${video.error?.code} ${video.error?.message}`;
+      window.errors.push(msg);
+      log(msg);
+    });
+  </script>
+</body>
+</html>

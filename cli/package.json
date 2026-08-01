@@ -1,0 +1,16 @@
+{
+  "name": "baander-cli",
+  "version": "1.0.0",
+  "description": "Baander development CLI",
+  "scripts": {
+    "build": "bun build src/index.ts --compile --outfile ../bin/baander",
+    "dev": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "commander": "^14.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "typescript": "^5.8.0"
+  }
+}

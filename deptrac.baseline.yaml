@@ -1,0 +1,470 @@
+deptrac:
+  skip_violations:
+    App\Activity\Infrastructure\ActivityEnrichmentService:
+      - App\Activity\Interface\Resource\ActivityResource
+      - App\Catalog\Application\Port\AlbumPortInterface
+      - App\Catalog\Application\Port\MoviePortInterface
+      - App\Catalog\Application\Port\SongPortInterface
+      - App\Media\Application\Port\ImagePortInterface
+    App\Activity\Infrastructure\Doctrine\Entity\MediaActivityEntity:
+      - App\Auth\Infrastructure\Doctrine\Entity\UserEntity
+      - App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity
+      - App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity
+      - App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity
+      - App\Catalog\Infrastructure\Doctrine\Entity\SongEntity
+    App\Activity\Infrastructure\Doctrine\Repository\MediaActivityRepository:
+      - App\Auth\Infrastructure\Doctrine\Entity\UserEntity
+      - App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity
+      - App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity
+      - App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity
+      - App\Catalog\Infrastructure\Doctrine\Entity\SongEntity
+    App\Activity\Interface\Controller\ActivityController:
+      - App\Activity\Domain\Model\MediaActivity
+      - App\Activity\Infrastructure\ActivityEnrichmentService
+      - App\Catalog\Application\Port\AlbumPortInterface
+      - App\Catalog\Application\Port\ArtistPortInterface
+      - App\Catalog\Application\Port\MoviePortInterface
+      - App\Catalog\Application\Port\SongPortInterface
+    App\Activity\Interface\Controller\UserRecentController:
+      - App\Activity\Domain\Model\MediaActivity
+      - App\Activity\Infrastructure\ActivityEnrichmentService
+    App\Activity\Interface\Resource\ActivityResource:
+      - App\Activity\Domain\Model\MediaActivity
+      - App\Catalog\Domain\Model\Album
+      - App\Catalog\Domain\Model\Song
+      - App\Media\Domain\Model\Image
+    App\Auth\Application\CommandHandler\User\CreateUserHandler:
+      - App\Notification\Application\DTO\SeedDefaultPreferencesCommand
+    App\Auth\Application\CommandHandler\User\RegisterUserHandler:
+      - App\Notification\Application\DTO\SeedDefaultPreferencesCommand
+    App\Auth\Interface\Console\CreateUserCommand:
+      - App\Auth\Domain\Model\User
+    App\Auth\Interface\Console\SetupClientsCommand:
+      - App\Auth\Domain\Model\OAuth\Client
+      - App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface
+    App\Auth\Interface\Controller\AdminLoginBlockController:
+      - App\Auth\Domain\Repository\LoginBlockRepositoryInterface
+    App\Auth\Interface\Controller\AdminUserController:
+      - App\Auth\Domain\Model\User
+    App\Auth\Interface\Controller\OAuth\ClientController:
+      - App\Auth\Domain\Model\OAuth\Client
+      - App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface
+      - App\Auth\Infrastructure\Security\SecurityUser
+    App\Auth\Interface\Controller\OAuth\OAuthController:
+      - App\Auth\Domain\Model\OAuth\AccessToken
+      - App\Auth\Domain\Model\OAuth\Client
+      - App\Auth\Domain\Model\OAuth\DeviceCode
+      - App\Auth\Domain\Model\OAuth\TokenId
+      - App\Auth\Domain\Model\OAuth\ValueObject\Scope
+      - App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface
+      - App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface
+      - App\Auth\Domain\Repository\OAuth\DeviceCodeRepositoryInterface
+      - App\Auth\Domain\Repository\UserRepositoryInterface
+      - App\Auth\Infrastructure\Security\OAuth\DpopNonceManager
+      - App\Auth\Infrastructure\Security\OAuth\DpopProofValidator
+    App\Auth\Interface\Controller\Passkey\PasskeyController:
+      - App\Auth\Domain\Model\Passkey\Passkey
+      - App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface
+      - App\Auth\Infrastructure\Security\Passkey\PasskeyService
+      - App\Auth\Infrastructure\Security\SecurityUser
+    App\Auth\Interface\Controller\Passkey\PasskeyLoginController:
+      - App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface
+      - App\Auth\Domain\Repository\UserRepositoryInterface
+    App\Auth\Interface\Controller\Totp\TotpController:
+      - App\Auth\Infrastructure\Security\SecurityUser
+    App\Auth\Interface\Controller\User\AuthController:
+      - App\Auth\Domain\Model\User
+      - App\Auth\Infrastructure\Security\OAuth\DpopNonceManager
+      - App\Auth\Infrastructure\Security\OAuth\DpopProofValidator
+      - App\Auth\Infrastructure\Security\Passkey\PasskeyService
+    App\Auth\Interface\Controller\User\LoginController:
+      - App\Auth\Domain\Model\OAuth\ValueObject\DpopValidationResult
+      - App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface
+      - App\Auth\Domain\Repository\UserRepositoryInterface
+      - App\Auth\Infrastructure\Security\OAuth\DpopNonceManager
+      - App\Auth\Infrastructure\Security\OAuth\DpopProofValidator
+    App\Auth\Interface\Resource\AdminUserResource:
+      - App\Auth\Domain\Model\User
+    App\Auth\Interface\Resource\ClientResource:
+      - App\Auth\Domain\Model\OAuth\Client
+    App\Auth\Interface\Resource\LoginBlockResource:
+      - App\Auth\Domain\Model\LoginBlock
+    App\Auth\Interface\Resource\UserResource:
+      - App\Auth\Domain\Model\User
+    App\Catalog\Application\CommandHandler\BatchExtractCoversHandler:
+      - App\Metadata\Application\Command\ExtractAlbumCoverCommand
+    App\Catalog\Application\CommandHandler\FilesDiscoveredHandler:
+      - App\Library\Application\Message\FilesDiscovered
+      - App\Metadata\Application\Command\ExtractAlbumCoverCommand
+      - App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter
+    App\Catalog\Application\Port\MetadataContentReaderPortInterface:
+      - App\Metadata\Domain\Model\ExtractedMetadata
+    App\Catalog\Infrastructure\AlbumDuplicateService:
+      - App\Catalog\Interface\Resource\AlbumResource
+      - App\Media\Application\Port\ImagePortInterface
+    App\Catalog\Infrastructure\AlbumService:
+      - App\Media\Application\Port\ImagePortInterface
+      - App\Media\Application\Port\StoragePortInterface
+      - App\Media\Domain\Model\Image
+    App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity:
+      - App\Library\Infrastructure\Doctrine\Entity\LibraryEntity
+      - App\Media\Infrastructure\Doctrine\Entity\ImageEntity
+    App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity:
+      - App\Media\Infrastructure\Doctrine\Entity\ImageEntity
+    App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity:
+      - App\Library\Infrastructure\Doctrine\Entity\LibraryEntity
+    App\Catalog\Infrastructure\Doctrine\Repository\AlbumRepository:
+      - App\Library\Infrastructure\Doctrine\Entity\LibraryEntity
+      - App\Media\Infrastructure\Doctrine\Entity\ImageEntity
+    App\Catalog\Infrastructure\Doctrine\Repository\ArtistRepository:
+      - App\Media\Infrastructure\Doctrine\Entity\ImageEntity
+    App\Catalog\Infrastructure\Doctrine\Repository\MovieRepository:
+      - App\Library\Infrastructure\Doctrine\Entity\LibraryEntity
+    App\Catalog\Infrastructure\SongService:
+      - App\Media\Application\Port\StoragePortInterface
+    App\Catalog\Interface\Console\ExtractAlbumCoversCommand:
+      - App\Catalog\Domain\Repository\AlbumRepositoryInterface
+      - App\Metadata\Application\Command\ExtractAlbumCoverCommand
+    App\Catalog\Interface\Controller\AdminAlbumController:
+      - App\Playlist\Domain\Repository\PlaylistRepositoryInterface
+    App\Catalog\Interface\Controller\AdminSongController:
+      - App\Playlist\Domain\Repository\PlaylistRepositoryInterface
+    App\Catalog\Interface\Controller\AlbumController:
+      - App\Catalog\Domain\Model\Album
+      - App\Media\Application\Port\ImagePortInterface
+    App\Catalog\Interface\Controller\AlbumCoverController:
+      - App\Filesystem\Application\Port\MimeDetectorPortInterface
+      - App\Media\Application\Port\ImagePortInterface
+      - App\Media\Application\Port\StoragePortInterface
+      - App\Media\Domain\Model\Image
+    App\Catalog\Interface\Controller\ArtistController:
+      - App\Catalog\Domain\Model\Artist
+      - App\Catalog\Domain\ValueObject\ArtistRole
+      - App\Media\Application\Port\ImagePortInterface
+    App\Catalog\Interface\Controller\ArtistCoverController:
+      - App\Filesystem\Application\Port\MimeDetectorPortInterface
+      - App\Media\Application\Port\ImagePortInterface
+      - App\Media\Application\Port\StoragePortInterface
+      - App\Media\Domain\Model\Image
+    App\Catalog\Interface\Controller\ExtractCoversController:
+      - App\Metadata\Application\Command\BatchExtractCoversCommand
+    App\Catalog\Interface\Controller\GenreController:
+      - App\Catalog\Domain\Model\Genre
+    App\Catalog\Interface\Controller\MovieController:
+      - App\Catalog\Domain\Repository\VideoRepositoryInterface
+    App\Catalog\Interface\Controller\SongController:
+      - App\Catalog\Domain\Model\Song
+      - App\Shared\Infrastructure\Pagination\CursorCodec
+    App\Catalog\Interface\Request\UploadCoverRequest:
+      - App\Filesystem\Application\Port\MimeDetectorPortInterface
+    App\Catalog\Interface\Resource\AlbumResource:
+      - App\Catalog\Domain\Model\Album
+      - App\Media\Domain\Model\Image
+    App\Catalog\Interface\Resource\ArtistResource:
+      - App\Catalog\Domain\Model\Artist
+      - App\Media\Domain\Model\Image
+    App\Catalog\Interface\Resource\DuplicateGroupResource:
+      - App\Catalog\Domain\ValueObject\DuplicateGroup
+    App\Catalog\Interface\Resource\GenreResource:
+      - App\Catalog\Domain\Model\Genre
+    App\Catalog\Interface\Resource\MovieResource:
+      - App\Catalog\Domain\Model\Movie
+    App\Catalog\Interface\Resource\SongResource:
+      - App\Catalog\Domain\Model\Song
+    App\Catalog\Interface\Resource\VideoResource:
+      - App\Catalog\Domain\Model\Video
+    App\Command\Dev\SetupCommand:
+      - App\Auth\Application\Command\User\CreateUserCommand
+    App\Filesystem\Command\WatchFilesCommand:
+      - App\Filesystem\Watcher\FileWatchEvent
+      - App\Filesystem\Watcher\FileWatcher
+    App\Filesystem\Mime\MimeDetector:
+      - App\Filesystem\Application\Port\MimeDetectorPortInterface
+    App\Filesystem\Watcher\FileWatcher:
+      - App\Shared\Infrastructure\Swoole\Async
+    App\Library\Application\MovieScanner:
+      - App\Library\Infrastructure\Scanner\MediaFile
+    App\Library\Application\MusicScanner:
+      - App\Library\Infrastructure\Scanner\MediaFile
+    App\Library\Application\Port\DirectoryScannerPortInterface:
+      - App\Library\Infrastructure\Scanner\MediaFile
+    App\Library\Interface\Console\CreateLibraryCommand:
+      - App\Library\Domain\Model\Library
+      - App\Library\Domain\ValueObject\LibraryPath
+      - App\Library\Domain\ValueObject\LibrarySlug
+      - App\Library\Domain\ValueObject\LibraryType
+    App\Library\Interface\Console\ScanLibraryCommand:
+      - App\Library\Domain\Model\Library
+      - App\Library\Domain\ValueObject\LibrarySlug
+    App\Library\Interface\Controller\LibraryController:
+      - App\Library\Domain\Model\Library
+      - App\Library\Domain\ValueObject\LibraryPath
+      - App\Library\Domain\ValueObject\LibrarySlug
+      - App\Library\Domain\ValueObject\LibraryType
+    App\Library\Interface\Resource\LibraryResource:
+      - App\Library\Domain\Model\Library
+    App\Lyrics\Infrastructure\Doctrine\Repository\LyricsAdminRepository:
+      - App\Catalog\Application\Port\SongPortInterface
+    App\Lyrics\Infrastructure\Service\LyricsService:
+      - App\Catalog\Application\Port\AlbumPortInterface
+      - App\Catalog\Application\Port\SongPortInterface
+    App\Media\Infrastructure\Doctrine\Entity\ImageEntity:
+      - App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity
+      - App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity
+      - App\Playlist\Infrastructure\Doctrine\Entity\PlaylistEntity
+    App\Media\Infrastructure\Doctrine\Repository\ImageRepository:
+      - App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity
+      - App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity
+    App\Media\Infrastructure\Service\StreamService:
+      - App\Catalog\Domain\Model\Song
+      - App\Catalog\Domain\Repository\SongRepositoryInterface
+      - App\Filesystem\Application\Port\LocalFilesystemPortInterface
+    App\Media\Interface\Controller\ImageController:
+      - App\Media\Infrastructure\Converter\BlurHashGenerator
+      - App\Media\Infrastructure\Storage\FlysystemStorage
+    App\Media\Interface\Controller\StreamController:
+      - App\Filesystem\Mime\MimeDetector
+    App\Media\Interface\Resource\ImageResource:
+      - App\Media\Domain\Model\Image
+    App\Metadata\Application\AlbumMetadataEnricher:
+      - App\Catalog\Application\Port\AlbumPortInterface
+      - App\Catalog\Application\Port\GenrePortInterface
+      - App\Catalog\Domain\Model\Album
+      - App\Catalog\Domain\ValueObject\MusicbrainzId
+      - App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter
+      - App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter
+    App\Metadata\Application\ArtistMetadataEnricher:
+      - App\Catalog\Application\Port\ArtistPortInterface
+      - App\Catalog\Domain\Model\Artist
+      - App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter
+      - App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter
+    App\Metadata\Application\CommandHandler\ExtractAlbumCoverHandler:
+      - App\Catalog\Application\Port\AlbumPortInterface
+      - App\Catalog\Application\Port\MetadataContentReaderPortInterface
+      - App\Catalog\Application\Port\SongPortInterface
+      - App\Media\Application\Port\ImagePortInterface
+      - App\Media\Application\Port\StoragePortInterface
+      - App\Media\Domain\Model\Image
+    App\Metadata\Application\MessageHandler\SyncAlbumHandler:
+      - App\Catalog\Application\Port\AlbumPortInterface
+    App\Metadata\Application\MessageHandler\SyncArtistHandler:
+      - App\Catalog\Application\Port\ArtistPortInterface
+    App\Metadata\Application\MessageHandler\SyncGenresHandler:
+      - App\Catalog\Application\Port\AlbumPortInterface
+      - App\Catalog\Application\Port\SongPortInterface
+    App\Metadata\Application\MessageHandler\SyncLibraryHandler:
+      - App\Catalog\Application\Port\AlbumPortInterface
+    App\Metadata\Application\MessageHandler\SyncSongHandler:
+      - App\Catalog\Application\Port\SongPortInterface
+    App\Metadata\Application\MetadataSyncOrchestrator:
+      - App\Library\Application\Port\LibraryPortInterface
+    App\Metadata\Application\MovieMetadataEnricher:
+      - App\Catalog\Application\Port\GenrePortInterface
+      - App\Catalog\Application\Port\MoviePortInterface
+      - App\Catalog\Domain\Model\Movie
+      - App\Metadata\Infrastructure\Api\Tmdb\DTO\TmdbMovieDto
+      - App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter
+    App\Metadata\Application\SongMetadataEnricher:
+      - App\Catalog\Application\Port\ArtistPortInterface
+      - App\Catalog\Application\Port\GenrePortInterface
+      - App\Catalog\Application\Port\SongPortInterface
+      - App\Catalog\Domain\Model\Song
+      - App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter
+      - App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter
+    App\Metadata\Infrastructure\Reader\MetadataContentReader:
+      - App\Catalog\Application\Port\MetadataContentReaderPortInterface
+    App\Metadata\Interface\Controller\MetadataBrowseController:
+      - App\Metadata\Infrastructure\Api\LastFm\LastFmAdapter
+      - App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter
+    App\Metadata\Interface\Controller\MetadataSearchController:
+      - App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter
+      - App\Metadata\Infrastructure\Api\LastFm\LastFmAdapter
+      - App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter
+    App\Metadata\Interface\Controller\MetadataSyncController:
+      - App\Metadata\Domain\Model\ExtractedMetadata
+      - App\Metadata\Domain\Model\MetadataMatch
+      - App\Metadata\Infrastructure\Matching\MatchingStrategy
+      - App\Metadata\Infrastructure\Reader\FlacReader
+      - App\Metadata\Infrastructure\Reader\FormatDetector
+      - App\Metadata\Infrastructure\Reader\Id3Reader
+      - App\Metadata\Infrastructure\Reader\OggReader
+    App\Notification\Application\Handler\CreateNotificationHandler:
+      - App\Auth\Domain\Model\User
+      - App\Auth\Domain\Repository\UserRepositoryInterface
+      - App\Library\Application\Query\LibraryMembershipQueryPort
+    App\Notification\Application\Handler\SendPushHandler:
+      - App\Notification\Infrastructure\Doctrine\Entity\PushSubscriptionEntity
+      - App\Notification\Infrastructure\Push\PushSubscriptionRepositoryInterface
+    App\Notification\Application\Handler\SendWebhookHandler:
+      - App\Notification\Infrastructure\Webhook\WebhookDeliveryService
+    App\Notification\Domain\Service\EventCategoryResolver:
+      - App\Auth\Domain\Event\OAuth\DeviceCodeApproved
+      - App\Auth\Domain\Event\OAuth\TokenRevoked
+      - App\Auth\Domain\Event\Passkey\PasskeyDeleted
+      - App\Auth\Domain\Event\Passkey\PasskeyRegistered
+      - App\Auth\Domain\Event\PasswordChanged
+      - App\Auth\Domain\Event\UserRegistered
+      - App\Catalog\Domain\Event\AlbumCreated
+      - App\Library\Domain\Event\LibraryScanCompleted
+      - App\Transcode\Domain\Event\TranscodeJobCompleted
+      - App\Transcode\Domain\Event\TranscodeJobFailed
+    App\Notification\Infrastructure\Security\NotificationVoter:
+      - App\Auth\Infrastructure\Security\SecurityUser
+    App\Notification\Interface\Controller\NotificationController:
+      - App\Auth\Infrastructure\Security\SecurityUser
+      - App\Notification\Domain\Model\Notification
+      - App\Notification\Domain\Repository\NotificationRepositoryInterface
+      - App\Notification\Domain\ValueObject\NotificationCategory
+    App\Notification\Interface\Controller\PreferenceController:
+      - App\Auth\Infrastructure\Security\SecurityUser
+      - App\Notification\Domain\Model\NotificationPreference
+      - App\Notification\Domain\Repository\NotificationPreferenceRepositoryInterface
+      - App\Notification\Domain\ValueObject\NotificationCategory
+      - App\Notification\Domain\ValueObject\NotificationChannel
+    App\Notification\Interface\Controller\PushSubscriptionController:
+      - App\Auth\Infrastructure\Security\SecurityUser
+      - App\Notification\Infrastructure\Doctrine\Entity\PushSubscriptionEntity
+      - App\Notification\Infrastructure\Push\PushSubscriptionRepositoryInterface
+    App\Notification\Interface\Controller\WebhookController:
+      - App\Notification\Infrastructure\Doctrine\Entity\WebhookEntity
+      - App\Notification\Infrastructure\Webhook\HmacSigner
+    App\Notification\Interface\Resource\NotificationPreferenceResource:
+      - App\Notification\Domain\Model\NotificationPreference
+    App\Notification\Interface\Resource\NotificationResource:
+      - App\Notification\Domain\Model\Notification
+    App\Party\Application\CommandHandler\PausePlaybackHandler:
+      - App\Transcode\Domain\Event\PlaybackPositionChanged
+    App\Party\Application\CommandHandler\SeekPlaybackHandler:
+      - App\Transcode\Domain\Event\PlaybackPositionChanged
+    App\Party\Application\CommandHandler\StartPlaybackHandler:
+      - App\Transcode\Domain\Event\PlaybackPositionChanged
+    App\Party\Interface\Resource\PartyMemberResource:
+      - App\Party\Domain\Model\PartyMember
+    App\Party\Interface\Resource\PartySessionResource:
+      - App\Party\Domain\Model\SyncedPartySession
+    App\Playlist\Infrastructure\Doctrine\Entity\PlaylistCollaboratorEntity:
+      - App\Auth\Infrastructure\Doctrine\Entity\UserEntity
+    App\Playlist\Infrastructure\Doctrine\Entity\PlaylistEntity:
+      - App\Auth\Infrastructure\Doctrine\Entity\UserEntity
+    App\Playlist\Infrastructure\Doctrine\Entity\PlaylistSongEntity:
+      - App\Catalog\Infrastructure\Doctrine\Entity\SongEntity
+    App\Playlist\Infrastructure\Doctrine\Repository\PlaylistRepository:
+      - App\Auth\Infrastructure\Doctrine\Entity\UserEntity
+    App\Playlist\Interface\Controller\PlaylistController:
+      - App\Catalog\Application\Port\SongPortInterface
+      - App\Catalog\Domain\Model\Song
+      - App\Catalog\Interface\Resource\SongResource
+      - App\Playlist\Domain\Model\Playlist
+      - App\Playlist\Domain\Model\PlaylistSong
+    App\Playlist\Interface\Resource\PlaylistResource:
+      - App\Playlist\Domain\Model\Playlist
+    App\Recommendation\Application\CommandHandler\GenerateRecommendationsHandler:
+      - App\Activity\Application\Port\ActivityPortInterface
+      - App\Catalog\Domain\Model\Song
+      - App\Catalog\Domain\Repository\SongRepositoryInterface
+      - App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool
+    App\Recommendation\Application\QueryHandler\GetPersonalizedRecommendationsHandler:
+      - App\Catalog\Domain\Model\Song
+      - App\Catalog\Domain\Repository\SongRepositoryInterface
+    App\Recommendation\Application\QueryHandler\GetRecommendationsForUserHandler:
+      - App\Catalog\Domain\Repository\AlbumRepositoryInterface
+      - App\Catalog\Domain\Repository\ArtistRepositoryInterface
+      - App\Catalog\Domain\Repository\SongRepositoryInterface
+      - App\Media\Application\Port\ImagePortInterface
+      - App\Recommendation\Interface\Resource\RecommendationResource
+    App\Recommendation\Infrastructure\Doctrine\Entity\RecommendationEntity:
+      - App\Auth\Infrastructure\Doctrine\Entity\UserEntity
+    App\Recommendation\Infrastructure\Doctrine\Repository\RecommendationRepository:
+      - App\Auth\Infrastructure\Doctrine\Entity\UserEntity
+    App\Recommendation\Interface\Controller\RecommendationAdminController:
+      - App\Recommendation\Domain\Model\RecommendationJob
+      - App\Recommendation\Domain\ValueObject\RecommendationJobStatus
+    App\Recommendation\Interface\Controller\RecommendationController:
+      - App\Recommendation\Domain\ValueObject\RecommendationType
+    App\Recommendation\Interface\Resource\RecommendationResource:
+      - App\Recommendation\Domain\Model\Recommendation
+    App\Shared\Infrastructure\EventListener\ExceptionSubscriber:
+      - App\Shared\Interface\DTO\ApiError
+    App\Shared\Infrastructure\EventListener\ValidationExceptionSubscriber:
+      - App\Shared\Interface\DTO\ApiError
+    App\Shared\Infrastructure\Event\AdminAlertService:
+      - App\Auth\Domain\Repository\UserRepositoryInterface
+      - App\Notification\Domain\Model\Notification
+      - App\Notification\Domain\Repository\NotificationRepositoryInterface
+      - App\Notification\Domain\ValueObject\NotificationCategory
+    App\Shared\Infrastructure\Event\AdminAlertSubscriber:
+      - App\Auth\Domain\Event\UserRegistered
+    App\Shared\Infrastructure\Event\NotificationBridgeSubscriber:
+      - App\Notification\Application\DTO\CreateNotificationCommand
+      - App\Notification\Domain\Service\EventCategoryResolver
+    App\Shared\Infrastructure\Messenger\Stamp\LibraryResultStamp:
+      - App\Library\Domain\Model\Library
+    App\Shared\Infrastructure\Messenger\Stamp\MediaActivityResultStamp:
+      - App\Activity\Domain\Model\MediaActivity
+    App\Shared\Infrastructure\Messenger\Stamp\PartyMemberResultStamp:
+      - App\Party\Domain\Model\PartyMember
+    App\Shared\Infrastructure\Messenger\Stamp\PasskeyResultStamp:
+      - App\Auth\Domain\Model\Passkey\Passkey
+    App\Shared\Infrastructure\Messenger\Stamp\PlaylistResultStamp:
+      - App\Playlist\Domain\Model\Playlist
+    App\Shared\Infrastructure\Messenger\Stamp\RecommendationResultStamp:
+      - App\Recommendation\Domain\Model\Recommendation
+    App\Shared\Infrastructure\Messenger\Stamp\SyncedPartySessionResultStamp:
+      - App\Party\Domain\Model\SyncedPartySession
+    App\Shared\Infrastructure\Messenger\Stamp\TokenResponseResultStamp:
+      - App\Auth\Application\DTO\TokenResponseDTO
+    App\Shared\Infrastructure\Messenger\Stamp\TranscodeSessionResultStamp:
+      - App\Transcode\Domain\Model\TranscodeSession
+    App\Shared\Infrastructure\Messenger\Stamp\UserResultStamp:
+      - App\Auth\Domain\Model\User
+    App\Shared\Infrastructure\Security\WsQueryTokenAuthenticator:
+      - App\Auth\Domain\Repository\UserRepositoryInterface
+    App\Shared\Interface\Controller\SystemSettingsController:
+      - App\Auth\Infrastructure\Security\Voter\AdminVoter
+    App\Shared\Interface\Controller\WebSocketController:
+      - App\Party\Application\Command\JoinPartySessionCommand
+      - App\Party\Application\Command\LeavePartySessionCommand
+      - App\Party\Application\Command\PausePlaybackCommand
+      - App\Party\Application\Command\SeekPlaybackCommand
+      - App\Party\Application\Command\StartPlaybackCommand
+      - App\Party\Application\Command\SyncPlaybackCommand
+      - App\Party\Domain\ValueObject\PlaybackAction
+      - App\Transcode\Application\Command\UpdateTranscodePositionCommand
+    App\Transcode\Infrastructure\Swoole\TranscodeSessionSubscriber:
+      - App\Catalog\Domain\Repository\VideoRepositoryInterface
+    App\Transcode\Interface\Controller\TranscodeSessionController:
+      - App\Transcode\Domain\ValueObject\AudioProfile
+      - App\Transcode\Domain\ValueObject\QualityTier
+      - App\Transcode\Domain\ValueObject\SessionPriority
+    App\Transcode\Interface\Resource\TranscodeJobResource:
+      - App\Transcode\Domain\Model\TranscodeJob
+    App\Transcode\Interface\Resource\TranscodeMetricsResource:
+      - App\Transcode\Domain\Model\TranscodeJob
+    App\Transcode\Interface\Resource\TranscodeSessionResource:
+      - App\Transcode\Domain\Model\TranscodeSession
+    App\UserPreference\Domain\Repository\AudioPreferencesRepositoryInterface:
+      - App\UserPreference\Infrastructure\Doctrine\Entity\AudioPreferencesEntity
+    App\UserPreference\Domain\Repository\EqDeviceProfileRepositoryInterface:
+      - App\UserPreference\Infrastructure\Doctrine\Entity\EqDeviceProfileEntity
+    App\UserPreference\Domain\Repository\LayoutPreferencesRepositoryInterface:
+      - App\UserPreference\Infrastructure\Doctrine\Entity\LayoutPreferencesEntity
+    App\UserPreference\Domain\Repository\PlayerPreferencesRepositoryInterface:
+      - App\UserPreference\Infrastructure\Doctrine\Entity\PlayerPreferencesEntity
+    App\UserPreference\Domain\Repository\PreferenceHistoryRepositoryInterface:
+      - App\UserPreference\Infrastructure\Doctrine\Entity\PreferenceHistoryEntity
+    App\UserPreference\Interface\Controller\AccentColorController:
+      - App\Auth\Infrastructure\Security\SecurityUser
+    App\UserPreference\Interface\Controller\AudioPreferencesController:
+      - App\Auth\Infrastructure\Security\SecurityUser
+    App\UserPreference\Interface\Controller\EqDeviceProfileController:
+      - App\Auth\Infrastructure\Security\SecurityUser
+    App\UserPreference\Interface\Controller\LayoutPreferencesController:
+      - App\Auth\Infrastructure\Security\SecurityUser
+    App\UserPreference\Interface\Controller\PlayerPreferencesController:
+      - App\Auth\Infrastructure\Security\SecurityUser
+    App\UserPreference\Interface\Controller\SidebarConfigController:
+      - App\Auth\Infrastructure\Security\SecurityUser
+    App\UserPreference\Interface\Controller\ThemeMoodController:
+      - App\Auth\Infrastructure\Security\SecurityUser
+    App\UserPreference\Interface\Resource\EqDeviceProfileResource:
+      - App\UserPreference\Infrastructure\Doctrine\Entity\EqDeviceProfileEntity
