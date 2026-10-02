@@ -319,15 +319,49 @@ deadlines, signal exits and 32 MiB of output without supervisor buffering.
 `WorkerSupervisor` now composes these primitives for a fixed admitted child set.
 It validates count and memory reservations before launching, preserves a separate
 restart budget per child, exposes sanitized lifecycle snapshots and requires
-external PID-matched heartbeat evidence for readiness. Loss of authority closes
+external PID- and launch-identity-matched heartbeat evidence for readiness. Loss of authority closes
 admission permanently and drains every child; a management failure attempts sibling
 shutdown before surfacing its original exception. Reservations are accounting,
 not enforcement of native memory or descendant limits.
-The combined application-image unit/rule suite passes 3,228 tests with 11,783
-assertions; focused production PHPStan passes. Seventeen supervisor cases cover
+The combined application-image unit/rule suite passes 3,235 tests with 11,859
+assertions; focused production PHPStan passes. Twenty-two supervisor cases cover
 real child exits/restarts, launch failure, restart exhaustion, admission budgets,
-PID-matched readiness, authority loss, concurrent drain and a restart-policy
+full-identity readiness, authority loss, concurrent drain and a restart-policy
 exception that must still stop a live sibling and preserve the original error.
+
+Launch identities now contain the deployment namespace, random supervisor boot
+token, worker ID and an increasing attempt generation, represented as explicit
+scalar arrays. Every attempted launch, including one whose launcher throws, must
+receive a matching external containment acknowledgment before replacement.
+Direct-child exit alone leaves `awaiting_containment`; stale or replayed
+acknowledgments cannot release another generation. Draining with outstanding
+containment cannot report `isStopped()`. `areDirectChildrenReaped()` deliberately
+reports the narrower condition so a PID-1 supervisor can exit and let its external
+container controller finish namespace containment without falsely releasing a lease.
+
+The migration-managed PostgreSQL `worker_deployment_leases` table preserves a row
+and increasing epoch for each deployment namespace. Acquisition requires a new
+namespace or explicit predecessor-containment acknowledgment. Expiry alone never
+permits takeover. Renewal locks the row before testing expiry against the database
+clock; an actual regression reproduced the earlier single-UPDATE approach renewing
+after an unchanged row lock delayed it past expiry. Owner boot and epoch qualify
+renewal and containment acknowledgment. A committed acquisition with a lost
+acknowledgment remains reserved for trusted-controller reconciliation.
+
+The DBAL adapter uses a dedicated connection, commits before returning a token,
+rejects caller-owned transactions, and bounds SQL statement and lock waits. Those
+limits do not bound connection setup, network I/O or commit. The future authority
+adapter must enforce an end-to-end deadline and conservative local lease validity;
+observing a token is not permission to launch. A real kernel/introspection check
+confirms ORM schema diffs exclude the DBAL-owned lease table, while normal entity
+tables remain visible. Fresh installation and repeat migration runs pass.
+The canonical messaging/PostgreSQL suite passes 40 tests with 838 assertions,
+including seven lease cases. The schema check passes one test with five assertions
+after all 15 migrations and a repeat no-op migration run. Two real-process cases
+also verify blocked replacement with a surviving descendant and after a launcher
+throws following process creation. Both container shutdown scenarios pass.
+Failed or uncertain database operations discard the dedicated connection; actual
+driver-BEGIN failure and committed-but-unacknowledged acquisition have regressions.
 
 `scripts/test-worker-containment-container.sh` exercises this core as PID 1 in a
 dedicated container with a child and a TERM-ignoring descendant. TERM and supervisor
@@ -338,15 +372,14 @@ does not prove descendant cleanup before restarting an individual worker. Host
 systemd containment remains untested.
 
 This is a stage-2 foundation, not a deployment supervisor. No application command
-or deployment configuration uses it yet. Local locking does not provide the fenced
-deployment lease or proof that a predecessor is contained. Lease expiry alone must
-not authorize takeover. The direct-child adapter's destructor is last-resort
-cleanup, not a bounded process-tree shutdown guarantee. Before deployment wiring,
-bind heartbeat evidence to supervisor boot and child launch generation as well as
-PID, so PID reuse cannot validate stale evidence. Those contracts, per-child
-descendant containment, role-specific boot, health aggregation and scheduler/media
-ownership must be implemented before the two-command cutover. Defaults are policy
-examples, not measured production capacity.
+or deployment configuration uses it yet. The lease and containment acknowledgment
+APIs require a trusted controller that actually verifies predecessor cleanup;
+they do not perform that verification themselves. The direct-child adapter's
+destructor is last-resort cleanup, not a process-tree shutdown guarantee. Controller
+integration, per-child containment scopes, deadline-bounded lease renewal,
+role-specific boot, heartbeat publication/aggregation and scheduler/media ownership
+remain necessary before the two-command cutover. Defaults are policy examples,
+not measured production capacity.
 
 This is source inspection of routing, all application Bootable implementations,
 timer/coroutine creation sites, tagged CPU handlers, scheduler providers, private

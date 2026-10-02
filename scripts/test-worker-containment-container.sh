@@ -52,7 +52,7 @@ for scenario in term kill; do
     expected_exit=137
     if [ "$scenario" = term ]; then
         expected_exit=0
-        docker logs "$container" | grep -qx supervisor_drained
+        docker logs "$container" | grep -qx supervisor_direct_children_drained
     fi
     test "$(docker inspect --format '{{.State.ExitCode}}' "$container")" = "$expected_exit"
     test "$(docker inspect --format '{{.State.OOMKilled}}' "$container")" = false

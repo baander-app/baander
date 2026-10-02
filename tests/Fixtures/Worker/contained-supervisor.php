@@ -8,6 +8,7 @@ require dirname(__DIR__, 3) . '/vendor/autoload.php';
 use App\Shared\Infrastructure\Worker\WorkerChildProcess;
 use App\Shared\Infrastructure\Worker\WorkerDefinition;
 use App\Shared\Infrastructure\Worker\WorkerSupervisor;
+use App\Shared\Infrastructure\Worker\WorkerLaunchIdentity;
 
 $role = $argv[1] ?? 'supervisor';
 pcntl_async_signals(true);
@@ -41,15 +42,15 @@ pcntl_signal(SIGTERM, static function () use (&$stop): void { $stop = true; });
 pcntl_signal(SIGINT, static function () use (&$stop): void { $stop = true; });
 $definition = new WorkerDefinition('containment', [PHP_BINARY, __FILE__, 'child'], dirname(__DIR__, 3), 32 * 1024 * 1024, 0.2);
 $supervisor = new WorkerSupervisor([$definition], 1, 64 * 1024 * 1024, 16 * 1024 * 1024,
-    static fn (WorkerDefinition $worker): WorkerChildProcess => WorkerChildProcess::start($worker->argv, $worker->directory, STDOUT, STDERR, $worker->environment));
+    static fn (WorkerDefinition $worker, WorkerLaunchIdentity $identity): WorkerChildProcess => WorkerChildProcess::start($worker->argv, $worker->directory, STDOUT, STDERR, $worker->environment), 'containment-fixture');
 while (true) {
     $now = hrtime(true) / 1e9;
     if ($stop) {
         $supervisor->requestDrain($now);
     }
     $supervisor->tick($now, true);
-    if ($supervisor->isStopped()) {
-        echo "supervisor_drained\n";
+    if ($supervisor->areDirectChildrenReaped()) {
+        echo "supervisor_direct_children_drained\n";
         exit(0);
     }
     usleep(10_000);

@@ -25,6 +25,7 @@ bash scripts/test-worker-containment-container.sh
 bash scripts/test-functional-container.sh tests/Functional/Controller/FavoritesControllerTest.php
 bash scripts/test-functional-container.sh tests/Integration/CoverExtractionPersistenceTest.php
 bash scripts/test-functional-container.sh tests/Integration/CoverlessAlbumKeysetTest.php
+bash scripts/test-functional-container.sh tests/Integration/WorkerDeploymentLeaseSchemaTest.php
 ```
 
 These require Docker and installed Composer dependencies. The unit runner uses
@@ -36,7 +37,11 @@ suite can compile its analysis container. This budget applies only to that isola
 runner; it does not change the tracked PHPUnit configuration or deployment settings.
 The messaging runner also explicitly selects `phpunit.xml.dist` and provisions
 disposable PostgreSQL and Redis for its selected transport, outbox, access-token
-cache transaction, and PGroonga compatibility tests. The search tests exercise
+cache transaction, deployment lease, and PGroonga compatibility tests. The lease
+tests use the actual migration and independent PostgreSQL connections to exercise
+ownership, expiry, lock contention, stale epochs and uncertain commit recovery.
+The separate schema test above uses the fully migrated application kernel to check
+that ORM introspection preserves the DBAL-owned lease table. The search tests exercise
 production Doctrine filtering and scored SQL against mapped PGroonga indexes;
 they require the project's extension-capable database image. Both runners fail on
 PHPUnit notices and skipped tests. Neither reads an
@@ -72,7 +77,10 @@ The worker containment runner creates dedicated, disposable containers with one
 CPU, 256 MiB of memory, no networking, no added capabilities, and no host mounts.
 It runs the supervisor core as PID 1 with a child and a TERM-ignoring descendant.
 Both graceful TERM and supervisor SIGKILL must stop the container and descendant
-activity within the test deadline. The runner fails on unexpected exit status or
+activity within the test deadline. The fixture distinguishes direct-child drain
+from verified containment: it exits as PID 1 without acknowledging containment or
+releasing a deployment lease, then the external runner checks namespace shutdown.
+The runner fails on unexpected exit status or
 OOM and removes its containers on exit. It tests the proposed container boundary;
 it does not certify per-child descendant cleanup on restart, host systemd behavior,
 deployment lease takeover, or measured production resource defaults.

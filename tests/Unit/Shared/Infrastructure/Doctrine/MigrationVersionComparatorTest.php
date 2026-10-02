@@ -34,6 +34,7 @@ final class MigrationVersionComparatorTest extends TestCase
         'DoctrineMigrations\\Version20261001170000',
         'DoctrineMigrations\\Version20261001171000',
         'DoctrineMigrations\\Version20261002120000',
+        'DoctrineMigrations\\Version20261002210000',
     ];
 
     public function testFreshPlanOrdersAllActualMigrationClassesByDependencies(): void
@@ -46,21 +47,21 @@ final class MigrationVersionComparatorTest extends TestCase
     public function testAppliedLegacyIdentitiesAreSkippedWithoutRenaming(): void
     {
         $applied = array_slice(self::ORDER, 0, 11);
-        $plan = $this->calculator($applied)->getPlanUntilVersion(new Version(self::ORDER[13]));
+        $plan = $this->calculator($applied)->getPlanUntilVersion(new Version(self::ORDER[array_key_last(self::ORDER)]));
 
         self::assertSame(array_slice(self::ORDER, 11), array_map(static fn ($item): string => (string) $item->getVersion(), $plan->getItems()));
     }
 
     public function testFullyAppliedPlanIsEmpty(): void
     {
-        $plan = $this->calculator(self::ORDER)->getPlanUntilVersion(new Version(self::ORDER[13]));
+        $plan = $this->calculator(self::ORDER)->getPlanUntilVersion(new Version(self::ORDER[array_key_last(self::ORDER)]));
 
         self::assertCount(0, $plan->getItems());
     }
 
     public function testLatestAvailableMigrationIsLatestTimestamp(): void
     {
-        self::assertSame(self::ORDER[13], (string) $this->calculator()->getMigrations()->getLast()->getVersion());
+        self::assertSame(self::ORDER[array_key_last(self::ORDER)], (string) $this->calculator()->getMigrations()->getLast()->getVersion());
     }
 
     public function testFutureTimestampsAndUnknownFormatsHaveDeterministicOrder(): void
@@ -70,12 +71,12 @@ final class MigrationVersionComparatorTest extends TestCase
             new Version('OtherMigrations\\Version20250101000000'),
             new Version('DoctrineMigrations\\VersionZCustom'),
             new Version('DoctrineMigrations\\Version20270101120000'),
-            new Version(self::ORDER[13]),
+            new Version(self::ORDER[array_key_last(self::ORDER)]),
         ];
         usort($versions, $comparator->compare(...));
 
         self::assertSame([
-            self::ORDER[13],
+            self::ORDER[array_key_last(self::ORDER)],
             'DoctrineMigrations\\Version20270101120000',
             'DoctrineMigrations\\VersionZCustom',
             'OtherMigrations\\Version20250101000000',

@@ -9,6 +9,11 @@ below are relative to this reference. Recheck them after dependency upgrades.
 DoctrineBundle 3.2.2, Migrations 3.9.7 and MigrationsBundle 4.0.0 at this review.
 Installed vendor metadata currently differs (ORM 3.6.7, DoctrineBundle 3.2.4).
 Inspect both; a fresh lockfile install and the current runtime need not match.
+DBAL 4.4.3's PostgreSQL exception converter leaves lock timeout SQLSTATE `55P03`
+as a generic `DriverException`; do not assume `LockWaitTimeoutException` applies.
+Check `getSQLState()` and the installed converter when classifying database errors.
+The disposable PostgreSQL 18 lease contention test verifies this behavior in
+[WorkerDeploymentLeaseTest](../../../../tests/Integration/WorkerDeploymentLeaseTest.php).
 Use `composer show --locked doctrine/orm` and `composer show doctrine/orm`, repeating
 for the relevant packages. Read installed implementation for generated SQL claims.
 

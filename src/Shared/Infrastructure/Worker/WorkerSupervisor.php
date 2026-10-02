@@ -13,9 +13,10 @@ use Throwable;
 #[Exclude]
 final class WorkerSupervisor
 {
-    /** @var array<string, array{definition: WorkerDefinition, child: ?WorkerChildProcess, state: string, restartAt: ?float, exitCode: ?int, terminationSignal: ?int, errorCode: ?string}> */
+    /** @var array<string, array{definition: WorkerDefinition, generation: int, identity: ?WorkerLaunchIdentity, containmentConfirmed: bool, plannedState: ?string, child: ?WorkerChildProcess, state: string, restartAt: ?float, exitCode: ?int, terminationSignal: ?int, errorCode: ?string}> */
     private array $workers = [];
 
+    private readonly string $supervisorBootId;
     private bool $draining = false;
     private ?float $lastTime = null;
 
@@ -23,7 +24,7 @@ final class WorkerSupervisor
      * Admission uses declared reservations only. Deployment containment must enforce actual resources and own descendants.
      *
      * @param list<WorkerDefinition> $definitions
-     * @param Closure(WorkerDefinition): WorkerChildProcess $launcher
+     * @param Closure(WorkerDefinition, WorkerLaunchIdentity): WorkerChildProcess $launcher
      */
     public function __construct(
         array $definitions,
@@ -31,7 +32,10 @@ final class WorkerSupervisor
         int $memoryLimitBytes,
         int $supervisorReservationBytes,
         private readonly Closure $launcher,
+        private readonly string $deploymentId,
+        ?string $supervisorBootId = null,
     ) {
+        $this->supervisorBootId = $supervisorBootId ?? bin2hex(random_bytes(16));
         if ($definitions === [] || $maxChildren < 1 || count($definitions) > $maxChildren
             || $memoryLimitBytes < 1 || $supervisorReservationBytes < 1 || $supervisorReservationBytes > $memoryLimitBytes
         ) {
@@ -40,6 +44,7 @@ final class WorkerSupervisor
         $reserved = $supervisorReservationBytes;
         $policies = [];
         foreach ($definitions as $definition) {
+            new WorkerLaunchIdentity($deploymentId, $this->supervisorBootId, $definition->id, 1);
             $policyId = spl_object_id($definition->restartPolicy);
             if (isset($this->workers[$definition->id]) || isset($policies[$policyId])) {
                 throw new InvalidArgumentException('Worker IDs and restart policy instances must be unique.');
@@ -51,6 +56,10 @@ final class WorkerSupervisor
             $policies[$policyId] = true;
             $this->workers[$definition->id] = [
                 'definition' => $definition,
+                'generation' => 0,
+                'identity' => null,
+                'containmentConfirmed' => true,
+                'plannedState' => null,
                 'child' => null,
                 'state' => 'starting',
                 'restartAt' => null,
@@ -80,7 +89,8 @@ final class WorkerSupervisor
                         $worker['terminationSignal'] = $child->terminationSignal();
                         $worker['child'] = null;
                         if ($this->draining) {
-                            $worker['state'] = 'stopped';
+                            $worker['plannedState'] = $worker['containmentConfirmed'] ? null : 'stopped';
+                            $worker['state'] = $worker['containmentConfirmed'] ? 'stopped' : 'awaiting_containment';
                         } else {
                             try {
                                 $this->scheduleRestart($worker, $now);
@@ -99,15 +109,23 @@ final class WorkerSupervisor
                 continue;
             }
             if ($this->draining) {
-                $worker['state'] = 'stopped';
+                $worker['plannedState'] = $worker['containmentConfirmed'] ? null : 'stopped';
+                $worker['state'] = $worker['containmentConfirmed'] ? 'stopped' : 'awaiting_containment';
                 $worker['restartAt'] = null;
+                continue;
+            }
+            if (!$worker['containmentConfirmed']) {
                 continue;
             }
             if ($worker['state'] === 'exhausted' || ($worker['restartAt'] !== null && $now < $worker['restartAt'])) {
                 continue;
             }
             try {
-                $worker['child'] = ($this->launcher)($worker['definition']);
+                ++$worker['generation'];
+                $worker['identity'] = new WorkerLaunchIdentity($this->deploymentId, $this->supervisorBootId, $worker['definition']->id, $worker['generation']);
+                $worker['containmentConfirmed'] = false;
+                $worker['plannedState'] = null;
+                $worker['child'] = ($this->launcher)($worker['definition'], $worker['identity']);
                 $worker['state'] = 'starting';
                 $worker['restartAt'] = null;
                 $worker['errorCode'] = null;
@@ -144,16 +162,22 @@ final class WorkerSupervisor
     }
 
     /**
-     * Readiness belongs to current PID-bound external heartbeat evidence, never merely a live process.
-     * @param array<string, int> $healthyPids
+     * Require current PID and full launch identity from externally verified heartbeat evidence.
+     * A live child or a PID reused by a later launch never supplies readiness by itself.
+     *
+     * @param array<string, mixed> $healthyWorkers Values contain a pid and the four-field identity array.
      */
-    public function isReady(array $healthyPids): bool
+    public function isReady(array $healthyWorkers): bool
     {
         if ($this->draining) {
             return false;
         }
         foreach ($this->workers as $id => $worker) {
-            if ($worker['state'] !== 'running' || $worker['child'] === null || ($healthyPids[$id] ?? null) !== $worker['child']->pid()) {
+            $evidence = $healthyWorkers[$id] ?? null;
+            if ($worker['state'] !== 'running' || $worker['child'] === null || $worker['identity'] === null
+                || !is_array($evidence) || ($evidence['pid'] ?? null) !== $worker['child']->pid()
+                || !is_array($evidence['identity'] ?? null) || !$worker['identity']->matches($evidence['identity'])
+            ) {
                 return false;
             }
         }
@@ -161,7 +185,27 @@ final class WorkerSupervisor
         return true;
     }
 
-    public function isStopped(): bool
+    /** Apply external containment proof only to the current, directly reaped launch attempt. */
+    public function acknowledgeContainment(WorkerLaunchIdentity $identity): bool
+    {
+        if (!isset($this->workers[$identity->workerId])) {
+            return false;
+        }
+        $worker = &$this->workers[$identity->workerId];
+        if ($worker['child'] !== null || $worker['identity'] === null || $worker['containmentConfirmed'] || $worker['plannedState'] === null
+            || !$worker['identity']->matches($identity->toArray())
+        ) {
+            return false;
+        }
+        $worker['containmentConfirmed'] = true;
+        $worker['state'] = $this->draining ? 'stopped' : $worker['plannedState'];
+        $worker['plannedState'] = null;
+
+        return true;
+    }
+
+    /** Direct-child reap alone does not prove that descendants have been contained. */
+    public function areDirectChildrenReaped(): bool
     {
         if (!$this->draining) {
             return false;
@@ -175,7 +219,21 @@ final class WorkerSupervisor
         return true;
     }
 
-    /** @return array<string, array{state: string, pid: ?int, restartAt: ?float, exitCode: ?int, terminationSignal: ?int, errorCode: ?string}> */
+    public function isStopped(): bool
+    {
+        if (!$this->areDirectChildrenReaped()) {
+            return false;
+        }
+        foreach ($this->workers as $worker) {
+            if (!$worker['containmentConfirmed']) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** @return array<string, array{state: string, pid: ?int, restartAt: ?float, exitCode: ?int, terminationSignal: ?int, errorCode: ?string, identity: ?array{deploymentId: string, supervisorBootId: string, workerId: string, generation: int}, containmentPending: bool, plannedState: ?string}> */
     public function snapshot(): array
     {
         $snapshot = [];
@@ -187,13 +245,16 @@ final class WorkerSupervisor
                 'exitCode' => $worker['exitCode'],
                 'terminationSignal' => $worker['terminationSignal'],
                 'errorCode' => $worker['errorCode'],
+                'identity' => $worker['identity']?->toArray(),
+                'containmentPending' => !$worker['containmentConfirmed'],
+                'plannedState' => $worker['plannedState'],
             ];
         }
 
         return $snapshot;
     }
 
-    /** @param array{definition: WorkerDefinition, child: ?WorkerChildProcess, state: string, restartAt: ?float, exitCode: ?int, terminationSignal: ?int, errorCode: ?string} $worker */
+    /** @param array{definition: WorkerDefinition, generation: int, identity: ?WorkerLaunchIdentity, containmentConfirmed: bool, plannedState: ?string, child: ?WorkerChildProcess, state: string, restartAt: ?float, exitCode: ?int, terminationSignal: ?int, errorCode: ?string} $worker */
     private function scheduleRestart(array &$worker, float $now): void
     {
         $delay = $worker['definition']->restartPolicy->nextDelay($now);
@@ -201,7 +262,11 @@ final class WorkerSupervisor
         if ($worker['restartAt'] !== null && !is_finite($worker['restartAt'])) {
             throw new InvalidArgumentException('Restart deadline must be finite.');
         }
-        $worker['state'] = $delay === null ? 'exhausted' : 'backoff';
+        $worker['plannedState'] = $delay === null ? 'exhausted' : 'backoff';
+        $worker['state'] = $worker['containmentConfirmed'] ? $worker['plannedState'] : 'awaiting_containment';
+        if ($worker['containmentConfirmed']) {
+            $worker['plannedState'] = null;
+        }
     }
 
     private function stopChildren(float $now): ?Throwable
@@ -210,17 +275,19 @@ final class WorkerSupervisor
         foreach ($this->workers as &$worker) {
             $worker['restartAt'] = null;
             if ($worker['child'] === null) {
-                $worker['state'] = 'stopped';
+                $worker['plannedState'] = $worker['containmentConfirmed'] ? null : 'stopped';
+                $worker['state'] = $worker['containmentConfirmed'] ? 'stopped' : 'awaiting_containment';
                 continue;
             }
             $worker['state'] = 'draining';
+            $worker['plannedState'] = 'stopped';
             try {
                 $worker['child']->requestStop($now, $worker['definition']->stopGraceSeconds);
                 if (!$worker['child']->poll($now)) {
                     $worker['exitCode'] = $worker['child']->exitCode();
                     $worker['terminationSignal'] = $worker['child']->terminationSignal();
                     $worker['child'] = null;
-                    $worker['state'] = 'stopped';
+                    $worker['state'] = 'awaiting_containment';
                 }
             } catch (Throwable $error) {
                 $worker['errorCode'] = 'stop_failed';
