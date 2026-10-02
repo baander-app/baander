@@ -102,6 +102,7 @@ final class FavoritesController
         ),
         responses: [
             new OA\Response(response: '201', description: 'Created', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', ref: new Model(type: \App\Favorites\Interface\Resource\FavoriteResource::class))])),
+            new OA\Response(response: '422', description: 'Invalid favorite payload'),
         ],
     )]
     #[Route('/', name: 'add', methods: ['POST'])]

@@ -128,6 +128,28 @@ connection. They cover deferred flush, outer rollback, and committed revocation
 with stale cache entries. Older workers still use their old cache semantics until
 upgraded; these checks do not certify a mixed-version rollout.
 
+## Favorite validation and installation corrections
+
+`AddFavoriteRequest` now validates the documented song, album, and artist types
+before dispatch. Real-validator tests first reproduced unsupported values being
+accepted. All 11 Favorites controller tests now pass, including HTTP 422 for an
+unsupported type and an empty favorites list afterward. The test firewall uses its
+test authenticator; production bearer-token/DPoP behavior is outside this check.
+
+Preparing the disposable database exposed alphabetical migration ordering that
+placed alterations before legacy table creation. `MigrationVersionComparator`
+orders the existing identities without modifying historical SQL or names. Plan
+regressions cover all 14 migrations, applied-version skipping, and a completed
+history. The disposable PostgreSQL run executes all 14 migrations; a second run
+reports no pending work. This is fresh-install evidence and plan-level upgrade
+coverage, not a production backup/restore rehearsal or full downgrade certification.
+
+The functional runner uses a fresh checkout directory and explicit disposable
+service settings. PHPUnit database/Redis defaults now allow environment overrides.
+The root OpenAPI export remains stale: Favorites routes are absent, and the existing
+201 response documentation/client envelope disagrees with the flat API response.
+The source annotation now documents 422; full contract regeneration remains open.
+
 ## Recommended follow-up changes
 
 These are separate reviewable changes. No baseline expansion or suppression is a
@@ -136,7 +158,6 @@ been reproduced end to end.
 
 | Priority | Evidence | Proposed change and acceptance |
 |---|---|---|
-| High | AddFavoriteRequest lacks Choice validation; the handler calls FavoriteType::from and a functional test characterizes HTTP 500. | Add executable validation and replace the characterization with the intended client-error contract. Verify through the firewall. |
 | Medium | Independent skill trial found NotBlank on UpdatePreferenceRequest.enabled and an undefined-key expression in PreferenceController's missing-filter path. | Reproduce disabling with false and reading without category/channel through the firewall; correct validation and optional-input handling. These are static findings, not executed endpoint failures. |
 | Medium | PlaylistResource documents publicId as UUID, while the shared PublicId generates a 21-character NanoID. | Correct identifier schemas and regenerate affected clients together; verify actual identifier formats in contract tests. |
 | Medium | useAudioPlayback destroys its service during cleanup but keeps an initialized guard; the app uses StrictMode. | Add a StrictMode setup/cleanup/replay regression, reproduce the lifecycle failure, and restore symmetric ownership. Static finding pending runtime reproduction. |

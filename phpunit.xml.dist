@@ -19,8 +19,8 @@
         <server name="APP_ENV" value="test" force="true"/>
         <server name="SHELL_VERBOSITY" value="-1"/>
         <server name="KERNEL_CLASS" value="App\Kernel"/>
-        <server name="DATABASE_URL" value="postgresql://baander:baander@database:5432/baander_test?serverVersion=18&amp;charset=utf8" force="true"/>
-        <server name="REDIS_URL" value="redis://default:baander@redis:6379" force="true"/>
+        <env name="DATABASE_URL" value="postgresql://baander:baander@database:5432/baander_test?serverVersion=18&amp;charset=utf8"/>
+        <env name="REDIS_URL" value="redis://default:baander@redis:6379"/>
         <server name="MESSENGER_TRANSPORT_DSN" value="in-memory://" force="true"/>
     </php>
 

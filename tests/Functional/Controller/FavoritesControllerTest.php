@@ -110,19 +110,24 @@ final class FavoritesControllerTest extends TestCase
         $this->assertSame('song', $data['entityType']);
     }
 
-    public function testAddWithInvalidEntityTypeReturns500(): void
+    public function testAddWithInvalidEntityTypeFailsValidation(): void
     {
-        // BUG PIN: AddFavoriteRequest has NotBlank but no Choice constraint on
-        // entityType. An invalid type passes DTO validation, then the handler's
-        // FavoriteType::from() throws ValueError → 500 instead of 422.
-        $user = $this->createTestUser();
+        $user = $this->createTestUser('favorite-validation-' . bin2hex(random_bytes(4)) . '@baander.app');
 
         $response = $this->authenticatedRequest('POST', '/api/favorites/', $user, [
             'entityType' => 'movie',
             'entityPublicId' => 'movie-1',
         ]);
 
-        $this->assertSame(500, $response->getStatusCode(), 'Invalid entityType produces 500 (missing Choice constraint).');
+        $data = $this->assertJsonResponse($response, 422);
+        $this->assertArrayHasKey('entityType', $data['error']['details']);
+
+        $favorites = $this->assertJsonResponse(
+            $this->authenticatedRequest('GET', '/api/favorites/', $user),
+            200,
+        );
+        $this->assertSame([], $favorites['data']);
+        $this->assertSame(0, $favorites['meta']['total']);
     }
 
     public function testAddWithBlankEntityPublicIdFailsValidation(): void

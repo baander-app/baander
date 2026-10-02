@@ -21,6 +21,7 @@ For strict unit and messaging checks, run from the checkout:
 ```bash
 bash scripts/test-unit-container.sh
 bash scripts/test-messaging-container.sh
+bash scripts/test-functional-container.sh tests/Functional/Controller/FavoritesControllerTest.php
 ```
 
 These require Docker and installed Composer dependencies. The unit runner uses
@@ -60,6 +61,22 @@ make exec cmd="./vendor/bin/phpunit -c phpunit.xml.dist --filter testCreateAlbum
 # Run with Xdebug off (faster)
 make exec cmd="XDEBUG_MODE=off ./vendor/bin/phpunit -c phpunit.xml.dist"
 ```
+
+The functional runner creates an isolated PostgreSQL/Redis network, extracts the
+checkout into a fresh directory, and runs all migrations twice before executing the
+requested PHPUnit paths or options. With no arguments it selects `tests/Functional`.
+The second migration run checks that the recorded history produces no pending work.
+It uses a 512 MiB PHP limit and a 300-second overall timeout. Database and Redis
+values supplied through the environment override the tracked PHPUnit defaults.
+The test firewall uses the test authenticator; this does not verify production
+bearer-token or DPoP authentication. The Favorites controller selection is verified;
+the runner's availability does not establish that the entire functional suite passes.
+
+Migration ordering is configured through `MigrationVersionComparator`. It preserves
+legacy class identities while placing their table creation before dependent changes.
+New migrations use `VersionYYYYMMDDHHMMSS`; unfamiliar naming formats need an
+explicit ordering review. Do not rename applied migrations to change their order.
+Existing irreversible migrations still prevent a general full downgrade.
 
 ## Coverage
 
