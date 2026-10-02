@@ -499,7 +499,7 @@ COPY --from=builder /usr/bin/composer /usr/bin/composer
 
 # Copy Composer files and patches first for layer caching.
 # The patches directory is needed by cweagans/composer-patches during install.
-COPY composer.json composer.lock ./
+COPY composer.json composer.lock patches.lock.json ./
 COPY patches/ ./patches/
 
 # Install production dependencies only.

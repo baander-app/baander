@@ -1,5 +1,5 @@
 {
-    "_hash": "c054570b57a192469f6961451485faa6fdbe62bb520e5af1ebdee7f8170e0f38",
+    "_hash": "051e86427fc07da8738b9cf88f6e4db3064d1e460814f877e9379e56bcf43f81",
     "patches": {
         "swoole-bundle/z-engine": [
             {
@@ -7,6 +7,18 @@
                 "description": "PHP 8.5 ZTS init + typed properties",
                 "url": "patches/swoole-bundle-z-engine-php85-zts-init.patch",
                 "sha256": "4512aa219c9c94b9953ff710281d0527e04387c32f4db97e9eff8ba9e93e4de8",
+                "depth": 1,
+                "extra": {
+                    "provenance": "root"
+                }
+            }
+        ],
+        "symfony/redis-messenger": [
+            {
+                "package": "symfony/redis-messenger",
+                "description": "Keep delayed deliveries recoverable until stream insertion succeeds",
+                "url": "patches/symfony-redis-messenger-recoverable-delays.patch",
+                "sha256": "4aa129bfac98f360f12943842e22272b721d3e4e1a46a2c399cf1e0d256a7afc",
                 "depth": 1,
                 "extra": {
                     "provenance": "root"

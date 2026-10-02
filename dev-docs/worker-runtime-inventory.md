@@ -47,11 +47,13 @@ supply the same durable consumer-group/retry contract. The current local busy
 heartbeat still ages out after an hour; renewable long-job health belongs in the
 supervisor lifecycle work.
 
-The installed Redis transport promotes delayed retries with separate `ZPOPMIN`
-and stream-add operations. A crash or rejected stream write between those steps
-can lose an accepted retry. Atomic or recoverable promotion, explicit admission
-limits and Redis crash persistence remain release gates; disabling stream trimming
-does not resolve those durability boundaries.
+The Redis transport now carries a locked Composer patch for recoverable delayed
+promotion. It selects a due member, inserts it into the stream, and only then
+removes the exact delayed member. Failed insertion preserves the retry; interrupted
+removal or concurrent pollers may duplicate it. Each poll promotes at most 100
+messages. See [patch notes](../patches/README.md). Poison delayed members and memory
+pressure can still block polling, so quarantine, admission/backpressure and Redis
+crash persistence remain release gates.
 
 ## Nested dispatch and durable delivery
 
@@ -284,6 +286,17 @@ an abandoned delivery can be reclaimed with its original payload. Application-im
 probes confirm PCNTL alarm support with Swoole loaded in ordinary CLI mode. These
 checks do not certify Redis host-crash persistence, delayed-retry promotion or
 full supervisor shutdown and containment.
+
+Delayed-promotion regressions first reproduced an accepted retry disappearing
+when Redis rejected stream insertion. With the patch applied, the canonical
+messaging runner passes 33 tests with 783 assertions, including interrupted
+removal, future due times, the 100-message promotion bound and retained poison
+members. The full unit/rule suite passes 3,161 tests with 11,564 assertions.
+A clean isolated Composer install of locked Redis Messenger 8.0.8 and Composer
+Patches 2.0.0 applies the checksum-locked patch and matches the local patched file.
+Dependency versions remain unchanged; production Docker dependency setup now
+copies the patch lockfile. Composer validation has only the existing loose-version
+constraint warnings. This does not certify the full production image build.
 
 This is source inspection of routing, all application Bootable implementations,
 timer/coroutine creation sites, tagged CPU handlers, scheduler providers, private

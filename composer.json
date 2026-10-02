@@ -150,6 +150,9 @@
     "patches": {
       "swoole-bundle/z-engine": {
         "PHP 8.5 ZTS init + typed properties": "patches/swoole-bundle-z-engine-php85-zts-init.patch"
+      },
+      "symfony/redis-messenger": {
+        "Keep delayed deliveries recoverable until stream insertion succeeds": "patches/symfony-redis-messenger-recoverable-delays.patch"
       }
     }
   },

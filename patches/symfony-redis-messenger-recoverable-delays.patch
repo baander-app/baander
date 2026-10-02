@@ -1,0 +1,41 @@
+--- a/Transport/Connection.php
++++ b/Transport/Connection.php
+@@ -460,26 +460,21 @@
+         $now = substr($now, 11).substr($now, 2, 3);
+
+-        $queuedMessageCount = $this->rawCommand('ZCOUNT', 0, $now) ?? 0;
+-
+-        while ($queuedMessageCount--) {
+-            if (!$message = $this->rawCommand('ZPOPMIN', 1)) {
++        // Bound promotion work so a due backlog cannot monopolize each poll.
++        for ($promoted = 0; $promoted < 100; ++$promoted) {
++            if (!$messages = $this->rawCommand('ZRANGEBYSCORE', 0, $now, 'LIMIT', 0, 1)) {
+                 break;
+             }
+
+-            [$queuedMessage, $expiry] = $message;
+-
+-            if (\strlen($expiry) === \strlen($now) ? $expiry > $now : \strlen($expiry) < \strlen($now)) {
+-                // if a future-placed message is popped because of a race condition with
+-                // another running consumer, the message is readded to the queue
+-
+-                if (!$this->rawCommand('ZADD', 'NX', $expiry, $queuedMessage)) {
+-                    throw new TransportException('Could not add a message to the redis stream.');
+-                }
+-
+-                break;
+-            }
+-
++            $queuedMessage = $messages[0];
+             $decodedQueuedMessage = json_decode($queuedMessage, true);
++            if (!\is_array($decodedQueuedMessage)) {
++                throw new TransportException('Invalid message in the Redis delay queue.');
++            }
++
++            // Keep the original member until insertion is acknowledged. A failed
++            // or uncertain insertion is recoverable; interruption after insertion
++            // or concurrent pollers can cause duplicates (at-least-once delivery).
+             $this->add(\array_key_exists('body', $decodedQueuedMessage) ? $decodedQueuedMessage['body'] : $queuedMessage, $decodedQueuedMessage['headers'] ?? [], 0);
++            $this->rawCommand('ZREM', $queuedMessage);
+         }
+     }
