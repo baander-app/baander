@@ -38,7 +38,7 @@ final class SendEmailHandlerTest extends TestCase
             $this->mailer,
             $this->twig,
             $this->logger,
-            'example.com',
+            'baander.app',
             'TestApp',
         );
     }
@@ -50,7 +50,7 @@ final class SendEmailHandlerTest extends TestCase
     ): SendEmailCommand {
         return new SendEmailCommand(
             userId: Uuid::generate(),
-            userEmail: 'user@example.com',
+            userEmail: 'user@baander.app',
             category: $category,
             title: $title,
             body: $body,
@@ -73,7 +73,7 @@ final class SendEmailHandlerTest extends TestCase
         $this->mailer->expects($this->once())->method('send')
             ->with($this->callback(function (Email $email) {
                 $to = $email->getTo();
-                return $to[0]->getAddress() === 'user@example.com'
+                return $to[0]->getAddress() === 'user@baander.app'
                     && str_contains($email->getSubject(), 'Password Changed')
                     && str_contains($email->getSubject(), 'TestApp');
             }));
@@ -114,7 +114,7 @@ final class SendEmailHandlerTest extends TestCase
                     return $context['category'] === 'background_jobs'
                         && $context['title'] === 'Library Scan Completed'
                         && $context['appName'] === 'TestApp'
-                        && $context['appDomain'] === 'example.com'
+                        && $context['appDomain'] === 'baander.app'
                         && $context['headerColor'] === '#16213e'
                         && $context['headerTitle'] === 'TestApp';
                 }),
@@ -141,6 +141,8 @@ final class SendEmailHandlerTest extends TestCase
                 }),
             );
 
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Template not found');
         $this->createHandler()($command);
     }
 
@@ -163,6 +165,8 @@ final class SendEmailHandlerTest extends TestCase
                 }),
             );
 
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('SMTP connection failed');
         $this->createHandler()($command);
     }
 }

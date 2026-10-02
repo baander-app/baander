@@ -16,6 +16,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class WebhookRedirectTest extends TestCase
@@ -23,7 +24,7 @@ final class WebhookRedirectTest extends TestCase
     public function testDeliveryPinsTheAllowedLanAddressAndNeverFollowsRedirects(): void
     {
         $webhook = new WebhookEntity(Uuid::generate());
-        $webhook->setUrl('http://192.168.1.2/hook');
+        $webhook->setUrl('http://lan.baander.app/hook');
         $webhook->setSecretHash('legacy-key');
         $repository = $this->createStub(EntityRepository::class);
         $repository->method('findAll')->willReturn([$webhook]);
@@ -33,14 +34,20 @@ final class WebhookRedirectTest extends TestCase
         $em->expects(self::once())->method('flush');
         $client = new MockHttpClient(function (string $method, string $url, array $options): MockResponse {
             self::assertSame('POST', $method);
-            self::assertSame('http://192.168.1.2/hook', $url);
+            self::assertSame('http://lan.baander.app/hook', $url);
             self::assertSame(0, $options['max_redirects']);
             self::assertSame('', $options['proxy']);
-            self::assertSame(['192.168.1.2' => '192.168.1.2'], $options['resolve']);
+            self::assertSame(['lan.baander.app' => '192.168.1.2'], $options['resolve']);
             return new MockResponse('', ['http_code' => 302, 'response_headers' => ['Location: http://169.254.169.254/']]);
         });
-        $service = new WebhookDeliveryService($em, $client, new HmacSigner(), new NullLogger(), new JsonEncoder(), new WebhookDestinationPolicy(['192.168.1.2']));
-        $service->deliverAll('title', 'body', NotificationCategory::Security, 'event-id', Uuid::generate());
+        $service = new WebhookDeliveryService($em, $client, new HmacSigner(), new NullLogger(), new JsonEncoder(), new WebhookDestinationPolicy(['192.168.1.2'], dnsResolver: static fn (string $host): array => ['192.168.1.2']));
+        $failure = null;
+        try {
+            $service->deliverAll('title', 'body', NotificationCategory::Security, 'event-id', Uuid::generate());
+        } catch (UnrecoverableMessageHandlingException $exception) {
+            $failure = $exception;
+        }
+        self::assertInstanceOf(UnrecoverableMessageHandlingException::class, $failure);
         self::assertSame(1, $client->getRequestsCount());
     }
 }

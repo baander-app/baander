@@ -34,6 +34,8 @@ final class SendWebhookHandler
                 'notification_id' => $command->notificationPublicId,
                 'exception' => $e->getMessage(),
             ]);
+
+            throw $e;
         }
     }
 }

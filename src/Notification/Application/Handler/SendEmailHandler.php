@@ -64,6 +64,8 @@ final class SendEmailHandler
                 'category' => $command->category->value,
                 'exception' => $e->getMessage(),
             ]);
+
+            throw $e;
         }
     }
 }

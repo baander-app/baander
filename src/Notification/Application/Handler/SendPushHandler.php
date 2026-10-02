@@ -9,7 +9,6 @@ use App\Notification\Infrastructure\Doctrine\Entity\PushSubscriptionEntity;
 use App\Notification\Infrastructure\Push\PushSubscriptionRepositoryInterface;
 use App\Notification\Domain\Repository\NotificationPreferenceRepositoryInterface;
 use App\Notification\Domain\ValueObject\NotificationChannel;
-use App\Shared\Domain\Model\Uuid;
 use Minishlink\WebPush\Subscription;
 use Minishlink\WebPush\WebPush;
 use Psr\Log\LoggerInterface;
@@ -53,30 +52,51 @@ final class SendPushHandler
             'url' => sprintf('https://%s/notifications/%s', $this->appDomain, $command->notificationPublicId),
         ], 'json');
 
+        $failureCount = 0;
+        $firstFailure = null;
+
         foreach ($subscriptions as $entity) {
-            $this->sendToSubscription($entity, $payload);
+            try {
+                $this->sendToSubscription($entity, $payload);
+            } catch (\Throwable $e) {
+                ++$failureCount;
+                $firstFailure ??= $e;
+                $this->logger->error('Failed to send push notification.', [
+                    'channel' => 'notification.push',
+                    'notification_id' => $command->notificationPublicId,
+                    'endpoint' => $entity->getEndpoint(),
+                    'exception' => $e,
+                ]);
+            }
+        }
+
+        if ($firstFailure !== null) {
+            throw new \RuntimeException(sprintf('Push delivery failed for %d subscription(s).', $failureCount), 0, $firstFailure);
         }
     }
 
     private function sendToSubscription(PushSubscriptionEntity $entity, string $payload): void
     {
-        try {
-            $subscription = Subscription::create([
-                'endpoint' => $entity->getEndpoint(),
-                'keys' => [
-                    'p256dh' => $entity->getPublicKey(),
-                    'auth' => $entity->getAuthKey(),
-                ],
-                'contentEncoding' => $entity->getContentEncoding(),
-            ]);
+        $subscription = Subscription::create([
+            'endpoint' => $entity->getEndpoint(),
+            'keys' => [
+                'p256dh' => $entity->getPublicKey(),
+                'auth' => $entity->getAuthKey(),
+            ],
+            'contentEncoding' => $entity->getContentEncoding(),
+        ]);
 
-            $this->webPush->sendOneNotification($subscription, $payload);
-        } catch (\Throwable $e) {
-            $this->logger->error('Failed to send push notification.', [
-                'channel' => 'notification.push',
-                'endpoint' => $entity->getEndpoint(),
-                'exception' => $e->getMessage(),
-            ]);
+        $report = $this->webPush->sendOneNotification($subscription, $payload);
+
+        if ($report->isSuccess()) {
+            return;
         }
+
+        if ($report->isSubscriptionExpired()) {
+            $this->subscriptionRepository->remove($entity);
+            return;
+        }
+
+        throw new \RuntimeException(sprintf('Push service rejected notification: %s', $report->getReason()));
     }
 }

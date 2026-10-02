@@ -12,6 +12,7 @@ use App\Notification\Infrastructure\Doctrine\Entity\WebhookEntity;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -40,13 +41,38 @@ final class WebhookDeliveryService
         Uuid $userId,
     ): void {
         $webhooks = $this->loadWebhooks();
+        $failureCount = 0;
+        $firstTransientFailure = null;
+        $firstPermanentFailure = null;
 
         foreach ($webhooks as $webhook) {
             if (!$this->matchesCategoryFilter($webhook, $category)) {
                 continue;
             }
 
-            $this->deliver($webhook, $title, $body, $category, $notificationId);
+            try {
+                $this->deliver($webhook, $title, $body, $category, $notificationId);
+            } catch (\Throwable $e) {
+                ++$failureCount;
+                if ($e instanceof UnrecoverableMessageHandlingException) {
+                    $firstPermanentFailure ??= $e;
+                } else {
+                    $firstTransientFailure ??= $e;
+                }
+                $this->logger->error('Webhook delivery did not complete.', [
+                    'channel' => 'notification.webhook',
+                    'webhook_id' => $webhook->getId()->toString(),
+                    'notification_id' => $notificationId,
+                    'exception' => $e,
+                ]);
+            }
+        }
+
+        if ($firstTransientFailure !== null) {
+            throw new \RuntimeException(sprintf('Webhook delivery failed for %d destination(s).', $failureCount), 0, $firstTransientFailure);
+        }
+        if ($firstPermanentFailure !== null) {
+            throw new UnrecoverableMessageHandlingException(sprintf('Webhook delivery permanently failed for %d destination(s).', $failureCount), 0, $firstPermanentFailure);
         }
     }
 
@@ -87,7 +113,10 @@ final class WebhookDeliveryService
                 'url' => $url,
             ]);
 
-            return;
+            $this->logDelivery($webhook, $notificationId, 'failed', null, 0);
+            // A null result can also mean DNS is temporarily unavailable. Keep
+            // the request blocked and let Messenger's bounded retries recheck it.
+            throw new \RuntimeException('Webhook destination could not be safely resolved.');
         }
 
         $payload = $this->jsonEncoder->encode([
@@ -104,6 +133,7 @@ final class WebhookDeliveryService
         $resolve = [$safe['host'] => $safe['ips'][0]];
 
         $lastStatusCode = null;
+        $lastFailure = null;
 
         try {
             $signingSecret = match ($webhook->getSigningVersion()) {
@@ -112,10 +142,10 @@ final class WebhookDeliveryService
                     ?? throw new \RuntimeException('Webhook secret encryption is not configured.'),
                 default => throw new \RuntimeException('Unsupported webhook signature version.'),
             };
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
             $this->logger->error('Webhook signing secret could not be decrypted.', ['webhook_id' => $webhook->getId()->toString()]);
             $this->logDelivery($webhook, $notificationId, 'failed', null, 0);
-            return;
+            throw $e;
         }
 
         for ($attempt = 1; $attempt <= self::MAX_RETRIES; $attempt++) {
@@ -123,6 +153,7 @@ final class WebhookDeliveryService
             // receivers that enforce signature freshness.
             $timestamp = (string) time();
             $signature = $this->hmacSigner->sign($timestamp . '.' . $payload, $signingSecret);
+            $statusCode = null;
 
             try {
                 $response = $this->httpClient->request('POST', $url, [
@@ -131,10 +162,12 @@ final class WebhookDeliveryService
                         'X-Webhook-Signature' => $signature,
                         'X-Webhook-Signature-Version' => (string) $webhook->getSigningVersion(),
                         'X-Webhook-Timestamp' => $timestamp,
+                        'Idempotency-Key' => hash('sha256', $notificationId . ':' . $webhook->getId()->toString()),
                         'User-Agent' => 'Baander-Webhook/1.0',
                     ],
                     'body' => $payload,
                     'timeout' => 10,
+                    'max_duration' => 10,
                     'resolve' => $resolve,
                     'max_redirects' => 0,
                     'proxy' => '',
@@ -142,10 +175,22 @@ final class WebhookDeliveryService
 
                 $statusCode = $response->getStatusCode();
                 $lastStatusCode = $statusCode;
+            } catch (\Throwable $e) {
+                $lastFailure = $e;
+                $this->logger->error('Webhook delivery failed.', [
+                    'channel' => 'notification.webhook',
+                    'webhook_id' => $webhook->getId()->toString(),
+                    'notification_id' => $notificationId,
+                    'attempt' => $attempt,
+                    'exception' => $e->getMessage(),
+                ]);
+            }
 
+            // Persistence failures must escape to Messenger without sending an
+            // already accepted HTTP request again inside this attempt loop.
+            if ($statusCode !== null) {
                 if ($statusCode >= 200 && $statusCode < 300) {
                     $this->logDelivery($webhook, $notificationId, 'success', $statusCode, $attempt);
-
                     return;
                 }
 
@@ -157,23 +202,16 @@ final class WebhookDeliveryService
                     'attempt' => $attempt,
                 ]);
 
-                if ($statusCode >= 300 && $statusCode < 500) {
+                if ($statusCode >= 300 && $statusCode < 500 && !in_array($statusCode, [408, 429], true)) {
                     $this->logDelivery($webhook, $notificationId, 'failed', $statusCode, $attempt);
-
-                    return;
+                    throw new UnrecoverableMessageHandlingException(sprintf('Webhook returned permanent HTTP status %d.', $statusCode));
                 }
-            } catch (\Throwable $e) {
-                $this->logger->error('Webhook delivery failed.', [
-                    'channel' => 'notification.webhook',
-                    'webhook_id' => $webhook->getId()->toString(),
-                    'notification_id' => $notificationId,
-                    'attempt' => $attempt,
-                    'exception' => $e->getMessage(),
-                ]);
+
+                $lastFailure = new \RuntimeException(sprintf('Webhook returned retryable HTTP status %d.', $statusCode));
             }
 
             if ($attempt < self::MAX_RETRIES) {
-                $delay = self::BACKOFF_DELAYS[$attempt - 1] ?? 1;
+                $delay = self::BACKOFF_DELAYS[$attempt - 1];
                 Async::sleep($delay);
             }
         }
@@ -181,6 +219,7 @@ final class WebhookDeliveryService
         // Retries exhausted — log the last known status code. It is null only when
         // every attempt threw before receiving a response (e.g. network errors).
         $this->logDelivery($webhook, $notificationId, 'failed', $lastStatusCode, self::MAX_RETRIES);
+        throw $lastFailure;
     }
 
     private function logDelivery(
@@ -206,6 +245,7 @@ final class WebhookDeliveryService
                 'webhook_id' => $webhook->getId()->toString(),
                 'exception' => $e->getMessage(),
             ]);
+            throw $e;
         }
     }
 

@@ -15,6 +15,7 @@ use Doctrine\ORM\EntityRepository;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -50,7 +51,7 @@ final class WebhookDeliveryServiceTest extends TestCase
             $this->hmacSigner,
             $this->logger,
             new JsonEncoder(),
-            new WebhookDestinationPolicy(dnsResolver: static fn (string $host): array => $host === 'example.com' ? ['93.184.216.34'] : []),
+            new WebhookDestinationPolicy(dnsResolver: static fn (string $host): array => $host === 'baander.app' ? ['93.184.216.34'] : []),
         );
         return $fixture;
     }
@@ -68,8 +69,8 @@ final class WebhookDeliveryServiceTest extends TestCase
 
     public function testIsUrlSafeBlocksInvalidScheme(): void
     {
-        $this->assertFalse($this->service->isUrlSafe('ftp://example.com/webhook'));
-        $this->assertFalse($this->service->isUrlSafe('gopher://example.com/webhook'));
+        $this->assertFalse($this->service->isUrlSafe('ftp://baander.app/webhook'));
+        $this->assertFalse($this->service->isUrlSafe('gopher://baander.app/webhook'));
         $this->assertFalse($this->service->isUrlSafe('file:///etc/passwd'));
     }
 
@@ -82,7 +83,7 @@ final class WebhookDeliveryServiceTest extends TestCase
     public function testIsUrlSafeAllowsPublicDnsUrl(): void
     {
         // DNS input is deterministic; the real destination policy still validates it.
-        $this->assertTrue($this->service->isUrlSafe('https://example.com/webhook'));
+        $this->assertTrue($this->service->isUrlSafe('https://baander.app/webhook'));
     }
 
     public function testIsUrlSafeBlocksUrlWithoutHost(): void
@@ -96,7 +97,7 @@ final class WebhookDeliveryServiceTest extends TestCase
         $this->service = $this->createWebhookDeliveryServiceFixture();
 
         $webhook = new WebhookEntity(Uuid::generate());
-        $webhook->setUrl('https://example.com/webhook');
+        $webhook->setUrl('https://baander.app/webhook');
         $webhook->setCategoryFilter(['security']);
         $webhook->setSecretHash('hashed');
 
@@ -129,6 +130,7 @@ final class WebhookDeliveryServiceTest extends TestCase
 
         $this->httpClient->expects($this->never())->method('request');
         $this->logger->expects($this->once())->method('warning');
+        $this->expectException(\RuntimeException::class);
 
         $this->service->deliverAll(
             title: 'Test',
@@ -145,7 +147,7 @@ final class WebhookDeliveryServiceTest extends TestCase
         $this->service = $this->createWebhookDeliveryServiceFixture();
 
         $webhook = new WebhookEntity(Uuid::generate());
-        $webhook->setUrl('https://example.com/webhook');
+        $webhook->setUrl('https://baander.app/webhook');
         $webhook->setCategoryFilter(null);
         $webhook->setSecretHash('hashed');
 
@@ -175,7 +177,7 @@ final class WebhookDeliveryServiceTest extends TestCase
 
         // null category filter means "all categories"
         $webhook = new WebhookEntity(Uuid::generate());
-        $webhook->setUrl('https://example.com/webhook');
+        $webhook->setUrl('https://baander.app/webhook');
         $webhook->setCategoryFilter(null); // all categories
         $webhook->setSecretHash('hashed');
 
@@ -220,7 +222,7 @@ final class WebhookDeliveryServiceTest extends TestCase
         $this->service = $this->createWebhookDeliveryServiceFixture();
 
         $webhook = new WebhookEntity(Uuid::generate());
-        $webhook->setUrl('https://example.com/webhook');
+        $webhook->setUrl('https://baander.app/webhook');
         $webhook->setCategoryFilter(null);
         $webhook->setSecretHash('hashed');
 
@@ -249,8 +251,10 @@ final class WebhookDeliveryServiceTest extends TestCase
         // client cannot re-resolve the host to a private address (DNS rebinding).
         $this->assertIsArray($capturedOptions);
         $this->assertArrayHasKey('resolve', $capturedOptions);
-        $this->assertArrayHasKey('example.com', $capturedOptions['resolve']);
-        $this->assertNotSame('', $capturedOptions['resolve']['example.com']);
+        $this->assertArrayHasKey('baander.app', $capturedOptions['resolve']);
+        $this->assertNotSame('', $capturedOptions['resolve']['baander.app']);
+        $this->assertSame(10, $capturedOptions['timeout']);
+        $this->assertSame(10, $capturedOptions['max_duration']);
     }
 
     public function testDeliverResignsSignaturePerAttempt(): void
@@ -259,7 +263,7 @@ final class WebhookDeliveryServiceTest extends TestCase
         $this->service = $this->createWebhookDeliveryServiceFixture();
 
         $webhook = new WebhookEntity(Uuid::generate());
-        $webhook->setUrl('https://example.com/webhook');
+        $webhook->setUrl('https://baander.app/webhook');
         $webhook->setCategoryFilter(null);
         $webhook->setSecretHash('hashed');
 
@@ -293,7 +297,7 @@ final class WebhookDeliveryServiceTest extends TestCase
     public function testDeliverLogsLastKnownStatusCodeOnFailure(): void
     {
         $webhook = new WebhookEntity(Uuid::generate());
-        $webhook->setUrl('https://example.com/webhook');
+        $webhook->setUrl('https://baander.app/webhook');
         $webhook->setCategoryFilter(null);
         $webhook->setSecretHash('hashed');
 
@@ -309,13 +313,20 @@ final class WebhookDeliveryServiceTest extends TestCase
                 $persisted = $entity;
             });
 
-        $this->service->deliverAll(
-            title: 'T',
-            body: 'B',
-            category: NotificationCategory::Security,
-            notificationId: 'n1',
-            userId: Uuid::generate(),
-        );
+        $failure = null;
+        try {
+            $this->service->deliverAll(
+                title: 'T',
+                body: 'B',
+                category: NotificationCategory::Security,
+                notificationId: 'n1',
+                userId: Uuid::generate(),
+            );
+        } catch (\RuntimeException $exception) {
+            $failure = $exception;
+        }
+        self::assertInstanceOf(\RuntimeException::class, $failure);
+        self::assertNotInstanceOf(UnrecoverableMessageHandlingException::class, $failure);
 
         // Pre-fix the terminal failure log was written with status_code=null even
         // though every attempt returned 500; it must now record the last known code.

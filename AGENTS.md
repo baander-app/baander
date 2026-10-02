@@ -1,3 +1,24 @@
+## Test domains
+
+Use `baander.app` or its subdomains for domain names in test code, fixtures,
+and test email addresses. Do not use placeholder domains
+such as `example.com`, `example.org`, or `example.net`. Keep HTTP and DNS mocked
+or explicitly routed to disposable local services; using the project domain does
+not authorize contacting production. Preserve literal IP-address cases needed
+to test networking and security boundaries.
+
+## PostgreSQL
+
+When designing, reviewing, or changing PostgreSQL schemas, migrations, queries,
+or connection configuration, follow the PostgreSQL wiki's
+[Don't Do This](https://wiki.postgresql.org/wiki/Don%27t_Do_This) guidance, including
+its documented exceptions. Use the repository's
+[postgres-remediation skill](.agents/skills/postgres-remediation/SKILL.md) to audit
+affected code and prepare, implement, and verify remedies. Explain any applicable
+exception; do not silently ignore a finding or expand the task into unrelated
+schema rewrites. These PostgreSQL rules do not change the registry's SQLite/rqlite
+architecture.
+
 <pi-intercom>
 Coordinate with other local pi sessions on related codebases. Use `/skill:pi-intercom` for patterns.
 

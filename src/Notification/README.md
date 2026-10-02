@@ -53,3 +53,21 @@ $valid = hash_equals($expected, $signature);
 Read `$timestamp` from `X-Webhook-Timestamp` and `$signature` from `X-Webhook-Signature`. Check timestamp freshness and deduplicate using `notification_id`; delivery can be retried. `X-Webhook-Signature-Version: 2` uses the original secret. Version 1 preserves the historical key `hash('sha256', $secret)` until the webhook is rotated.
 
 Version 2 secrets are encrypted using Defuse and `APP_SECRET`. Back up that secret alongside the database, and keep it consistent across workers. A restore needs the matching `APP_SECRET`; an incorrect key fails delivery rather than changing the signature scheme. Before changing `APP_SECRET`, pause webhook delivery and arrange rotation of each webhook and its receiver. If the old key is lost, rotate each affected webhook to establish a new shared secret. The additive migration preserves version 1 rows; rollback after creating version 2 webhooks requires a matching pre-migration database backup.
+
+Webhook requests include an `Idempotency-Key` derived from the notification ID and
+webhook ID. It stays the same across retries. Request timestamps and signatures
+can change, so receivers should treat the key as the operation identity rather
+than assuming retried request bodies are byte-for-byte identical.
+
+Transient HTTP failures, including 408 and 429, receive up to three attempts per
+handler invocation, each with a 10-second total request limit. Exhausted failures
+propagate to Messenger's bounded retry and failure-queue handling. Redirects and
+other 4xx responses are permanent failures; if the whole failed batch is permanent,
+Messenger sends it to the failure queue without retrying. A destination that cannot
+be resolved safely sends no HTTP request and remains retryable because the policy
+also returns that result during DNS outages.
+
+Every matching destination is attempted before a batch failure is reported. A
+retry after partial success can repeat delivery to successful destinations;
+receivers still need deduplication. Email failures and unsuccessful push reports
+also propagate to Messenger. Expired push subscriptions are removed.
