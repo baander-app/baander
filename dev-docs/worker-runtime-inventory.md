@@ -1,0 +1,231 @@
+# Worker runtime inventory
+
+Verified against source on 2026-10-02 for stage 1 of the
+[web and worker runtime redesign](../docs/plans/2026-07-17-001-feat-messenger-enterprise-hardening-plan.md).
+The two commands `app:serve` and `app:worker`, queue families, and capacity policies
+below are proposed deployment interfaces. This inventory does not implement them
+or certify runtime resource defaults.
+
+## Current asynchronous routes
+
+[messenger.yaml](../config/packages/messenger.yaml) declares **13 routes**: eleven
+to `swoole_task`, two directly to Redis `async`. The table records current handler
+registration separately from the proposed family. `Any` means no `fromTransport`
+restriction; it does not mean the handler is asynchronously routed everywhere.
+All thirteen have explicit version-1 entries in
+[JsonMessageCodec](../src/Shared/Infrastructure/Messaging/JsonMessageCodec.php).
+
+| Message (source path) | Current route | Handler and restriction | Wire type | Proposed owner / work class |
+| --- | --- | --- | --- | --- |
+| `Library/Application/Command/ScanLibraryCommand.php` | `swoole_task` | [ScanLibraryHandler](../src/Library/Application/CommandHandler/ScanLibraryHandler.php), Any | `library.scan` | Scaled `catalog`; filesystem scan, hash/probe work and directory batches |
+| `Library/Application/Message/FilesDiscovered.php` | `async` | [FilesDiscoveredHandler](../src/Catalog/Application/CommandHandler/FilesDiscoveredHandler.php), Any | `library.files_discovered` | Scaled `catalog`; ingestion/probing/persistence, cross-context Catalog handler |
+| `Metadata/Application/Command/ExtractAlbumCoverCommand.php` | `async` | [ExtractAlbumCoverHandler](../src/Metadata/Application/CommandHandler/ExtractAlbumCoverHandler.php), `async` | `metadata.extract_album_cover` | Scaled `media`; file/image conversion with CPU and memory reservation |
+| `Metadata/Application/Message/SyncSongMessage.php` | `swoole_task` | [SyncSongHandler](../src/Metadata/Application/MessageHandler/SyncSongHandler.php), `swoole_task` | `metadata.sync_song` | Scaled `metadata`; provider I/O |
+| `Metadata/Application/Message/SyncAlbumMessage.php` | `swoole_task` | [SyncAlbumHandler](../src/Metadata/Application/MessageHandler/SyncAlbumHandler.php), `swoole_task` | `metadata.sync_album` | Scaled `metadata`; provider I/O |
+| `Metadata/Application/Message/SyncLibraryMessage.php` | `swoole_task` | [SyncLibraryHandler](../src/Metadata/Application/MessageHandler/SyncLibraryHandler.php), `swoole_task` | `metadata.sync_library` | Scaled `metadata`; bounded fan-out coordination |
+| `Notification/Application/DTO/SendEmailCommand.php` | `swoole_task` | [SendEmailHandler](../src/Notification/Application/Handler/SendEmailHandler.php), `swoole_task` and `async` | `notification.send_email` | Scaled `notifications`; provider I/O and delivery limits |
+| `Notification/Application/DTO/SendPushCommand.php` | `swoole_task` | [SendPushHandler](../src/Notification/Application/Handler/SendPushHandler.php), `swoole_task` and `async` | `notification.send_push` | Scaled `notifications`; subscription fan-out/provider I/O |
+| `Media/Application/Command/PruneMissingImagesCommand.php` | `swoole_task` | [PruneMissingImagesHandler](../src/Media/Application/CommandHandler/PruneMissingImagesHandler.php), Any | `media.prune_missing_images` | Scaled `catalog`; filesystem/persistence maintenance |
+| `Radio/Application/Command/SyncCountryStationsCommand.php` | `swoole_task` | [SyncCountryStationsHandler](../src/Radio/Application/CommandHandler/SyncCountryStationsHandler.php), `swoole_task` | `radio.sync_country_stations` | Scaled `metadata`; remote provider I/O |
+| `Scheduler/Application/Command/ExecuteScheduledJobCommand.php` | `swoole_task` | [ExecuteScheduledJobHandler](../src/Scheduler/Application/CommandHandler/ExecuteScheduledJobHandler.php), Any | `scheduler.execute_job` | Fixed scheduler service dispatches occurrences; actual payload selects queue/resource class |
+| `Shared/Domain/Event/Outbox/RelayOutboxCommand.php` | `swoole_task` | [RelayOutboxHandler](../src/Shared/Domain/Event/Outbox/RelayOutboxHandler.php), Any | `outbox.relay` | Fixed outbox service; direct bounded relay calls, not recursive relay queue |
+| `Transcode/Application/Command/UpdateTranscodePositionCommand.php` | `swoole_task` | [UpdateTranscodePositionHandler](../src/Transcode/Application/CommandHandler/UpdateTranscodePositionHandler.php), Any | `transcode.update_position` | Scaled `control` with reserved capacity; persist position and signal session owner |
+
+Message paths in the first column are relative to `src/`. Queue family names are
+design candidates, not existing transport aliases. Every new transport requires a
+matching handler registration, explicit retry/failure policy, codec compatibility,
+and measured execution budget before activation.
+
+Redis currently uses stream `messages`, group `baander`, per-process consumer names,
+`delete_after_ack: true`, `stream_max_entries: 100000`, a 3600-second redelivery
+timeout, a 60000-ms claim interval and three retries with exponential delay. Failed
+messages use a separate `failed_messages` stream/group `failed`. These settings
+apply to direct Redis and fallback traffic; they are not a retention or keepalive
+certification. Swoole task dispatch does not itself supply the same durable
+consumer-group/retry contract.
+
+## Nested dispatch and durable delivery
+
+| Entry | Verified continuation | Migration consequence |
+| --- | --- | --- |
+| ScanLibraryHandler | Dispatches `FilesDiscovered` per directory; emits `LibraryScanCompleted` after scan dispatch | Scan completion is not downstream ingestion completion; preserve bounded payloads and recover accepted batches |
+| FilesDiscoveredHandler | Processes music/movie files, aggregates file failures and throws; dispatches `ExtractAlbumCoverCommand`, but logs and suppresses failures of that dispatch | Retrying a batch can revisit already persisted files; a successful batch does not prove every cover intent was accepted |
+| [MetadataSyncOrchestrator](../src/Metadata/Application/MetadataSyncOrchestrator.php) | Dispatches library/album/song routes plus unrouted `SyncArtistMessage` and `SyncGenresMessage` | Artist/genre work currently executes synchronously through unrestricted handlers; do not silently turn them into unsupported wire messages |
+| SyncLibraryHandler / [SyncGenresHandler](../src/Metadata/Application/MessageHandler/SyncGenresHandler.php) | Dispatch album and optionally song messages during iteration | Capacity must account for fan-out, not only outer coordination duration |
+| [NotificationBridgeSubscriber](../src/Shared/Infrastructure/Event/NotificationBridgeSubscriber.php) | Private outbox replay dispatches synchronous `CreateNotificationCommand`; channel commands go to [NotificationDeliveryBus](../src/Shared/Infrastructure/Event/NotificationDeliveryBus.php) | Preserve transactional projection and delivery-intent insertion; do not replace the injected bus with immediate external sends |
+| [RelayNotificationDeliveriesHandler](../src/Shared/Infrastructure/Event/RelayNotificationDeliveriesHandler.php) | Decodes committed email/push/webhook intents and forces `TransportNamesStamp(['async'])` | Route migration must update this explicit override. Webhook is asynchronous through this path despite having no YAML route |
+| UpdateTranscodePositionHandler | Emits `PlaybackPositionChanged`; [PlaybackPositionChangedListener](../src/Transcode/Infrastructure/Swoole/PlaybackPositionChangedListener.php) signals SeekSignalBroker | Delivery to a different process cannot reach the existing process-local encoding channel |
+
+[OutboxEventDispatcher](../src/Shared/Infrastructure/Event/OutboxEventDispatcher.php)
+uses a private notification replay dispatcher and transactional receipt
+`notifications.v1`; it does not replay every ordinary runtime event listener.
+[OutboxSubscriberPass](../src/Shared/Domain/Event/Outbox/OutboxSubscriberPass.php)
+and [services.yaml](../config/services.yaml) define that wiring. Existing outbox
+leases, renewals, retries, dead letters and replay receipts must survive extraction.
+[RelayOutboxWorkerCommand](../src/Shared/Infrastructure/Event/RelayOutboxWorkerCommand.php)
+already runs both event relay and delivery-intent relay directly, clears the ORM
+between iterations, handles TERM/INT, and has bounded time/memory exit conditions.
+
+## Scheduler payloads
+
+[SchedulerProcess](../src/Scheduler/Infrastructure/Swoole/SchedulerProcess.php)
+starts one Swoole child, checks active jobs every 60 seconds, takes per-job Redis
+NX/EX locks with a 3600-second default TTL, and dispatches the wrapper containing
+`jobId`, `jobType`, `command` and `parameters`. There is no immediate startup tick
+or persisted occurrence identity in that loop. Dispatch exceptions can leave the
+lock until expiry; lock release is an unconditional delete, not an ownership-token
+comparison. These are current recovery limits, not the proposed occurrence model.
+
+[SchedulerRegistry](../src/Scheduler/Domain/Service/SchedulerRegistry.php) collects
+tagged implementations of the two schedulable interfaces. Current allowlisted
+payloads are:
+
+| Registered payload | Current execution / codec | Proposed resource placement |
+| --- | --- | --- |
+| [PruneMissingImagesCommand](../src/Media/Application/Command/PruneMissingImagesCommand.php) | Routed Swoole task; codec present | `catalog` |
+| [BatchExtractCoversCommand](../src/Catalog/Application/Command/BatchExtractCoversCommand.php) | No route or codec; [handler](../src/Catalog/Application/CommandHandler/BatchExtractCoversHandler.php) requires `swoole_task` and fans out extraction commands | `catalog` coordination then reserved `media` extraction; currently executes synchronously |
+| [BulkFetchLyricsCommand](../src/Lyrics/Application/Command/BulkFetchLyricsCommand.php) | No route or codec; unrestricted [handler](../src/Lyrics/Application/CommandHandler/BulkFetchLyricsHandler.php) loops songs and synchronously dispatches unrouted `FetchLyricsCommand`, with a default 500-ms delay | `metadata` provider budget; bounded fan-out if made asynchronous |
+| [CleanupOrphanedJobsCommand](../src/Transcode/Application/Command/CleanupOrphanedJobsCommand.php) | No route or codec; unrestricted [handler](../src/Transcode/Application/CommandHandler/CleanupOrphanedJobsHandler.php) calls cleanup synchronously | Bounded maintenance capacity; classify measured cleanup cost before family assignment |
+| [SweepTranscodeCacheCommand](../src/Transcode/Interface/Console/SweepTranscodeCacheCommand.php) | Console payload `scheduled_console` via CPU pool, then `proc_open` of `bin/console` | Worker-owned maintenance child with descendant/process and storage-I/O limits |
+
+The wrapper validates the current registry, reconstructs Messenger payloads with
+`new ($messageClass)(...$parameters)` and calls the bus. It marks success after
+dispatch, not after an asynchronously routed payload completes. The batch-cover
+handler executes synchronously: Symfony applies its transport restriction only
+when a ReceivedStamp is present. It then dispatches individual cover extractions
+to Redis.
+
+Console execution uses
+[SchedulerConsolePoolWorker](../src/Scheduler/Infrastructure/Swoole/SchedulerConsolePoolWorker.php)
+and positional arguments or `--key=value` options. The wrapper polls results for
+300 seconds, truncates returned output to 10000 characters and currently marks
+`pool_timeout` as success; absent result tables mean fire-and-forget success.
+Its catch records failure without rethrowing to Messenger. These completion and
+acknowledgement distinctions must be deliberate before extraction. Console
+execution must remain allowlisted, with bounded output, cancellation, ownership
+renewal and descendant cleanup; the generic wrapper cannot bypass media budgets.
+
+## Swoole lifecycle and background ownership
+
+All five application `Bootable` implementations are explicitly tagged in
+[services.yaml](../config/services.yaml). Tables created before fork are shared
+only inside the existing process ancestry; they are not independent-service IPC.
+
+| Current hook / service | Current work and state | Proposed lifetime |
+| --- | --- | --- |
+| [HardwareCapabilitiesProber](../src/Transcode/Infrastructure/FFmpeg/HardwareCapabilitiesProber.php) `boot()` | Probes encoder/device support; lazily boots from `getProfile()` too | Worker owns probing/device reservations; publish admission/profile state needed by web |
+| [SegmentAvailabilityTable](../src/Transcode/Infrastructure/Swoole/SegmentAvailabilityTable.php) `boot()` | Pre-fork Swoole table, configured 16384 rows; readiness with file-stat fallback | Worker publishes shared readiness by session generation; web reads it |
+| [CpuProcessPool](../src/Shared/Infrastructure/Swoole/ProcessPool/CpuProcessPool.php) `boot()` | Six configured Swoole pipe children; 8192-row result table plus result files under `/tmp/baander_cpu_pool_results`; JSON registry instantiates handlers without container arguments | Worker owns all CPU children and IPC/results; resource reservations include their subprocesses |
+| SchedulerProcess `boot()` | One pipe child/timer; two-second shutdown wait before KILL | Fixed scheduler child under worker supervisor |
+| [CpuGpuSampler](../src/QoL/Infrastructure/Swoole/CpuGpuSampler.php) `boot()` | Pre-fork sampling table; timer deferred to HTTP worker 0 | Fixed worker sampling/control service |
+| [SwooleWorkerEventSubscriber](../src/Shared/Infrastructure/Swoole/SwooleWorkerEventSubscriber.php) | HTTP worker 0 starts pool health, sampler and [MidStreamMonitor](../src/QoL/Infrastructure/Swoole/MidStreamMonitor.php); imports governor learning state; server SIGINT hook stops pool and server | Worker owns health/sampling/governor timers. Web keeps connection registry/pusher and HTTP lifecycle |
+| [CpuProcessPoolShutdownHandler](../src/Shared/Infrastructure/Swoole/ProcessPool/CpuProcessPoolShutdownHandler.php) / [SchedulerProcessShutdownHandler](../src/Scheduler/Infrastructure/Swoole/SchedulerProcessShutdownHandler.php) | Web/server shutdown stops background children | Replace with worker-owned drain/reaping; no competing shutdown owner |
+| [TranscodeSessionSubscriber](../src/Transcode/Infrastructure/Swoole/TranscodeSessionSubscriber.php) | `TranscodeSessionAttached` starts a CoWrapper coroutine (inline fallback), Redis loop lock and renewal timer; drives encodes/completion/failure | Worker media session service; durable intent and recoverable control |
+| [TranscodeStreamManager](../src/Transcode/Infrastructure/Swoole/TranscodeStreamManager.php) | Long-lived FFmpeg through ProcOpenSpawner, outside one-shot CPU pool; four-stream limit per manager instance; poll/drain output and STOP/CONT/KILL control | Worker media descendants with global deployment budget and cancellation |
+| [SeekSignalBroker](../src/Transcode/Infrastructure/Swoole/SeekSignalBroker.php) | In-process per-job Coroutine Channels, capacity 16; missing channels drop signals | Worker-owned session control with explicit delivery/ownership semantics |
+| [ImageController](../src/Media/Interface/Controller/ImageController.php) | Missing preset/WebP starts fire-and-forget conversion coroutine; serves original image immediately | Scaled `media` jobs; preserve original-response fallback |
+| [LearningEngineSubscriber](../src/QoL/Infrastructure/Swoole/LearningEngineSubscriber.php) | Completion starts coroutine (inline fallback), loads job/sample, updates governor, releases allocation and sometimes persists learning | Worker-owned learning persistence; preserve sample provenance and reservation release |
+| [SessionBudgetSubscriber](../src/QoL/Infrastructure/Swoole/SessionBudgetSubscriber.php) | Priority-1 synchronous attachment listener can veto then allocate a stream before encoding listener | Keep synchronous admission behavior through shared worker admission state; do not defer veto until after response |
+
+CPU pool handlers are [TranscodePoolWorker](../src/Transcode/Infrastructure/Swoole/TranscodePoolWorker.php)
+(`encode_segment`, `encode_init_segment`, `analyze_loudness`, `extract_subtitles`),
+[RecommendationPoolWorker](../src/Recommendation/Infrastructure/Swoole/RecommendationPoolWorker.php)
+(`generate_recommendations`) and SchedulerConsolePoolWorker (`scheduled_console`).
+[GenerateRecommendationsHandler](../src/Recommendation/Application/CommandHandler/GenerateRecommendationsHandler.php)
+also uses this pool and has inline fallback; moving the pool affects recommendation
+execution as well as media. These internal JSON job payloads are distinct from the
+versioned Messenger codec and need an explicit compatibility contract when IPC moves.
+
+## Deployment and migration traps
+
+[supervisord.conf](../docker/general/supervisord.conf) currently owns three daemons:
+`swoole:server:run`, one `messenger:consume async` and `app:outbox:consume`. Swoole
+configures four HTTP workers and two task workers; there is no current queue
+autoscaler. [swoole.yaml](../config/packages/swoole.yaml) disables both HTTP and
+task-worker recycling because of child-pool lifetime coupling. The configured
+six-child pool must be measured at runtime; comments describing older worker
+counts are not a process-tree measurement.
+
+The proposed worker tree has fixed scheduler/outbox/control-service ownership and
+scaled queue consumers for `control`, `notifications`, `catalog`, `metadata` and
+`media`. Media descendants consume the same reservations as their parent jobs.
+Reserved control capacity is required, but its measured minimum and every family
+limit remain implementation configuration, not asserted defaults here.
+
+1. Change routing and transport-restricted handlers together. Metadata song/album/
+   library and radio handlers currently accept only `swoole_task`; the Redis fallback
+   can place them on `async`, whose received transport will not match registration.
+   Preserve and drain old `messages`, retries and failures during cutover.
+2. [SwooleTaskWithRedisFallbackSender](../src/Shared/Infrastructure/Messenger/SwooleTaskWithRedisFallbackSender.php)
+   builds a task envelope with `ReceivedStamp` and sends that envelope to Redis if
+   dispatch fails. [HttpServerTaskDispatcher](../src/Shared/Infrastructure/Messenger/HttpServerTaskDispatcher.php)
+   depends on the live HTTP server. Independent worker boot must avoid that dependency
+   and must not acknowledge a missing-handler or failed dispatch as completed work.
+3. Email/push have two allowed transports; webhook has an unrestricted handler and
+   codec entry but no YAML route. Delivery relay's explicit `async` override is part
+   of the accepted-message contract and must move with notification routing.
+4. [JsonTransportSerializer](../src/Shared/Infrastructure/Messenger/JsonTransportSerializer.php)
+   accepts only explicit stamps: transport ID, bus, correlation, job ID, delay, retry,
+   failure receiver, transport names, bounded handled-handler names and error details.
+   Unknown sendable stamps are rejected; non-sendable stamps are omitted. Preserve
+   version-1 messages, the default 1-MiB payload bound, exact fields and bounded JSON
+   depth when introducing operation/resource metadata. Codec support alone does not
+   imply a route, and scheduler allowlisting alone does not imply codec support.
+5. Preserve outbox transaction/receipt and delivery-intent behavior. Retry and
+   dead-letter ownership already exists in both event and notification relays;
+   moving supervision must not introduce a second queue-based relay loop.
+6. Separate process-local FFmpeg handles, channels, pre-fork tables, governor
+   allocations and result files before web recycling or independent role restarts.
+   Test seek/pause/resume/reconnect against the actual owning session generation.
+7. Review suppress-and-return paths before treating handler return as delivery
+   success: cover fan-out failures and scheduler failure/timeout outcomes above are
+   concrete cases. Existing file-ingestion, email, push and outbox handlers propagate
+   their material failures; preserve those semantics.
+8. Cut over Dockerfile/Compose, startup scripts, Supervisor and `bin/dev-server` /
+   `bin/queue-worker` together. Role restart must not clear shared cache/logs or
+   restart the other role; release-scoped preparation precedes both. GPU ownership
+   and all encoder/console descendants belong to the worker budget.
+
+## Verification and open measurements
+
+The first delivery correction makes `ExtractAlbumCoverHandler` propagate read,
+storage and persistence failures to Messenger. Logging and failed cleanup cannot
+replace the original failure or undo a committed cover. Each extraction attempt
+uses a distinct stored path; uncertain commits/failed rollbacks retain the file
+for reconciliation rather than risk deleting committed data. This does not add
+automatic orphan reconciliation or serialize concurrent successful extractions.
+
+Twenty focused unit cases verify these branches. Two real Redis delivery cases
+verify retry/recovery and dead-letter behavior after storage failure, using the
+production handler and JSON codec. The combined unit/rule suite passes 3,106 tests
+with 8,744 assertions; the selected disposable integration runner passes 22 tests
+with 331 assertions.
+
+A further production-kernel test with real PostgreSQL flush failure reproduced
+the next delivery receiving a closed manager. Swoole removes pooled services from
+Symfony's ordinary reset list, so the standard reset subscriber was insufficient.
+`WorkerServicePoolResetSubscriber` now releases the current context's pools after
+delivery and at stop, before the remaining Symfony reset. Six focused lifecycle
+tests pass with 17 assertions. The real PostgreSQL/Redis regression passes with
+30 assertions: an independent connection observes rollback and then one committed
+image/album link after the same handler retries. DAMA rollback is explicitly disabled
+for that case. Focused production PHPStan and syntax checks pass. These checks do
+not certify uncertain-commit reconciliation, concurrent extraction serialization,
+or the future supervisor's resource and shutdown behavior.
+
+This is source inspection of routing, all application Bootable implementations,
+timer/coroutine creation sites, tagged CPU handlers, scheduler providers, private
+outbox wiring and deployment programs. GitNexus 1.6.12 query/context resolved the
+current CpuProcessPool and ExecuteScheduledJobHandler after the lead rebuilt the
+index; the index identified commit `48154b8` while HEAD `06a5de5` adds only the plan.
+Its scheduler context exposes test references rather than dynamic Messenger wiring;
+the handler attributes and actual DI/configuration were therefore verified directly.
+No production capacity, delivery latency, queue durability, extension availability,
+or process-parentage claim was validated by a runtime load test.
+
+Before selecting defaults, measure idle/active RSS and native memory for each child,
+CPU time, FFmpeg/device concurrency, queue wait/service rates, real process ancestry,
+result-store limits and shutdown under load in the deployment image. Stage-1 routing
+and acknowledgement findings above remain fixes to implement and test, not completed
+remediations. Keep independent-role, legacy-drain, failure/retry, occurrence recovery,
+shared admission and playback acceptance gates from the redesign plan.

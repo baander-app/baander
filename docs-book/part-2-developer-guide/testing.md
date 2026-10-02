@@ -22,6 +22,7 @@ For strict unit and messaging checks, run from the checkout:
 bash scripts/test-unit-container.sh
 bash scripts/test-messaging-container.sh
 bash scripts/test-functional-container.sh tests/Functional/Controller/FavoritesControllerTest.php
+bash scripts/test-functional-container.sh tests/Integration/CoverExtractionPersistenceTest.php
 ```
 
 These require Docker and installed Composer dependencies. The unit runner uses
@@ -69,6 +70,14 @@ The functional runner creates an isolated PostgreSQL/Redis network, extracts the
 checkout into a fresh directory, and runs all migrations twice before executing the
 requested PHPUnit paths or options. With no arguments it selects `tests/Functional`.
 The second migration run checks that the recorded history produces no pending work.
+
+The functional runner also supplies the isolated PostgreSQL/Redis environment
+aliases used by integration tests that need the full migrated schema and kernel.
+`CoverExtractionPersistenceTest` disables DAMA rollback with its supported attribute
+and observes commits through a second connection. It injects a real flush failure,
+then verifies that the worker's Swoole pool release and Symfony reset allow the
+same handler to retry successfully. Its exact expected pool-reset diagnostic is
+asserted; unexpected-output checks remain enabled.
 It uses a 512 MiB PHP limit and a 300-second overall timeout. Database and Redis
 values supplied through the environment override the tracked PHPUnit defaults.
 The test firewall uses the test authenticator; this does not verify production

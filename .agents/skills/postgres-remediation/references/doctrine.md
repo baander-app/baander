@@ -117,6 +117,19 @@ Do not replace that path with a blanket reset of the shared proxy/service pool.
 ORM native lazy entity objects (DoctrineBundle enables them) and Swoole contextual
 service proxies are different mechanisms; tests must exercise the relevant one.
 
+CLI Messenger also needs an explicit pooled-service release boundary. The installed
+Swoole `StatefulServicesPass::reduceServiceResetters()` removes pooled services from
+Symfony's ordinary reset list. `ResetServicesListener` alone therefore left a closed
+manager in the next delivery in a real PostgreSQL test. The application
+[WorkerServicePoolResetSubscriber](../../../../src/Shared/Infrastructure/Messenger/WorkerServicePoolResetSubscriber.php)
+releases only the current execution context after delivery and at stop, before
+Symfony resets remaining services. The pool discards a closed manager through its
+stability checker; it must not replace or unset the shared proxy. Preserve this
+boundary when extracting the independent worker runtime and recheck it after bundle
+upgrades. [CoverExtractionPersistenceTest](../../../../tests/Integration/CoverExtractionPersistenceTest.php)
+uses the production kernel/proxy, real failed flush, both reset subscribers and an
+independent observer to verify same-process retry and committed recovery.
+
 [DAMA configuration](../../../../config/packages/dama_doctrine_test_bundle.yaml)
 and [phpunit.xml.dist](../../../../phpunit.xml.dist) wrap functional tests in static
 connections/transactions. They are useful for isolation but cannot alone prove

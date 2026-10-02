@@ -39,7 +39,9 @@ tar -cf - "${archive_paths[@]}" |
         -e BAANDER_TEST_CHECKOUT_IN_IMAGE="${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" \
         -e APP_ENV=test -e APP_DEBUG=0 -e XDEBUG_MODE=off -e REDIS_PASSWORD=test-only \
         -e REDIS_URL=redis://default:test-only@redis:6379 \
+        -e MESSENGER_TEST_REDIS_DSN=redis://default:test-only@redis:6379 \
         -e MESSENGER_TRANSPORT_DSN=redis://default:test-only@redis:6379/messages \
+        -e OUTBOX_TEST_DATABASE_URL="postgresql://baander:test-only@postgres:5432/functional_test?serverVersion=18&charset=utf8" \
         -e DATABASE_URL="postgresql://baander:test-only@postgres:5432/functional_test?serverVersion=18&charset=utf8" \
         "${BAANDER_TEST_IMAGE:-martinjuul/baander-app:latest}" -c '
             set -eu
