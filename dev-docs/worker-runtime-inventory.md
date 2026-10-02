@@ -49,7 +49,7 @@ consumer-group/retry contract.
 | Entry | Verified continuation | Migration consequence |
 | --- | --- | --- |
 | ScanLibraryHandler | Dispatches `FilesDiscovered` per directory; emits `LibraryScanCompleted` after scan dispatch | Scan completion is not downstream ingestion completion; preserve bounded payloads and recover accepted batches |
-| FilesDiscoveredHandler | Processes music/movie files, aggregates file failures and throws; dispatches `ExtractAlbumCoverCommand`, but logs and suppresses failures of that dispatch | Retrying a batch can revisit already persisted files; a successful batch does not prove every cover intent was accepted |
+| FilesDiscoveredHandler | Processes music/movie files and propagates aggregated file failures; dispatches `ExtractAlbumCoverCommand` for coverless albums after successful final song/genre flushes | Dispatch failure reaches Messenger; retry revisits an existing album and deduplicated songs before retrying cover dispatch |
 | [MetadataSyncOrchestrator](../src/Metadata/Application/MetadataSyncOrchestrator.php) | Dispatches library/album/song routes plus unrouted `SyncArtistMessage` and `SyncGenresMessage` | Artist/genre work currently executes synchronously through unrestricted handlers; do not silently turn them into unsupported wire messages |
 | SyncLibraryHandler / [SyncGenresHandler](../src/Metadata/Application/MessageHandler/SyncGenresHandler.php) | Dispatch album and optionally song messages during iteration | Capacity must account for fan-out, not only outer coordination duration |
 | [NotificationBridgeSubscriber](../src/Shared/Infrastructure/Event/NotificationBridgeSubscriber.php) | Private outbox replay dispatches synchronous `CreateNotificationCommand`; channel commands go to [NotificationDeliveryBus](../src/Shared/Infrastructure/Event/NotificationDeliveryBus.php) | Preserve transactional projection and delivery-intent insertion; do not replace the injected bus with immediate external sends |
@@ -94,6 +94,13 @@ dispatch, not after an asynchronously routed payload completes. The batch-cover
 handler executes synchronously: Symfony applies its transport restriction only
 when a ReceivedStamp is present. It then dispatches individual cover extractions
 to Redis.
+
+Batch cover dispatch stops on the first rejected dispatch and preserves its
+original exception if diagnostics also fail. Earlier accepted messages may run
+again when the batch is retried. Its current offset pagination can still skip
+albums when completed extractions shrink the coverless set; the standalone
+extraction command uses the same pattern. Replace both loops with a bounded
+keyset query, with PostgreSQL regression coverage, before certifying bulk coverage.
 
 Console execution uses
 [SchedulerConsolePoolWorker](../src/Scheduler/Infrastructure/Swoole/SchedulerConsolePoolWorker.php)
@@ -182,9 +189,9 @@ limit remain implementation configuration, not asserted defaults here.
    allocations and result files before web recycling or independent role restarts.
    Test seek/pause/resume/reconnect against the actual owning session generation.
 7. Review suppress-and-return paths before treating handler return as delivery
-   success: cover fan-out failures remain a concrete case. Scheduler console
-   uncertainty now pauses cron dispatch; asynchronous payload completion still
-   needs an explicit acknowledgement contract. File-ingestion, email, push and outbox handlers propagate
+   success. Cover fan-out now propagates dispatch failures, and scheduler console
+   uncertainty pauses cron dispatch; asynchronous payload completion still needs
+   an explicit acknowledgement contract. File-ingestion, email, push and outbox handlers propagate
    their material failures; preserve those semantics.
 8. Cut over Dockerfile/Compose, startup scripts, Supervisor and `bin/dev-server` /
    `bin/queue-worker` together. Role restart must not clear shared cache/logs or
@@ -238,6 +245,14 @@ The combined unit/rule suite passes 3,144 tests with 8,935 assertions; focused
 production PHPStan passes. These handler tests double the pool and persistence
 ports; they do not certify real child cancellation or crash recovery.
 
+Cover fan-out corrections pass eight ingestion reliability tests (40 assertions)
+and three batch-dispatch tests (534 assertions). These verify ordering after final
+flushes, retry with an existing album and deduplicated song, original exception
+identity, skipping covered albums, and stopping after a rejected batch dispatch.
+The full unit/rule runner passes 3,153 tests with 9,504 assertions; focused production
+PHPStan passes. The ports and bus are test doubles: these tests do not certify
+cross-connection persistence visibility or bulk pagination under concurrent work.
+
 This is source inspection of routing, all application Bootable implementations,
 timer/coroutine creation sites, tagged CPU handlers, scheduler providers, private
 outbox wiring and deployment programs. GitNexus 1.6.12 query/context resolved the
@@ -251,7 +266,7 @@ or process-parentage claim was validated by a runtime load test.
 Before selecting defaults, measure idle/active RSS and native memory for each child,
 CPU time, FFmpeg/device concurrency, queue wait/service rates, real process ancestry,
 result-store limits and shutdown under load in the deployment image. The focused
-corrections above do not complete stage 1: fan-out delivery failures and durable
+corrections above do not complete stage 1: stable batch pagination and durable
 execution ownership still require remediation. Keep independent-role, legacy-drain,
 failure/retry, occurrence recovery,
 shared admission and playback acceptance gates from the redesign plan.

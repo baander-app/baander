@@ -7,7 +7,6 @@ namespace App\Catalog\Application\CommandHandler;
 use App\Catalog\Application\Command\BatchExtractCoversCommand;
 use App\Catalog\Domain\Repository\AlbumRepositoryInterface;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
-use App\Shared\Domain\Model\Uuid;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -40,11 +39,16 @@ final class BatchExtractCoversHandler
                     $this->bus->dispatch(new ExtractAlbumCoverCommand($albumId));
                     ++$dispatched;
                 } catch (\Throwable $e) {
-                    $this->logger->warning('Failed to dispatch cover extraction for album {id}', [
-                        'id' => $albumId->toString(),
-                        'error' => $e->getMessage(),
-                        'dispatched' => $dispatched,
-                    ]);
+                    try {
+                        $this->logger->warning('Failed to dispatch cover extraction for album {id}', [
+                            'id' => $albumId->toString(),
+                            'error' => $e->getMessage(),
+                            'dispatched' => $dispatched,
+                        ]);
+                    } catch (\Throwable) {
+                        // Diagnostics must not replace the failed dispatch.
+                    }
+                    throw $e;
                 }
             }
 

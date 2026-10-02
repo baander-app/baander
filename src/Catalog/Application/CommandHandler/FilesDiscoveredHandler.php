@@ -151,6 +151,12 @@ final class FilesDiscoveredHandler
         if ($failures !== []) {
             throw new RuntimeException($this->buildFailureMessage($failures));
         }
+
+        // A consumer can run immediately after dispatch. Flush songs first, and
+        // retry cover dispatch even when an earlier delivery created the album.
+        if ($album->getCoverImageId() === null) {
+            $this->dispatchCoverExtraction($album);
+        }
     }
 
     private function processMovieFiles(FilesDiscovered $message): void
@@ -223,6 +229,7 @@ final class FilesDiscoveredHandler
     }
 
     /**
+     * @param array<\App\Library\Domain\Model\DiscoveredFile> $files
      * @return array{Album|null, bool}
      */
     private function resolveAlbum(Uuid $libraryId, string $directory, array $files): array
@@ -265,9 +272,6 @@ final class FilesDiscoveredHandler
                 $this->albumService->linkArtistToAlbum($album->getId(), trim($metadataAlbumArtist), ArtistRole::Primary->value);
                 $this->albumService->flush();
             }
-
-            // Dispatch cover extraction for new album
-            $this->dispatchCoverExtraction($album);
 
             return [$album, true];
         }
@@ -346,15 +350,8 @@ final class FilesDiscoveredHandler
 
     private function dispatchCoverExtraction(Album $album): void
     {
-        try {
-            $this->messageBus->dispatch(
-                new \App\Metadata\Application\Command\ExtractAlbumCoverCommand($album->getId()),
-            );
-        } catch (\Throwable $e) {
-            $this->logger->warning('Failed to dispatch cover extraction', [
-                'album_id' => $album->getId()->toString(),
-                'error' => $e->getMessage(),
-            ]);
-        }
+        $this->messageBus->dispatch(
+            new \App\Metadata\Application\Command\ExtractAlbumCoverCommand($album->getId()),
+        );
     }
 }
