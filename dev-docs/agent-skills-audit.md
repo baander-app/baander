@@ -184,10 +184,40 @@ rows after denial and no private notification fields in error responses. These u
 the configured test firewall. The full unit/rule suite passes 2,954 tests with 8,545
 assertions; focused controller PHPStan also passes.
 
-The controller uses a direct owner check. Reusing generic EDIT/DELETE authorization
-would involve library and playlist voters that accept unrelated objects and grant
-administrators access. Their broader subject matching remains a separate finding;
-the notification checks do not depend on those voters.
+The controller uses a direct owner check; its notification checks do not depend
+on generic resource voters.
+
+## Voter subject isolation
+
+Library, Playlist and Album voters now support their concrete domain/ORM types
+and existing string subjects. Song retains string-subject authorization and
+abstains for real Song models, which have no ownership metadata. Unrelated
+objects abstain, including objects exposing similarly named ownership methods.
+Existing Library/Album admin policy and Playlist owner/admin policy remain;
+this change adds no library-membership grants or controller permission changes.
+
+The real Symfony decision manager reproduced five failures before correction;
+its eight regression tests now pass with 27 assertions. The full unit/rule suite
+passes 3,090 tests with 8,696 assertions. Notification, Playlist and LibraryAccess
+functional suites pass 36 tests with 150 assertions after all 14 migrations and
+a second no-op migration run. They use the test firewall, not production DPoP.
+Focused PHPStan passes for the four changed voters.
+
+## PostgreSQL specialist knowledge
+
+The project `postgres` agent reads the PostgreSQL skill's Doctrine and extension
+references. Substantial PostgreSQL work is routed to that role, with an explicit
+worker-instruction fallback. Verified discoveries update the shared extension
+inventory during assigned tasks; packaged, available, enabled and actually used
+extensions remain separate claims. Read-only assignments return proposed updates.
+TOML/skill validation and independent scenario review pass; these checks do not
+prove that a future agent will follow every instruction.
+
+PGroonga source already uses the 2+ operator/scoring API; no historical migration
+or working query was rewritten. The disposable integration runner now includes
+actual mapped index/operator-class checks and production DQL/scored-search tests.
+All 20 integration tests pass with 282 assertions. The scoring fixture forces
+index use on its small dataset; it does not certify production query plans.
 
 ## Recommended follow-up changes
 
@@ -197,7 +227,6 @@ been reproduced end to end.
 
 | Priority | Evidence | Proposed change and acceptance |
 |---|---|---|
-| High | LibraryVoter and PlaylistVoter accept generic EDIT/DELETE attributes for any object and can grant administrator access to unrelated subjects. | Narrow supported subject types or use scoped attributes; test the complete decision manager across resource types without broadening permissions. |
 | High | NotificationPreferenceRepository::isEnabled defaults missing rows to true, while GET displays most missing preferences as disabled; email and push handlers use the repository result. | Define one default policy and verify display and delivery agree for unseeded and partially seeded users. |
 | Medium | Notification preference GET includes admin_operations, while writes/seeding support three categories; PUT also manually decodes input and documents a different response envelope. | Resolve category policy and contract drift; verify malformed JSON and wrong-shaped preference input return client errors before persistence. |
 | Medium | PlaylistResource documents publicId as UUID, while the shared PublicId generates a 21-character NanoID. | Correct identifier schemas and regenerate affected clients together; verify actual identifier formats in contract tests. |

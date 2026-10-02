@@ -7,15 +7,24 @@ description: Audit and remedy PostgreSQL schema, migration, query, and connectio
 
 Apply the [PostgreSQL guidance](https://wiki.postgresql.org/wiki/Don%27t_Do_This)
 to the affected persistence path. Read [review and migration notes](references/remediation.md)
-before proposing a remedy. Check the linked source when an exception or current
+before proposing a remedy. For Doctrine mappings, schema drift, repositories,
+transactions or migration plans, also read [Doctrine in Baander](references/doctrine.md).
+For search indexes, custom types or extension-dependent environments, read
+[PostgreSQL extensions](references/extensions.md). Check the linked source when an exception or current
 PostgreSQL behavior is uncertain. If it is unavailable, use the local checklist
 and disclose that the source could not be refreshed.
+During authorized PostgreSQL work, keep the extension inventory current using
+the [evidence-based maintenance protocol](references/extensions.md#maintain-this-inventory).
+Updating guidance does not authorize database, deployment or permission changes.
 
 ## Establish the actual contract
 
 Read the current SQL, migrations, ORM mapping, and consumers together. Confirm the
 server version, whether a migration has already been applied, and the intended
 data semantics. Keep parameterized SQL and the existing application port boundaries.
+Distinguish mapping intent, platform-generated DDL, migration history and the actual
+catalog. Doctrine defaults explain a finding; they do not automatically excuse it
+or authorize a mass rewrite. A clean ORM diff does not cover excluded objects.
 Run the repository-required GitNexus impact analysis before editing existing symbols.
 
 Use targeted searches in the affected paths for candidate anti-patterns. For an

@@ -32,8 +32,11 @@ The unit runner sets a 256 MiB PHP memory limit so the combined unit and PHPStan
 suite can compile its analysis container. This budget applies only to that isolated
 runner; it does not change the tracked PHPUnit configuration or deployment settings.
 The messaging runner also explicitly selects `phpunit.xml.dist` and provisions
-disposable PostgreSQL and Redis for its selected transport, outbox, and access-token
-cache transaction tests. Both runners fail on PHPUnit notices and skipped tests. Neither reads an
+disposable PostgreSQL and Redis for its selected transport, outbox, access-token
+cache transaction, and PGroonga compatibility tests. The search tests exercise
+production Doctrine filtering and scored SQL against mapped PGroonga indexes;
+they require the project's extension-capable database image. Both runners fail on
+PHPUnit notices and skipped tests. Neither reads an
 ignored local `phpunit.xml` or runs the whole functional suite. The Makefile's
 `phpunit`, `paratest`, and `ci` targets also select
 `phpunit.xml.dist` explicitly. A configured development test environment can use

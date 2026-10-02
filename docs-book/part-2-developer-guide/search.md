@@ -9,7 +9,13 @@ Baander uses PGroonga (a PostgreSQL extension for full-text search) to power sea
 3. PGroonga performs full-text search with scoring (`pgroonga_score`)
 4. Results are returned as domain models, sorted by relevance
 
-PGroonga indexes text columns using a GIN-like index. The `&@~` operator performs full-text matching, and `pgroonga_score()` returns a relevance score for each result row.
+Baander uses the PGroonga 2+ API: `&@~` for query-language matching and
+`pgroonga_score(tableoid, ctid)` for relevance scores. PGroonga has its own index
+access method; it is not a PostgreSQL GIN index. See the
+[official reference](https://pgroonga.github.io/reference/) for operator classes,
+index options, and version requirements. The database image currently requests
+PGroonga package `4.0.5-1`; inspect `pg_extension.extversion` on the target database
+rather than assuming the running installation matches the image source.
 
 ## Making a Context Searchable
 
@@ -46,8 +52,8 @@ final class AlbumRepository implements AlbumRepositoryInterface
             options: $options,
             em: $this->entityManager,
             entityClass: AlbumEntity::class,
-            tableName: 'catalog_album',
-            searchColumn: 's.title',
+            tableName: 'albums',
+            searchColumn: 'title',
         );
 
         $models = array_map(
@@ -55,18 +61,25 @@ final class AlbumRepository implements AlbumRepositoryInterface
             $result['entities'],
         );
 
-        return new SearchResult(
+        return SearchResult::create(
             items: $models,
             total: $result['total'],
+            highestScore: $result['highestScore'],
         );
     }
 }
 ```
 
-### 3. Add a PGroonga index to the migration
+### 3. Keep the mapping and migration index definitions aligned
+
+The existing album index uses the definition below. Do not recreate an applied
+index or rewrite migration history; use a reviewed forward migration for changes.
+Entity index metadata must retain the same PGroonga flags and options.
 
 ```sql
-CREATE INDEX idx_album_title ON catalog_album USING pgroonga (title);
+CREATE INDEX idx_albums_title_pgroonga ON albums USING pgroonga (title)
+WITH (plugins='token_filters/stem', tokenizer='TokenNgram',
+      normalizer='NormalizerAuto', token_filters='TokenFilterStem');
 ```
 
 ## SearchOptions

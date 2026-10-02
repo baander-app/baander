@@ -34,6 +34,11 @@ Audit, remedy, and verify affected code; explain applicable exceptions. Do not
 ignore findings or expand into unrelated schema rewrites. This does not change
 the registry's SQLite/rqlite architecture.
 
+Delegate substantial PostgreSQL work to the [postgres specialist](.codex/agents/postgres.toml).
+If named roles are unavailable, give a worker that profile's instructions. It
+maintains the skill's extension inventory from verified discoveries during tasks;
+coordinate a single writer and review those updates with the implementation.
+
 ## Coding guidance
 
 For backend changes, read [architecture rules](.agents/rules/architecture-rules.md)
