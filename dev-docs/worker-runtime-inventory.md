@@ -355,10 +355,10 @@ helper described below supplies the parent-side deadline; observing a database
 token alone is not permission to launch. A real kernel/introspection check
 confirms ORM schema diffs exclude the DBAL-owned lease table, while normal entity
 tables remain visible. Fresh installation and repeat migration runs pass.
-The canonical messaging/PostgreSQL suite passes 78 tests with 1,041 assertions,
+The canonical messaging/PostgreSQL suite passes 96 tests with 1,217 assertions,
 including seven database lease cases, 14 fresh-process lease-helper cases and
-nine external-controller database coordination cases, eight inventory cases and
-seven registered-recovery cases. The schema check passes one test with seven assertions
+nine external-controller database coordination cases, 12 inventory cases, seven registered-recovery cases and
+14 startup cases. The schema check passes one test with seven assertions
 after all 16 migrations and a repeat no-op migration run. Two real-process cases
 also verify blocked replacement with a surviving descendant and after a launcher
 throws following process creation. Both container shutdown scenarios pass.
@@ -389,7 +389,7 @@ without acknowledging containment or releasing the deployment lease. Invalid clo
 readings still trigger initial stop attempts, then propagate to the outer owner
 for containment. Real-process tests cover delayed acquisition, denied grants,
 hung renewal, expiry during sibling launches and clock failure. The combined unit
-and static-analysis-rule suite passes 3,321 tests with 12,057 assertions; focused
+and static-analysis-rule suite passes 3,324 tests with 12,063 assertions; focused
 production PHPStan passes. These are correctness checks, not capacity measurements.
 
 `scripts/test-worker-containment-container.sh` exercises this core as PID 1 in a
@@ -447,12 +447,23 @@ Docker command are separate calls, so they do not protect against an endpoint
 swap between calls; the configured local daemon endpoint must remain trusted and
 stable throughout recovery.
 
-The startup controller must still create a stopped container, commit its binding,
-and only then start it. An uncertain create response must not cause a second
+`RegisteredDeploymentStart` now accepts an explicitly precreated container. It
+requires the deterministic namespace/boot name, matching daemon and labels, private
+isolation, `created` state and Docker restart disabled. It commits registration and
+a one-shot `start_claimed_at` before issuing Docker start, then rechecks isolation
+and state. A conflicting claim or any uncertain result cannot authorize another
+start. Binding values remain immutable; only the start timestamp changes, once.
+A failed post-claim check burns the attempt and requires explicit recovery. A
+successful return confirms Docker acknowledged startup; it does not establish
+application readiness or a valid runtime lease. An uncertain create response must not cause a second
 container to be created for the same boot: use a deterministic boot-specific Docker
 name to reconcile creation before recording the immutable ID, or fail closed.
-This startup path is not yet wired. The recovery acceptance fixture registers its
-controlled containers for the test; it does not certify registration-before-start.
+The external controller must still own deterministic container creation and its
+uncertain-outcome reconciliation. The combined acceptance fixture now leaves the
+predecessor unstarted and uses the startup adapter; an independent PostgreSQL
+connection verifies the committed claim before the real Docker start. It then
+exercises inventory-backed retirement. This validates external startup/recovery,
+not the full application runtime or deployment command wiring.
 
 This is a stage-2 foundation, not a deployment supervisor. No application command
 or deployment configuration uses it yet. The deployment must wire the external controller and persist its lifecycle

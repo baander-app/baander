@@ -63,6 +63,133 @@ final class WorkerDeploymentInventoryTest extends TestCase
         self::assertSame('timestamp with time zone', $this->second->fetchOne("SELECT data_type FROM information_schema.columns WHERE table_schema = :schema AND table_name = 'worker_deployment_containers' AND column_name = 'created_at'", ['schema' => $this->schema]));
     }
 
+    public function testStartClaimCommitsOnceAndRegistrationRetriesPreserveItsTimestamp(): void
+    {
+        $first = new DoctrineDeploymentInventory($this->first);
+        $second = new DoctrineDeploymentInventory($this->second);
+        $binding = $this->binding();
+        self::assertTrue($first->register($binding));
+        self::assertNull($this->second->fetchOne('SELECT start_claimed_at FROM worker_deployment_containers'));
+        self::assertTrue($first->claimStart($binding));
+        self::assertSame(0, $this->first->getTransactionNestingLevel());
+        $claimedAt = $this->second->fetchOne('SELECT start_claimed_at FROM worker_deployment_containers');
+        self::assertNotNull($claimedAt, 'The start permission is committed before returning true.');
+        self::assertFalse($second->claimStart($binding));
+        self::assertTrue($first->register($binding));
+        self::assertFalse($first->claimStart($binding));
+        self::assertSame($claimedAt, $this->second->fetchOne('SELECT start_claimed_at FROM worker_deployment_containers'));
+        self::assertSame('timestamp with time zone', $this->second->fetchOne("SELECT data_type FROM information_schema.columns WHERE table_schema = :schema AND table_name = 'worker_deployment_containers' AND column_name = 'start_claimed_at'", ['schema' => $this->schema]));
+    }
+
+    public function testWrongStartBindingCannotConsumePermission(): void
+    {
+        $inventory = new DoctrineDeploymentInventory($this->first);
+        self::assertTrue($inventory->register($this->binding()));
+        foreach ([
+            $this->binding(namespace: 'baander.app:other-workers'),
+            $this->binding(boot: str_repeat('b', 32)),
+            $this->binding(daemon: 'baander.app:other-daemon'),
+            $this->binding(container: str_repeat('d', 64)),
+        ] as $wrong) {
+            self::assertFalse($inventory->claimStart($wrong));
+        }
+        self::assertNull($this->second->fetchOne('SELECT start_claimed_at FROM worker_deployment_containers'));
+        self::assertTrue($inventory->claimStart($this->binding()));
+    }
+
+    public function testUncertainCommittedStartClaimCannotBeRetried(): void
+    {
+        self::assertTrue((new DoctrineDeploymentInventory($this->first))->register($this->binding()));
+        $params = $this->params;
+        $params['wrapperClass'] = InventoryCommitThenThrowConnection::class;
+        $connection = DriverManager::getConnection($params);
+        self::assertInstanceOf(InventoryCommitThenThrowConnection::class, $connection);
+        $this->extras[] = $connection;
+        $connection->executeStatement('SET search_path TO ' . $this->schema);
+        $connection->throwAfterCommit = true;
+        $permission = null;
+        try {
+            $permission = (new DoctrineDeploymentInventory($connection))->claimStart($this->binding());
+            self::fail('Uncertain commit acknowledgment must not supply start permission.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('Inventory commit acknowledgment is uncertain.', $error->getMessage());
+        }
+        self::assertNull($permission);
+        self::assertFalse($connection->isConnected());
+        $claimedAt = $this->second->fetchOne('SELECT start_claimed_at FROM worker_deployment_containers');
+        self::assertNotNull($claimedAt);
+        $observer = new DoctrineDeploymentInventory($this->second);
+        self::assertTrue($observer->register($this->binding()));
+        self::assertFalse($observer->claimStart($this->binding()));
+        self::assertSame($claimedAt, $this->second->fetchOne('SELECT start_claimed_at FROM worker_deployment_containers'));
+    }
+
+    public function testConcurrentFreshProcessesReceiveExactlyOneStartPermission(): void
+    {
+        self::assertTrue((new DoctrineDeploymentInventory($this->first))->register($this->binding()));
+        $gate = sys_get_temp_dir() . '/baander-start-claim-' . bin2hex(random_bytes(12));
+        $code = <<<'PHP'
+require $argv[1];
+$params = (new \Doctrine\DBAL\Tools\DsnParser(['postgresql' => 'pdo_pgsql']))->parse(getenv('OUTBOX_TEST_DATABASE_URL'));
+$connection = \Doctrine\DBAL\DriverManager::getConnection($params);
+$connection->executeStatement('SET search_path TO ' . $argv[2]);
+file_put_contents($argv[3].'.ready', 'ready');
+$deadline = microtime(true) + 3;
+while (!is_file($argv[4])) { if (microtime(true) > $deadline) { exit(2); } usleep(1000); }
+$binding = new \App\Shared\Infrastructure\Worker\DeploymentContainer('baander.app:workers', str_repeat('a', 32), 'baander.app:daemon', str_repeat('c', 64));
+echo json_encode((new \App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory($connection))->claimStart($binding));
+PHP;
+        $processes = [];
+        $outputs = [];
+        try {
+            for ($i = 0; $i < 2; ++$i) {
+                $output = tmpfile();
+                self::assertIsResource($output);
+                $outputs[] = $output;
+                $process = proc_open([PHP_BINARY, '-r', $code, '--', dirname(__DIR__, 2) . '/vendor/autoload.php', $this->schema, $gate . $i, $gate], [0 => ['file', '/dev/null', 'r'], 1 => $output, 2 => $output], $pipes);
+                self::assertIsResource($process);
+                $processes[] = $process;
+            }
+            $deadline = microtime(true) + 3;
+            while (!is_file($gate . '0.ready') || !is_file($gate . '1.ready')) {
+                if (microtime(true) > $deadline) {
+                    self::fail('Both independent PostgreSQL contenders must become ready.');
+                }
+                usleep(1000);
+            }
+            file_put_contents($gate, 'start');
+            $results = [];
+            foreach ($processes as $index => $process) {
+                while (proc_get_status($process)['running']) {
+                    if (microtime(true) > $deadline) {
+                        self::fail('Concurrent claim did not complete within the fixture deadline.');
+                    }
+                    usleep(1000);
+                }
+                self::assertSame(0, proc_close($process));
+                $results[] = json_decode(file_get_contents(stream_get_meta_data($outputs[$index])['uri']), true, flags: JSON_THROW_ON_ERROR);
+            }
+            sort($results);
+            self::assertSame([false, true], $results);
+            self::assertNotNull($this->second->fetchOne('SELECT start_claimed_at FROM worker_deployment_containers'));
+        } finally {
+            foreach ($processes as $process) {
+                if (is_resource($process)) {
+                    proc_terminate($process, 9);
+                    proc_close($process);
+                }
+            }
+            foreach ($outputs as $output) {
+                fclose($output);
+            }
+            foreach ([$gate, $gate . '0.ready', $gate . '1.ready'] as $file) {
+                if (is_file($file)) {
+                    unlink($file);
+                }
+            }
+        }
+    }
+
     public function testBootCannotRebindToDifferentDaemonOrContainer(): void
     {
         $inventory = new DoctrineDeploymentInventory($this->first);

@@ -7,7 +7,7 @@ namespace DoctrineMigrations;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
-/** DBAL-owned pre-start inventory, independent of the later lease epoch. */
+/** Fresh-install DBAL inventory, independent of the later lease epoch; no production deployments. */
 final class Version20261002220000 extends AbstractMigration
 {
     public function getDescription(): string
@@ -24,6 +24,7 @@ final class Version20261002220000 extends AbstractMigration
                 daemon_id TEXT NOT NULL CHECK (daemon_id ~ '^[A-Za-z0-9_.:-]{1,128}$'),
                 container_id TEXT NOT NULL CHECK (container_id ~ '^[0-9a-f]{64}$'),
                 created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+                start_claimed_at TIMESTAMPTZ DEFAULT NULL,
                 PRIMARY KEY (namespace, boot_id),
                 UNIQUE (daemon_id, container_id)
             )

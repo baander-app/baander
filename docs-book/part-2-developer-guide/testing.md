@@ -105,7 +105,11 @@ coordination. It needs host PHP with `pdo_pgsql`, publishes only an ephemeral
 loopback database port, and destroys its disposable resources. It verifies
 wrong-owner and wrong-label rejection, expiry without takeover, confirmed removal,
 new epoch acquisition and stale-token rejection. The fixture exercises external
-controller recovery, not a complete `LeasedWorkerRuntime` deployment.
+controller startup and recovery, not a complete `LeasedWorkerRuntime` deployment.
+The predecessor is created with restart disabled and remains unstarted until its
+inventory binding and one-shot start claim commit. The fixture checks visibility
+through an independent PostgreSQL connection at the real Docker start call, then
+verifies that a repeated controller start cannot restart the predecessor.
 
 The functional runner creates an isolated PostgreSQL/Redis network, extracts the
 checkout into a fresh directory, and runs all migrations twice before executing the

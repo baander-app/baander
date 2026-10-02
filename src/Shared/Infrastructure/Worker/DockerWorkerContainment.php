@@ -32,6 +32,17 @@ FORMAT;
      */
     public function retire(string $containerId, DeploymentLease $lease): void
     {
+        $this->verifyIsolation($containerId, $lease->namespace, $lease->bootId);
+        $removed = ($this->execute)(['container', 'rm', '--force', $containerId]);
+        if (trim($removed) !== $containerId) {
+            throw new RuntimeException('Immutable container removal was not confirmed.');
+        }
+    }
+
+    /** Inspection verifies identity and isolation only; it supplies no retirement or start receipt. */
+    public function verifyIsolation(string $containerId, string $namespace, string $bootId): void
+    {
+        DeploymentLease::validateIdentity($namespace, $bootId);
         if (preg_match('/\A[0-9a-f]{64}\z/D', $containerId) !== 1) {
             throw new InvalidArgumentException('Containment requires a full immutable lowercase 64-hex container ID.');
         }
@@ -43,8 +54,8 @@ FORMAT;
         }
         if (!is_array($inspection) || count($inspection) !== 15
             || ($inspection['id'] ?? null) !== $containerId
-            || ($inspection['namespace'] ?? null) !== $lease->namespace
-            || ($inspection['bootId'] ?? null) !== $lease->bootId
+            || ($inspection['namespace'] ?? null) !== $namespace
+            || ($inspection['bootId'] ?? null) !== $bootId
             || ($inspection['role'] ?? null) !== 'deployment'
             || ($inspection['privileged'] ?? null) !== false
             // Docker's empty PidMode denotes its own private PID namespace.
@@ -59,10 +70,6 @@ FORMAT;
             if (!array_key_exists($field, $inspection) || !in_array($inspection[$field], [null, []], true)) {
                 throw new RuntimeException('Container resources do not match containment requirements.');
             }
-        }
-        $removed = ($this->execute)(['container', 'rm', '--force', $containerId]);
-        if (trim($removed) !== $containerId) {
-            throw new RuntimeException('Immutable container removal was not confirmed.');
         }
     }
 }

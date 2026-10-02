@@ -32,6 +32,44 @@ final class DockerWorkerContainmentTest extends TestCase
         self::assertSame(['container', 'rm', '--force', self::ID], $calls[1]);
     }
 
+    public function testPrestartIsolationVerificationInspectsWithoutRemovalOrLease(): void
+    {
+        $calls = [];
+        $containment = new DockerWorkerContainment(static function (array $argv) use (&$calls): string {
+            $calls[] = $argv;
+            self::assertSame('inspect', $argv[1], 'Verification cannot start or remove a container.');
+            return json_encode(self::inspection(), JSON_THROW_ON_ERROR);
+        });
+        $containment->verifyIsolation(self::ID, 'worker.baander.app', self::BOOT);
+        self::assertCount(1, $calls);
+        self::assertSame(self::ID, $calls[0][4]);
+    }
+
+    public function testPrestartIsolationVerificationRejectsWrongBoot(): void
+    {
+        $calls = 0;
+        $containment = new DockerWorkerContainment(static function (array $argv) use (&$calls): string {
+            ++$calls;
+            self::assertSame('inspect', $argv[1]);
+            return json_encode(self::inspection(), JSON_THROW_ON_ERROR);
+        });
+        try {
+            $containment->verifyIsolation(self::ID, 'worker.baander.app', str_repeat('f', 32));
+            self::fail('Wrong boot cannot pass prestart verification.');
+        } catch (RuntimeException) {
+            self::assertSame(1, $calls);
+        }
+    }
+
+    public function testInvalidPrestartIdentityNeverReachesDocker(): void
+    {
+        $containment = new DockerWorkerContainment(static function (): string {
+            self::fail('Invalid identity must be rejected before inspection.');
+        });
+        $this->expectException(InvalidArgumentException::class);
+        $containment->verifyIsolation(self::ID, 'unsafe namespace', self::BOOT);
+    }
+
     #[DataProvider('unsafeInspections')]
     public function testUnsafeIdentityOrIsolationNeverAttemptsRemoval(string $field, mixed $value): void
     {

@@ -12,6 +12,7 @@ use App\Shared\Infrastructure\Worker\DeploymentContainmentController;
 use App\Shared\Infrastructure\Worker\DeploymentContainer;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory;
 use App\Shared\Infrastructure\Worker\RegisteredDeploymentRecovery;
+use App\Shared\Infrastructure\Worker\RegisteredDeploymentStart;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
 use App\Shared\Infrastructure\Worker\DockerWorkerCommand;
 use App\Shared\Infrastructure\Worker\DockerWorkerContainment;
@@ -21,10 +22,12 @@ use DoctrineMigrations\Version20261002210000;
 use DoctrineMigrations\Version20261002220000;
 use Psr\Log\NullLogger;
 
-$connection = DriverManager::getConnection([
+$connectionParameters = [
     'driver' => 'pdo_pgsql', 'host' => '127.0.0.1', 'port' => (int) getenv('WORKER_RECOVERY_PG_PORT'),
     'user' => getenv('POSTGRES_USER'), 'password' => getenv('POSTGRES_PASSWORD'), 'dbname' => getenv('POSTGRES_DB'),
-]);
+];
+$connection = DriverManager::getConnection($connectionParameters);
+$observer = DriverManager::getConnection($connectionParameters);
 $schema = 'worker_recovery_' . bin2hex(random_bytes(8));
 $connection->executeStatement('CREATE SCHEMA ' . $schema);
 try {
@@ -41,15 +44,59 @@ try {
     $containment = new DockerWorkerContainment($command->execute(...));
     $controller = new DeploymentContainmentController($leases, $containment->retire(...));
     $namespace = 'baander.app:recovery-test';
-    $boot = str_repeat('a', 32);
+    $boot = (string) getenv('WORKER_RECOVERY_BOOT_ID');
     $replacementBoot = str_repeat('b', 32);
     $inventory = new DoctrineDeploymentInventory($connection);
     $daemonId = trim($command->execute(['info', '--format', '{{.ID}}']));
-    // This recovery acceptance registers already-running controlled fixtures.
-    // It does not prove the production register-before-start lifecycle.
-    if (!$inventory->register(new DeploymentContainer($namespace, $boot, $daemonId, $argv[3]))) {
-        throw new RuntimeException('Initial deployment inventory registration failed.');
+    $observer->executeStatement('SET search_path TO ' . $schema);
+    $binding = new DeploymentContainer($namespace, $boot, $daemonId, $argv[3]);
+    $state = json_decode($command->execute(['container', 'inspect', '--format', '{"status":{{json .State.Status}},"pid":{{json .State.Pid}}}', $binding->containerId]), true, flags: JSON_THROW_ON_ERROR);
+    if ($state !== ['status' => 'created', 'pid' => 0]) {
+        throw new RuntimeException('Predecessor had process activity before registered startup.');
     }
+    $startCalls = 0;
+    $starter = new RegisteredDeploymentStart($inventory, static function (array $arguments) use ($command, $observer, $binding, &$startCalls): string {
+        if ($arguments === ['container', 'start', $binding->containerId]) {
+            // Independent connection visibility proves registration and one-shot
+            // admission committed BEFORE Docker starts the first worker process.
+            $committed = $observer->fetchOne('SELECT count(*) FROM worker_deployment_containers WHERE namespace = :namespace AND boot_id = :boot AND daemon_id = :daemon AND container_id = :container AND start_claimed_at IS NOT NULL',
+                ['namespace' => $binding->namespace, 'boot' => $binding->bootId, 'daemon' => $binding->daemonId, 'container' => $binding->containerId]);
+            if ((int) $committed !== 1) {
+                throw new RuntimeException('Start attempted before committed inventory and claim.');
+            }
+            ++$startCalls;
+        }
+        return $command->execute($arguments);
+    });
+    if (!$starter->start($binding) || $startCalls !== 1) {
+        throw new RuntimeException('Registered initial startup was not admitted once.');
+    }
+    $readyDeadline = hrtime(true) / 1e9 + 5;
+    do {
+        try {
+            $command->execute(['container', 'exec', $binding->containerId, 'test', '-s', '/tmp/baander-descendant-ready']);
+            break;
+        } catch (RuntimeException) {
+            if (hrtime(true) / 1e9 >= $readyDeadline) {
+                throw new RuntimeException('Registered worker descendant failed to become ready.');
+            }
+            usleep(100_000);
+        }
+    } while (true);
+    $firstPid = trim($command->execute(['container', 'inspect', '--format', '{{.State.Pid}}', $binding->containerId]));
+    try {
+        if ($starter->start($binding)) {
+            throw new LogicException('A repeated controller start was admitted.');
+        }
+    } catch (RuntimeException) {
+        // Created-state validation rejects repeating a start on a running container.
+    }
+    if ($startCalls !== 1 || trim($command->execute(['container', 'inspect', '--format', '{{.State.Pid}}', $binding->containerId])) !== $firstPid) {
+        throw new RuntimeException('Repeated startup issued another start or changed the predecessor PID.');
+    }
+    echo "PASS: committed inventory and one-shot claim precede initial process activity; repeated start refused\n";
+    // The mechanical namespace fixture does not consult a lease. The controller
+    // acquires the real database lease AFTER its registered startup acceptance.
     $registeredRecovery = new RegisteredDeploymentRecovery($inventory, $leases, $command->execute(...));
     $initial = $leases->acquire($namespace, $boot, 60);
     if ($initial === null || $initial->epoch !== 1) {
@@ -115,5 +162,6 @@ try {
 } finally {
     $connection->executeStatement('SET search_path TO public');
     $connection->executeStatement('DROP SCHEMA ' . $schema . ' CASCADE');
+    $observer->close();
     $connection->close();
 }

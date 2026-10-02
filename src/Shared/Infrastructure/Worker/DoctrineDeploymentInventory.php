@@ -7,7 +7,7 @@ namespace App\Shared\Infrastructure\Worker;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
-/** Append-only DBAL inventory, on a dedicated idle autocommit PostgreSQL connection. */
+/** Immutable bindings and irreversible start claims, on a dedicated idle autocommit PostgreSQL connection. */
 #[Exclude]
 final class DoctrineDeploymentInventory
 {
@@ -33,6 +33,20 @@ final class DoctrineDeploymentInventory
             $registered = $this->select($container->namespace, $container->bootId);
             return $registered !== null && $registered->daemonId === $container->daemonId && $registered->containerId === $container->containerId;
         });
+    }
+
+    /**
+     * Commit one start permission for this exact binding. Only acknowledged true
+     * permits one Docker start attempt. Never reset or retry after uncertainty,
+     * even when container inspection shows it has not started or already exited.
+     */
+    public function claimStart(DeploymentContainer $container): bool
+    {
+        return $this->operation(fn (): bool => $this->connection->executeStatement(<<<'SQL'
+            UPDATE worker_deployment_containers SET start_claimed_at = clock_timestamp()
+            WHERE namespace = :namespace AND boot_id = :boot AND daemon_id = :daemon
+                AND container_id = :container AND start_claimed_at IS NULL
+            SQL, ['namespace' => $container->namespace, 'boot' => $container->bootId, 'daemon' => $container->daemonId, 'container' => $container->containerId]) === 1);
     }
 
     public function find(string $namespace, string $bootId): ?DeploymentContainer

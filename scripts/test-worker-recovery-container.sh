@@ -35,20 +35,31 @@ port_mapping=$(docker port "$pg_id" 5432/tcp)
 WORKER_RECOVERY_PG_PORT=${port_mapping##*:}
 [[ "$port_mapping" == 127.0.0.1:* && "$WORKER_RECOVERY_PG_PORT" =~ ^[0-9]+$ ]] || { echo 'Unexpected PostgreSQL port mapping.' >&2; exit 1; }
 export WORKER_RECOVERY_PG_PORT
+WORKER_RECOVERY_BOOT_ID=$(php -r 'echo bin2hex(random_bytes(16));')
+export WORKER_RECOVERY_BOOT_ID
+predecessor_name=$(php -r 'require "vendor/autoload.php"; echo \App\Shared\Infrastructure\Worker\RegisteredDeploymentStart::containerName("baander.app:recovery-test", getenv("WORKER_RECOVERY_BOOT_ID"));')
 
-# Two real live deployment boundaries, one deliberately mislabeled. The test
+# Predecessor stays never-started until the registered PHP controller admits it.
+# The deliberately mislabeled fault container is started directly. The test
 # controller runs on the host; no Docker socket or database credential enters them.
 for role in predecessor wrong-label; do
-    boot_id=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    if [ "$role" = wrong-label ]; then boot_id=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; fi
-    container_id=$(docker create --name "$run_id-$role" --network none --memory 256m --memory-swap 256m \
-        --cpus 1 --pids-limit 32 --cap-drop ALL --security-opt no-new-privileges --cgroupns private --restart always \
+    boot_id=$WORKER_RECOVERY_BOOT_ID
+    container_name=$predecessor_name
+    restart_policy=no
+    if [ "$role" = wrong-label ]; then
+        boot_id=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        container_name="$run_id-$role"
+        restart_policy=always
+    fi
+    container_id=$(docker create --name "$container_name" --network none --memory 256m --memory-swap 256m \
+        --cpus 1 --pids-limit 32 --cap-drop ALL --security-opt no-new-privileges --cgroupns private --restart "$restart_policy" \
         --label app.baander.worker.namespace=baander.app:recovery-test \
         --label "app.baander.worker.boot-id=$boot_id" --label app.baander.worker.role=deployment \
         --entrypoint php "${BAANDER_TEST_IMAGE:-martinjuul/baander-app:latest}" \
         /tmp/tests/Fixtures/Worker/contained-supervisor.php)
     if [ "$role" = predecessor ]; then predecessor_id=$container_id; else wrong_label_id=$container_id; fi
     tar -cf - vendor packages src tests/Fixtures/Worker | docker cp - "$container_id:/tmp/"
+    if [ "$role" = predecessor ]; then continue; fi
     docker start "$container_id" >/dev/null
     ready=false
     for attempt in $(seq 1 50); do
