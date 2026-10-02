@@ -25,6 +25,30 @@ class WebhookEntity
     #[ORM\Column(type: 'text')]
     private string $secretHash;
 
+    #[ORM\Column(type: 'smallint', options: ['default' => 1])]
+    private int $signingVersion = 1;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $encryptedSecret = null;
+
+    public function getSigningVersion(): int
+    {
+        return $this->signingVersion;
+    }
+
+    public function getEncryptedSecret(): ?string
+    {
+        return $this->encryptedSecret;
+    }
+
+    public function setEncryptedSigningSecret(string $encryptedSecret, string $secretHash): void
+    {
+        $this->encryptedSecret = $encryptedSecret;
+        $this->secretHash = $secretHash;
+        $this->signingVersion = 2;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
     #[ORM\Column]
     private \DateTimeImmutable $createdAt;
 

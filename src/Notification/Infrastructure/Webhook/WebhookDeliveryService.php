@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Notification\Infrastructure\Webhook;
 
 use App\Notification\Domain\ValueObject\NotificationCategory;
+use App\Notification\Application\Port\WebhookSecretPortInterface;
 use App\Shared\Infrastructure\Swoole\Async;
 use App\Notification\Infrastructure\Doctrine\Entity\WebhookDeliveryLogEntity;
 use App\Notification\Infrastructure\Doctrine\Entity\WebhookEntity;
@@ -20,26 +21,14 @@ final class WebhookDeliveryService
 
     private const BACKOFF_DELAYS = [1, 2, 4];
 
-    /**
-     * @var list<array{network: string, prefix: int, bits: int}>
-     */
-    private const IP_BLOCKLIST = [
-        ['network' => '10.0.0.0', 'prefix' => 8, 'bits' => 32],
-        ['network' => '172.16.0.0', 'prefix' => 12, 'bits' => 32],
-        ['network' => '192.168.0.0', 'prefix' => 16, 'bits' => 32],
-        ['network' => '127.0.0.0', 'prefix' => 8, 'bits' => 32],
-        ['network' => '169.254.0.0', 'prefix' => 32, 'bits' => 32],
-        ['network' => '::1', 'prefix' => 128, 'bits' => 128],
-        ['network' => 'fc00::', 'prefix' => 7, 'bits' => 128],
-        ['network' => 'fe80::', 'prefix' => 10, 'bits' => 128],
-    ];
-
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly HttpClientInterface $httpClient,
         private readonly HmacSigner $hmacSigner,
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
+        private readonly WebhookDestinationPolicy $destinations = new WebhookDestinationPolicy(),
+        private readonly ?WebhookSecretPortInterface $secrets = null,
     ) {
     }
 
@@ -89,7 +78,7 @@ final class WebhookDeliveryService
         string $notificationId,
     ): void {
         $url = $webhook->getUrl();
-        $safe = $this->resolveSafeIps($url);
+        $safe = $this->destinations->resolve($url);
 
         if ($safe === null) {
             $this->logger->warning('Webhook blocked: URL failed SSRF validation.', [
@@ -116,23 +105,39 @@ final class WebhookDeliveryService
 
         $lastStatusCode = null;
 
+        try {
+            $signingSecret = match ($webhook->getSigningVersion()) {
+                1 => $webhook->getSecretHash(),
+                2 => $this->secrets?->decrypt($webhook->getEncryptedSecret() ?? '')
+                    ?? throw new \RuntimeException('Webhook secret encryption is not configured.'),
+                default => throw new \RuntimeException('Unsupported webhook signature version.'),
+            };
+        } catch (\Throwable) {
+            $this->logger->error('Webhook signing secret could not be decrypted.', ['webhook_id' => $webhook->getId()->toString()]);
+            $this->logDelivery($webhook, $notificationId, 'failed', null, 0);
+            return;
+        }
+
         for ($attempt = 1; $attempt <= self::MAX_RETRIES; $attempt++) {
             // Re-sign per attempt: a fresh timestamp keeps retries valid against
             // receivers that enforce signature freshness.
             $timestamp = (string) time();
-            $signature = $this->hmacSigner->sign($timestamp . '.' . $payload, $webhook->getSecretHash());
+            $signature = $this->hmacSigner->sign($timestamp . '.' . $payload, $signingSecret);
 
             try {
                 $response = $this->httpClient->request('POST', $url, [
                     'headers' => [
                         'Content-Type' => 'application/json',
                         'X-Webhook-Signature' => $signature,
+                        'X-Webhook-Signature-Version' => (string) $webhook->getSigningVersion(),
                         'X-Webhook-Timestamp' => $timestamp,
                         'User-Agent' => 'Baander-Webhook/1.0',
                     ],
                     'body' => $payload,
                     'timeout' => 10,
                     'resolve' => $resolve,
+                    'max_redirects' => 0,
+                    'proxy' => '',
                 ]);
 
                 $statusCode = $response->getStatusCode();
@@ -152,7 +157,7 @@ final class WebhookDeliveryService
                     'attempt' => $attempt,
                 ]);
 
-                if ($statusCode >= 400 && $statusCode < 500) {
+                if ($statusCode >= 300 && $statusCode < 500) {
                     $this->logDelivery($webhook, $notificationId, 'failed', $statusCode, $attempt);
 
                     return;
@@ -206,157 +211,7 @@ final class WebhookDeliveryService
 
     public function isUrlSafe(string $url): bool
     {
-        return $this->resolveSafeIps($url) !== null;
+        return $this->destinations->resolve($url) !== null;
     }
 
-    /**
-     * Validate the URL scheme/host and resolve the host to non-private IPs.
-     *
-     * Returns the host together with its validated IPs so the caller can pin the
-     * connection (preventing DNS rebinding). Returns null when the URL is unsafe
-     * or the host cannot be resolved to a non-private address.
-     *
-     * @return array{host: string, ips: list<string>}|null
-     */
-    private function resolveSafeIps(string $url): ?array
-    {
-        $parsed = parse_url($url);
-
-        if ($parsed === false) {
-            return null;
-        }
-
-        $scheme = strtolower($parsed['scheme'] ?? '');
-        if ($scheme !== 'https' && $scheme !== 'http') {
-            return null;
-        }
-
-        $host = $parsed['host'] ?? '';
-        if ($host === '') {
-            return null;
-        }
-
-        $resolvedIps = $this->resolveHost($host);
-        if ($resolvedIps === []) {
-            return null;
-        }
-
-        foreach ($resolvedIps as $ip) {
-            if ($this->isPrivateIp($ip)) {
-                return null;
-            }
-        }
-
-        return ['host' => $host, 'ips' => $resolvedIps];
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function resolveHost(string $host): array
-    {
-        $records = @dns_get_record($host, DNS_A | DNS_AAAA);
-        if ($records === false || $records === []) {
-            return [];
-        }
-
-        $ips = [];
-        foreach ($records as $record) {
-            if (isset($record['ipv6'])) {
-                $ips[] = $record['ipv6'];
-            } elseif (isset($record['ip'])) {
-                $ips[] = $record['ip'];
-            }
-        }
-
-        return $ips;
-    }
-
-    private function isPrivateIp(string $ip): bool
-    {
-        if (str_starts_with($ip, '::ffff:')) {
-            $ipv4 = substr($ip, 7);
-            if (filter_var($ipv4, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
-                return $this->isPrivateIp($ipv4);
-            }
-
-            return true;
-        }
-
-        $packed = @inet_pton($ip);
-        if ($packed === false) {
-            return true;
-        }
-
-        $isIpv4 = str_contains($ip, '.');
-        $bits = $isIpv4 ? 32 : 128;
-
-        foreach (self::IP_BLOCKLIST as $range) {
-            if ($range['bits'] !== $bits) {
-                continue;
-            }
-
-            if ($this->cidrMatch($ip, $range['network'], $range['prefix'], $bits)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function cidrMatch(string $ip, string $network, int $prefix, int $bits): bool
-    {
-        if ($prefix === 0) {
-            return true;
-        }
-
-        if ($bits === 32) {
-            $ipLong = $this->ipToLong($ip);
-            $networkLong = $this->ipToLong($network);
-
-            if ($ipLong === null || $networkLong === null) {
-                return false;
-            }
-
-            $mask = (~0 << (32 - $prefix)) & 0xFFFFFFFF;
-
-            return ($ipLong & $mask) === ($networkLong & $mask);
-        }
-
-        $ipPacked = inet_pton($ip);
-        $networkPacked = inet_pton($network);
-
-        if ($ipPacked === false || $networkPacked === false) {
-            return false;
-        }
-
-        $fullBytes = (int) floor($prefix / 8);
-        $remainingBits = $prefix % 8;
-
-        if ($fullBytes > 0 && substr($ipPacked, 0, $fullBytes) !== substr($networkPacked, 0, $fullBytes)) {
-            return false;
-        }
-
-        if ($remainingBits > 0) {
-            $ipByte = ord($ipPacked[$fullBytes]);
-            $networkByte = ord($networkPacked[$fullBytes]);
-            $bitMask = (0xFF << (8 - $remainingBits)) & 0xFF;
-
-            return ($ipByte & $bitMask) === ($networkByte & $bitMask);
-        }
-
-        return true;
-    }
-
-    private function ipToLong(string $ip): ?int
-    {
-        $packed = @inet_pton($ip);
-        if ($packed === false) {
-            return null;
-        }
-
-        $unpacked = unpack('N', $packed);
-
-        return $unpacked !== false ? $unpacked[1] : null;
-    }
 }

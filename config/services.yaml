@@ -4,6 +4,7 @@ imports:
 # yaml-language-server: $schema=../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
 
 parameters:
+    env(WEBHOOK_LAN_ALLOWLIST): ''
     app.domain: '%env(APP_DOMAIN)%'
     app.name: '%env(APP_NAME)%'
     swoole_bundle.cache_dir: '%kernel.cache_dir%/swoole_bundle'
@@ -57,6 +58,20 @@ services:
             - '../src/**/Entity/'
             - '../src/**/ValueObject/'
             - '../src/Shared/Infrastructure/Messenger/AllowedClassNormalizer.php'
+
+    App\Notification\Infrastructure\Webhook\WebhookDestinationPolicy:
+        arguments:
+            $lanAllowlist: '%env(csv:WEBHOOK_LAN_ALLOWLIST)%'
+
+    App\Notification\Application\Port\WebhookDestinationPortInterface:
+        alias: App\Notification\Infrastructure\Webhook\WebhookDestinationPolicy
+
+    App\Notification\Infrastructure\Webhook\WebhookSecretCodec:
+        arguments:
+            $applicationSecret: '%kernel.secret%'
+
+    App\Notification\Application\Port\WebhookSecretPortInterface:
+        alias: App\Notification\Infrastructure\Webhook\WebhookSecretCodec
 
     _instanceof:
         App\Scheduler\Domain\Model\SchedulableCommandInterface:

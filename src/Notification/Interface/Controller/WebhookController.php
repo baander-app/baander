@@ -6,6 +6,9 @@ namespace App\Notification\Interface\Controller;
 
 use App\Notification\Infrastructure\Doctrine\Entity\WebhookEntity;
 use App\Notification\Infrastructure\Webhook\HmacSigner;
+use App\Notification\Application\Port\WebhookDestinationPortInterface;
+use App\Notification\Application\Port\WebhookSecretPortInterface;
+use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use Doctrine\ORM\EntityManagerInterface;
@@ -16,7 +19,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\AsController;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 #[AsController]
 #[OA\Tag(name: 'Webhooks', description: 'Outgoing webhook management (admin only)')]
@@ -29,7 +31,8 @@ final class WebhookController
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly HmacSigner $hmacSigner,
-        private readonly JsonEncoder $jsonEncoder,
+        private readonly WebhookDestinationPortInterface $destinations,
+        private readonly WebhookSecretPortInterface $secrets,
     )
     {
     }
@@ -91,20 +94,20 @@ final class WebhookController
     #[Route('/', name: 'create', methods: ['POST'])]
     public function create(Request $request): JsonResponse
     {
-        $data = $this->jsonEncoder->decode((string)$request->getContent(), 'json');
+        $data = $request->toArray();
 
         $url = $data['url'] ?? null;
         if (!is_string($url) || trim($url) === '') {
             return $this->errorResponse('URL is required.', 422);
         }
 
-        if (!filter_var($url, FILTER_VALIDATE_URL)) {
-            return $this->errorResponse('Invalid URL format.', 422);
+        if ($this->destinations->resolve($url) === null) {
+            return $this->errorResponse('Webhook destination is not allowed or cannot be resolved.', 422);
         }
 
         $categoryFilter = $data['category_filter'] ?? null;
-        if ($categoryFilter !== null && !is_array($categoryFilter)) {
-            return $this->errorResponse('category_filter must be an array or null.', 422);
+        if (!$this->validCategoryFilter($categoryFilter)) {
+            return $this->errorResponse('category_filter must contain supported notification categories.', 422);
         }
 
         $secret = bin2hex(random_bytes(32));
@@ -113,7 +116,7 @@ final class WebhookController
         $webhook = new WebhookEntity(Uuid::generate());
         $webhook->setUrl($url);
         $webhook->setCategoryFilter($categoryFilter);
-        $webhook->setSecretHash($secretHash);
+        $webhook->setEncryptedSigningSecret($this->secrets->encrypt($secret), $secretHash);
 
         $this->entityManager->persist($webhook);
         $this->entityManager->flush();
@@ -123,6 +126,7 @@ final class WebhookController
             'url'             => $webhook->getUrl(),
             'category_filter' => $webhook->getCategoryFilter(),
             'secret'          => $secret,
+            'signing_version' => $webhook->getSigningVersion(),
             'created_at'      => $webhook->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'updated_at'      => $webhook->getUpdatedAt()->format(\DateTimeInterface::ATOM),
         ]);
@@ -164,16 +168,20 @@ final class WebhookController
             return $this->notFound('Webhook not found.');
         }
 
-        $data = $this->jsonEncoder->decode((string)$request->getContent(), 'json');
+        $data = $request->toArray();
+
+        if (array_key_exists('category_filter', $data) && !$this->validCategoryFilter($data['category_filter'])) {
+            return $this->errorResponse('category_filter must contain supported notification categories.', 422);
+        }
 
         $url = $data['url'] ?? null;
-        if ($url !== null) {
+        if (array_key_exists('url', $data)) {
             if (!is_string($url) || trim($url) === '') {
                 return $this->errorResponse('URL must be a non-empty string.', 422);
             }
 
-            if (!filter_var($url, FILTER_VALIDATE_URL)) {
-                return $this->errorResponse('Invalid URL format.', 422);
+            if ($this->destinations->resolve($url) === null) {
+                return $this->errorResponse('Webhook destination is not allowed or cannot be resolved.', 422);
             }
 
             $webhook->setUrl($url);
@@ -181,10 +189,6 @@ final class WebhookController
 
         if (array_key_exists('category_filter', $data)) {
             $categoryFilter = $data['category_filter'];
-            if ($categoryFilter !== null && !is_array($categoryFilter)) {
-                return $this->errorResponse('category_filter must be an array or null.', 422);
-            }
-
             $webhook->setCategoryFilter($categoryFilter);
         }
 
@@ -228,6 +232,46 @@ final class WebhookController
         $this->entityManager->flush();
 
         return $this->noContent();
+    }
+
+    #[OA\Post(
+        path: '/api/webhooks/{id}/rotate-secret',
+        summary: 'Rotate a webhook secret and upgrade to signature version 2',
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))],
+        responses: [
+            new OA\Response(response: '200', description: 'New secret, returned once'),
+            new OA\Response(response: '403', description: 'Administrator required'),
+            new OA\Response(response: '404', description: 'Webhook not found'),
+        ],
+    )]
+    #[Route('/{id}/rotate-secret', name: 'rotate_secret', methods: ['POST'])]
+    public function rotateSecret(string $id): JsonResponse
+    {
+        $webhook = $this->findWebhook($id);
+        if ($webhook === null) {
+            return $this->notFound('Webhook not found.');
+        }
+        $secret = bin2hex(random_bytes(32));
+        $webhook->setEncryptedSigningSecret($this->secrets->encrypt($secret), $this->hmacSigner->hashSecret($secret));
+        $this->entityManager->flush();
+
+        return $this->successResponse(['id' => $id, 'secret' => $secret, 'signing_version' => 2]);
+    }
+
+    private function validCategoryFilter(mixed $filter): bool
+    {
+        if ($filter === null) {
+            return true;
+        }
+        if (!is_array($filter) || !array_is_list($filter)) {
+            return false;
+        }
+        foreach ($filter as $category) {
+            if (!is_string($category) || NotificationCategory::tryFrom($category) === null) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private function findWebhook(string $id): ?WebhookEntity

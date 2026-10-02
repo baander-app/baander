@@ -8,6 +8,7 @@ use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Notification\Infrastructure\Doctrine\Entity\WebhookEntity;
 use App\Notification\Infrastructure\Webhook\HmacSigner;
 use App\Notification\Infrastructure\Webhook\WebhookDeliveryService;
+use App\Notification\Infrastructure\Webhook\WebhookDestinationPolicy;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
@@ -21,30 +22,37 @@ final class WebhookDeliveryServiceTest extends TestCase
 {
     private WebhookDeliveryService $service;
     private EntityManagerInterface&MockObject $entityManager;
-    private HttpClientInterface&MockObject $httpClient;
+    private HttpClientInterface $httpClient;
     private HmacSigner $hmacSigner;
-    private LoggerInterface&MockObject $logger;
-    private EntityRepository&MockObject $webhookRepo;
+    private LoggerInterface $logger;
+    private EntityRepository $webhookRepo;
 
     protected function setUp(): void
     {
         $this->entityManager = $this->createMock(EntityManagerInterface::class);
-        $this->httpClient = $this->createMock(HttpClientInterface::class);
+        $this->httpClient = $this->createStub(HttpClientInterface::class);
         $this->hmacSigner = new HmacSigner();
-        $this->logger = $this->createMock(LoggerInterface::class);
-        $this->webhookRepo = $this->createMock(EntityRepository::class);
+        $this->logger = $this->createStub(LoggerInterface::class);
+        $this->webhookRepo = $this->createStub(EntityRepository::class);
 
-        $this->entityManager->method('getRepository')
+        $this->entityManager->expects($this->atMost(1))->method('getRepository')
             ->with(WebhookEntity::class)
             ->willReturn($this->webhookRepo);
 
-        $this->service = new WebhookDeliveryService(
+        $this->service = $this->createWebhookDeliveryServiceFixture();
+    }
+
+    private function createWebhookDeliveryServiceFixture(): WebhookDeliveryService
+    {
+        $fixture = new WebhookDeliveryService(
             $this->entityManager,
             $this->httpClient,
             $this->hmacSigner,
             $this->logger,
             new JsonEncoder(),
+            new WebhookDestinationPolicy(dnsResolver: static fn (string $host): array => $host === 'example.com' ? ['93.184.216.34'] : []),
         );
+        return $fixture;
     }
 
     public function testIsUrlSafeBlocksPrivateIp(): void
@@ -73,8 +81,7 @@ final class WebhookDeliveryServiceTest extends TestCase
 
     public function testIsUrlSafeAllowsPublicDnsUrl(): void
     {
-        // A real public domain should resolve and not be in the blocklist.
-        // We use a well-known domain that should resolve to a public IP.
+        // DNS input is deterministic; the real destination policy still validates it.
         $this->assertTrue($this->service->isUrlSafe('https://example.com/webhook'));
     }
 
@@ -85,6 +92,9 @@ final class WebhookDeliveryServiceTest extends TestCase
 
     public function testDeliverAllSkipsWebhooksWithCategoryFilterMismatch(): void
     {
+        $this->httpClient = $this->createMock(HttpClientInterface::class);
+        $this->service = $this->createWebhookDeliveryServiceFixture();
+
         $webhook = new WebhookEntity(Uuid::generate());
         $webhook->setUrl('https://example.com/webhook');
         $webhook->setCategoryFilter(['security']);
@@ -106,6 +116,10 @@ final class WebhookDeliveryServiceTest extends TestCase
 
     public function testDeliverAllSkipsWebhooksWithUnsafeUrl(): void
     {
+        $this->httpClient = $this->createMock(HttpClientInterface::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->service = $this->createWebhookDeliveryServiceFixture();
+
         $webhook = new WebhookEntity(Uuid::generate());
         $webhook->setUrl('http://127.0.0.1/webhook');
         $webhook->setCategoryFilter(null);
@@ -127,6 +141,9 @@ final class WebhookDeliveryServiceTest extends TestCase
 
     public function testDeliverAllDeliversToMatchingWebhook(): void
     {
+        $this->httpClient = $this->createMock(HttpClientInterface::class);
+        $this->service = $this->createWebhookDeliveryServiceFixture();
+
         $webhook = new WebhookEntity(Uuid::generate());
         $webhook->setUrl('https://example.com/webhook');
         $webhook->setCategoryFilter(null);
@@ -134,7 +151,7 @@ final class WebhookDeliveryServiceTest extends TestCase
 
         $this->webhookRepo->method('findAll')->willReturn([$webhook]);
 
-        $response = $this->createMock(\Symfony\Contracts\HttpClient\ResponseInterface::class);
+        $response = $this->createStub(\Symfony\Contracts\HttpClient\ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(200);
 
         $this->httpClient->expects($this->once())->method('request')
@@ -153,6 +170,9 @@ final class WebhookDeliveryServiceTest extends TestCase
 
     public function testDeliverAllRespectsNullCategoryFilter(): void
     {
+        $this->httpClient = $this->createMock(HttpClientInterface::class);
+        $this->service = $this->createWebhookDeliveryServiceFixture();
+
         // null category filter means "all categories"
         $webhook = new WebhookEntity(Uuid::generate());
         $webhook->setUrl('https://example.com/webhook');
@@ -161,7 +181,7 @@ final class WebhookDeliveryServiceTest extends TestCase
 
         $this->webhookRepo->method('findAll')->willReturn([$webhook]);
 
-        $response = $this->createMock(\Symfony\Contracts\HttpClient\ResponseInterface::class);
+        $response = $this->createStub(\Symfony\Contracts\HttpClient\ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(200);
 
         $this->httpClient->expects($this->once())->method('request')
@@ -178,6 +198,9 @@ final class WebhookDeliveryServiceTest extends TestCase
 
     public function testDeliverAllNoWebhooksReturnsEarly(): void
     {
+        $this->httpClient = $this->createMock(HttpClientInterface::class);
+        $this->service = $this->createWebhookDeliveryServiceFixture();
+
         $this->webhookRepo->method('findAll')->willReturn([]);
 
         $this->httpClient->expects($this->never())->method('request');
@@ -193,6 +216,9 @@ final class WebhookDeliveryServiceTest extends TestCase
 
     public function testDeliverPinsResolvedIpToPreventDnsRebinding(): void
     {
+        $this->httpClient = $this->createMock(HttpClientInterface::class);
+        $this->service = $this->createWebhookDeliveryServiceFixture();
+
         $webhook = new WebhookEntity(Uuid::generate());
         $webhook->setUrl('https://example.com/webhook');
         $webhook->setCategoryFilter(null);
@@ -200,7 +226,7 @@ final class WebhookDeliveryServiceTest extends TestCase
 
         $this->webhookRepo->method('findAll')->willReturn([$webhook]);
 
-        $response = $this->createMock(\Symfony\Contracts\HttpClient\ResponseInterface::class);
+        $response = $this->createStub(\Symfony\Contracts\HttpClient\ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(200);
 
         $capturedOptions = null;
@@ -229,6 +255,9 @@ final class WebhookDeliveryServiceTest extends TestCase
 
     public function testDeliverResignsSignaturePerAttempt(): void
     {
+        $this->httpClient = $this->createMock(HttpClientInterface::class);
+        $this->service = $this->createWebhookDeliveryServiceFixture();
+
         $webhook = new WebhookEntity(Uuid::generate());
         $webhook->setUrl('https://example.com/webhook');
         $webhook->setCategoryFilter(null);
@@ -240,7 +269,7 @@ final class WebhookDeliveryServiceTest extends TestCase
         $this->httpClient->expects($this->exactly(2))->method('request')
             ->willReturnCallback(function (string $method, string $url, array $options) use (&$timestamps) {
                 $timestamps[] = $options['headers']['X-Webhook-Timestamp'];
-                $response = $this->createMock(\Symfony\Contracts\HttpClient\ResponseInterface::class);
+                $response = $this->createStub(\Symfony\Contracts\HttpClient\ResponseInterface::class);
                 // First attempt 5xx (retry), second attempt 2xx (success).
                 $response->method('getStatusCode')->willReturn(count($timestamps) === 1 ? 500 : 200);
 
@@ -270,7 +299,7 @@ final class WebhookDeliveryServiceTest extends TestCase
 
         $this->webhookRepo->method('findAll')->willReturn([$webhook]);
 
-        $response = $this->createMock(\Symfony\Contracts\HttpClient\ResponseInterface::class);
+        $response = $this->createStub(\Symfony\Contracts\HttpClient\ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(500);
         $this->httpClient->method('request')->willReturn($response);
 
