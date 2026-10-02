@@ -24,9 +24,7 @@ final class FlysystemStorage implements StoragePortInterface
      */
     public function store(string $sourcePath, string $relativeDestination): StoredFile
     {
-        $destination = $this->basePath . '/' . ltrim($relativeDestination, '/');
-
-        $this->guardPathTraversal($destination);
+        $destination = $this->guardPathTraversal($relativeDestination, true);
 
         if (!copy($sourcePath, $destination)) {
             throw new \RuntimeException(sprintf('Failed to copy file to "%s".', $destination));
@@ -47,9 +45,7 @@ final class FlysystemStorage implements StoragePortInterface
      */
     public function storeFromBytes(string $contents, string $relativeDestination): StoredFile
     {
-        $destination = $this->basePath . '/' . ltrim($relativeDestination, '/');
-
-        $this->guardPathTraversal($destination);
+        $destination = $this->guardPathTraversal($relativeDestination, true);
 
         if (file_put_contents($destination, $contents) === false) {
             throw new \RuntimeException(sprintf('Failed to write file to "%s".', $destination));
@@ -70,7 +66,7 @@ final class FlysystemStorage implements StoragePortInterface
      */
     public function delete(string $relativePath): void
     {
-        $fullPath = $this->basePath . '/' . ltrim($relativePath, '/');
+        $fullPath = $this->guardPathTraversal($relativePath);
 
         if (file_exists($fullPath)) {
             unlink($fullPath);
@@ -82,7 +78,7 @@ final class FlysystemStorage implements StoragePortInterface
      */
     public function exists(string $relativePath): bool
     {
-        return file_exists($this->basePath . '/' . ltrim($relativePath, '/'));
+        return file_exists($this->guardPathTraversal($relativePath));
     }
 
     /**
@@ -90,32 +86,37 @@ final class FlysystemStorage implements StoragePortInterface
      */
     public function fullPath(string $relativePath): string
     {
-        return $this->basePath . '/' . ltrim($relativePath, '/');
+        return $this->guardPathTraversal($relativePath);
     }
 
     public function resolve(string $relativePath): string
     {
-        return $this->basePath . '/' . ltrim($relativePath, '/');
+        return $this->guardPathTraversal($relativePath);
     }
 
     public function deleteDerived(string $relativePath, string $extension): void
     {
-        $fullPath = $this->basePath . '/' . ltrim($relativePath, '/');
-        $directory = dirname($fullPath);
-        $filename = pathinfo($fullPath, PATHINFO_FILENAME);
+        $fullPath = $this->guardPathTraversal($relativePath);
+        $relativeDirectory = dirname(ltrim($relativePath, '/'));
+        $filename = pathinfo($relativePath, PATHINFO_FILENAME);
 
         // Delete unconditional WebP: {filename}.webp
-        $webpPath = $directory . '/' . $filename . '.webp';
+        $webpPath = $this->guardPathTraversal($relativeDirectory . '/' . $filename . '.webp');
+        $derivedPaths = [];
         if (file_exists($webpPath) && $webpPath !== $fullPath) {
-            unlink($webpPath);
+            $derivedPaths[] = $webpPath;
         }
 
         // Delete preset variants: iterate PRESETS keys from GdImageConverter to stay in sync
         foreach (array_keys(\App\Media\Infrastructure\Converter\GdImageConverter::PRESETS) as $preset) {
-            $presetPath = $directory . '/' . $filename . '_' . $preset . '.webp';
+            $presetPath = $this->guardPathTraversal($relativeDirectory . '/' . $filename . '_' . $preset . '.webp');
             if (file_exists($presetPath)) {
-                unlink($presetPath);
+                $derivedPaths[] = $presetPath;
             }
+        }
+        // Validate every derived path before removing any of them.
+        foreach ($derivedPaths as $path) {
+            unlink($path);
         }
     }
 
@@ -123,12 +124,27 @@ final class FlysystemStorage implements StoragePortInterface
      * Guard against path traversal attacks by verifying the resolved
      * destination stays within the storage base path.
      */
-    private function guardPathTraversal(string $destination): void
+    private function guardPathTraversal(string $relativePath, bool $createParent = false): string
     {
+        $segments = explode('/', ltrim($relativePath, '/'));
+        if ($relativePath === '' || str_contains($relativePath, "\0") || str_contains($relativePath, '\\') || in_array('..', $segments, true)) {
+            throw new \RuntimeException('Path traversal detected: invalid storage path.');
+        }
+        $segments = array_values(array_filter($segments, static fn (string $part): bool => $part !== '' && $part !== '.'));
+        if ($segments === []) {
+            throw new \RuntimeException('Path traversal detected: storage path must identify a file.');
+        }
+
+        // Reject invalid input before creating even the storage root.
+        clearstatcache(true);
         $realBase = realpath($this->basePath);
         if ($realBase === false) {
-            // Base path does not exist yet — create it before resolving
-            mkdir($this->basePath, 0755, true);
+            if (!$createParent) {
+                return rtrim($this->basePath, '/') . '/' . implode('/', $segments);
+            }
+            if (!is_dir($this->basePath) && !mkdir($this->basePath, 0755, true) && !is_dir($this->basePath)) {
+                throw new \RuntimeException('Unable to create storage root.');
+            }
             $realBase = realpath($this->basePath);
         }
 
@@ -136,21 +152,23 @@ final class FlysystemStorage implements StoragePortInterface
             throw new \RuntimeException(sprintf('Storage base path "%s" could not be resolved.', $this->basePath));
         }
 
-        // Build the expected directory and create it so realpath works
-        $directory = dirname($destination);
-        if (!is_dir($directory)) {
-            mkdir($directory, 0755, true);
+        $destination = $realBase;
+        foreach ($segments as $part) {
+            $destination .= '/' . $part;
+            // Check each existing ancestor before creating any missing directory.
+            if (file_exists($destination) || is_link($destination)) {
+                $resolved = realpath($destination);
+                if ($resolved === false || !str_starts_with($resolved, rtrim($realBase, '/') . '/')) {
+                    throw new \RuntimeException('Path traversal detected: path resolves outside storage root.');
+                }
+                $destination = $resolved;
+            }
+        }
+        if ($createParent && !is_dir(dirname($destination)) &&
+            !mkdir(dirname($destination), 0755, true) && !is_dir(dirname($destination))) {
+            throw new \RuntimeException('Unable to create storage directory.');
         }
 
-        $realDestination = realpath($destination);
-
-        // If the file doesn't exist yet, resolve its directory instead
-        if ($realDestination === false) {
-            $realDestination = realpath($directory);
-        }
-
-        if ($realDestination === false || !str_starts_with($realDestination, $realBase)) {
-            throw new \RuntimeException(sprintf('Path traversal detected: "%s" resolves outside storage root.', $destination));
-        }
+        return $destination;
     }
 }
