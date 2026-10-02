@@ -6,11 +6,19 @@ on:
             - master
         paths:
             - 'ui/web/**'
+            - 'ui/shared/**'
+            - 'ui/rn/**'
+            - 'ui/android/**'
+            - 'ui/electron/**'
             - '.forgejo/workflows/frontend.yaml'
     pull_request:
         types: [ opened, synchronize, reopened ]
         paths:
             - 'ui/web/**'
+            - 'ui/shared/**'
+            - 'ui/rn/**'
+            - 'ui/android/**'
+            - 'ui/electron/**'
             - '.forgejo/workflows/frontend.yaml'
 
 env:
@@ -52,6 +60,13 @@ jobs:
             -   name: Install dependencies
                 working-directory: ui/web
                 run: yarn install --immutable
+
+            -   name: Shared package checks
+                working-directory: ui/shared
+                run: |
+                    yarn install --immutable
+                    yarn typecheck
+                    yarn test
 
             -   name: Typecheck
                 working-directory: ui/web
@@ -253,4 +268,4 @@ jobs:
 
             -   name: Verify output
                 working-directory: ui/web
-                run: ls -la dist/ && test -f dist/index.html
+                run: node scripts/verify-build.mjs

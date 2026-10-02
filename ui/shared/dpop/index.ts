@@ -9,12 +9,12 @@
  * Depends on @baander/shared for crypto backend primitives.
  */
 
-export { createDpopProof } from './dpop-proof';
-export { generateDpopKeyPair, type DpopKeyPair } from './dpop-key-pair';
+export { createDpopProof } from './proof';
+export { generateDpopKeyPair, type DpopKeyPair } from './key-pair';
 export {
   getDpopKeyPair,
   setDpopKeyPair,
   clearDpopKeyPair,
   getDpopNonce,
   setDpopNonce,
-} from './dpop-store';
+} from './store';

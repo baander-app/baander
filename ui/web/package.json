@@ -7,8 +7,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "typecheck": "tsc -b",
+    "build": "yarn typecheck && vite build",
+    "typecheck": "tsc -b && tsc -p tsconfig.worker.json",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",

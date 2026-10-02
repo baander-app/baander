@@ -1,5 +1,5 @@
-/// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
+import { configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import symfonyPlugin from 'vite-plugin-symfony';
 import { build } from 'esbuild';
@@ -11,7 +11,7 @@ const WORKER_DEST = resolve(__dirname, '../../public/auth-stream-worker.js');
 
 function compileWorker() {
   mkdirSync(resolve(__dirname, '../../public'), { recursive: true });
-  build({
+  return build({
     entryPoints: [WORKER_SRC],
     outfile: WORKER_DEST,
     bundle: false,
@@ -26,13 +26,13 @@ function copyServiceWorker(): import('vite').Plugin {
   return {
     name: 'copy-service-worker',
     buildEnd() {
-      compileWorker();
+      return compileWorker().then(() => undefined);
     },
-    configureServer(server) {
-      compileWorker();
+    async configureServer(server) {
+      await compileWorker();
       server.watcher.on('change', (file) => {
         if (file === WORKER_SRC) {
-          compileWorker();
+          compileWorker().catch(error => server.config.logger.error(String(error)));
         }
       });
     },
@@ -68,6 +68,10 @@ export default defineConfig({
     port: 5174,
   },
   test: {
+    exclude: [...configDefaults.exclude, 'tests/e2e/**'],
+    coverage: {
+      reporter: ['text', 'html', 'json-summary', 'clover'],
+    },
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],

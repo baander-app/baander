@@ -37,7 +37,7 @@ export function decode(blurhash: string, options: DecodeOptions): DecodedBlurhas
   const { width, height, punch = 1 } = options;
   const data = decodeToArray(blurhash, { width, height, punch });
 
-  return { width, height, data: new Uint8ClampedArray(data.buffer) };
+  return { width, height, data: new Uint8ClampedArray(data) };
 }
 
 /**

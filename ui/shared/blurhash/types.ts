@@ -16,7 +16,7 @@ export interface BlurhashOptions {
    * More components = more detail but longer hash.
    * @default 3
    */
-  componentsY?:;
+  componentsY?: number;
 }
 
 export interface EncodeOptions extends BlurhashOptions {

@@ -15,7 +15,8 @@ import type { DecodeOptions } from '../types';
  * Useful for cleanup before re-rendering.
  */
 export function clearCanvas(canvas: HTMLCanvasElement | OffscreenCanvas): void {
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d') as
+    CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
   if (!ctx) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
@@ -32,7 +33,8 @@ export function drawBlurhash(
   canvas: HTMLCanvasElement | OffscreenCanvas,
   punch = 1,
 ): void {
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d') as
+    CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
   if (!ctx) {
     throw new Error('Failed to get 2D context from canvas');
   }
@@ -40,7 +42,7 @@ export function drawBlurhash(
   const { width, height } = canvas;
   const pixels = decodeToArray(blurhash, { width, height, punch });
 
-  const imageData = new ImageData(new Uint8ClampedArray(pixels.buffer), width, height);
+  const imageData = new ImageData(new Uint8ClampedArray(pixels), width, height);
   ctx.putImageData(imageData, 0, 0);
 }
 
@@ -58,7 +60,7 @@ export async function createImageBitmapFromBlurhash(
   const { width, height, punch = 1 } = options;
   const pixels = decodeToArray(blurhash, { width, height, punch });
 
-  const imageData = new ImageData(new Uint8ClampedArray(pixels.buffer), width, height);
+  const imageData = new ImageData(new Uint8ClampedArray(pixels), width, height);
   const canvas = new OffscreenCanvas(width, height);
   const ctx = canvas.getContext('2d')!;
   ctx.putImageData(imageData, 0, 0);
@@ -80,7 +82,7 @@ export async function toDataURL(
   const { width, height, punch = 1 } = options;
   const pixels = decodeToArray(blurhash, { width, height, punch });
 
-  const imageData = new ImageData(new Uint8ClampedArray(pixels.buffer), width, height);
+  const imageData = new ImageData(new Uint8ClampedArray(pixels), width, height);
   const canvas = new OffscreenCanvas(width, height);
   const ctx = canvas.getContext('2d')!;
   ctx.putImageData(imageData, 0, 0);
@@ -108,7 +110,7 @@ export async function toBlob(
   const { width, height, punch = 1 } = options;
   const pixels = decodeToArray(blurhash, { width, height, punch });
 
-  const imageData = new ImageData(new Uint8ClampedArray(pixels.buffer), width, height);
+  const imageData = new ImageData(new Uint8ClampedArray(pixels), width, height);
   const canvas = new OffscreenCanvas(width, height);
   const ctx = canvas.getContext('2d')!;
   ctx.putImageData(imageData, 0, 0);
