@@ -50,8 +50,11 @@ an inventory or repeating a worker's passing checks without a relevant change.
 
 Current enforcement has limits: Deptrac omits some context layers and external
 framework dependencies; the custom PHPStan rules cover payload typing and OpenAPI
-tag descriptions, not all architecture conventions. The payload rule's current
-parser-node defect is separate code follow-up, not permission for bare `object` DTOs.
+tag descriptions, not all architecture conventions. Parsed-source tests now cover
+missing payload types, `object`, `?object`, and `object|null`, and Symfony attribute
+identity through imports and fully qualified names with PHP's case-insensitive
+class matching. Typed-array payloads remain supported;
+the rule does not enforce every scalar, union, or DTO validation requirement.
 
 ## Findings
 

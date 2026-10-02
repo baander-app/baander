@@ -26,7 +26,7 @@ done
 docker exec "$run_id-postgres" pg_isready -U baander -d producer_test >/dev/null
 docker exec -e REDISCLI_AUTH=test-only "$run_id-redis" redis-cli ping | grep -qx PONG
 
-archive_paths=(vendor src tests config packages migrations bin docker/general phpunit.xml phpunit.xml.dist
+archive_paths=(vendor src tests config packages migrations bin docker/general phpunit.xml.dist
     .env .env.test composer.json composer.lock translations)
 if [ "${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" = 1 ]; then
     archive_paths=(--files-from /dev/null)

@@ -1,11 +1,13 @@
 # Agent skills migration and code audit
 
-The October 2026 review replaces 32 local Claude skill entrypoints with ten
+The October 2026 review replaces 32 local Claude skill entrypoints with nine
 maintained project skills, alongside `postgres-remediation` and `prose-fix`.
 The source tree was ignored by Git. Before retirement, it was archived with a
 SHA-256 file manifest under the operator's
 `~/.local/state/baander/retired-agent-config/` directory. Local permissions and
 vendored browser dependencies are not part of the migrated library.
+The initially migrated `sync-github` skill was subsequently retired at the user's
+request; the maintained library contains 11 skills.
 
 This is a bounded review of instructions against representative code and checks,
 not certification of the entire application. Existing violations and baseline
@@ -35,7 +37,7 @@ to `.agents/skills`; detailed procedures are loaded only when relevant.
 | update-command-docs | Merge into documentation-maintainer references | Preserve operator command documentation and read-only check mode. |
 | forgejo | Update, same name | Retain project integration; remove credential sourcing and fixed host assumptions. |
 | reli | Update, same name | Retain profiler workflow; accurately describe wrapper limitations. |
-| sync-github | Rewrite, same name, with tested helper | Old dry run modified refs; publishing must preserve local branches and detect remote races. |
+| sync-github | Retire at user request | Initially migrated with a tested helper; the user no longer needs this publishing workflow. |
 | feature-pipeline | Retire; replace companion delivery guide | Obsolete pi tools, CI bypass, branch-only checks, and local merge fallback. |
 | test-fix | Retire; preserve project details in testing guide | Generic loop duplicates debugging guidance; changed-file bookkeeping was incorrect. |
 | test-scaffold | Retire; preserve project details in testing guide | Generic recipes and confirmation gates add little; retain real fixture contracts. |
@@ -79,6 +81,53 @@ checker work, not permission to copy the implementation into new scaffolds.
 | Unit/runtime container scripts isolate resources differently and have different timeout policies. | Overstated testing guarantees | Name the actual runner and its limits; independent-connection drills prove persistence visibility. |
 | Swoole task workers share a queue; comments do not implement workload affinity. | Stale operational explanation | Describe actual routing and verify production lifecycle settings separately. |
 
+## Resolved checker finding
+
+The review found that
+`packages/baander-phpstan-rules/src/Rules/MapRequestPayloadObjectTypeRule.php`
+checked `Node\Name` for bare `object`. A parsed-source probe returned
+`Node\Identifier` and zero violations; the original tests manufactured `Name`
+nodes. This was an enforcement defect, not permission for untyped payloads.
+
+The subsequent checker fix uses the parsed identifier type, unwraps nullable types,
+checks union members for generic `object`, and resolves the attribute's fully
+qualified Symfony name through PHPStan's scope with case-insensitive class matching.
+The complete `StaticAnalysisRules` suite passed 11 tests with 13 assertions under
+strict settings; source PHPStan also passed. The payload fixtures reject missing
+types and `object`, `?object`, or `object|null` through ordinary imports, aliases,
+and fully qualified attributes, including mixed-case class names. They accept
+concrete and nullable DTOs and Symfony's typed-array payload contract, and ignore
+unrelated attributes with the same short
+name. This resolves the recorded parser-node and attribute-identity defects; it
+does not establish general scalar/union restrictions or validate DTO contents.
+
+The tracked PHPUnit configuration now includes `StaticAnalysisRules`; the strict
+unit container runner selects it alongside `Unit`. This checker fix is separate
+from the documentation migration and from the remaining application findings below.
+
+## Access-token cache correction
+
+The audit found that `setRevoked()` used cache `get()` as an overwrite, so a warm
+null entry prevented its callback from publishing the new status. Investigation
+also found that refresh rotation calls `save(false)` before commit: even a correct
+cache overwrite could leave a revocation marker after the database rolled back.
+Active-token cache deletion could throw after persistence had succeeded.
+
+The decorator now delegates reads to its inner repository and only invalidates
+legacy cache entries after writes. It publishes no status before commit and ignores
+legacy revocation markers on reads. Inner repository failures propagate unchanged;
+cache and logging failures do not turn successful persistence into failure.
+The OAuth adapter still checks the returned token's revocation and expiry.
+This removes the revoked-token shortcut; active-token reads already used the database.
+
+Real cache-adapter regressions failed before the correction and pass afterward.
+The combined unit/rule run passes 2,909 tests with 8,426 assertions. The disposable
+PostgreSQL/Messenger run passes 17 tests with 261 assertions, including three new
+token-cache transaction tests using the real Doctrine repository and an independent
+connection. They cover deferred flush, outer rollback, and committed revocation
+with stale cache entries. Older workers still use their old cache semantics until
+upgraded; these checks do not certify a mixed-version rollout.
+
 ## Recommended follow-up changes
 
 These are separate reviewable changes. No baseline expansion or suppression is a
@@ -87,8 +136,6 @@ been reproduced end to end.
 
 | Priority | Evidence | Proposed change and acceptance |
 |---|---|---|
-| High | `packages/baander-phpstan-rules/src/Rules/MapRequestPayloadObjectTypeRule.php` checks Node\\Name for bare object. A parsed-source probe returned Node\\Identifier and zero violations; existing tests manufacture Name nodes. | Fix DTO type enforcement using parsed-source RuleTestCase fixtures. Reject bare object and missing types; accept a real DTO, including imported attribute aliases. |
-| High | `CachedAccessTokenRepository::setRevoked()` uses cache get rather than unconditional replacement. Cached null remains a hit; active-save deletion can throw after DB persistence. | Reproduce with a real cache adapter, fix write/invalidation semantics, and test failures plus commit/rollback effects. DB fallback remains present; this review did not establish revoked-token acceptance. |
 | High | AddFavoriteRequest lacks Choice validation; the handler calls FavoriteType::from and a functional test characterizes HTTP 500. | Add executable validation and replace the characterization with the intended client-error contract. Verify through the firewall. |
 | Medium | Independent skill trial found NotBlank on UpdatePreferenceRequest.enabled and an undefined-key expression in PreferenceController's missing-filter path. | Reproduce disabling with false and reading without category/channel through the firewall; correct validation and optional-input handling. These are static findings, not executed endpoint failures. |
 | Medium | PlaylistResource documents publicId as UUID, while the shared PublicId generates a 21-character NanoID. | Correct identifier schemas and regenerate affected clients together; verify actual identifier formats in contract tests. |
@@ -107,16 +154,16 @@ been reproduced end to end.
 
 Migration verification completed:
 
-- All 12 skills passed the skill validator and appeared in fresh Codex discovery
-  after retirement. Local Markdown links in the skills, rules, and changed guides
+- The initial 12 skills passed the skill validator and appeared in fresh Codex discovery
+  after Claude retirement; 11 remain after the requested `sync-github` removal.
+  Local Markdown links in the skills, rules, and changed guides
   resolved; diff whitespace checks passed.
-- The snapshot helper's reproducible suite passed 12 tests against temporary local
-  Git repositories. Run it with
-  `python3 .agents/skills/sync-github/scripts/test_sync_github.py`.
+- Before its removal, the snapshot helper's reproducible suite passed 12 tests
+  against temporary local Git repositories.
 - Independent snapshot review/trial verified preview and export preservation and
-  identified the missing source-commit guard. Apply now requires both the previewed
-  source commit and remote SHA; the suite verifies rejection before writes when
-  the source changes or the source pin is omitted.
+  identified the missing source-commit guard. The helper was corrected to require
+  both the previewed source commit and remote SHA; its suite verified rejection
+  before writes when the source changed or the source pin was omitted.
 - Independent backend review/scaffold trials accepted resource mapping and internal
   ports while reporting repository coupling and identifier-contract defects.
 - An independent frontend trial accepted native worker fetches and stable selectors,
@@ -132,14 +179,6 @@ Validate skill frontmatter and relative references, then run realistic independe
 trials against representative code. Skill reviews must distinguish an intentional
 exception from a defect, and report incomplete evidence rather than manufacture a
 passing result. Syntax validation alone is not behavioral verification.
-
-Test snapshot publishing against disposable local bare repositories only. Dry run
-must leave objects, refs, index, and worktree unchanged; apply must preserve local
-branches and dirty files and reject a stale expected remote SHA or source commit.
-The export contains every committed path, including any committed environment or
-development credential files; it has no automatic public-export filter. Review the
-exact source tree before publication. No production
-publishing is part of migration validation.
 
 Refresh GitNexus with `analyze --index-only`. Verify in a disposable checkout that
 it neither recreates the retired Claude files nor overwrites maintained skills or

@@ -11,6 +11,8 @@
          displayDetailsOnTestsThatTriggerDeprecations="true"
          displayDetailsOnTestsThatTriggerNotices="true"
          cacheDirectory=".phpunit.cache"
+         executionOrder="depends,random"
+         beStrictAboutOutputDuringTests="true"
 >
     <php>
         <ini name="error_reporting" value="-1"/>
@@ -26,6 +28,9 @@
         <testsuite name="Unit">
             <directory>tests/Unit</directory>
         </testsuite>
+        <testsuite name="StaticAnalysisRules">
+            <directory>packages/baander-phpstan-rules/tests</directory>
+        </testsuite>
         <testsuite name="Functional">
             <directory>tests/Functional</directory>
         </testsuite>
@@ -37,6 +42,7 @@
     <source>
         <include>
             <directory>src</directory>
+            <directory>packages/baander-phpstan-rules/src</directory>
         </include>
     </source>
 

@@ -1,15 +1,16 @@
 # Testing
 
-Baander uses PHPUnit 13 with three test suites. Disposable container runners
-exercise the application's PHP runtime without using the development database
-or Redis instance. The Makefile commands remain available for a configured
-development test environment.
+Baander uses PHPUnit 13 with four test suites in the tracked `phpunit.xml.dist`.
+Disposable container runners exercise the application's PHP runtime without using
+the development database or Redis instance. The Makefile commands remain available
+for a configured development test environment.
 
 ## Test Suites
 
 | Suite | Directory | Scope |
 |-------|-----------|-------|
 | **Unit** | `tests/Unit/` | Domain behavior and application/infrastructure contracts; no Symfony kernel boot |
+| **StaticAnalysisRules** | `packages/baander-phpstan-rules/tests/` | Custom PHPStan rules, including parsed-source request-payload fixtures |
 | **Functional** | `tests/Functional/` | With Symfony kernel container, database, and services |
 | **Integration** | `tests/Integration/` | Database, transport, and other integration contracts against configured test services |
 
@@ -23,29 +24,41 @@ bash scripts/test-messaging-container.sh
 ```
 
 These require Docker and installed Composer dependencies. The unit runner uses
-the application image with networking disabled. The messaging runner provisions
-disposable PostgreSQL and Redis for its selected transport and outbox integration
-tests. Both fail on PHPUnit notices and skipped tests. They do not run the whole
-functional suite. A configured development test environment can use `make exec`:
+the application image with networking disabled and explicitly selects
+`Unit,StaticAnalysisRules` from `phpunit.xml.dist`. That configuration randomizes
+test order within dependency constraints and treats unexpected output as risky.
+The unit runner sets a 256 MiB PHP memory limit so the combined unit and PHPStan-rule
+suite can compile its analysis container. This budget applies only to that isolated
+runner; it does not change the tracked PHPUnit configuration or deployment settings.
+The messaging runner also explicitly selects `phpunit.xml.dist` and provisions
+disposable PostgreSQL and Redis for its selected transport, outbox, and access-token
+cache transaction tests. Both runners fail on PHPUnit notices and skipped tests. Neither reads an
+ignored local `phpunit.xml` or runs the whole functional suite. The Makefile's
+`phpunit`, `paratest`, and `ci` targets also select
+`phpunit.xml.dist` explicitly. A configured development test environment can use
+`make exec`:
 
 ```bash
 # Run all tests
 make phpunit
 
 # Run a single test file
-make exec cmd="./vendor/bin/phpunit tests/Unit/Catalog/Domain/Model/AlbumTest.php"
+make exec cmd="./vendor/bin/phpunit -c phpunit.xml.dist tests/Unit/Catalog/Domain/Model/AlbumTest.php"
 
 # Run a specific suite
-make exec cmd="./vendor/bin/phpunit --testsuite Unit"
+make exec cmd="./vendor/bin/phpunit -c phpunit.xml.dist --testsuite Unit"
+
+# Run the custom PHPStan rule tests
+make exec cmd="./vendor/bin/phpunit -c phpunit.xml.dist --testsuite StaticAnalysisRules"
 
 # Run a specific controller's functional tests
-make exec cmd="./vendor/bin/phpunit --filter NotificationControllerTest"
+make exec cmd="./vendor/bin/phpunit -c phpunit.xml.dist --filter NotificationControllerTest"
 
 # Run a single test method
-make exec cmd="./vendor/bin/phpunit --filter testCreateAlbum"
+make exec cmd="./vendor/bin/phpunit -c phpunit.xml.dist --filter testCreateAlbum"
 
 # Run with Xdebug off (faster)
-make exec cmd="XDEBUG_MODE=off ./vendor/bin/phpunit"
+make exec cmd="XDEBUG_MODE=off ./vendor/bin/phpunit -c phpunit.xml.dist"
 ```
 
 ## Coverage

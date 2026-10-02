@@ -1,0 +1,5 @@
+parameters:
+    bootstrapFiles:
+        - data/map-request-payload-invalid.php
+        - data/map-request-payload-valid.php
+        - data/map-request-payload-unrelated.php

@@ -6,27 +6,23 @@ namespace App\Auth\Infrastructure\Cache;
 
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\TokenId;
-use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
+use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Shared\Infrastructure\Cache\CacheTags;
 use Psr\Log\LoggerInterface;
-use Symfony\Contracts\Cache\CacheInterface;
-use Symfony\Contracts\Cache\ItemInterface;
 use Symfony\Contracts\Cache\TagAwareCacheInterface;
 use Throwable;
 
 /**
- * Decorator that caches token revocation status in Redis.
+ * Keeps token lookups authoritative in the database.
  *
- * Caches a boolean revocation status separately from the full domain object.
- * The ACL adapter's isAccessTokenRevoked() hot path only needs to know
- * if a token is revoked/expired/not-found — it does not use the full AccessToken.
+ * A repository flush can run inside an outer transaction, so cache publication
+ * could deny an active token after rollback. Legacy status entries are ignored;
+ * invalidation remains best effort for workers running the previous decorator.
  */
 final readonly class CachedAccessTokenRepository implements AccessTokenRepositoryInterface
 {
-    private const REVOCATION_TTL = 60;
-
     public function __construct(
         private readonly AccessTokenRepositoryInterface $inner,
         private readonly TagAwareCacheInterface $cache,
@@ -39,48 +35,17 @@ final readonly class CachedAccessTokenRepository implements AccessTokenRepositor
         $this->inner->save($accessToken, $flush);
 
         $tokenId = $accessToken->getTokenId()->toString();
-
-        if ($accessToken->isRevoked()) {
-            // Proactively set cache to true — prevents TOCTOU race where
-            // a concurrent request repopulates from DB between delete and next read
-            $this->setRevoked($tokenId);
-        } else {
-            // Token state changed (not a revocation) — clear cache for fresh read
-            $this->cache->delete($this->revocationKey($tokenId));
-        }
+        $this->invalidateCache(
+            fn (): bool => $this->cache->delete($this->revocationKey($tokenId)),
+            'Failed to invalidate token cache on save',
+            ['token_id' => $tokenId],
+        );
     }
 
     public function findByTokenId(TokenId $tokenId): ?AccessToken
     {
-        $revocationKey = $this->revocationKey($tokenId->toString());
-
-        try {
-            $isRevoked = $this->cache->get(
-                $revocationKey,
-                function (ItemInterface $item): ?bool {
-                    $item->tag([
-                        CacheTags::oauthToken($item->getKey()),
-                        CacheTags::OAUTH_TOKEN,
-                    ]);
-                    $item->expiresAfter(self::REVOCATION_TTL);
-
-                    return null; // Cache miss — null signals need to check DB
-                },
-                beta: 1.5,
-            );
-
-            // If cache returned true (explicitly cached as revoked), return null
-            // The ACL adapter treats null as revoked
-            if ($isRevoked === true) {
-                return null;
-            }
-        } catch (Throwable $e) {
-            $this->logger->warning('Token revocation cache read failed, falling through to database', [
-                'exception' => $e,
-                'token_id' => $tokenId->toString(),
-            ]);
-        }
-
+        // Even cached true can describe a revocation that later rolled back.
+        // Consumers need the actual aggregate for revocation and expiry checks.
         return $this->inner->findByTokenId($tokenId);
     }
 
@@ -88,52 +53,42 @@ final readonly class CachedAccessTokenRepository implements AccessTokenRepositor
     {
         $this->inner->revokeByChainId($chainId);
 
-        try {
-            $this->cache->invalidateTags([CacheTags::OAUTH_TOKEN]);
-        } catch (Throwable $e) {
-            $this->logger->error('Failed to invalidate token cache on chain revocation', [
-                'exception' => $e,
-                'chain_id' => $chainId->toString(),
-            ]);
-        }
+        $this->invalidateCache(
+            fn (): bool => $this->cache->invalidateTags([CacheTags::OAUTH_TOKEN]),
+            'Failed to invalidate token cache on chain revocation',
+            ['chain_id' => $chainId->toString()],
+        );
     }
 
     public function revokeForUser(User $user): void
     {
         $this->inner->revokeForUser($user);
 
-        try {
-            $this->cache->invalidateTags([CacheTags::OAUTH_TOKEN]);
-        } catch (Throwable $e) {
-            $this->logger->error('Failed to invalidate token cache on user revocation', [
-                'exception' => $e,
-                'user_id' => $user->getId()->toString(),
-            ]);
-        }
+        $this->invalidateCache(
+            fn (): bool => $this->cache->invalidateTags([CacheTags::OAUTH_TOKEN]),
+            'Failed to invalidate token cache on user revocation',
+            ['user_id' => $user->getId()->toString()],
+        );
     }
 
-    private function setRevoked(string $tokenId): void
+    /**
+     * @param callable(): bool $operation
+     * @param array<string, mixed> $context
+     */
+    private function invalidateCache(callable $operation, string $message, array $context): void
     {
-        $revocationKey = $this->revocationKey($tokenId);
+        try {
+            if ($operation()) {
+                return;
+            }
+        } catch (Throwable $exception) {
+            $context['exception'] = $exception;
+        }
 
         try {
-            $this->cache->get(
-                $revocationKey,
-                function (ItemInterface $item): bool {
-                    $item->tag([
-                        CacheTags::oauthToken($item->getKey()),
-                        CacheTags::OAUTH_TOKEN,
-                    ]);
-                    $item->expiresAfter(self::REVOCATION_TTL);
-
-                    return true;
-                },
-            );
-        } catch (Throwable $e) {
-            $this->logger->error('Failed to set revoked status in cache', [
-                'exception' => $e,
-                'token_id' => $tokenId,
-            ]);
+            $this->logger->error($message, $context);
+        } catch (Throwable) {
+            // Optional cache/logging availability must not mask a successful write.
         }
     }
 

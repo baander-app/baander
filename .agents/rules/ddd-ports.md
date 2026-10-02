@@ -37,9 +37,15 @@ mapping, while controller repository/infrastructure shortcuts remain debt. Deptr
 currently baselines both; do not treat its baseline as a universal permission.
 
 The project's custom PHPStan rules check OpenAPI tag descriptions and request-payload
-typing, not complete DDD conformance. The payload rule currently checks the wrong
-parser node type for bare `object`; a clean PHPStan result alone does not prove this
-contract. Keep that checker defect as separate follow-up work.
+typing, not complete DDD conformance. Parsed-source tests verify that the payload
+rule rejects missing types and generic `object`, including `?object` and
+`object|null`, for Symfony's `MapRequestPayload` attribute. Attribute resolution
+covers imported aliases and
+fully qualified names, matching PHP class names case-insensitively without matching
+unrelated attributes by short name. The rule accepts concrete DTOs and Symfony's
+typed-array payload contract; it does not
+enforce every scalar, union, or DTO validation requirement. A clean PHPStan result
+alone does not prove the full HTTP contract.
 
 Current references: `src/Auth/Interface/Controller/Totp/TotpController.php`,
 `src/Auth/Application/Port/TotpVerifierInterface.php`,

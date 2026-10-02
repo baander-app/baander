@@ -14,10 +14,11 @@ that rehydration preserves domain invariants. Decide whether absent results are
 cached and for how long; do not assume every `find*`/`get*` method is safe to cache.
 
 For status caching, define a truth table for each status and its effect on the
-consumer. The OAuth reference uses `true = revoked`, `null = consult database`;
-`false` does not supply an active AccessToken. Do not reuse that boolean as generic
-`true = active` or authorize a request from a cached status without its required
-expiry/ownership checks. Treat security staleness as a contract decision.
+consumer. The OAuth decorator reads access tokens from the database and only
+invalidates legacy cache entries after writes. It must ignore old revocation
+markers: publishing them before commit could deny a valid token after rollback.
+Do not restore status caching without a verified commit boundary and freshness
+contract. A boolean cannot supply the aggregate or its expiry/ownership checks.
 
 ## Cache operations and failure boundaries
 

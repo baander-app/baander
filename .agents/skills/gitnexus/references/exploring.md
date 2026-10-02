@@ -7,7 +7,7 @@ Read the underlying files to distinguish discovered edges from actual behavior.
 ```bash
 node .gitnexus/run.cjs query "token revocation" --repo .
 node .gitnexus/run.cjs context "findByTokenId" --repo . --file src/Auth/Infrastructure/Cache/CachedAccessTokenRepository.php
-node .gitnexus/run.cjs trace "save" "setRevoked" --repo . --from-file src/Auth/Infrastructure/Cache/CachedAccessTokenRepository.php
+node .gitnexus/run.cjs trace "save" "invalidateCache" --repo . --from-file src/Auth/Infrastructure/Cache/CachedAccessTokenRepository.php
 ```
 
 MCP equivalents are `query({search_query, repo})`, `context({name, repo})`, and

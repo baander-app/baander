@@ -238,10 +238,10 @@ migrate-dev: ## Runs all migrations for main database only
 	@make exec cmd="php bin/console doctrine:migrations:migrate --no-interaction"
 
 phpunit: ## Runs PhpUnit tests
-	@make exec cmd="./vendor/bin/phpunit -c phpunit.xml --coverage-html reports/coverage $(PHPUNIT_OPTIONS) --coverage-clover reports/clover.xml --log-junit reports/junit.xml"
+	@make exec cmd="./vendor/bin/phpunit -c phpunit.xml.dist --coverage-html reports/coverage $(PHPUNIT_OPTIONS) --coverage-clover reports/clover.xml --log-junit reports/junit.xml"
 
 paratest: ## Runs tests in parallel via paratest
-	@make exec cmd="./vendor/bin/paratest --processes auto --tmp-dir var $(PARATEST_OPTIONS)"
+	@make exec cmd="./vendor/bin/paratest -c phpunit.xml.dist --processes auto --tmp-dir var $(PARATEST_OPTIONS)"
 
 phpstan: ## Runs PHPStan static analysis
 	@make exec-bash cmd="XDEBUG_MODE=off php ./vendor/bin/phpstan analyse --memory-limit=512M $(PHPSTAN_OPTIONS)"
@@ -277,7 +277,7 @@ ci: ## Run full CI pipeline (lint, static analysis, architecture, tests)
 	@echo "\033[34m[ci] deptrac\033[39m"
 	@make exec cmd="vendor/bin/deptrac analyse --no-cache --no-progress"
 	@echo "\033[34m[ci] phpunit\033[39m"
-	@make exec-bash cmd="XDEBUG_MODE=off ./vendor/bin/phpunit -c phpunit.xml --coverage-html reports/coverage --coverage-clover reports/clover.xml --log-junit reports/junit.xml"
+	@make exec-bash cmd="XDEBUG_MODE=off ./vendor/bin/phpunit -c phpunit.xml.dist --coverage-html reports/coverage --coverage-clover reports/clover.xml --log-junit reports/junit.xml"
 	@echo "\033[32m[ci] All checks passed.\033[39m"
 
 swoole-dev: ## Clear cache and start Swoole dev server (foreground)

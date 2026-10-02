@@ -6,272 +6,253 @@ namespace App\Tests\Unit\Auth\Infrastructure\Cache;
 
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
-use App\Auth\Domain\Model\OAuth\TokenId;
-use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
+use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Infrastructure\Cache\CachedAccessTokenRepository;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Infrastructure\Cache\CacheTags;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
+use Symfony\Component\Cache\Adapter\TagAwareAdapter;
 use Symfony\Contracts\Cache\ItemInterface;
 use Symfony\Contracts\Cache\TagAwareCacheInterface;
 
 final class CachedAccessTokenRepositoryTest extends TestCase
 {
-    private TagAwareCacheInterface $cache;
-    private AccessTokenRepositoryInterface $inner;
-    private LoggerInterface $logger;
-    private CachedAccessTokenRepository $decorator;
-
-    private static Client $client;
-    private static User $user;
-    private static AccessToken $activeToken;
-    private static AccessToken $revokedToken;
-
-    /** 40-char hex token ID (matches bin2hex(random_bytes(40))) */
-    private const TOKEN_ID = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-    private const TOKEN_ID_2 = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    private AccessToken $token;
+    private User $user;
+    private TagAwareAdapter $cache;
 
     protected function setUp(): void
     {
-        self::$client ??= Client::create('Test', ['http://localhost']);
-        self::$user ??= User::register(new Email('test@example.com'), 'hashed', 'Alice');
-        self::$activeToken ??= AccessToken::issue(self::$client, self::$user, [new \App\Auth\Domain\Model\OAuth\ValueObject\Scope('read')]);
-
-        $active = AccessToken::issue(self::$client, self::$user, [new \App\Auth\Domain\Model\OAuth\ValueObject\Scope('read')]);
-        $active->revoke();
-        self::$revokedToken = $active;
-
-        $this->cache = $this->createStub(TagAwareCacheInterface::class);
-        $this->inner = $this->createStub(AccessTokenRepositoryInterface::class);
-        $this->logger = $this->createStub(LoggerInterface::class);
-        $this->decorator = $this->createCachedAccessTokenRepositoryFixture();
+        $this->user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
+        $this->token = AccessToken::issue(Client::create('Test', ['https://baander.app']), $this->user);
+        $this->cache = new TagAwareAdapter(new ArrayAdapter());
     }
 
-    private function createCachedAccessTokenRepositoryFixture(): CachedAccessTokenRepository
+    /** @return iterable<string, array{bool|null}> */
+    public static function cachedStatuses(): iterable
     {
-        $fixture = new CachedAccessTokenRepository(
-            $this->inner,
-            $this->cache,
-            $this->logger,
+        yield 'legacy revoked' => [true];
+        yield 'legacy active' => [false];
+        yield 'warm null' => [null];
+    }
+
+    #[DataProvider('cachedStatuses')]
+    public function testCachedStatusNeverOverridesDatabaseAggregate(?bool $status): void
+    {
+        $this->seed($status);
+        $inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $inner->expects($this->once())->method('findByTokenId')
+            ->with($this->token->getTokenId())->willReturn($this->token);
+
+        self::assertSame($this->token, $this->decorator($inner)->findByTokenId($this->token->getTokenId()));
+    }
+
+    public function testAbsentTokenIsNotPublishedAsAuthenticationDecision(): void
+    {
+        $inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $inner->expects($this->once())->method('findByTokenId')->willReturn(null);
+
+        self::assertNull($this->decorator($inner)->findByTokenId($this->token->getTokenId()));
+        self::assertFalse($this->cache->getItem($this->key())->isHit());
+    }
+
+    public function testRevokedDatabaseAggregateIsReturnedForConsumerChecks(): void
+    {
+        $this->seed(false);
+        $this->token->revoke();
+        $inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $inner->expects($this->once())->method('findByTokenId')->willReturn($this->token);
+
+        self::assertSame($this->token, $this->decorator($inner)->findByTokenId($this->token->getTokenId()));
+        self::assertTrue($this->token->isRevoked());
+    }
+
+    /** @return iterable<string, array{bool, bool}> */
+    public static function savedStates(): iterable
+    {
+        yield 'active flushed' => [false, true];
+        yield 'revoked flushed' => [true, true];
+        yield 'active deferred' => [false, false];
+        yield 'revoked deferred' => [true, false];
+    }
+
+    #[DataProvider('savedStates')]
+    public function testSaveInvalidatesWarmStatusWithoutPublishingState(bool $revoked, bool $flush): void
+    {
+        $this->seed(null);
+        if ($revoked) {
+            $this->token->revoke();
+        }
+        $inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $inner->expects($this->once())->method('save')->with($this->token, $flush);
+
+        $this->decorator($inner)->save($this->token, $flush);
+
+        self::assertFalse($this->cache->getItem($this->key())->isHit());
+    }
+
+    public function testDeferredRevocationDoesNotHideIndependentActiveStateAfterRollback(): void
+    {
+        // Model persistence restoring the same identity; runtime tests cover real DB rollback.
+        $active = AccessToken::reconstitute(clone $this->token->getState());
+        $this->token->revoke();
+        $inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $inner->expects($this->once())->method('save')->with($this->token, false);
+        $inner->expects($this->once())->method('findByTokenId')->willReturn($active);
+        $decorator = $this->decorator($inner);
+
+        $decorator->save($this->token, false);
+
+        self::assertSame($active, $decorator->findByTokenId($active->getTokenId()));
+        self::assertFalse($active->isRevoked());
+        self::assertFalse($this->cache->getItem($this->key())->isHit());
+    }
+
+    public function testCacheOutageCannotAffectDatabaseLookup(): void
+    {
+        $cache = $this->createMock(TagAwareCacheInterface::class);
+        $cache->expects($this->never())->method('get');
+        $inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $inner->expects($this->once())->method('findByTokenId')->willReturn($this->token);
+
+        self::assertSame($this->token, $this->decorator($inner, $cache)->findByTokenId($this->token->getTokenId()));
+    }
+
+    public function testDatabaseLookupFailureIsNotRetriedOrMasked(): void
+    {
+        $failure = new \RuntimeException('Database unavailable');
+        $inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $inner->expects($this->once())->method('findByTokenId')->willThrowException($failure);
+        $this->expectExceptionObject($failure);
+
+        $this->decorator($inner)->findByTokenId($this->token->getTokenId());
+    }
+
+    public function testDatabaseSaveFailurePreventsCacheInvalidation(): void
+    {
+        $failure = new \RuntimeException('Database unavailable');
+        $inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $inner->expects($this->once())->method('save')->willThrowException($failure);
+        $cache = $this->createMock(TagAwareCacheInterface::class);
+        $cache->expects($this->never())->method('delete');
+        $this->expectExceptionObject($failure);
+
+        $this->decorator($inner, $cache)->save($this->token);
+    }
+
+    public function testSaveCacheFailureIsLoggedAfterSuccessfulDatabaseWrite(): void
+    {
+        $inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $inner->expects($this->once())->method('save')->with($this->token, false);
+        $cache = $this->createStub(TagAwareCacheInterface::class);
+        $failure = new \RuntimeException('Cache unavailable');
+        $cache->method('delete')->willThrowException($failure);
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('error')->with(
+            $this->stringContains('invalidate'),
+            $this->callback(fn (array $context): bool => $context['exception'] === $failure),
         );
-        return $fixture;
+
+        $this->decorator($inner, $cache, $logger)->save($this->token, false);
     }
 
-    // --- findByTokenId: cache miss delegates to DB ---
-
-    public function testFindByTokenIdCacheMissDelegatesToDatabase(): void
+    public function testFalseInvalidationResultIsLogged(): void
     {
-        $this->inner = $this->createMock(AccessTokenRepositoryInterface::class);
-        $this->decorator = $this->createCachedAccessTokenRepositoryFixture();
+        $inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $inner->expects($this->once())->method('save');
+        $cache = $this->createStub(TagAwareCacheInterface::class);
+        $cache->method('delete')->willReturn(false);
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('error');
 
-        $tokenId = TokenId::fromString(self::TOKEN_ID);
-
-        $this->cache->method('get')
-            ->willReturnCallback(function (string $key, callable $callback) {
-                return $callback($this->createStub(ItemInterface::class));
-            });
-
-        $this->inner->expects($this->once())
-            ->method('findByTokenId')
-            ->with($tokenId)
-            ->willReturn(self::$activeToken);
-
-        $result = $this->decorator->findByTokenId($tokenId);
-
-        $this->assertSame(self::$activeToken, $result);
+        $this->decorator($inner, $cache, $logger)->save($this->token);
     }
 
-    public function testFindByTokenIdCacheMissReturnsDomainObject(): void
+    public function testLoggerFailureDoesNotMaskSuccessfulSave(): void
     {
-        $this->inner = $this->createMock(AccessTokenRepositoryInterface::class);
-        $this->decorator = $this->createCachedAccessTokenRepositoryFixture();
+        $inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $inner->expects($this->once())->method('save');
+        $cache = $this->createStub(TagAwareCacheInterface::class);
+        $cache->method('delete')->willThrowException(new \RuntimeException('Cache unavailable'));
+        $logger = $this->createStub(LoggerInterface::class);
+        $logger->method('error')->willThrowException(new \RuntimeException('Logger unavailable'));
 
-        $tokenId = TokenId::fromString(self::TOKEN_ID);
-
-        $this->cache->method('get')
-            ->willReturnCallback(function (string $key, callable $callback) {
-                return null; // Cache miss
-            });
-
-        $this->inner->expects($this->once())
-            ->method('findByTokenId')
-            ->with($tokenId)
-            ->willReturn(self::$activeToken);
-
-        $result = $this->decorator->findByTokenId($tokenId);
-
-        $this->assertSame(self::$activeToken, $result);
+        $this->decorator($inner, $cache, $logger)->save($this->token);
     }
 
-    public function testFindByTokenIdCacheHitRevokedReturnsNull(): void
+    /** @return iterable<string, array{string}> */
+    public static function bulkMethods(): iterable
     {
-        $this->inner = $this->createMock(AccessTokenRepositoryInterface::class);
-        $this->decorator = $this->createCachedAccessTokenRepositoryFixture();
-
-        $tokenId = TokenId::fromString(self::TOKEN_ID_2);
-
-        // Cache returns true (revoked)
-        $this->cache->method('get')
-            ->willReturnCallback(function (string $key, callable $callback) {
-                return true;
-            });
-
-        // Should NOT call database
-        $this->inner->expects($this->never())
-            ->method('findByTokenId');
-
-        $result = $this->decorator->findByTokenId($tokenId);
-
-        $this->assertNull($result);
+        yield 'chain revocation' => ['revokeByChainId'];
+        yield 'user revocation' => ['revokeForUser'];
     }
 
-    // --- findByTokenId: error handling ---
-
-    public function testFindByTokenIdCacheFailureFallsThroughToDatabase(): void
+    #[DataProvider('bulkMethods')]
+    public function testBulkRevocationInvalidatesLegacyTaggedStatus(string $method): void
     {
-        $this->inner = $this->createMock(AccessTokenRepositoryInterface::class);
-        $this->logger = $this->createMock(LoggerInterface::class);
-        $this->decorator = $this->createCachedAccessTokenRepositoryFixture();
+        $this->seed(true);
+        $argument = $method === 'revokeByChainId' ? ChainId::generate() : $this->user;
+        $inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $inner->expects($this->once())->method($method)->with($argument);
 
-        $tokenId = TokenId::fromString(self::TOKEN_ID);
+        $this->decorator($inner)->{$method}($argument);
 
-        $this->cache->method('get')
-            ->willThrowException(new \RuntimeException('Redis connection refused'));
-
-        $this->logger->expects($this->once())
-            ->method('warning');
-
-        $this->inner->expects($this->once())
-            ->method('findByTokenId')
-            ->with($tokenId)
-            ->willReturn(self::$activeToken);
-
-        $result = $this->decorator->findByTokenId($tokenId);
-
-        $this->assertSame(self::$activeToken, $result);
+        self::assertFalse($this->cache->getItem($this->key())->isHit());
     }
 
-    // --- save: revocation detection ---
-
-    public function testSaveWithRevokedTokenSetsCacheToTrue(): void
+    #[DataProvider('bulkMethods')]
+    public function testBulkDatabaseFailureDoesNotInvalidateCache(string $method): void
     {
-        $this->cache = $this->createMock(TagAwareCacheInterface::class);
-        $this->inner = $this->createMock(AccessTokenRepositoryInterface::class);
-        $this->decorator = $this->createCachedAccessTokenRepositoryFixture();
+        $argument = $method === 'revokeByChainId' ? ChainId::generate() : $this->user;
+        $failure = new \RuntimeException('Database unavailable');
+        $inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $inner->expects($this->once())->method($method)->willThrowException($failure);
+        $cache = $this->createMock(TagAwareCacheInterface::class);
+        $cache->expects($this->never())->method('invalidateTags');
+        $this->expectExceptionObject($failure);
 
-        $this->inner->expects($this->once())
-            ->method('save')
-            ->with(self::$revokedToken);
-
-        // Cache should be written with true
-        $this->cache->expects($this->once())
-            ->method('get')
-            ->willReturnCallback(function (string $key, callable $callback) {
-                return true; // Will be set during save
-            });
-
-        $this->decorator->save(self::$revokedToken);
+        $this->decorator($inner, $cache)->{$method}($argument);
     }
 
-    public function testSaveWithActiveTokenDeletesCacheEntry(): void
+    #[DataProvider('bulkMethods')]
+    public function testBulkCacheAndLoggerFailureDoNotMaskDatabaseSuccess(string $method): void
     {
-        $this->cache = $this->createMock(TagAwareCacheInterface::class);
-        $this->inner = $this->createMock(AccessTokenRepositoryInterface::class);
-        $this->decorator = $this->createCachedAccessTokenRepositoryFixture();
+        $argument = $method === 'revokeByChainId' ? ChainId::generate() : $this->user;
+        $inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $inner->expects($this->once())->method($method)->with($argument);
+        $cache = $this->createStub(TagAwareCacheInterface::class);
+        $cache->method('invalidateTags')->willThrowException(new \RuntimeException('Cache unavailable'));
+        $logger = $this->createStub(LoggerInterface::class);
+        $logger->method('error')->willThrowException(new \RuntimeException('Logger unavailable'));
 
-        $this->inner->expects($this->once())
-            ->method('save')
-            ->with(self::$activeToken);
-
-        $this->cache->expects($this->once())
-            ->method('delete')
-            ->with($this->stringContains('oauth_revoked_'));
-
-        $this->decorator->save(self::$activeToken);
+        $this->decorator($inner, $cache, $logger)->{$method}($argument);
     }
 
-    // --- revokeByChainId: tag invalidation ---
-
-    public function testRevokeByChainIdInvalidatesAllTokenCaches(): void
+    private function seed(?bool $status): void
     {
-        $this->cache = $this->createMock(TagAwareCacheInterface::class);
-        $this->inner = $this->createMock(AccessTokenRepositoryInterface::class);
-        $this->decorator = $this->createCachedAccessTokenRepositoryFixture();
-
-        $chainId = ChainId::generate();
-
-        $this->inner->expects($this->once())
-            ->method('revokeByChainId')
-            ->with($chainId);
-
-        $this->cache->expects($this->once())
-            ->method('invalidateTags')
-            ->with([CacheTags::OAUTH_TOKEN]);
-
-        $this->decorator->revokeByChainId($chainId);
+        $this->cache->get($this->key(), static function (ItemInterface $item) use ($status): ?bool {
+            $item->tag([CacheTags::OAUTH_TOKEN]);
+            $item->expiresAfter(60);
+            return $status;
+        });
+        self::assertTrue($this->cache->getItem($this->key())->isHit());
     }
 
-    public function testRevokeByChainIdLogsErrorOnInvalidationFailure(): void
+    private function key(): string
     {
-        $this->inner = $this->createMock(AccessTokenRepositoryInterface::class);
-        $this->logger = $this->createMock(LoggerInterface::class);
-        $this->decorator = $this->createCachedAccessTokenRepositoryFixture();
-
-        $chainId = ChainId::generate();
-
-        $this->inner->expects($this->once())
-            ->method('revokeByChainId');
-
-        $this->cache->method('invalidateTags')
-            ->willThrowException(new \RuntimeException('Lua script error'));
-
-        $this->logger->expects($this->once())
-            ->method('error')
-            ->with($this->stringContains('Failed to invalidate'));
-
-        $this->decorator->revokeByChainId($chainId);
+        return 'oauth_revoked_' . $this->token->getTokenId()->toString();
     }
 
-    // --- revokeForUser: tag invalidation ---
-
-    public function testRevokeForUserInvalidatesAllTokenCaches(): void
-    {
-        $this->cache = $this->createMock(TagAwareCacheInterface::class);
-        $this->inner = $this->createMock(AccessTokenRepositoryInterface::class);
-        $this->decorator = $this->createCachedAccessTokenRepositoryFixture();
-
-        $this->inner->expects($this->once())
-            ->method('revokeForUser')
-            ->with(self::$user);
-
-        $this->cache->expects($this->once())
-            ->method('invalidateTags');
-
-        $this->decorator->revokeForUser(self::$user);
-    }
-
-    // --- save: error handling ---
-
-    public function testSaveWithRevokedTokenLogsErrorOnCacheFailure(): void
-    {
-        $this->inner = $this->createMock(AccessTokenRepositoryInterface::class);
-        $this->logger = $this->createMock(LoggerInterface::class);
-        $this->decorator = $this->createCachedAccessTokenRepositoryFixture();
-
-        $this->inner->expects($this->once())
-            ->method('save')
-            ->with(self::$revokedToken);
-
-        $this->cache->method('get')
-            ->willThrowException(new \RuntimeException('Redis down'));
-
-        $this->logger->expects($this->once())
-            ->method('error')
-            ->with($this->stringContains('Failed to set revoked'));
-
-        $this->decorator->save(self::$revokedToken);
+    private function decorator(
+        AccessTokenRepositoryInterface $inner,
+        ?TagAwareCacheInterface $cache = null,
+        ?LoggerInterface $logger = null,
+    ): CachedAccessTokenRepository {
+        return new CachedAccessTokenRepository($inner, $cache ?? $this->cache, $logger ?? $this->createStub(LoggerInterface::class));
     }
 }

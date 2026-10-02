@@ -23,7 +23,6 @@ final class ConsistentOpenApiTagDescriptionRuleTest extends TestCase
     {
         $ref = new \ReflectionClass(ConsistentOpenApiTagDescriptionRule::class);
         $prop = $ref->getProperty('tags');
-        $prop->setAccessible(true);
         $prop->setValue(null, []);
 
         $this->rule = new ConsistentOpenApiTagDescriptionRule();
@@ -41,7 +40,7 @@ final class ConsistentOpenApiTagDescriptionRuleTest extends TestCase
                 new Attribute(new Name('Route'), [new Arg(new String_('/api/test'), name: new Identifier('path'))]),
             ]),
         ]);
-        $scope = $this->createMock(Scope::class);
+        $scope = $this->createStub(Scope::class);
         $scope->method('getFile')->willReturn('/some/file.php');
 
         $errors = $this->rule->processNode($class, $scope);
@@ -52,7 +51,7 @@ final class ConsistentOpenApiTagDescriptionRuleTest extends TestCase
     public function testNoErrorForSingleTag(): void
     {
         $class = $this->createClassWithTag('Auth', 'Auth endpoints');
-        $scope = $this->createMock(Scope::class);
+        $scope = $this->createStub(Scope::class);
         $scope->method('getFile')->willReturn('/src/AuthController.php');
 
         $errors = $this->rule->processNode($class, $scope);
@@ -62,9 +61,9 @@ final class ConsistentOpenApiTagDescriptionRuleTest extends TestCase
 
     public function testNoErrorForConsistentDescriptions(): void
     {
-        $scope1 = $this->createMock(Scope::class);
+        $scope1 = $this->createStub(Scope::class);
         $scope1->method('getFile')->willReturn('/src/AuthController.php');
-        $scope2 = $this->createMock(Scope::class);
+        $scope2 = $this->createStub(Scope::class);
         $scope2->method('getFile')->willReturn('/src/LoginController.php');
 
         $this->rule->processNode($this->createClassWithTag('Auth', 'Auth endpoints'), $scope1);
@@ -75,9 +74,9 @@ final class ConsistentOpenApiTagDescriptionRuleTest extends TestCase
 
     public function testErrorForConflictingDescriptions(): void
     {
-        $scope1 = $this->createMock(Scope::class);
+        $scope1 = $this->createStub(Scope::class);
         $scope1->method('getFile')->willReturn('/src/AuthController.php');
-        $scope2 = $this->createMock(Scope::class);
+        $scope2 = $this->createStub(Scope::class);
         $scope2->method('getFile')->willReturn('/src/LoginController.php');
 
         $this->rule->processNode($this->createClassWithTag('Auth', 'Auth endpoints'), $scope1);
@@ -90,9 +89,9 @@ final class ConsistentOpenApiTagDescriptionRuleTest extends TestCase
 
     public function testErrorForMissingVsPresentDescription(): void
     {
-        $scope1 = $this->createMock(Scope::class);
+        $scope1 = $this->createStub(Scope::class);
         $scope1->method('getFile')->willReturn('/src/FirstController.php');
-        $scope2 = $this->createMock(Scope::class);
+        $scope2 = $this->createStub(Scope::class);
         $scope2->method('getFile')->willReturn('/src/SecondController.php');
 
         $this->rule->processNode($this->createClassWithTag('Catalog', 'Catalog endpoints'), $scope1);
@@ -103,7 +102,7 @@ final class ConsistentOpenApiTagDescriptionRuleTest extends TestCase
 
     public function testNoErrorForDifferentTagNames(): void
     {
-        $scope = $this->createMock(Scope::class);
+        $scope = $this->createStub(Scope::class);
         $scope->method('getFile')->willReturn('/src/Controller.php');
 
         $this->rule->processNode($this->createClassWithTag('Auth', 'Auth endpoints'), $scope);

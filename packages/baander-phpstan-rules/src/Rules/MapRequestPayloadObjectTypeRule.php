@@ -26,7 +26,7 @@ final class MapRequestPayloadObjectTypeRule implements Rule
         $errors = [];
 
         foreach ($node->getParams() as $param) {
-            if (!$this->hasMapRequestPayloadAttribute($param)) {
+            if (!$this->hasMapRequestPayloadAttribute($param, $scope)) {
                 continue;
             }
 
@@ -41,27 +41,31 @@ final class MapRequestPayloadObjectTypeRule implements Rule
                 continue;
             }
 
-            if ($type instanceof Node\Name && $type->toString() === 'object') {
-                $errors[] = RuleErrorBuilder::message(
-                    'Parameter $' . $this->getParamName($param) . ' with #[MapRequestPayload] is typed as "object". Use a concrete request DTO class instead.',
-                )
-                    ->identifier('baander.mapRequestPayload.objectType')
-                    ->build();
+            if ($type instanceof Node\NullableType) {
+                $type = $type->type;
+            }
+
+            $types = $type instanceof Node\UnionType ? $type->types : [$type];
+            foreach ($types as $member) {
+                if ($member instanceof Node\Identifier && strtolower($member->toString()) === 'object') {
+                    $errors[] = RuleErrorBuilder::message(
+                        'Parameter $' . $this->getParamName($param) . ' with #[MapRequestPayload] is typed as "object". Use a concrete request DTO class instead.',
+                    )
+                        ->identifier('baander.mapRequestPayload.objectType')
+                        ->build();
+                    break;
+                }
             }
         }
 
         return $errors;
     }
 
-    private function hasMapRequestPayloadAttribute(Param $param): bool
+    private function hasMapRequestPayloadAttribute(Param $param, Scope $scope): bool
     {
         foreach ($param->attrGroups as $attrGroup) {
             foreach ($attrGroup->attrs as $attr) {
-                $name = $attr->name->toString();
-                if (
-                    $name === 'Symfony\Component\HttpKernel\Attribute\MapRequestPayload'
-                    || $name === 'MapRequestPayload'
-                ) {
+                if (strcasecmp($scope->resolveName($attr->name), 'Symfony\Component\HttpKernel\Attribute\MapRequestPayload') === 0) {
                     return true;
                 }
             }
