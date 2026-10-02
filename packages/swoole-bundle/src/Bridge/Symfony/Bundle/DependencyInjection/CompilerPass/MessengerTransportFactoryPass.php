@@ -8,11 +8,11 @@ use SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\DependencyInjection\Containe
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\CoWrapper;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Messenger\ContextReleasingTransportHandler;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Messenger\SwooleServerTaskTransportFactory;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Messenger\SwooleServerTaskSender;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Messenger\SwooleServerTaskTransportHandler;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Messenger\ThreadSafeTaskDispatcher;
 use SwooleBundle\SwooleBundle\Server\HttpServer;
 use SwooleBundle\SwooleBundle\Server\TaskHandler\TaskHandler;
-use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
@@ -32,19 +32,22 @@ final class MessengerTransportFactoryPass implements CompilerPassInterface
         $transportFactory->addTag('messenger.transport_factory');
         $container->setDefinition(SwooleServerTaskTransportFactory::class, $transportFactory);
 
-        // ThreadSafeTaskDispatcher — serializes Messenger Envelopes in thread mode
+        // Use the application transport contract for every task boundary.
         $threadSafeDispatcher = new Definition(ThreadSafeTaskDispatcher::class);
-        $threadSafeDispatcher->setArgument('$serializer', new Reference('messenger.transport.native_php_serializer'));
-        $threadSafeDispatcher->setArgument('$swoole', new Reference(Swoole::class));
+        $threadSafeDispatcher->setArgument('$serializer', new Reference('messenger.default_serializer'));
         $container->setDefinition(ThreadSafeTaskDispatcher::class, $threadSafeDispatcher);
 
         // Inject ThreadSafeTaskDispatcher into SwooleServerTaskTransportFactory
         $factoryDef = $container->findDefinition(SwooleServerTaskTransportFactory::class);
         $factoryDef->addMethodCall('setThreadSafeDispatcher', [new Reference(ThreadSafeTaskDispatcher::class)]);
+        // Resolve the container sender so application decorators (e.g. Redis fallback) run.
+        $factoryDef->addMethodCall('setSender', [new Reference(SwooleServerTaskSender::class)]);
+        $container->findDefinition(SwooleServerTaskSender::class)
+            ->setArgument('$threadSafeDispatcher', new Reference(ThreadSafeTaskDispatcher::class));
 
         $transportHandler = new Definition(SwooleServerTaskTransportHandler::class);
         $transportHandler->setArgument('$bus', new Reference(MessageBusInterface::class));
-        $transportHandler->setArgument('$serializer', new Reference('messenger.transport.native_php_serializer'));
+        $transportHandler->setArgument('$serializer', new Reference('messenger.default_serializer'));
         $transportHandler->setArgument('$decorated', new Reference(SwooleServerTaskTransportHandler::class . '.inner'));
         $transportHandler->setDecoratedService(TaskHandler::class, null, -10);
         $container->setDefinition(SwooleServerTaskTransportHandler::class, $transportHandler);

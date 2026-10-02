@@ -125,7 +125,10 @@ final readonly class JsonMessageCodec
         }
     }
 
-    /** @param array<mixed> $payload @param list<string> $fields */
+    /**
+     * @param array<mixed> $payload
+     * @param list<string> $fields
+     */
     private function requireFields(array $payload, array $fields): void
     {
         if (array_diff($fields, array_keys($payload)) !== [] || array_diff(array_keys($payload), $fields) !== []) {

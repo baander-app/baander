@@ -6,6 +6,7 @@ namespace SwooleBundle\SwooleBundle\Bridge\Symfony\Messenger;
 
 use SwooleBundle\SwooleBundle\Server\HttpServer;
 use Symfony\Component\Messenger\Transport\Serialization\SerializerInterface;
+use Symfony\Component\Messenger\Transport\Sender\SenderInterface;
 use Symfony\Component\Messenger\Transport\TransportFactoryInterface;
 use Symfony\Component\Messenger\Transport\TransportInterface;
 
@@ -15,12 +16,18 @@ use Symfony\Component\Messenger\Transport\TransportInterface;
 final class SwooleServerTaskTransportFactory implements TransportFactoryInterface
 {
     private ?ThreadSafeTaskDispatcher $threadSafeDispatcher = null;
+    private ?SenderInterface $sender = null;
 
     public function __construct(private readonly HttpServer $server) {}
 
     public function setThreadSafeDispatcher(?ThreadSafeTaskDispatcher $dispatcher): void
     {
         $this->threadSafeDispatcher = $dispatcher;
+    }
+
+    public function setSender(SenderInterface $sender): void
+    {
+        $this->sender = $sender;
     }
 
     /**
@@ -31,7 +38,7 @@ final class SwooleServerTaskTransportFactory implements TransportFactoryInterfac
     {
         return new SwooleServerTaskTransport(
             new SwooleServerTaskReceiver(),
-            new SwooleServerTaskSender($this->server, $this->threadSafeDispatcher)
+            $this->sender ?? new SwooleServerTaskSender($this->server, $this->threadSafeDispatcher ?? new ThreadSafeTaskDispatcher($serializer))
         );
     }
 

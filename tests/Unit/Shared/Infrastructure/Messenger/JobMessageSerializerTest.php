@@ -7,13 +7,9 @@ namespace App\Tests\Unit\Shared\Infrastructure\Messenger;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Messenger\JobMessageSerializer;
-use App\Shared\Infrastructure\Messenger\JobMessageSerializerFactory;
-use App\Shared\Infrastructure\Messenger\PublicIdNormalizer;
-use App\Shared\Infrastructure\Messenger\UuidNormalizer;
+use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Envelope;
-use Symfony\Component\PropertyAccess\PropertyAccessor;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class JobMessageSerializerTest extends TestCase
 {
@@ -21,18 +17,7 @@ final class JobMessageSerializerTest extends TestCase
 
     protected function setUp(): void
     {
-        $propertyAccessor = new PropertyAccessor();
-        $serializer = JobMessageSerializerFactory::create(
-            $propertyAccessor,
-            new UuidNormalizer(),
-            new PublicIdNormalizer(),
-        );
-
-        $this->serializer = new JobMessageSerializer(
-            serializer: $serializer,
-            maxPayloadSize: 1_048_576,
-            jsonEncoder: new JsonEncoder(),
-        );
+        $this->serializer = new JobMessageSerializer(new JsonMessageCodec());
     }
 
     public function testSerializesValidCommandToJson(): void
@@ -47,26 +32,16 @@ final class JobMessageSerializerTest extends TestCase
         $this->assertJson($result);
 
         $decoded = json_decode($result, true);
-        $this->assertArrayHasKey('albumId', $decoded);
-        $this->assertSame($albumId->toString(), $decoded['albumId']);
-        $this->assertArrayHasKey('__class', $decoded);
-        $this->assertSame(ExtractAlbumCoverCommand::class, $decoded['__class']);
+        $this->assertSame('baander.message', $decoded['format']);
+        $this->assertSame(1, $decoded['version']);
+        $this->assertSame('metadata.extract_album_cover', $decoded['type']);
+        $this->assertSame($albumId->toString(), $decoded['payload']['album_id']);
+        $this->assertArrayNotHasKey('__class', $decoded);
     }
 
     public function testReturnsNullWhenPayloadExceedsThreshold(): void
     {
-        $propertyAccessor = new PropertyAccessor();
-        $serializer = JobMessageSerializerFactory::create(
-            $propertyAccessor,
-            new UuidNormalizer(),
-            new PublicIdNormalizer(),
-        );
-
-        $serializer = new JobMessageSerializer(
-            serializer: $serializer,
-            maxPayloadSize: 1,
-            jsonEncoder: new JsonEncoder(),
-        );
+        $serializer = new JobMessageSerializer(new JsonMessageCodec(), maxPayloadSize: 1);
 
         $command = new ExtractAlbumCoverCommand(Uuid::generate());
         $envelope = new Envelope($command);
@@ -78,8 +53,7 @@ final class JobMessageSerializerTest extends TestCase
 
     public function testReturnsNullOnSerializationFailure(): void
     {
-        // stdClass is not in the allowed patterns, so AllowedClassNormalizer returns null
-        // which causes a serialization error upstream
+        // Only explicitly versioned message types may be persisted for retry.
         $envelope = new Envelope(new \stdClass());
 
         $result = $this->serializer->serialize($envelope);
@@ -89,7 +63,7 @@ final class JobMessageSerializerTest extends TestCase
 
     public function testDeserializeReturnsNullOnFailure(): void
     {
-        $result = $this->serializer->deserialize('not-valid-json', ExtractAlbumCoverCommand::class);
+        $result = $this->serializer->deserialize('not-valid-json');
 
         $this->assertNull($result);
     }
@@ -97,14 +71,12 @@ final class JobMessageSerializerTest extends TestCase
     public function testDeserializeValidPayload(): void
     {
         $albumId = Uuid::generate();
-        $data = json_encode([
-            '__class' => ExtractAlbumCoverCommand::class,
-            'albumId' => $albumId->toString(),
-        ]);
+        $data = (new JsonMessageCodec())->encode(new ExtractAlbumCoverCommand($albumId));
 
         $result = $this->serializer->deserialize($data);
 
         $this->assertNotNull($result);
         $this->assertInstanceOf(ExtractAlbumCoverCommand::class, $result);
+        $this->assertTrue($albumId->equals($result->getAlbumId()));
     }
 }

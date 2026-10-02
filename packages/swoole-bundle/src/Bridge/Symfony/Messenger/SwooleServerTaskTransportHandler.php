@@ -9,6 +9,7 @@ use Swoole\Server;
 use SwooleBundle\SwooleBundle\Server\TaskHandler\TaskHandler;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\ReceivedStamp;
 use Symfony\Component\Messenger\Transport\Serialization\SerializerInterface;
 
 final readonly class SwooleServerTaskTransportHandler implements TaskHandler
@@ -23,11 +24,10 @@ final readonly class SwooleServerTaskTransportHandler implements TaskHandler
     {
         $data = $task->data;
 
-        // Thread mode: data arrives as a serialized array (encoded by ThreadSafeTaskDispatcher)
-        // Process mode: data arrives as a raw Envelope object
+        // Both modes accept the configured transport wire format.
         if (is_array($data)) {
             Assertion::notNull($this->serializer, 'Cannot deserialize task data: SerializerInterface not available.');
-            $data = $this->serializer->decode($data);
+            $data = $this->serializer->decode($data)->with(new ReceivedStamp('swoole_task'));
         }
 
         Assertion::isInstanceOf($data, Envelope::class);

@@ -10,6 +10,7 @@ use Swoole\Server;
 use SwooleBundle\SwooleBundle\Server\TaskHandler\TaskHandler;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Stamp\ReceivedStamp;
+use Symfony\Component\Messenger\Transport\Serialization\SerializerInterface;
 
 /**
  * Decorates the Swoole ServerTaskTransportHandler to track async jobs.
@@ -25,12 +26,16 @@ final readonly class SwooleTaskJobMonitorDecorator implements TaskHandler
         private JobMonitorService $jobMonitorService,
         private JobMessageSerializer $messageSerializer,
         private LoggerInterface $logger,
+        private SerializerInterface $transportSerializer,
     ) {
     }
 
     public function handle(Server $server, Server\Task $task): void
     {
         $data = $task->data;
+        if (is_array($data)) {
+            $data = $this->transportSerializer->decode($data)->with(new ReceivedStamp('swoole_task'));
+        }
 
         if (!($data instanceof Envelope)) {
             $this->decorated->handle($server, $task);

@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace SwooleBundle\SwooleBundle\Bridge\Symfony\Messenger;
 
 use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Transport\Sender\SenderInterface;
 use Symfony\Component\Messenger\Transport\TransportInterface;
 
 final readonly class SwooleServerTaskTransport implements TransportInterface
 {
     public function __construct(
         private SwooleServerTaskReceiver $receiver,
-        private SwooleServerTaskSender $sender,
+        private SenderInterface $sender,
     ) {}
 
     public function send(Envelope $envelope): Envelope

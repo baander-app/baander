@@ -5,9 +5,10 @@
 # Add to .env.local: OTEL_ENABLED=true, OTEL_EXPORTER_OTLP_ENDPOINT, OTEL_SERVICE_NAME
 
 parameters:
+    env(OTEL_SERVICE_NAME): baander
     app.otel.enabled: '%env(bool:OTEL_ENABLED)%'
     app.otel.exporter_url: '%env(OTEL_EXPORTER_OTLP_ENDPOINT)%'
-    app.otel.service_name: '%env(default:baander:OTEL_SERVICE_NAME)%'
+    app.otel.service_name: '%env(OTEL_SERVICE_NAME)%'
 
 services:
     # SpanBridge — shared ring buffer for the debug endpoint

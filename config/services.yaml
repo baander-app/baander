@@ -690,6 +690,7 @@ services:
     App\Shared\Infrastructure\Messenger\HttpServerTaskDispatcher:
         arguments:
             $httpServer: '@SwooleBundle\SwooleBundle\Server\HttpServer'
+            $serializer: '@messenger.default_serializer'
 
     App\Shared\Infrastructure\Messenger\SwooleTaskDispatcherInterface:
         alias: App\Shared\Infrastructure\Messenger\HttpServerTaskDispatcher
@@ -709,6 +710,7 @@ services:
         decorates: 'SwooleBundle\SwooleBundle\Bridge\Symfony\Messenger\SwooleServerTaskTransportHandler'
         arguments:
             $decorated: '@.inner'
+            $transportSerializer: '@messenger.default_serializer'
 
     # --- Messenger Middleware ---
     App\Shared\Infrastructure\Messenger\CorrelationIdMiddleware:
@@ -731,16 +733,7 @@ services:
 
     App\Shared\Infrastructure\Messenger\JobMessageSerializer:
         arguments:
-            $serializer: '@job_monitor.serializer'
             $maxPayloadSize: '%env(int:JOB_MONITOR_MAX_PAYLOAD_SIZE)%'
-
-    job_monitor.serializer:
-        class: Symfony\Component\Serializer\Serializer
-        factory: [ 'App\Shared\Infrastructure\Messenger\JobMessageSerializerFactory', 'create' ]
-        arguments:
-            $propertyAccessor: '@property_accessor'
-            $uuidNormalizer: '@App\Shared\Infrastructure\Messenger\UuidNormalizer'
-            $publicIdNormalizer: '@App\Shared\Infrastructure\Messenger\PublicIdNormalizer'
 
     App\Shared\Infrastructure\Messenger\UuidNormalizer: ~
     App\Shared\Infrastructure\Messenger\PublicIdNormalizer: ~
@@ -870,15 +863,18 @@ services:
         tags:
             - { name: 'swoole_bundle.bootable_service' }
 
+    App\Transcode\Domain\ValueObject\EncoderProfile:
+        factory: ['@App\Transcode\Infrastructure\FFmpeg\HardwareCapabilitiesProber', 'getProfile']
+
     App\Transcode\Infrastructure\HLS\FMP4SegmentWriter:
         arguments:
             $ffmpegPath: '%env(FFMPEG_PATH)%'
-            $encoderProfile: '@=service("App\\Transcode\\Infrastructure\\FFmpeg\\HardwareCapabilitiesProber").getProfile()'
+            $encoderProfile: '@App\Transcode\Domain\ValueObject\EncoderProfile'
 
     App\Transcode\Infrastructure\FFmpeg\FFmpegAdapter:
         arguments:
             $ffmpegPath: '%env(FFMPEG_PATH)%'
-            $encoderProfile: '@=service("App\\Transcode\\Infrastructure\\FFmpeg\\HardwareCapabilitiesProber").getProfile()'
+            $encoderProfile: '@App\Transcode\Domain\ValueObject\EncoderProfile'
             $ffprobeAdapter: '@App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter'
             $fmp4Writer: '@App\Transcode\Infrastructure\HLS\FMP4SegmentWriter'
 
@@ -913,12 +909,12 @@ services:
     App\Transcode\Infrastructure\Swoole\TranscodeProcessPool:
         arguments:
             $pool: '@App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool'
-            $encoderProfile: '@=service("App\\Transcode\\Infrastructure\\FFmpeg\\HardwareCapabilitiesProber").getProfile()'
+            $encoderProfile: '@App\Transcode\Domain\ValueObject\EncoderProfile'
 
     App\Transcode\Infrastructure\FFmpeg\SegmentEncoder:
         arguments:
-            $encoderProfile: '@=service("App\\Transcode\\Infrastructure\\FFmpeg\\HardwareCapabilitiesProber").getProfile()'
-            $bitrateMultiplier: '@=service("App\\Transcode\\Infrastructure\\FFmpeg\\HardwareCapabilitiesProber").getBitrateMultiplier()'
+            $encoderProfile: '@App\Transcode\Domain\ValueObject\EncoderProfile'
+            $bitrateMultiplier: '%env(float:HW_BITRATE_MULTIPLIER)%'
 
     App\Transcode\Infrastructure\Swoole\JobStatePersister:
         arguments:

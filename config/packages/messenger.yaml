@@ -1,5 +1,7 @@
 framework:
     messenger:
+        serializer:
+            default_serializer: App\Shared\Infrastructure\Messenger\JsonTransportSerializer
         transports:
             # Swoole task workers — primary async transport
             swoole_task:

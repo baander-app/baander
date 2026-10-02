@@ -69,6 +69,27 @@ make migrate
 
 Then visit `http://localhost`.
 
+## Message delivery and upgrades
+
+Queued commands and job retry data use the `baander.message` JSON format, version 1.
+The codec lists supported message types and fields explicitly. Redis and Swoole use
+this same contract; message payloads do not depend on Symfony object serialization.
+Retry metadata retains completed handler names so a retry skips handlers that
+already succeeded. External delivery still requires consumer idempotency.
+
+Before upgrading an instance that has older queued messages, stop producers and
+use the previous release to drain Redis and Swoole work. Resolve or export failed
+messages and back up the Redis streams and job history. Upgrade producers and
+workers together. PHP-serialized envelopes and legacy `__class` job payloads are
+rejected; archived legacy jobs cannot be retried through the new codec. Do not
+remove pending messages to make an upgrade pass.
+
+Run the strict unit suite with `bash scripts/test-unit-container.sh`. Run real
+Redis delivery, retry, failure-stream, and PostgreSQL lease tests with
+`bash scripts/test-messaging-container.sh`. Both scripts require installed Composer
+dependencies and Docker. The messaging script creates disposable services on its
+own network; it does not use the application's database or Redis instance.
+
 ## License
 
 Proprietary.

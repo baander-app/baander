@@ -124,6 +124,7 @@ jobs:
                     docker run --name "$CI_TEST_CONTAINER" --privileged --network "$CI_NETWORK" \
                       -e XDEBUG_MODE=coverage \
                       -e DATABASE_URL="postgresql://baander:baander@database:5432/baander_test?serverVersion=18&charset=utf8" \
+                      -e MESSENGER_TEST_REDIS_DSN="redis://default:baander@redis:6379" \
                       -e OUTBOX_TEST_DATABASE_URL="postgresql://baander:baander@database:5432/baander_test?serverVersion=18&charset=utf8" \
                       -e REDIS_URL="redis://default:baander@redis:6379" \
                       "$CI_IMAGE" \
