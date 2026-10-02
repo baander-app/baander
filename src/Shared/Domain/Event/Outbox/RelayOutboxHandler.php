@@ -30,6 +30,11 @@ final class RelayOutboxHandler
 
         foreach ($pending as $row) {
             $id = (int) $row['id'];
+            $leaseToken = $row['lease_token'];
+
+            if (!$this->outboxRepository->renewLease($id, $leaseToken)) {
+                continue;
+            }
 
             try {
                 $payload = json_decode($row['payload'], true, 512, JSON_THROW_ON_ERROR);
@@ -43,13 +48,15 @@ final class RelayOutboxHandler
                     $this->eventDispatcher->dispatch($event, 'outbox.relay');
                 }
 
-                $this->outboxRepository->markRelayed($id);
+                if (!$this->outboxRepository->markRelayed($id, $leaseToken)) {
+                    throw new \RuntimeException('Outbox lease expired before acknowledgement.');
+                }
                 ++$relayed;
             } catch (\Throwable $e) {
                 $attempts = ((int) ($row['attempts'] ?? 0)) + 1;
 
                 if ($attempts >= self::MAX_ATTEMPTS) {
-                    $this->outboxRepository->recordFailure($id, $attempts, null, new \DateTimeImmutable());
+                    $this->outboxRepository->recordFailure($id, $attempts, null, new \DateTimeImmutable(), $leaseToken);
                     $this->logger->error('Outbox event moved to dead-letter after {attempts} attempts', [
                         'id' => $id,
                         'event' => $row['event_name'],
@@ -61,7 +68,7 @@ final class RelayOutboxHandler
                         sprintf('+%d seconds', self::BASE_BACKOFF_SECONDS * (2 ** ($attempts - 1))),
                     );
 
-                    $this->outboxRepository->recordFailure($id, $attempts, $nextAttemptAt, null);
+                    $this->outboxRepository->recordFailure($id, $attempts, $nextAttemptAt, null, $leaseToken);
                     $this->logger->warning('Outbox relay failed for event {event}; will retry', [
                         'id' => $id,
                         'event' => $row['event_name'],

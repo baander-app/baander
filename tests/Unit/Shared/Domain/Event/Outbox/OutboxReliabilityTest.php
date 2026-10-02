@@ -89,23 +89,23 @@ final class OutboxReliabilityTest extends TestCase
                 'occurred_at' => (new \DateTimeImmutable())->format(\DateTimeImmutable::ATOM),
             ], JSON_THROW_ON_ERROR),
             'attempts' => 0,
+            'lease_token' => 'lease-a',
         ];
 
         $connection = $this->createMock(Connection::class);
         $connection->expects($this->once())
             ->method('executeQuery')
             ->willReturn($this->createResultMock([$row]));
-        $connection->expects($this->once())
-            ->method('update')
-            ->with(
-                'domain_event_outbox',
-                $this->callback(static function (array $data): bool {
-                    return isset($data['attempts'], $data['next_attempt_at'])
-                        && $data['attempts'] === 1
-                        && $data['dead_lettered_at'] === null;
-                }),
-                ['id' => 1],
-            );
+        $connection->expects($this->exactly(2))->method('executeStatement')
+            ->willReturnCallback(static function (string $sql, array $parameters): int {
+                self::assertSame('lease-a', $parameters['leaseToken']);
+                if (str_contains($sql, 'next_attempt_at =')) {
+                    self::assertSame(1, $parameters['attempts']);
+                    self::assertNotNull($parameters['nextAttemptAt']);
+                    self::assertNull($parameters['deadLetteredAt']);
+                }
+                return 1;
+            });
 
         $repository = new OutboxRepository($connection);
 
@@ -147,23 +147,23 @@ final class OutboxReliabilityTest extends TestCase
                 'occurred_at' => (new \DateTimeImmutable())->format(\DateTimeImmutable::ATOM),
             ], JSON_THROW_ON_ERROR),
             'attempts' => 4,
+            'lease_token' => 'lease-b',
         ];
 
         $connection = $this->createMock(Connection::class);
         $connection->expects($this->once())
             ->method('executeQuery')
             ->willReturn($this->createResultMock([$row]));
-        $connection->expects($this->once())
-            ->method('update')
-            ->with(
-                'domain_event_outbox',
-                $this->callback(static function (array $data): bool {
-                    return $data['attempts'] === 5
-                        && $data['next_attempt_at'] === null
-                        && $data['dead_lettered_at'] !== null;
-                }),
-                ['id' => 2],
-            );
+        $connection->expects($this->exactly(2))->method('executeStatement')
+            ->willReturnCallback(static function (string $sql, array $parameters): int {
+                self::assertSame('lease-b', $parameters['leaseToken']);
+                if (str_contains($sql, 'next_attempt_at =')) {
+                    self::assertSame(5, $parameters['attempts']);
+                    self::assertNull($parameters['nextAttemptAt']);
+                    self::assertNotNull($parameters['deadLetteredAt']);
+                }
+                return 1;
+            });
 
         $repository = new OutboxRepository($connection);
 
