@@ -399,6 +399,8 @@ RUN set -xe && \
     chown -R ${USERNAME}:${USERNAME} ${APP_HOME}
 
 # Copy cron file
+COPY ./docker/general/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY --chmod=755 ./docker/general/start-supervisor.sh /usr/local/bin/start-supervisor.sh
 COPY --chown=root:crontab ./docker/general/cron /var/spool/cron/crontabs/root
 RUN chmod 0600 /var/spool/cron/crontabs/root
 
@@ -408,7 +410,7 @@ WORKDIR ${APP_HOME}
 # Switch to app user
 USER ${USERNAME}
 
-CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["/usr/local/bin/start-supervisor.sh"]
 
 # -----------------------------------------------------------------------------
 # Stage 5: dev
@@ -416,6 +418,8 @@ CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
 # Designed for use with docker-compose volume mount workflow.
 # -----------------------------------------------------------------------------
 FROM runtime AS dev
+
+ENV APP_ENV=dev
 
 ARG HOST_UID=1000
 ARG HOST_GID=1000
@@ -475,7 +479,7 @@ RUN chown www-data:www-data /usr/local/etc/php/conf.d && \
 USER www-data
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["/usr/local/bin/start-supervisor.sh"]
 
 # -----------------------------------------------------------------------------
 # Stage 6: production
@@ -484,6 +488,8 @@ CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
 # When used with docker-compose.yml volume mount, host files overlay this.
 # -----------------------------------------------------------------------------
 FROM runtime AS production
+
+ENV APP_ENV=prod
 
 # Switch to root for COPY and composer install
 USER root
@@ -512,7 +518,7 @@ USER www-data
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD ["php", "bin/console", "app:health:check"]
 
-CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["/usr/local/bin/start-supervisor.sh"]
 
 # -----------------------------------------------------------------------------
 # Stage 7: ci

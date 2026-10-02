@@ -11,6 +11,7 @@ use App\Shared\Infrastructure\Doctrine\Entity\JobMonitorEntity;
 use App\Shared\Infrastructure\Pagination\CursorPaginator;
 use App\Shared\Infrastructure\Pagination\CursorResult;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\DBAL\ParameterType;
 use RuntimeException;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
@@ -585,7 +586,16 @@ final class JobMonitorService
      */
     private function updateJob(string $jobId, array $data): void
     {
-        $this->entityManager->getConnection()->update('job_monitors', $data, ['job_id' => $jobId]);
+        $types = ['job_id' => ParameterType::STRING];
+        foreach ($data as $column => $value) {
+            $types[$column] = match (true) {
+                is_bool($value) => ParameterType::BOOLEAN,
+                is_int($value) => ParameterType::INTEGER,
+                $value === null => ParameterType::NULL,
+                default => ParameterType::STRING,
+            };
+        }
+        $this->entityManager->getConnection()->update('job_monitors', $data, ['job_id' => $jobId], $types);
     }
 
     private function now(): string

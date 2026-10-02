@@ -24,6 +24,7 @@ services:
         image: martinjuul/baander-app:latest
         privileged: true
         container_name: baander-app
+        stop_grace_period: 3605s
         build:
             context: .
             target: dev

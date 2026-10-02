@@ -77,6 +77,20 @@ this same contract; message payloads do not depend on Symfony object serializati
 Retry metadata retains completed handler names so a retry skips handlers that
 already succeeded. External delivery still requires consumer idempotency.
 
+Each app container runs one Supervisor-managed `async` consumer. Its Redis
+consumer name includes the container hostname. `/health`, `/ready`, and
+`app:health:check` require a live local consumer: an idle heartbeat expires after
+45 seconds, while an active job has the transport's 3,600-second lease window.
+Readiness also checks the Linux process start identity, so a killed process or
+reused PID cannot keep an old heartbeat healthy. `/live` remains process liveness.
+
+The Messenger health details report `lastDeliveryQueueAgeSeconds` and
+`lastDeliveryAt`. These describe the last dequeued message, not the oldest waiting
+message. Supervisor allows active work up to 3,600 seconds to finish on shutdown;
+Compose allows 3,605 seconds before killing the container. Other orchestrators
+need an equivalent shutdown grace period. Development cache cleanup runs before
+Supervisor starts either process, never during an individual child restart.
+
 Before upgrading an instance that has older queued messages, stop producers and
 use the previous release to drain Redis and Swoole work. Resolve or export failed
 messages and back up the Redis streams and job history. Upgrade producers and
@@ -89,6 +103,12 @@ Redis delivery, retry, failure-stream, and PostgreSQL lease tests with
 `bash scripts/test-messaging-container.sh`. Both scripts require installed Composer
 dependencies and Docker. The messaging script creates disposable services on its
 own network; it does not use the application's database or Redis instance.
+
+The production consumer startup and recovery drill is
+`bash scripts/test-worker-runtime-container.sh`. It runs the application's actual
+consumer command against disposable PostgreSQL and Redis services, verifies job
+completion, kills the worker, verifies Supervisor recovery, and checks shutdown
+readiness. CI runs the drill against the image it just built.
 
 ## License
 

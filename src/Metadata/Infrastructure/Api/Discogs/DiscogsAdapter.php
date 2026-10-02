@@ -210,7 +210,7 @@ final class DiscogsAdapter
         $retryCount = 0;
         $maxRetries = 1;
 
-        while ($retryCount <= $maxRetries) {
+        while (true) {
             $response = @file_get_contents($url, false, $context);
 
             if ($response === false) {
@@ -224,11 +224,11 @@ final class DiscogsAdapter
                 return [];
             }
 
-            // Decode the HTTP status from the response headers (PHP places them in $http_response_header)
-            $statusCode = $this->extractStatusCode();
+            $responseHeaders = http_get_last_response_headers() ?? [];
+            $statusCode = $this->extractStatusCode($responseHeaders);
 
             if ($statusCode === 429) {
-                $retryAfter = $this->extractHeader('Retry-After');
+                $retryAfter = $this->extractHeader('Retry-After', $responseHeaders);
 
                 if ($retryAfter !== null && $retryCount < $maxRetries) {
                     $wait = (int) $retryAfter;
@@ -266,36 +266,33 @@ final class DiscogsAdapter
             return is_array($decoded) ? $decoded : [];
         }
 
-        return [];
     }
 
-    private function extractStatusCode(): int
+    /** @param list<string> $headers */
+    private function extractStatusCode(array $headers): int
     {
-        if (!isset($http_response_header)) {
-            return 0;
-        }
-
-        foreach ($http_response_header as $header) {
+        $status = 0;
+        foreach ($headers as $header) {
             if (preg_match('#^HTTP/\S+\s+(\d{3})#', $header, $matches)) {
-                return (int) $matches[1];
+                $status = (int) $matches[1];
             }
         }
 
-        return 0;
+        return $status;
     }
 
-    private function extractHeader(string $name): ?string
+    /** @param list<string> $headers */
+    private function extractHeader(string $name, array $headers): ?string
     {
-        if (!isset($http_response_header)) {
-            return null;
-        }
-
-        foreach ($http_response_header as $header) {
-            if (strncasecmp($header, "{$name}:", strlen($name) + 1) === 0) {
-                return trim(substr($header, strlen($name) + 1));
+        $value = null;
+        foreach ($headers as $header) {
+            if (str_starts_with($header, 'HTTP/')) {
+                $value = null;
+            } elseif (strncasecmp($header, "{$name}:", strlen($name) + 1) === 0) {
+                $value = trim(substr($header, strlen($name) + 1));
             }
         }
 
-        return null;
+        return $value;
     }
 }

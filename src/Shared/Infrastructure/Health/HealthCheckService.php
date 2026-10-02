@@ -28,6 +28,7 @@ final class HealthCheckService
         private readonly string $oauthPublicKeyPath,
         private readonly string $vapidPublicKey,
         private readonly string $vapidPrivateKey,
+        private readonly MessengerWorkerHealth $messengerWorkerHealth,
         private readonly array $apiKeys = [],
     )
     {
@@ -41,6 +42,7 @@ final class HealthCheckService
         return [
             $this->checkPostgreSQL(),
             $this->checkRedis(),
+            $this->messengerWorkerHealth->check(),
             $this->checkSwoole(),
             $this->checkMemory(),
         ];
@@ -56,6 +58,7 @@ final class HealthCheckService
         return [
             $this->checkPostgreSQL(),
             $this->checkRedis(),
+            $this->messengerWorkerHealth->check(),
             $this->checkMemory(),
         ];
     }
