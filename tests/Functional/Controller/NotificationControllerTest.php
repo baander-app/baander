@@ -8,7 +8,9 @@ use App\Auth\Domain\Model\User;
 use App\Notification\Domain\Model\Notification;
 use App\Notification\Domain\Repository\NotificationRepositoryInterface;
 use App\Notification\Domain\ValueObject\NotificationCategory;
+use App\Shared\Domain\Model\Email;
 use App\Tests\Functional\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Functional tests for notification management.
@@ -20,10 +22,7 @@ use App\Tests\Functional\TestCase;
  *   PATCH  /api/notifications/read-all       mark all as read
  *   DELETE /api/notifications/{id}           delete
  *
- * Notable behaviour pinned here: markRead() and delete() look up a notification
- * by public ID WITHOUT verifying ownership — any authenticated user can mark-read
- * or delete another user's notification. See testMarkReadDoesNotEnforceOwnership
- * and testDeleteDoesNotEnforceOwnership.
+ * Single-notification writes require ownership, including for unrelated admins.
  */
 final class NotificationControllerTest extends TestCase
 {
@@ -187,14 +186,16 @@ final class NotificationControllerTest extends TestCase
         $this->assertTrue($data['data']['isRead']);
     }
 
-    public function testMarkReadDoesNotEnforceOwnership(): void
+    #[DataProvider('unrelatedReaders')]
+    public function testMarkReadRejectsUnrelatedUsers(bool $admin, bool $alreadyRead): void
     {
-        // BUG PIN: findByPublicId() ignores userId, so any authenticated user can
-        // mark another user's notification as read. The controller never checks
-        // ownership, returning 200 instead of 403.
-        $owner = $this->createTestUser();
-        $intruder = $this->createTestUser();
+        $owner = $this->createNotificationUser();
+        $intruder = $this->createNotificationUser($admin);
         $notification = $this->createNotification($owner);
+        if ($alreadyRead) {
+            $this->notificationRepository->markAsRead($notification->getId());
+        }
+        $before = $this->storedNotification($notification);
 
         $response = $this->authenticatedRequest(
             'PATCH',
@@ -202,7 +203,24 @@ final class NotificationControllerTest extends TestCase
             $intruder,
         );
 
-        $this->assertSame(200, $response->getStatusCode(), 'markRead has no ownership check (bug).');
+        $data = $this->assertJsonResponse($response, 403);
+        $this->assertPrivateNotificationIsAbsent($data, $notification);
+        $this->assertSame($before, $this->storedNotification($notification));
+    }
+
+    public function testOwnerCanMarkReadRepeatedly(): void
+    {
+        $owner = $this->createNotificationUser();
+        $notification = $this->createNotification($owner);
+        $uri = '/api/notifications/' . $notification->getPublicId()->toString() . '/read';
+
+        $first = $this->assertJsonResponse($this->authenticatedRequest('PATCH', $uri, $owner), 200, 'data');
+        $this->assertTrue($first['data']['isRead']);
+        $stored = $this->storedNotification($notification);
+        $this->entityManager->clear();
+        $second = $this->assertJsonResponse($this->authenticatedRequest('PATCH', $uri, $owner), 200, 'data');
+        $this->assertSame($first['data'], $second['data']);
+        $this->assertSame($stored, $this->storedNotification($notification));
     }
 
     // ---------------------------------------------------------------
@@ -272,13 +290,13 @@ final class NotificationControllerTest extends TestCase
         $this->assertSame([], $data['data']);
     }
 
-    public function testDeleteDoesNotEnforceOwnership(): void
+    #[DataProvider('unrelatedUsers')]
+    public function testDeleteRejectsUnrelatedUsers(bool $admin): void
     {
-        // BUG PIN: delete() looks up by public ID only — no ownership check.
-        // Any authenticated user can delete another user's notification.
-        $owner = $this->createTestUser();
-        $intruder = $this->createTestUser();
+        $owner = $this->createNotificationUser();
+        $intruder = $this->createNotificationUser($admin);
         $notification = $this->createNotification($owner);
+        $before = $this->storedNotification($notification);
 
         $response = $this->authenticatedRequest(
             'DELETE',
@@ -286,12 +304,69 @@ final class NotificationControllerTest extends TestCase
             $intruder,
         );
 
-        $this->assertSame(204, $response->getStatusCode(), 'delete has no ownership check (bug).');
+        $data = $this->assertJsonResponse($response, 403);
+        $this->assertPrivateNotificationIsAbsent($data, $notification);
+        $this->assertSame($before, $this->storedNotification($notification));
     }
 
     // ---------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------
+
+    /** @return iterable<string, array{bool}> */
+    public static function unrelatedUsers(): iterable
+    {
+        yield 'ordinary user' => [false];
+        yield 'unrelated admin' => [true];
+    }
+
+    /** @return iterable<string, array{bool, bool}> */
+    public static function unrelatedReaders(): iterable
+    {
+        yield 'ordinary user, unread' => [false, false];
+        yield 'unrelated admin, unread' => [true, false];
+        yield 'ordinary user, already read' => [false, true];
+        yield 'unrelated admin, already read' => [true, true];
+    }
+
+    private function createNotificationUser(bool $admin = false): User
+    {
+        $email = 'notification-owner-' . bin2hex(random_bytes(8)) . '@baander.app';
+        if (!$admin) {
+            return $this->createTestUser($email);
+        }
+
+        $user = User::createByOperator(new Email($email), password_hash('password123', PASSWORD_BCRYPT), 'Unrelated Admin', ['ROLE_USER', 'ROLE_ADMIN']);
+        $this->userRepository->save($user);
+
+        return $user;
+    }
+
+    /** @return array<string, mixed> */
+    private function storedNotification(Notification $notification): array
+    {
+        $stored = $this->entityManager->getConnection()->fetchAssociative(
+            'SELECT * FROM notifications WHERE id = ?',
+            [$notification->getId()->toString()],
+        );
+        $this->assertNotFalse($stored, 'A denied write must preserve the notification row.');
+
+        return $stored;
+    }
+
+    /** @param array<string, mixed> $response */
+    private function assertPrivateNotificationIsAbsent(array $response, Notification $notification): void
+    {
+        $this->assertArrayHasKey('error', $response);
+        $this->assertArrayNotHasKey('data', $response);
+        $json = json_encode($response, JSON_THROW_ON_ERROR);
+        foreach ([$notification->getTitle(), $notification->getBody(), $notification->getUserId()->toString()] as $privateValue) {
+            $this->assertStringNotContainsString($privateValue, $json);
+        }
+        foreach (['title', 'body', 'parameters', 'referenceData'] as $privateField) {
+            $this->assertStringNotContainsString('"' . $privateField . '"', $json);
+        }
+    }
 
     private function createNotification(
         User $user,

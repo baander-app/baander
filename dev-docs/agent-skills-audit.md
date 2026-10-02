@@ -170,6 +170,25 @@ exact assertion crossed a wall-clock second; controlled-clock cases now verify
 both the original deadline and one second of elapsed time without changing
 production behavior.
 
+## Notification ownership correction
+
+Single-item mark-read and delete now enforce the existing owner-only notification
+policy before mutation or resource mapping. An unrelated administrator is also
+denied. Foreign records return the documented 403 without notification contents;
+missing or malformed IDs retain 404. Owner operations and repeated mark-read remain
+supported. List, count, and mark-all-read were already scoped to the current user.
+
+The unfixed controller failed all six cross-user HTTP cases. The fixed notification
+and preference suites pass 31 tests with 731 assertions, including unchanged stored
+rows after denial and no private notification fields in error responses. These use
+the configured test firewall. The full unit/rule suite passes 2,954 tests with 8,545
+assertions; focused controller PHPStan also passes.
+
+The controller uses a direct owner check. Reusing generic EDIT/DELETE authorization
+would involve library and playlist voters that accept unrelated objects and grant
+administrators access. Their broader subject matching remains a separate finding;
+the notification checks do not depend on those voters.
+
 ## Recommended follow-up changes
 
 These are separate reviewable changes. No baseline expansion or suppression is a
@@ -178,8 +197,8 @@ been reproduced end to end.
 
 | Priority | Evidence | Proposed change and acceptance |
 |---|---|---|
+| High | LibraryVoter and PlaylistVoter accept generic EDIT/DELETE attributes for any object and can grant administrator access to unrelated subjects. | Narrow supported subject types or use scoped attributes; test the complete decision manager across resource types without broadening permissions. |
 | High | NotificationPreferenceRepository::isEnabled defaults missing rows to true, while GET displays most missing preferences as disabled; email and push handlers use the repository result. | Define one default policy and verify display and delivery agree for unseeded and partially seeded users. |
-| High | Existing NotificationController functional tests characterize cross-user mark-read and delete operations without ownership checks. | Reproduce through the firewall and enforce owner/admin policy with negative regressions. |
 | Medium | Notification preference GET includes admin_operations, while writes/seeding support three categories; PUT also manually decodes input and documents a different response envelope. | Resolve category policy and contract drift; verify malformed JSON and wrong-shaped preference input return client errors before persistence. |
 | Medium | PlaylistResource documents publicId as UUID, while the shared PublicId generates a 21-character NanoID. | Correct identifier schemas and regenerate affected clients together; verify actual identifier formats in contract tests. |
 | Medium | useAudioPlayback destroys its service during cleanup but keeps an initialized guard; the app uses StrictMode. | Add a StrictMode setup/cleanup/replay regression, reproduce the lifecycle failure, and restore symmetric ownership. Static finding pending runtime reproduction. |

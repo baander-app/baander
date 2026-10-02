@@ -161,6 +161,11 @@ final class NotificationController
             return $this->notFound();
         }
 
+        $user = $this->security->getUser();
+        if (!$user instanceof SecurityUser || !$notification->getUserId()->equals(Uuid::fromString($user->getId()))) {
+            return $this->forbidden();
+        }
+
         if (!$notification->isRead()) {
             $this->notificationRepository->markAsRead($notification->getId());
             $notification->markAsRead();
@@ -229,6 +234,11 @@ final class NotificationController
         $notification = $this->findNotification($publicId);
         if ($notification === null) {
             return $this->notFound();
+        }
+
+        $user = $this->security->getUser();
+        if (!$user instanceof SecurityUser || !$notification->getUserId()->equals(Uuid::fromString($user->getId()))) {
+            return $this->forbidden();
         }
 
         $this->notificationRepository->delete($notification);
