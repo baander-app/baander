@@ -23,6 +23,7 @@ bash scripts/test-unit-container.sh
 bash scripts/test-messaging-container.sh
 bash scripts/test-worker-retirement-container.sh
 bash scripts/test-worker-recovery-container.sh
+bash scripts/test-worker-command-container.sh
 bash scripts/test-worker-containment-container.sh
 bash scripts/test-functional-container.sh tests/Functional/Controller/FavoritesControllerTest.php
 bash scripts/test-functional-container.sh tests/Integration/CoverExtractionPersistenceTest.php
@@ -113,6 +114,17 @@ verifies that a repeated controller start cannot restart the predecessor. A seco
 fixture makes Docker create a real container and then discards its acknowledgment.
 It verifies durable creation admission, refusal to recreate, exact-recipe
 reconciliation without process activity, and registered startup/recovery.
+
+The worker-command runner boots the actual `app:worker` as PID 1 against disposable
+production-mode PostgreSQL and Redis after fresh and repeat migrations. It verifies
+two direct child roles and the namespace/boot-qualified Redis consumer, kills the
+consumer to require whole-container draining, tests TERM and forced database lease
+expiry, and confirms a duplicate
+lease claim exits with zero launch attempts. It checks that ownership remains
+reserved after shutdown. This verifies lifecycle and consumer registration; it does
+not establish application readiness, autoscaling or scheduler/media ownership.
+The functional `Console/ServeCommandTest` verifies that `app:serve` and the legacy
+server name resolve to the same real command and preserve its options.
 
 The functional runner creates an isolated PostgreSQL/Redis network, extracts the
 checkout into a fresh directory, and runs all migrations twice before executing the

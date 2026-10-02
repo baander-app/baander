@@ -7,6 +7,7 @@ use App\Shared\Infrastructure\Doctrine\Type\CustomTypesRegistrar;
 use App\Shared\Infrastructure\Logging\BoundedContextLoggerPass;
 use App\Shared\Infrastructure\Logging\MonologHandlerResetterPass;
 use App\Shared\Infrastructure\Swoole\DBAL\DBALAliveKeeperCompilerPass;
+use App\Shared\Infrastructure\Swoole\ServeCommandPass;
 use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\BlockingContainer;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\Modifier\Modifier;
@@ -14,6 +15,7 @@ use SwooleBundle\SwooleBundle\Bridge\Symfony\Kernel\CoroutinesSupportingKernel;
 use SwooleBundle\SwooleBundle\Reflection\ClassModifier;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Compiler\PassConfig;
 use Symfony\Component\HttpKernel\Kernel as BaseKernel;
 
 class Kernel extends BaseKernel
@@ -43,6 +45,7 @@ class Kernel extends BaseKernel
         $container->addCompilerPass(new DBALAliveKeeperCompilerPass());
         $container->addCompilerPass(new MonologHandlerResetterPass());
         $container->addCompilerPass(new OutboxSubscriberPass());
+        $container->addCompilerPass(new ServeCommandPass(), PassConfig::TYPE_BEFORE_REMOVING, 10);
     }
 
     /**
@@ -90,6 +93,10 @@ class Kernel extends BaseKernel
 
         if (!$this->areCoroutinesEnabled()) {
             return;
+        }
+
+        if (!$this->container instanceof BlockingContainer) {
+            throw new \LogicException('Coroutine support requires a blocking service container.');
         }
 
         Modifier::modifyContainer($this->container, $cacheDir, $this->isDebug());

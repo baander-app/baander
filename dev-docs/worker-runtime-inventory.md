@@ -2,9 +2,10 @@
 
 Verified against source on 2026-10-02 for stage 1 of the
 [web and worker runtime redesign](../docs/plans/2026-07-17-001-feat-messenger-enterprise-hardening-plan.md).
-The two commands `app:serve` and `app:worker`, queue families, and capacity policies
-below are proposed deployment interfaces. This inventory does not implement them
-or certify runtime resource defaults.
+`app:serve` now names the existing foreground web server, and `app:worker` runs an
+initial fixed Redis-consumer/outbox-relay supervisor. Queue families, autoscaling,
+role ownership transfers and deployment cutover below remain planned. This inventory
+does not certify runtime resource defaults.
 
 ## Current asynchronous routes
 
@@ -390,7 +391,7 @@ without acknowledging containment or releasing the deployment lease. Invalid clo
 readings still trigger initial stop attempts, then propagate to the outer owner
 for containment. Real-process tests cover delayed acquisition, denied grants,
 hung renewal, expiry during sibling launches and clock failure. The combined unit
-and static-analysis-rule suite passes 3,362 tests with 12,122 assertions; focused
+and static-analysis-rule suite passes 3,393 tests with 12,190 assertions; focused
 production PHPStan passes. These are correctness checks, not capacity measurements.
 
 `scripts/test-worker-containment-container.sh` exercises this core as PID 1 in a
@@ -478,14 +479,40 @@ connection verifies the committed claim before the real Docker start. It then
 exercises inventory-backed retirement. This validates external startup/recovery,
 not the full application runtime or deployment command wiring.
 
-This is a stage-2 foundation, not a deployment supervisor. No application command
-or deployment configuration uses it yet. The deployment must wire the external controller and persist its lifecycle
-inventory; the low-level lease acknowledgment API does not verify cleanup itself. The direct-child adapter's
-destructor is last-resort cleanup, not a process-tree shutdown guarantee. Controller
-integration, per-child containment scopes,
-role-specific boot, heartbeat publication/aggregation and scheduler/media ownership
-remain necessary before the two-command cutover. Defaults are policy examples,
-not measured production capacity.
+The first command facade is now wired. `app:serve` is the canonical name of the
+existing `ServerRunCommand`, retaining `swoole:server:run` as an alias and preserving
+its options, signal handling and BootManager behavior. `app:worker` uses an
+application port to run one Redis `async` consumer with keepalive and one outbox
+relay, plus the bounded lease helper. It requires container PID 1, a private local
+lock, deployment/boot identity and explicit memory reservations. CLI identity must
+match the container environment when provided. Child PHP heaps are limited to
+256 MiB; admission requires at least 320 MiB per child and 128 MiB for management.
+These are conservative initial policy bounds, not measured capacity guarantees.
+
+Every child exit, authority loss or management failure drains the whole deployment.
+The supervisor reaps direct children and exits without acknowledging containment or
+releasing the lease. A 35-second drain fallback replaces PHP with an immediate-exit
+process to avoid blocking child destructors; external containment must enforce the
+final boundary if that replacement fails. The runner does not restart individual
+children or infer readiness from process presence. It emits only a best-effort,
+nonblocking stopped diagnostic with launch-attempt count and exit code. Consumer
+names include the namespace hash, boot, role and generation. Resolved environment
+values are forwarded without Symfony's prior Dotenv-loaded-variable marker, which
+would otherwise overwrite the injected consumer identity when child kernels boot.
+
+The command acceptance runner uses disposable production-mode PostgreSQL and Redis.
+It verifies actual consumer/relay parentage and the registered Redis identity, then
+checks child-crash draining, TERM, denial with zero launch attempts, and database
+lease-expiry draining. Every case retains the original active lease reservation.
+The functional web-command test resolves both names to the same real command.
+These checks establish lifecycle behavior, not end-to-end media or scheduler work.
+
+The worker command is not yet a replacement for every web-owned background role.
+Scheduler/media ownership, role-specific boot, queue families, autoscaling,
+full-identity health publication and deployment configuration cutover remain open.
+The external creation/start/recovery controller must still be wired into deployment
+operations. Its low-level lease acknowledgment does not itself verify cleanup, and
+host-systemd and per-child containment remain unqualified.
 
 This is source inspection of routing, all application Bootable implementations,
 timer/coroutine creation sites, tagged CPU handlers, scheduler providers, private

@@ -1125,3 +1125,11 @@ services:
         alias: App\QoL\Infrastructure\QoLAdminService
 
     App\QoL\Infrastructure\QoLAdminService: ~
+
+    App\Shared\Infrastructure\Worker\WorkerSupervisorRunner:
+        arguments:
+            $projectDirectory: '%kernel.project_dir%'
+            $databaseUrl: '%env(resolve:DATABASE_URL)%'
+
+    App\Shared\Application\Port\WorkerSupervisorRunnerInterface:
+        alias: App\Shared\Infrastructure\Worker\WorkerSupervisorRunner
