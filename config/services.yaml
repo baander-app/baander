@@ -790,6 +790,8 @@ services:
         alias: App\Transcode\Infrastructure\Doctrine\Query\TranscodeSessionQuery
 
     # --- Transcode Application Port Aliases ---
+    App\Transcode\Application\Port\PlaybackPortInterface:
+        alias: App\Transcode\Infrastructure\Auth\AuthorizedPlayback
     App\Transcode\Application\Port\TranscodeSessionPortInterface:
         alias: App\Transcode\Infrastructure\Transcode\TranscodeSessionService
     App\Transcode\Application\Port\TranscodeJobPortInterface:

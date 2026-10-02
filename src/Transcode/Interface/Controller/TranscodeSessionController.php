@@ -13,6 +13,7 @@ use App\Transcode\Application\Command\ResumeTranscodeSessionCommand;
 use App\Transcode\Application\Command\UpdateTranscodePositionCommand;
 use App\Transcode\Application\Command\UpdateTranscodeSessionCommand;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
+use App\Transcode\Application\Port\PlaybackPortInterface;
 use App\Transcode\Application\Query\TranscodeSessionQueryPort;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
@@ -26,6 +27,9 @@ use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
@@ -40,6 +44,7 @@ final class TranscodeSessionController
         private readonly Security $security,
         private readonly MessageBusInterface $commandBus,
         private readonly TranscodeSessionPortInterface $sessionPort,
+        private readonly PlaybackPortInterface $playback,
     ) {
     }
 
@@ -74,6 +79,8 @@ final class TranscodeSessionController
         if ($user === null) {
             return $this->unauthorized();
         }
+
+        $this->playback->assertAccess(Uuid::fromString($payload->videoId));
 
         $envelope = $this->commandBus->dispatch(new CreateTranscodeSessionCommand(
             userId: Uuid::fromString($user->getId()),
@@ -128,6 +135,7 @@ final class TranscodeSessionController
         if ($session === null) {
             return $this->notFound();
         }
+        $this->assertSessionOwner($session->getUserId()->toString());
 
         return $this->successResponse(TranscodeSessionResource::from($session));
     }
@@ -146,6 +154,7 @@ final class TranscodeSessionController
     #[Route('/{uuid}/pause', name: 'pause', methods: ['PATCH'])]
     public function pause(string $uuid): JsonResponse
     {
+        $this->requireOwnedSession($uuid);
         $this->commandBus->dispatch(new PauseTranscodeSessionCommand(
             sessionId: Uuid::fromString($uuid),
         ));
@@ -167,6 +176,7 @@ final class TranscodeSessionController
     #[Route('/{uuid}/resume', name: 'resume', methods: ['PATCH'])]
     public function resume(string $uuid): JsonResponse
     {
+        $this->requireOwnedSession($uuid);
         $this->commandBus->dispatch(new ResumeTranscodeSessionCommand(
             sessionId: Uuid::fromString($uuid),
         ));
@@ -188,6 +198,7 @@ final class TranscodeSessionController
     #[Route('/{uuid}', name: 'cancel', methods: ['DELETE'])]
     public function cancel(string $uuid): JsonResponse
     {
+        $this->requireOwnedSession($uuid);
         $this->commandBus->dispatch(new CancelTranscodeSessionCommand(
             sessionId: Uuid::fromString($uuid),
         ));
@@ -227,6 +238,7 @@ final class TranscodeSessionController
         if ($session === null) {
             return $this->notFound();
         }
+        $this->assertSessionOwner($session->getUserId()->toString());
 
         if ($request->audioProfile !== null) {
             $session->updateAudioProfile(AudioProfile::fromString($request->audioProfile));
@@ -280,8 +292,19 @@ final class TranscodeSessionController
         Request $request,
     ): JsonResponse
     {
-        $position = (float) $request->request->get('position', 0.0);
-        $action = (string) $request->request->get('action', 'seek');
+        $this->requireOwnedSession($uuid);
+        try {
+            $payload = $request->toArray();
+        } catch (\Symfony\Component\HttpFoundation\Exception\JsonException) {
+            return $this->errorResponse('Expected a JSON object.', 400);
+        }
+        $position = $payload['position'] ?? null;
+        $action = $payload['action'] ?? 'seek';
+        if ((!is_int($position) && !is_float($position)) || !is_finite((float) $position) || $position < 0
+            || !in_array($action, ['seek', 'pause', 'resume'], true)) {
+            return $this->errorResponse('Position must be a nonnegative number and action must be seek, pause, or resume.', 422);
+        }
+        $position = (float) $position;
 
         $this->commandBus->dispatch(new UpdateTranscodePositionCommand(
             sessionId: Uuid::fromString($uuid),
@@ -291,4 +314,29 @@ final class TranscodeSessionController
 
         return $this->successResponse(['status' => 'ok', 'position' => $position]);
     }
+    private function requireOwnedSession(string $uuid): void
+    {
+        try {
+            $sessionId = Uuid::fromString($uuid);
+        } catch (\InvalidArgumentException) {
+            throw new NotFoundHttpException('Session not found.');
+        }
+        $session = $this->sessionPort->findByUuid($sessionId);
+        if ($session === null) {
+            throw new NotFoundHttpException('Session not found.');
+        }
+        $this->assertSessionOwner($session->getUserId()->toString());
+    }
+
+    private function assertSessionOwner(string $ownerId): void
+    {
+        $user = $this->security->getUser();
+        if ($user === null || !method_exists($user, 'getId')) {
+            throw new HttpException(401, 'Authentication required.');
+        }
+        if (!$this->security->isGranted('ROLE_ADMIN') && $ownerId !== $user->getId()) {
+            throw new AccessDeniedException('This session belongs to another user.');
+        }
+    }
+
 }

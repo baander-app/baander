@@ -11,18 +11,18 @@ use League\OAuth2\Server\Repositories\ClientRepositoryInterface;
 use League\OAuth2\Server\Repositories\DeviceCodeRepositoryInterface;
 use League\OAuth2\Server\Repositories\RefreshTokenRepositoryInterface;
 use League\OAuth2\Server\Repositories\ScopeRepositoryInterface;
-use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 final class AuthorizationServerFactoryTest extends TestCase
 {
-    private ClientRepositoryInterface&MockObject $clientRepository;
-    private AccessTokenRepositoryInterface&MockObject $accessTokenRepository;
-    private ScopeRepositoryInterface&MockObject $scopeRepository;
-    private AuthCodeRepositoryInterface&MockObject $authCodeRepository;
-    private RefreshTokenRepositoryInterface&MockObject $refreshTokenRepository;
-    private DeviceCodeRepositoryInterface&MockObject $deviceCodeRepository;
+    private ClientRepositoryInterface&Stub $clientRepository;
+    private AccessTokenRepositoryInterface&Stub $accessTokenRepository;
+    private ScopeRepositoryInterface&Stub $scopeRepository;
+    private AuthCodeRepositoryInterface&Stub $authCodeRepository;
+    private RefreshTokenRepositoryInterface&Stub $refreshTokenRepository;
+    private DeviceCodeRepositoryInterface&Stub $deviceCodeRepository;
 
     private static string $privateKeyPath;
     private static bool $keyCreatedByUs = false;
@@ -55,12 +55,12 @@ final class AuthorizationServerFactoryTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->clientRepository = $this->createMock(ClientRepositoryInterface::class);
-        $this->accessTokenRepository = $this->createMock(AccessTokenRepositoryInterface::class);
-        $this->scopeRepository = $this->createMock(ScopeRepositoryInterface::class);
-        $this->authCodeRepository = $this->createMock(AuthCodeRepositoryInterface::class);
-        $this->refreshTokenRepository = $this->createMock(RefreshTokenRepositoryInterface::class);
-        $this->deviceCodeRepository = $this->createMock(DeviceCodeRepositoryInterface::class);
+        $this->clientRepository = $this->createStub(ClientRepositoryInterface::class);
+        $this->accessTokenRepository = $this->createStub(AccessTokenRepositoryInterface::class);
+        $this->scopeRepository = $this->createStub(ScopeRepositoryInterface::class);
+        $this->authCodeRepository = $this->createStub(AuthCodeRepositoryInterface::class);
+        $this->refreshTokenRepository = $this->createStub(RefreshTokenRepositoryInterface::class);
+        $this->deviceCodeRepository = $this->createStub(DeviceCodeRepositoryInterface::class);
     }
 
     private function createFactory(string $encryptionKey = ''): AuthorizationServerFactory

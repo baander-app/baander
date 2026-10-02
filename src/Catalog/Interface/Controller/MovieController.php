@@ -24,6 +24,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
 #[OA\Tag(name: 'Catalog', description: 'Album, artist, song, movie, and genre management endpoints')]
 #[Route('/api/movies', name: 'movie_')]
+#[\Symfony\Component\Security\Http\Attribute\IsGranted('ROLE_ADMIN', methods: ['POST', 'PUT', 'PATCH', 'DELETE'])]
 final class MovieController
 {
     use ApiResponsesTrait;

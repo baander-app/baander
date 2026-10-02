@@ -21,40 +21,50 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 final class RevokeTokenHandlerTest extends TestCase
 {
-    private AccessTokenRepositoryInterface&MockObject $accessTokenRepository;
-    private RefreshTokenRepositoryInterface&MockObject $refreshTokenRepository;
-    private EntityManagerInterface&MockObject $entityManager;
+    private AccessTokenRepositoryInterface $accessTokenRepository;
+    private RefreshTokenRepositoryInterface $refreshTokenRepository;
+    private EntityManagerInterface $entityManager;
     private Connection&MockObject $connection;
-    private EventDispatcherInterface&MockObject $eventDispatcher;
+    private EventDispatcherInterface $eventDispatcher;
     private RevokeTokenHandler $handler;
 
     protected function setUp(): void
     {
-        $this->accessTokenRepository = $this->createMock(AccessTokenRepositoryInterface::class);
-        $this->refreshTokenRepository = $this->createMock(RefreshTokenRepositoryInterface::class);
+        $this->accessTokenRepository = $this->createStub(AccessTokenRepositoryInterface::class);
+        $this->refreshTokenRepository = $this->createStub(RefreshTokenRepositoryInterface::class);
 
         $this->connection = $this->createMock(Connection::class);
         $this->connection->method('transactional')->willReturnCallback(
             static fn (callable $callback) => $callback(),
         );
 
-        $this->entityManager = $this->createMock(EntityManagerInterface::class);
+        $this->entityManager = $this->createStub(EntityManagerInterface::class);
         $this->entityManager->method('getConnection')->willReturn($this->connection);
 
-        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        $this->eventDispatcher = $this->createStub(EventDispatcherInterface::class);
 
-        $this->handler = new RevokeTokenHandler(
+        $this->handler = $this->createRevokeTokenHandlerFixture();
+    }
+
+    private function createRevokeTokenHandlerFixture(): RevokeTokenHandler
+    {
+        $fixture = new RevokeTokenHandler(
             $this->accessTokenRepository,
             $this->refreshTokenRepository,
             $this->entityManager,
             $this->eventDispatcher,
         );
+        return $fixture;
     }
 
     // --- Chain revocation tests ---
 
     public function testChainRevocationViaRefreshToken(): void
     {
+        $this->accessTokenRepository = $this->createMock(AccessTokenRepositoryInterface::class);
+        $this->refreshTokenRepository = $this->createMock(RefreshTokenRepositoryInterface::class);
+        $this->handler = $this->createRevokeTokenHandlerFixture();
+
         $chainId = ChainId::generate();
         $tokenId = $this->generateValidTokenIdString();
 
@@ -62,6 +72,7 @@ final class RevokeTokenHandlerTest extends TestCase
         $refreshToken = RefreshToken::issue($accessToken, $chainId);
 
         $this->refreshTokenRepository
+            ->expects($this->once())
             ->method('findByTokenId')
             ->with($this->callback(fn (TokenId $id): bool => $id->toString() === $tokenId))
             ->willReturn($refreshToken);
@@ -85,6 +96,10 @@ final class RevokeTokenHandlerTest extends TestCase
 
     public function testChainRevocationViaAccessToken(): void
     {
+        $this->accessTokenRepository = $this->createMock(AccessTokenRepositoryInterface::class);
+        $this->refreshTokenRepository = $this->createMock(RefreshTokenRepositoryInterface::class);
+        $this->handler = $this->createRevokeTokenHandlerFixture();
+
         $chainId = ChainId::generate();
         $tokenId = $this->generateValidTokenIdString();
 
@@ -95,6 +110,7 @@ final class RevokeTokenHandlerTest extends TestCase
             ->willReturn(null);
 
         $this->accessTokenRepository
+            ->expects($this->once())
             ->method('findByTokenId')
             ->with($this->callback(fn (TokenId $id): bool => $id->toString() === $tokenId))
             ->willReturn($accessToken);
@@ -118,6 +134,10 @@ final class RevokeTokenHandlerTest extends TestCase
 
     public function testChainRevocationReturnsSilentlyWhenNoTokensFound(): void
     {
+        $this->accessTokenRepository = $this->createMock(AccessTokenRepositoryInterface::class);
+        $this->refreshTokenRepository = $this->createMock(RefreshTokenRepositoryInterface::class);
+        $this->handler = $this->createRevokeTokenHandlerFixture();
+
         $tokenId = $this->generateValidTokenIdString();
 
         $this->refreshTokenRepository
@@ -145,6 +165,10 @@ final class RevokeTokenHandlerTest extends TestCase
 
     public function testChainRevocationDoesNothingWhenAccessTokenHasNoChainId(): void
     {
+        $this->accessTokenRepository = $this->createMock(AccessTokenRepositoryInterface::class);
+        $this->refreshTokenRepository = $this->createMock(RefreshTokenRepositoryInterface::class);
+        $this->handler = $this->createRevokeTokenHandlerFixture();
+
         $tokenId = $this->generateValidTokenIdString();
 
         $accessToken = $this->createAccessToken(null);
@@ -176,12 +200,17 @@ final class RevokeTokenHandlerTest extends TestCase
 
     public function testSingleRefreshTokenRevocation(): void
     {
+        $this->accessTokenRepository = $this->createMock(AccessTokenRepositoryInterface::class);
+        $this->refreshTokenRepository = $this->createMock(RefreshTokenRepositoryInterface::class);
+        $this->handler = $this->createRevokeTokenHandlerFixture();
+
         $tokenId = $this->generateValidTokenIdString();
 
         $accessToken = $this->createAccessToken(null);
         $refreshToken = RefreshToken::issue($accessToken);
 
         $this->refreshTokenRepository
+            ->expects($this->once())
             ->method('findByTokenId')
             ->with($this->callback(fn (TokenId $id): bool => $id->toString() === $tokenId))
             ->willReturn($refreshToken);
@@ -206,6 +235,9 @@ final class RevokeTokenHandlerTest extends TestCase
 
     public function testSingleAccessTokenRevocation(): void
     {
+        $this->accessTokenRepository = $this->createMock(AccessTokenRepositoryInterface::class);
+        $this->handler = $this->createRevokeTokenHandlerFixture();
+
         $tokenId = $this->generateValidTokenIdString();
 
         $accessToken = $this->createAccessToken(null);
@@ -215,6 +247,7 @@ final class RevokeTokenHandlerTest extends TestCase
             ->willReturn(null);
 
         $this->accessTokenRepository
+            ->expects($this->once())
             ->method('findByTokenId')
             ->with($this->callback(fn (TokenId $id): bool => $id->toString() === $tokenId))
             ->willReturn($accessToken);
@@ -235,6 +268,10 @@ final class RevokeTokenHandlerTest extends TestCase
 
     public function testRfc7009SilentReturnWhenTokenNotFound(): void
     {
+        $this->accessTokenRepository = $this->createMock(AccessTokenRepositoryInterface::class);
+        $this->refreshTokenRepository = $this->createMock(RefreshTokenRepositoryInterface::class);
+        $this->handler = $this->createRevokeTokenHandlerFixture();
+
         $tokenId = $this->generateValidTokenIdString();
 
         $this->refreshTokenRepository
@@ -277,6 +314,7 @@ final class RevokeTokenHandlerTest extends TestCase
 
         $transactionalCalled = false;
         $this->connection
+            ->expects($this->once())
             ->method('transactional')
             ->willReturnCallback(function (callable $callback) use (&$transactionalCalled): void {
                 $transactionalCalled = true;
@@ -301,6 +339,7 @@ final class RevokeTokenHandlerTest extends TestCase
 
         $transactionalCalled = false;
         $this->connection
+            ->expects($this->once())
             ->method('transactional')
             ->willReturnCallback(function (callable $callback) use (&$transactionalCalled): void {
                 $transactionalCalled = true;
@@ -328,6 +367,7 @@ final class RevokeTokenHandlerTest extends TestCase
 
         $transactionalCalled = false;
         $this->connection
+            ->expects($this->once())
             ->method('transactional')
             ->willReturnCallback(function (callable $callback) use (&$transactionalCalled): void {
                 $transactionalCalled = true;
@@ -343,6 +383,11 @@ final class RevokeTokenHandlerTest extends TestCase
 
     public function testRevokeChainDefaultsToFalse(): void
     {
+        $this->connection->expects($this->never())->method('transactional');
+
+        $this->accessTokenRepository = $this->createMock(AccessTokenRepositoryInterface::class);
+        $this->handler = $this->createRevokeTokenHandlerFixture();
+
         $tokenId = $this->generateValidTokenIdString();
 
         $this->refreshTokenRepository

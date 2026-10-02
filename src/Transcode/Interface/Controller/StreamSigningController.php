@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Transcode\Interface\Controller;
 
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Domain\Model\Uuid;
+use App\Transcode\Application\Port\PlaybackPortInterface;
 use App\Transcode\Application\Port\StreamAuthPortInterface;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -21,6 +23,7 @@ final class StreamSigningController
 
     public function __construct(
         private readonly StreamAuthPortInterface $streamAuth,
+        private readonly PlaybackPortInterface $playback,
     ) {
     }
 
@@ -31,7 +34,7 @@ final class StreamSigningController
             required: true,
             content: new OA\JsonContent(
                 properties: [
-                    new OA\Property(property: 'path', type: 'string', example: '/api/stream/abc123/seg_0.m4s'),
+                    new OA\Property(property: 'path', type: 'string', example: '/api/transcode/00000000-0000-4000-8000-000000000001/master.m3u8'),
                     new OA\Property(property: 'expiresInSeconds', type: 'int', example: 86400),
                 ],
             ),
@@ -44,14 +47,23 @@ final class StreamSigningController
     #[Route('/sign', name: 'sign', methods: ['POST'])]
     public function sign(Request $request): JsonResponse
     {
-        $data = json_decode($request->getContent(), true, 512, JSON_THROW_ON_ERROR);
-        $path = $data['path'] ?? '';
-
-        if ($path === '') {
-            return new JsonResponse(['error' => 'path is required'], 400);
+        try {
+            $data = $request->toArray();
+        } catch (\Symfony\Component\HttpFoundation\Exception\JsonException) {
+            return $this->errorResponse('Expected a JSON object.', 400);
         }
-
-        $expiresInSeconds = (int) ($data['expiresInSeconds'] ?? 86400);
+        $path = $data['path'] ?? null;
+        $expiresInSeconds = array_key_exists('expiresInSeconds', $data) ? $data['expiresInSeconds'] : 86400;
+        if (!is_string($path) || !preg_match('~^/api/transcode/([0-9a-fA-F-]{36})/(?:master\.m3u8|manifest\.mpd)$~D', $path, $matches)
+            || !is_int($expiresInSeconds) || $expiresInSeconds < 1 || $expiresInSeconds > 86400) {
+            return $this->errorResponse('Expected a video manifest path and a lifetime from 1 to 86400 seconds.', 400);
+        }
+        try {
+            $videoId = Uuid::fromString($matches[1]);
+        } catch (\InvalidArgumentException) {
+            return $this->errorResponse('Invalid video identifier.', 400);
+        }
+        $this->playback->start($videoId);
 
         $result = $this->streamAuth->signUrl($path, $expiresInSeconds);
 

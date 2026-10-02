@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Auth\Infrastructure\Security\OAuth;
 
+use App\Auth\Infrastructure\Security\SecurityUser;
 use Lcobucci\JWT\Encoding\JoseEncoder;
 use Lcobucci\JWT\Token\Parser;
+use Lcobucci\JWT\UnencryptedToken;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\Request;
@@ -45,10 +47,17 @@ final class DpopBindingListener
 
         $request = $event->getRequest();
 
-        // Stream endpoints are intentionally DPoP-free. They rely on URL
-        // signatures and/or session cookies for authorization, and native
-        // media players cannot attach DPoP proof headers to segment requests.
-        if (str_starts_with($request->getPathInfo(), '/api/transcode/')) {
+        // These delivery actions independently require a valid URL signature.
+        // Session controls and playback initiation must still validate DPoP.
+        if ($request->isMethod('GET') && in_array($request->attributes->get('_route'), [
+            'stream_master_manifest',
+            'stream_media_manifest',
+            'stream_dash_manifest',
+            'stream_subtitle_manifest',
+            'stream_segment_init_segment',
+            'stream_segment_segment',
+            'stream_segment_subtitle_segment',
+        ], true)) {
             return;
         }
 
@@ -103,6 +112,9 @@ final class DpopBindingListener
             return null;
         }
 
+        if (!$token instanceof UnencryptedToken) {
+            return null;
+        }
         $cnf = $token->claims()->get('cnf');
         if (!is_array($cnf)) {
             return null;

@@ -28,33 +28,43 @@ use RuntimeException;
 
 final class RefreshTokenHandlerTest extends TestCase
 {
-    private AccessTokenRepositoryInterface&MockObject $accessTokenRepository;
-    private RefreshTokenRepositoryInterface&MockObject $refreshTokenRepository;
+    private AccessTokenRepositoryInterface $accessTokenRepository;
+    private RefreshTokenRepositoryInterface $refreshTokenRepository;
+    /** @var list<AccessToken> */
+    private array $savedAccessTokens = [];
+    /** @var list<RefreshToken> */
+    private array $savedRefreshTokens = [];
     private TokenChainValidator $chainValidator;
-    private EntityManagerInterface&MockObject $entityManager;
-    private JwtGeneratorInterface&MockObject $jwtGenerator;
+    private EntityManagerInterface $entityManager;
+    private JwtGeneratorInterface $jwtGenerator;
     private RefreshTokenHandler $handler;
 
     protected function setUp(): void
     {
-        $this->accessTokenRepository = $this->createMock(AccessTokenRepositoryInterface::class);
-        $this->refreshTokenRepository = $this->createMock(RefreshTokenRepositoryInterface::class);
+        $this->accessTokenRepository = $this->createStub(AccessTokenRepositoryInterface::class);
+        $this->refreshTokenRepository = $this->createStub(RefreshTokenRepositoryInterface::class);
+        $this->accessTokenRepository->method('save')->willReturnCallback(function (AccessToken $token): void {
+            $this->savedAccessTokens[] = $token;
+        });
+        $this->refreshTokenRepository->method('save')->willReturnCallback(function (RefreshToken $token): void {
+            $this->savedRefreshTokens[] = $token;
+        });
 
         // TokenChainValidator is final and cannot be mocked. Use a real instance
         // with dedicated repository mocks for its dependency chain.
-        $chainValidatorAccessTokenRepo = $this->createMock(AccessTokenRepositoryInterface::class);
-        $chainValidatorRefreshTokenRepo = $this->createMock(RefreshTokenRepositoryInterface::class);
+        $chainValidatorAccessTokenRepo = $this->createStub(AccessTokenRepositoryInterface::class);
+        $chainValidatorRefreshTokenRepo = $this->createStub(RefreshTokenRepositoryInterface::class);
         $this->chainValidator = new TokenChainValidator(
             $chainValidatorAccessTokenRepo,
             $chainValidatorRefreshTokenRepo,
         );
 
-        $connection = $this->createMock(Connection::class);
+        $connection = $this->createStub(Connection::class);
         $connection->method('transactional')->willReturnCallback(static fn (callable $callback) => $callback());
-        $this->entityManager = $this->createMock(EntityManagerInterface::class);
+        $this->entityManager = $this->createStub(EntityManagerInterface::class);
         $this->entityManager->method('getConnection')->willReturn($connection);
 
-        $this->jwtGenerator = $this->createMock(JwtGeneratorInterface::class);
+        $this->jwtGenerator = $this->createStub(JwtGeneratorInterface::class);
         $this->jwtGenerator->method('generate')->willReturn('mock-jwt-token');
 
         $this->refreshTokenRepository
@@ -107,11 +117,6 @@ final class RefreshTokenHandlerTest extends TestCase
 
         $this->refreshTokenRepository->method('findByTokenId')->willReturn($oldRefreshToken);
 
-        // Expect saves: old refresh token (markUsed), old access token (revoke),
-        // new access token, new refresh token
-        $this->refreshTokenRepository->expects($this->exactly(2))->method('save');
-        $this->accessTokenRepository->expects($this->exactly(2))->method('save');
-
         $command = new RefreshTokenCommand(
             refreshTokenId: $oldRefreshToken->getTokenId()->toString(),
         );
@@ -123,6 +128,12 @@ final class RefreshTokenHandlerTest extends TestCase
         $this->assertEquals(3600, $result->getExpiresIn());
         $this->assertContains('profile', $result->getScopes());
         $this->assertContains('library', $result->getScopes());
+        self::assertCount(2, $this->savedRefreshTokens);
+        self::assertCount(2, $this->savedAccessTokens);
+        self::assertSame($oldRefreshToken, $this->savedRefreshTokens[0]);
+        self::assertSame($oldAccessToken, $this->savedAccessTokens[0]);
+        self::assertNotSame($oldRefreshToken, $this->savedRefreshTokens[1]);
+        self::assertNotSame($oldAccessToken, $this->savedAccessTokens[1]);
     }
 
     public function testOldAccessTokenIsRevoked(): void
@@ -382,7 +393,7 @@ final class RefreshTokenHandlerTest extends TestCase
         $this->refreshTokenRepository->method('findByTokenId')->willReturn($oldRefreshToken);
 
         // Mock repository to return null (entity not found) -- handler silently skips
-        $tokenRepo = $this->createMock(\Doctrine\ORM\EntityRepository::class);
+        $tokenRepo = $this->createStub(\Doctrine\ORM\EntityRepository::class);
         $tokenRepo->method('findOneBy')->willReturn(null);
         $this->entityManager->method('getRepository')->willReturn($tokenRepo);
 
@@ -507,14 +518,14 @@ final class RefreshTokenHandlerTest extends TestCase
         $accessTokenRepo->expects($this->never())->method('save');
 
         // Make the connection throw on transactional to simulate a DB failure
-        $connection = $this->createMock(Connection::class);
+        $connection = $this->createStub(Connection::class);
         $connection->method('transactional')->willThrowException(
             new RuntimeException('Database error'),
         );
-        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager = $this->createStub(EntityManagerInterface::class);
         $entityManager->method('getConnection')->willReturn($connection);
 
-        $jwtGenerator = $this->createMock(JwtGeneratorInterface::class);
+        $jwtGenerator = $this->createStub(JwtGeneratorInterface::class);
         $jwtGenerator->method('generate')->willReturn('mock-jwt-token');
 
         $handler = new RefreshTokenHandler(

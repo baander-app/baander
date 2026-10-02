@@ -30,31 +30,32 @@ use App\Auth\Domain\Service\TokenChainValidator;
 use App\Shared\Domain\Model\Email;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 final class IssueTokenHandlerTest extends TestCase
 {
-    private AccessTokenRepositoryInterface&MockObject $accessTokenRepository;
-    private RefreshTokenRepositoryInterface&MockObject $refreshTokenRepository;
-    private AuthCodeRepositoryInterface&MockObject $authCodeRepository;
-    private DeviceCodeRepositoryInterface&MockObject $deviceCodeRepository;
-    private ClientRepositoryInterface&MockObject $clientRepository;
-    private UserRepositoryInterface&MockObject $userRepository;
+    private AccessTokenRepositoryInterface $accessTokenRepository;
+    private RefreshTokenRepositoryInterface $refreshTokenRepository;
+    private AuthCodeRepositoryInterface $authCodeRepository;
+    private DeviceCodeRepositoryInterface $deviceCodeRepository;
+    private ClientRepositoryInterface $clientRepository;
+    private UserRepositoryInterface $userRepository;
     private ScopeAllowlist $scopeAllowlist;
-    private EntityManagerInterface&MockObject $entityManager;
-    private TokenMetadataRepositoryInterface&MockObject $tokenMetadataRepository;
+    private EntityManagerInterface $entityManager;
+    private TokenMetadataRepositoryInterface $tokenMetadataRepository;
+    /** @var list<\App\Auth\Domain\Model\OAuth\TokenMetadata> */
+    private array $savedMetadata = [];
     private IssueTokenHandler $handler;
 
     protected function setUp(): void
     {
-        $this->accessTokenRepository = $this->createMock(AccessTokenRepositoryInterface::class);
-        $this->refreshTokenRepository = $this->createMock(RefreshTokenRepositoryInterface::class);
-        $this->authCodeRepository = $this->createMock(AuthCodeRepositoryInterface::class);
-        $this->deviceCodeRepository = $this->createMock(DeviceCodeRepositoryInterface::class);
-        $this->clientRepository = $this->createMock(ClientRepositoryInterface::class);
-        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->accessTokenRepository = $this->createStub(AccessTokenRepositoryInterface::class);
+        $this->refreshTokenRepository = $this->createStub(RefreshTokenRepositoryInterface::class);
+        $this->authCodeRepository = $this->createStub(AuthCodeRepositoryInterface::class);
+        $this->deviceCodeRepository = $this->createStub(DeviceCodeRepositoryInterface::class);
+        $this->clientRepository = $this->createStub(ClientRepositoryInterface::class);
+        $this->userRepository = $this->createStub(UserRepositoryInterface::class);
         $this->scopeAllowlist = new ScopeAllowlist(
             userGrants: ['profile', 'email', 'library', 'playlist'],
             clientCredentials: ['admin'],
@@ -62,22 +63,25 @@ final class IssueTokenHandlerTest extends TestCase
 
         // TokenChainValidator is final and cannot be mocked. Use a real instance
         // with dedicated repository mocks for its dependency chain.
-        $chainValidatorAccessTokenRepo = $this->createMock(AccessTokenRepositoryInterface::class);
-        $chainValidatorRefreshTokenRepo = $this->createMock(RefreshTokenRepositoryInterface::class);
+        $chainValidatorAccessTokenRepo = $this->createStub(AccessTokenRepositoryInterface::class);
+        $chainValidatorRefreshTokenRepo = $this->createStub(RefreshTokenRepositoryInterface::class);
         $chainValidator = new TokenChainValidator(
             $chainValidatorAccessTokenRepo,
             $chainValidatorRefreshTokenRepo,
         );
 
-        $connection = $this->createMock(Connection::class);
+        $connection = $this->createStub(Connection::class);
         $connection->method('transactional')->willReturnCallback(static fn(callable $callback) => $callback());
-        $this->entityManager = $this->createMock(EntityManagerInterface::class);
+        $this->entityManager = $this->createStub(EntityManagerInterface::class);
         $this->entityManager->method('getConnection')->willReturn($connection);
 
-        $jwtGenerator = $this->createMock(JwtGeneratorInterface::class);
+        $jwtGenerator = $this->createStub(JwtGeneratorInterface::class);
         $jwtGenerator->method('generate')->willReturn('eyJhbGciOiJSUzI1NiJ9.eyJqdGkiOiJ0ZXN0In0.signature');
 
-        $this->tokenMetadataRepository = $this->createMock(TokenMetadataRepositoryInterface::class);
+        $this->tokenMetadataRepository = $this->createStub(TokenMetadataRepositoryInterface::class);
+        $this->tokenMetadataRepository->method('save')->willReturnCallback(function (\App\Auth\Domain\Model\OAuth\TokenMetadata $metadata): void {
+            $this->savedMetadata[] = $metadata;
+        });
 
         $this->handler = new IssueTokenHandler(
             $this->accessTokenRepository,
@@ -819,15 +823,6 @@ final class IssueTokenHandlerTest extends TestCase
         $this->clientRepository->method('findClientByUuid')->willReturn($client);
         $this->authCodeRepository->method('findByCodeId')->willReturn($authCode);
 
-        $this->tokenMetadataRepository
-            ->expects($this->once())
-            ->method('save')
-            ->with($this->callback(static fn ($metadata) =>
-                $metadata->getUserAgent() === 'PHPUnit/10'
-                    && $metadata->getIpAddress() === '127.0.0.1'
-                    && $metadata->getClientFingerprint() === 'fp-123'
-            ));
-
         $command = new IssueTokenCommand(
             grantType: 'authorization_code',
             clientId: $client->getId(),
@@ -839,6 +834,10 @@ final class IssueTokenHandlerTest extends TestCase
         );
 
         ($this->handler)($command);
+        self::assertCount(1, $this->savedMetadata);
+        self::assertSame('PHPUnit/10', $this->savedMetadata[0]->getUserAgent());
+        self::assertSame('127.0.0.1', $this->savedMetadata[0]->getIpAddress());
+        self::assertSame('fp-123', $this->savedMetadata[0]->getClientFingerprint());
     }
 
     // --- Helpers ---

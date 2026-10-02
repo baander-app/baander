@@ -15,32 +15,37 @@ use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use RuntimeException;
 
 final class ApproveDeviceCodeHandlerTest extends TestCase
 {
-    private DeviceCodeRepositoryInterface&MockObject $deviceCodeRepo;
-    private UserRepositoryInterface&MockObject $userRepo;
-    private EntityManagerInterface&MockObject $entityManager;
-    private EventDispatcherInterface&MockObject $eventDispatcher;
+    private DeviceCodeRepositoryInterface $deviceCodeRepo;
+    private UserRepositoryInterface $userRepo;
+    private EntityManagerInterface $entityManager;
+    private EventDispatcherInterface $eventDispatcher;
     private ApproveDeviceCodeHandler $handler;
 
     protected function setUp(): void
     {
-        $this->deviceCodeRepo = $this->createMock(DeviceCodeRepositoryInterface::class);
-        $this->userRepo = $this->createMock(UserRepositoryInterface::class);
+        $this->deviceCodeRepo = $this->createStub(DeviceCodeRepositoryInterface::class);
+        $this->userRepo = $this->createStub(UserRepositoryInterface::class);
 
-        $connection = $this->createMock(Connection::class);
+        $connection = $this->createStub(Connection::class);
         $connection->method('transactional')->willReturnCallback(static fn (callable $callback) => $callback());
-        $this->entityManager = $this->createMock(EntityManagerInterface::class);
+        $this->entityManager = $this->createStub(EntityManagerInterface::class);
         $this->entityManager->method('getConnection')->willReturn($connection);
 
-        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        $this->eventDispatcher = $this->createStub(EventDispatcherInterface::class);
 
-        $this->handler = new ApproveDeviceCodeHandler($this->deviceCodeRepo, $this->userRepo, $this->entityManager, $this->eventDispatcher);
+        $this->handler = $this->createApproveDeviceCodeHandlerFixture();
+    }
+
+    private function createApproveDeviceCodeHandlerFixture(): ApproveDeviceCodeHandler
+    {
+        $fixture = new ApproveDeviceCodeHandler($this->deviceCodeRepo, $this->userRepo, $this->entityManager, $this->eventDispatcher);
+        return $fixture;
     }
 
     private function createDeviceCode(): DeviceCode
@@ -55,10 +60,13 @@ final class ApproveDeviceCodeHandlerTest extends TestCase
 
     public function testApprovesDeviceCode(): void
     {
+        $this->deviceCodeRepo = $this->createMock(DeviceCodeRepositoryInterface::class);
+        $this->handler = $this->createApproveDeviceCodeHandlerFixture();
+
         $deviceCode = $this->createDeviceCode();
         $user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
 
-        $this->deviceCodeRepo->method('findByUserCode')->with('ABCD')->willReturn($deviceCode);
+        $this->deviceCodeRepo->expects($this->once())->method('findByUserCode')->with('ABCD')->willReturn($deviceCode);
         $this->userRepo->method('findByUuid')->willReturn($user);
         $this->deviceCodeRepo->expects($this->once())->method('save');
 

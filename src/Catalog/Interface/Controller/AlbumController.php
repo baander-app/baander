@@ -32,6 +32,7 @@ use Throwable;
 
 #[OA\Tag(name: 'Catalog', description: 'Album, artist, song, movie, and genre management endpoints')]
 #[Route('/api/albums', name: 'album_')]
+#[\Symfony\Component\Security\Http\Attribute\IsGranted('ROLE_ADMIN', methods: ['POST', 'PUT', 'PATCH', 'DELETE'])]
 final class AlbumController
 {
     use ApiResponsesTrait;

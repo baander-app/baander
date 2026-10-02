@@ -218,46 +218,52 @@ final class IssueTokenHandler
             $this->chainValidator->validateWithLoadedPrevious($refreshToken);
         }
 
-        // Mark the old refresh token as used
-        $refreshToken->markUsed();
+        try {
+            return $this->entityManager->getConnection()->transactional(function () use ($refreshTokenId, $client, $command): TokenResponseDTO {
+                $refreshToken = $this->refreshTokenRepository->consumeByTokenId($refreshTokenId);
+                if ($refreshToken === null) {
+                    throw new RuntimeException('Refresh token reuse detected.');
+                }
 
-        // Issue new token pair in the same chain
-        $chainId = $refreshToken->getChainId();
-        $user = $refreshToken->getAccessToken()->getUser();
-        $scopes = $this->resolveScopes($command->getScopes(), $refreshToken->getAccessToken()->getScopes(), $client, 'refresh_token');
+                // Issue new token pair in the same chain
+                $chainId = $refreshToken->getChainId();
+                $user = $refreshToken->getAccessToken()->getUser();
+                $scopes = $this->resolveScopes($command->getScopes(), $refreshToken->getAccessToken()->getScopes(), $client, 'refresh_token');
 
-        $newAccessToken = AccessToken::issue(
-            $client,
-            $user,
-            $scopes,
-            $command->getTokenName(),
-            $this->accessTokenTtl,
-            $chainId,
-        );
+                $newAccessToken = AccessToken::issue(
+                    $client,
+                    $user,
+                    $scopes,
+                    $command->getTokenName(),
+                    $this->accessTokenTtl,
+                    $chainId,
+                );
 
-        $newRefreshToken = RefreshToken::issue(
-            $newAccessToken,
-            $chainId,
-            $this->refreshTokenTtl,
-            $refreshToken, // Chain link to previous
-        );
+                $newRefreshToken = RefreshToken::issue(
+                    $newAccessToken,
+                    $chainId,
+                    $this->refreshTokenTtl,
+                    $refreshToken, // Chain link to previous
+                );
 
-        // Perform all write operations atomically
-        $this->entityManager->getConnection()->transactional(function () use ($refreshToken, $newAccessToken, $newRefreshToken): void {
-            $this->refreshTokenRepository->save($refreshToken, false);
-            $this->accessTokenRepository->save($newAccessToken, false);
-            $this->refreshTokenRepository->save($newRefreshToken, false);
-            $this->entityManager->flush();
-        });
+                $this->refreshTokenRepository->save($refreshToken, false);
+                $this->accessTokenRepository->save($newAccessToken, false);
+                $this->refreshTokenRepository->save($newRefreshToken, false);
+                $this->entityManager->flush();
 
-        $this->storeTokenMetadata($newAccessToken, $command);
+                $this->storeTokenMetadata($newAccessToken, $command);
 
-        return new TokenResponseDTO(
-            accessToken: $this->jwtGenerator->generate($newAccessToken, $command->getDpopJkt()),
-            expiresIn: $this->accessTokenTtl->s,
-            refreshToken: $newRefreshToken->getTokenId()->toString(),
-            scopes: $newAccessToken->getScopeIdentifiers(),
-        );
+                return new TokenResponseDTO(
+                    accessToken: $this->jwtGenerator->generate($newAccessToken, $command->getDpopJkt()),
+                    expiresIn: $this->accessTokenTtl->s,
+                    refreshToken: $newRefreshToken->getTokenId()->toString(),
+                    scopes: $newAccessToken->getScopeIdentifiers(),
+                );
+            });
+        } catch (\Throwable $exception) {
+            $this->entityManager->clear();
+            throw $exception;
+        }
     }
 
     /**

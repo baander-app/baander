@@ -26,39 +26,31 @@ final class DpopAwareBearerTokenValidator extends BearerTokenValidator
 
     public function validateAuthorization(ServerRequestInterface $request): ServerRequestInterface
     {
-        $validatedRequest = parent::validateAuthorization($request);
-
-        $authorization = $validatedRequest->getAttribute('Authorization', '');
-        if (!is_string($authorization)) {
-            $authorization = '';
-        }
-
-        // Extract JWT claims by parsing the token from the Authorization header
+        $authorization = $request->getHeaderLine('Authorization');
         $jwt = trim((string) preg_replace('/^\s*Bearer\s/i', '', $authorization));
-        if ($jwt === '') {
-            return $validatedRequest;
-        }
-
-        // Read the aud and client_id claims via reflection on the parent's
-        // validated request attributes — parent already sets oauth_client_id
-        // from aud[0], we need to override it from the client_id claim.
-        //
-        // Instead of re-parsing the JWT, we use a simple approach: the parent
-        // sets oauth_client_id from aud[0]. We need to get the actual client_id
-        // from the JWT. Since the parent already validates the token, we can
-        // safely decode it here to read the client_id claim.
         $claims = $this->parseJwtClaims($jwt);
 
-        if (isset($claims['client_id'])) {
-            $validatedRequest = $validatedRequest
-                ->withAttribute('oauth_client_id', $claims['client_id']);
-        }
-
-        // Validate aud claim against resource server identifier
-        if ($this->resourceServerUri !== null && isset($claims['aud'])) {
-            if ($claims['aud'] !== $this->resourceServerUri) {
+        // Reject malformed/missing audiences before the parent indexes aud[0].
+        // These unverified claims are used only to reject: acceptance still
+        // requires the parent's signature, expiry, and revocation validation.
+        if ($this->resourceServerUri !== null) {
+            $audience = $claims['aud'] ?? null;
+            $audiences = is_string($audience) ? [$audience] : $audience;
+            if (!is_array($audiences) || !array_is_list($audiences)
+                || array_filter($audiences, static fn (mixed $value): bool => !is_string($value)) !== []
+                || !in_array($this->resourceServerUri, $audiences, true)) {
                 throw OAuthServerException::accessDenied('Access token audience does not match resource server identifier');
             }
+        }
+
+        $validatedRequest = parent::validateAuthorization($request);
+
+        if (isset($claims['client_id'])) {
+            if (!is_string($claims['client_id']) || $claims['client_id'] === '') {
+                throw OAuthServerException::accessDenied('Access token client identifier is invalid');
+            }
+            $validatedRequest = $validatedRequest
+                ->withAttribute('oauth_client_id', $claims['client_id']);
         }
 
         return $validatedRequest;

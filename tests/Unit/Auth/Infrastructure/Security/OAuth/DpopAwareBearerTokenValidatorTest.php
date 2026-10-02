@@ -8,76 +8,70 @@ use App\Auth\Infrastructure\Security\OAuth\DpopAwareBearerTokenValidator;
 use League\OAuth2\Server\Exception\OAuthServerException;
 use League\OAuth2\Server\Repositories\AccessTokenRepositoryInterface;
 use Nyholm\Psr7\ServerRequest;
-use PHPUnit\Framework\MockObject\MockObject;
+use League\OAuth2\Server\CryptKey;
 use PHPUnit\Framework\TestCase;
 
 final class DpopAwareBearerTokenValidatorTest extends TestCase
 {
-    private AccessTokenRepositoryInterface&MockObject $accessTokenRepository;
+    private AccessTokenRepositoryInterface $accessTokenRepository;
 
     protected function setUp(): void
     {
-        $this->accessTokenRepository = $this->createMock(AccessTokenRepositoryInterface::class);
+        $this->accessTokenRepository = $this->createStub(AccessTokenRepositoryInterface::class);
         $this->accessTokenRepository->method('isAccessTokenRevoked')->willReturn(false);
     }
 
     public function testValidatorRejectsTokenWithMismatchedAudience(): void
     {
+        [$request, $publicKey] = $this->signedRequest('https://wrong-resource-server.com');
+        $matching = new DpopAwareBearerTokenValidator($this->accessTokenRepository, null, 'https://wrong-resource-server.com');
+        $matching->setPublicKey($publicKey);
+        self::assertSame('user-uuid', $matching->validateAuthorization($request)->getAttribute('oauth_user_id'));
+
+        $validator = new DpopAwareBearerTokenValidator($this->accessTokenRepository, null, 'https://baander.example.com');
+        $validator->setPublicKey($publicKey);
         $this->expectException(OAuthServerException::class);
-
-        $validator = new DpopAwareBearerTokenValidator(
-            $this->accessTokenRepository,
-            null,
-            'https://baander.example.com',
-        );
-
-        // Create a JWT with aud set to a different value
-        // We need a real signed JWT for the parent to validate, so we use a
-        // mock approach — this test verifies the aud validation logic.
-        $payload = base64_encode(json_encode([
-            'jti' => 'test-token-id',
-            'sub' => 'user-uuid',
-            'aud' => 'https://wrong-resource-server.com',
-            'client_id' => 'client-uuid',
-            'scopes' => ['profile'],
-            'iat' => time(),
-            'nbf' => time(),
-            'exp' => time() + 3600,
-        ]));
-
-        // This will fail at the parent's signature validation before reaching
-        // our aud check, so we test the logic differently
-        $this->markTestSkipped('Requires a signed JWT to test end-to-end');
+        $validator->validateAuthorization($request);
     }
 
     public function testValidatorParsesClientIdFromJwt(): void
     {
-        $validator = new DpopAwareBearerTokenValidator(
-            $this->accessTokenRepository,
-            null,
-            'https://baander.example.com',
-        );
-
-        // Test that the parseJwtClaims method works correctly
-        // We can't easily test the full flow without a signed JWT,
-        // so we test the JWT parsing logic indirectly
-        $this->assertInstanceOf(
-            DpopAwareBearerTokenValidator::class,
-            $validator,
-        );
+        [$request, $publicKey] = $this->signedRequest('https://baander.example.com');
+        $validator = new DpopAwareBearerTokenValidator($this->accessTokenRepository, null, 'https://baander.example.com');
+        $validator->setPublicKey($publicKey);
+        $validated = $validator->validateAuthorization($request);
+        self::assertSame('client-uuid', $validated->getAttribute('oauth_client_id'));
+        self::assertSame('user-uuid', $validated->getAttribute('oauth_user_id'));
     }
 
     public function testValidatorWorksWithoutResourceServerUri(): void
     {
-        $validator = new DpopAwareBearerTokenValidator(
-            $this->accessTokenRepository,
-        );
+        [$request, $publicKey] = $this->signedRequest('https://baander.example.com');
+        $validator = new DpopAwareBearerTokenValidator($this->accessTokenRepository);
+        $validator->setPublicKey($publicKey);
+        self::assertSame('client-uuid', $validator->validateAuthorization($request)->getAttribute('oauth_client_id'));
+    }
 
-        // No resource server URI means aud validation is skipped
-        $this->assertInstanceOf(
-            DpopAwareBearerTokenValidator::class,
-            $validator,
-        );
+    /** @return array{ServerRequest, CryptKey} */
+    private function signedRequest(string $audience): array
+    {
+        $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+        self::assertNotFalse($key);
+        $details = openssl_pkey_get_details($key);
+        self::assertNotFalse($details);
+        $encode = static fn (string $value): string => rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
+        $claims = [
+            'jti' => 'test-token-id', 'sub' => 'user-uuid', 'aud' => $audience,
+            'client_id' => 'client-uuid', 'scopes' => ['profile'],
+            'iat' => time(), 'nbf' => time() - 1, 'exp' => time() + 60,
+        ];
+        $body = $encode(json_encode(['alg' => 'RS256', 'typ' => 'JWT'], JSON_THROW_ON_ERROR)) . '.'
+            . $encode(json_encode($claims, JSON_THROW_ON_ERROR));
+        self::assertTrue(openssl_sign($body, $signature, $key, OPENSSL_ALGO_SHA256));
+        return [
+            new ServerRequest('GET', 'https://baander.example.com/api/test', ['Authorization' => 'Bearer ' . $body . '.' . $encode($signature)]),
+            new CryptKey($details['key'], null, false),
+        ];
     }
 
     public function testParseJwtClaimsExtractsClientIdAndAud(): void

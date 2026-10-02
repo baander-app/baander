@@ -22,7 +22,7 @@ use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
-use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -37,30 +37,30 @@ use RuntimeException;
  */
 final class RefreshTokenHandlerConcurrencyTest extends TestCase
 {
-    private AccessTokenRepositoryInterface&MockObject $accessTokenRepository;
-    private RefreshTokenRepositoryInterface&MockObject $refreshTokenRepository;
-    private EntityManagerInterface&MockObject $entityManager;
+    private AccessTokenRepositoryInterface&Stub $accessTokenRepository;
+    private RefreshTokenRepositoryInterface&Stub $refreshTokenRepository;
+    private EntityManagerInterface&Stub $entityManager;
     private RefreshTokenHandler $handler;
     private int $consumeCallCount = 0;
 
     protected function setUp(): void
     {
-        $this->accessTokenRepository = $this->createMock(AccessTokenRepositoryInterface::class);
-        $this->refreshTokenRepository = $this->createMock(RefreshTokenRepositoryInterface::class);
+        $this->accessTokenRepository = $this->createStub(AccessTokenRepositoryInterface::class);
+        $this->refreshTokenRepository = $this->createStub(RefreshTokenRepositoryInterface::class);
 
-        $chainValidatorAccessTokenRepo = $this->createMock(AccessTokenRepositoryInterface::class);
-        $chainValidatorRefreshTokenRepo = $this->createMock(RefreshTokenRepositoryInterface::class);
+        $chainValidatorAccessTokenRepo = $this->createStub(AccessTokenRepositoryInterface::class);
+        $chainValidatorRefreshTokenRepo = $this->createStub(RefreshTokenRepositoryInterface::class);
         $chainValidator = new TokenChainValidator(
             $chainValidatorAccessTokenRepo,
             $chainValidatorRefreshTokenRepo,
         );
 
-        $connection = $this->createMock(Connection::class);
+        $connection = $this->createStub(Connection::class);
         $connection->method('transactional')->willReturnCallback(static fn(callable $callback) => $callback());
-        $this->entityManager = $this->createMock(EntityManagerInterface::class);
+        $this->entityManager = $this->createStub(EntityManagerInterface::class);
         $this->entityManager->method('getConnection')->willReturn($connection);
 
-        $jwtGenerator = $this->createMock(JwtGeneratorInterface::class);
+        $jwtGenerator = $this->createStub(JwtGeneratorInterface::class);
         $jwtGenerator->method('generate')->willReturn('mock-jwt');
 
         $this->handler = new RefreshTokenHandler(

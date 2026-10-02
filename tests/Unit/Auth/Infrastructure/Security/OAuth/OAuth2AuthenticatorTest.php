@@ -10,7 +10,7 @@ use App\Auth\Infrastructure\Security\OAuth\OAuth2Authenticator;
 use App\Shared\Domain\Model\Uuid;
 use League\OAuth2\Server\Exception\OAuthServerException;
 use League\OAuth2\Server\ResourceServer;
-use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Bridge\PsrHttpMessage\HttpMessageFactoryInterface;
@@ -22,18 +22,18 @@ use Nyholm\Psr7\ServerRequest as Psr7Request;
 final class OAuth2AuthenticatorTest extends TestCase
 {
     private OAuth2Authenticator $authenticator;
-    private ResourceServer&MockObject $resourceServer;
-    private HttpMessageFactoryInterface&MockObject $psrFactory;
+    private ResourceServer&Stub $resourceServer;
+    private HttpMessageFactoryInterface&Stub $psrFactory;
 
     protected function setUp(): void
     {
-        $this->resourceServer = $this->createMock(ResourceServer::class);
-        $this->psrFactory = $this->createMock(HttpMessageFactoryInterface::class);
-        $logger = $this->createMock(LoggerInterface::class);
-        $tokenMetadataRepository = $this->createMock(TokenMetadataRepositoryInterface::class);
+        $this->resourceServer = $this->createStub(ResourceServer::class);
+        $this->psrFactory = $this->createStub(HttpMessageFactoryInterface::class);
+        $logger = $this->createStub(LoggerInterface::class);
+        $tokenMetadataRepository = $this->createStub(TokenMetadataRepositoryInterface::class);
         $this->authenticator = new OAuth2Authenticator(
             $this->resourceServer,
-            $this->createMock(\App\Auth\Domain\Repository\UserRepositoryInterface::class),
+            $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class),
             $this->psrFactory,
             $logger,
             $tokenMetadataRepository,
@@ -67,7 +67,7 @@ final class OAuth2AuthenticatorTest extends TestCase
     {
         $result = $this->authenticator->onAuthenticationSuccess(
             Request::create('/'),
-            $this->createMock(\Symfony\Component\Security\Core\Authentication\Token\TokenInterface::class),
+            $this->createStub(\Symfony\Component\Security\Core\Authentication\Token\TokenInterface::class),
             'main',
         );
 
@@ -116,7 +116,7 @@ final class OAuth2AuthenticatorTest extends TestCase
 
         $this->setupSuccessfulResourceServerValidation($accessTokenId, $userId);
 
-        $tokenMetadataRepository = $this->createConfiguredMock(TokenMetadataRepositoryInterface::class, [
+        $tokenMetadataRepository = $this->createConfiguredStub(TokenMetadataRepositoryInterface::class, [
             'findByTokenId' => TokenMetadata::create(
                 Uuid::fromString($accessTokenId),
                 clientFingerprint: 'matching-fingerprint',
@@ -141,7 +141,7 @@ final class OAuth2AuthenticatorTest extends TestCase
 
         $this->setupSuccessfulResourceServerValidation($accessTokenId, $userId);
 
-        $tokenMetadataRepository = $this->createConfiguredMock(TokenMetadataRepositoryInterface::class, [
+        $tokenMetadataRepository = $this->createConfiguredStub(TokenMetadataRepositoryInterface::class, [
             'findByTokenId' => TokenMetadata::create(
                 Uuid::fromString($accessTokenId),
                 clientFingerprint: 'stored-fingerprint',
@@ -175,7 +175,7 @@ final class OAuth2AuthenticatorTest extends TestCase
 
     private function createAuthenticator(TokenMetadataRepositoryInterface $tokenMetadataRepository): OAuth2Authenticator
     {
-        $userRepository = $this->createMock(\App\Auth\Domain\Repository\UserRepositoryInterface::class);
+        $userRepository = $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class);
         $userRepository->method('findByUuid')->willReturn(
             \App\Auth\Domain\Model\User::register(
                 new \App\Shared\Domain\Model\Email('test@example.com'),
@@ -188,7 +188,7 @@ final class OAuth2AuthenticatorTest extends TestCase
             $this->resourceServer,
             $userRepository,
             $this->psrFactory,
-            $this->createMock(LoggerInterface::class),
+            $this->createStub(LoggerInterface::class),
             $tokenMetadataRepository,
         );
     }

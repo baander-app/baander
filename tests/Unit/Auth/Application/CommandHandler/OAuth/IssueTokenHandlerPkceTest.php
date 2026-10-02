@@ -23,7 +23,7 @@ use App\Shared\Domain\Model\Email;
 use App\Auth\Domain\Model\User;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
-use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -34,26 +34,26 @@ use RuntimeException;
  */
 final class IssueTokenHandlerPkceTest extends TestCase
 {
-    private AccessTokenRepositoryInterface&MockObject $accessTokenRepository;
-    private RefreshTokenRepositoryInterface&MockObject $refreshTokenRepository;
-    private AuthCodeRepositoryInterface&MockObject $authCodeRepository;
-    private DeviceCodeRepositoryInterface&MockObject $deviceCodeRepository;
-    private ClientRepositoryInterface&MockObject $clientRepository;
-    private UserRepositoryInterface&MockObject $userRepository;
-    private EntityManagerInterface&MockObject $entityManager;
+    private AccessTokenRepositoryInterface&Stub $accessTokenRepository;
+    private RefreshTokenRepositoryInterface&Stub $refreshTokenRepository;
+    private AuthCodeRepositoryInterface&Stub $authCodeRepository;
+    private DeviceCodeRepositoryInterface&Stub $deviceCodeRepository;
+    private ClientRepositoryInterface&Stub $clientRepository;
+    private UserRepositoryInterface&Stub $userRepository;
+    private EntityManagerInterface&Stub $entityManager;
     private IssueTokenHandler $handler;
 
     protected function setUp(): void
     {
-        $this->accessTokenRepository = $this->createMock(AccessTokenRepositoryInterface::class);
-        $this->refreshTokenRepository = $this->createMock(RefreshTokenRepositoryInterface::class);
-        $this->authCodeRepository = $this->createMock(AuthCodeRepositoryInterface::class);
-        $this->deviceCodeRepository = $this->createMock(DeviceCodeRepositoryInterface::class);
-        $this->clientRepository = $this->createMock(ClientRepositoryInterface::class);
-        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->accessTokenRepository = $this->createStub(AccessTokenRepositoryInterface::class);
+        $this->refreshTokenRepository = $this->createStub(RefreshTokenRepositoryInterface::class);
+        $this->authCodeRepository = $this->createStub(AuthCodeRepositoryInterface::class);
+        $this->deviceCodeRepository = $this->createStub(DeviceCodeRepositoryInterface::class);
+        $this->clientRepository = $this->createStub(ClientRepositoryInterface::class);
+        $this->userRepository = $this->createStub(UserRepositoryInterface::class);
 
-        $chainValidatorAccessTokenRepo = $this->createMock(AccessTokenRepositoryInterface::class);
-        $chainValidatorRefreshTokenRepo = $this->createMock(RefreshTokenRepositoryInterface::class);
+        $chainValidatorAccessTokenRepo = $this->createStub(AccessTokenRepositoryInterface::class);
+        $chainValidatorRefreshTokenRepo = $this->createStub(RefreshTokenRepositoryInterface::class);
         $chainValidator = new TokenChainValidator(
             $chainValidatorAccessTokenRepo,
             $chainValidatorRefreshTokenRepo,
@@ -64,15 +64,15 @@ final class IssueTokenHandlerPkceTest extends TestCase
             clientCredentials: ['admin'],
         );
 
-        $connection = $this->createMock(Connection::class);
+        $connection = $this->createStub(Connection::class);
         $connection->method('transactional')->willReturnCallback(static fn(callable $callback) => $callback());
-        $this->entityManager = $this->createMock(EntityManagerInterface::class);
+        $this->entityManager = $this->createStub(EntityManagerInterface::class);
         $this->entityManager->method('getConnection')->willReturn($connection);
 
-        $jwtGenerator = $this->createMock(JwtGeneratorInterface::class);
+        $jwtGenerator = $this->createStub(JwtGeneratorInterface::class);
         $jwtGenerator->method('generate')->willReturn('mock-jwt');
 
-        $tokenMetadataRepository = $this->createMock(TokenMetadataRepositoryInterface::class);
+        $tokenMetadataRepository = $this->createStub(TokenMetadataRepositoryInterface::class);
 
         $this->handler = new IssueTokenHandler(
             $this->accessTokenRepository,

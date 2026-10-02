@@ -129,6 +129,7 @@ final class DiscoveryController
         ],
     )]
     #[Route('/qr-payload/{serverPublicId}', name: 'qr_payload', methods: ['GET'])]
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
     public function qrPayload(string $serverPublicId): JsonResponse
     {
         $server = $this->serverPort->findByPublicId(PublicId::fromString($serverPublicId));

@@ -4,25 +4,18 @@ declare(strict_types=1);
 
 namespace App\Transcode\Interface\Controller;
 
-use App\Auth\Domain\Repository\UserRepositoryInterface;
-use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Swoole\Async;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
-use App\Transcode\Domain\ValueObject\AudioProfile;
-use App\Transcode\Domain\ValueObject\QualityTier;
-use App\Transcode\Domain\ValueObject\SessionPriority;
+use App\Transcode\Application\Port\PlaybackPortInterface;
+use App\Transcode\Interface\Security\SignedStreamRequest;
+use Symfony\Component\HttpFoundation\Request;
 use OpenApi\Attributes as OA;
-use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use Symfony\Component\Messenger\MessageBusInterface;
-use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[OA\Tag(name: 'Streaming', description: 'HLS/DASH streaming endpoints')]
 #[Route('/api/transcode', name: 'stream_')]
@@ -32,9 +25,8 @@ final class StreamManifestController
 
     public function __construct(
         private readonly TranscodeStreamingPortInterface $streamingService,
-        private readonly MessageBusInterface $commandBus,
-        private readonly Security $security,
-        private readonly UserRepositoryInterface $userRepository,
+        private readonly SignedStreamRequest $signedRequest,
+        private readonly PlaybackPortInterface $playback,
     ) {
     }
 
@@ -49,42 +41,10 @@ final class StreamManifestController
         ],
     )]
     #[Route('/{videoId}/master.m3u8', name: 'master_manifest', methods: ['GET'])]
-    public function masterManifest(string $videoId): StreamedResponse
+    public function masterManifest(string $videoId, Request $request): StreamedResponse
     {
+        $this->signedRequest->validate($request);
         $videoUuid = Uuid::fromString($videoId);
-
-        // Auto-start transcode sessions for the standard quality ladder. This
-        // lets browser playback trigger transcoding on-demand instead of
-        // requiring a separate session creation step. The command handler is
-        // idempotent — active sessions are returned as-is and failed/cancelled
-        // jobs are retried — so repeat manifest requests are harmless.
-        $user = $this->security->getUser();
-        $ownerId = null;
-
-        if ($user !== null) {
-            $ownerId = Uuid::fromString($user->getId());
-        } else {
-            // Stream endpoints are public (signed URLs) so native players can
-            // fetch manifests/segments. Fall back to the admin account for
-            // on-demand session ownership.
-            $admin = $this->userRepository->findByEmail(new Email('admin@baander.test'));
-            if ($admin !== null) {
-                $ownerId = $admin->getId();
-            }
-        }
-
-        if ($ownerId !== null) {
-            foreach ([QualityTier::p360(), QualityTier::p720(), QualityTier::p1080()] as $tier) {
-                $this->commandBus->dispatch(new CreateTranscodeSessionCommand(
-                    userId: $ownerId,
-                    videoId: $videoUuid,
-                    qualityTier: $tier,
-                    audioProfile: AudioProfile::streamingStereo(),
-                    priority: SessionPriority::Normal,
-                    audioLanguages: ['en'],
-                ));
-            }
-        }
 
         $manifest = $this->streamingService->getMasterManifest($videoUuid);
 
@@ -104,8 +64,9 @@ final class StreamManifestController
         ],
     )]
     #[Route('/{jobPublicId}/media.m3u8', name: 'media_manifest', methods: ['GET'])]
-    public function mediaManifest(string $jobPublicId): StreamedResponse
+    public function mediaManifest(string $jobPublicId, Request $request): StreamedResponse
     {
+        $this->signedRequest->validate($request);
         $publicId = PublicId::fromString($jobPublicId);
 
         // Wait for the encoding loop to finish probing and populate totalSegments
@@ -137,8 +98,9 @@ final class StreamManifestController
         ],
     )]
     #[Route('/{videoId}/manifest.mpd', name: 'dash_manifest', methods: ['GET'])]
-    public function dashManifest(string $videoId): StreamedResponse
+    public function dashManifest(string $videoId, Request $request): StreamedResponse
     {
+        $this->signedRequest->validate($request);
         $manifest = $this->streamingService->getDashManifest(Uuid::fromString($videoId));
 
         return new StreamedResponse(static fn() => print $manifest, 200, [
@@ -159,6 +121,7 @@ final class StreamManifestController
     #[Route('/{videoId}/quality-ladder', name: 'quality_ladder', methods: ['GET'])]
     public function qualityLadder(string $videoId): JsonResponse
     {
+        $this->playback->assertAccess(Uuid::fromString($videoId));
         $tiers = $this->streamingService->getQualityLadderForVideo(Uuid::fromString($videoId));
 
         return $this->successResponse($tiers);
@@ -176,8 +139,9 @@ final class StreamManifestController
         ],
     )]
     #[Route('/{jobPublicId}/subtitles/{language}/media.m3u8', name: 'subtitle_manifest', methods: ['GET'])]
-    public function subtitleManifest(string $jobPublicId, string $language): StreamedResponse
+    public function subtitleManifest(string $jobPublicId, string $language, Request $request): StreamedResponse
     {
+        $this->signedRequest->validate($request);
         $manifest = $this->streamingService->getSubtitleManifest(PublicId::fromString($jobPublicId), $language);
 
         return new StreamedResponse(static fn() => print $manifest, 200, [

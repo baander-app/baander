@@ -67,55 +67,60 @@ final class RefreshTokenHandler
             $this->chainValidator->validateWithLoadedPrevious($refreshToken);
         }
 
-        // Atomically consume the refresh token. If another request already used
-        // this token, the conditional UPDATE will affect zero rows.
-        $consumedToken = $this->refreshTokenRepository->consumeByTokenId($refreshTokenId);
-        if ($consumedToken === null) {
-            throw new RuntimeException('Refresh token reuse detected.');
+        try {
+            return $this->entityManager->getConnection()->transactional(function () use ($refreshTokenId, $command): TokenResponseDTO {
+                // Atomically consume the refresh token. If another request already used
+                // this token, the conditional UPDATE will affect zero rows.
+                $consumedToken = $this->refreshTokenRepository->consumeByTokenId($refreshTokenId);
+                if ($consumedToken === null) {
+                    throw new RuntimeException('Refresh token reuse detected.');
+                }
+
+                $refreshToken = $consumedToken;
+                $oldAccessToken = $refreshToken->getAccessToken();
+
+                // Issue new token pair in the same chain
+                $chainId = $refreshToken->getChainId();
+                $client = $oldAccessToken->getClient();
+                $user = $oldAccessToken->getUser();
+
+                $newAccessToken = AccessToken::issue(
+                    $client,
+                    $user,
+                    $oldAccessToken->getScopes(),
+                    $oldAccessToken->getName(),
+                    $this->accessTokenTtl,
+                    $chainId,
+                );
+
+                $newRefreshToken = RefreshToken::issue(
+                    $newAccessToken,
+                    $chainId,
+                    $this->refreshTokenTtl,
+                    $refreshToken, // Chain link to previous
+                );
+
+                $this->refreshTokenRepository->save($refreshToken, false);
+
+                // Revoke the old access token
+                $oldAccessToken->revoke();
+                $this->accessTokenRepository->save($oldAccessToken, false);
+
+                $this->accessTokenRepository->save($newAccessToken, false);
+                $this->refreshTokenRepository->save($newRefreshToken, false);
+                $this->entityManager->flush();
+
+                return new TokenResponseDTO(
+                    accessToken: $this->jwtGenerator->generate($newAccessToken, $command->getDpopJkt()),
+                    expiresIn: $this->accessTokenTtl->s,
+                    refreshToken: $newRefreshToken->getTokenId()->toString(),
+                    scopes: $newAccessToken->getScopeIdentifiers(),
+                );
+            });
+        } catch (\Throwable $exception) {
+            // The rollback restores rows; discard entities carrying rolled-back state.
+            $this->entityManager->clear();
+            throw $exception;
         }
-
-        $refreshToken = $consumedToken;
-        $oldAccessToken = $refreshToken->getAccessToken();
-
-        // Issue new token pair in the same chain
-        $chainId = $refreshToken->getChainId();
-        $client = $oldAccessToken->getClient();
-        $user = $oldAccessToken->getUser();
-
-        $newAccessToken = AccessToken::issue(
-            $client,
-            $user,
-            $oldAccessToken->getScopes(),
-            $oldAccessToken->getName(),
-            $this->accessTokenTtl,
-            $chainId,
-        );
-
-        $newRefreshToken = RefreshToken::issue(
-            $newAccessToken,
-            $chainId,
-            $this->refreshTokenTtl,
-            $refreshToken, // Chain link to previous
-        );
-
-        // Perform all write operations atomically
-        $this->entityManager->getConnection()->transactional(function () use ($refreshToken, $oldAccessToken, $newAccessToken, $newRefreshToken): void {
-            $this->refreshTokenRepository->save($refreshToken, false);
-
-            // Revoke the old access token
-            $oldAccessToken->revoke();
-            $this->accessTokenRepository->save($oldAccessToken, false);
-
-            $this->accessTokenRepository->save($newAccessToken, false);
-            $this->refreshTokenRepository->save($newRefreshToken, false);
-            $this->entityManager->flush();
-        });
-
-        return new TokenResponseDTO(
-            accessToken: $this->jwtGenerator->generate($newAccessToken, $command->getDpopJkt()),
-            expiresIn: $this->accessTokenTtl->s,
-            refreshToken: $newRefreshToken->getTokenId()->toString(),
-            scopes: $newAccessToken->getScopeIdentifiers(),
-        );
     }
 }

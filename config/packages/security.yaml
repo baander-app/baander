@@ -42,7 +42,8 @@ security:
         - { path: '^/api/debug', roles: ROLE_ADMIN }
         - { path: '^/api/auth/', roles: PUBLIC_ACCESS }
         - { path: '^/api/discovery/', roles: PUBLIC_ACCESS }
-        - { path: '^/api/transcode/', roles: PUBLIC_ACCESS }
+        - { path: '^/api/transcode/[^/]+/(master\.m3u8|media\.m3u8|manifest\.mpd|init|segment)$', roles: PUBLIC_ACCESS, methods: [GET] }
+        - { path: '^/api/transcode/[^/]+/subtitles/[^/]+/(media\.m3u8|[^/]+\.vtt)$', roles: PUBLIC_ACCESS, methods: [GET] }
         - { path: '^/api/monitor', roles: ROLE_ADMIN }
         - { path: '^/api/ws', roles: IS_AUTHENTICATED_FULLY }
         - { path: '^/api/', roles: IS_AUTHENTICATED_FULLY }

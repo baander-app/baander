@@ -81,6 +81,9 @@ final class TranscodeJobController
     #[Route('/cleanup', name: 'cleanup', methods: ['POST'])]
     public function cleanup(): JsonResponse
     {
+        if (!$this->security->isGranted('ROLE_ADMIN')) {
+            return $this->forbidden();
+        }
         $stamp = $this->commandBus->dispatch(new CleanupOrphanedJobsCommand())->last(HandledStamp::class);
         $count = $stamp?->getResult() ?? 0;
 
