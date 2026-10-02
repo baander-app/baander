@@ -21,6 +21,7 @@ For strict unit and messaging checks, run from the checkout:
 ```bash
 bash scripts/test-unit-container.sh
 bash scripts/test-messaging-container.sh
+bash scripts/test-worker-retirement-container.sh
 bash scripts/test-worker-containment-container.sh
 bash scripts/test-functional-container.sh tests/Functional/Controller/FavoritesControllerTest.php
 bash scripts/test-functional-container.sh tests/Integration/CoverExtractionPersistenceTest.php
@@ -35,7 +36,9 @@ test order within dependency constraints and treats unexpected output as risky.
 The unit runner sets a 256 MiB PHP memory limit so the combined unit and PHPStan-rule
 suite can compile its analysis container. This budget applies only to that isolated
 runner; it does not change the tracked PHPUnit configuration or deployment settings.
-The messaging runner also explicitly selects `phpunit.xml.dist` and provisions
+The messaging runner waits for PostgreSQL TCP readiness (not its temporary
+initialization socket) and prints service logs on readiness timeout. It also
+explicitly selects `phpunit.xml.dist` and provisions
 disposable PostgreSQL and Redis for its selected transport, outbox, access-token
 cache transaction, deployment lease, and PGroonga compatibility tests. The lease
 tests use the actual migration and independent PostgreSQL connections to exercise
@@ -89,6 +92,15 @@ The runner fails on unexpected exit status or
 OOM and removes its containers on exit. It tests the proposed container boundary;
 it does not certify per-child descendant cleanup on restart, host systemd behavior,
 deployment lease takeover, or measured production resource defaults.
+
+The retirement runner additionally needs host PHP and Docker CLI access to a local
+Unix daemon endpoint. It starts a restricted restart-always deployment fixture,
+rejects an incorrect boot identity, then exercises the real external retirement
+adapter. Confirmed force-removal must prevent restart of the old full container ID;
+a subsequent absent-container request must fail closed. PostgreSQL controller tests
+in the messaging runner separately verify that retirement failures preserve the
+lease and concurrent recovery cannot release a newer epoch. These do not yet form
+a combined Docker/database deployment acceptance test.
 
 The functional runner creates an isolated PostgreSQL/Redis network, extracts the
 checkout into a fresh directory, and runs all migrations twice before executing the

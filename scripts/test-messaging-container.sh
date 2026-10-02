@@ -14,15 +14,23 @@ docker run -d --name "$run_id-redis" --network "$run_id" --network-alias redis \
 docker run -d --name "$run_id-postgres" --network "$run_id" --network-alias postgres \
     -e POSTGRES_USER=baander -e POSTGRES_PASSWORD=test-only -e POSTGRES_DB=messaging_test \
     "${BAANDER_TEST_POSTGRES_IMAGE:-baander-database:latest}" >/dev/null
+ready=false
 for attempt in $(seq 1 30); do
-    if docker exec "$run_id-postgres" pg_isready -U baander -d messaging_test >/dev/null 2>&1 &&
+    if docker exec "$run_id-postgres" pg_isready -h 127.0.0.1 -U baander -d messaging_test >/dev/null 2>&1 &&
         docker exec "$run_id-redis" redis-cli ping | grep -qx PONG; then
+        ready=true
         break
     fi
     sleep 1
 done
-docker exec "$run_id-postgres" pg_isready -U baander -d messaging_test >/dev/null
-docker exec "$run_id-redis" redis-cli ping | grep -qx PONG
+# The image's temporary initialization server listens only on a Unix socket.
+# Wait for TCP so its shutdown cannot be mistaken for application readiness.
+if [ "$ready" != true ]; then
+    echo 'Messaging services did not become ready within 30 attempts.' >&2
+    docker logs --tail 40 "$run_id-postgres" >&2 || true
+    docker logs --tail 40 "$run_id-redis" >&2 || true
+    exit 1
+fi
 
 tar -cf - vendor src tests config packages migrations bin phpunit.xml.dist \
     .env .env.test composer.json composer.lock |
@@ -34,6 +42,6 @@ tar -cf - vendor src tests config packages migrations bin phpunit.xml.dist \
             mkdir -p /tmp/baander-tests
             tar -xf - -C /tmp/baander-tests
             cd /tmp/baander-tests
-            exec php vendor/bin/phpunit -c phpunit.xml.dist tests/Integration/MessengerJsonDeliveryTest.php tests/Integration/MessengerRetentionTest.php tests/Integration/MessengerDelayedPromotionTest.php tests/Integration/NotificationRetryDeliveryTest.php tests/Integration/CoverExtractionRetryTest.php tests/Integration/OutboxLeaseTest.php tests/Integration/OutboxNotificationReplayTest.php tests/Integration/AccessTokenCacheTransactionTest.php tests/Integration/PgroongaSearchCompatibilityTest.php tests/Integration/WorkerDeploymentLeaseTest.php tests/Integration/WorkerLeaseAgentTest.php \
+            exec php vendor/bin/phpunit -c phpunit.xml.dist tests/Integration/MessengerJsonDeliveryTest.php tests/Integration/MessengerRetentionTest.php tests/Integration/MessengerDelayedPromotionTest.php tests/Integration/NotificationRetryDeliveryTest.php tests/Integration/CoverExtractionRetryTest.php tests/Integration/OutboxLeaseTest.php tests/Integration/OutboxNotificationReplayTest.php tests/Integration/AccessTokenCacheTransactionTest.php tests/Integration/PgroongaSearchCompatibilityTest.php tests/Integration/WorkerDeploymentLeaseTest.php tests/Integration/WorkerLeaseAgentTest.php tests/Integration/WorkerDeploymentContainmentTest.php \
                 --no-progress --colors=never --display-all-issues --fail-on-phpunit-notice --fail-on-skipped
         '

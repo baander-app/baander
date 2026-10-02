@@ -355,8 +355,9 @@ helper described below supplies the parent-side deadline; observing a database
 token alone is not permission to launch. A real kernel/introspection check
 confirms ORM schema diffs exclude the DBAL-owned lease table, while normal entity
 tables remain visible. Fresh installation and repeat migration runs pass.
-The canonical messaging/PostgreSQL suite passes 54 tests with 913 assertions,
-including seven database lease cases and 14 fresh-process lease-helper cases. The schema check passes one test with five assertions
+The canonical messaging/PostgreSQL suite passes 63 tests with 954 assertions,
+including seven database lease cases, 14 fresh-process lease-helper cases and
+nine external-controller database coordination cases. The schema check passes one test with five assertions
 after all 15 migrations and a repeat no-op migration run. Two real-process cases
 also verify blocked replacement with a surviving descendant and after a launcher
 throws following process creation. Both container shutdown scenarios pass.
@@ -387,7 +388,7 @@ without acknowledging containment or releasing the deployment lease. Invalid clo
 readings still trigger initial stop attempts, then propagate to the outer owner
 for containment. Real-process tests cover delayed acquisition, denied grants,
 hung renewal, expiry during sibling launches and clock failure. The combined unit
-and static-analysis-rule suite passes 3,278 tests with 11,969 assertions; focused
+and static-analysis-rule suite passes 3,321 tests with 12,057 assertions; focused
 production PHPStan passes. These are correctness checks, not capacity measurements.
 
 `scripts/test-worker-containment-container.sh` exercises this core as PID 1 in a
@@ -398,10 +399,40 @@ is a fixture budget, not measured application capacity. Whole-container cleanup
 does not prove descendant cleanup before restarting an individual worker. Host
 systemd containment remains untested.
 
+Explicit predecessor recovery now has an external-controller implementation.
+`DeploymentContainmentController` checks the expected boot, retires the known full
+container ID outside a database transaction, and acknowledges only the fetched
+lease epoch. Concurrent recovery cannot release a newer boot or epoch. The
+PostgreSQL tests use retirement callbacks to check this coordination; they do not
+claim Docker containment from a mock.
+
+`DockerWorkerContainment` requires deployment namespace/boot/role labels and a
+restricted private PID/cgroup namespace. It rejects privileged containers, mounts,
+devices and added capabilities. It then requires successful force-removal of the
+immutable container ID before returning. A stopped-state observation is insufficient:
+removal prevents that predecessor from restarting. Missing containers, mismatches,
+command errors and uncertain removal outcomes leave ownership reserved. This
+strict initial policy does not yet support media mounts or GPU devices.
+
+`DockerWorkerCommand` pins a local Unix daemon endpoint, isolates Docker
+configuration, uses argument arrays, and bounds CLI time and observed output. It
+runs only in the trusted external controller, never in the supervisor loop. A CLI
+timeout cannot cancel an operation already submitted to Docker; it cannot authorize
+a lease release. Docker access is not exposed to the application container.
+`scripts/test-worker-retirement-container.sh` verifies wrong-owner rejection and
+forced retirement of a running restart-always container with a TERM-ignoring
+descendant, then checks that the old ID cannot restart and absence is rejected.
+
+The caller must durably associate a fresh deployment boot with its container ID
+before starting it. Labels alone do not establish that lifecycle inventory or defend
+against a malicious Docker operator. Automatic recovery after a lost removal
+response, daemon replacement, and host-systemd containment remain unimplemented.
+This adapter and the database controller are tested separately; their deployment
+wiring and a combined Docker/PostgreSQL acceptance test are still required.
+
 This is a stage-2 foundation, not a deployment supervisor. No application command
-or deployment configuration uses it yet. The lease and containment acknowledgment
-APIs require a trusted controller that actually verifies predecessor cleanup;
-they do not perform that verification themselves. The direct-child adapter's
+or deployment configuration uses it yet. The deployment must wire the external controller and persist its lifecycle
+inventory; the low-level lease acknowledgment API does not verify cleanup itself. The direct-child adapter's
 destructor is last-resort cleanup, not a process-tree shutdown guarantee. Controller
 integration, per-child containment scopes,
 role-specific boot, heartbeat publication/aggregation and scheduler/media ownership
