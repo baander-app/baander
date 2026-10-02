@@ -1,95 +1,105 @@
 (() => {
-  let accessToken = null;
-  let dpopNonce = null;
-  let apiUrl = null;
+  const clientAuth = /* @__PURE__ */ new Map();
+  const MAX_CLIENTS = 128;
+  const MAX_PENDING_PROOFS = 32;
+  let pendingProofs = 0;
   self.addEventListener("install", () => {
-    self.skipWaiting();
+    void self.skipWaiting();
   });
   self.addEventListener("activate", (event) => {
-    event.waitUntil(
-      self.clients.claim().then(() => {
-        return self.clients.matchAll().then((clients) => {
-          clients.forEach((client) => client.postMessage({ type: "SW_REQUEST_TOKEN" }));
-        });
-      })
-    );
+    event.waitUntil(self.clients.claim().then(async () => {
+      const clients = await self.clients.matchAll();
+      clients.forEach((client) => client.postMessage({ type: "SW_REQUEST_TOKEN" }));
+    }));
   });
   self.addEventListener("message", (event) => {
-    if (event.data?.type === "SW_SET_TOKEN") {
-      accessToken = event.data.token;
+    const source = event.source;
+    if (!source || !("id" in source) || !("url" in source)) return;
+    if (new URL(source.url).origin !== self.location.origin) return;
+    const type = event.data?.type;
+    if (type !== "SW_SET_TOKEN" && type !== "SW_SET_API_URL") return;
+    const previous = clientAuth.get(source.id) ?? { accessToken: null, apiOrigin: null, nonce: null };
+    const next = { ...previous };
+    if (type === "SW_SET_TOKEN") {
+      next.accessToken = typeof event.data.token === "string" && event.data.token ? event.data.token : null;
+      if (next.accessToken !== previous.accessToken) next.nonce = null;
+    } else {
+      try {
+        const url = new URL(event.data.apiUrl);
+        if (!["https:", "http:"].includes(url.protocol) || url.username || url.password) return;
+        next.apiOrigin = url.origin;
+      } catch {
+        return;
+      }
     }
-    if (event.data?.type === "SW_SET_API_URL") {
-      apiUrl = event.data.apiUrl;
-    }
+    clientAuth.delete(source.id);
+    if (clientAuth.size >= MAX_CLIENTS) clientAuth.delete(clientAuth.keys().next().value);
+    clientAuth.set(source.id, next);
   });
   function buildHtu(url) {
-    try {
-      const baseUrl = apiUrl ?? self.location.origin;
-      const parsed = new URL(url, baseUrl);
-      return `https://${parsed.host}${parsed.pathname}`;
-    } catch {
-      return url;
-    }
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}`;
   }
-  function requestDpopProof(method, url, token) {
+  function requestDpopProof(clientId, method, url, auth) {
+    if (pendingProofs >= MAX_PENDING_PROOFS) return Promise.resolve(null);
+    pendingProofs++;
     return new Promise((resolve) => {
-      const timeout = setTimeout(() => resolve(null), 3e3);
-      const nonce = dpopNonce;
       const channel = new MessageChannel();
-      channel.port1.onmessage = (event) => {
+      let finished = false;
+      const finish = (proof) => {
+        if (finished) return;
+        finished = true;
         clearTimeout(timeout);
-        if (event.data?.type === "SW_DPOP_PROOF" && typeof event.data.proof === "string") {
-          if (event.data.nonce) {
-            dpopNonce = event.data.nonce;
-          }
-          resolve(event.data.proof);
-        } else {
-          resolve(null);
-        }
+        channel.port1.onmessage = null;
+        channel.port1.close();
+        channel.port2.close();
+        pendingProofs--;
+        resolve(proof);
       };
-      self.clients.matchAll().then((clients) => {
-        if (clients.length === 0) {
-          clearTimeout(timeout);
-          resolve(null);
+      const timeout = setTimeout(() => finish(null), 3e3);
+      channel.port1.onmessageerror = () => finish(null);
+      channel.port1.onmessage = (event) => {
+        if (event.data?.type === "SW_DPOP_PROOF" && typeof event.data.proof === "string" && clientAuth.get(clientId) === auth) {
+          if (typeof event.data.nonce === "string") auth.nonce = event.data.nonce;
+          finish(event.data.proof);
+        } else finish(null);
+      };
+      self.clients.get(clientId).then((client) => {
+        if (finished) return;
+        if (!client || clientAuth.get(clientId) !== auth) {
+          finish(null);
           return;
         }
-        const client = clients[0];
-        client.postMessage(
-          { type: "SW_SIGN_DPOP", method, url, nonce: nonce ?? void 0 },
-          [channel.port2]
-        );
-      }).catch(() => {
-        clearTimeout(timeout);
-        resolve(null);
-      });
+        client.postMessage({
+          type: "SW_SIGN_DPOP",
+          method,
+          url,
+          nonce: auth.nonce ?? void 0,
+          token: auth.accessToken
+        }, [channel.port2]);
+      }).catch(() => finish(null));
     });
   }
   self.addEventListener("fetch", (event) => {
     const url = new URL(event.request.url);
-    if (!url.pathname.startsWith("/api/stream/") && !url.pathname.startsWith("/api/images/")) {
-      return;
-    }
-    if (!accessToken) {
-      return;
-    }
+    const auth = clientAuth.get(event.clientId);
+    if (!auth?.accessToken || url.origin !== auth.apiOrigin) return;
+    if (!url.pathname.startsWith("/api/stream/") && !url.pathname.startsWith("/api/images/")) return;
+    if (!["GET", "HEAD"].includes(event.request.method)) return;
     event.respondWith((async () => {
-      const htu = buildHtu(url.toString());
-      const proof = await requestDpopProof(event.request.method, htu, accessToken);
-      if (!proof) {
-        return fetch(event.request);
-      }
+      const proof = await requestDpopProof(event.clientId, event.request.method, buildHtu(url.href), auth);
+      if (!proof || clientAuth.get(event.clientId) !== auth) return fetch(event.request);
       const headers = new Headers(event.request.headers);
-      headers.set("Authorization", `DPoP ${accessToken}`);
+      headers.set("Authorization", `DPoP ${auth.accessToken}`);
       headers.set("DPoP", proof);
-      const response = await fetch(event.request, { headers });
-      const nonce = response.headers.get("dpop-nonce");
-      if (nonce) {
-        dpopNonce = nonce;
-      }
-      if (response.status === 401) {
-        self.clients.matchAll().then((clients) => {
-          clients.forEach((client) => client.postMessage({ type: "SW_AUTH_EXPIRED" }));
-        });
+      const response = await fetch(event.request, { headers, redirect: "error" });
+      if (clientAuth.get(event.clientId) === auth) {
+        const nonce = response.headers.get("dpop-nonce");
+        if (nonce) auth.nonce = nonce;
+        if (response.status === 401) {
+          const client = await self.clients.get(event.clientId);
+          client?.postMessage({ type: "SW_AUTH_EXPIRED" });
+        }
       }
       return response;
     })());

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
+import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 
 interface UseBaanderPlayerOptions {
   videoId: string
@@ -42,8 +43,19 @@ export function useBaanderPlayer({
     containerRef.current.appendChild(video)
     videoRef.current = video
 
-    // Use HLS source from the Baander transcoding pipeline
-    video.src = `/api/transcode/${videoId}/master.m3u8`
+    const abortController = new AbortController()
+    // Authorize and start playback before handing a signed URL to the native player.
+    void AXIOS_INSTANCE.post<{ url: string }>('/api/stream/sign', {
+      path: `/api/transcode/${videoId}/master.m3u8`,
+    }, { signal: abortController.signal }).then(({ data }) => {
+      if (abortController.signal.aborted || videoRef.current !== video) return
+      video.src = new URL(data.url, window.__BAANDER_API_URL__ || window.location.origin).href
+      if (autoPlay) void video.play().catch(() => {})
+    }).catch(() => {
+      if (abortController.signal.aborted || videoRef.current !== video) return
+      setState('error')
+      onError?.(null)
+    })
 
     video.addEventListener('loadedmetadata', () => {
       setDuration(video.duration)
@@ -75,11 +87,8 @@ export function useBaanderPlayer({
       onError?.(video.error)
     })
 
-    if (autoPlay) {
-      video.play().catch(() => {})
-    }
-
     return () => {
+      abortController.abort()
       video.pause()
       video.src = ''
       videoRef.current = null

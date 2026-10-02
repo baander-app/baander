@@ -186,6 +186,7 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
     });
     clearStoredAuth().catch((err) => { logger.warn('Failed to clear stored auth:', err) });
+    postTokenToWorker(null).catch((err) => { logger.warn('Failed to clear worker credentials:', err) });
   },
 
   initAuth: async () => {
@@ -211,6 +212,7 @@ export const useAuthStore = create<AuthState>()(
         user: stored.user as User,
         isAuthenticated: true,
       });
+      await postTokenToWorker(stored.accessToken);
     } catch (err) {
       logger.warn('Failed to load stored auth, starting unauthenticated:', err)
     }

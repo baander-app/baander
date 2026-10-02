@@ -267,6 +267,11 @@ describe('useAuthStore', () => {
   })
 
   describe('clearAuth', () => {
+    it('clears the credentials held by this tab in the service worker', () => {
+      useAuthStore.setState({ accessToken: 'old', refreshToken: 'old-refresh' })
+      useAuthStore.getState().clearAuth()
+      expect(mockPostTokenToWorker).toHaveBeenCalledWith(null)
+    })
     it('clears DPoP key pair, state, and IndexedDB', () => {
       useAuthStore.setState({
         accessToken: 'tok',
@@ -335,6 +340,7 @@ describe('useAuthStore', () => {
       expect(state.refreshToken).toBe('restored-refresh')
       expect(state.user).toEqual(VALID_USER)
       expect(state.isAuthenticated).toBe(true)
+      expect(mockPostTokenToWorker).toHaveBeenCalledWith('restored-access')
     })
 
     it('does not throw when loadStoredAuth rejects (logs and stays unauthenticated)', async () => {

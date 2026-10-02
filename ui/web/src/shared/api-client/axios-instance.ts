@@ -9,6 +9,7 @@ interface CustomAxiosRequestConfig extends AxiosRequestConfig {
   _skipAuth?: boolean;
   _didRetry?: boolean;
   _dpopRetryCount?: number;
+  _authToken?: string | null;
 }
 
 const MAX_DPOP_NONCE_RETRIES = 1;
@@ -28,7 +29,7 @@ export const AXIOS_INSTANCE = Axios.create({
  */
 function buildHtu(url: string): string {
   try {
-    const baseUrl = window.__BAANDER_API_URL__;
+    const baseUrl = window.__BAANDER_API_URL__ || window.location.origin;
     const parsed = new URL(url, baseUrl);
     // Normalize http/https to https per RFC 9449 §4.3
     return `https://${parsed.host}${parsed.pathname}`;
@@ -37,11 +38,25 @@ function buildHtu(url: string): string {
   }
 }
 
+function isApiRequest(config: AxiosRequestConfig): boolean {
+  try {
+    const api = new URL(window.__BAANDER_API_URL__ || window.location.origin);
+    const target = new URL(AXIOS_INSTANCE.getUri(config), window.location.origin);
+    return target.origin === api.origin && !target.username && !target.password;
+  } catch {
+    return false;
+  }
+}
+
 // --- Request interceptor: attach DPoP proof + sender-constrained token ---
 AXIOS_INSTANCE.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   const customConfig = config as CustomAxiosRequestConfig;
+  config.headers.delete('Authorization');
+  config.headers.delete('DPoP');
+  if (!isApiRequest(config)) return config;
   const {accessToken} = getAuthStore();
   const keyPair = getDpopKeyPair();
+  customConfig._authToken = accessToken;
 
   if (keyPair) {
     // Attach DPoP proof whenever a key pair exists (including login).
@@ -50,11 +65,14 @@ AXIOS_INSTANCE.interceptors.request.use(async (config: InternalAxiosRequestConfi
       config.headers.Authorization = `DPoP ${accessToken}`;
     }
 
-    const htu = buildHtu(config.url ?? '');
+    const htu = buildHtu(AXIOS_INSTANCE.getUri(config));
     const proof = await createDpopProof(keyPair, config.method ?? 'GET', htu, {
       accessToken: !customConfig._skipAuth ? (accessToken ?? undefined) : undefined,
       nonce: getDpopNonce() ?? undefined,
     });
+    if (getAuthStore().accessToken !== accessToken || getDpopKeyPair() !== keyPair) {
+      throw new Axios.CanceledError('Authentication changed while signing');
+    }
     config.headers.DPoP = proof;
   }
 
@@ -64,29 +82,69 @@ AXIOS_INSTANCE.interceptors.request.use(async (config: InternalAxiosRequestConfi
 // --- Response interceptor: extract DPoP-Nonce from responses ---
 AXIOS_INSTANCE.interceptors.response.use((response) => {
   const nonce = response.headers?.['dpop-nonce'];
-  if (typeof nonce === 'string' && nonce !== '') {
+  if (isApiRequest(response.config) && typeof nonce === 'string' && nonce !== '') {
     setDpopNonce(nonce);
   }
   return response;
 });
 
 // --- Token refresh: queue concurrent 401s, retry after refresh ---
-let isRefreshing = false;
-let pendingRequests: Array<{
-  resolve: (token: string) => void
-  reject: (error: unknown) => void
-}> = [];
+let refreshInFlight: Promise<void> | null = null;
 
-function processPendingRequests(token: string | null, error?: unknown) {
-  pendingRequests.forEach(({resolve, reject}) => {
-    if (token) resolve(token);
-    else reject(error);
-  });
-  pendingRequests = [];
+async function refreshSession(): Promise<void> {
+  const {accessToken, refreshToken} = getAuthStore();
+  const keyPair = getDpopKeyPair();
+  const isCurrentSession = () => getAuthStore().refreshToken === refreshToken &&
+    getAuthStore().accessToken === accessToken && getDpopKeyPair() === keyPair;
+  try {
+    if (!refreshToken || !keyPair) throw new Error('No refresh credentials');
+    const refreshUrl = new URL('/api/auth/refresh', window.__BAANDER_API_URL__ || window.location.origin).href;
+    for (let attempt = 0; attempt <= MAX_DPOP_NONCE_RETRIES; attempt++) {
+      const proof = await createDpopProof(keyPair, 'POST', buildHtu(refreshUrl), {
+        nonce: getDpopNonce() ?? undefined,
+      });
+      if (!isCurrentSession()) throw new Axios.CanceledError('Authentication changed during refresh');
+      try {
+        const response = await Axios.post(refreshUrl, {refreshToken}, {
+          headers: {DPoP: proof}, timeout: 15000,
+        });
+        if (!isCurrentSession()) throw new Axios.CanceledError('Authentication changed during refresh');
+        const data = response.data?.data ?? response.data;
+        if (typeof data?.accessToken !== 'string' || !data.accessToken ||
+            typeof data?.refreshToken !== 'string' || !data.refreshToken) {
+          throw new Error('Refresh returned invalid tokens');
+        }
+        const nonce = response.headers['dpop-nonce'];
+        if (typeof nonce === 'string' && nonce) setDpopNonce(nonce);
+        getAuthStore().setTokens(data.accessToken, data.refreshToken);
+        return;
+      } catch (error) {
+        if (!isCurrentSession()) throw error;
+        const nonce = Axios.isAxiosError(error) ? error.response?.headers?.['dpop-nonce'] : undefined;
+        if (attempt < MAX_DPOP_NONCE_RETRIES && Axios.isAxiosError(error) &&
+            error.response?.status === 400 && error.response.data?.error === 'use_dpop_nonce' &&
+            typeof nonce === 'string' && nonce) {
+          setDpopNonce(nonce);
+          continue;
+        }
+        throw error;
+      }
+    }
+  } catch (error) {
+    if (isCurrentSession()) {
+      getAuthStore().clearAuth();
+      window.location.href = '/login';
+    }
+    throw error;
+  }
 }
 
 AXIOS_INSTANCE.interceptors.response.use(undefined, async (error) => {
-  const originalRequest = error.config as CustomAxiosRequestConfig;
+  const originalRequest = error.config as CustomAxiosRequestConfig | undefined;
+  if (!originalRequest || !isApiRequest(originalRequest)) return Promise.reject(error);
+  if (originalRequest._authToken !== getAuthStore().accessToken && !getAuthStore().accessToken) {
+    return Promise.reject(error);
+  }
 
   if (error.response?.status !== 401 || originalRequest._skipAuth || originalRequest._didRetry) {
     // Handle use_dpop_nonce error from token endpoint: retry with nonce
@@ -107,68 +165,16 @@ AXIOS_INSTANCE.interceptors.response.use(undefined, async (error) => {
     return Promise.reject(error);
   }
 
-  if (isRefreshing) {
-    return new Promise<string>((resolve, reject) => {
-      pendingRequests.push({resolve, reject});
-    }).then((token) => {
-      originalRequest.headers!.Authorization = `DPoP ${token}`;
-      return AXIOS_INSTANCE(originalRequest);
-    });
-  }
-
+  // Every participant spends its one refresh retry, including queued requests.
   originalRequest._didRetry = true;
-  isRefreshing = true;
-
-  try {
-    const {refreshToken} = getAuthStore();
-    if (!refreshToken) throw new Error('No refresh token');
-
-    const keyPair = getDpopKeyPair();
-    if (!keyPair) throw new Error('No DPoP key pair');
-
-    const refreshHtu = buildHtu('/api/auth/refresh');
-    const proof = await createDpopProof(keyPair, 'POST', refreshHtu, {
-      nonce: getDpopNonce() ?? undefined,
-    });
-
-    const baseUrl = window.__BAANDER_API_URL__;
-    const refreshResponse = await Axios.post(`${baseUrl}/api/auth/refresh`, {
-      refreshToken,
-    }, {
-      headers: {
-        DPoP: proof,
-      },
-    });
-
-    const data = refreshResponse.data;
-    const newAccessToken = data?.data?.accessToken ?? data?.accessToken;
-    if (!newAccessToken) {
-      throw new Error('Refresh returned no access token');
+  // A late 401 for the old token must reuse the already rotated session.
+  if (originalRequest._authToken === getAuthStore().accessToken) {
+    if (!refreshInFlight) {
+      refreshInFlight = refreshSession().finally(() => { refreshInFlight = null; });
     }
-
-    // Extract DPoP-Nonce from refresh response before persisting so the
-    // latest nonce is written to IndexedDB via setTokens.
-    const nonce = refreshResponse.headers?.['dpop-nonce'] ?? refreshResponse.headers?.['DPoP-Nonce'];
-    if (typeof nonce === 'string' && nonce !== '') {
-      setDpopNonce(nonce);
-    }
-
-    getAuthStore().setTokens(
-      newAccessToken,
-      data?.data?.refreshToken ?? refreshToken,
-    );
-
-    processPendingRequests(newAccessToken);
-    originalRequest.headers!.Authorization = `DPoP ${newAccessToken}`;
-    return AXIOS_INSTANCE(originalRequest);
-  } catch (refreshError) {
-    processPendingRequests(null, refreshError);
-    getAuthStore().clearAuth();
-    window.location.href = '/login';
-    return Promise.reject(refreshError);
-  } finally {
-    isRefreshing = false;
+    await refreshInFlight;
   }
+  return AXIOS_INSTANCE(originalRequest);
 });
 
 export const customInstance = <T>(
