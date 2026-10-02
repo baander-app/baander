@@ -350,18 +350,45 @@ acknowledgment remains reserved for trusted-controller reconciliation.
 
 The DBAL adapter uses a dedicated connection, commits before returning a token,
 rejects caller-owned transactions, and bounds SQL statement and lock waits. Those
-limits do not bound connection setup, network I/O or commit. The future authority
-adapter must enforce an end-to-end deadline and conservative local lease validity;
-observing a token is not permission to launch. A real kernel/introspection check
+limits do not bound connection setup, network I/O or commit. The asynchronous lease
+helper described below supplies the parent-side deadline; observing a database
+token alone is not permission to launch. A real kernel/introspection check
 confirms ORM schema diffs exclude the DBAL-owned lease table, while normal entity
 tables remain visible. Fresh installation and repeat migration runs pass.
-The canonical messaging/PostgreSQL suite passes 40 tests with 838 assertions,
-including seven lease cases. The schema check passes one test with five assertions
+The canonical messaging/PostgreSQL suite passes 54 tests with 913 assertions,
+including seven database lease cases and 14 fresh-process lease-helper cases. The schema check passes one test with five assertions
 after all 15 migrations and a repeat no-op migration run. Two real-process cases
 also verify blocked replacement with a surviving descendant and after a launcher
 throws following process creation. Both container shutdown scenarios pass.
 Failed or uncertain database operations discard the dedicated connection; actual
 driver-BEGIN failure and committed-but-unacknowledged acquisition have regressions.
+
+`LeaseAuthority` derives local validity from the monotonic request-start time,
+TTL and a positive safety margin. Delayed replies cannot extend that deadline.
+Renewal retains the old deadline while pending; expiry, rejected grants and
+explicit revocation permanently close authority for that boot. Renewal must retain
+the owner identity and epoch, and stale sequence replies cannot restore authority.
+
+`LeaseAgentProcess` launches a fresh PHP CLI helper for acquire/renew operations,
+without booting Symfony or serializing application objects. PostgreSQL credentials
+travel through the environment, not arguments or response frames. The parent polls
+without database I/O, enforces a deadline, sends TERM then KILL, and retains the
+process until reaped. Strict JSON framing, identity checks and bounded output reads
+reject malformed replies. Private output files have observed size limits, not disk
+quotas; deployment containment must enforce resource limits. An uncertain committed
+acquisition remains reserved for controller reconciliation.
+
+`LeasedWorkerRuntime` combines the helper, authority and fixed-set supervisor.
+Initial acquisition does not launch workers; each subsequent launch checks fresh
+local authority. A blocked renewal cannot prevent child polling or draining when
+authority expires. One process slot is reserved for the helper, whose memory belongs
+in the management reservation. Shutdown cancels the helper and signals workers
+without acknowledging containment or releasing the deployment lease. Invalid clock
+readings still trigger initial stop attempts, then propagate to the outer owner
+for containment. Real-process tests cover delayed acquisition, denied grants,
+hung renewal, expiry during sibling launches and clock failure. The combined unit
+and static-analysis-rule suite passes 3,278 tests with 11,969 assertions; focused
+production PHPStan passes. These are correctness checks, not capacity measurements.
 
 `scripts/test-worker-containment-container.sh` exercises this core as PID 1 in a
 dedicated container with a child and a TERM-ignoring descendant. TERM and supervisor
@@ -376,7 +403,7 @@ or deployment configuration uses it yet. The lease and containment acknowledgmen
 APIs require a trusted controller that actually verifies predecessor cleanup;
 they do not perform that verification themselves. The direct-child adapter's
 destructor is last-resort cleanup, not a process-tree shutdown guarantee. Controller
-integration, per-child containment scopes, deadline-bounded lease renewal,
+integration, per-child containment scopes,
 role-specific boot, heartbeat publication/aggregation and scheduler/media ownership
 remain necessary before the two-command cutover. Defaults are policy examples,
 not measured production capacity.

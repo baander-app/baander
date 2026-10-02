@@ -24,7 +24,7 @@ done
 docker exec "$run_id-postgres" pg_isready -U baander -d messaging_test >/dev/null
 docker exec "$run_id-redis" redis-cli ping | grep -qx PONG
 
-tar -cf - vendor src tests config packages migrations phpunit.xml.dist \
+tar -cf - vendor src tests config packages migrations bin phpunit.xml.dist \
     .env .env.test composer.json composer.lock |
     docker run --rm --privileged --network "$run_id" -i --entrypoint sh \
         -e MESSENGER_TEST_REDIS_DSN=redis://redis:6379 \
@@ -34,6 +34,6 @@ tar -cf - vendor src tests config packages migrations phpunit.xml.dist \
             mkdir -p /tmp/baander-tests
             tar -xf - -C /tmp/baander-tests
             cd /tmp/baander-tests
-            exec php vendor/bin/phpunit -c phpunit.xml.dist tests/Integration/MessengerJsonDeliveryTest.php tests/Integration/MessengerRetentionTest.php tests/Integration/MessengerDelayedPromotionTest.php tests/Integration/NotificationRetryDeliveryTest.php tests/Integration/CoverExtractionRetryTest.php tests/Integration/OutboxLeaseTest.php tests/Integration/OutboxNotificationReplayTest.php tests/Integration/AccessTokenCacheTransactionTest.php tests/Integration/PgroongaSearchCompatibilityTest.php tests/Integration/WorkerDeploymentLeaseTest.php \
+            exec php vendor/bin/phpunit -c phpunit.xml.dist tests/Integration/MessengerJsonDeliveryTest.php tests/Integration/MessengerRetentionTest.php tests/Integration/MessengerDelayedPromotionTest.php tests/Integration/NotificationRetryDeliveryTest.php tests/Integration/CoverExtractionRetryTest.php tests/Integration/OutboxLeaseTest.php tests/Integration/OutboxNotificationReplayTest.php tests/Integration/AccessTokenCacheTransactionTest.php tests/Integration/PgroongaSearchCompatibilityTest.php tests/Integration/WorkerDeploymentLeaseTest.php tests/Integration/WorkerLeaseAgentTest.php \
                 --no-progress --colors=never --display-all-issues --fail-on-phpunit-notice --fail-on-skipped
         '

@@ -40,6 +40,11 @@ disposable PostgreSQL and Redis for its selected transport, outbox, access-token
 cache transaction, deployment lease, and PGroonga compatibility tests. The lease
 tests use the actual migration and independent PostgreSQL connections to exercise
 ownership, expiry, lock contention, stale epochs and uncertain commit recovery.
+The runner includes `bin/worker-lease-agent.php` and exercises fresh helper processes
+against PostgreSQL, including blocked calls, parent deadlines, cancellation,
+malformed responses and output limits. Unit tests separately exercise monotonic
+lease authority and the runtime coordinator with controlled helper responses;
+they verify that pending renewal cannot block worker shutdown at lease expiry.
 The separate schema test above uses the fully migrated application kernel to check
 that ORM introspection preserves the DBAL-owned lease table. The search tests exercise
 production Doctrine filtering and scored SQL against mapped PGroonga indexes;
