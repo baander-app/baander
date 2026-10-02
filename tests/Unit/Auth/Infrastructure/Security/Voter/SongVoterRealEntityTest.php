@@ -8,42 +8,23 @@ use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Auth\Infrastructure\Security\Voter\SongVoter;
 use App\Catalog\Domain\Model\Song;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\VoterInterface;
 
-/**
- * Security-focused test for SongVoter against the real Song aggregate.
- *
- * SongVoter expects subjects to expose getOwnerId(), but the real Song domain
- * model does not. This causes the voter to fall through and deny access for
- * every real Song, breaking authorization for SongController update/delete.
- */
 final class SongVoterRealEntityTest extends TestCase
 {
-    public function testVoterDoesNotDenyByDefaultForRealSongEntity(): void
+    public function testRealSongWithoutOwnershipMetadataRemainsOutsideVoterContract(): void
     {
-        $ownerId = Uuid::v4()->toString();
-        $song = Song::create(
-            album: Uuid::v4(),
-            title: 'Test Song',
-            path: '/music/test.mp3',
-            size: 1000,
-            mimeType: 'audio/mpeg',
-        );
-
-        $user = new SecurityUser($ownerId, 'user@example.com', 'hashed', ['ROLE_USER']);
-        $token = $this->createStub(TokenInterface::class);
-        $token->method('getUser')->willReturn($user);
-        $token->method('getRoleNames')->willReturn(['ROLE_USER']);
-
+        $song = Song::create(Uuid::generate(), 'Song', '/music/song.mp3', 1000, 'audio/mpeg');
         $voter = new SongVoter();
-        $result = $voter->vote($token, $song, [SongVoter::EDIT]);
-
-        // Without ownership information the voter cannot make an access
-        // decision. Denying by default makes the voter unusable for the real
-        // Song aggregate and leaves SongController endpoints unprotected.
-        $this->assertNotSame(VoterInterface::ACCESS_DENIED, $result);
+        foreach ([['ROLE_USER'], ['ROLE_ADMIN']] as $roles) {
+            $token = $this->createStub(TokenInterface::class);
+            $token->method('getUser')->willReturn(new SecurityUser(Uuid::generate()->toString(), 'user@baander.app', 'hashed', $roles));
+            $token->method('getRoleNames')->willReturn($roles);
+            foreach ([SongVoter::VIEW, SongVoter::EDIT, SongVoter::DELETE] as $attribute) {
+                self::assertSame(VoterInterface::ACCESS_ABSTAIN, $voter->vote($token, $song, [$attribute]));
+            }
+        }
     }
 }

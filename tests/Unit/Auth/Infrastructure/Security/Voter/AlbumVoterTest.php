@@ -4,190 +4,107 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Infrastructure\Security\Voter;
 
-use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Auth\Infrastructure\Security\Voter\AlbumVoter;
-use PHPUnit\Framework\MockObject\Stub;
+use App\Catalog\Domain\Model\Album;
+use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
+use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
+use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\VoterInterface;
 
 final class AlbumVoterTest extends TestCase
 {
-    private AlbumVoter $voter;
-
-    protected function setUp(): void
+    /** @return iterable<string, array{string, string, string, int}> */
+    public static function resourceVotes(): iterable
     {
-        $this->voter = new AlbumVoter();
+        foreach (['domain', 'orm', 'string'] as $kind) {
+            foreach (['user', 'admin'] as $actor) {
+                foreach (['VIEW', 'EDIT', 'DELETE'] as $attribute) {
+                    $expected = ($actor === 'admin') ? VoterInterface::ACCESS_GRANTED : VoterInterface::ACCESS_DENIED;
+                    yield "$kind $actor $attribute" => [$kind, $actor, $attribute, $expected];
+                }
+            }
+        }
     }
 
-    private function createToken(string $userId, array $roles): TokenInterface&Stub
+    #[DataProvider('resourceVotes')]
+    public function testRealResourceAndExplicitStringPolicy(string $kind, string $actor, string $attribute, int $expected): void
     {
-        $user = new SecurityUser($userId, 'user@example.com', 'hashed', $roles);
+        $userId = Uuid::generate();
+        $roles = $actor === 'admin' ? ['ROLE_ADMIN'] : ['ROLE_USER'];
 
-        $token = $this->createStub(TokenInterface::class);
-        $token->method('getUser')->willReturn($user);
-        $token->method('getRoleNames')->willReturn($roles);
-
-        return $token;
+        self::assertSame($expected, $this->voter()->vote($this->token($userId, $roles), $this->subject($kind), [$attribute]));
     }
 
-    private function createAlbumEntity(string $ownerId, string $id = 'album-id'): object
+    /** @return iterable<string, array{string, bool, string}> */
+    public static function unrelatedVotes(): iterable
     {
-        return new class($ownerId, $id) {
-            public function __construct(
-                private readonly string $ownerId,
-                private readonly string $id,
-            ) {
+        foreach (['duck', 'plain', 'null', 'other string'] as $kind) {
+            foreach ([false, true] as $admin) {
+                foreach (['VIEW', 'EDIT', 'DELETE'] as $attribute) {
+                    yield $kind . ($admin ? ' admin ' : ' ordinary ') . $attribute => [$kind, $admin, $attribute];
+                }
             }
+        }
+    }
 
-            public function getOwnerId(): string
-            {
-                return $this->ownerId;
-            }
-
-            public function getId(): string
-            {
-                return $this->id;
-            }
+    #[DataProvider('unrelatedVotes')]
+    public function testUnrelatedSubjectsAbstainEvenForAdmins(string $kind, bool $admin, string $attribute): void
+    {
+        $userId = Uuid::generate();
+        $subject = match ($kind) {
+            'duck' => new class($userId) {
+                public function __construct(private readonly Uuid $ownerId) {}
+                public function getOwnerId(): string { return $this->ownerId->toString(); }
+                public function getUserId(): Uuid { return $this->ownerId; }
+                public function getId(): Uuid { return Uuid::generate(); }
+                public function isCollaborator(string $userId): bool { return true; }
+            },
+            'plain' => new \stdClass(),
+            'null' => null,
+            default => 'unrelated',
         };
+
+        self::assertSame(VoterInterface::ACCESS_ABSTAIN, $this->voter()->vote($this->token($userId, $admin ? ['ROLE_ADMIN'] : ['ROLE_USER']), $subject, [$attribute]));
     }
 
-    // --- supports() ---
-
-    public function testSupportsStringSubject(): void
+    public function testUnknownAttributeAbstains(): void
     {
-        $token = $this->createToken('user-1', ['ROLE_USER']);
-        $this->assertNotEquals(VoterInterface::ACCESS_ABSTAIN, $this->voter->vote($token, 'album', [AlbumVoter::VIEW]));
-        $this->assertNotEquals(VoterInterface::ACCESS_ABSTAIN, $this->voter->vote($token, 'album', [AlbumVoter::EDIT]));
-        $this->assertNotEquals(VoterInterface::ACCESS_ABSTAIN, $this->voter->vote($token, 'album', [AlbumVoter::DELETE]));
+        self::assertSame(VoterInterface::ACCESS_ABSTAIN, $this->voter()->vote($this->token(Uuid::generate(), ['ROLE_ADMIN']), 'album', ['UNKNOWN']));
     }
 
-    public function testSupportsObjectSubject(): void
-    {
-        $entity = $this->createAlbumEntity('user-1');
-        $token = $this->createToken('user-1', ['ROLE_USER']);
-        $this->assertNotEquals(VoterInterface::ACCESS_ABSTAIN, $this->voter->vote($token, $entity, [AlbumVoter::VIEW]));
-    }
-
-    public function testAbstainsOnUnknownAttribute(): void
-    {
-        $token = $this->createToken('user-1', ['ROLE_USER']);
-        $this->assertSame(VoterInterface::ACCESS_ABSTAIN, $this->voter->vote($token, 'album', ['UNKNOWN']));
-    }
-
-    public function testAbstainsOnWrongStringSubject(): void
-    {
-        $token = $this->createToken('user-1', ['ROLE_USER']);
-        $this->assertSame(VoterInterface::ACCESS_ABSTAIN, $this->voter->vote($token, 'song', [AlbumVoter::VIEW]));
-    }
-
-    // --- Entity-based voting ---
-
-    public function testOwnerCanView(): void
-    {
-        $album = $this->createAlbumEntity('user-123');
-        $token = $this->createToken('user-123', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_GRANTED, $this->voter->vote($token, $album, [AlbumVoter::VIEW]));
-    }
-
-    public function testOwnerCanEdit(): void
-    {
-        $album = $this->createAlbumEntity('user-123');
-        $token = $this->createToken('user-123', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_GRANTED, $this->voter->vote($token, $album, [AlbumVoter::EDIT]));
-    }
-
-    public function testOwnerCanDelete(): void
-    {
-        $album = $this->createAlbumEntity('user-123');
-        $token = $this->createToken('user-123', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_GRANTED, $this->voter->vote($token, $album, [AlbumVoter::DELETE]));
-    }
-
-    public function testNonOwnerCannotView(): void
-    {
-        $album = $this->createAlbumEntity('user-123');
-        $token = $this->createToken('user-456', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, $album, [AlbumVoter::VIEW]));
-    }
-
-    public function testNonOwnerCannotEdit(): void
-    {
-        $album = $this->createAlbumEntity('user-123');
-        $token = $this->createToken('user-456', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, $album, [AlbumVoter::EDIT]));
-    }
-
-    public function testNonOwnerCannotDelete(): void
-    {
-        $album = $this->createAlbumEntity('user-123');
-        $token = $this->createToken('user-456', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, $album, [AlbumVoter::DELETE]));
-    }
-
-    // --- Admin override ---
-
-    public function testAdminCanViewAnyAlbum(): void
-    {
-        $album = $this->createAlbumEntity('user-123');
-        $token = $this->createToken('admin-1', ['ROLE_ADMIN']);
-
-        $this->assertSame(VoterInterface::ACCESS_GRANTED, $this->voter->vote($token, $album, [AlbumVoter::VIEW]));
-    }
-
-    public function testAdminCanEditAnyAlbum(): void
-    {
-        $album = $this->createAlbumEntity('user-123');
-        $token = $this->createToken('admin-1', ['ROLE_ADMIN']);
-
-        $this->assertSame(VoterInterface::ACCESS_GRANTED, $this->voter->vote($token, $album, [AlbumVoter::EDIT]));
-    }
-
-    public function testAdminCanDeleteAnyAlbum(): void
-    {
-        $album = $this->createAlbumEntity('user-123');
-        $token = $this->createToken('admin-1', ['ROLE_ADMIN']);
-
-        $this->assertSame(VoterInterface::ACCESS_GRANTED, $this->voter->vote($token, $album, [AlbumVoter::DELETE]));
-    }
-
-    // --- String subject fallback (the fix) ---
-
-    public function testStringSubjectDeniesView(): void
-    {
-        $token = $this->createToken('user-123', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, 'album', [AlbumVoter::VIEW]));
-    }
-
-    public function testStringSubjectDeniesEdit(): void
-    {
-        $token = $this->createToken('user-123', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, 'album', [AlbumVoter::EDIT]));
-    }
-
-    public function testStringSubjectDeniesDelete(): void
-    {
-        $token = $this->createToken('user-123', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, 'album', [AlbumVoter::DELETE]));
-    }
-
-    // --- Edge cases ---
-
-    public function testNonSecurityUserIsDenied(): void
+    public function testNonSecurityUserIsDeniedForSupportedSubject(): void
     {
         $token = $this->createStub(TokenInterface::class);
         $token->method('getUser')->willReturn(null);
 
-        $album = $this->createAlbumEntity('user-123');
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, $album, [AlbumVoter::VIEW]));
+        self::assertSame(VoterInterface::ACCESS_DENIED, $this->voter()->vote($token, 'album', ['VIEW']));
+    }
+
+    private function voter(): AlbumVoter
+    {
+        return new AlbumVoter();
+    }
+
+    private function subject(string $kind): object|string
+    {
+        return match ($kind) {
+            'domain' => Album::create(Uuid::generate(), 'Album', 'album'),
+            'orm' => new AlbumEntity(new PublicId(), new LibraryEntity('Music', 'music', '/music', 'music', 'local'), 'Album', 'album'),
+            default => 'album',
+        };
+    }
+
+    /** @param list<string> $roles */
+    private function token(Uuid $userId, array $roles): TokenInterface
+    {
+        $token = $this->createStub(TokenInterface::class);
+        $token->method('getUser')->willReturn(new SecurityUser($userId->toString(), 'user@baander.app', 'hashed', $roles));
+        $token->method('getRoleNames')->willReturn($roles);
+        return $token;
     }
 }

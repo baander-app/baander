@@ -4,243 +4,108 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Infrastructure\Security\Voter;
 
-use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Auth\Infrastructure\Security\Voter\PlaylistVoter;
-use PHPUnit\Framework\MockObject\Stub;
+use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Playlist\Domain\Model\Playlist;
+use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistEntity;
+use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\VoterInterface;
 
 final class PlaylistVoterTest extends TestCase
 {
-    private PlaylistVoter $voter;
-
-    protected function setUp(): void
+    /** @return iterable<string, array{string, string, string, int}> */
+    public static function resourceVotes(): iterable
     {
-        $this->voter = new PlaylistVoter();
+        foreach (['domain', 'orm', 'string'] as $kind) {
+            foreach (['owner', 'other', 'admin'] as $actor) {
+                foreach (['VIEW', 'EDIT', 'DELETE', 'MANAGE_COLLABORATORS'] as $attribute) {
+                    $expected = (($kind !== 'string' && $actor === 'owner') || $actor === 'admin') ? VoterInterface::ACCESS_GRANTED : VoterInterface::ACCESS_DENIED;
+                    yield "$kind $actor $attribute" => [$kind, $actor, $attribute, $expected];
+                }
+            }
+        }
     }
 
-    private function createToken(string $userId, array $roles): TokenInterface&Stub
+    #[DataProvider('resourceVotes')]
+    public function testRealResourceAndExplicitStringPolicy(string $kind, string $actor, string $attribute, int $expected): void
     {
-        $user = new SecurityUser($userId, 'user@example.com', 'hashed', $roles);
+        $ownerId = Uuid::generate();
+        $userId = $actor === 'owner' ? $ownerId : Uuid::generate();
+        $roles = $actor === 'admin' ? ['ROLE_ADMIN'] : ['ROLE_USER'];
 
-        $token = $this->createStub(TokenInterface::class);
-        $token->method('getUser')->willReturn($user);
-        $token->method('getRoleNames')->willReturn($roles);
-
-        return $token;
+        self::assertSame($expected, $this->voter()->vote($this->token($userId, $roles), $this->subject($kind, $ownerId), [$attribute]));
     }
 
-    private function createPlaylistEntity(string $ownerId, array $collaborators = [], string $id = 'playlist-id'): object
+    /** @return iterable<string, array{string, bool, string}> */
+    public static function unrelatedVotes(): iterable
     {
-        return new class($ownerId, $collaborators, $id) {
-            public function __construct(
-                private readonly string $ownerId,
-                private readonly array $collaborators,
-                private readonly string $id,
-            ) {
+        foreach (['duck', 'plain', 'null', 'other string'] as $kind) {
+            foreach ([false, true] as $admin) {
+                foreach (['VIEW', 'EDIT', 'DELETE', 'MANAGE_COLLABORATORS'] as $attribute) {
+                    yield $kind . ($admin ? ' admin ' : ' ordinary ') . $attribute => [$kind, $admin, $attribute];
+                }
             }
+        }
+    }
 
-            public function getUserId(): object
-            {
-                return new class($this->ownerId) {
-                    public function __construct(private readonly string $ownerId) {}
-                    public function toString(): string { return $this->ownerId; }
-                };
-            }
-
-            public function getId(): string
-            {
-                return $this->id;
-            }
-
-            public function isCollaborator(string $userId): bool
-            {
-                return in_array($userId, $this->collaborators, true);
-            }
+    #[DataProvider('unrelatedVotes')]
+    public function testUnrelatedSubjectsAbstainEvenForAdmins(string $kind, bool $admin, string $attribute): void
+    {
+        $userId = Uuid::generate();
+        $subject = match ($kind) {
+            'duck' => new class($userId) {
+                public function __construct(private readonly Uuid $ownerId) {}
+                public function getOwnerId(): string { return $this->ownerId->toString(); }
+                public function getUserId(): Uuid { return $this->ownerId; }
+                public function getId(): Uuid { return Uuid::generate(); }
+                public function isCollaborator(string $userId): bool { return true; }
+            },
+            'plain' => new \stdClass(),
+            'null' => null,
+            default => 'unrelated',
         };
+
+        self::assertSame(VoterInterface::ACCESS_ABSTAIN, $this->voter()->vote($this->token($userId, $admin ? ['ROLE_ADMIN'] : ['ROLE_USER']), $subject, [$attribute]));
     }
 
-    // --- supports() ---
-
-    public function testSupportsStringSubject(): void
+    public function testUnknownAttributeAbstains(): void
     {
-        $token = $this->createToken('user-1', ['ROLE_USER']);
-        $this->assertNotEquals(VoterInterface::ACCESS_ABSTAIN, $this->voter->vote($token, 'playlist', [PlaylistVoter::VIEW]));
-        $this->assertNotEquals(VoterInterface::ACCESS_ABSTAIN, $this->voter->vote($token, 'playlist', [PlaylistVoter::EDIT]));
-        $this->assertNotEquals(VoterInterface::ACCESS_ABSTAIN, $this->voter->vote($token, 'playlist', [PlaylistVoter::DELETE]));
-        $this->assertNotEquals(VoterInterface::ACCESS_ABSTAIN, $this->voter->vote($token, 'playlist', [PlaylistVoter::MANAGE_COLLABORATORS]));
+        self::assertSame(VoterInterface::ACCESS_ABSTAIN, $this->voter()->vote($this->token(Uuid::generate(), ['ROLE_ADMIN']), 'playlist', ['UNKNOWN']));
     }
 
-    public function testSupportsObjectSubject(): void
-    {
-        $entity = $this->createPlaylistEntity('user-1');
-        $token = $this->createToken('user-1', ['ROLE_USER']);
-        $this->assertNotEquals(VoterInterface::ACCESS_ABSTAIN, $this->voter->vote($token, $entity, [PlaylistVoter::VIEW]));
-    }
-
-    public function testAbstainsOnUnknownAttribute(): void
-    {
-        $token = $this->createToken('user-1', ['ROLE_USER']);
-        $this->assertSame(VoterInterface::ACCESS_ABSTAIN, $this->voter->vote($token, 'playlist', ['UNKNOWN']));
-    }
-
-    public function testAbstainsOnWrongStringSubject(): void
-    {
-        $token = $this->createToken('user-1', ['ROLE_USER']);
-        $this->assertSame(VoterInterface::ACCESS_ABSTAIN, $this->voter->vote($token, 'album', [PlaylistVoter::VIEW]));
-    }
-
-    // --- Entity-based voting: owner ---
-
-    public function testOwnerCanView(): void
-    {
-        $playlist = $this->createPlaylistEntity('user-123');
-        $token = $this->createToken('user-123', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_GRANTED, $this->voter->vote($token, $playlist, [PlaylistVoter::VIEW]));
-    }
-
-    public function testOwnerCanEdit(): void
-    {
-        $playlist = $this->createPlaylistEntity('user-123');
-        $token = $this->createToken('user-123', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_GRANTED, $this->voter->vote($token, $playlist, [PlaylistVoter::EDIT]));
-    }
-
-    public function testOwnerCanDelete(): void
-    {
-        $playlist = $this->createPlaylistEntity('user-123');
-        $token = $this->createToken('user-123', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_GRANTED, $this->voter->vote($token, $playlist, [PlaylistVoter::DELETE]));
-    }
-
-    public function testOwnerCanManageCollaborators(): void
-    {
-        $playlist = $this->createPlaylistEntity('user-123');
-        $token = $this->createToken('user-123', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_GRANTED, $this->voter->vote($token, $playlist, [PlaylistVoter::MANAGE_COLLABORATORS]));
-    }
-
-    // --- Entity-based voting: collaborator ---
-
-    public function testCollaboratorCanView(): void
-    {
-        $playlist = $this->createPlaylistEntity('user-123', ['user-456']);
-        $token = $this->createToken('user-456', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_GRANTED, $this->voter->vote($token, $playlist, [PlaylistVoter::VIEW]));
-    }
-
-    public function testCollaboratorCanEdit(): void
-    {
-        $playlist = $this->createPlaylistEntity('user-123', ['user-456']);
-        $token = $this->createToken('user-456', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_GRANTED, $this->voter->vote($token, $playlist, [PlaylistVoter::EDIT]));
-    }
-
-    public function testCollaboratorCannotDelete(): void
-    {
-        $playlist = $this->createPlaylistEntity('user-123', ['user-456']);
-        $token = $this->createToken('user-456', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, $playlist, [PlaylistVoter::DELETE]));
-    }
-
-    public function testCollaboratorCannotManageCollaborators(): void
-    {
-        $playlist = $this->createPlaylistEntity('user-123', ['user-456']);
-        $token = $this->createToken('user-456', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, $playlist, [PlaylistVoter::MANAGE_COLLABORATORS]));
-    }
-
-    // --- Entity-based voting: non-owner, non-collaborator ---
-
-    public function testNonOwnerNonCollaboratorCannotView(): void
-    {
-        $playlist = $this->createPlaylistEntity('user-123');
-        $token = $this->createToken('user-456', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, $playlist, [PlaylistVoter::VIEW]));
-    }
-
-    public function testNonOwnerNonCollaboratorCannotEdit(): void
-    {
-        $playlist = $this->createPlaylistEntity('user-123');
-        $token = $this->createToken('user-456', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, $playlist, [PlaylistVoter::EDIT]));
-    }
-
-    // --- Admin override ---
-
-    public function testAdminCanViewAnyPlaylist(): void
-    {
-        $playlist = $this->createPlaylistEntity('user-123');
-        $token = $this->createToken('admin-1', ['ROLE_ADMIN']);
-
-        $this->assertSame(VoterInterface::ACCESS_GRANTED, $this->voter->vote($token, $playlist, [PlaylistVoter::VIEW]));
-    }
-
-    public function testAdminCanManageCollaborators(): void
-    {
-        $playlist = $this->createPlaylistEntity('user-123');
-        $token = $this->createToken('admin-1', ['ROLE_ADMIN']);
-
-        $this->assertSame(VoterInterface::ACCESS_GRANTED, $this->voter->vote($token, $playlist, [PlaylistVoter::MANAGE_COLLABORATORS]));
-    }
-
-    public function testAdminCanDeleteAnyPlaylist(): void
-    {
-        $playlist = $this->createPlaylistEntity('user-123');
-        $token = $this->createToken('admin-1', ['ROLE_ADMIN']);
-
-        $this->assertSame(VoterInterface::ACCESS_GRANTED, $this->voter->vote($token, $playlist, [PlaylistVoter::DELETE]));
-    }
-
-    // --- String subject fallback (the fix) ---
-
-    public function testStringSubjectDeniesView(): void
-    {
-        $token = $this->createToken('user-123', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, 'playlist', [PlaylistVoter::VIEW]));
-    }
-
-    public function testStringSubjectDeniesEdit(): void
-    {
-        $token = $this->createToken('user-123', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, 'playlist', [PlaylistVoter::EDIT]));
-    }
-
-    public function testStringSubjectDeniesDelete(): void
-    {
-        $token = $this->createToken('user-123', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, 'playlist', [PlaylistVoter::DELETE]));
-    }
-
-    public function testStringSubjectDeniesManageCollaborators(): void
-    {
-        $token = $this->createToken('user-123', ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, 'playlist', [PlaylistVoter::MANAGE_COLLABORATORS]));
-    }
-
-    // --- Edge cases ---
-
-    public function testNonSecurityUserIsDenied(): void
+    public function testNonSecurityUserIsDeniedForSupportedSubject(): void
     {
         $token = $this->createStub(TokenInterface::class);
         $token->method('getUser')->willReturn(null);
 
-        $playlist = $this->createPlaylistEntity('user-123');
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, $playlist, [PlaylistVoter::VIEW]));
+        self::assertSame(VoterInterface::ACCESS_DENIED, $this->voter()->vote($token, 'playlist', ['VIEW']));
+    }
+
+    private function voter(): PlaylistVoter
+    {
+        return new PlaylistVoter();
+    }
+
+    private function subject(string $kind, Uuid $ownerId): object|string
+    {
+        return match ($kind) {
+            'domain' => Playlist::create('Playlist', $ownerId, isPublic: true, isCollaborative: true),
+            'orm' => new PlaylistEntity(new PublicId(), new UserEntity(new PublicId(), 'Owner', 'owner@baander.app', 'hashed', '', $ownerId), 'Playlist'),
+            default => 'playlist',
+        };
+    }
+
+    /** @param list<string> $roles */
+    private function token(Uuid $userId, array $roles): TokenInterface
+    {
+        $token = $this->createStub(TokenInterface::class);
+        $token->method('getUser')->willReturn(new SecurityUser($userId->toString(), 'user@baander.app', 'hashed', $roles));
+        $token->method('getRoleNames')->willReturn($roles);
+        return $token;
     }
 }

@@ -5,18 +5,18 @@ declare(strict_types=1);
 namespace App\Auth\Infrastructure\Security\Voter;
 
 use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Playlist\Domain\Model\Playlist;
+use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistEntity;
+use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\Vote;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
 /**
- * Voter for Playlist resource access control.
+ * Playlist subjects allow their owner and administrators. The domain and ORM
+ * model expose ownership differently; neither defines collaborator membership.
  *
- * Works with both string subjects ('playlist') and actual Playlist entities.
- * When a Playlist entity is available, it checks owner_id and collaborator
- * relations. With string subjects, it falls back to role-based access.
- *
- * Attributes: VIEW, EDIT, DELETE, MANAGE_COLLABORATORS
+ * @extends Voter<'VIEW'|'EDIT'|'DELETE'|'MANAGE_COLLABORATORS', Playlist|PlaylistEntity|'playlist'>
  */
 final class PlaylistVoter extends Voter
 {
@@ -28,41 +28,29 @@ final class PlaylistVoter extends Voter
     protected function supports(string $attribute, mixed $subject): bool
     {
         return in_array($attribute, [self::VIEW, self::EDIT, self::DELETE, self::MANAGE_COLLABORATORS], true)
-            && ($subject === 'playlist' || is_object($subject));
+            && ($subject === 'playlist' || $subject instanceof Playlist || $subject instanceof PlaylistEntity);
     }
 
     protected function voteOnAttribute(string $attribute, mixed $subject, TokenInterface $token, ?Vote $vote = null): bool
     {
         $user = $token->getUser();
-
-        if (!($user instanceof SecurityUser)) {
+        if (!$user instanceof SecurityUser) {
             return false;
         }
 
-        $roles = $token->getRoleNames();
-
-        // Admins can do everything
-        if (in_array('ROLE_ADMIN', $roles, true)) {
+        if (in_array('ROLE_ADMIN', $token->getRoleNames(), true)) {
             return true;
         }
 
-        // When the actual entity is available, check ownership/collaboration
-        if (is_object($subject) && method_exists($subject, 'getUserId')) {
-            $userId = $user->getId();
-            $isOwner = $subject->getUserId()->toString() === $userId;
-            $isCollaborator = method_exists($subject, 'isCollaborator')
-                && $subject->isCollaborator($userId);
-
-            return match ($attribute) {
-                self::VIEW => $isOwner || $isCollaborator,
-                self::EDIT => $isOwner || $isCollaborator,
-                self::DELETE => $isOwner,
-                self::MANAGE_COLLABORATORS => $isOwner,
-                default => false,
-            };
+        $userId = Uuid::fromString($user->getId());
+        if ($subject instanceof Playlist) {
+            return $subject->getUserId()->equals($userId);
         }
 
-        // String subject (no entity): deny by default to prevent accidental access
+        if ($subject instanceof PlaylistEntity) {
+            return $subject->getUser()->getId()->equals($userId);
+        }
+
         return false;
     }
 }

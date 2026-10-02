@@ -10,14 +10,10 @@ use Symfony\Component\Security\Core\Authorization\Voter\Vote;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
 /**
- * Voter for Song resource access control.
+ * Only the explicit song string is supported. The current Song domain and ORM
+ * models have no owner field and continue to make this voter abstain.
  *
- * Works with Song entities that expose an owner identifier via getOwnerId().
- * Real Song aggregates without ownership metadata are not supported and
- * cause the voter to abstain. String subjects ('song') are supported but
- * denied by default to prevent accidental access.
- *
- * Attributes: VIEW, EDIT, DELETE
+ * @extends Voter<'VIEW'|'EDIT'|'DELETE', 'song'>
  */
 final class SongVoter extends Voter
 {
@@ -28,36 +24,20 @@ final class SongVoter extends Voter
     protected function supports(string $attribute, mixed $subject): bool
     {
         return in_array($attribute, [self::VIEW, self::EDIT, self::DELETE], true)
-            && ($subject === 'song' || (is_object($subject) && method_exists($subject, 'getOwnerId')));
+            && ($subject === 'song');
     }
 
     protected function voteOnAttribute(string $attribute, mixed $subject, TokenInterface $token, ?Vote $vote = null): bool
     {
         $user = $token->getUser();
-
-        if (!($user instanceof SecurityUser)) {
+        if (!$user instanceof SecurityUser) {
             return false;
         }
 
-        $roles = $token->getRoleNames();
-
-        // Admins have unrestricted access
-        if (in_array('ROLE_ADMIN', $roles, true)) {
+        if (in_array('ROLE_ADMIN', $token->getRoleNames(), true)) {
             return true;
         }
 
-        // When the actual entity is available, check ownership
-        if (is_object($subject) && method_exists($subject, 'getOwnerId')) {
-            $userId = $user->getId();
-            $isOwner = $subject->getOwnerId() === $userId;
-
-            return match ($attribute) {
-                self::VIEW, self::EDIT, self::DELETE => $isOwner,
-                default => false,
-            };
-        }
-
-        // String subject (no entity): deny by default to prevent accidental access
         return false;
     }
 }

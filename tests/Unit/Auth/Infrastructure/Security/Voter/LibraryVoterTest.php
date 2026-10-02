@@ -4,226 +4,109 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Infrastructure\Security\Voter;
 
-use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Auth\Infrastructure\Security\Voter\LibraryVoter;
+use App\Library\Domain\Model\Library;
+use App\Library\Domain\ValueObject\LibraryPath;
+use App\Library\Domain\ValueObject\LibrarySlug;
+use App\Library\Domain\ValueObject\LibraryType;
+use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
+use App\Shared\Domain\ValueObject\FilesystemType;
+use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Shared\Domain\Model\Uuid;
-use Doctrine\DBAL\Connection;
-use PHPUnit\Framework\MockObject\Stub;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\VoterInterface;
 
 final class LibraryVoterTest extends TestCase
 {
-    private LibraryVoter $voter;
-    private Connection&Stub $connection;
-
-    protected function setUp(): void
+    /** @return iterable<string, array{string, string, string, int}> */
+    public static function resourceVotes(): iterable
     {
-        $this->connection = $this->createStub(Connection::class);
-        $this->voter = new LibraryVoter($this->connection);
+        foreach (['domain', 'orm', 'string'] as $kind) {
+            foreach (['user', 'admin'] as $actor) {
+                foreach (['VIEW', 'EDIT', 'DELETE'] as $attribute) {
+                    $expected = ($actor === 'admin') ? VoterInterface::ACCESS_GRANTED : VoterInterface::ACCESS_DENIED;
+                    yield "$kind $actor $attribute" => [$kind, $actor, $attribute, $expected];
+                }
+            }
+        }
     }
 
-    private function createToken(string $userId, array $roles): TokenInterface&Stub
+    #[DataProvider('resourceVotes')]
+    public function testRealResourceAndExplicitStringPolicy(string $kind, string $actor, string $attribute, int $expected): void
     {
-        $user = new SecurityUser($userId, 'user@example.com', 'hashed', $roles);
+        $userId = Uuid::generate();
+        $roles = $actor === 'admin' ? ['ROLE_ADMIN'] : ['ROLE_USER'];
 
-        $token = $this->createStub(TokenInterface::class);
-        $token->method('getUser')->willReturn($user);
-        $token->method('getRoleNames')->willReturn($roles);
-
-        return $token;
+        self::assertSame($expected, $this->voter()->vote($this->token($userId, $roles), $this->subject($kind), [$attribute]));
     }
 
-    /**
-     * Creates a library entity stub with real UUIDs so LibraryVoter can
-     * pass them to LibraryAccessService::canAccessLibrary().
-     */
-    private function createLibraryEntity(string $ownerId, ?string $id = null): object
+    /** @return iterable<string, array{string, bool, string}> */
+    public static function unrelatedVotes(): iterable
     {
-        return new class($ownerId, $id ?? Uuid::v4()->toString()) {
-            public function __construct(
-                private readonly string $ownerId,
-                private readonly string $id,
-            ) {
+        foreach (['duck', 'plain', 'null', 'other string'] as $kind) {
+            foreach ([false, true] as $admin) {
+                foreach (['VIEW', 'EDIT', 'DELETE'] as $attribute) {
+                    yield $kind . ($admin ? ' admin ' : ' ordinary ') . $attribute => [$kind, $admin, $attribute];
+                }
             }
+        }
+    }
 
-            public function getOwnerId(): string
-            {
-                return $this->ownerId;
-            }
-
-            public function getId(): string
-            {
-                return $this->id;
-            }
+    #[DataProvider('unrelatedVotes')]
+    public function testUnrelatedSubjectsAbstainEvenForAdmins(string $kind, bool $admin, string $attribute): void
+    {
+        $userId = Uuid::generate();
+        $subject = match ($kind) {
+            'duck' => new class($userId) {
+                public function __construct(private readonly Uuid $ownerId) {}
+                public function getOwnerId(): string { return $this->ownerId->toString(); }
+                public function getUserId(): Uuid { return $this->ownerId; }
+                public function getId(): Uuid { return Uuid::generate(); }
+                public function isCollaborator(string $userId): bool { return true; }
+            },
+            'plain' => new \stdClass(),
+            'null' => null,
+            default => 'unrelated',
         };
+
+        self::assertSame(VoterInterface::ACCESS_ABSTAIN, $this->voter()->vote($this->token($userId, $admin ? ['ROLE_ADMIN'] : ['ROLE_USER']), $subject, [$attribute]));
     }
 
-    // --- supports() ---
-
-    public function testSupportsStringSubject(): void
+    public function testUnknownAttributeAbstains(): void
     {
-        $token = $this->createToken(Uuid::v4()->toString(), ['ROLE_USER']);
-        $this->assertNotEquals(VoterInterface::ACCESS_ABSTAIN, $this->voter->vote($token, 'library', [LibraryVoter::VIEW]));
-        $this->assertNotEquals(VoterInterface::ACCESS_ABSTAIN, $this->voter->vote($token, 'library', [LibraryVoter::EDIT]));
-        $this->assertNotEquals(VoterInterface::ACCESS_ABSTAIN, $this->voter->vote($token, 'library', [LibraryVoter::DELETE]));
+        self::assertSame(VoterInterface::ACCESS_ABSTAIN, $this->voter()->vote($this->token(Uuid::generate(), ['ROLE_ADMIN']), 'library', ['UNKNOWN']));
     }
 
-    public function testSupportsObjectSubject(): void
-    {
-        $entity = $this->createLibraryEntity(Uuid::v4()->toString());
-        $token = $this->createToken(Uuid::v4()->toString(), ['ROLE_USER']);
-        $this->assertNotEquals(VoterInterface::ACCESS_ABSTAIN, $this->voter->vote($token, $entity, [LibraryVoter::VIEW]));
-    }
-
-    public function testAbstainsOnUnknownAttribute(): void
-    {
-        $token = $this->createToken(Uuid::v4()->toString(), ['ROLE_USER']);
-        $this->assertSame(VoterInterface::ACCESS_ABSTAIN, $this->voter->vote($token, 'library', ['UNKNOWN']));
-    }
-
-    public function testAbstainsOnWrongStringSubject(): void
-    {
-        $token = $this->createToken(Uuid::v4()->toString(), ['ROLE_USER']);
-        $this->assertSame(VoterInterface::ACCESS_ABSTAIN, $this->voter->vote($token, 'album', [LibraryVoter::VIEW]));
-    }
-
-    // --- Entity-based voting ---
-
-    public function testOwnerCanView(): void
-    {
-        $ownerId = Uuid::v4()->toString();
-        $library = $this->createLibraryEntity($ownerId);
-        $token = $this->createToken($ownerId, ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_GRANTED, $this->voter->vote($token, $library, [LibraryVoter::VIEW]));
-    }
-
-    public function testOwnerCanEdit(): void
-    {
-        $ownerId = Uuid::v4()->toString();
-        $library = $this->createLibraryEntity($ownerId);
-        $token = $this->createToken($ownerId, ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_GRANTED, $this->voter->vote($token, $library, [LibraryVoter::EDIT]));
-    }
-
-    public function testOwnerCanDelete(): void
-    {
-        $ownerId = Uuid::v4()->toString();
-        $library = $this->createLibraryEntity($ownerId);
-        $token = $this->createToken($ownerId, ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_GRANTED, $this->voter->vote($token, $library, [LibraryVoter::DELETE]));
-    }
-
-    public function testNonOwnerCannotViewWhenNoAccessGranted(): void
-    {
-        $ownerId = Uuid::v4()->toString();
-        $nonOwnerId = Uuid::v4()->toString();
-        $library = $this->createLibraryEntity($ownerId);
-        $token = $this->createToken($nonOwnerId, ['ROLE_USER']);
-
-        $this->connection->method('fetchOne')->willReturn(false);
-
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, $library, [LibraryVoter::VIEW]));
-    }
-
-    public function testNonOwnerCanViewWhenAccessGrantedByService(): void
-    {
-        $ownerId = Uuid::v4()->toString();
-        $nonOwnerId = Uuid::v4()->toString();
-        $library = $this->createLibraryEntity($ownerId);
-        $token = $this->createToken($nonOwnerId, ['ROLE_USER']);
-
-        $this->connection->method('fetchOne')->willReturn('1');
-
-        $this->assertSame(VoterInterface::ACCESS_GRANTED, $this->voter->vote($token, $library, [LibraryVoter::VIEW]));
-    }
-
-    public function testNonOwnerCannotEditWhenNoAccessGranted(): void
-    {
-        $ownerId = Uuid::v4()->toString();
-        $nonOwnerId = Uuid::v4()->toString();
-        $library = $this->createLibraryEntity($ownerId);
-        $token = $this->createToken($nonOwnerId, ['ROLE_USER']);
-
-        $this->connection->method('fetchOne')->willReturn(false);
-
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, $library, [LibraryVoter::EDIT]));
-    }
-
-    public function testNonOwnerCannotDeleteEvenWithAccessGranted(): void
-    {
-        $ownerId = Uuid::v4()->toString();
-        $nonOwnerId = Uuid::v4()->toString();
-        $library = $this->createLibraryEntity($ownerId);
-        $token = $this->createToken($nonOwnerId, ['ROLE_USER']);
-
-        // Only owner can delete, access service result is irrelevant
-        $this->connection->method('fetchOne')->willReturn('1');
-
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, $library, [LibraryVoter::DELETE]));
-    }
-
-    // --- Admin override ---
-
-    public function testAdminCanViewAnyLibrary(): void
-    {
-        $library = $this->createLibraryEntity(Uuid::v4()->toString());
-        $token = $this->createToken(Uuid::v4()->toString(), ['ROLE_ADMIN']);
-
-        $this->assertSame(VoterInterface::ACCESS_GRANTED, $this->voter->vote($token, $library, [LibraryVoter::VIEW]));
-    }
-
-    public function testAdminCanEditAnyLibrary(): void
-    {
-        $library = $this->createLibraryEntity(Uuid::v4()->toString());
-        $token = $this->createToken(Uuid::v4()->toString(), ['ROLE_ADMIN']);
-
-        $this->assertSame(VoterInterface::ACCESS_GRANTED, $this->voter->vote($token, $library, [LibraryVoter::EDIT]));
-    }
-
-    public function testAdminCanDeleteAnyLibrary(): void
-    {
-        $library = $this->createLibraryEntity(Uuid::v4()->toString());
-        $token = $this->createToken(Uuid::v4()->toString(), ['ROLE_ADMIN']);
-
-        $this->assertSame(VoterInterface::ACCESS_GRANTED, $this->voter->vote($token, $library, [LibraryVoter::DELETE]));
-    }
-
-    // --- String subject fallback (the fix) ---
-
-    public function testStringSubjectDeniesView(): void
-    {
-        $token = $this->createToken(Uuid::v4()->toString(), ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, 'library', [LibraryVoter::VIEW]));
-    }
-
-    public function testStringSubjectDeniesEdit(): void
-    {
-        $token = $this->createToken(Uuid::v4()->toString(), ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, 'library', [LibraryVoter::EDIT]));
-    }
-
-    public function testStringSubjectDeniesDelete(): void
-    {
-        $token = $this->createToken(Uuid::v4()->toString(), ['ROLE_USER']);
-
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, 'library', [LibraryVoter::DELETE]));
-    }
-
-    // --- Edge cases ---
-
-    public function testNonSecurityUserIsDenied(): void
+    public function testNonSecurityUserIsDeniedForSupportedSubject(): void
     {
         $token = $this->createStub(TokenInterface::class);
         $token->method('getUser')->willReturn(null);
 
-        $library = $this->createLibraryEntity(Uuid::v4()->toString());
-        $this->assertSame(VoterInterface::ACCESS_DENIED, $this->voter->vote($token, $library, [LibraryVoter::VIEW]));
+        self::assertSame(VoterInterface::ACCESS_DENIED, $this->voter()->vote($token, 'library', ['VIEW']));
+    }
+
+    private function voter(): LibraryVoter
+    {
+        return new LibraryVoter();
+    }
+
+    private function subject(string $kind): object|string
+    {
+        return match ($kind) {
+            'domain' => Library::create('Music', new LibrarySlug('music'), new LibraryPath('/music'), LibraryType::Music, FilesystemType::Local),
+            'orm' => new LibraryEntity('Music', 'music', '/music', 'music', 'local'),
+            default => 'library',
+        };
+    }
+
+    /** @param list<string> $roles */
+    private function token(Uuid $userId, array $roles): TokenInterface
+    {
+        $token = $this->createStub(TokenInterface::class);
+        $token->method('getUser')->willReturn(new SecurityUser($userId->toString(), 'user@baander.app', 'hashed', $roles));
+        $token->method('getRoleNames')->willReturn($roles);
+        return $token;
     }
 }
