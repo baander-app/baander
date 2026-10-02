@@ -11,23 +11,28 @@ use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Auth\Infrastructure\Security\UserProvider;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\Exception\UnsupportedUserException;
 use Symfony\Component\Security\Core\Exception\UserNotFoundException;
 
 final class UserProviderTest extends TestCase
 {
-    private UserRepositoryInterface&MockObject $userRepository;
+    private UserRepositoryInterface $userRepository;
     private UserProvider $provider;
 
     protected function setUp(): void
     {
-        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
-        $this->provider = new UserProvider(
+        $this->userRepository = $this->createStub(UserRepositoryInterface::class);
+        $this->provider = $this->createUserProviderFixture();
+    }
+
+    private function createUserProviderFixture(): UserProvider
+    {
+        $fixture = new UserProvider(
             $this->userRepository,
             $this->createPasswordHasher(),
         );
+        return $fixture;
     }
 
     private function createPasswordHasher(): \App\Auth\Infrastructure\Security\User\PasswordHasher
@@ -35,10 +40,10 @@ final class UserProviderTest extends TestCase
         $factory = $this->createMock(
             \Symfony\Component\PasswordHasher\Hasher\PasswordHasherFactoryInterface::class,
         );
-        $symfonyHasher = $this->createMock(
+        $symfonyHasher = $this->createStub(
             \Symfony\Component\PasswordHasher\PasswordHasherInterface::class,
         );
-        $factory->method('getPasswordHasher')->with(SecurityUser::class)->willReturn($symfonyHasher);
+        $factory->expects($this->once())->method('getPasswordHasher')->with(SecurityUser::class)->willReturn($symfonyHasher);
 
         return new \App\Auth\Infrastructure\Security\User\PasswordHasher($factory);
     }
@@ -74,6 +79,9 @@ final class UserProviderTest extends TestCase
 
     public function testLoadsUserByEmail(): void
     {
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->provider = $this->createUserProviderFixture();
+
         $email = 'test@example.com';
         $domainUser = $this->createDomainUser($email, 'hashed-pw');
 
@@ -116,6 +124,9 @@ final class UserProviderTest extends TestCase
 
     public function testRefreshesSecurityUser(): void
     {
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->provider = $this->createUserProviderFixture();
+
         $domainUser = $this->createDomainUser('test@example.com', 'new-hash');
         $securityUser = new SecurityUser(
             $domainUser->getId()->toString(),
@@ -138,7 +149,7 @@ final class UserProviderTest extends TestCase
 
     public function testThrowsWhenRefreshingNonSecurityUser(): void
     {
-        $otherUser = $this->createMock(\Symfony\Component\Security\Core\User\UserInterface::class);
+        $otherUser = $this->createStub(\Symfony\Component\Security\Core\User\UserInterface::class);
 
         $this->expectException(UnsupportedUserException::class);
 
@@ -164,6 +175,9 @@ final class UserProviderTest extends TestCase
 
     public function testUpgradesPasswordForSecurityUser(): void
     {
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->provider = $this->createUserProviderFixture();
+
         $domainUser = $this->createDomainUser('test@example.com', 'old-hash');
         $newHash = 'new-hashed-password';
 
@@ -174,6 +188,7 @@ final class UserProviderTest extends TestCase
         );
 
         $this->userRepository
+            ->expects($this->once())
             ->method('findByUuid')
             ->with($domainUser->getId())
             ->willReturn($domainUser);
@@ -191,7 +206,10 @@ final class UserProviderTest extends TestCase
 
     public function testUpgradePasswordDoesNothingForNonSecurityUser(): void
     {
-        $otherUser = $this->createMock(\Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface::class);
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->provider = $this->createUserProviderFixture();
+
+        $otherUser = $this->createStub(\Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface::class);
 
         $this->userRepository
             ->expects($this->never())
@@ -202,6 +220,9 @@ final class UserProviderTest extends TestCase
 
     public function testUpgradePasswordDoesNothingWhenUserNotFound(): void
     {
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->provider = $this->createUserProviderFixture();
+
         $userUuid = Uuid::v4();
         $securityUser = new SecurityUser($userUuid->toString(), 'test@example.com', 'old-hash');
 

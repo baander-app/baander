@@ -19,14 +19,14 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 final class EndPartySessionHandlerTest extends TestCase
 {
     private PartySessionPortInterface&MockObject $sessionPort;
-    private PartyMemberPortInterface&MockObject $memberPort;
+    private PartyMemberPortInterface $memberPort;
     private EventDispatcherInterface&MockObject $eventDispatcher;
     private EndPartySessionHandler $handler;
 
     protected function setUp(): void
     {
         $this->sessionPort = $this->createMock(PartySessionPortInterface::class);
-        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
+        $this->memberPort = $this->createStub(PartyMemberPortInterface::class);
         $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
         $this->eventDispatcher->method('dispatch')->willReturnCallback(fn (object $e) => $e);
         $this->handler = new EndPartySessionHandler($this->sessionPort, $this->memberPort, $this->eventDispatcher);

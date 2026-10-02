@@ -14,7 +14,6 @@ use App\Auth\Infrastructure\Security\Totp\TotpService;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -26,21 +25,21 @@ final class PasswordAuthenticatorTest extends TestCase
 {
     private PasswordAuthenticator $authenticator;
     private TotpService $totpService;
-    private UserRepositoryInterface&MockObject $userRepository;
-    private PasswordHasherInterface&MockObject $passwordHasher;
-    private LoggerInterface&MockObject $logger;
+    private UserRepositoryInterface $userRepository;
+    private PasswordHasherInterface $passwordHasher;
+    private LoggerInterface $logger;
 
     protected function setUp(): void
     {
         $this->totpService = new TotpService(issuer: 'Test', window: 0);
-        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
-        $this->passwordHasher = $this->createMock(PasswordHasherInterface::class);
-        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->userRepository = $this->createStub(UserRepositoryInterface::class);
+        $this->passwordHasher = $this->createStub(PasswordHasherInterface::class);
+        $this->logger = $this->createStub(LoggerInterface::class);
         $this->authenticator = new PasswordAuthenticator(
             $this->totpService,
             $this->userRepository,
             $this->passwordHasher,
-            $this->createMock(LoginBlockRepositoryInterface::class),
+            $this->createStub(LoginBlockRepositoryInterface::class),
             $this->logger,
             new JsonEncoder(),
         );
@@ -217,7 +216,7 @@ final class PasswordAuthenticatorTest extends TestCase
     {
         $result = $this->authenticator->onAuthenticationSuccess(
             Request::create('/'),
-            $this->createMock(TokenInterface::class),
+            $this->createStub(TokenInterface::class),
             'main',
         );
 
@@ -284,9 +283,9 @@ final class PasskeyAuthenticatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $bus = $this->createMock(\Symfony\Component\Messenger\MessageBusInterface::class);
-        $logger = $this->createMock(LoggerInterface::class);
-        $this->authenticator = new PasskeyAuthenticator($bus, $this->createMock(\App\Auth\Domain\Repository\UserRepositoryInterface::class), $logger);
+        $bus = $this->createStub(\Symfony\Component\Messenger\MessageBusInterface::class);
+        $logger = $this->createStub(LoggerInterface::class);
+        $this->authenticator = new PasskeyAuthenticator($bus, $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class), $logger);
     }
 
     public function testSupportsCorrectRoute(): void
@@ -317,7 +316,7 @@ final class PasskeyAuthenticatorTest extends TestCase
     {
         $result = $this->authenticator->onAuthenticationSuccess(
             Request::create('/'),
-            $this->createMock(\Symfony\Component\Security\Core\Authentication\Token\TokenInterface::class),
+            $this->createStub(\Symfony\Component\Security\Core\Authentication\Token\TokenInterface::class),
             'main',
         );
 

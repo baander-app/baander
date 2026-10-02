@@ -6,24 +6,23 @@ namespace App\Tests\Unit\Shared\Infrastructure\Redis;
 
 use App\Shared\Infrastructure\Redis\ManagedRedisConnection;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Redis;
 
 final class ManagedRedisConnectionTest extends TestCase
 {
-    private Redis&MockObject $redis;
+    private Redis $redis;
 
     private ConnectionReturnSpy $spy;
 
-    private LoggerInterface&MockObject $logger;
+    private LoggerInterface $logger;
 
     protected function setUp(): void
     {
-        $this->redis = $this->createMock(Redis::class);
+        $this->redis = $this->createStub(Redis::class);
         $this->spy = new ConnectionReturnSpy();
-        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->logger = $this->createStub(LoggerInterface::class);
     }
 
     private function createConnection(): ManagedRedisConnection
@@ -38,7 +37,9 @@ final class ManagedRedisConnectionTest extends TestCase
 
     public function test_delegates_method_call_to_redis(): void
     {
-        $this->redis->method('get')->with('mykey')->willReturn('myvalue');
+        $this->redis = $this->createMock(Redis::class);
+
+        $this->redis->expects($this->once())->method('get')->with('mykey')->willReturn('myvalue');
 
         $conn = $this->createConnection();
 
@@ -47,7 +48,9 @@ final class ManagedRedisConnectionTest extends TestCase
 
     public function test_delegates_setex(): void
     {
-        $this->redis->method('setex')->with('key', 60, 'value')->willReturn(true);
+        $this->redis = $this->createMock(Redis::class);
+
+        $this->redis->expects($this->once())->method('setex')->with('key', 60, 'value')->willReturn(true);
 
         $conn = $this->createConnection();
 
@@ -84,6 +87,8 @@ final class ManagedRedisConnectionTest extends TestCase
 
     public function test_destructor_logs_warning_if_not_released(): void
     {
+        $this->logger = $this->createMock(LoggerInterface::class);
+
         $this->logger->expects($this->once())
             ->method('warning')
             ->with($this->stringContains('released'));
@@ -95,6 +100,8 @@ final class ManagedRedisConnectionTest extends TestCase
 
     public function test_destructor_no_warning_if_released(): void
     {
+        $this->logger = $this->createMock(LoggerInterface::class);
+
         $this->logger->expects($this->never())->method('warning');
 
         $conn = $this->createConnection();

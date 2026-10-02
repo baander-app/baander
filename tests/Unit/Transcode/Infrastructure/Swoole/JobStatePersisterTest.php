@@ -13,7 +13,6 @@ use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\TranscodeStatus;
 use App\Transcode\Infrastructure\Swoole\JobStatePersister;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
@@ -21,16 +20,16 @@ use Symfony\Component\Serializer\Exception\NotEncodableValueException;
 
 final class JobStatePersisterTest extends TestCase
 {
-    private TranscodeJobRepositoryInterface&MockObject $jobRepository;
-    private TranscodeStoragePortInterface&MockObject $storage;
-    private LoggerInterface&MockObject $logger;
+    private TranscodeJobRepositoryInterface $jobRepository;
+    private TranscodeStoragePortInterface $storage;
+    private LoggerInterface $logger;
     private string $stateDir;
 
     protected function setUp(): void
     {
-        $this->jobRepository = $this->createMock(TranscodeJobRepositoryInterface::class);
-        $this->storage = $this->createMock(TranscodeStoragePortInterface::class);
-        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->jobRepository = $this->createStub(TranscodeJobRepositoryInterface::class);
+        $this->storage = $this->createStub(TranscodeStoragePortInterface::class);
+        $this->logger = $this->createStub(LoggerInterface::class);
         $this->stateDir = sys_get_temp_dir() . '/baander_test_job_state_' . uniqid();
     }
 
@@ -43,6 +42,8 @@ final class JobStatePersisterTest extends TestCase
 
     public function testPersistAndLoadRoundTripsCorrectly(): void
     {
+        $this->logger = $this->createMock(LoggerInterface::class);
+
         $this->logger->expects($this->once())->method('debug');
         $this->storage->method('exists')->willReturn(true);
 
@@ -104,6 +105,8 @@ final class JobStatePersisterTest extends TestCase
 
     public function testPersistForCompletedJobIsNoOp(): void
     {
+        $this->logger = $this->createMock(LoggerInterface::class);
+
         $job = TranscodeJob::create(Uuid::v4(), QualityTier::p720(), '/tmp/output');
         $job->markInProgress();
         $job->markSegmentCompleted(0, '/tmp/output/seg0.m4s', 1000, 2.0);
@@ -120,6 +123,8 @@ final class JobStatePersisterTest extends TestCase
 
     public function testPersistForFailedJobIsNoOp(): void
     {
+        $this->logger = $this->createMock(LoggerInterface::class);
+
         $job = TranscodeJob::create(Uuid::v4(), QualityTier::p720(), '/tmp/output');
         $job->markInProgress();
         $job->markFailed('encoder crashed');
@@ -135,6 +140,8 @@ final class JobStatePersisterTest extends TestCase
 
     public function testPersistForCancelledJobIsNoOp(): void
     {
+        $this->logger = $this->createMock(LoggerInterface::class);
+
         $job = TranscodeJob::create(Uuid::v4(), QualityTier::p720(), '/tmp/output');
         $job->markCancelled();
 

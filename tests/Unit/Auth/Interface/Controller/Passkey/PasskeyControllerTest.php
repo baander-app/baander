@@ -17,24 +17,33 @@ use Symfony\Bundle\SecurityBundle\Security;
 
 final class PasskeyControllerTest extends TestCase
 {
-    private Security&MockObject $security;
-    private PasskeyRepositoryInterface&MockObject $passkeyRepository;
+    private Security $security;
+    private PasskeyRepositoryInterface $passkeyRepository;
     private PasskeyController $controller;
 
     protected function setUp(): void
     {
-        $this->security = $this->createMock(Security::class);
-        $this->passkeyRepository = $this->createMock(PasskeyRepositoryInterface::class);
+        $this->security = $this->createStub(Security::class);
+        $this->passkeyRepository = $this->createStub(PasskeyRepositoryInterface::class);
 
+        $this->controller = $this->createController();
+    }
+
+    private function createController(): PasskeyController
+    {
         $ref = new \ReflectionClass(PasskeyController::class);
-        $this->controller = $ref->newInstanceWithoutConstructor();
+        $controller = $ref->newInstanceWithoutConstructor();
 
-        $this->setPrivate($this->controller, 'security', $this->security);
-        $this->setPrivate($this->controller, 'passkeyRepository', $this->passkeyRepository);
+        $this->setPrivate($controller, 'security', $this->security);
+        $this->setPrivate($controller, 'passkeyRepository', $this->passkeyRepository);
+        return $controller;
     }
 
     public function testListReturnsPasskeysForAuthenticatedUser(): void
     {
+        $this->passkeyRepository = $this->createMock(PasskeyRepositoryInterface::class);
+        $this->controller = $this->createController();
+
         $userId = Uuid::v4();
         $user = new SecurityUser(
             id: $userId->toString(),

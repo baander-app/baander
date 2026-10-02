@@ -13,30 +13,35 @@ use App\Shared\Infrastructure\Security\WsQueryTokenAuthenticator;
 use League\OAuth2\Server\Exception\OAuthServerException;
 use League\OAuth2\Server\ResourceServer;
 use Nyholm\Psr7\Factory\Psr17Factory;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bridge\PsrHttpMessage\HttpMessageFactoryInterface;
 
 final class WsQueryTokenAuthenticatorTest extends TestCase
 {
     private WsQueryTokenAuthenticator $authenticator;
-    private ResourceServer&MockObject $resourceServer;
-    private UserRepositoryInterface&MockObject $userRepository;
-    private HttpMessageFactoryInterface&MockObject $psrHttpFactory;
+    private ResourceServer $resourceServer;
+    private UserRepositoryInterface $userRepository;
+    private HttpMessageFactoryInterface $psrHttpFactory;
     private Psr17Factory $psr17Factory;
 
     protected function setUp(): void
     {
-        $this->resourceServer = $this->createMock(ResourceServer::class);
-        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
-        $this->psrHttpFactory = $this->createMock(HttpMessageFactoryInterface::class);
+        $this->resourceServer = $this->createStub(ResourceServer::class);
+        $this->userRepository = $this->createStub(UserRepositoryInterface::class);
+        $this->psrHttpFactory = $this->createStub(HttpMessageFactoryInterface::class);
         $this->psr17Factory = new Psr17Factory();
 
-        $this->authenticator = new WsQueryTokenAuthenticator(
+        $this->authenticator = $this->createWsQueryTokenAuthenticatorFixture();
+    }
+
+    private function createWsQueryTokenAuthenticatorFixture(): WsQueryTokenAuthenticator
+    {
+        $fixture = new WsQueryTokenAuthenticator(
             $this->resourceServer,
             $this->userRepository,
             $this->psrHttpFactory,
         );
+        return $fixture;
     }
 
     private function createSwooleRequest(array $get = [], string $requestUri = '/api/ws'): \Swoole\Http\Request
@@ -111,6 +116,9 @@ final class WsQueryTokenAuthenticatorTest extends TestCase
 
     public function testAuthenticateReturnsNullWhenUserNotFound(): void
     {
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->authenticator = $this->createWsQueryTokenAuthenticatorFixture();
+
         $uuid = Uuid::fromString('00000000-0000-7000-8000-000000000099');
         $swooleRequest = $this->createSwooleRequest(['token' => 'valid-token']);
 
@@ -129,6 +137,7 @@ final class WsQueryTokenAuthenticatorTest extends TestCase
             ->willReturn($validatedRequest);
 
         $this->userRepository
+            ->expects($this->once())
             ->method('findByUuid')
             ->with($uuid)
             ->willReturn(null);
@@ -140,6 +149,9 @@ final class WsQueryTokenAuthenticatorTest extends TestCase
 
     public function testAuthenticateReturnsUserIdOnSuccess(): void
     {
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->authenticator = $this->createWsQueryTokenAuthenticatorFixture();
+
         $uuid = Uuid::fromString('00000000-0000-7000-8000-000000000001');
         $swooleRequest = $this->createSwooleRequest(['token' => 'valid-token']);
 
@@ -171,6 +183,7 @@ final class WsQueryTokenAuthenticatorTest extends TestCase
         ));
 
         $this->userRepository
+            ->expects($this->once())
             ->method('findByUuid')
             ->with($uuid)
             ->willReturn($user);

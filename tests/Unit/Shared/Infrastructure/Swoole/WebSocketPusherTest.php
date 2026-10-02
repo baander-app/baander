@@ -38,7 +38,7 @@ final class WebSocketPusherTest extends TestCase
     {
         $this->registry->addConnection(10, 'user-1', 0);
 
-        $this->server->method('isEstablished')->with(10)->willReturn(true);
+        $this->server->expects($this->once())->method('isEstablished')->with(10)->willReturn(true);
         $this->server->expects($this->once())
             ->method('push')
             ->with(10, '{"type":"test","data":"hello"}')
@@ -91,7 +91,7 @@ final class WebSocketPusherTest extends TestCase
 
     public function testPushToConnectionWithArrayPayload(): void
     {
-        $this->server->method('isEstablished')->with(42)->willReturn(true);
+        $this->server->expects($this->once())->method('isEstablished')->with(42)->willReturn(true);
         $this->server->expects($this->once())
             ->method('push')
             ->with(42, '{"type":"direct"}')
@@ -103,7 +103,7 @@ final class WebSocketPusherTest extends TestCase
 
     public function testPushToConnectionWithStringPayload(): void
     {
-        $this->server->method('isEstablished')->with(42)->willReturn(true);
+        $this->server->expects($this->once())->method('isEstablished')->with(42)->willReturn(true);
         $this->server->expects($this->once())
             ->method('push')
             ->with(42, 'raw-string-payload')
@@ -115,7 +115,7 @@ final class WebSocketPusherTest extends TestCase
 
     public function testPushToClosedConnectionReturnsFalse(): void
     {
-        $this->server->method('isEstablished')->with(99)->willReturn(false);
+        $this->server->expects($this->once())->method('isEstablished')->with(99)->willReturn(false);
         $this->server->expects($this->never())->method('push');
 
         $result = $this->pusher->pushToConnection(99, ['type' => 'test']);

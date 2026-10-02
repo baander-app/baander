@@ -14,7 +14,6 @@ use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\Envelope;
@@ -23,39 +22,54 @@ use RuntimeException;
 
 final class RegisterUserHandlerTest extends TestCase
 {
-    private UserRepositoryInterface&MockObject $userRepository;
-    private PasswordHasherInterface&MockObject $passwordHasher;
-    private EventDispatcherInterface&MockObject $eventDispatcher;
-    private MessageBusInterface&MockObject $bus;
-    private EmailVerificationTokenRepositoryInterface&MockObject $emailVerificationTokenRepository;
+    private UserRepositoryInterface $userRepository;
+    private PasswordHasherInterface $passwordHasher;
+    private EventDispatcherInterface $eventDispatcher;
+    private MessageBusInterface $bus;
+    private EmailVerificationTokenRepositoryInterface $emailVerificationTokenRepository;
     private RegisterUserHandler $handler;
 
     protected function setUp(): void
     {
-        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
-        $this->passwordHasher = $this->createMock(PasswordHasherInterface::class);
-        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-        $this->bus = $this->createMock(MessageBusInterface::class);
+        $this->userRepository = $this->createStub(UserRepositoryInterface::class);
+        $this->passwordHasher = $this->createStub(PasswordHasherInterface::class);
+        $this->eventDispatcher = $this->createStub(EventDispatcherInterface::class);
+        $this->bus = $this->createStub(MessageBusInterface::class);
         $this->bus->method('dispatch')->willReturnCallback(fn (object $m) => new Envelope($m));
-        $this->emailVerificationTokenRepository = $this->createMock(EmailVerificationTokenRepositoryInterface::class);
-        $this->emailVerificationTokenRepository->method('createForUser')->willReturnCallback(
+        $this->emailVerificationTokenRepository = $this->createVerificationTokenRepository();
+        $this->handler = $this->createRegisterUserHandlerFixture();
+    }
+
+    private function createVerificationTokenRepository(bool $expectCalls = false): EmailVerificationTokenRepositoryInterface
+    {
+        $double = $expectCalls ? $this->createMock(EmailVerificationTokenRepositoryInterface::class) : $this->createStub(EmailVerificationTokenRepositoryInterface::class);
+        $double->method('createForUser')->willReturnCallback(
             fn ($userId, $token, $expiresAt) => new EmailVerificationTokenEntity(
                 new UserEntity(new PublicId(), 'Test', 'test@example.com', 'pw', ''),
                 $token,
                 $expiresAt,
             ),
         );
-        $this->handler = new RegisterUserHandler(
+        return $double;
+    }
+
+    private function createRegisterUserHandlerFixture(): RegisterUserHandler
+    {
+        $fixture = new RegisterUserHandler(
             $this->userRepository,
             $this->passwordHasher,
             $this->eventDispatcher,
             $this->bus,
             $this->emailVerificationTokenRepository,
         );
+        return $fixture;
     }
 
     public function testRegistersUser(): void
     {
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->handler = $this->createRegisterUserHandlerFixture();
+
         $email = new Email('test@example.com');
         $this->userRepository->method('existsWithEmail')->willReturn(false);
         $this->passwordHasher->method('hash')->willReturn('hashed-pw');
@@ -80,6 +94,10 @@ final class RegisterUserHandlerTest extends TestCase
 
     public function testCreatesEmailVerificationTokenAfterRegistration(): void
     {
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->emailVerificationTokenRepository = $this->createVerificationTokenRepository(expectCalls: true);
+        $this->handler = $this->createRegisterUserHandlerFixture();
+
         $email = new Email('test@example.com');
         $this->userRepository->method('existsWithEmail')->willReturn(false);
         $this->passwordHasher->method('hash')->willReturn('hashed-pw');

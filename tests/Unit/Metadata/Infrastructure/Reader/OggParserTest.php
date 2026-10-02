@@ -14,7 +14,7 @@ final class OggParserTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->logger = $this->createStub(LoggerInterface::class);
     }
 
     public function testParsesVorbisComments(): void

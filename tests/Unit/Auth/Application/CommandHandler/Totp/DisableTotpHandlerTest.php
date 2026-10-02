@@ -10,30 +10,39 @@ use App\Auth\Application\Port\TotpVerifierInterface;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Domain\Model\Email;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 final class DisableTotpHandlerTest extends TestCase
 {
-    private UserRepositoryInterface&MockObject $userRepository;
-    private TotpVerifierInterface&MockObject $totpVerifier;
+    private UserRepositoryInterface $userRepository;
+    private TotpVerifierInterface $totpVerifier;
     private DisableTotpHandler $handler;
 
     protected function setUp(): void
     {
-        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
-        $this->totpVerifier = $this->createMock(TotpVerifierInterface::class);
-        $this->handler = new DisableTotpHandler($this->userRepository, $this->totpVerifier);
+        $this->userRepository = $this->createStub(UserRepositoryInterface::class);
+        $this->totpVerifier = $this->createStub(TotpVerifierInterface::class);
+        $this->handler = $this->createDisableTotpHandlerFixture();
+    }
+
+    private function createDisableTotpHandlerFixture(): DisableTotpHandler
+    {
+        $fixture = new DisableTotpHandler($this->userRepository, $this->totpVerifier);
+        return $fixture;
     }
 
     public function testDisablesTotpWithValidCode(): void
     {
+        $this->totpVerifier = $this->createMock(TotpVerifierInterface::class);
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->handler = $this->createDisableTotpHandlerFixture();
+
         $user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
         $user->setTotpSecret('JBSWY3DPEHPK3PXP');
 
         $this->userRepository->method('findByUuid')->willReturn($user);
-        $this->totpVerifier->method('verifyCode')->with('JBSWY3DPEHPK3PXP', '123456')->willReturn(true);
+        $this->totpVerifier->expects($this->once())->method('verifyCode')->with('JBSWY3DPEHPK3PXP', '123456')->willReturn(true);
         $this->userRepository->expects($this->once())->method('save');
 
         ($this->handler)(new DisableTotpCommand($user->getId()->toString(), '123456'));
@@ -80,6 +89,9 @@ final class DisableTotpHandlerTest extends TestCase
 
     public function testDoesNotClearSecretOnInvalidCode(): void
     {
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->handler = $this->createDisableTotpHandlerFixture();
+
         $user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
         $user->setTotpSecret('JBSWY3DPEHPK3PXP');
 

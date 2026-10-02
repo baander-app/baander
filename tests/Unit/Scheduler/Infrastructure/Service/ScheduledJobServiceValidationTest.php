@@ -20,8 +20,8 @@ final class ScheduledJobServiceValidationTest extends TestCase
 {
     public function testCreateRejectsUnregisteredMessengerCommand(): void
     {
-        $repository = $this->createMock(ScheduledJobRepositoryInterface::class);
-        $registry = $this->createMock(SchedulerRegistry::class);
+        $repository = $this->createStub(ScheduledJobRepositoryInterface::class);
+        $registry = $this->createStub(SchedulerRegistry::class);
         $registry->method('isMessengerCommandAllowed')->willReturn(false);
         $service = new ScheduledJobService($repository, $registry);
 
@@ -38,8 +38,8 @@ final class ScheduledJobServiceValidationTest extends TestCase
 
     public function testCreateRejectsParametersNotInAllowedSchema(): void
     {
-        $repository = $this->createMock(ScheduledJobRepositoryInterface::class);
-        $registry = $this->createMock(SchedulerRegistry::class);
+        $repository = $this->createStub(ScheduledJobRepositoryInterface::class);
+        $registry = $this->createStub(SchedulerRegistry::class);
         $registry->method('isMessengerCommandAllowed')->willReturnCallback(
             static fn (string $command): bool => $command === BatchExtractCoversCommand::class,
         );

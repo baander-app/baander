@@ -8,22 +8,30 @@ use App\Radio\Application\Command\StartRadioCommand;
 use App\Radio\Application\CommandHandler\StartRadioHandler;
 use App\Radio\Application\Port\RadioSessionPortInterface;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 final class StartRadioHandlerTest extends TestCase
 {
-    private RadioSessionPortInterface&MockObject $sessionPort;
+    private RadioSessionPortInterface $sessionPort;
     private StartRadioHandler $handler;
 
     protected function setUp(): void
     {
-        $this->sessionPort = $this->createMock(RadioSessionPortInterface::class);
-        $this->handler = new StartRadioHandler($this->sessionPort);
+        $this->sessionPort = $this->createStub(RadioSessionPortInterface::class);
+        $this->handler = $this->createStartRadioHandlerFixture();
+    }
+
+    private function createStartRadioHandlerFixture(): StartRadioHandler
+    {
+        $fixture = new StartRadioHandler($this->sessionPort);
+        return $fixture;
     }
 
     public function testStartRadioCallsPortAndReturnsResult(): void
     {
+        $this->sessionPort = $this->createMock(RadioSessionPortInterface::class);
+        $this->handler = $this->createStartRadioHandlerFixture();
+
         $userId = Uuid::v7();
         $stationId = Uuid::v7();
         $streamUrl = 'https://stream.example.com/live.mp3';

@@ -14,7 +14,6 @@ use App\Session\Interface\Request\ClaimSessionRequest;
 use App\Session\Interface\Request\CreateSessionRequest;
 use App\Session\Interface\Request\SyncSessionRequest;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Request;
@@ -24,21 +23,27 @@ use Symfony\Component\Messenger\Stamp\HandledStamp;
 
 final class SessionControllerTest extends TestCase
 {
-    private Security&MockObject $security;
-    private SessionPortInterface&MockObject $sessionPort;
-    private MessageBusInterface&MockObject $commandBus;
+    private Security $security;
+    private SessionPortInterface $sessionPort;
+    private MessageBusInterface $commandBus;
     private SessionController $controller;
 
     protected function setUp(): void
     {
-        $this->security = $this->createMock(Security::class);
-        $this->sessionPort = $this->createMock(SessionPortInterface::class);
-        $this->commandBus = $this->createMock(MessageBusInterface::class);
-        $this->controller = new SessionController(
+        $this->security = $this->createStub(Security::class);
+        $this->sessionPort = $this->createStub(SessionPortInterface::class);
+        $this->commandBus = $this->createStub(MessageBusInterface::class);
+        $this->controller = $this->createSessionControllerFixture();
+    }
+
+    private function createSessionControllerFixture(): SessionController
+    {
+        $fixture = new SessionController(
             $this->security,
             $this->sessionPort,
             $this->commandBus,
         );
+        return $fixture;
     }
 
     public function testGetReturnsSession(): void
@@ -92,6 +97,9 @@ final class SessionControllerTest extends TestCase
 
     public function testSyncDispatchesCommandAndReturnsResult(): void
     {
+        $this->commandBus = $this->createMock(MessageBusInterface::class);
+        $this->controller = $this->createSessionControllerFixture();
+
         $user = new SecurityUser(Uuid::v7()->toString(), 'test@example.com', 'hash');
         $this->security->method('getUser')->willReturn($user);
 
@@ -137,6 +145,9 @@ final class SessionControllerTest extends TestCase
 
     public function testClaimDispatchesCommand(): void
     {
+        $this->commandBus = $this->createMock(MessageBusInterface::class);
+        $this->controller = $this->createSessionControllerFixture();
+
         $user = new SecurityUser(Uuid::v7()->toString(), 'test@example.com', 'hash');
         $this->security->method('getUser')->willReturn($user);
 
@@ -158,6 +169,9 @@ final class SessionControllerTest extends TestCase
 
     public function testNewCreatesSessionAndReturns201(): void
     {
+        $this->commandBus = $this->createMock(MessageBusInterface::class);
+        $this->controller = $this->createSessionControllerFixture();
+
         $user = new SecurityUser(Uuid::v7()->toString(), 'test@example.com', 'hash');
         $this->security->method('getUser')->willReturn($user);
 

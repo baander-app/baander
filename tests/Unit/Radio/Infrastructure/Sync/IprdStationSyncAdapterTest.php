@@ -76,7 +76,7 @@ final class IprdStationSyncAdapterTest extends TestCase
     {
         $summaryResponse = $this->createResponse(200, ['total_stations' => 23088]);
 
-        $httpClient = $this->createMock(HttpClientInterface::class);
+        $httpClient = $this->createStub(HttpClientInterface::class);
         $httpClient->method('request')->willReturn($summaryResponse);
 
         $adapter = new IprdStationSyncAdapter($httpClient);
@@ -93,7 +93,7 @@ final class IprdStationSyncAdapterTest extends TestCase
             ],
         ]);
 
-        $httpClient = $this->createMock(HttpClientInterface::class);
+        $httpClient = $this->createStub(HttpClientInterface::class);
         $httpClient->method('request')->willReturn($summaryResponse);
 
         $adapter = new IprdStationSyncAdapter($httpClient);
@@ -108,7 +108,7 @@ final class IprdStationSyncAdapterTest extends TestCase
     {
         $errorResponse = $this->createResponse(503);
 
-        $httpClient = $this->createMock(HttpClientInterface::class);
+        $httpClient = $this->createStub(HttpClientInterface::class);
         $httpClient->method('request')->willReturn($errorResponse);
 
         $adapter = new IprdStationSyncAdapter($httpClient);
@@ -157,7 +157,7 @@ final class IprdStationSyncAdapterTest extends TestCase
     {
         $catalogResponse = $this->createResponse(200, self::CATALOG_DATA);
 
-        $httpClient = $this->createMock(HttpClientInterface::class);
+        $httpClient = $this->createStub(HttpClientInterface::class);
         $httpClient->method('request')->willReturn($catalogResponse);
 
         $adapter = new IprdStationSyncAdapter($httpClient);
@@ -170,7 +170,7 @@ final class IprdStationSyncAdapterTest extends TestCase
     {
         $errorResponse = $this->createResponse(500);
 
-        $httpClient = $this->createMock(HttpClientInterface::class);
+        $httpClient = $this->createStub(HttpClientInterface::class);
         $httpClient->method('request')->willReturn($errorResponse);
 
         $adapter = new IprdStationSyncAdapter($httpClient);
@@ -196,7 +196,7 @@ final class IprdStationSyncAdapterTest extends TestCase
             ],
         ]);
 
-        $httpClient = $this->createMock(HttpClientInterface::class);
+        $httpClient = $this->createStub(HttpClientInterface::class);
         $httpClient->method('request')->willReturn($catalogResponse);
 
         $adapter = new IprdStationSyncAdapter($httpClient);
@@ -206,9 +206,9 @@ final class IprdStationSyncAdapterTest extends TestCase
         $this->assertSame('German, English', $stations[0]['language']);
     }
 
-    private function createResponse(int $statusCode, ?array $data = null): ResponseInterface&MockObject
+    private function createResponse(int $statusCode, ?array $data = null): ResponseInterface
     {
-        $response = $this->createMock(ResponseInterface::class);
+        $response = $this->createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn($statusCode);
 
         if ($data !== null) {

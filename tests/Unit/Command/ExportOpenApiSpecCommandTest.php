@@ -6,7 +6,6 @@ namespace App\Tests\Unit\Command;
 
 use App\Command\ExportOpenApiSpecCommand;
 use Nelmio\ApiDocBundle\Render\RenderOpenApi;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
@@ -14,11 +13,11 @@ use Symfony\Component\Console\Tester\CommandTester;
 
 final class ExportOpenApiSpecCommandTest extends TestCase
 {
-    private RenderOpenApi&MockObject $renderOpenApi;
+    private RenderOpenApi $renderOpenApi;
 
     protected function setUp(): void
     {
-        $this->renderOpenApi = $this->createMock(RenderOpenApi::class);
+        $this->renderOpenApi = $this->createStub(RenderOpenApi::class);
     }
 
     public function testConfigureSetsNameAndDescription(): void
@@ -45,6 +44,8 @@ final class ExportOpenApiSpecCommandTest extends TestCase
 
     public function testExecuteWritesJsonSpecToConfiguredPath(): void
     {
+        $this->renderOpenApi = $this->createMock(RenderOpenApi::class);
+
         $outputFile = $this->tempPath('.json');
         $this->renderOpenApi
             ->expects($this->once())
@@ -63,6 +64,8 @@ final class ExportOpenApiSpecCommandTest extends TestCase
 
     public function testExecuteWritesYamlSpecWhenFormatRequested(): void
     {
+        $this->renderOpenApi = $this->createMock(RenderOpenApi::class);
+
         $outputFile = $this->tempPath('.yaml');
         $this->renderOpenApi
             ->expects($this->once())
@@ -90,6 +93,8 @@ final class ExportOpenApiSpecCommandTest extends TestCase
 
     public function testExecuteFailsWhenRendererThrows(): void
     {
+        $this->renderOpenApi = $this->createMock(RenderOpenApi::class);
+
         $this->renderOpenApi
             ->expects($this->once())
             ->method('render')

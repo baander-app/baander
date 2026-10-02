@@ -17,7 +17,7 @@ final class UuidTypeTest extends TestCase
     protected function setUp(): void
     {
         $this->type = new UuidType();
-        $this->platform = $this->createMock(AbstractPlatform::class);
+        $this->platform = $this->createStub(AbstractPlatform::class);
     }
 
     public function testGetNameReturnsUuid(): void
@@ -27,6 +27,8 @@ final class UuidTypeTest extends TestCase
 
     public function testGetSQLDeclarationDelegatesToPlatform(): void
     {
+        $this->platform = $this->createMock(AbstractPlatform::class);
+
         $column = ['name' => 'id'];
         $this->platform
             ->expects($this->once())

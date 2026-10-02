@@ -28,7 +28,7 @@ final class NotificationBridgeSubscriberTest extends TestCase
     {
         $this->categoryResolver = new EventCategoryResolver();
         $this->bus = $this->createMock(MessageBusInterface::class);
-        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->logger = $this->createStub(LoggerInterface::class);
     }
 
     private function subscriber(): NotificationBridgeSubscriber
@@ -88,10 +88,11 @@ final class NotificationBridgeSubscriberTest extends TestCase
         $userId = Uuid::generate();
         $event = new PasswordChanged($userId, Email::fromString('test@example.com'));
 
-        $this->bus->method('dispatch')->willReturn(new Envelope(new \stdClass()));
+        $this->bus->expects($this->once())->method('dispatch')
+            ->with($this->callback(static fn (CreateNotificationCommand $command): bool => $command->eventClass === PasswordChanged::class))
+            ->willReturn(new Envelope(new \stdClass()));
 
         // Should not throw
         ($this->subscriber())($event);
-        $this->assertTrue(true);
     }
 }

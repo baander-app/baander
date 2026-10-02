@@ -8,22 +8,30 @@ use App\Radio\Application\Command\StopRadioCommand;
 use App\Radio\Application\CommandHandler\StopRadioHandler;
 use App\Radio\Application\Port\RadioSessionPortInterface;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 final class StopRadioHandlerTest extends TestCase
 {
-    private RadioSessionPortInterface&MockObject $sessionPort;
+    private RadioSessionPortInterface $sessionPort;
     private StopRadioHandler $handler;
 
     protected function setUp(): void
     {
-        $this->sessionPort = $this->createMock(RadioSessionPortInterface::class);
-        $this->handler = new StopRadioHandler($this->sessionPort);
+        $this->sessionPort = $this->createStub(RadioSessionPortInterface::class);
+        $this->handler = $this->createStopRadioHandlerFixture();
+    }
+
+    private function createStopRadioHandlerFixture(): StopRadioHandler
+    {
+        $fixture = new StopRadioHandler($this->sessionPort);
+        return $fixture;
     }
 
     public function testStopRadioCallsPortAndReturnsResult(): void
     {
+        $this->sessionPort = $this->createMock(RadioSessionPortInterface::class);
+        $this->handler = $this->createStopRadioHandlerFixture();
+
         $userId = Uuid::v7();
 
         $expectedResult = [

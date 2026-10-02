@@ -52,16 +52,16 @@ final class AuthCodeRepositoryFlushTest extends TestCase
         );
         $authCode = AuthCode::create($user, $client, [new Scope('profile')]);
 
-        $clientEntity = $this->createMock(ClientEntity::class);
-        $userEntity = $this->createMock(UserEntity::class);
+        $clientEntity = $this->createStub(ClientEntity::class);
+        $userEntity = $this->createStub(UserEntity::class);
 
-        $clientRepo = $this->createMock(EntityRepository::class);
+        $clientRepo = $this->createStub(EntityRepository::class);
         $clientRepo->method('find')->willReturn($clientEntity);
 
-        $userRepo = $this->createMock(EntityRepository::class);
+        $userRepo = $this->createStub(EntityRepository::class);
         $userRepo->method('find')->willReturn($userEntity);
 
-        $authCodeRepo = $this->createMock(EntityRepository::class);
+        $authCodeRepo = $this->createStub(EntityRepository::class);
         $authCodeRepo->method('find')->willReturn(null);
 
         $this->entityManager

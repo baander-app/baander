@@ -20,22 +20,32 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 final class CreatePartySessionHandlerTest extends TestCase
 {
-    private PartySessionPortInterface&MockObject $sessionPort;
-    private PartyMemberPortInterface&MockObject $memberPort;
+    private PartySessionPortInterface $sessionPort;
+    private PartyMemberPortInterface $memberPort;
     private EventDispatcherInterface&MockObject $eventDispatcher;
     private CreatePartySessionHandler $handler;
 
     protected function setUp(): void
     {
-        $this->sessionPort = $this->createMock(PartySessionPortInterface::class);
-        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
+        $this->sessionPort = $this->createStub(PartySessionPortInterface::class);
+        $this->memberPort = $this->createStub(PartyMemberPortInterface::class);
         $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
         $this->eventDispatcher->method('dispatch')->willReturnCallback(fn (object $e) => $e);
-        $this->handler = new CreatePartySessionHandler($this->sessionPort, $this->memberPort, $this->eventDispatcher);
+        $this->handler = $this->createCreatePartySessionHandlerFixture();
+    }
+
+    private function createCreatePartySessionHandlerFixture(): CreatePartySessionHandler
+    {
+        $fixture = new CreatePartySessionHandler($this->sessionPort, $this->memberPort, $this->eventDispatcher);
+        return $fixture;
     }
 
     public function testCreatesSessionPromotesHostAndDispatchesEvents(): void
     {
+        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
+        $this->sessionPort = $this->createMock(PartySessionPortInterface::class);
+        $this->handler = $this->createCreatePartySessionHandlerFixture();
+
         $hostUserId = Uuid::v4();
         $videoId = Uuid::v4();
         $transcodeJobId = Uuid::v4();
@@ -87,6 +97,9 @@ final class CreatePartySessionHandlerTest extends TestCase
 
     public function testPassesCustomMaxMembersToSessionAndEvent(): void
     {
+        $this->sessionPort = $this->createMock(PartySessionPortInterface::class);
+        $this->handler = $this->createCreatePartySessionHandlerFixture();
+
         $hostUserId = Uuid::v4();
         $videoId = Uuid::v4();
         $transcodeJobId = Uuid::v4();
@@ -103,7 +116,7 @@ final class CreatePartySessionHandlerTest extends TestCase
         $this->memberPort->method('save');
 
         $dispatched = [];
-        $this->eventDispatcher->method('dispatch')
+        $this->eventDispatcher->expects($this->exactly(2))->method('dispatch')
             ->willReturnCallback(function (object $e) use (&$dispatched): object {
                 $dispatched[] = $e;
 

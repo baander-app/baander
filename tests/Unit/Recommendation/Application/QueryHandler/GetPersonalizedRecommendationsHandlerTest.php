@@ -41,12 +41,12 @@ final class GetPersonalizedRecommendationsHandlerTest extends TestCase
             Recommendation::create('song', Uuid::v7()->toString(), 'song', $targetId, 0.4, $userId, 'genre'),
         ];
 
-        $recommendationRepository = $this->createMock(RecommendationRepositoryInterface::class);
+        $recommendationRepository = $this->createStub(RecommendationRepositoryInterface::class);
         $recommendationRepository
             ->method('findForUser')
             ->willReturn($recommendations);
 
-        $songRepository = $this->createMock(SongRepositoryInterface::class);
+        $songRepository = $this->createStub(SongRepositoryInterface::class);
         $songRepository
             ->method('findByUuids')
             ->willReturn([$targetId => $song]);

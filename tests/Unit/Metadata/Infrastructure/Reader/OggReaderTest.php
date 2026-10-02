@@ -17,7 +17,7 @@ final class OggReaderTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->logger = $this->createStub(LoggerInterface::class);
         $this->reader = new OggReader($this->logger);
     }
 

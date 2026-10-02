@@ -109,15 +109,15 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $expectedOptions = PublicKeyCredentialRequestOptions::create(random_bytes(32), 'example.com');
         $storedCredential = $this->createStoredCredential($passkey->getCounter());
 
-        $this->passkeyVerifier->method('getChallenge')
+        $this->passkeyVerifier->expects($this->once())->method('getChallenge')
             ->with('challenge-key-123')
             ->willReturn($expectedOptions);
 
-        $this->passkeyVerifier->method('credentialRecordFromArray')
+        $this->passkeyVerifier->expects($this->once())->method('credentialRecordFromArray')
             ->with($passkey->getData(), $passkey->getCounter())
             ->willReturn($storedCredential);
 
-        $this->passkeyVerifier->method('verifyAuthenticationResponse')
+        $this->passkeyVerifier->expects($this->once())->method('verifyAuthenticationResponse')
             ->with($response, $expectedOptions, $storedCredential)
             ->willReturn($updatedCredential);
     }
@@ -130,7 +130,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $response = $this->createValidResponse();
         $updatedCredential = $this->createUpdatedCredential(10);
 
-        $this->passkeyRepository->method('ofCredentialId')
+        $this->passkeyRepository->expects($this->once())->method('ofCredentialId')
             ->with(self::CREDENTIAL_ID)
             ->willReturn($passkey);
         $this->setUpVerificationMocks($passkey, $response, $updatedCredential);
@@ -150,10 +150,10 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $response = $this->createValidResponse();
         $updatedCredential = $this->createUpdatedCredential(10);
 
-        $this->passkeyRepository->method('ofCredentialId')
+        $this->passkeyRepository->expects($this->once())->method('ofCredentialId')
             ->with(self::CREDENTIAL_ID)
             ->willReturn($passkey);
-        $this->passkeyRepository->method('userIdForCredentialId')
+        $this->passkeyRepository->expects($this->once())->method('userIdForCredentialId')
             ->with(self::CREDENTIAL_ID)
             ->willReturn($userId);
         $this->setUpVerificationMocks($passkey, $response, $updatedCredential);
@@ -168,7 +168,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
     {
         $response = $this->createValidResponse();
 
-        $this->passkeyRepository->method('ofCredentialId')
+        $this->passkeyRepository->expects($this->once())->method('ofCredentialId')
             ->with(self::CREDENTIAL_ID)
             ->willReturn(null);
         $this->passkeyVerifier->expects($this->never())->method('getChallenge');
@@ -184,7 +184,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $passkey = $this->createPasskey(self::CREDENTIAL_ID, 5);
         $response = $this->createValidResponse();
 
-        $this->passkeyRepository->method('ofCredentialId')
+        $this->passkeyRepository->expects($this->once())->method('ofCredentialId')
             ->with(self::CREDENTIAL_ID)
             ->willReturn($passkey);
 
@@ -202,7 +202,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $passkey = $this->createPasskey(self::CREDENTIAL_ID, 5);
         $response = $this->createValidResponse();
 
-        $this->passkeyRepository->method('ofCredentialId')
+        $this->passkeyRepository->expects($this->once())->method('ofCredentialId')
             ->with(self::CREDENTIAL_ID)
             ->willReturn($passkey);
 
@@ -227,7 +227,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $response = $this->createValidResponse();
         $updatedCredential = $this->createUpdatedCredential(5);
 
-        $this->passkeyRepository->method('ofCredentialId')
+        $this->passkeyRepository->expects($this->once())->method('ofCredentialId')
             ->with(self::CREDENTIAL_ID)
             ->willReturn($passkey);
         $this->setUpVerificationMocks($passkey, $response, $updatedCredential);
@@ -245,7 +245,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $response = $this->createValidResponse();
         $updatedCredential = $this->createUpdatedCredential(10);
 
-        $this->passkeyRepository->method('ofCredentialId')
+        $this->passkeyRepository->expects($this->once())->method('ofCredentialId')
             ->with(self::CREDENTIAL_ID)
             ->willReturn($passkey);
         $this->setUpVerificationMocks($passkey, $response, $updatedCredential);
@@ -262,10 +262,10 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $response = $this->createValidResponse();
         $updatedCredential = $this->createUpdatedCredential(10);
 
-        $this->passkeyRepository->method('ofCredentialId')
+        $this->passkeyRepository->expects($this->once())->method('ofCredentialId')
             ->with(self::CREDENTIAL_ID)
             ->willReturn($passkey);
-        $this->passkeyRepository->method('userIdForCredentialId')
+        $this->passkeyRepository->expects($this->once())->method('userIdForCredentialId')
             ->with(self::CREDENTIAL_ID)
             ->willReturn(null);
         $this->setUpVerificationMocks($passkey, $response, $updatedCredential);
@@ -281,7 +281,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $passkey = $this->createPasskey(self::CREDENTIAL_ID, 5);
         $response = $this->createValidResponse();
 
-        $this->passkeyRepository->method('ofCredentialId')
+        $this->passkeyRepository->expects($this->once())->method('ofCredentialId')
             ->with(self::CREDENTIAL_ID)
             ->willReturn($passkey);
         $this->passkeyVerifier->method('getChallenge')
@@ -299,7 +299,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $response = $this->createValidResponse();
         $updatedCredential = $this->createUpdatedCredential(15);
 
-        $this->passkeyRepository->method('ofCredentialId')
+        $this->passkeyRepository->expects($this->once())->method('ofCredentialId')
             ->with(self::CREDENTIAL_ID)
             ->willReturn($passkey);
         $this->setUpVerificationMocks($passkey, $response, $updatedCredential);
@@ -327,7 +327,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $passkey = $this->createPasskey($credentialId, 5);
         $updatedCredential = $this->createUpdatedCredential(10);
 
-        $this->passkeyRepository->method('ofCredentialId')
+        $this->passkeyRepository->expects($this->once())->method('ofCredentialId')
             ->with($credentialId)
             ->willReturn($passkey);
         $this->setUpVerificationMocks($passkey, $response, $updatedCredential);

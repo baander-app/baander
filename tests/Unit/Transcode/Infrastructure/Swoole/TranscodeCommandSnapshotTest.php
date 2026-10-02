@@ -223,8 +223,8 @@ final class TranscodeCommandSnapshotTest extends TestCase
     public function testBitrateMultiplierScalesQualityTier(): void
     {
         $encoder = new SegmentEncoder(
-            $this->createMock(\App\Transcode\Application\Port\FFmpegPortInterface::class),
-            $this->createMock(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class),
+            $this->createStub(\App\Transcode\Application\Port\FFmpegPortInterface::class),
+            $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class),
             EncoderProfile::fromEncoderName('hevc_nvenc'),
             1.5,
         );
@@ -240,8 +240,8 @@ final class TranscodeCommandSnapshotTest extends TestCase
     public function testBitrateMultiplierOneIsNoop(): void
     {
         $encoder = new SegmentEncoder(
-            $this->createMock(\App\Transcode\Application\Port\FFmpegPortInterface::class),
-            $this->createMock(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class),
+            $this->createStub(\App\Transcode\Application\Port\FFmpegPortInterface::class),
+            $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class),
             EncoderProfile::software(),
             1.0,
         );

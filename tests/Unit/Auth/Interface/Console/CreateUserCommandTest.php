@@ -7,7 +7,7 @@ namespace App\Tests\Unit\Auth\Interface\Console;
 use App\Auth\Domain\Model\User;
 use App\Auth\Interface\Console\CreateUserCommand;
 use App\Shared\Domain\Model\Email;
-use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -18,12 +18,12 @@ use RuntimeException;
 
 final class CreateUserCommandTest extends TestCase
 {
-    private MessageBusInterface&MockObject $commandBus;
+    private MessageBusInterface&Stub $commandBus;
     private CreateUserCommand $command;
 
     protected function setUp(): void
     {
-        $this->commandBus = $this->createMock(MessageBusInterface::class);
+        $this->commandBus = $this->createStub(MessageBusInterface::class);
         $this->command = new CreateUserCommand($this->commandBus);
     }
 

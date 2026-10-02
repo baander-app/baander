@@ -12,7 +12,6 @@ use App\Media\Domain\Model\TrackStreamMetadata;
 use App\Media\Interface\Controller\StreamController;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -31,9 +30,9 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 final class StreamControllerSecurityTest extends TestCase
 {
     private string $mediaBasePath;
-    private StreamPortInterface&MockObject $streamService;
+    private StreamPortInterface $streamService;
     private MimeDetector $mimeDetector;
-    private LibraryAccessPortInterface&MockObject $libraryAccess;
+    private LibraryAccessPortInterface $libraryAccess;
     private StreamController $controller;
 
     protected function setUp(): void
@@ -41,11 +40,16 @@ final class StreamControllerSecurityTest extends TestCase
         $this->mediaBasePath = sys_get_temp_dir() . '/stream_base_' . uniqid('', true);
         mkdir($this->mediaBasePath, 0o755, true);
 
-        $this->streamService = $this->createMock(StreamPortInterface::class);
+        $this->streamService = $this->createStub(StreamPortInterface::class);
         $this->mimeDetector = new MimeDetector();
-        $this->libraryAccess = $this->createMock(LibraryAccessPortInterface::class);
+        $this->libraryAccess = $this->createStub(LibraryAccessPortInterface::class);
 
-        $this->controller = new StreamController(
+        $this->controller = $this->createStreamControllerFixture();
+    }
+
+    private function createStreamControllerFixture(): StreamController
+    {
+        $fixture = new StreamController(
             mediaBasePath: $this->mediaBasePath,
             mimeDetector: $this->mimeDetector,
             streamService: $this->streamService,
@@ -53,9 +57,10 @@ final class StreamControllerSecurityTest extends TestCase
             libraryAccess: $this->libraryAccess,
         );
 
-        $translator = $this->createMock(TranslatorInterface::class);
+        $translator = $this->createStub(TranslatorInterface::class);
         $translator->method('trans')->willReturnArgument(0);
-        $this->controller->setTranslator($translator);
+        $fixture->setTranslator($translator);
+        return $fixture;
     }
 
     protected function tearDown(): void
@@ -96,6 +101,9 @@ final class StreamControllerSecurityTest extends TestCase
 
     public function testStreamByIdRejectsMissingLibraryAccess(): void
     {
+        $this->libraryAccess = $this->createMock(LibraryAccessPortInterface::class);
+        $this->controller = $this->createStreamControllerFixture();
+
         $trackId = new PublicId();
         $libraryId = Uuid::fromString('550e8400-e29b-41d4-a716-446655440000');
         $userId = Uuid::fromString('6ba7b810-9dad-11d1-80b4-00c04fd430c8');
@@ -125,7 +133,7 @@ final class StreamControllerSecurityTest extends TestCase
             ->with($userId, $libraryId)
             ->willReturn(false);
 
-        $security = $this->createMock(Security::class);
+        $security = $this->createStub(Security::class);
         $security->method('getUser')->willReturn(new SecurityUser(
             id: $userId->toString(),
             email: 'user@example.com',
@@ -140,7 +148,7 @@ final class StreamControllerSecurityTest extends TestCase
             libraryAccess: $this->libraryAccess,
         );
 
-        $translator = $this->createMock(TranslatorInterface::class);
+        $translator = $this->createStub(TranslatorInterface::class);
         $translator->method('trans')->willReturnArgument(0);
         $controller->setTranslator($translator);
 
@@ -153,6 +161,9 @@ final class StreamControllerSecurityTest extends TestCase
 
     public function testStreamByIdAllowsAccessWhenUserHasLibraryAccess(): void
     {
+        $this->libraryAccess = $this->createMock(LibraryAccessPortInterface::class);
+        $this->controller = $this->createStreamControllerFixture();
+
         $trackId = new PublicId();
         $libraryId = Uuid::fromString('550e8400-e29b-41d4-a716-446655440000');
         $userId = Uuid::fromString('6ba7b810-9dad-11d1-80b4-00c04fd430c8');
@@ -182,7 +193,7 @@ final class StreamControllerSecurityTest extends TestCase
             ->with($userId, $libraryId)
             ->willReturn(true);
 
-        $security = $this->createMock(Security::class);
+        $security = $this->createStub(Security::class);
         $security->method('getUser')->willReturn(new SecurityUser(
             id: $userId->toString(),
             email: 'user@example.com',
@@ -197,7 +208,7 @@ final class StreamControllerSecurityTest extends TestCase
             libraryAccess: $this->libraryAccess,
         );
 
-        $translator = $this->createMock(TranslatorInterface::class);
+        $translator = $this->createStub(TranslatorInterface::class);
         $translator->method('trans')->willReturnArgument(0);
         $controller->setTranslator($translator);
 

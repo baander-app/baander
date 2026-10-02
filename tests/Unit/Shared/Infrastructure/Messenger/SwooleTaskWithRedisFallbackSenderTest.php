@@ -14,13 +14,13 @@ use Symfony\Component\Messenger\Transport\Sender\SenderInterface;
 
 final class SwooleTaskWithRedisFallbackSenderTest extends TestCase
 {
-    private SwooleTaskDispatcherInterface&MockObject $dispatcher;
+    private SwooleTaskDispatcherInterface $dispatcher;
     private SenderInterface&MockObject $redisFallback;
     private LoggerInterface&MockObject $logger;
 
     protected function setUp(): void
     {
-        $this->dispatcher = $this->createMock(SwooleTaskDispatcherInterface::class);
+        $this->dispatcher = $this->createStub(SwooleTaskDispatcherInterface::class);
         $this->redisFallback = $this->createMock(SenderInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
     }
@@ -50,7 +50,7 @@ final class SwooleTaskWithRedisFallbackSenderTest extends TestCase
     {
         $envelope = new Envelope(new \stdClass());
         $this->dispatcher->method('dispatchTask')->willReturn(false);
-        $this->redisFallback->method('send')->willReturn($envelope);
+        $this->redisFallback->expects($this->once())->method('send')->willReturn($envelope);
         $this->logger->expects($this->once())->method('warning');
 
         $result = $this->createSender()->send($envelope);
@@ -62,7 +62,7 @@ final class SwooleTaskWithRedisFallbackSenderTest extends TestCase
     {
         $envelope = new Envelope(new \stdClass());
         $this->dispatcher->method('dispatchTask')->willThrowException(new \RuntimeException('Server shutting down'));
-        $this->redisFallback->method('send')->willReturn($envelope);
+        $this->redisFallback->expects($this->once())->method('send')->willReturn($envelope);
         $this->logger->expects($this->exactly(2))->method('warning');
 
         $result = $this->createSender()->send($envelope);

@@ -30,15 +30,15 @@ use Symfony\Component\Messenger\Stamp\HandledStamp;
 final class PartySessionControllerTest extends TestCase
 {
     private MessageBusInterface&MockObject $commandBus;
-    private PartySessionPortInterface&MockObject $sessionPort;
-    private PartyMemberPortInterface&MockObject $memberPort;
+    private PartySessionPortInterface $sessionPort;
+    private PartyMemberPortInterface $memberPort;
     private PartySessionController $controller;
 
     protected function setUp(): void
     {
         $this->commandBus = $this->createMock(MessageBusInterface::class);
-        $this->sessionPort = $this->createMock(PartySessionPortInterface::class);
-        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
+        $this->sessionPort = $this->createStub(PartySessionPortInterface::class);
+        $this->memberPort = $this->createStub(PartyMemberPortInterface::class);
 
         $this->controller = new PartySessionController(
             $this->commandBus,

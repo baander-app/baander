@@ -14,7 +14,6 @@ use App\Media\Domain\Model\Image;
 use App\Media\Domain\Model\StoredFile;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -23,29 +22,35 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 
 final class AlbumCoverControllerTest extends TestCase
 {
-    private AlbumPortInterface&MockObject $albumService;
-    private ImagePortInterface&MockObject $imagePort;
-    private StoragePortInterface&MockObject $storage;
-    private MimeDetectorPortInterface&MockObject $mimeDetector;
+    private AlbumPortInterface $albumService;
+    private ImagePortInterface $imagePort;
+    private StoragePortInterface $storage;
+    private MimeDetectorPortInterface $mimeDetector;
     private AlbumCoverController $controller;
 
     protected function setUp(): void
     {
-        $this->albumService = $this->createMock(AlbumPortInterface::class);
-        $this->imagePort = $this->createMock(ImagePortInterface::class);
-        $this->storage = $this->createMock(StoragePortInterface::class);
-        $this->mimeDetector = $this->createMock(MimeDetectorPortInterface::class);
+        $this->albumService = $this->createStub(AlbumPortInterface::class);
+        $this->imagePort = $this->createStub(ImagePortInterface::class);
+        $this->storage = $this->createStub(StoragePortInterface::class);
+        $this->mimeDetector = $this->createStub(MimeDetectorPortInterface::class);
 
-        $this->controller = new AlbumCoverController(
+        $this->controller = $this->createController();
+    }
+
+    private function createController(): AlbumCoverController
+    {
+        $controller = new AlbumCoverController(
             $this->albumService,
             $this->imagePort,
             $this->storage,
             $this->mimeDetector,
         );
 
-        $translator = $this->createMock(TranslatorInterface::class);
+        $translator = $this->createStub(TranslatorInterface::class);
         $translator->method('trans')->willReturnArgument(0);
-        $this->controller->setTranslator($translator);
+        $controller->setTranslator($translator);
+        return $controller;
     }
 
     protected function tearDown(): void
@@ -94,6 +99,10 @@ final class AlbumCoverControllerTest extends TestCase
 
     public function testUploadCreatesCoverImageForAlbum(): void
     {
+        $this->albumService = $this->createMock(AlbumPortInterface::class);
+        $this->imagePort = $this->createMock(ImagePortInterface::class);
+        $this->controller = $this->createController();
+
         $album = $this->createAlbum();
         $publicId = $album->getPublicId()->toString();
 
@@ -134,6 +143,11 @@ final class AlbumCoverControllerTest extends TestCase
 
     public function testUploadReplacesExistingCover(): void
     {
+        $this->albumService = $this->createMock(AlbumPortInterface::class);
+        $this->imagePort = $this->createMock(ImagePortInterface::class);
+        $this->storage = $this->createMock(StoragePortInterface::class);
+        $this->controller = $this->createController();
+
         $oldImage = Image::create(
             path: 'images/album/old.jpg',
             extension: 'jpg',
@@ -151,7 +165,7 @@ final class AlbumCoverControllerTest extends TestCase
         $this->albumService->method('findByPublicId')->willReturn($album);
 
         // Old image should be found and deleted
-        $this->imagePort->method('findByUuid')
+        $this->imagePort->expects($this->once())->method('findByUuid')
             ->with($oldImage->getId())
             ->willReturn($oldImage);
 
@@ -183,6 +197,9 @@ final class AlbumCoverControllerTest extends TestCase
 
     public function testUploadReturns422WhenNoFileProvided(): void
     {
+        $this->imagePort = $this->createMock(ImagePortInterface::class);
+        $this->controller = $this->createController();
+
         $album = $this->createAlbum();
         $publicId = $album->getPublicId()->toString();
 
@@ -201,6 +218,9 @@ final class AlbumCoverControllerTest extends TestCase
 
     public function testUploadReturns422WhenFileIsTooLarge(): void
     {
+        $this->imagePort = $this->createMock(ImagePortInterface::class);
+        $this->controller = $this->createController();
+
         $album = $this->createAlbum();
         $publicId = $album->getPublicId()->toString();
 
@@ -226,6 +246,9 @@ final class AlbumCoverControllerTest extends TestCase
 
     public function testUploadReturns422WhenMimeTypeIsUnsupported(): void
     {
+        $this->imagePort = $this->createMock(ImagePortInterface::class);
+        $this->controller = $this->createController();
+
         $album = $this->createAlbum();
         $publicId = $album->getPublicId()->toString();
 
@@ -251,6 +274,9 @@ final class AlbumCoverControllerTest extends TestCase
 
     public function testUploadReturns404WhenAlbumDoesNotExist(): void
     {
+        $this->imagePort = $this->createMock(ImagePortInterface::class);
+        $this->controller = $this->createController();
+
         $publicId = (new PublicId())->toString();
 
         $this->albumService->method('findByPublicId')->willReturn(null);
@@ -285,6 +311,11 @@ final class AlbumCoverControllerTest extends TestCase
 
     public function testDeleteRemovesCoverImageFromAlbum(): void
     {
+        $this->albumService = $this->createMock(AlbumPortInterface::class);
+        $this->imagePort = $this->createMock(ImagePortInterface::class);
+        $this->storage = $this->createMock(StoragePortInterface::class);
+        $this->controller = $this->createController();
+
         $image = Image::create(
             path: 'images/album/test.jpg',
             extension: 'jpg',
@@ -300,7 +331,7 @@ final class AlbumCoverControllerTest extends TestCase
         $publicId = $album->getPublicId()->toString();
 
         $this->albumService->method('findByPublicId')->willReturn($album);
-        $this->imagePort->method('findByUuid')
+        $this->imagePort->expects($this->once())->method('findByUuid')
             ->with($image->getId())
             ->willReturn($image);
 
@@ -320,6 +351,10 @@ final class AlbumCoverControllerTest extends TestCase
 
     public function testDeleteReturns404WhenNoCoverExists(): void
     {
+        $this->imagePort = $this->createMock(ImagePortInterface::class);
+        $this->storage = $this->createMock(StoragePortInterface::class);
+        $this->controller = $this->createController();
+
         $album = $this->createAlbum();
         $publicId = $album->getPublicId()->toString();
 

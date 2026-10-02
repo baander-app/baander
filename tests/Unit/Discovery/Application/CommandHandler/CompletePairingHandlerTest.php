@@ -15,27 +15,42 @@ use App\Discovery\Domain\ValueObject\PairingCode;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 final class CompletePairingHandlerTest extends TestCase
 {
-    private DiscoveryPortInterface&MockObject $discoveryPort;
-    private EventDispatcherInterface&MockObject $eventDispatcher;
+    private DiscoveryPortInterface $discoveryPort;
+    private EventDispatcherInterface $eventDispatcher;
     private CompletePairingHandler $handler;
 
     protected function setUp(): void
     {
-        $this->discoveryPort = $this->createMock(DiscoveryPortInterface::class);
-        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-        $this->eventDispatcher->method('dispatch')->willReturnCallback(fn (object $e) => $e);
-        $this->handler = new CompletePairingHandler($this->discoveryPort, $this->eventDispatcher);
+        $this->discoveryPort = $this->createStub(DiscoveryPortInterface::class);
+        $this->eventDispatcher = $this->createEventDispatcher();
+        $this->handler = $this->createCompletePairingHandlerFixture();
+    }
+
+    private function createEventDispatcher(bool $expectCalls = false): EventDispatcherInterface
+    {
+        $double = $expectCalls ? $this->createMock(EventDispatcherInterface::class) : $this->createStub(EventDispatcherInterface::class);
+        $double->method('dispatch')->willReturnCallback(fn (object $e) => $e);
+        return $double;
+    }
+
+    private function createCompletePairingHandlerFixture(): CompletePairingHandler
+    {
+        $fixture = new CompletePairingHandler($this->discoveryPort, $this->eventDispatcher);
+        return $fixture;
     }
 
     public function testCompletesPendingSessionAndDispatchesEvent(): void
     {
+        $this->discoveryPort = $this->createMock(DiscoveryPortInterface::class);
+        $this->eventDispatcher = $this->createEventDispatcher(expectCalls: true);
+        $this->handler = $this->createCompletePairingHandlerFixture();
+
         $serverPublicId = new PublicId();
         $session = $this->createPendingSession($serverPublicId);
 
@@ -60,6 +75,10 @@ final class CompletePairingHandlerTest extends TestCase
 
     public function testReturnsAlreadyCompletedSessionWithoutDispatching(): void
     {
+        $this->discoveryPort = $this->createMock(DiscoveryPortInterface::class);
+        $this->eventDispatcher = $this->createEventDispatcher(expectCalls: true);
+        $this->handler = $this->createCompletePairingHandlerFixture();
+
         $serverPublicId = new PublicId();
         $session = $this->createPendingSession($serverPublicId);
         $session->complete();

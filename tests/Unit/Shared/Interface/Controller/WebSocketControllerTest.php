@@ -8,7 +8,7 @@ use App\Shared\Infrastructure\Swoole\ReconnectionTokenService;
 use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
 use App\Shared\Infrastructure\Swoole\WebSocketPusher;
 use App\Shared\Interface\Controller\WebSocketController;
-use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Swoole\WebSocket\Server;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -18,8 +18,8 @@ final class WebSocketControllerTest extends TestCase
 {
     private WebSocketConnectionRegistry $registry;
     private WebSocketPusher $pusher;
-    private Server&MockObject $server;
-    private MessageBusInterface&MockObject $bus;
+    private Server&Stub $server;
+    private MessageBusInterface&Stub $bus;
     private ReconnectionTokenService $reconnectionTokens;
     private WebSocketController $controller;
 
@@ -38,7 +38,7 @@ final class WebSocketControllerTest extends TestCase
         );
 
         $this->pushedMessages = [];
-        $this->server = $this->createMock(Server::class);
+        $this->server = $this->createStub(Server::class);
         $this->server->worker_id = 0;
 
         $pushedMessages = &$this->pushedMessages;
@@ -54,7 +54,7 @@ final class WebSocketControllerTest extends TestCase
         $this->pusher = new WebSocketPusher($this->registry, new JsonEncoder());
         $this->pusher->setServer($this->server);
 
-        $this->bus = $this->createMock(MessageBusInterface::class);
+        $this->bus = $this->createStub(MessageBusInterface::class);
 
         $this->reconnectionTokens = ReconnectionTokenService::create(maxTokens: 64);
 

@@ -12,24 +12,33 @@ use App\Party\Domain\ValueObject\MemberRole;
 use App\Party\Infrastructure\PlaybackSynchronizer;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 final class PlaybackSynchronizerTest extends TestCase
 {
-    private PartySessionPortInterface&MockObject $sessionPort;
-    private PartyMemberPortInterface&MockObject $memberPort;
+    private PartySessionPortInterface $sessionPort;
+    private PartyMemberPortInterface $memberPort;
     private PlaybackSynchronizer $synchronizer;
 
     protected function setUp(): void
     {
-        $this->sessionPort = $this->createMock(PartySessionPortInterface::class);
-        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
-        $this->synchronizer = new PlaybackSynchronizer($this->sessionPort, $this->memberPort);
+        $this->sessionPort = $this->createStub(PartySessionPortInterface::class);
+        $this->memberPort = $this->createStub(PartyMemberPortInterface::class);
+        $this->synchronizer = $this->createPlaybackSynchronizerFixture();
+    }
+
+    private function createPlaybackSynchronizerFixture(): PlaybackSynchronizer
+    {
+        $fixture = new PlaybackSynchronizer($this->sessionPort, $this->memberPort);
+        return $fixture;
     }
 
     public function testSynchronizeReturnsServerPositionWithSmallDrift(): void
     {
+        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
+        $this->sessionPort = $this->createMock(PartySessionPortInterface::class);
+        $this->synchronizer = $this->createPlaybackSynchronizerFixture();
+
         $sessionId = Uuid::v4();
         $userId = Uuid::v4();
         $serverPosition = 100.5;
@@ -37,12 +46,14 @@ final class PlaybackSynchronizerTest extends TestCase
         $clientLatency = 0.2;
 
         $this->sessionPort
+            ->expects($this->once())
             ->method('syncPlayback')
             ->with($sessionId, $clientPosition, $clientLatency)
             ->willReturn($serverPosition);
 
         $member = $this->createMemberWithJitter($userId, $sessionId, 0.0);
         $this->memberPort
+            ->expects($this->once())
             ->method('findByUserAndSession')
             ->with($userId, $sessionId)
             ->willReturn($member);
@@ -59,6 +70,9 @@ final class PlaybackSynchronizerTest extends TestCase
 
     public function testJitterCompensationUsesExponentialMovingAverage(): void
     {
+        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
+        $this->synchronizer = $this->createPlaybackSynchronizerFixture();
+
         $sessionId = Uuid::v4();
         $userId = Uuid::v4();
         $serverPosition = 100.0;
@@ -95,6 +109,9 @@ final class PlaybackSynchronizerTest extends TestCase
 
     public function testJitterCompensationInitializesFromDriftWhenZero(): void
     {
+        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
+        $this->synchronizer = $this->createPlaybackSynchronizerFixture();
+
         $sessionId = Uuid::v4();
         $userId = Uuid::v4();
         $serverPosition = 50.0;
@@ -127,6 +144,10 @@ final class PlaybackSynchronizerTest extends TestCase
 
     public function testMemberNotFoundReturnsServerPositionWithoutUpdate(): void
     {
+        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
+        $this->sessionPort = $this->createMock(PartySessionPortInterface::class);
+        $this->synchronizer = $this->createPlaybackSynchronizerFixture();
+
         $sessionId = Uuid::v4();
         $userId = Uuid::v4();
         $serverPosition = 80.0;
@@ -134,11 +155,13 @@ final class PlaybackSynchronizerTest extends TestCase
         $clientLatency = 0.3;
 
         $this->sessionPort
+            ->expects($this->once())
             ->method('syncPlayback')
             ->with($sessionId, $clientPosition, $clientLatency)
             ->willReturn($serverPosition);
 
         $this->memberPort
+            ->expects($this->once())
             ->method('findByUserAndSession')
             ->with($userId, $sessionId)
             ->willReturn(null);
@@ -155,6 +178,9 @@ final class PlaybackSynchronizerTest extends TestCase
 
     public function testLargeDriftIsClampedToMaxJitter(): void
     {
+        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
+        $this->synchronizer = $this->createPlaybackSynchronizerFixture();
+
         $sessionId = Uuid::v4();
         $userId = Uuid::v4();
         $serverPosition = 100.0;
@@ -188,6 +214,9 @@ final class PlaybackSynchronizerTest extends TestCase
 
     public function testLargeDriftWithExistingJitterUsesEmaClamped(): void
     {
+        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
+        $this->synchronizer = $this->createPlaybackSynchronizerFixture();
+
         $sessionId = Uuid::v4();
         $userId = Uuid::v4();
         $serverPosition = 200.0;

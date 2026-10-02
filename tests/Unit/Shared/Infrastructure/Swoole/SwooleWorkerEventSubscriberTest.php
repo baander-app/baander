@@ -20,7 +20,7 @@ final class SwooleWorkerEventSubscriberTest extends TestCase
     public function test_subscriber_accepts_redis_client_factory(): void
     {
         $buffer = new SwooleWorkerEventBuffer();
-        $factory = $this->createMock(RedisClientFactory::class);
+        $factory = $this->createStub(RedisClientFactory::class);
 
         $subscriber = new SwooleWorkerEventSubscriber(
             buffer: $buffer,

@@ -77,7 +77,7 @@ final class GeneratePublicIdListenerTest extends TestCase
 
     private function createEventArgs(object $entity): PrePersistEventArgs
     {
-        $em = $this->createMock(EntityManagerInterface::class);
+        $em = $this->createStub(EntityManagerInterface::class);
 
         return new PrePersistEventArgs($entity, $em);
     }

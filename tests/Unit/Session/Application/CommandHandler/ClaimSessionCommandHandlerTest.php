@@ -8,22 +8,30 @@ use App\Session\Application\Command\ClaimSessionCommand;
 use App\Session\Application\CommandHandler\ClaimSessionCommandHandler;
 use App\Session\Application\Port\SessionPortInterface;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 final class ClaimSessionCommandHandlerTest extends TestCase
 {
-    private SessionPortInterface&MockObject $sessionPort;
+    private SessionPortInterface $sessionPort;
     private ClaimSessionCommandHandler $handler;
 
     protected function setUp(): void
     {
-        $this->sessionPort = $this->createMock(SessionPortInterface::class);
-        $this->handler = new ClaimSessionCommandHandler($this->sessionPort);
+        $this->sessionPort = $this->createStub(SessionPortInterface::class);
+        $this->handler = $this->createClaimSessionCommandHandlerFixture();
+    }
+
+    private function createClaimSessionCommandHandlerFixture(): ClaimSessionCommandHandler
+    {
+        $fixture = new ClaimSessionCommandHandler($this->sessionPort);
+        return $fixture;
     }
 
     public function testClaimSessionCallsPortAndReturnsResult(): void
     {
+        $this->sessionPort = $this->createMock(SessionPortInterface::class);
+        $this->handler = $this->createClaimSessionCommandHandlerFixture();
+
         $userId = Uuid::v7();
         $deviceId = Uuid::v7();
 

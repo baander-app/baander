@@ -18,7 +18,6 @@ use App\Library\Interface\Request\CreateLibraryRequest;
 use App\Library\Interface\Request\UpdateLibraryRequest;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\FilesystemType;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Response;
@@ -35,33 +34,42 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  */
 final class LibraryControllerSecurityTest extends TestCase
 {
-    private LibraryPortInterface&MockObject $libraryService;
-    private LibraryStatsQueryPort&MockObject $statsQuery;
+    private LibraryPortInterface $libraryService;
+    private LibraryStatsQueryPort $statsQuery;
     private PathValidator $pathValidator;
-    private MessageBusInterface&MockObject $commandBus;
+    private MessageBusInterface $commandBus;
     private LibraryController $controller;
 
     protected function setUp(): void
     {
-        $this->libraryService = $this->createMock(LibraryPortInterface::class);
-        $this->statsQuery = $this->createMock(LibraryStatsQueryPort::class);
+        $this->libraryService = $this->createStub(LibraryPortInterface::class);
+        $this->statsQuery = $this->createStub(LibraryStatsQueryPort::class);
         $this->pathValidator = new PathValidator();
-        $this->commandBus = $this->createMock(MessageBusInterface::class);
+        $this->commandBus = $this->createStub(MessageBusInterface::class);
 
-        $this->controller = new LibraryController(
+        $this->controller = $this->createLibraryControllerFixture();
+    }
+
+    private function createLibraryControllerFixture(): LibraryController
+    {
+        $fixture = new LibraryController(
             libraryService: $this->libraryService,
             statsQuery: $this->statsQuery,
             pathValidator: $this->pathValidator,
             commandBus: $this->commandBus,
         );
 
-        $translator = $this->createMock(TranslatorInterface::class);
+        $translator = $this->createStub(TranslatorInterface::class);
         $translator->method('trans')->willReturnArgument(0);
-        $this->controller->setTranslator($translator);
+        $fixture->setTranslator($translator);
+        return $fixture;
     }
 
     public function testStoreGrantsCreatorAccess(): void
     {
+        $this->libraryService = $this->createMock(LibraryPortInterface::class);
+        $this->controller = $this->createLibraryControllerFixture();
+
         $userId = Uuid::fromString('6ba7b810-9dad-11d1-80b4-00c04fd430c8');
         $library = $this->createLibrary();
 
@@ -74,7 +82,7 @@ final class LibraryControllerSecurityTest extends TestCase
             ->method('grant')
             ->with($userId, self::isInstanceOf(Uuid::class));
 
-        $security = $this->createMock(Security::class);
+        $security = $this->createStub(Security::class);
         $security->method('getUser')->willReturn(new SecurityUser(
             id: $userId->toString(),
             email: 'creator@example.com',
@@ -90,7 +98,7 @@ final class LibraryControllerSecurityTest extends TestCase
             libraryAccess: $libraryAccess,
         );
 
-        $translator = $this->createMock(TranslatorInterface::class);
+        $translator = $this->createStub(TranslatorInterface::class);
         $translator->method('trans')->willReturnArgument(0);
         $controller->setTranslator($translator);
 
@@ -108,6 +116,9 @@ final class LibraryControllerSecurityTest extends TestCase
 
     public function testStoreRequiresAuthentication(): void
     {
+        $this->libraryService = $this->createMock(LibraryPortInterface::class);
+        $this->controller = $this->createLibraryControllerFixture();
+
         $this->libraryService->method('findBySlug')->willReturn(null);
         $this->libraryService->expects($this->once())->method('save');
 
@@ -123,7 +134,7 @@ final class LibraryControllerSecurityTest extends TestCase
             libraryAccess: $libraryAccess,
         );
 
-        $translator = $this->createMock(TranslatorInterface::class);
+        $translator = $this->createStub(TranslatorInterface::class);
         $translator->method('trans')->willReturnArgument(0);
         $controller->setTranslator($translator);
 
@@ -142,6 +153,9 @@ final class LibraryControllerSecurityTest extends TestCase
 
     public function testUpdateRequiresOwnershipOrAdmin(): void
     {
+        $this->libraryService = $this->createMock(LibraryPortInterface::class);
+        $this->controller = $this->createLibraryControllerFixture();
+
         $library = $this->createLibrary();
 
         $this->libraryService->method('findByUuid')->willReturn($library);
@@ -159,6 +173,9 @@ final class LibraryControllerSecurityTest extends TestCase
 
     public function testDestroyRequiresOwnershipOrAdmin(): void
     {
+        $this->libraryService = $this->createMock(LibraryPortInterface::class);
+        $this->controller = $this->createLibraryControllerFixture();
+
         $library = $this->createLibrary();
 
         $this->libraryService->method('findByUuid')->willReturn($library);
@@ -174,6 +191,10 @@ final class LibraryControllerSecurityTest extends TestCase
 
     public function testScanRequiresOwnershipOrAdmin(): void
     {
+        $this->commandBus = $this->createMock(MessageBusInterface::class);
+        $this->libraryService = $this->createMock(LibraryPortInterface::class);
+        $this->controller = $this->createLibraryControllerFixture();
+
         $library = $this->createLibrary();
 
         $this->libraryService->method('findByUuid')->willReturn($library);

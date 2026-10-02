@@ -34,7 +34,7 @@ final class TranscodeStreamManagerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->availability = $this->createMock(SegmentAvailabilityInterface::class);
+        $this->availability = $this->createStub(SegmentAvailabilityInterface::class);
         $this->storage = $this->createStub(TranscodeStoragePortInterface::class);
 
         // SegmentEncoder is final — create a real instance with stub deps
@@ -53,7 +53,12 @@ final class TranscodeStreamManagerTest extends TestCase
 
         $this->spawner = new StubSpawner();
 
-        $this->manager = new TranscodeStreamManager(
+        $this->manager = $this->createTranscodeStreamManagerFixture();
+    }
+
+    private function createTranscodeStreamManagerFixture(): TranscodeStreamManager
+    {
+        $fixture = new TranscodeStreamManager(
             availability: $this->availability,
             storage: $this->storage,
             segmentEncoder: $this->segmentEncoder,
@@ -61,6 +66,7 @@ final class TranscodeStreamManagerTest extends TestCase
             spawner: $this->spawner,
             maxConcurrentStreams: 3,
         );
+        return $fixture;
     }
 
     public function testStartStreamSpawnsProcessAndReturnsOutputDir(): void
@@ -212,6 +218,9 @@ final class TranscodeStreamManagerTest extends TestCase
 
     public function testPollOnceMarksNewSegmentsAvailable(): void
     {
+        $this->availability = $this->createMock(SegmentAvailabilityInterface::class);
+        $this->manager = $this->createTranscodeStreamManagerFixture();
+
         $job = $this->makeJob();
         $outputDir = sys_get_temp_dir() . '/stream-avail-test-' . uniqid('', true);
         @mkdir($outputDir, 0755, true);
@@ -249,6 +258,9 @@ final class TranscodeStreamManagerTest extends TestCase
 
     public function testPollOnceDoesNotRemarkAlreadyMarkedSegments(): void
     {
+        $this->availability = $this->createMock(SegmentAvailabilityInterface::class);
+        $this->manager = $this->createTranscodeStreamManagerFixture();
+
         $job = $this->makeJob();
         $outputDir = sys_get_temp_dir() . '/stream-remark-test-' . uniqid('', true);
         @mkdir($outputDir, 0755, true);

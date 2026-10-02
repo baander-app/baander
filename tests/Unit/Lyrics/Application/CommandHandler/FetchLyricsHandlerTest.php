@@ -15,40 +15,51 @@ use App\Lyrics\Application\Port\LrclibClientInterface;
 use App\Lyrics\Domain\Model\Lyrics;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 final class FetchLyricsHandlerTest extends TestCase
 {
-    private SongPortInterface&MockObject $songPort;
-    private AlbumPortInterface&MockObject $albumPort;
-    private LrclibClientInterface&MockObject $lrclibClient;
-    private LyricsRepositoryInterface&MockObject $lyricsRepository;
-    private LoggerInterface&MockObject $logger;
+    private SongPortInterface $songPort;
+    private AlbumPortInterface $albumPort;
+    private LrclibClientInterface $lrclibClient;
+    private LyricsRepositoryInterface $lyricsRepository;
+    private LoggerInterface $logger;
     private FetchLyricsHandler $handler;
 
     protected function setUp(): void
     {
-        $this->songPort = $this->createMock(SongPortInterface::class);
-        $this->albumPort = $this->createMock(AlbumPortInterface::class);
-        $this->lrclibClient = $this->createMock(LrclibClientInterface::class);
-        $this->lyricsRepository = $this->createMock(LyricsRepositoryInterface::class);
-        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->songPort = $this->createStub(SongPortInterface::class);
+        $this->albumPort = $this->createStub(AlbumPortInterface::class);
+        $this->lrclibClient = $this->createStub(LrclibClientInterface::class);
+        $this->lyricsRepository = $this->createStub(LyricsRepositoryInterface::class);
+        $this->logger = $this->createStub(LoggerInterface::class);
 
-        $this->handler = new FetchLyricsHandler(
+        $this->handler = $this->createFetchLyricsHandlerFixture();
+    }
+
+    private function createFetchLyricsHandlerFixture(): FetchLyricsHandler
+    {
+        $fixture = new FetchLyricsHandler(
             $this->songPort,
             $this->albumPort,
             $this->lrclibClient,
             $this->lyricsRepository,
             $this->logger,
         );
+        return $fixture;
     }
 
     // --- Happy path ---
 
     public function testFetchesFromCachedEndpointAndStores(): void
     {
+        $this->albumPort = $this->createMock(AlbumPortInterface::class);
+        $this->lrclibClient = $this->createMock(LrclibClientInterface::class);
+        $this->lyricsRepository = $this->createMock(LyricsRepositoryInterface::class);
+        $this->songPort = $this->createMock(SongPortInterface::class);
+        $this->handler = $this->createFetchLyricsHandlerFixture();
+
         $songId = Uuid::v7();
         $albumId = Uuid::v7();
         $song = $this->createSong($albumId, 'Test Song', 233.0);
@@ -65,11 +76,11 @@ final class FetchLyricsHandlerTest extends TestCase
             syncedLyrics: '[00:17.12] Line 1\n[00:20.00] Line 2',
         );
 
-        $this->songPort->method('findByUuid')->with($songId)->willReturn($song);
-        $this->lyricsRepository->method('findBySongId')->with($songId)->willReturn(null);
-        $this->songPort->method('getArtistNameForSong')->with($songId)->willReturn('Test Artist');
-        $this->albumPort->method('findByUuid')->with($albumId)->willReturn($album);
-        $this->lrclibClient->method('getBySignatureCached')->with(
+        $this->songPort->expects($this->once())->method('findByUuid')->with($songId)->willReturn($song);
+        $this->lyricsRepository->expects($this->once())->method('findBySongId')->with($songId)->willReturn(null);
+        $this->songPort->expects($this->once())->method('getArtistNameForSong')->with($songId)->willReturn('Test Artist');
+        $this->albumPort->expects($this->once())->method('findByUuid')->with($albumId)->willReturn($album);
+        $this->lrclibClient->expects($this->once())->method('getBySignatureCached')->with(
             'Test Song',
             'Test Artist',
             'Test Album',
@@ -91,6 +102,12 @@ final class FetchLyricsHandlerTest extends TestCase
 
     public function testFallsBackToFullEndpointWhenCachedReturnsNull(): void
     {
+        $this->albumPort = $this->createMock(AlbumPortInterface::class);
+        $this->lrclibClient = $this->createMock(LrclibClientInterface::class);
+        $this->lyricsRepository = $this->createMock(LyricsRepositoryInterface::class);
+        $this->songPort = $this->createMock(SongPortInterface::class);
+        $this->handler = $this->createFetchLyricsHandlerFixture();
+
         $songId = Uuid::v7();
         $albumId = Uuid::v7();
         $song = $this->createSong($albumId, 'Test Song', 200.0);
@@ -107,12 +124,12 @@ final class FetchLyricsHandlerTest extends TestCase
             syncedLyrics: null,
         );
 
-        $this->songPort->method('findByUuid')->with($songId)->willReturn($song);
-        $this->lyricsRepository->method('findBySongId')->with($songId)->willReturn(null);
-        $this->songPort->method('getArtistNameForSong')->with($songId)->willReturn('Test Artist');
-        $this->albumPort->method('findByUuid')->with($albumId)->willReturn($album);
+        $this->songPort->expects($this->once())->method('findByUuid')->with($songId)->willReturn($song);
+        $this->lyricsRepository->expects($this->once())->method('findBySongId')->with($songId)->willReturn(null);
+        $this->songPort->expects($this->once())->method('getArtistNameForSong')->with($songId)->willReturn('Test Artist');
+        $this->albumPort->expects($this->once())->method('findByUuid')->with($albumId)->willReturn($album);
         $this->lrclibClient->method('getBySignatureCached')->willReturn(null);
-        $this->lrclibClient->method('getBySignature')->with(
+        $this->lrclibClient->expects($this->once())->method('getBySignature')->with(
             'Test Song',
             'Test Artist',
             'Test Album',
@@ -130,6 +147,11 @@ final class FetchLyricsHandlerTest extends TestCase
 
     public function testHandlesInstrumentalTrack(): void
     {
+        $this->albumPort = $this->createMock(AlbumPortInterface::class);
+        $this->lyricsRepository = $this->createMock(LyricsRepositoryInterface::class);
+        $this->songPort = $this->createMock(SongPortInterface::class);
+        $this->handler = $this->createFetchLyricsHandlerFixture();
+
         $songId = Uuid::v7();
         $albumId = Uuid::v7();
         $song = $this->createSong($albumId, 'Instrumental Track', 180.0);
@@ -146,10 +168,10 @@ final class FetchLyricsHandlerTest extends TestCase
             syncedLyrics: null,
         );
 
-        $this->songPort->method('findByUuid')->with($songId)->willReturn($song);
-        $this->lyricsRepository->method('findBySongId')->with($songId)->willReturn(null);
-        $this->songPort->method('getArtistNameForSong')->with($songId)->willReturn('Test Artist');
-        $this->albumPort->method('findByUuid')->with($albumId)->willReturn($album);
+        $this->songPort->expects($this->once())->method('findByUuid')->with($songId)->willReturn($song);
+        $this->lyricsRepository->expects($this->once())->method('findBySongId')->with($songId)->willReturn(null);
+        $this->songPort->expects($this->once())->method('getArtistNameForSong')->with($songId)->willReturn('Test Artist');
+        $this->albumPort->expects($this->once())->method('findByUuid')->with($albumId)->willReturn($album);
         $this->lrclibClient->method('getBySignatureCached')->willReturn($result);
 
         $this->lyricsRepository->expects($this->once())->method('save');
@@ -164,9 +186,14 @@ final class FetchLyricsHandlerTest extends TestCase
 
     public function testReturnsNullWhenSongNotFound(): void
     {
+        $this->lrclibClient = $this->createMock(LrclibClientInterface::class);
+        $this->lyricsRepository = $this->createMock(LyricsRepositoryInterface::class);
+        $this->songPort = $this->createMock(SongPortInterface::class);
+        $this->handler = $this->createFetchLyricsHandlerFixture();
+
         $songId = Uuid::v7();
 
-        $this->songPort->method('findByUuid')->with($songId)->willReturn(null);
+        $this->songPort->expects($this->once())->method('findByUuid')->with($songId)->willReturn(null);
         $this->lrclibClient->expects($this->never())->method('getBySignatureCached');
         $this->lyricsRepository->expects($this->never())->method('save');
 
@@ -177,13 +204,18 @@ final class FetchLyricsHandlerTest extends TestCase
 
     public function testReturnsExistingLyricsWithoutFetching(): void
     {
+        $this->lrclibClient = $this->createMock(LrclibClientInterface::class);
+        $this->lyricsRepository = $this->createMock(LyricsRepositoryInterface::class);
+        $this->songPort = $this->createMock(SongPortInterface::class);
+        $this->handler = $this->createFetchLyricsHandlerFixture();
+
         $songId = Uuid::v7();
         $existingLyrics = Lyrics::create($songId, 'Existing lyrics', 'embedded');
 
-        $this->songPort->method('findByUuid')->with($songId)->willReturn(
+        $this->songPort->expects($this->once())->method('findByUuid')->with($songId)->willReturn(
             $this->createSong(Uuid::v7(), 'Test', 200.0),
         );
-        $this->lyricsRepository->method('findBySongId')->with($songId)->willReturn($existingLyrics);
+        $this->lyricsRepository->expects($this->once())->method('findBySongId')->with($songId)->willReturn($existingLyrics);
         $this->lrclibClient->expects($this->never())->method('getBySignatureCached');
         $this->lyricsRepository->expects($this->never())->method('save');
 
@@ -194,12 +226,17 @@ final class FetchLyricsHandlerTest extends TestCase
 
     public function testReturnsNullWhenNoArtistName(): void
     {
+        $this->lrclibClient = $this->createMock(LrclibClientInterface::class);
+        $this->lyricsRepository = $this->createMock(LyricsRepositoryInterface::class);
+        $this->songPort = $this->createMock(SongPortInterface::class);
+        $this->handler = $this->createFetchLyricsHandlerFixture();
+
         $songId = Uuid::v7();
         $song = $this->createSong(Uuid::v7(), 'Test Song', 200.0);
 
-        $this->songPort->method('findByUuid')->with($songId)->willReturn($song);
-        $this->lyricsRepository->method('findBySongId')->with($songId)->willReturn(null);
-        $this->songPort->method('getArtistNameForSong')->with($songId)->willReturn(null);
+        $this->songPort->expects($this->once())->method('findByUuid')->with($songId)->willReturn($song);
+        $this->lyricsRepository->expects($this->once())->method('findBySongId')->with($songId)->willReturn(null);
+        $this->songPort->expects($this->once())->method('getArtistNameForSong')->with($songId)->willReturn(null);
         $this->lrclibClient->expects($this->never())->method('getBySignatureCached');
 
         $lyrics = ($this->handler)(new FetchLyricsCommand($songId));
@@ -209,12 +246,17 @@ final class FetchLyricsHandlerTest extends TestCase
 
     public function testReturnsNullWhenArtistNameIsEmpty(): void
     {
+        $this->lrclibClient = $this->createMock(LrclibClientInterface::class);
+        $this->lyricsRepository = $this->createMock(LyricsRepositoryInterface::class);
+        $this->songPort = $this->createMock(SongPortInterface::class);
+        $this->handler = $this->createFetchLyricsHandlerFixture();
+
         $songId = Uuid::v7();
         $song = $this->createSong(Uuid::v7(), 'Test Song', 200.0);
 
-        $this->songPort->method('findByUuid')->with($songId)->willReturn($song);
-        $this->lyricsRepository->method('findBySongId')->with($songId)->willReturn(null);
-        $this->songPort->method('getArtistNameForSong')->with($songId)->willReturn('  ');
+        $this->songPort->expects($this->once())->method('findByUuid')->with($songId)->willReturn($song);
+        $this->lyricsRepository->expects($this->once())->method('findBySongId')->with($songId)->willReturn(null);
+        $this->songPort->expects($this->once())->method('getArtistNameForSong')->with($songId)->willReturn('  ');
         $this->lrclibClient->expects($this->never())->method('getBySignatureCached');
 
         $lyrics = ($this->handler)(new FetchLyricsCommand($songId));
@@ -224,12 +266,17 @@ final class FetchLyricsHandlerTest extends TestCase
 
     public function testReturnsNullWhenSongHasNoDuration(): void
     {
+        $this->lrclibClient = $this->createMock(LrclibClientInterface::class);
+        $this->lyricsRepository = $this->createMock(LyricsRepositoryInterface::class);
+        $this->songPort = $this->createMock(SongPortInterface::class);
+        $this->handler = $this->createFetchLyricsHandlerFixture();
+
         $songId = Uuid::v7();
         $song = $this->createSong(Uuid::v7(), 'Test Song', null);
 
-        $this->songPort->method('findByUuid')->with($songId)->willReturn($song);
-        $this->lyricsRepository->method('findBySongId')->with($songId)->willReturn(null);
-        $this->songPort->method('getArtistNameForSong')->with($songId)->willReturn('Test Artist');
+        $this->songPort->expects($this->once())->method('findByUuid')->with($songId)->willReturn($song);
+        $this->lyricsRepository->expects($this->once())->method('findBySongId')->with($songId)->willReturn(null);
+        $this->songPort->expects($this->once())->method('getArtistNameForSong')->with($songId)->willReturn('Test Artist');
         $this->lrclibClient->expects($this->never())->method('getBySignatureCached');
 
         $lyrics = ($this->handler)(new FetchLyricsCommand($songId));
@@ -239,15 +286,20 @@ final class FetchLyricsHandlerTest extends TestCase
 
     public function testReturnsNullWhenNoLyricsFoundOnLrclib(): void
     {
+        $this->albumPort = $this->createMock(AlbumPortInterface::class);
+        $this->lyricsRepository = $this->createMock(LyricsRepositoryInterface::class);
+        $this->songPort = $this->createMock(SongPortInterface::class);
+        $this->handler = $this->createFetchLyricsHandlerFixture();
+
         $songId = Uuid::v7();
         $albumId = Uuid::v7();
         $song = $this->createSong($albumId, 'Obscure Song', 300.0);
         $album = $this->createAlbum($albumId, 'Obscure Album');
 
-        $this->songPort->method('findByUuid')->with($songId)->willReturn($song);
-        $this->lyricsRepository->method('findBySongId')->with($songId)->willReturn(null);
-        $this->songPort->method('getArtistNameForSong')->with($songId)->willReturn('Unknown Artist');
-        $this->albumPort->method('findByUuid')->with($albumId)->willReturn($album);
+        $this->songPort->expects($this->once())->method('findByUuid')->with($songId)->willReturn($song);
+        $this->lyricsRepository->expects($this->once())->method('findBySongId')->with($songId)->willReturn(null);
+        $this->songPort->expects($this->once())->method('getArtistNameForSong')->with($songId)->willReturn('Unknown Artist');
+        $this->albumPort->expects($this->once())->method('findByUuid')->with($albumId)->willReturn($album);
         $this->lrclibClient->method('getBySignatureCached')->willReturn(null);
         $this->lrclibClient->method('getBySignature')->willReturn(null);
         $this->lyricsRepository->expects($this->never())->method('save');
@@ -259,6 +311,12 @@ final class FetchLyricsHandlerTest extends TestCase
 
     public function testWorksWhenAlbumNotFound(): void
     {
+        $this->albumPort = $this->createMock(AlbumPortInterface::class);
+        $this->lrclibClient = $this->createMock(LrclibClientInterface::class);
+        $this->lyricsRepository = $this->createMock(LyricsRepositoryInterface::class);
+        $this->songPort = $this->createMock(SongPortInterface::class);
+        $this->handler = $this->createFetchLyricsHandlerFixture();
+
         $songId = Uuid::v7();
         $albumId = Uuid::v7();
         $song = $this->createSong($albumId, 'Test Song', 200.0);
@@ -274,11 +332,11 @@ final class FetchLyricsHandlerTest extends TestCase
             syncedLyrics: null,
         );
 
-        $this->songPort->method('findByUuid')->with($songId)->willReturn($song);
-        $this->lyricsRepository->method('findBySongId')->with($songId)->willReturn(null);
-        $this->songPort->method('getArtistNameForSong')->with($songId)->willReturn('Test Artist');
-        $this->albumPort->method('findByUuid')->with($albumId)->willReturn(null);
-        $this->lrclibClient->method('getBySignatureCached')->with(
+        $this->songPort->expects($this->once())->method('findByUuid')->with($songId)->willReturn($song);
+        $this->lyricsRepository->expects($this->once())->method('findBySongId')->with($songId)->willReturn(null);
+        $this->songPort->expects($this->once())->method('getArtistNameForSong')->with($songId)->willReturn('Test Artist');
+        $this->albumPort->expects($this->once())->method('findByUuid')->with($albumId)->willReturn(null);
+        $this->lrclibClient->expects($this->once())->method('getBySignatureCached')->with(
             'Test Song',
             'Test Artist',
             '',

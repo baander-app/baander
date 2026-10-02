@@ -96,7 +96,8 @@ final class CronExpressionValidatorTest extends TestCase
 
     public function testWrongConstraintTypeThrowsException(): void
     {
-        $wrongConstraint = $this->createMock(Constraint::class);
+        $wrongConstraint = $this->createStub(Constraint::class);
+        $this->context->expects($this->never())->method('buildViolation');
 
         $this->expectException(UnexpectedTypeException::class);
 

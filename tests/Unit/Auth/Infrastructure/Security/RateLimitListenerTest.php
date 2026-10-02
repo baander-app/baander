@@ -59,7 +59,7 @@ final class RateLimitListenerTest extends TestCase
         $rateLimit->method('getRemainingTokens')->willReturn($remainingTokens);
 
         $limiter = $this->createMock(LimiterInterface::class);
-        $limiter->method('consume')->with(1)->willReturn($rateLimit);
+        $limiter->expects($this->once())->method('consume')->with(1)->willReturn($rateLimit);
 
         return $limiter;
     }
@@ -73,7 +73,7 @@ final class RateLimitListenerTest extends TestCase
         );
 
         $limiter = $this->createMock(LimiterInterface::class);
-        $limiter->method('consume')->with(1)->willReturn($rateLimit);
+        $limiter->expects($this->once())->method('consume')->with(1)->willReturn($rateLimit);
 
         return $limiter;
     }
@@ -122,7 +122,7 @@ final class RateLimitListenerTest extends TestCase
         $event = $this->createRequestEvent($request);
 
         $this->loginIpLimiter->method('create')->willReturn($this->createRejectedLimit(120));
-        $this->loginIpEmailLimiter->method('create')->willReturn($this->createAcceptedLimit(2));
+        $this->loginIpEmailLimiter->expects($this->never())->method('create');
 
         $this->logger->expects($this->once())->method('warning');
 
@@ -240,7 +240,7 @@ final class RateLimitListenerTest extends TestCase
         $rateLimit = $this->createMock(RateLimit::class);
         $rateLimit->method('isAccepted')->willReturn(true);
         $rateLimit->method('getRemainingTokens')->willReturn(29);
-        $limiter->method('consume')->with(1)->willReturn($rateLimit);
+        $limiter->expects($this->once())->method('consume')->with(1)->willReturn($rateLimit);
 
         $this->refreshClientLimiter->expects($this->once())
             ->method('create')
@@ -289,8 +289,8 @@ final class RateLimitListenerTest extends TestCase
         $eventIp2 = $this->createRequestEvent($requestIp2);
 
         // IP1 is rate limited
-        $this->loginIpLimiter->method('create')
-            ->willReturnCallback(function (string $key) use ($requestIp1): LimiterInterface {
+        $this->loginIpLimiter->expects($this->exactly(2))->method('create')
+            ->willReturnCallback(function (string $key): LimiterInterface {
                 if ($key === '10.0.0.1') {
                     return $this->createRejectedLimit(120);
                 }
@@ -300,9 +300,15 @@ final class RateLimitListenerTest extends TestCase
 
         $this->loginIpEmailLimiter->method('create')->willReturn($this->createAcceptedLimit(2));
 
-        // IP1 should be rejected
-        $this->expectException(TooManyRequestsHttpException::class);
-        $this->listener->onKernelRequest($eventIp1);
+        try {
+            $this->listener->onKernelRequest($eventIp1);
+            self::fail('The first IP must be rate limited.');
+        } catch (TooManyRequestsHttpException $exception) {
+            self::assertSame(429, $exception->getStatusCode());
+        }
+
+        $this->listener->onKernelRequest($eventIp2);
+        self::assertSame(2, $requestIp2->attributes->get('rate_limit_remaining'));
     }
 
     public function testDifferentIpsHaveIndependentLimitsSecondIpAllowed(): void

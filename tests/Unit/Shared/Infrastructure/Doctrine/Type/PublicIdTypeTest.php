@@ -17,7 +17,7 @@ final class PublicIdTypeTest extends TestCase
     protected function setUp(): void
     {
         $this->type = new PublicIdType();
-        $this->platform = $this->createMock(AbstractPlatform::class);
+        $this->platform = $this->createStub(AbstractPlatform::class);
     }
 
     public function testGetNameReturnsPublicId(): void

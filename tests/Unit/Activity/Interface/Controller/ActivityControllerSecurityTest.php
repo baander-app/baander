@@ -31,26 +31,26 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  */
 final class ActivityControllerSecurityTest extends TestCase
 {
-    private Security&MockObject $security;
-    private ActivityPortInterface&MockObject $activityService;
+    private Security $security;
+    private ActivityPortInterface $activityService;
     private MessageBusInterface&MockObject $commandBus;
-    private SongPortInterface&MockObject $songPort;
-    private AlbumPortInterface&MockObject $albumPort;
-    private ArtistPortInterface&MockObject $artistPort;
-    private MoviePortInterface&MockObject $moviePort;
-    private ImagePortInterface&MockObject $imagePort;
+    private SongPortInterface $songPort;
+    private AlbumPortInterface $albumPort;
+    private ArtistPortInterface $artistPort;
+    private MoviePortInterface $moviePort;
+    private ImagePortInterface $imagePort;
     private ActivityController $controller;
 
     protected function setUp(): void
     {
-        $this->security = $this->createMock(Security::class);
-        $this->activityService = $this->createMock(ActivityPortInterface::class);
+        $this->security = $this->createStub(Security::class);
+        $this->activityService = $this->createStub(ActivityPortInterface::class);
         $this->commandBus = $this->createMock(MessageBusInterface::class);
-        $this->songPort = $this->createMock(SongPortInterface::class);
-        $this->albumPort = $this->createMock(AlbumPortInterface::class);
-        $this->artistPort = $this->createMock(ArtistPortInterface::class);
-        $this->moviePort = $this->createMock(MoviePortInterface::class);
-        $this->imagePort = $this->createMock(ImagePortInterface::class);
+        $this->songPort = $this->createStub(SongPortInterface::class);
+        $this->albumPort = $this->createStub(AlbumPortInterface::class);
+        $this->artistPort = $this->createStub(ArtistPortInterface::class);
+        $this->moviePort = $this->createStub(MoviePortInterface::class);
+        $this->imagePort = $this->createStub(ImagePortInterface::class);
 
         $enrichmentService = new ActivityEnrichmentService(
             songService: $this->songPort,
@@ -70,7 +70,7 @@ final class ActivityControllerSecurityTest extends TestCase
             moviePort: $this->moviePort,
         );
 
-        $translator = $this->createMock(TranslatorInterface::class);
+        $translator = $this->createStub(TranslatorInterface::class);
         $translator->method('trans')->willReturnArgument(0);
         $this->controller->setTranslator($translator);
     }

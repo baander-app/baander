@@ -8,7 +8,6 @@ use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Shared\Domain\Model\Uuid;
 use App\UserPreference\Application\Port\AudioPreferencesPortInterface;
 use App\UserPreference\Interface\Controller\AudioPreferencesController;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Request;
@@ -19,20 +18,25 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 final class AudioPreferencesControllerTest extends TestCase
 {
-    private AudioPreferencesPortInterface&MockObject $port;
-    private ValidatorInterface&MockObject $validator;
-    private JsonEncoder&MockObject $jsonEncoder;
-    private Security&MockObject $security;
+    private AudioPreferencesPortInterface $port;
+    private ValidatorInterface $validator;
+    private JsonEncoder $jsonEncoder;
+    private Security $security;
     private AudioPreferencesController $controller;
 
     protected function setUp(): void
     {
-        $this->port = $this->createMock(AudioPreferencesPortInterface::class);
-        $this->validator = $this->createMock(ValidatorInterface::class);
-        $this->jsonEncoder = $this->createMock(JsonEncoder::class);
-        $this->security = $this->createMock(Security::class);
+        $this->port = $this->createStub(AudioPreferencesPortInterface::class);
+        $this->validator = $this->createStub(ValidatorInterface::class);
+        $this->jsonEncoder = $this->createStub(JsonEncoder::class);
+        $this->security = $this->createStub(Security::class);
 
-        $this->controller = new AudioPreferencesController(
+        $this->controller = $this->createAudioPreferencesControllerFixture();
+    }
+
+    private function createAudioPreferencesControllerFixture(): AudioPreferencesController
+    {
+        $fixture = new AudioPreferencesController(
             $this->port,
             $this->validator,
             $this->jsonEncoder,
@@ -45,6 +49,7 @@ final class AudioPreferencesControllerTest extends TestCase
             password: 'hashed-pw',
         );
         $this->security->method('getUser')->willReturn($user);
+        return $fixture;
     }
 
     // --- GET returns stored preferences with version (200) ---
@@ -82,6 +87,9 @@ final class AudioPreferencesControllerTest extends TestCase
 
     public function testPutSavesAndReturnsNewVersion(): void
     {
+        $this->port = $this->createMock(AudioPreferencesPortInterface::class);
+        $this->controller = $this->createAudioPreferencesControllerFixture();
+
         $inputData = ['payload' => ['enabled' => true, 'preset' => 'flat'], 'version' => 1];
 
         $request = $this->createJsonRequest('PUT', json_encode($inputData));
@@ -148,6 +156,9 @@ final class AudioPreferencesControllerTest extends TestCase
 
     public function testRollbackRestoresSpecifiedVersion(): void
     {
+        $this->port = $this->createMock(AudioPreferencesPortInterface::class);
+        $this->controller = $this->createAudioPreferencesControllerFixture();
+
         $request = $this->createJsonRequest('POST', json_encode(['version' => 2]));
 
         $this->jsonEncoder->method('decode')->willReturn(['version' => 2]);
@@ -171,6 +182,9 @@ final class AudioPreferencesControllerTest extends TestCase
 
     public function testPutReturns422OnInvalidPayload(): void
     {
+        $this->port = $this->createMock(AudioPreferencesPortInterface::class);
+        $this->controller = $this->createAudioPreferencesControllerFixture();
+
         $request = $this->createJsonRequest('PUT', json_encode(['payload' => [], 'version' => 0]));
 
         $this->jsonEncoder->method('decode')->willReturn(['payload' => [], 'version' => 0]);

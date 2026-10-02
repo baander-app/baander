@@ -16,7 +16,6 @@ use App\Scheduler\Domain\ValueObject\ScheduleStatus;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPoolInterface;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use Symfony\Component\Console\Command\Command;
@@ -25,18 +24,18 @@ use Symfony\Component\Messenger\MessageBusInterface;
 
 final class ExecuteScheduledJobHandlerTest extends TestCase
 {
-    private ScheduledJobPortInterface&MockObject $jobService;
-    private MessageBusInterface&MockObject $messageBus;
-    private CpuProcessPoolInterface&MockObject $cpuPool;
-    private RedisClientFactory&MockObject $redis;
+    private ScheduledJobPortInterface $jobService;
+    private MessageBusInterface $messageBus;
+    private CpuProcessPoolInterface $cpuPool;
+    private RedisClientFactory $redis;
     private TestLogger $logger;
 
     protected function setUp(): void
     {
-        $this->jobService = $this->createMock(ScheduledJobPortInterface::class);
-        $this->messageBus = $this->createMock(MessageBusInterface::class);
-        $this->cpuPool = $this->createMock(CpuProcessPoolInterface::class);
-        $this->redis = $this->createMock(RedisClientFactory::class);
+        $this->jobService = $this->createStub(ScheduledJobPortInterface::class);
+        $this->messageBus = $this->createStub(MessageBusInterface::class);
+        $this->cpuPool = $this->createStub(CpuProcessPoolInterface::class);
+        $this->redis = $this->createStub(RedisClientFactory::class);
         $this->logger = new TestLogger();
     }
 
@@ -59,6 +58,8 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
 
     public function testInvocationSkipsWhenJobNotFound(): void
     {
+        $this->messageBus = $this->createMock(MessageBusInterface::class);
+
         $command = new ExecuteScheduledJobCommand(
             jobId: Uuid::v4()->toString(),
             jobType: JobType::Messenger->value,
@@ -78,6 +79,9 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
 
     public function testInvocationFailsWhenMessengerCommandNotInRegistry(): void
     {
+        $this->jobService = $this->createMock(ScheduledJobPortInterface::class);
+        $this->messageBus = $this->createMock(MessageBusInterface::class);
+
         $job = ScheduledJob::create(
             name: 'Rogue',
             expression: '* * * * *',
@@ -108,6 +112,9 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
 
     public function testSuccessfulMessengerDispatch(): void
     {
+        $this->jobService = $this->createMock(ScheduledJobPortInterface::class);
+        $this->messageBus = $this->createMock(MessageBusInterface::class);
+
         $job = ScheduledJob::create(
             name: 'Valid Messenger',
             expression: '* * * * *',
@@ -177,6 +184,8 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
 
     public function testConsoleDispatchUsesCpuPool(): void
     {
+        $this->cpuPool = $this->createMock(CpuProcessPoolInterface::class);
+
         $consoleCommand = new class extends Command implements SchedulableConsoleCommandInterface {
             public function __construct()
             {
@@ -274,6 +283,8 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
 
     public function testJobMarkedFailedOnMessengerException(): void
     {
+        $this->redis = $this->createMock(RedisClientFactory::class);
+
         $job = ScheduledJob::create(
             name: 'Failing',
             expression: '* * * * *',

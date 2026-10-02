@@ -10,7 +10,6 @@ use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Auth\Interface\Controller\OAuth\ClientController;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
@@ -20,28 +19,37 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 
 final class ClientControllerTest extends TestCase
 {
-    private Security&MockObject $security;
-    private ClientRepositoryInterface&MockObject $clientRepository;
+    private Security $security;
+    private ClientRepositoryInterface $clientRepository;
     private ClientController $controller;
 
     protected function setUp(): void
     {
-        $this->security = $this->createMock(Security::class);
-        $this->clientRepository = $this->createMock(ClientRepositoryInterface::class);
-        $this->controller = new ClientController(
+        $this->security = $this->createStub(Security::class);
+        $this->clientRepository = $this->createStub(ClientRepositoryInterface::class);
+        $this->controller = $this->createClientControllerFixture();
+    }
+
+    private function createClientControllerFixture(): ClientController
+    {
+        $fixture = new ClientController(
             $this->security,
             $this->clientRepository,
         );
 
-        $translator = $this->createMock(TranslatorInterface::class);
+        $translator = $this->createStub(TranslatorInterface::class);
         $translator->method('trans')->willReturnArgument(0);
-        $this->controller->setTranslator($translator);
+        $fixture->setTranslator($translator);
+        return $fixture;
     }
 
     // --- IDOR: list filters by user ---
 
     public function testListReturnsOnlyClientsOwnedByCurrentUser(): void
     {
+        $this->clientRepository = $this->createMock(ClientRepositoryInterface::class);
+        $this->controller = $this->createClientControllerFixture();
+
         $userId = Uuid::v4();
         $user = new SecurityUser(
             id: $userId->toString(),
@@ -94,6 +102,9 @@ final class ClientControllerTest extends TestCase
 
     public function testListReturnsUnauthorizedWhenNotAuthenticated(): void
     {
+        $this->clientRepository = $this->createMock(ClientRepositoryInterface::class);
+        $this->controller = $this->createClientControllerFixture();
+
         $this->security->method('getUser')->willReturn(null);
 
         $response = $this->controller->index();
@@ -108,6 +119,9 @@ final class ClientControllerTest extends TestCase
 
     public function testRevokeRejectsWhenClientNotOwnedByUser(): void
     {
+        $this->clientRepository = $this->createMock(ClientRepositoryInterface::class);
+        $this->controller = $this->createClientControllerFixture();
+
         $userIdA = Uuid::v4();
         $userIdB = Uuid::v4();
         $userA = new SecurityUser(
@@ -132,6 +146,9 @@ final class ClientControllerTest extends TestCase
 
     public function testRevokeSucceedsWhenClientOwnedByUser(): void
     {
+        $this->clientRepository = $this->createMock(ClientRepositoryInterface::class);
+        $this->controller = $this->createClientControllerFixture();
+
         $userId = Uuid::v4();
         $user = new SecurityUser(
             id: $userId->toString(),
@@ -195,6 +212,9 @@ final class ClientControllerTest extends TestCase
 
     public function testRevokeReturnsUnauthorizedWhenNotAuthenticated(): void
     {
+        $this->clientRepository = $this->createMock(ClientRepositoryInterface::class);
+        $this->controller = $this->createClientControllerFixture();
+
         $this->security->method('getUser')->willReturn(null);
 
         $response = $this->controller->revoke('some-id');

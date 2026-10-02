@@ -11,23 +11,28 @@ use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Service\TokenChainValidator;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 final class TokenChainValidatorTest extends TestCase
 {
-    private AccessTokenRepositoryInterface&MockObject $accessTokenRepo;
-    private RefreshTokenRepositoryInterface&MockObject $refreshTokenRepo;
+    private AccessTokenRepositoryInterface $accessTokenRepo;
+    private RefreshTokenRepositoryInterface $refreshTokenRepo;
     private TokenChainValidator $validator;
     private ChainId $chainId;
 
     protected function setUp(): void
     {
-        $this->accessTokenRepo = $this->createMock(AccessTokenRepositoryInterface::class);
-        $this->refreshTokenRepo = $this->createMock(RefreshTokenRepositoryInterface::class);
-        $this->validator = new TokenChainValidator($this->accessTokenRepo, $this->refreshTokenRepo);
+        $this->accessTokenRepo = $this->createStub(AccessTokenRepositoryInterface::class);
+        $this->refreshTokenRepo = $this->createStub(RefreshTokenRepositoryInterface::class);
+        $this->validator = $this->createTokenChainValidatorFixture();
+    }
+
+    private function createTokenChainValidatorFixture(): TokenChainValidator
+    {
+        $fixture = new TokenChainValidator($this->accessTokenRepo, $this->refreshTokenRepo);
         $this->chainId = ChainId::generate();
+        return $fixture;
     }
 
     private function createRefreshToken(bool $used = false, bool $revoked = false, ?ChainId $chainId = null): RefreshToken
@@ -57,6 +62,10 @@ final class TokenChainValidatorTest extends TestCase
 
     public function testValidateReplayRevokesChain(): void
     {
+        $this->accessTokenRepo = $this->createMock(AccessTokenRepositoryInterface::class);
+        $this->refreshTokenRepo = $this->createMock(RefreshTokenRepositoryInterface::class);
+        $this->validator = $this->createTokenChainValidatorFixture();
+
         $token = $this->createRefreshToken(used: true);
 
         $this->accessTokenRepo->expects($this->once())->method('revokeByChainId');
@@ -117,6 +126,10 @@ final class TokenChainValidatorTest extends TestCase
 
     public function testRevokeChain(): void
     {
+        $this->accessTokenRepo = $this->createMock(AccessTokenRepositoryInterface::class);
+        $this->refreshTokenRepo = $this->createMock(RefreshTokenRepositoryInterface::class);
+        $this->validator = $this->createTokenChainValidatorFixture();
+
         $this->accessTokenRepo->expects($this->once())->method('revokeByChainId')->with($this->chainId);
         $this->refreshTokenRepo->expects($this->once())->method('revokeByChainId')->with($this->chainId);
 

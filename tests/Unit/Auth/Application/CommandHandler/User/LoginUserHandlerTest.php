@@ -10,28 +10,36 @@ use App\Auth\Application\Port\PasswordHasherInterface;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Domain\Model\Email;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 final class LoginUserHandlerTest extends TestCase
 {
-    private UserRepositoryInterface&MockObject $userRepository;
-    private PasswordHasherInterface&MockObject $passwordHasher;
+    private UserRepositoryInterface $userRepository;
+    private PasswordHasherInterface $passwordHasher;
     private LoginUserHandler $handler;
 
     protected function setUp(): void
     {
-        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
-        $this->passwordHasher = $this->createMock(PasswordHasherInterface::class);
-        $this->handler = new LoginUserHandler($this->userRepository, $this->passwordHasher);
+        $this->userRepository = $this->createStub(UserRepositoryInterface::class);
+        $this->passwordHasher = $this->createStub(PasswordHasherInterface::class);
+        $this->handler = $this->createLoginUserHandlerFixture();
+    }
+
+    private function createLoginUserHandlerFixture(): LoginUserHandler
+    {
+        $fixture = new LoginUserHandler($this->userRepository, $this->passwordHasher);
+        return $fixture;
     }
 
     public function testSuccessfulLogin(): void
     {
+        $this->passwordHasher = $this->createMock(PasswordHasherInterface::class);
+        $this->handler = $this->createLoginUserHandlerFixture();
+
         $user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
         $this->userRepository->method('findByEmail')->willReturn($user);
-        $this->passwordHasher->method('verify')->with('pw', 'hashed')->willReturn(true);
+        $this->passwordHasher->expects($this->once())->method('verify')->with('pw', 'hashed')->willReturn(true);
 
         $result = ($this->handler)(new LoginUserCommand(new Email('test@example.com'), 'pw'));
 

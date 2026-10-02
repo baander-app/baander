@@ -12,31 +12,40 @@ use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use RuntimeException;
 
 final class RegisterPasskeyHandlerTest extends TestCase
 {
-    private UserRepositoryInterface&MockObject $userRepository;
-    private PasskeyRepositoryInterface&MockObject $passkeyRepository;
-    private EventDispatcherInterface&MockObject $eventDispatcher;
+    private UserRepositoryInterface $userRepository;
+    private PasskeyRepositoryInterface $passkeyRepository;
+    private EventDispatcherInterface $eventDispatcher;
     private RegisterPasskeyHandler $handler;
 
     protected function setUp(): void
     {
-        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
-        $this->passkeyRepository = $this->createMock(PasskeyRepositoryInterface::class);
-        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-        $this->handler = new RegisterPasskeyHandler($this->userRepository, $this->passkeyRepository, $this->eventDispatcher);
+        $this->userRepository = $this->createStub(UserRepositoryInterface::class);
+        $this->passkeyRepository = $this->createStub(PasskeyRepositoryInterface::class);
+        $this->eventDispatcher = $this->createStub(EventDispatcherInterface::class);
+        $this->handler = $this->createRegisterPasskeyHandlerFixture();
+    }
+
+    private function createRegisterPasskeyHandlerFixture(): RegisterPasskeyHandler
+    {
+        $fixture = new RegisterPasskeyHandler($this->userRepository, $this->passkeyRepository, $this->eventDispatcher);
+        return $fixture;
     }
 
     public function testRegistersPasskey(): void
     {
+        $this->passkeyRepository = $this->createMock(PasskeyRepositoryInterface::class);
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->handler = $this->createRegisterPasskeyHandlerFixture();
+
         $user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
         $userId = $user->getId();
-        $this->userRepository->method('findByUuid')->with($userId)->willReturn($user);
+        $this->userRepository->expects($this->once())->method('findByUuid')->with($userId)->willReturn($user);
         $this->passkeyRepository->method('ofCredentialId')->willReturn(null);
         $this->passkeyRepository->expects($this->once())->method('save');
 

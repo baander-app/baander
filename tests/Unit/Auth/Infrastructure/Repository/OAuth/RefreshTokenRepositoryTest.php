@@ -24,7 +24,7 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 final class RefreshTokenRepositoryTest extends TestCase
 {
     private EntityManagerInterface&MockObject $entityManager;
-    private Connection&MockObject $connection;
+    private Connection $connection;
     private RefreshTokenRepository $repository;
 
     private static Uuid $entityId;
@@ -33,8 +33,8 @@ final class RefreshTokenRepositoryTest extends TestCase
     protected function setUp(): void
     {
         $this->entityManager = $this->createMock(EntityManagerInterface::class);
-        $this->connection = $this->createMock(Connection::class);
-        $this->entityManager->method('getConnection')->willReturn($this->connection);
+        $this->connection = $this->createStub(Connection::class);
+        $this->entityManager->method('getConnection')->willReturnCallback(fn (): Connection => $this->connection);
         $this->repository = new RefreshTokenRepository($this->entityManager, new JsonEncoder());
 
         self::$entityId ??= Uuid::v4();
@@ -77,16 +77,16 @@ final class RefreshTokenRepositoryTest extends TestCase
 
         // The repository will call find() on the parent entity's ID to load it fresh.
         $refreshTokenRepo = $this->createMock(EntityRepository::class);
-        $refreshTokenRepo->method('find')
+        $refreshTokenRepo->expects($this->once())->method('find')
             ->with($parentEntity->getId())
             ->willReturn($parentEntity);
 
-        $this->entityManager->method('getRepository')
+        $this->entityManager->expects($this->atLeastOnce())->method('getRepository')
             ->with(RefreshTokenEntity::class)
             ->willReturn($refreshTokenRepo);
 
         // Invoke toDomain via findByTokenId
-        $refreshTokenRepo->method('findOneBy')
+        $refreshTokenRepo->expects($this->once())->method('findOneBy')
             ->with(['tokenId' => self::$entityId->toString()])
             ->willReturn($currentEntity);
 
@@ -117,11 +117,11 @@ final class RefreshTokenRepositoryTest extends TestCase
         );
 
         $refreshTokenRepo = $this->createMock(EntityRepository::class);
-        $refreshTokenRepo->method('findOneBy')
+        $refreshTokenRepo->expects($this->once())->method('findOneBy')
             ->with(['tokenId' => self::$entityId->toString()])
             ->willReturn($currentEntity);
 
-        $this->entityManager->method('getRepository')
+        $this->entityManager->expects($this->atLeastOnce())->method('getRepository')
             ->with(RefreshTokenEntity::class)
             ->willReturn($refreshTokenRepo);
 
@@ -154,14 +154,14 @@ final class RefreshTokenRepositoryTest extends TestCase
 
         // Simulate the predecessor entity being deleted from DB after association.
         $refreshTokenRepo = $this->createMock(EntityRepository::class);
-        $refreshTokenRepo->method('findOneBy')
+        $refreshTokenRepo->expects($this->once())->method('findOneBy')
             ->with(['tokenId' => self::$entityId->toString()])
             ->willReturn($currentEntity);
-        $refreshTokenRepo->method('find')
+        $refreshTokenRepo->expects($this->once())->method('find')
             ->with($parentId)
             ->willReturn(null);
 
-        $this->entityManager->method('getRepository')
+        $this->entityManager->expects($this->atLeastOnce())->method('getRepository')
             ->with(RefreshTokenEntity::class)
             ->willReturn($refreshTokenRepo);
 
@@ -189,11 +189,11 @@ final class RefreshTokenRepositoryTest extends TestCase
         );
 
         $refreshTokenRepo = $this->createMock(EntityRepository::class);
-        $refreshTokenRepo->method('findOneBy')
+        $refreshTokenRepo->expects($this->once())->method('findOneBy')
             ->with(['tokenId' => self::$entityId->toString()])
             ->willReturn($entity);
 
-        $this->entityManager->method('getRepository')
+        $this->entityManager->expects($this->atLeastOnce())->method('getRepository')
             ->with(RefreshTokenEntity::class)
             ->willReturn($refreshTokenRepo);
 
@@ -219,11 +219,11 @@ final class RefreshTokenRepositoryTest extends TestCase
         );
 
         $refreshTokenRepo = $this->createMock(EntityRepository::class);
-        $refreshTokenRepo->method('findOneBy')
+        $refreshTokenRepo->expects($this->once())->method('findOneBy')
             ->with(['tokenId' => self::$entityId->toString()])
             ->willReturn($entity);
 
-        $this->entityManager->method('getRepository')
+        $this->entityManager->expects($this->atLeastOnce())->method('getRepository')
             ->with(RefreshTokenEntity::class)
             ->willReturn($refreshTokenRepo);
 
@@ -240,6 +240,8 @@ final class RefreshTokenRepositoryTest extends TestCase
 
     public function testRevokeByChainIdExecutesBulkUpdate(): void
     {
+        $this->connection = $this->createMock(Connection::class);
+
         $this->connection->expects($this->once())
             ->method('executeStatement')
             ->with(
@@ -255,6 +257,8 @@ final class RefreshTokenRepositoryTest extends TestCase
 
     public function testRevokeByChainIdClearsEntityManagerAfterUpdate(): void
     {
+        $this->connection = $this->createMock(Connection::class);
+
         $callOrder = [];
 
         $this->connection->expects($this->once())
@@ -333,7 +337,6 @@ final class RefreshTokenRepositoryTest extends TestCase
 
         // Use reflection to set the ID since the constructor generates a random one
         $ref = new \ReflectionProperty(RefreshTokenEntity::class, 'id');
-        $ref->setAccessible(true);
         $ref->setValue($entity, $id);
 
         return $entity;

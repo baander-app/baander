@@ -8,22 +8,30 @@ use App\Radio\Application\Command\SubscribeCountryCommand;
 use App\Radio\Application\CommandHandler\SubscribeCountryHandler;
 use App\Radio\Application\Port\CountrySubscriptionPortInterface;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 final class SubscribeCountryHandlerTest extends TestCase
 {
-    private CountrySubscriptionPortInterface&MockObject $subscriptionPort;
+    private CountrySubscriptionPortInterface $subscriptionPort;
     private SubscribeCountryHandler $handler;
 
     protected function setUp(): void
     {
-        $this->subscriptionPort = $this->createMock(CountrySubscriptionPortInterface::class);
-        $this->handler = new SubscribeCountryHandler($this->subscriptionPort);
+        $this->subscriptionPort = $this->createStub(CountrySubscriptionPortInterface::class);
+        $this->handler = $this->createSubscribeCountryHandlerFixture();
+    }
+
+    private function createSubscribeCountryHandlerFixture(): SubscribeCountryHandler
+    {
+        $fixture = new SubscribeCountryHandler($this->subscriptionPort);
+        return $fixture;
     }
 
     public function testSubscribeCallsPortAndReturnsResult(): void
     {
+        $this->subscriptionPort = $this->createMock(CountrySubscriptionPortInterface::class);
+        $this->handler = $this->createSubscribeCountryHandlerFixture();
+
         $userId = Uuid::v7();
         $sourceId = Uuid::v7();
         $countryCode = 'DE';

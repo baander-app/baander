@@ -13,7 +13,6 @@ use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Infrastructure\Cache\CachedAccessTokenRepository;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Infrastructure\Cache\CacheTags;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Cache\ItemInterface;
@@ -21,9 +20,9 @@ use Symfony\Contracts\Cache\TagAwareCacheInterface;
 
 final class CachedAccessTokenRepositoryTest extends TestCase
 {
-    private TagAwareCacheInterface&MockObject $cache;
-    private AccessTokenRepositoryInterface&MockObject $inner;
-    private LoggerInterface&MockObject $logger;
+    private TagAwareCacheInterface $cache;
+    private AccessTokenRepositoryInterface $inner;
+    private LoggerInterface $logger;
     private CachedAccessTokenRepository $decorator;
 
     private static Client $client;
@@ -45,25 +44,34 @@ final class CachedAccessTokenRepositoryTest extends TestCase
         $active->revoke();
         self::$revokedToken = $active;
 
-        $this->cache = $this->createMock(TagAwareCacheInterface::class);
-        $this->inner = $this->createMock(AccessTokenRepositoryInterface::class);
-        $this->logger = $this->createMock(LoggerInterface::class);
-        $this->decorator = new CachedAccessTokenRepository(
+        $this->cache = $this->createStub(TagAwareCacheInterface::class);
+        $this->inner = $this->createStub(AccessTokenRepositoryInterface::class);
+        $this->logger = $this->createStub(LoggerInterface::class);
+        $this->decorator = $this->createCachedAccessTokenRepositoryFixture();
+    }
+
+    private function createCachedAccessTokenRepositoryFixture(): CachedAccessTokenRepository
+    {
+        $fixture = new CachedAccessTokenRepository(
             $this->inner,
             $this->cache,
             $this->logger,
         );
+        return $fixture;
     }
 
     // --- findByTokenId: cache miss delegates to DB ---
 
     public function testFindByTokenIdCacheMissDelegatesToDatabase(): void
     {
+        $this->inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $this->decorator = $this->createCachedAccessTokenRepositoryFixture();
+
         $tokenId = TokenId::fromString(self::TOKEN_ID);
 
         $this->cache->method('get')
             ->willReturnCallback(function (string $key, callable $callback) {
-                return $callback($this->createMock(ItemInterface::class));
+                return $callback($this->createStub(ItemInterface::class));
             });
 
         $this->inner->expects($this->once())
@@ -78,6 +86,9 @@ final class CachedAccessTokenRepositoryTest extends TestCase
 
     public function testFindByTokenIdCacheMissReturnsDomainObject(): void
     {
+        $this->inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $this->decorator = $this->createCachedAccessTokenRepositoryFixture();
+
         $tokenId = TokenId::fromString(self::TOKEN_ID);
 
         $this->cache->method('get')
@@ -97,6 +108,9 @@ final class CachedAccessTokenRepositoryTest extends TestCase
 
     public function testFindByTokenIdCacheHitRevokedReturnsNull(): void
     {
+        $this->inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $this->decorator = $this->createCachedAccessTokenRepositoryFixture();
+
         $tokenId = TokenId::fromString(self::TOKEN_ID_2);
 
         // Cache returns true (revoked)
@@ -118,6 +132,10 @@ final class CachedAccessTokenRepositoryTest extends TestCase
 
     public function testFindByTokenIdCacheFailureFallsThroughToDatabase(): void
     {
+        $this->inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->decorator = $this->createCachedAccessTokenRepositoryFixture();
+
         $tokenId = TokenId::fromString(self::TOKEN_ID);
 
         $this->cache->method('get')
@@ -140,6 +158,10 @@ final class CachedAccessTokenRepositoryTest extends TestCase
 
     public function testSaveWithRevokedTokenSetsCacheToTrue(): void
     {
+        $this->cache = $this->createMock(TagAwareCacheInterface::class);
+        $this->inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $this->decorator = $this->createCachedAccessTokenRepositoryFixture();
+
         $this->inner->expects($this->once())
             ->method('save')
             ->with(self::$revokedToken);
@@ -156,6 +178,10 @@ final class CachedAccessTokenRepositoryTest extends TestCase
 
     public function testSaveWithActiveTokenDeletesCacheEntry(): void
     {
+        $this->cache = $this->createMock(TagAwareCacheInterface::class);
+        $this->inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $this->decorator = $this->createCachedAccessTokenRepositoryFixture();
+
         $this->inner->expects($this->once())
             ->method('save')
             ->with(self::$activeToken);
@@ -171,6 +197,10 @@ final class CachedAccessTokenRepositoryTest extends TestCase
 
     public function testRevokeByChainIdInvalidatesAllTokenCaches(): void
     {
+        $this->cache = $this->createMock(TagAwareCacheInterface::class);
+        $this->inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $this->decorator = $this->createCachedAccessTokenRepositoryFixture();
+
         $chainId = ChainId::generate();
 
         $this->inner->expects($this->once())
@@ -186,6 +216,10 @@ final class CachedAccessTokenRepositoryTest extends TestCase
 
     public function testRevokeByChainIdLogsErrorOnInvalidationFailure(): void
     {
+        $this->inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->decorator = $this->createCachedAccessTokenRepositoryFixture();
+
         $chainId = ChainId::generate();
 
         $this->inner->expects($this->once())
@@ -205,6 +239,10 @@ final class CachedAccessTokenRepositoryTest extends TestCase
 
     public function testRevokeForUserInvalidatesAllTokenCaches(): void
     {
+        $this->cache = $this->createMock(TagAwareCacheInterface::class);
+        $this->inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $this->decorator = $this->createCachedAccessTokenRepositoryFixture();
+
         $this->inner->expects($this->once())
             ->method('revokeForUser')
             ->with(self::$user);
@@ -219,6 +257,10 @@ final class CachedAccessTokenRepositoryTest extends TestCase
 
     public function testSaveWithRevokedTokenLogsErrorOnCacheFailure(): void
     {
+        $this->inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->decorator = $this->createCachedAccessTokenRepositoryFixture();
+
         $this->inner->expects($this->once())
             ->method('save')
             ->with(self::$revokedToken);

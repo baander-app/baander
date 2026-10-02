@@ -14,31 +14,41 @@ use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 final class VerifyEmailHandlerTest extends TestCase
 {
-    private EmailVerificationTokenRepositoryInterface&MockObject $tokenRepository;
-    private UserRepositoryInterface&MockObject $userRepository;
-    private EventDispatcherInterface&MockObject $eventDispatcher;
+    private EmailVerificationTokenRepositoryInterface $tokenRepository;
+    private UserRepositoryInterface $userRepository;
+    private EventDispatcherInterface $eventDispatcher;
     private VerifyEmailHandler $handler;
 
     protected function setUp(): void
     {
-        $this->tokenRepository = $this->createMock(EmailVerificationTokenRepositoryInterface::class);
-        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
-        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-        $this->handler = new VerifyEmailHandler(
+        $this->tokenRepository = $this->createStub(EmailVerificationTokenRepositoryInterface::class);
+        $this->userRepository = $this->createStub(UserRepositoryInterface::class);
+        $this->eventDispatcher = $this->createStub(EventDispatcherInterface::class);
+        $this->handler = $this->createVerifyEmailHandlerFixture();
+    }
+
+    private function createVerifyEmailHandlerFixture(): VerifyEmailHandler
+    {
+        $fixture = new VerifyEmailHandler(
             $this->tokenRepository,
             $this->userRepository,
             $this->eventDispatcher,
         );
+        return $fixture;
     }
 
     public function testVerifyEmailMarksUserVerifiedAndDeletesToken(): void
     {
+        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        $this->tokenRepository = $this->createMock(EmailVerificationTokenRepositoryInterface::class);
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->handler = $this->createVerifyEmailHandlerFixture();
+
         $tokenString = 'valid-token';
         $userEntity = new UserEntity(new PublicId(), 'Alice', 'alice@example.com', 'hashed-pw', '');
         $tokenEntity = new EmailVerificationTokenEntity(

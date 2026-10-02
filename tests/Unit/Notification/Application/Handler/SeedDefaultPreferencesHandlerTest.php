@@ -27,7 +27,7 @@ final class SeedDefaultPreferencesHandlerTest extends TestCase
     public function testSeedsCorrectDefaults(): void
     {
         $savedPreferences = [];
-        $preferenceRepository = $this->createMock(NotificationPreferenceRepositoryInterface::class);
+        $preferenceRepository = $this->createStub(NotificationPreferenceRepositoryInterface::class);
         $preferenceRepository->method('save')
             ->willReturnCallback(function (\App\Notification\Domain\Model\NotificationPreference $pref) use (&$savedPreferences): void {
                 $savedPreferences[] = [

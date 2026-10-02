@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Auth\Infrastructure\Security;
 
 use App\Auth\Infrastructure\Security\Passkey\PasskeyService;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
@@ -20,20 +19,25 @@ use Webauthn\PublicKeyCredentialRequestOptions;
 
 final class PasskeyServiceTest extends TestCase
 {
-    private LoggerInterface&MockObject $logger;
-    private CounterChecker&MockObject $counterChecker;
-    private EventDispatcherInterface&MockObject $eventDispatcher;
-    private CacheItemPoolInterface&MockObject $cache;
+    private LoggerInterface $logger;
+    private CounterChecker $counterChecker;
+    private EventDispatcherInterface $eventDispatcher;
+    private CacheItemPoolInterface $cache;
     private PasskeyService $service;
 
     protected function setUp(): void
     {
-        $this->logger = $this->createMock(LoggerInterface::class);
-        $this->counterChecker = $this->createMock(CounterChecker::class);
-        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-        $this->cache = $this->createMock(CacheItemPoolInterface::class);
+        $this->logger = $this->createStub(LoggerInterface::class);
+        $this->counterChecker = $this->createStub(CounterChecker::class);
+        $this->eventDispatcher = $this->createStub(EventDispatcherInterface::class);
+        $this->cache = $this->createStub(CacheItemPoolInterface::class);
 
-        $this->service = new PasskeyService(
+        $this->service = $this->createService();
+    }
+
+    private function createService(): PasskeyService
+    {
+        return new PasskeyService(
             appDomain: 'localhost',
             appName: 'Test App',
             timeout: 60000,
@@ -54,13 +58,16 @@ final class PasskeyServiceTest extends TestCase
 
     public function testStoreChallengeWritesToCache(): void
     {
+        $this->cache = $this->createMock(CacheItemPoolInterface::class);
+        $this->service = $this->createService();
+
         $creationOptions = PublicKeyCredentialCreationOptions::create(
             rp: \Webauthn\PublicKeyCredentialRpEntity::create(name: 'Test App', id: 'localhost'),
             user: \Webauthn\PublicKeyCredentialUserEntity::create(name: 'user@test.com', id: 'user-1', displayName: 'User'),
             challenge: random_bytes(32),
         );
 
-        $cacheItem = $this->createMock(CacheItemInterface::class);
+        $cacheItem = $this->createStub(CacheItemInterface::class);
         $cacheItem->method('set')->willReturnSelf();
         $cacheItem->method('expiresAfter')->willReturnSelf();
 
@@ -87,7 +94,7 @@ final class PasskeyServiceTest extends TestCase
 
         // Capture the serialized JSON that storeChallenge writes to cache
         $capturedJson = null;
-        $storeItem = $this->createMock(CacheItemInterface::class);
+        $storeItem = $this->createStub(CacheItemInterface::class);
         $self = $storeItem;
         $storeItem->method('set')->willReturnCallback(function (string $value) use (&$capturedJson, $self): CacheItemInterface {
             $capturedJson = $value;
@@ -103,7 +110,7 @@ final class PasskeyServiceTest extends TestCase
         $this->assertNotNull($capturedJson);
 
         // Now replace cache mock for getChallenge to return the captured value
-        $retrieveItem = $this->createMock(CacheItemInterface::class);
+        $retrieveItem = $this->createStub(CacheItemInterface::class);
         $retrieveItem->method('isHit')->willReturn(true);
         $retrieveItem->method('get')->willReturn($capturedJson);
 
@@ -134,6 +141,10 @@ final class PasskeyServiceTest extends TestCase
 
     public function testGetChallengeFallsBackToInMemoryWhenCacheFails(): void
     {
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->cache = $this->createMock(CacheItemPoolInterface::class);
+        $this->service = $this->createService();
+
         $creationOptions = PublicKeyCredentialCreationOptions::create(
             rp: \Webauthn\PublicKeyCredentialRpEntity::create(name: 'Test App', id: 'localhost'),
             user: \Webauthn\PublicKeyCredentialUserEntity::create(name: 'user@test.com', id: 'user-1', displayName: 'User'),
@@ -166,7 +177,7 @@ final class PasskeyServiceTest extends TestCase
         $key = $this->service->storeChallenge($options);
 
         // First retrieval via cache hit should remove from in-memory too
-        $hitItem = $this->createMock(CacheItemInterface::class);
+        $hitItem = $this->createStub(CacheItemInterface::class);
         $hitItem->method('isHit')->willReturn(true);
         $hitItem->method('get')->willReturnCallback(function () use ($options) {
             $challenge = rtrim(strtr(base64_encode($options->challenge), '+/', '-_'), '=');
@@ -184,7 +195,7 @@ final class PasskeyServiceTest extends TestCase
         $freshCache = $this->createMock(CacheItemPoolInterface::class);
         $freshCache->expects($this->exactly(2))
             ->method('getItem')
-            ->willReturnOnConsecutiveCalls($hitItem, $this->createConfiguredMock(CacheItemInterface::class, ['isHit' => false]));
+            ->willReturnOnConsecutiveCalls($hitItem, $this->createConfiguredStub(CacheItemInterface::class, ['isHit' => false]));
         $freshCache->expects($this->once())
             ->method('deleteItem');
 
@@ -216,7 +227,10 @@ final class PasskeyServiceTest extends TestCase
 
     public function testGetChallengeThrowsOnUnknownKey(): void
     {
-        $missItem = $this->createMock(CacheItemInterface::class);
+        $this->cache = $this->createMock(CacheItemPoolInterface::class);
+        $this->service = $this->createService();
+
+        $missItem = $this->createStub(CacheItemInterface::class);
         $missItem->method('isHit')->willReturn(false);
 
         $this->cache->expects($this->once())
@@ -232,8 +246,8 @@ final class PasskeyServiceTest extends TestCase
     public function testExpiredChallengeReturnsNullFromCacheAndThrows(): void
     {
         // Use a fresh service with empty in-memory store to simulate a restart
-        $freshCache = $this->createMock(CacheItemPoolInterface::class);
-        $missItem = $this->createMock(CacheItemInterface::class);
+        $freshCache = $this->createStub(CacheItemPoolInterface::class);
+        $missItem = $this->createStub(CacheItemInterface::class);
         $missItem->method('isHit')->willReturn(false);
 
         $freshCache->method('getItem')->willReturn($missItem);
@@ -263,6 +277,9 @@ final class PasskeyServiceTest extends TestCase
 
     public function testStoreChallengeFallsBackToInMemoryOnCacheFailure(): void
     {
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->service = $this->createService();
+
         $creationOptions = PublicKeyCredentialCreationOptions::create(
             rp: \Webauthn\PublicKeyCredentialRpEntity::create(name: 'Test App', id: 'localhost'),
             user: \Webauthn\PublicKeyCredentialUserEntity::create(name: 'user@test.com', id: 'user-1', displayName: 'User'),
@@ -286,6 +303,9 @@ final class PasskeyServiceTest extends TestCase
 
     public function testGetChallengeDeserializesRequestOptions(): void
     {
+        $this->cache = $this->createMock(CacheItemPoolInterface::class);
+        $this->service = $this->createService();
+
         $options = PublicKeyCredentialRequestOptions::create(
             challenge: random_bytes(32),
             rpId: 'localhost',
@@ -295,7 +315,7 @@ final class PasskeyServiceTest extends TestCase
 
         $key = $this->service->storeChallenge($options);
 
-        $cacheItem = $this->createMock(CacheItemInterface::class);
+        $cacheItem = $this->createStub(CacheItemInterface::class);
         $cacheItem->method('isHit')->willReturn(true);
         $cacheItem->method('get')->willReturnCallback(function () use ($options) {
             $challenge = rtrim(strtr(base64_encode($options->challenge), '+/', '-_'), '=');

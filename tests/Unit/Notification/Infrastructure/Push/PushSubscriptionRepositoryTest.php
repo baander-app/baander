@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Notification\Infrastructure\Push;
 
+use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Notification\Infrastructure\Doctrine\Entity\PushSubscriptionEntity;
 use App\Notification\Infrastructure\Push\PushSubscriptionRepository;
 use App\Shared\Domain\Model\Uuid;
@@ -27,9 +28,8 @@ final class PushSubscriptionRepositoryTest extends TestCase
 
     public function testSavePersistsAndFlushes(): void
     {
-        $userId = new Uuid();
         $subscription = new PushSubscriptionEntity(
-            userId: $userId,
+            user: $this->createStub(UserEntity::class),
             endpoint: 'https://fcm.googleapis.com/test',
             publicKey: 'pk',
             authKey: 'ak',
@@ -44,9 +44,8 @@ final class PushSubscriptionRepositoryTest extends TestCase
 
     public function testRemoveDeletesAndFlushes(): void
     {
-        $userId = new Uuid();
         $subscription = new PushSubscriptionEntity(
-            userId: $userId,
+            user: $this->createStub(UserEntity::class),
             endpoint: 'https://fcm.googleapis.com/test',
             publicKey: 'pk',
             authKey: 'ak',
@@ -64,12 +63,12 @@ final class PushSubscriptionRepositoryTest extends TestCase
         $userId = new Uuid();
 
         $repo = $this->createMock(\Doctrine\ORM\EntityRepository::class);
-        $this->entityManager->method('getRepository')
+        $this->entityManager->expects($this->once())->method('getRepository')
             ->with(PushSubscriptionEntity::class)
             ->willReturn($repo);
 
         $repo->expects($this->once())->method('findBy')
-            ->with(['userId' => $userId]);
+            ->with(['user' => $userId]);
 
         $this->createRepository()->findByUser($userId);
     }
@@ -79,7 +78,7 @@ final class PushSubscriptionRepositoryTest extends TestCase
         $endpoint = 'https://fcm.googleapis.com/test';
 
         $repo = $this->createMock(\Doctrine\ORM\EntityRepository::class);
-        $this->entityManager->method('getRepository')
+        $this->entityManager->expects($this->once())->method('getRepository')
             ->with(PushSubscriptionEntity::class)
             ->willReturn($repo);
 
@@ -91,10 +90,9 @@ final class PushSubscriptionRepositoryTest extends TestCase
 
     public function testRemoveByEndpointRemovesIfFound(): void
     {
-        $userId = new Uuid();
         $endpoint = 'https://fcm.googleapis.com/test';
         $subscription = new PushSubscriptionEntity(
-            userId: $userId,
+            user: $this->createStub(UserEntity::class),
             endpoint: $endpoint,
             publicKey: 'pk',
             authKey: 'ak',
@@ -102,9 +100,9 @@ final class PushSubscriptionRepositoryTest extends TestCase
         );
 
         $repo = $this->createMock(\Doctrine\ORM\EntityRepository::class);
-        $this->entityManager->method('getRepository')
+        $this->entityManager->expects($this->once())->method('getRepository')
             ->willReturn($repo);
-        $repo->method('findOneBy')
+        $repo->expects($this->once())->method('findOneBy')
             ->with(['endpoint' => $endpoint])
             ->willReturn($subscription);
 
@@ -116,9 +114,9 @@ final class PushSubscriptionRepositoryTest extends TestCase
     public function testRemoveByEndpointDoesNothingIfNotFound(): void
     {
         $repo = $this->createMock(\Doctrine\ORM\EntityRepository::class);
-        $this->entityManager->method('getRepository')
+        $this->entityManager->expects($this->once())->method('getRepository')
             ->willReturn($repo);
-        $repo->method('findOneBy')->willReturn(null);
+        $repo->expects($this->once())->method('findOneBy')->willReturn(null);
 
         $this->entityManager->expects($this->never())->method('remove');
 

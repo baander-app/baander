@@ -12,7 +12,6 @@ use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Notification\Application\DTO\SeedDefaultPreferencesCommand;
 use App\Shared\Domain\Model\Email;
 use InvalidArgumentException;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -21,29 +20,47 @@ use Symfony\Component\Messenger\MessageBusInterface;
 
 final class CreateUserHandlerTest extends TestCase
 {
-    private UserRepositoryInterface&MockObject $userRepository;
-    private PasswordHasherInterface&MockObject $passwordHasher;
-    private EventDispatcherInterface&MockObject $eventDispatcher;
-    private MessageBusInterface&MockObject $bus;
+    private UserRepositoryInterface $userRepository;
+    private PasswordHasherInterface $passwordHasher;
+    private EventDispatcherInterface $eventDispatcher;
+    private MessageBusInterface $bus;
     private CreateUserHandler $handler;
 
     protected function setUp(): void
     {
-        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
-        $this->passwordHasher = $this->createMock(PasswordHasherInterface::class);
-        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-        $this->bus = $this->createMock(MessageBusInterface::class);
-        $this->bus->method('dispatch')->willReturnCallback(fn (object $m) => new Envelope($m));
-        $this->handler = new CreateUserHandler($this->userRepository, $this->passwordHasher, $this->eventDispatcher, $this->bus);
+        $this->userRepository = $this->createStub(UserRepositoryInterface::class);
+        $this->passwordHasher = $this->createStub(PasswordHasherInterface::class);
+        $this->eventDispatcher = $this->createStub(EventDispatcherInterface::class);
+        $this->bus = $this->createMessageBus();
+        $this->handler = $this->createCreateUserHandlerFixture();
+    }
+
+    private function createMessageBus(bool $expectCalls = false): MessageBusInterface
+    {
+        $double = $expectCalls ? $this->createMock(MessageBusInterface::class) : $this->createStub(MessageBusInterface::class);
+        $double->method('dispatch')->willReturnCallback(fn (object $m) => new Envelope($m));
+        return $double;
+    }
+
+    private function createCreateUserHandlerFixture(): CreateUserHandler
+    {
+        $fixture = new CreateUserHandler($this->userRepository, $this->passwordHasher, $this->eventDispatcher, $this->bus);
+        return $fixture;
     }
 
     public function testCreatesUserWithCorrectRoleAndDispatchesEvents(): void
     {
+        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        $this->passwordHasher = $this->createMock(PasswordHasherInterface::class);
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->bus = $this->createMessageBus(expectCalls: true);
+        $this->handler = $this->createCreateUserHandlerFixture();
+
         $email = new Email('test@example.com');
         $roles = ['ROLE_USER'];
 
-        $this->userRepository->method('existsWithEmail')->with($email)->willReturn(false);
-        $this->passwordHasher->method('hash')->with('password123')->willReturn('hashed-pw');
+        $this->userRepository->expects($this->once())->method('existsWithEmail')->with($email)->willReturn(false);
+        $this->passwordHasher->expects($this->once())->method('hash')->with('password123')->willReturn('hashed-pw');
         $this->userRepository->expects($this->once())->method('save');
 
         $this->bus->expects($this->once())
@@ -63,8 +80,11 @@ final class CreateUserHandlerTest extends TestCase
 
     public function testThrowsOnDuplicateEmail(): void
     {
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->handler = $this->createCreateUserHandlerFixture();
+
         $email = new Email('test@example.com');
-        $this->userRepository->method('existsWithEmail')->with($email)->willReturn(true);
+        $this->userRepository->expects($this->once())->method('existsWithEmail')->with($email)->willReturn(true);
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('already exists');
@@ -84,11 +104,15 @@ final class CreateUserHandlerTest extends TestCase
 
     public function testCreatesAdminUser(): void
     {
+        $this->passwordHasher = $this->createMock(PasswordHasherInterface::class);
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->handler = $this->createCreateUserHandlerFixture();
+
         $email = new Email('admin@example.com');
         $roles = ['ROLE_ADMIN'];
 
-        $this->userRepository->method('existsWithEmail')->with($email)->willReturn(false);
-        $this->passwordHasher->method('hash')->with('admin-pw')->willReturn('hashed-admin-pw');
+        $this->userRepository->expects($this->once())->method('existsWithEmail')->with($email)->willReturn(false);
+        $this->passwordHasher->expects($this->once())->method('hash')->with('admin-pw')->willReturn('hashed-admin-pw');
 
         $user = ($this->handler)(new CreateUserCommand($email, 'Admin', 'admin-pw', $roles));
 
@@ -100,11 +124,15 @@ final class CreateUserHandlerTest extends TestCase
 
     public function testCreatesRegularUser(): void
     {
+        $this->passwordHasher = $this->createMock(PasswordHasherInterface::class);
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->handler = $this->createCreateUserHandlerFixture();
+
         $email = new Email('user@example.com');
         $roles = ['ROLE_USER'];
 
-        $this->userRepository->method('existsWithEmail')->with($email)->willReturn(false);
-        $this->passwordHasher->method('hash')->with('user-pw')->willReturn('hashed-user-pw');
+        $this->userRepository->expects($this->once())->method('existsWithEmail')->with($email)->willReturn(false);
+        $this->passwordHasher->expects($this->once())->method('hash')->with('user-pw')->willReturn('hashed-user-pw');
 
         $user = ($this->handler)(new CreateUserCommand($email, 'Bob', 'user-pw', $roles));
 
@@ -116,8 +144,12 @@ final class CreateUserHandlerTest extends TestCase
 
     public function testDispatchesSeedDefaultPreferencesCommand(): void
     {
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->bus = $this->createMessageBus(expectCalls: true);
+        $this->handler = $this->createCreateUserHandlerFixture();
+
         $email = new Email('test@example.com');
-        $this->userRepository->method('existsWithEmail')->with($email)->willReturn(false);
+        $this->userRepository->expects($this->once())->method('existsWithEmail')->with($email)->willReturn(false);
         $this->passwordHasher->method('hash')->willReturn('hashed-pw');
 
         $expectedUserId = null;
@@ -135,8 +167,12 @@ final class CreateUserHandlerTest extends TestCase
 
     public function testDispatchesUserCreatedByOperatorEvent(): void
     {
+        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->handler = $this->createCreateUserHandlerFixture();
+
         $email = new Email('test@example.com');
-        $this->userRepository->method('existsWithEmail')->with($email)->willReturn(false);
+        $this->userRepository->expects($this->once())->method('existsWithEmail')->with($email)->willReturn(false);
         $this->passwordHasher->method('hash')->willReturn('hashed-pw');
 
         $this->eventDispatcher->expects($this->once())

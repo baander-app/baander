@@ -8,7 +8,7 @@ use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Auth\Infrastructure\Security\Voter\LibraryVoter;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Connection;
-use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\VoterInterface;
@@ -16,19 +16,19 @@ use Symfony\Component\Security\Core\Authorization\Voter\VoterInterface;
 final class LibraryVoterTest extends TestCase
 {
     private LibraryVoter $voter;
-    private Connection&MockObject $connection;
+    private Connection&Stub $connection;
 
     protected function setUp(): void
     {
-        $this->connection = $this->createMock(Connection::class);
+        $this->connection = $this->createStub(Connection::class);
         $this->voter = new LibraryVoter($this->connection);
     }
 
-    private function createToken(string $userId, array $roles): TokenInterface&MockObject
+    private function createToken(string $userId, array $roles): TokenInterface&Stub
     {
         $user = new SecurityUser($userId, 'user@example.com', 'hashed', $roles);
 
-        $token = $this->createMock(TokenInterface::class);
+        $token = $this->createStub(TokenInterface::class);
         $token->method('getUser')->willReturn($user);
         $token->method('getRoleNames')->willReturn($roles);
 
@@ -39,7 +39,7 @@ final class LibraryVoterTest extends TestCase
      * Creates a library entity stub with real UUIDs so LibraryVoter can
      * pass them to LibraryAccessService::canAccessLibrary().
      */
-    private function createLibraryEntity(string $ownerId, string $id = null): object
+    private function createLibraryEntity(string $ownerId, ?string $id = null): object
     {
         return new class($ownerId, $id ?? Uuid::v4()->toString()) {
             public function __construct(
@@ -220,7 +220,7 @@ final class LibraryVoterTest extends TestCase
 
     public function testNonSecurityUserIsDenied(): void
     {
-        $token = $this->createMock(TokenInterface::class);
+        $token = $this->createStub(TokenInterface::class);
         $token->method('getUser')->willReturn(null);
 
         $library = $this->createLibraryEntity(Uuid::v4()->toString());

@@ -16,13 +16,13 @@ use PHPUnit\Framework\TestCase;
 final class SyncPlaybackHandlerTest extends TestCase
 {
     private PartySessionPortInterface&MockObject $sessionPort;
-    private PartyMemberPortInterface&MockObject $memberPort;
+    private PartyMemberPortInterface $memberPort;
     private SyncPlaybackHandler $handler;
 
     protected function setUp(): void
     {
         $this->sessionPort = $this->createMock(PartySessionPortInterface::class);
-        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
+        $this->memberPort = $this->createStub(PartyMemberPortInterface::class);
         $this->handler = new SyncPlaybackHandler(
             new PlaybackSynchronizer($this->sessionPort, $this->memberPort),
         );

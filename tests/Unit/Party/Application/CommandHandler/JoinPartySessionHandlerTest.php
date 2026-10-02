@@ -18,29 +18,44 @@ use App\Party\Domain\ValueObject\PlaybackState;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 final class JoinPartySessionHandlerTest extends TestCase
 {
-    private PartySessionPortInterface&MockObject $sessionPort;
-    private PartyMemberPortInterface&MockObject $memberPort;
-    private EventDispatcherInterface&MockObject $eventDispatcher;
+    private PartySessionPortInterface $sessionPort;
+    private PartyMemberPortInterface $memberPort;
+    private EventDispatcherInterface $eventDispatcher;
     private JoinPartySessionHandler $handler;
 
     protected function setUp(): void
     {
-        $this->sessionPort = $this->createMock(PartySessionPortInterface::class);
-        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
-        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-        $this->eventDispatcher->method('dispatch')->willReturnCallback(fn (object $e) => $e);
-        $this->handler = new JoinPartySessionHandler($this->sessionPort, $this->memberPort, $this->eventDispatcher);
+        $this->sessionPort = $this->createStub(PartySessionPortInterface::class);
+        $this->memberPort = $this->createStub(PartyMemberPortInterface::class);
+        $this->eventDispatcher = $this->createEventDispatcher();
+        $this->handler = $this->createJoinPartySessionHandlerFixture();
+    }
+
+    private function createEventDispatcher(bool $expectCalls = false): EventDispatcherInterface
+    {
+        $double = $expectCalls ? $this->createMock(EventDispatcherInterface::class) : $this->createStub(EventDispatcherInterface::class);
+        $double->method('dispatch')->willReturnCallback(fn (object $e) => $e);
+        return $double;
+    }
+
+    private function createJoinPartySessionHandlerFixture(): JoinPartySessionHandler
+    {
+        $fixture = new JoinPartySessionHandler($this->sessionPort, $this->memberPort, $this->eventDispatcher);
+        return $fixture;
     }
 
     public function testReconnectsExistingMemberAndReturnsIt(): void
     {
+        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
+        $this->eventDispatcher = $this->createEventDispatcher(expectCalls: true);
+        $this->handler = $this->createJoinPartySessionHandlerFixture();
+
         $userId = Uuid::v4();
         $session = $this->createActiveSession(5);
 
@@ -74,6 +89,10 @@ final class JoinPartySessionHandlerTest extends TestCase
 
     public function testNewMemberJoinsAndDispatchesMemberJoinedEvent(): void
     {
+        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
+        $this->eventDispatcher = $this->createEventDispatcher(expectCalls: true);
+        $this->handler = $this->createJoinPartySessionHandlerFixture();
+
         $userId = Uuid::v4();
         $session = $this->createActiveSession(5);
         $newMember = PartyMember::create($userId, $session->getId());
@@ -104,6 +123,9 @@ final class JoinPartySessionHandlerTest extends TestCase
 
     public function testThrowsWhenSessionNotFound(): void
     {
+        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
+        $this->handler = $this->createJoinPartySessionHandlerFixture();
+
         $this->sessionPort->method('findByUuid')->willReturn(null);
         $this->memberPort->expects($this->never())->method('addMember');
 
@@ -115,6 +137,9 @@ final class JoinPartySessionHandlerTest extends TestCase
 
     public function testThrowsWhenSessionInactive(): void
     {
+        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
+        $this->handler = $this->createJoinPartySessionHandlerFixture();
+
         $inactiveSession = SyncedPartySession::reconstitute(new SyncedPartySessionState(
             id: Uuid::v4(),
             publicId: new PublicId(),
@@ -141,6 +166,9 @@ final class JoinPartySessionHandlerTest extends TestCase
 
     public function testThrowsWhenSessionIsFull(): void
     {
+        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
+        $this->handler = $this->createJoinPartySessionHandlerFixture();
+
         $session = $this->createActiveSession(2);
 
         $this->sessionPort->method('findByUuid')->willReturn($session);

@@ -5,20 +5,20 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Command\Dev;
 
 use App\Command\Dev\SetupCommand;
-use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpKernel\KernelInterface;
 
 final class SetupCommandTest extends TestCase
 {
-    private KernelInterface&MockObject $kernel;
-    private Filesystem&MockObject $filesystem;
+    private KernelInterface&Stub $kernel;
+    private Filesystem&Stub $filesystem;
 
     protected function setUp(): void
     {
-        $this->kernel = $this->createMock(KernelInterface::class);
-        $this->filesystem = $this->createMock(Filesystem::class);
+        $this->kernel = $this->createStub(KernelInterface::class);
+        $this->filesystem = $this->createStub(Filesystem::class);
     }
 
     public function testConfigureSetsNameAndDescription(): void

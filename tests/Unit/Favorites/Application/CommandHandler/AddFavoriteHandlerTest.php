@@ -10,23 +10,31 @@ use App\Favorites\Application\Port\FavoritesPortInterface;
 use App\Favorites\Domain\Model\UserFavorite;
 use App\Favorites\Domain\ValueObject\FavoriteType;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use ValueError;
 
 final class AddFavoriteHandlerTest extends TestCase
 {
-    private FavoritesPortInterface&MockObject $favoritesPort;
+    private FavoritesPortInterface $favoritesPort;
     private AddFavoriteHandler $handler;
 
     protected function setUp(): void
     {
-        $this->favoritesPort = $this->createMock(FavoritesPortInterface::class);
-        $this->handler = new AddFavoriteHandler($this->favoritesPort);
+        $this->favoritesPort = $this->createStub(FavoritesPortInterface::class);
+        $this->handler = $this->createAddFavoriteHandlerFixture();
+    }
+
+    private function createAddFavoriteHandlerFixture(): AddFavoriteHandler
+    {
+        $fixture = new AddFavoriteHandler($this->favoritesPort);
+        return $fixture;
     }
 
     public function testAddsNewFavoriteWhenNoneExists(): void
     {
+        $this->favoritesPort = $this->createMock(FavoritesPortInterface::class);
+        $this->handler = $this->createAddFavoriteHandlerFixture();
+
         $userId = Uuid::v4();
         $newFavorite = UserFavorite::create($userId, FavoriteType::Song, 'song-pub-1');
 
@@ -47,6 +55,9 @@ final class AddFavoriteHandlerTest extends TestCase
 
     public function testReturnsExistingFavoriteWhenAlreadyFavorited(): void
     {
+        $this->favoritesPort = $this->createMock(FavoritesPortInterface::class);
+        $this->handler = $this->createAddFavoriteHandlerFixture();
+
         $userId = Uuid::v4();
         $existing = UserFavorite::create($userId, FavoriteType::Album, 'album-pub-2');
 
@@ -76,6 +87,9 @@ final class AddFavoriteHandlerTest extends TestCase
 
     public function testThrowsOnInvalidEntityType(): void
     {
+        $this->favoritesPort = $this->createMock(FavoritesPortInterface::class);
+        $this->handler = $this->createAddFavoriteHandlerFixture();
+
         $userId = Uuid::v4();
 
         $this->favoritesPort->expects($this->never())->method('findByUserAndEntity');

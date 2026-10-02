@@ -37,13 +37,11 @@ final readonly class GeneratePublicIdListener
             return;
         }
 
-        $property->setAccessible(true);
         $property->setValue($entity, new PublicId());
     }
 
     private function setReadOnlyProperty(object $entity, ReflectionProperty $property, PublicId $id): void
     {
-        $property->setAccessible(true);
         $property->setValue($entity, $id);
     }
 }

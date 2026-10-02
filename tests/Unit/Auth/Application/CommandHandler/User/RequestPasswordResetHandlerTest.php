@@ -15,13 +15,13 @@ use PHPUnit\Framework\TestCase;
 
 final class RequestPasswordResetHandlerTest extends TestCase
 {
-    private UserRepositoryInterface&MockObject $userRepository;
+    private UserRepositoryInterface $userRepository;
     private PasswordResetTokenRepositoryInterface&MockObject $tokenRepository;
     private RequestPasswordResetHandler $handler;
 
     protected function setUp(): void
     {
-        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->userRepository = $this->createStub(UserRepositoryInterface::class);
         $this->tokenRepository = $this->createMock(PasswordResetTokenRepositoryInterface::class);
         $this->handler = new RequestPasswordResetHandler($this->userRepository, $this->tokenRepository);
     }
@@ -55,18 +55,15 @@ final class RequestPasswordResetHandlerTest extends TestCase
         $user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
         $this->userRepository->method('findByEmail')->willReturn($user);
 
-        // Repository already has an existing token for this email
-        $this->tokenRepository
-            ->method('findByEmail')
-            ->with('test@example.com')
-            ->willReturn('existing-token-string');
-
-        $this->tokenRepository
-            ->expects($this->once())
-            ->method('save')
-            ->with($this->equalTo('test@example.com'), $this->callback(fn($v) => is_string($v)));
+        $stored = ['test@example.com' => 'existing-token-string'];
+        $this->tokenRepository->expects($this->once())->method('save')
+            ->with('test@example.com', $this->callback(static fn (string $token): bool => \Symfony\Component\Uid\Ulid::isValid($token)))
+            ->willReturnCallback(static function (string $email, string $token) use (&$stored): void {
+                $stored[$email] = $token;
+            });
 
         ($this->handler)(new RequestPasswordResetCommand(new Email('test@example.com')));
+        self::assertNotSame('existing-token-string', $stored['test@example.com']);
     }
 
     public function testCreatesNewTokenWhenNoneExists(): void
@@ -74,17 +71,15 @@ final class RequestPasswordResetHandlerTest extends TestCase
         $user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
         $this->userRepository->method('findByEmail')->willReturn($user);
 
-        // No existing token for this email
-        $this->tokenRepository
-            ->method('findByEmail')
-            ->with('test@example.com')
-            ->willReturn(null);
-
-        $this->tokenRepository
-            ->expects($this->once())
-            ->method('save')
-            ->with($this->equalTo('test@example.com'), $this->callback(fn($v) => is_string($v)));
+        $stored = [];
+        $this->tokenRepository->expects($this->once())->method('save')
+            ->with('test@example.com', $this->callback(static fn (string $token): bool => \Symfony\Component\Uid\Ulid::isValid($token)))
+            ->willReturnCallback(static function (string $email, string $token) use (&$stored): void {
+                $stored[$email] = $token;
+            });
 
         ($this->handler)(new RequestPasswordResetCommand(new Email('test@example.com')));
+        self::assertArrayHasKey('test@example.com', $stored);
+
     }
 }

@@ -14,22 +14,21 @@ use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Library\Infrastructure\Scanner\MediaFile;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 final class MusicScannerTest extends TestCase
 {
-    private DirectoryScannerPortInterface&MockObject $directoryScanner;
-    private LibraryFileIndexRepositoryInterface&MockObject $fileIndexRepository;
-    private LoggerInterface&MockObject $logger;
+    private DirectoryScannerPortInterface $directoryScanner;
+    private LibraryFileIndexRepositoryInterface $fileIndexRepository;
+    private LoggerInterface $logger;
     private string $tmpDir;
 
     protected function setUp(): void
     {
-        $this->directoryScanner = $this->createMock(DirectoryScannerPortInterface::class);
-        $this->fileIndexRepository = $this->createMock(LibraryFileIndexRepositoryInterface::class);
-        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->directoryScanner = $this->createStub(DirectoryScannerPortInterface::class);
+        $this->fileIndexRepository = $this->createStub(LibraryFileIndexRepositoryInterface::class);
+        $this->logger = $this->createStub(LoggerInterface::class);
 
         $this->tmpDir = sys_get_temp_dir() . '/baander_test_' . uniqid();
         mkdir($this->tmpDir . '/Album1', 0777, true);
@@ -164,6 +163,8 @@ final class MusicScannerTest extends TestCase
 
     public function testRescanForcesReprocessing(): void
     {
+        $this->fileIndexRepository = $this->createMock(LibraryFileIndexRepositoryInterface::class);
+
         $library = $this->createLibrary();
 
         $file = $this->createAudioFile('Album1', 'track01.mp3');

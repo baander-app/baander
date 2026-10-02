@@ -13,7 +13,7 @@ use Redis;
 
 final class RedisClientFactoryTest extends TestCase
 {
-    /** @var list<Redis&MockObject> */
+    /** @var list<Redis> */
     private array $mockConnections = [];
 
     private int $nextCid = 1;
@@ -45,14 +45,14 @@ final class RedisClientFactoryTest extends TestCase
         );
     }
 
-    private function addMockConnection(Redis&MockObject $redis): void
+    private function addMockConnection(Redis $redis): void
     {
         $this->mockConnections[] = $redis;
     }
 
-    private function createMockRedis(): Redis&MockObject
+    private function createMockRedis(bool $expectCalls = false): Redis
     {
-        $redis = $this->createMock(Redis::class);
+        $redis = $expectCalls ? $this->createMock(Redis::class) : $this->createStub(Redis::class);
         $redis->method('ping')->willReturn(true);
         return $redis;
     }
@@ -213,11 +213,11 @@ final class RedisClientFactoryTest extends TestCase
     {
         $factory = $this->createFactory(maxSize: 5, cidExistsFn: fn(int $cid) => true);
 
-        $redis1 = $this->createMockRedis();
+        $redis1 = $this->createMockRedis(expectCalls: true);
         $redis1->expects($this->once())->method('close');
         $this->addMockConnection($redis1);
 
-        $redis2 = $this->createMockRedis();
+        $redis2 = $this->createMockRedis(expectCalls: true);
         $redis2->expects($this->once())->method('close');
         $this->addMockConnection($redis2);
 
@@ -244,7 +244,7 @@ final class RedisClientFactoryTest extends TestCase
     {
         $factory = $this->createFactory(maxSize: 5, idleTimeoutSeconds: 1, cidExistsFn: fn(int $cid) => true);
 
-        $staleRedis = $this->createMockRedis();
+        $staleRedis = $this->createMockRedis(expectCalls: true);
         $staleRedis->expects($this->once())->method('close');
         $this->addMockConnection($staleRedis);
 

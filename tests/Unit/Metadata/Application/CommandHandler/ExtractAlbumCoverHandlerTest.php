@@ -18,33 +18,37 @@ use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 
 final class ExtractAlbumCoverHandlerTest extends TestCase
 {
-    private MetadataContentReaderPortInterface&MockObject $metadataReader;
-    private SongPortInterface&MockObject $songService;
-    private AlbumPortInterface&MockObject $albumService;
-    private ImagePortInterface&MockObject $imagePort;
-    private StoragePortInterface&MockObject $storage;
-    private EntityManagerInterface&MockObject $entityManager;
-    private LoggerInterface&MockObject $logger;
+    private MetadataContentReaderPortInterface $metadataReader;
+    private SongPortInterface $songService;
+    private AlbumPortInterface $albumService;
+    private ImagePortInterface $imagePort;
+    private StoragePortInterface $storage;
+    private EntityManagerInterface $entityManager;
+    private LoggerInterface $logger;
     private ExtractAlbumCoverHandler $handler;
 
     protected function setUp(): void
     {
-        $this->metadataReader = $this->createMock(MetadataContentReaderPortInterface::class);
-        $this->songService = $this->createMock(SongPortInterface::class);
-        $this->albumService = $this->createMock(AlbumPortInterface::class);
-        $this->imagePort = $this->createMock(ImagePortInterface::class);
-        $this->storage = $this->createMock(StoragePortInterface::class);
-        $this->entityManager = $this->createMock(EntityManagerInterface::class);
-        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->metadataReader = $this->createStub(MetadataContentReaderPortInterface::class);
+        $this->songService = $this->createStub(SongPortInterface::class);
+        $this->albumService = $this->createStub(AlbumPortInterface::class);
+        $this->imagePort = $this->createStub(ImagePortInterface::class);
+        $this->storage = $this->createStub(StoragePortInterface::class);
+        $this->entityManager = $this->createStub(EntityManagerInterface::class);
+        $this->logger = $this->createStub(LoggerInterface::class);
 
-        $this->handler = new ExtractAlbumCoverHandler(
+        $this->handler = $this->createExtractAlbumCoverHandlerFixture();
+    }
+
+    private function createExtractAlbumCoverHandlerFixture(): ExtractAlbumCoverHandler
+    {
+        $fixture = new ExtractAlbumCoverHandler(
             $this->metadataReader,
             $this->songService,
             $this->albumService,
@@ -53,13 +57,18 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
             $this->entityManager,
             $this->logger,
         );
+        return $fixture;
     }
 
     public function testReturnsGracefullyWhenAlbumNotFound(): void
     {
+        $this->albumService = $this->createMock(AlbumPortInterface::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->handler = $this->createExtractAlbumCoverHandlerFixture();
+
         $albumId = Uuid::v7();
 
-        $this->albumService->method('findByUuid')->with($albumId)->willReturn(null);
+        $this->albumService->expects($this->once())->method('findByUuid')->with($albumId)->willReturn(null);
         $this->logger->expects($this->once())->method('warning')->with(
             'Album not found for cover extraction, skipping',
             $this->anything(),
@@ -70,6 +79,11 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
 
     public function testSkipsWhenAlbumAlreadyHasCoverImage(): void
     {
+        $this->albumService = $this->createMock(AlbumPortInterface::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->songService = $this->createMock(SongPortInterface::class);
+        $this->handler = $this->createExtractAlbumCoverHandlerFixture();
+
         $album = Album::create(
             Uuid::v7(),
             'Test Album',
@@ -77,7 +91,7 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
         );
         $album->setCoverImage(Uuid::v7());
 
-        $this->albumService->method('findByUuid')->with($album->getId())->willReturn($album);
+        $this->albumService->expects($this->once())->method('findByUuid')->with($album->getId())->willReturn($album);
         $this->songService->expects($this->never())->method('findByAlbum');
         $this->logger->expects($this->once())->method('debug')->with(
             'Album already has a cover image, skipping',
@@ -88,10 +102,15 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
 
     public function testSkipsWhenNoSongsFound(): void
     {
+        $this->albumService = $this->createMock(AlbumPortInterface::class);
+        $this->songService = $this->createMock(SongPortInterface::class);
+        $this->storage = $this->createMock(StoragePortInterface::class);
+        $this->handler = $this->createExtractAlbumCoverHandlerFixture();
+
         $album = Album::create(Uuid::v7(), 'Test Album', 'album');
 
-        $this->albumService->method('findByUuid')->with($album->getId())->willReturn($album);
-        $this->songService->method('findByAlbum')->with($album->getId(), $this->anything())->willReturn([]);
+        $this->albumService->expects($this->once())->method('findByUuid')->with($album->getId())->willReturn($album);
+        $this->songService->expects($this->once())->method('findByAlbum')->with($album->getId(), $this->anything())->willReturn([]);
         $this->storage->expects($this->never())->method('storeFromBytes');
 
         ($this->handler)(new ExtractAlbumCoverCommand($album->getId()));
@@ -99,15 +118,21 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
 
     public function testSkipsWhenNoCoverArtFound(): void
     {
+        $this->albumService = $this->createMock(AlbumPortInterface::class);
+        $this->metadataReader = $this->createMock(MetadataContentReaderPortInterface::class);
+        $this->songService = $this->createMock(SongPortInterface::class);
+        $this->storage = $this->createMock(StoragePortInterface::class);
+        $this->handler = $this->createExtractAlbumCoverHandlerFixture();
+
         $album = Album::create(Uuid::v7(), 'Test Album', 'album');
         $tmpFile = tempnam(sys_get_temp_dir(), 'cover_test_');
         file_put_contents($tmpFile, 'fake audio data');
 
         $song = $this->createSongWithMockPath($tmpFile);
 
-        $this->albumService->method('findByUuid')->with($album->getId())->willReturn($album);
-        $this->songService->method('findByAlbum')->with($album->getId(), $this->anything())->willReturn([$song]);
-        $this->metadataReader->method('readMetadata')->with($tmpFile)->willReturn(
+        $this->albumService->expects($this->once())->method('findByUuid')->with($album->getId())->willReturn($album);
+        $this->songService->expects($this->once())->method('findByAlbum')->with($album->getId(), $this->anything())->willReturn([$song]);
+        $this->metadataReader->expects($this->once())->method('readMetadata')->with($tmpFile)->willReturn(
             new ExtractedMetadata(),
         );
         $this->storage->expects($this->never())->method('storeFromBytes');
@@ -119,6 +144,13 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
 
     public function testSkipsWhenCoverArtHasEmptyImageData(): void
     {
+        $this->albumService = $this->createMock(AlbumPortInterface::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->metadataReader = $this->createMock(MetadataContentReaderPortInterface::class);
+        $this->songService = $this->createMock(SongPortInterface::class);
+        $this->storage = $this->createMock(StoragePortInterface::class);
+        $this->handler = $this->createExtractAlbumCoverHandlerFixture();
+
         $album = Album::create(Uuid::v7(), 'Test Album', 'album');
         $tmpFile = tempnam(sys_get_temp_dir(), 'cover_test_');
         file_put_contents($tmpFile, 'fake audio data');
@@ -131,9 +163,9 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
             'imageData' => '',
         ]);
 
-        $this->albumService->method('findByUuid')->with($album->getId())->willReturn($album);
-        $this->songService->method('findByAlbum')->with($album->getId(), $this->anything())->willReturn([$song]);
-        $this->metadataReader->method('readMetadata')->with($tmpFile)->willReturn(
+        $this->albumService->expects($this->once())->method('findByUuid')->with($album->getId())->willReturn($album);
+        $this->songService->expects($this->once())->method('findByAlbum')->with($album->getId(), $this->anything())->willReturn([$song]);
+        $this->metadataReader->expects($this->once())->method('readMetadata')->with($tmpFile)->willReturn(
             (function() use ($coverArt) { $m = new ExtractedMetadata(); $m->setPictures([$coverArt]); return $m; })(),
         );
         $this->storage->expects($this->never())->method('storeFromBytes');
@@ -148,6 +180,13 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
 
     public function testSkipsWhenCoverArtHasUnsupportedMimeType(): void
     {
+        $this->albumService = $this->createMock(AlbumPortInterface::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->metadataReader = $this->createMock(MetadataContentReaderPortInterface::class);
+        $this->songService = $this->createMock(SongPortInterface::class);
+        $this->storage = $this->createMock(StoragePortInterface::class);
+        $this->handler = $this->createExtractAlbumCoverHandlerFixture();
+
         $album = Album::create(Uuid::v7(), 'Test Album', 'album');
         $tmpFile = tempnam(sys_get_temp_dir(), 'cover_test_');
         file_put_contents($tmpFile, 'fake audio data');
@@ -160,9 +199,9 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
             'imageData' => "\x00\x01\x02",
         ]);
 
-        $this->albumService->method('findByUuid')->with($album->getId())->willReturn($album);
-        $this->songService->method('findByAlbum')->with($album->getId(), $this->anything())->willReturn([$song]);
-        $this->metadataReader->method('readMetadata')->with($tmpFile)->willReturn(
+        $this->albumService->expects($this->once())->method('findByUuid')->with($album->getId())->willReturn($album);
+        $this->songService->expects($this->once())->method('findByAlbum')->with($album->getId(), $this->anything())->willReturn([$song]);
+        $this->metadataReader->expects($this->once())->method('readMetadata')->with($tmpFile)->willReturn(
             (function() use ($coverArt) { $m = new ExtractedMetadata(); $m->setPictures([$coverArt]); return $m; })(),
         );
         $this->storage->expects($this->never())->method('storeFromBytes');
@@ -177,6 +216,13 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
 
     public function testSkipsWhenCoverArtExceedsMaxSize(): void
     {
+        $this->albumService = $this->createMock(AlbumPortInterface::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->metadataReader = $this->createMock(MetadataContentReaderPortInterface::class);
+        $this->songService = $this->createMock(SongPortInterface::class);
+        $this->storage = $this->createMock(StoragePortInterface::class);
+        $this->handler = $this->createExtractAlbumCoverHandlerFixture();
+
         $album = Album::create(Uuid::v7(), 'Test Album', 'album');
         $tmpFile = tempnam(sys_get_temp_dir(), 'cover_test_');
         file_put_contents($tmpFile, 'fake audio data');
@@ -190,9 +236,9 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
             'imageData' => $imageData,
         ]);
 
-        $this->albumService->method('findByUuid')->with($album->getId())->willReturn($album);
-        $this->songService->method('findByAlbum')->with($album->getId(), $this->anything())->willReturn([$song]);
-        $this->metadataReader->method('readMetadata')->with($tmpFile)->willReturn(
+        $this->albumService->expects($this->once())->method('findByUuid')->with($album->getId())->willReturn($album);
+        $this->songService->expects($this->once())->method('findByAlbum')->with($album->getId(), $this->anything())->willReturn([$song]);
+        $this->metadataReader->expects($this->once())->method('readMetadata')->with($tmpFile)->willReturn(
             (function() use ($coverArt) { $m = new ExtractedMetadata(); $m->setPictures([$coverArt]); return $m; })(),
         );
         $this->storage->expects($this->never())->method('storeFromBytes');
@@ -207,6 +253,15 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
 
     public function testExtractsCoverAndPersistsImage(): void
     {
+        $this->albumService = $this->createMock(AlbumPortInterface::class);
+        $this->entityManager = $this->createMock(EntityManagerInterface::class);
+        $this->imagePort = $this->createMock(ImagePortInterface::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->metadataReader = $this->createMock(MetadataContentReaderPortInterface::class);
+        $this->songService = $this->createMock(SongPortInterface::class);
+        $this->storage = $this->createMock(StoragePortInterface::class);
+        $this->handler = $this->createExtractAlbumCoverHandlerFixture();
+
         $album = Album::create(Uuid::v7(), 'Test Album', 'album');
         $tmpFile = tempnam(sys_get_temp_dir(), 'cover_test_');
         file_put_contents($tmpFile, 'fake audio data');
@@ -228,12 +283,12 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
             strlen($imageData),
         );
 
-        $this->albumService->method('findByUuid')->with($album->getId())->willReturn($album);
-        $this->songService->method('findByAlbum')->with($album->getId(), $this->anything())->willReturn([$song]);
-        $this->metadataReader->method('readMetadata')->with($tmpFile)->willReturn(
+        $this->albumService->expects($this->once())->method('findByUuid')->with($album->getId())->willReturn($album);
+        $this->songService->expects($this->once())->method('findByAlbum')->with($album->getId(), $this->anything())->willReturn([$song]);
+        $this->metadataReader->expects($this->once())->method('readMetadata')->with($tmpFile)->willReturn(
             (function() use ($coverArt) { $m = new ExtractedMetadata(); $m->setPictures([$coverArt]); return $m; })(),
         );
-        $this->storage->method('storeFromBytes')
+        $this->storage->expects($this->once())->method('storeFromBytes')
             ->with($imageData, 'images/album/' . $album->getId()->toString() . '.jpg')
             ->willReturn($storedFile);
 
@@ -259,6 +314,14 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
 
     public function testRollsBackAndCleansUpFileOnDatabaseFailure(): void
     {
+        $this->albumService = $this->createMock(AlbumPortInterface::class);
+        $this->entityManager = $this->createMock(EntityManagerInterface::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->metadataReader = $this->createMock(MetadataContentReaderPortInterface::class);
+        $this->songService = $this->createMock(SongPortInterface::class);
+        $this->storage = $this->createMock(StoragePortInterface::class);
+        $this->handler = $this->createExtractAlbumCoverHandlerFixture();
+
         $album = Album::create(Uuid::v7(), 'Test Album', 'album');
         $tmpFile = tempnam(sys_get_temp_dir(), 'cover_test_');
         file_put_contents($tmpFile, 'fake audio data');
@@ -280,9 +343,9 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
             strlen($imageData),
         );
 
-        $this->albumService->method('findByUuid')->with($album->getId())->willReturn($album);
-        $this->songService->method('findByAlbum')->with($album->getId(), $this->anything())->willReturn([$song]);
-        $this->metadataReader->method('readMetadata')->with($tmpFile)->willReturn(
+        $this->albumService->expects($this->once())->method('findByUuid')->with($album->getId())->willReturn($album);
+        $this->songService->expects($this->once())->method('findByAlbum')->with($album->getId(), $this->anything())->willReturn([$song]);
+        $this->metadataReader->expects($this->once())->method('readMetadata')->with($tmpFile)->willReturn(
             (function() use ($coverArt) { $m = new ExtractedMetadata(); $m->setPictures([$coverArt]); return $m; })(),
         );
         $this->storage->method('storeFromBytes')->willReturn($storedFile);
@@ -314,6 +377,14 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
 
     public function testReturnsGracefullyWhenFileStorageFails(): void
     {
+        $this->albumService = $this->createMock(AlbumPortInterface::class);
+        $this->entityManager = $this->createMock(EntityManagerInterface::class);
+        $this->imagePort = $this->createMock(ImagePortInterface::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->metadataReader = $this->createMock(MetadataContentReaderPortInterface::class);
+        $this->songService = $this->createMock(SongPortInterface::class);
+        $this->handler = $this->createExtractAlbumCoverHandlerFixture();
+
         $album = Album::create(Uuid::v7(), 'Test Album', 'album');
         $tmpFile = tempnam(sys_get_temp_dir(), 'cover_test_');
         file_put_contents($tmpFile, 'fake audio data');
@@ -327,9 +398,9 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
             'imageData' => $imageData,
         ]);
 
-        $this->albumService->method('findByUuid')->with($album->getId())->willReturn($album);
-        $this->songService->method('findByAlbum')->with($album->getId(), $this->anything())->willReturn([$song]);
-        $this->metadataReader->method('readMetadata')->with($tmpFile)->willReturn(
+        $this->albumService->expects($this->once())->method('findByUuid')->with($album->getId())->willReturn($album);
+        $this->songService->expects($this->once())->method('findByAlbum')->with($album->getId(), $this->anything())->willReturn([$song]);
+        $this->metadataReader->expects($this->once())->method('readMetadata')->with($tmpFile)->willReturn(
             (function() use ($coverArt) { $m = new ExtractedMetadata(); $m->setPictures([$coverArt]); return $m; })(),
         );
         $this->storage->method('storeFromBytes')->willThrowException(new RuntimeException('Write failed'));

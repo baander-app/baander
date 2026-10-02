@@ -8,7 +8,7 @@ use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Auth\Infrastructure\Security\Voter\SongVoter;
 use App\Catalog\Domain\Model\Song;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\VoterInterface;
@@ -34,7 +34,7 @@ final class SongVoterRealEntityTest extends TestCase
         );
 
         $user = new SecurityUser($ownerId, 'user@example.com', 'hashed', ['ROLE_USER']);
-        $token = $this->createMock(TokenInterface::class);
+        $token = $this->createStub(TokenInterface::class);
         $token->method('getUser')->willReturn($user);
         $token->method('getRoleNames')->willReturn(['ROLE_USER']);
 

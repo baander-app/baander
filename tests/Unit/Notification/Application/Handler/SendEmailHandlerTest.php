@@ -10,7 +10,6 @@ use App\Notification\Domain\Repository\NotificationPreferenceRepositoryInterface
 use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Notification\Domain\ValueObject\NotificationChannel;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mailer\MailerInterface;
@@ -19,17 +18,17 @@ use Twig\Environment;
 
 final class SendEmailHandlerTest extends TestCase
 {
-    private NotificationPreferenceRepositoryInterface&MockObject $preferenceRepository;
-    private MailerInterface&MockObject $mailer;
-    private Environment&MockObject $twig;
-    private LoggerInterface&MockObject $logger;
+    private NotificationPreferenceRepositoryInterface $preferenceRepository;
+    private MailerInterface $mailer;
+    private Environment $twig;
+    private LoggerInterface $logger;
 
     protected function setUp(): void
     {
-        $this->preferenceRepository = $this->createMock(NotificationPreferenceRepositoryInterface::class);
-        $this->mailer = $this->createMock(MailerInterface::class);
-        $this->twig = $this->createMock(Environment::class);
-        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->preferenceRepository = $this->createStub(NotificationPreferenceRepositoryInterface::class);
+        $this->mailer = $this->createStub(MailerInterface::class);
+        $this->twig = $this->createStub(Environment::class);
+        $this->logger = $this->createStub(LoggerInterface::class);
     }
 
     private function createHandler(): SendEmailHandler
@@ -62,6 +61,8 @@ final class SendEmailHandlerTest extends TestCase
 
     public function testEmailSentWhenPreferenceEnabled(): void
     {
+        $this->mailer = $this->createMock(MailerInterface::class);
+
         $command = $this->createCommand();
 
         $this->preferenceRepository->method('isEnabled')
@@ -82,6 +83,8 @@ final class SendEmailHandlerTest extends TestCase
 
     public function testEmailNotSentWhenPreferenceDisabled(): void
     {
+        $this->mailer = $this->createMock(MailerInterface::class);
+
         $command = $this->createCommand();
 
         $this->preferenceRepository->method('isEnabled')
@@ -94,6 +97,8 @@ final class SendEmailHandlerTest extends TestCase
 
     public function testEmailRendersCorrectTemplatePerCategory(): void
     {
+        $this->twig = $this->createMock(Environment::class);
+
         $command = $this->createCommand(
             category: NotificationCategory::BackgroundJobs,
             title: 'Library Scan Completed',
@@ -120,6 +125,8 @@ final class SendEmailHandlerTest extends TestCase
 
     public function testTwigRenderFailureIsLogged(): void
     {
+        $this->logger = $this->createMock(LoggerInterface::class);
+
         $command = $this->createCommand();
 
         $this->preferenceRepository->method('isEnabled')->willReturn(true);
@@ -139,6 +146,8 @@ final class SendEmailHandlerTest extends TestCase
 
     public function testMailerFailureIsLogged(): void
     {
+        $this->logger = $this->createMock(LoggerInterface::class);
+
         $command = $this->createCommand();
 
         $this->preferenceRepository->method('isEnabled')->willReturn(true);

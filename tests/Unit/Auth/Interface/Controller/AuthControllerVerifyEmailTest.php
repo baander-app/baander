@@ -35,19 +35,19 @@ use Webauthn\Counter\CounterChecker;
  */
 final class AuthControllerVerifyEmailTest extends TestCase
 {
-    private Security&MockObject $security;
+    private Security $security;
     private MessageBusInterface&MockObject $commandBus;
-    private UserPortInterface&MockObject $userService;
-    private HttpMessageFactoryInterface&MockObject $psrHttpFactory;
+    private UserPortInterface $userService;
+    private HttpMessageFactoryInterface $psrHttpFactory;
     private JsonEncoder $jsonEncoder;
     private AuthController $controller;
 
     protected function setUp(): void
     {
-        $this->security = $this->createMock(Security::class);
+        $this->security = $this->createStub(Security::class);
         $this->commandBus = $this->createMock(MessageBusInterface::class);
-        $this->userService = $this->createMock(UserPortInterface::class);
-        $this->psrHttpFactory = $this->createMock(HttpMessageFactoryInterface::class);
+        $this->userService = $this->createStub(UserPortInterface::class);
+        $this->psrHttpFactory = $this->createStub(HttpMessageFactoryInterface::class);
         $this->jsonEncoder = new JsonEncoder();
 
         // verifyEmail() does not use these dependencies, but they are final and
@@ -60,16 +60,16 @@ final class AuthControllerVerifyEmailTest extends TestCase
             userVerification: 'preferred',
             residentKey: 'preferred',
             attestation: 'none',
-            counterChecker: $this->createMock(CounterChecker::class),
-            eventDispatcher: $this->createMock(EventDispatcherInterface::class),
-            logger: $this->createMock(LoggerInterface::class),
-            cache: $this->createMock(CacheItemPoolInterface::class),
+            counterChecker: $this->createStub(CounterChecker::class),
+            eventDispatcher: $this->createStub(EventDispatcherInterface::class),
+            logger: $this->createStub(LoggerInterface::class),
+            cache: $this->createStub(CacheItemPoolInterface::class),
             supportedAlgorithmIds: [-7],
             jsonEncoder: $this->jsonEncoder,
         );
 
         $dpopProofValidator = new DpopProofValidator(
-            jtiCache: $this->createMock(DpopJtiCacheInterface::class),
+            jtiCache: $this->createStub(DpopJtiCacheInterface::class),
         );
 
         $redisClientFactory = new RedisClientFactory('redis://localhost:6379');
@@ -87,7 +87,7 @@ final class AuthControllerVerifyEmailTest extends TestCase
             new NullLogger(),
         );
 
-        $translator = $this->createMock(TranslatorInterface::class);
+        $translator = $this->createStub(TranslatorInterface::class);
         $translator->method('trans')->willReturnArgument(0);
         $this->controller->setTranslator($translator);
     }

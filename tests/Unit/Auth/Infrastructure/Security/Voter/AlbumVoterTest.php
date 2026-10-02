@@ -6,7 +6,7 @@ namespace App\Tests\Unit\Auth\Infrastructure\Security\Voter;
 
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Auth\Infrastructure\Security\Voter\AlbumVoter;
-use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\VoterInterface;
@@ -20,11 +20,11 @@ final class AlbumVoterTest extends TestCase
         $this->voter = new AlbumVoter();
     }
 
-    private function createToken(string $userId, array $roles): TokenInterface&MockObject
+    private function createToken(string $userId, array $roles): TokenInterface&Stub
     {
         $user = new SecurityUser($userId, 'user@example.com', 'hashed', $roles);
 
-        $token = $this->createMock(TokenInterface::class);
+        $token = $this->createStub(TokenInterface::class);
         $token->method('getUser')->willReturn($user);
         $token->method('getRoleNames')->willReturn($roles);
 
@@ -184,7 +184,7 @@ final class AlbumVoterTest extends TestCase
 
     public function testNonSecurityUserIsDenied(): void
     {
-        $token = $this->createMock(TokenInterface::class);
+        $token = $this->createStub(TokenInterface::class);
         $token->method('getUser')->willReturn(null);
 
         $album = $this->createAlbumEntity('user-123');

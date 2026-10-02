@@ -15,14 +15,14 @@ final class TransactionFinalizingDBALAliveKeeperTest extends TestCase
 {
     private Connection&MockObject $connection;
     private DBALAliveKeeper&MockObject $decorated;
-    private LoggerInterface&MockObject $logger;
+    private LoggerInterface $logger;
     private TransactionFinalizingDBALAliveKeeper $keeper;
 
     protected function setUp(): void
     {
         $this->connection = $this->createMock(Connection::class);
         $this->decorated = $this->createMock(DBALAliveKeeper::class);
-        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->logger = $this->createStub(LoggerInterface::class);
 
         $this->keeper = new TransactionFinalizingDBALAliveKeeper(
             decorated: $this->decorated,

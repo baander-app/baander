@@ -15,7 +15,6 @@ use App\Notification\Domain\Model\Notification;
 use App\Notification\Domain\Repository\NotificationRepositoryInterface;
 use App\Notification\Domain\Service\EventCategoryResolver;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -25,7 +24,7 @@ final class CreateNotificationHandlerTest extends TestCase
 {
     private EventCategoryResolver $categoryResolver;
     private NotificationContentResolver $contentResolver;
-    private TranslatorInterface&MockObject $translator;
+    private TranslatorInterface $translator;
     private NotificationRepositoryInterface $notificationRepository;
     private LibraryMembershipQueryPort $libraryMembershipQuery;
     private UserRepositoryInterface $userRepository;
@@ -35,14 +34,14 @@ final class CreateNotificationHandlerTest extends TestCase
     {
         $this->categoryResolver = new EventCategoryResolver();
         $this->contentResolver = new NotificationContentResolver();
-        $this->translator = $this->createMock(TranslatorInterface::class);
-        $this->notificationRepository = $this->createMock(NotificationRepositoryInterface::class);
-        $this->libraryMembershipQuery = $this->createMock(LibraryMembershipQueryPort::class);
-        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
-        $this->bus = $this->createMock(MessageBusInterface::class);
+        $this->translator = $this->createStub(TranslatorInterface::class);
+        $this->notificationRepository = $this->createStub(NotificationRepositoryInterface::class);
+        $this->libraryMembershipQuery = $this->createStub(LibraryMembershipQueryPort::class);
+        $this->userRepository = $this->createStub(UserRepositoryInterface::class);
+        $this->bus = $this->createStub(MessageBusInterface::class);
 
         $this->translator->method('trans')->willReturnCallback(
-            fn (string $id, array $params = [], string $domain = null, ?string $locale = null) => $id,
+            fn (string $id, array $params = [], ?string $domain = null, ?string $locale = null) => $id,
         );
     }
 
@@ -61,6 +60,8 @@ final class CreateNotificationHandlerTest extends TestCase
 
     public function testPasswordChangedCreatesNotificationForUser(): void
     {
+        $this->notificationRepository = $this->createMock(NotificationRepositoryInterface::class);
+
         $userId = Uuid::generate();
         $command = new CreateNotificationCommand(
             eventClass: \App\Auth\Domain\Event\PasswordChanged::class,
@@ -76,6 +77,8 @@ final class CreateNotificationHandlerTest extends TestCase
 
     public function testLibraryScanCreatesNotificationsForAllLibraryUsers(): void
     {
+        $this->notificationRepository = $this->createMock(NotificationRepositoryInterface::class);
+
         $libraryId = Uuid::generate();
         $user1 = Uuid::generate();
         $user2 = Uuid::generate();
@@ -97,6 +100,8 @@ final class CreateNotificationHandlerTest extends TestCase
 
     public function testUnmappedEventProducesNoNotification(): void
     {
+        $this->notificationRepository = $this->createMock(NotificationRepositoryInterface::class);
+
         $command = new CreateNotificationCommand(
             eventClass: \App\Auth\Domain\Event\OAuth\TokenIssued::class,
             payload: ['token_id' => 'abc', 'scopes' => ['read']],
@@ -110,6 +115,8 @@ final class CreateNotificationHandlerTest extends TestCase
 
     public function testLibraryWithNoUsersCreatesNoNotification(): void
     {
+        $this->notificationRepository = $this->createMock(NotificationRepositoryInterface::class);
+
         $libraryId = Uuid::generate();
 
         $this->libraryMembershipQuery->method('findUserIdsForLibrary')
@@ -128,6 +135,8 @@ final class CreateNotificationHandlerTest extends TestCase
 
     public function testEventWithoutUserIdAndNotLibraryScopedCreatesNoNotification(): void
     {
+        $this->notificationRepository = $this->createMock(NotificationRepositoryInterface::class);
+
         $command = new CreateNotificationCommand(
             eventClass: \App\Auth\Domain\Event\OAuth\TokenRevoked::class,
             payload: ['token_id' => 'abc', 'token_type' => 'access_token'],
@@ -141,6 +150,8 @@ final class CreateNotificationHandlerTest extends TestCase
 
     public function testLibraryScanStoresParametersWithFileCounts(): void
     {
+        $this->notificationRepository = $this->createMock(NotificationRepositoryInterface::class);
+
         $userId = Uuid::generate();
         $libraryId = Uuid::generate();
 
@@ -167,6 +178,9 @@ final class CreateNotificationHandlerTest extends TestCase
 
     public function testEmailCommandDispatchedForVerifiedUser(): void
     {
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->bus = $this->createMock(MessageBusInterface::class);
+
         $userId = Uuid::generate();
 
         $user = User::reconstitute(new UserState(
@@ -181,7 +195,7 @@ final class CreateNotificationHandlerTest extends TestCase
             emailVerifiedAt: new \DateTimeImmutable('-1 day'),
         ));
 
-        $this->userRepository->method('findByUuid')->with($userId)->willReturn($user);
+        $this->userRepository->expects($this->once())->method('findByUuid')->with($userId)->willReturn($user);
 
         $command = new CreateNotificationCommand(
             eventClass: \App\Auth\Domain\Event\PasswordChanged::class,
@@ -198,6 +212,9 @@ final class CreateNotificationHandlerTest extends TestCase
 
     public function testEmailCommandNotDispatchedForUnverifiedUser(): void
     {
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->bus = $this->createMock(MessageBusInterface::class);
+
         $userId = Uuid::generate();
 
         $user = User::reconstitute(new UserState(
@@ -211,7 +228,7 @@ final class CreateNotificationHandlerTest extends TestCase
             updatedAt: new \DateTimeImmutable(),
         ));
 
-        $this->userRepository->method('findByUuid')->with($userId)->willReturn($user);
+        $this->userRepository->expects($this->once())->method('findByUuid')->with($userId)->willReturn($user);
 
         $command = new CreateNotificationCommand(
             eventClass: \App\Auth\Domain\Event\PasswordChanged::class,
@@ -228,9 +245,12 @@ final class CreateNotificationHandlerTest extends TestCase
 
     public function testEmailCommandNotDispatchedWhenUserNotFound(): void
     {
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->bus = $this->createMock(MessageBusInterface::class);
+
         $userId = Uuid::generate();
 
-        $this->userRepository->method('findByUuid')->with($userId)->willReturn(null);
+        $this->userRepository->expects($this->once())->method('findByUuid')->with($userId)->willReturn(null);
 
         $command = new CreateNotificationCommand(
             eventClass: \App\Auth\Domain\Event\PasswordChanged::class,

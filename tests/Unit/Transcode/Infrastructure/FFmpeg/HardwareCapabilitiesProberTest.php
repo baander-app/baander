@@ -7,7 +7,7 @@ namespace App\Tests\Unit\Transcode\Infrastructure\FFmpeg;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\HardwareAccelerator;
 use App\Transcode\Infrastructure\FFmpeg\HardwareCapabilitiesProber;
-use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -19,11 +19,11 @@ use Psr\Log\LoggerInterface;
  */
 final class HardwareCapabilitiesProberTest extends TestCase
 {
-    private LoggerInterface&MockObject $logger;
+    private LoggerInterface&Stub $logger;
 
     protected function setUp(): void
     {
-        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->logger = $this->createStub(LoggerInterface::class);
     }
 
     //

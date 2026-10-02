@@ -140,7 +140,7 @@ final class CursorPaginatorTest extends TestCase
      */
     public function testPaginateThrowsInvalidArgumentExceptionForLimitZero(): void
     {
-        $qb = $this->createMock(\Doctrine\ORM\QueryBuilder::class);
+        $qb = $this->createStub(\Doctrine\ORM\QueryBuilder::class);
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Limit must be at least 1');
@@ -157,7 +157,7 @@ final class CursorPaginatorTest extends TestCase
 
     public function testPaginateThrowsInvalidArgumentExceptionForNegativeLimit(): void
     {
-        $qb = $this->createMock(\Doctrine\ORM\QueryBuilder::class);
+        $qb = $this->createStub(\Doctrine\ORM\QueryBuilder::class);
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Limit must be at least 1');

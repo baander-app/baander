@@ -7,7 +7,6 @@ namespace App\Tests\Unit\Lyrics\Infrastructure\Api;
 use App\Lyrics\Application\DTO\LrclibResult;
 use App\Lyrics\Application\DTO\LrclibSearchResult;
 use App\Lyrics\Infrastructure\Api\LrclibClient;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -15,15 +14,20 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
 
 final class LrclibClientTest extends TestCase
 {
-    private HttpClientInterface&MockObject $httpClient;
-    private LoggerInterface&MockObject $logger;
+    private HttpClientInterface $httpClient;
+    private LoggerInterface $logger;
     private LrclibClient $client;
 
     protected function setUp(): void
     {
-        $this->httpClient = $this->createMock(HttpClientInterface::class);
-        $this->logger = $this->createMock(LoggerInterface::class);
-        $this->client = new LrclibClient(
+        $this->httpClient = $this->createStub(HttpClientInterface::class);
+        $this->logger = $this->createStub(LoggerInterface::class);
+        $this->client = $this->createClient();
+    }
+
+    private function createClient(): LrclibClient
+    {
+        return new LrclibClient(
             $this->httpClient,
             $this->logger,
             'https://lrclib.net',
@@ -34,7 +38,7 @@ final class LrclibClientTest extends TestCase
 
     public function testGetBySignatureCachedReturnsResult(): void
     {
-        $response = $this->createMock(ResponseInterface::class);
+        $response = $this->createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(200);
         $response->method('toArray')->willReturn([
             'id' => 123,
@@ -64,7 +68,7 @@ final class LrclibClientTest extends TestCase
 
     public function testGetBySignatureCachedReturnsNullOn404(): void
     {
-        $response = $this->createMock(ResponseInterface::class);
+        $response = $this->createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(404);
 
         $this->httpClient->method('request')->willReturn($response);
@@ -78,7 +82,10 @@ final class LrclibClientTest extends TestCase
 
     public function testGetBySignatureReturnsResultFromFullEndpoint(): void
     {
-        $fullResponse = $this->createMock(ResponseInterface::class);
+        $this->httpClient = $this->createMock(HttpClientInterface::class);
+        $this->client = $this->createClient();
+
+        $fullResponse = $this->createStub(ResponseInterface::class);
         $fullResponse->method('getStatusCode')->willReturn(200);
         $fullResponse->method('toArray')->willReturn([
             'id' => 42,
@@ -103,7 +110,10 @@ final class LrclibClientTest extends TestCase
 
     public function testGetBySignatureReturnsNullOn404(): void
     {
-        $response = $this->createMock(ResponseInterface::class);
+        $this->httpClient = $this->createMock(HttpClientInterface::class);
+        $this->client = $this->createClient();
+
+        $response = $this->createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(404);
 
         $this->httpClient->expects($this->once())->method('request')->willReturn($response);
@@ -115,7 +125,11 @@ final class LrclibClientTest extends TestCase
 
     public function testGetBySignatureReturnsNullOnHttpError(): void
     {
-        $response = $this->createMock(ResponseInterface::class);
+        $this->httpClient = $this->createMock(HttpClientInterface::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->client = $this->createClient();
+
+        $response = $this->createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(500);
 
         $this->httpClient->expects($this->once())->method('request')->willReturn($response);
@@ -130,7 +144,7 @@ final class LrclibClientTest extends TestCase
 
     public function testGetByIdReturnsResult(): void
     {
-        $response = $this->createMock(ResponseInterface::class);
+        $response = $this->createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(200);
         $response->method('toArray')->willReturn([
             'id' => 555,
@@ -154,7 +168,7 @@ final class LrclibClientTest extends TestCase
 
     public function testGetByIdReturnsNullOn404(): void
     {
-        $response = $this->createMock(ResponseInterface::class);
+        $response = $this->createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(404);
 
         $this->httpClient->method('request')->willReturn($response);
@@ -168,7 +182,7 @@ final class LrclibClientTest extends TestCase
 
     public function testSearchReturnsArrayOfResults(): void
     {
-        $response = $this->createMock(ResponseInterface::class);
+        $response = $this->createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(200);
         $response->method('toArray')->willReturn([
             [
@@ -207,7 +221,7 @@ final class LrclibClientTest extends TestCase
 
     public function testSearchReturnsEmptyArrayOn404(): void
     {
-        $response = $this->createMock(ResponseInterface::class);
+        $response = $this->createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(404);
 
         $this->httpClient->method('request')->willReturn($response);
@@ -219,7 +233,7 @@ final class LrclibClientTest extends TestCase
 
     public function testSearchReturnsEmptyArrayWhenResponseIsNotList(): void
     {
-        $response = $this->createMock(ResponseInterface::class);
+        $response = $this->createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(200);
         $response->method('toArray')->willReturn(['error' => 'something']);
 
@@ -234,7 +248,10 @@ final class LrclibClientTest extends TestCase
 
     public function testLogsWarningOnHttp500Error(): void
     {
-        $response = $this->createMock(ResponseInterface::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->client = $this->createClient();
+
+        $response = $this->createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(500);
 
         $this->httpClient->method('request')->willReturn($response);
@@ -248,6 +265,9 @@ final class LrclibClientTest extends TestCase
 
     public function testReturnsNullOnHttpException(): void
     {
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->client = $this->createClient();
+
         // Simulate a transport-level error that Symfony wraps in an exception
         $this->httpClient->method('request')->willThrowException(
             new \Symfony\Component\HttpClient\Exception\TransportException('Connection refused'),
@@ -262,6 +282,9 @@ final class LrclibClientTest extends TestCase
 
     public function testReturnsNullOnGenericException(): void
     {
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->client = $this->createClient();
+
         $this->httpClient->method('request')->willThrowException(
             new \LogicException('Unexpected state'),
         );
@@ -275,6 +298,9 @@ final class LrclibClientTest extends TestCase
 
     public function testReturnsNullOnNetworkError(): void
     {
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->client = $this->createClient();
+
         $this->httpClient->method('request')->willThrowException(
             new \RuntimeException('Connection timed out'),
         );
@@ -288,6 +314,9 @@ final class LrclibClientTest extends TestCase
 
     public function testSearchReturnsEmptyArrayOnNetworkError(): void
     {
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->client = $this->createClient();
+
         $this->httpClient->method('request')->willThrowException(
             new \RuntimeException('DNS failure'),
         );
@@ -303,7 +332,7 @@ final class LrclibClientTest extends TestCase
 
     public function testHandlesInstrumentalTrackWithNullLyrics(): void
     {
-        $response = $this->createMock(ResponseInterface::class);
+        $response = $this->createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(200);
         $response->method('toArray')->willReturn([
             'id' => 777,

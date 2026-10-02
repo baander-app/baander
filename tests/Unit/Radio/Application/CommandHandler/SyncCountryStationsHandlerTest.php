@@ -8,22 +8,30 @@ use App\Radio\Application\Command\SyncCountryStationsCommand;
 use App\Radio\Application\CommandHandler\SyncCountryStationsHandler;
 use App\Radio\Application\Port\RadioStationPortInterface;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 final class SyncCountryStationsHandlerTest extends TestCase
 {
-    private RadioStationPortInterface&MockObject $stationPort;
+    private RadioStationPortInterface $stationPort;
     private SyncCountryStationsHandler $handler;
 
     protected function setUp(): void
     {
-        $this->stationPort = $this->createMock(RadioStationPortInterface::class);
-        $this->handler = new SyncCountryStationsHandler($this->stationPort);
+        $this->stationPort = $this->createStub(RadioStationPortInterface::class);
+        $this->handler = $this->createSyncCountryStationsHandlerFixture();
+    }
+
+    private function createSyncCountryStationsHandlerFixture(): SyncCountryStationsHandler
+    {
+        $fixture = new SyncCountryStationsHandler($this->stationPort);
+        return $fixture;
     }
 
     public function testSyncCallsPortAndReturnsCount(): void
     {
+        $this->stationPort = $this->createMock(RadioStationPortInterface::class);
+        $this->handler = $this->createSyncCountryStationsHandlerFixture();
+
         $sourceId = Uuid::v7();
         $countryCode = 'DE';
 
