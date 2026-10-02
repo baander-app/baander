@@ -24,7 +24,9 @@ final class WorkerDeploymentLeaseSchemaTest extends TestCase
             self::assertInstanceOf(EntityManagerInterface::class, $manager);
             $connection = $manager->getConnection();
             self::assertSame('worker_deployment_leases', $connection->fetchOne("SELECT to_regclass('worker_deployment_leases')::text"));
+            self::assertSame('worker_deployment_containers', $connection->fetchOne("SELECT to_regclass('worker_deployment_containers')::text"));
             $tables = $connection->createSchemaManager()->listTableNames();
+            self::assertNotContains('worker_deployment_containers', $tables, 'ORM introspection must preserve the immutable DBAL-owned inventory.');
             self::assertContains('albums', $tables, 'Ordinary ORM-managed tables remain visible.');
             self::assertNotContains('worker_deployment_leases', $tables, 'ORM introspection must not propose deleting the DBAL-owned lease table.');
             self::assertNotContains('domain_event_outbox', $tables, 'The existing migration-owned outbox exclusion remains intact.');

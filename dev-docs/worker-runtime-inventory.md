@@ -355,10 +355,11 @@ helper described below supplies the parent-side deadline; observing a database
 token alone is not permission to launch. A real kernel/introspection check
 confirms ORM schema diffs exclude the DBAL-owned lease table, while normal entity
 tables remain visible. Fresh installation and repeat migration runs pass.
-The canonical messaging/PostgreSQL suite passes 63 tests with 954 assertions,
+The canonical messaging/PostgreSQL suite passes 78 tests with 1,041 assertions,
 including seven database lease cases, 14 fresh-process lease-helper cases and
-nine external-controller database coordination cases. The schema check passes one test with five assertions
-after all 15 migrations and a repeat no-op migration run. Two real-process cases
+nine external-controller database coordination cases, eight inventory cases and
+seven registered-recovery cases. The schema check passes one test with seven assertions
+after all 16 migrations and a repeat no-op migration run. Two real-process cases
 also verify blocked replacement with a surviving descendant and after a launcher
 throws following process creation. Both container shutdown scenarios pass.
 Failed or uncertain database operations discard the dedicated connection; actual
@@ -427,8 +428,31 @@ The caller must durably associate a fresh deployment boot with its container ID
 before starting it. Labels alone do not establish that lifecycle inventory or defend
 against a malicious Docker operator. Automatic recovery after a lost removal
 response, daemon replacement, and host-systemd containment remain unimplemented.
-This adapter and the database controller are tested separately; their deployment
-wiring and a combined Docker/PostgreSQL acceptance test are still required.
+The combined Docker/PostgreSQL recovery runner now checks real adapter removal
+and committed lease transitions together. Its deliberately controlled container
+fixture does not run `LeasedWorkerRuntime`; deployment startup wiring remains open.
+
+`worker_deployment_containers` records a deployment namespace and boot against
+one Docker daemon ID and full container ID. The DBAL inventory permits exact retries
+but rejects rebinding either the boot or the daemon/container pair. Records remain
+after retirement. A separate migration and Doctrine schema filter preserve this
+coordination table without presenting it as an ORM entity.
+
+`RegisteredDeploymentRecovery` obtains the full container ID from that inventory;
+callers cannot substitute another ID. It verifies the recorded daemon identity
+before each inspect/removal command and retains the existing exact-epoch lease
+acknowledgment. Missing inventory, observed daemon mismatches, invalid labels and
+uncertain retirement cannot release ownership. The identity check and following
+Docker command are separate calls, so they do not protect against an endpoint
+swap between calls; the configured local daemon endpoint must remain trusted and
+stable throughout recovery.
+
+The startup controller must still create a stopped container, commit its binding,
+and only then start it. An uncertain create response must not cause a second
+container to be created for the same boot: use a deterministic boot-specific Docker
+name to reconcile creation before recording the immutable ID, or fail closed.
+This startup path is not yet wired. The recovery acceptance fixture registers its
+controlled containers for the test; it does not certify registration-before-start.
 
 This is a stage-2 foundation, not a deployment supervisor. No application command
 or deployment configuration uses it yet. The deployment must wire the external controller and persist its lifecycle

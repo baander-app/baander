@@ -22,6 +22,7 @@ For strict unit and messaging checks, run from the checkout:
 bash scripts/test-unit-container.sh
 bash scripts/test-messaging-container.sh
 bash scripts/test-worker-retirement-container.sh
+bash scripts/test-worker-recovery-container.sh
 bash scripts/test-worker-containment-container.sh
 bash scripts/test-functional-container.sh tests/Functional/Controller/FavoritesControllerTest.php
 bash scripts/test-functional-container.sh tests/Integration/CoverExtractionPersistenceTest.php
@@ -99,8 +100,12 @@ rejects an incorrect boot identity, then exercises the real external retirement
 adapter. Confirmed force-removal must prevent restart of the old full container ID;
 a subsequent absent-container request must fail closed. PostgreSQL controller tests
 in the messaging runner separately verify that retirement failures preserve the
-lease and concurrent recovery cannot release a newer epoch. These do not yet form
-a combined Docker/database deployment acceptance test.
+lease and concurrent recovery cannot release a newer epoch. The recovery runner combines the real Docker adapter with PostgreSQL lease
+coordination. It needs host PHP with `pdo_pgsql`, publishes only an ephemeral
+loopback database port, and destroys its disposable resources. It verifies
+wrong-owner and wrong-label rejection, expiry without takeover, confirmed removal,
+new epoch acquisition and stale-token rejection. The fixture exercises external
+controller recovery, not a complete `LeasedWorkerRuntime` deployment.
 
 The functional runner creates an isolated PostgreSQL/Redis network, extracts the
 checkout into a fresh directory, and runs all migrations twice before executing the
