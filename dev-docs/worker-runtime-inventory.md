@@ -98,12 +98,16 @@ to Redis.
 Console execution uses
 [SchedulerConsolePoolWorker](../src/Scheduler/Infrastructure/Swoole/SchedulerConsolePoolWorker.php)
 and positional arguments or `--key=value` options. The wrapper polls results for
-300 seconds, truncates returned output to 10000 characters and currently marks
-`pool_timeout` as success; absent result tables mean fire-and-forget success.
-Its catch records failure without rethrowing to Messenger. These completion and
-acknowledgement distinctions must be deliberate before extraction. Console
-execution must remain allowlisted, with bounded output, cancellation, ownership
-renewal and descendant cleanup; the generic wrapper cannot bypass media budgets.
+300 seconds by default and truncates returned output to 10000 characters. It
+always reads file-backed results, independently of the optional shared table, and
+uses a unique key per execution. Known child failures are recorded as failures.
+A timeout or result-read exception records unknown completion and pauses an active
+schedule without requesting a Messenger retry. Operators must reconcile the child
+process before resuming it; pausing does not cancel a child. Existing queued/manual
+commands and failure to persist the pause still need durable execution ownership.
+Console execution must remain allowlisted, with bounded output, cancellation,
+ownership renewal and descendant cleanup; the generic wrapper cannot bypass media
+budgets.
 
 ## Swoole lifecycle and background ownership
 
@@ -178,8 +182,9 @@ limit remain implementation configuration, not asserted defaults here.
    allocations and result files before web recycling or independent role restarts.
    Test seek/pause/resume/reconnect against the actual owning session generation.
 7. Review suppress-and-return paths before treating handler return as delivery
-   success: cover fan-out failures and scheduler failure/timeout outcomes above are
-   concrete cases. Existing file-ingestion, email, push and outbox handlers propagate
+   success: cover fan-out failures remain a concrete case. Scheduler console
+   uncertainty now pauses cron dispatch; asynchronous payload completion still
+   needs an explicit acknowledgement contract. File-ingestion, email, push and outbox handlers propagate
    their material failures; preserve those semantics.
 8. Cut over Dockerfile/Compose, startup scripts, Supervisor and `bin/dev-server` /
    `bin/queue-worker` together. Role restart must not clear shared cache/logs or
@@ -225,6 +230,14 @@ messaging runner passes 26 tests with 389 assertions. Focused production PHPStan
 passes. Provider integration and future queue-family registration remain separate
 gates.
 
+The scheduler console correction passes 31 focused tests with 188 assertions.
+They cover file-result polling without a table, known and malformed results,
+unknown completion with paused/disabled state preservation, the saved pause before
+lock release, cron exclusion, unique keys and failures in Redis plus diagnostics.
+The combined unit/rule suite passes 3,144 tests with 8,935 assertions; focused
+production PHPStan passes. These handler tests double the pool and persistence
+ports; they do not certify real child cancellation or crash recovery.
+
 This is source inspection of routing, all application Bootable implementations,
 timer/coroutine creation sites, tagged CPU handlers, scheduler providers, private
 outbox wiring and deployment programs. GitNexus 1.6.12 query/context resolved the
@@ -237,7 +250,8 @@ or process-parentage claim was validated by a runtime load test.
 
 Before selecting defaults, measure idle/active RSS and native memory for each child,
 CPU time, FFmpeg/device concurrency, queue wait/service rates, real process ancestry,
-result-store limits and shutdown under load in the deployment image. Stage-1 routing
-and acknowledgement findings above remain fixes to implement and test, not completed
-remediations. Keep independent-role, legacy-drain, failure/retry, occurrence recovery,
+result-store limits and shutdown under load in the deployment image. The focused
+corrections above do not complete stage 1: fan-out delivery failures and durable
+execution ownership still require remediation. Keep independent-role, legacy-drain,
+failure/retry, occurrence recovery,
 shared admission and playback acceptance gates from the redesign plan.

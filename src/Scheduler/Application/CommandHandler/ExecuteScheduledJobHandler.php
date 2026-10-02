@@ -6,8 +6,10 @@ namespace App\Scheduler\Application\CommandHandler;
 
 use App\Scheduler\Application\Command\ExecuteScheduledJobCommand;
 use App\Scheduler\Application\Port\ScheduledJobPortInterface;
+use App\Scheduler\Application\Exception\ScheduledConsoleCompletionUnknown;
 use App\Scheduler\Domain\Service\SchedulerRegistry;
 use App\Scheduler\Domain\ValueObject\JobType;
+use App\Scheduler\Domain\ValueObject\ScheduleStatus;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Shared\Infrastructure\Swoole\Async;
@@ -27,8 +29,11 @@ final class ExecuteScheduledJobHandler
         private readonly CpuProcessPoolInterface $cpuPool,
         private readonly RedisClientFactory $redis,
         private readonly LoggerInterface $logger,
-        private readonly int $lockTtlSeconds = 3600,
+        private readonly float $consoleResultTimeoutSeconds = 300.0,
     ) {
+        if (!is_finite($consoleResultTimeoutSeconds) || $consoleResultTimeoutSeconds <= 0) {
+            throw new \InvalidArgumentException('Console result timeout must be finite and positive.');
+        }
     }
 
     public function __invoke(ExecuteScheduledJobCommand $command): void
@@ -71,6 +76,13 @@ final class ExecuteScheduledJobHandler
             };
 
             $job->markSuccess($result);
+        } catch (ScheduledConsoleCompletionUnknown $e) {
+            // The child may still be running. Persist the uncertainty and stop
+            // future cron dispatches; Messenger retries could duplicate its work.
+            $job->markFailed($e->getMessage());
+            if ($job->getStatus() === ScheduleStatus::Active) {
+                $job->pause();
+            }
         } catch (Throwable $e) {
             $this->logger->error('Scheduled job failed', [
                 'jobId' => $command->jobId,
@@ -106,34 +118,53 @@ final class ExecuteScheduledJobHandler
             'parameters' => $command->parameters,
         ], JSON_THROW_ON_ERROR);
 
-        $key = sprintf('scheduled_console:%s', $command->jobId);
+        $key = sprintf('scheduled_console:%s:%s', $command->jobId, Uuid::generate()->toString());
 
         $this->cpuPool->dispatch($payload, $key);
 
-        // When the pool has no result table (e.g. results are not collected),
-        // the dispatch is fire-and-forget — there is nothing to wait for.
-        if ($this->cpuPool->getResultTable() === null) {
-            return 'dispatched_to_pool';
-        }
-
-        // Poll result store for completion (with timeout)
-        $deadline = microtime(true) + 300.0; // 5 minute timeout
-        while (microtime(true) < $deadline) {
-            $row = $this->cpuPool->readResult($key);
+        // Results are file-backed; the optional shared table is not a signal
+        // that completion can be skipped. Use a monotonic deadline.
+        $deadline = hrtime(true) / 1_000_000_000 + $this->consoleResultTimeoutSeconds;
+        do {
+            try {
+                $row = $this->cpuPool->readResult($key);
+            } catch (Throwable $e) {
+                throw new ScheduledConsoleCompletionUnknown(
+                    'Console completion unknown: result could not be read. Reconcile the child process before resuming the schedule.',
+                    previous: $e,
+                );
+            }
             if ($row !== null) {
-                $data = json_decode($row['data'] ?? '{}', true, 512, JSON_THROW_ON_ERROR);
-
-                if (($data['success'] ?? false) === false) {
-                    throw new \RuntimeException($data['error'] ?? 'Console command failed.');
+                if ($row['status'] === 'error') {
+                    throw new \RuntimeException($row['data']);
+                }
+                if ($row['status'] !== 'ok') {
+                    throw new \RuntimeException('Invalid console pool result status.');
+                }
+                $data = json_decode($row['data'], true, 512, JSON_THROW_ON_ERROR);
+                if (!is_array($data) || !isset($data['success']) || !is_bool($data['success'])) {
+                    throw new \RuntimeException('Invalid console command result.');
+                }
+                if (!$data['success']) {
+                    throw new \RuntimeException(is_string($data['error'] ?? null) ? $data['error'] : 'Console command failed.');
+                }
+                $output = array_key_exists('output', $data) ? $data['output'] : 'ok';
+                if (!is_string($output)) {
+                    throw new \RuntimeException('Invalid console command output.');
                 }
 
-                return mb_substr($data['output'] ?? 'ok', 0, 10000); // Truncate to 10KB
+                return mb_substr($output, 0, 10000);
             }
 
-            Async::sleep(0.1);
-        }
+            $remaining = $deadline - hrtime(true) / 1_000_000_000;
+            if ($remaining > 0) {
+                Async::sleep(min(0.1, $remaining));
+            }
+        } while ($remaining > 0);
 
-        return 'pool_timeout';
+        throw new ScheduledConsoleCompletionUnknown(
+            'Console completion unknown: result wait timed out. Reconcile the child process before resuming the schedule.',
+        );
     }
 
     private function releaseLock(string $jobId): void
@@ -145,10 +176,14 @@ final class ExecuteScheduledJobHandler
                 $redis->del($lockKey);
             });
         } catch (Throwable $e) {
-            $this->logger->warning('Failed to release scheduler lock', [
-                'jobId' => $jobId,
-                'error' => $e->getMessage(),
-            ]);
+            try {
+                $this->logger->warning('Failed to release scheduler lock', [
+                    'jobId' => $jobId,
+                    'error' => $e->getMessage(),
+                ]);
+            } catch (Throwable) {
+                // Diagnostics cannot retry an already persisted outcome.
+            }
         }
     }
 }
