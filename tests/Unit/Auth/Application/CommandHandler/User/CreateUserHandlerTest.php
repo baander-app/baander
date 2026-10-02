@@ -10,6 +10,7 @@ use App\Auth\Application\Port\PasswordHasherInterface;
 use App\Auth\Domain\Event\UserCreatedByOperator;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Notification\Application\DTO\SeedDefaultPreferencesCommand;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
@@ -24,6 +25,7 @@ final class CreateUserHandlerTest extends TestCase
     private PasswordHasherInterface $passwordHasher;
     private EventDispatcherInterface $eventDispatcher;
     private MessageBusInterface $bus;
+    private TransactionPortInterface $transaction;
     private CreateUserHandler $handler;
 
     protected function setUp(): void
@@ -32,6 +34,8 @@ final class CreateUserHandlerTest extends TestCase
         $this->passwordHasher = $this->createStub(PasswordHasherInterface::class);
         $this->eventDispatcher = $this->createStub(EventDispatcherInterface::class);
         $this->bus = $this->createMessageBus();
+        $this->transaction = $this->createStub(TransactionPortInterface::class);
+        $this->transaction->method('run')->willReturnCallback(static fn (callable $operation): mixed => $operation());
         $this->handler = $this->createCreateUserHandlerFixture();
     }
 
@@ -44,7 +48,7 @@ final class CreateUserHandlerTest extends TestCase
 
     private function createCreateUserHandlerFixture(): CreateUserHandler
     {
-        $fixture = new CreateUserHandler($this->userRepository, $this->passwordHasher, $this->eventDispatcher, $this->bus);
+        $fixture = new CreateUserHandler($this->userRepository, $this->passwordHasher, $this->eventDispatcher, $this->bus, $this->transaction);
         return $fixture;
     }
 
@@ -56,7 +60,7 @@ final class CreateUserHandlerTest extends TestCase
         $this->bus = $this->createMessageBus(expectCalls: true);
         $this->handler = $this->createCreateUserHandlerFixture();
 
-        $email = new Email('test@example.com');
+        $email = new Email('test@baander.app');
         $roles = ['ROLE_USER'];
 
         $this->userRepository->expects($this->once())->method('existsWithEmail')->with($email)->willReturn(false);
@@ -74,7 +78,7 @@ final class CreateUserHandlerTest extends TestCase
         $user = ($this->handler)(new CreateUserCommand($email, 'Alice', 'password123', $roles));
 
         $this->assertSame('Alice', $user->getName());
-        $this->assertSame('test@example.com', $user->getEmail());
+        $this->assertSame('test@baander.app', $user->getEmail());
         $this->assertSame(['ROLE_USER'], $user->getRoles());
     }
 
@@ -83,7 +87,7 @@ final class CreateUserHandlerTest extends TestCase
         $this->userRepository = $this->createMock(UserRepositoryInterface::class);
         $this->handler = $this->createCreateUserHandlerFixture();
 
-        $email = new Email('test@example.com');
+        $email = new Email('test@baander.app');
         $this->userRepository->expects($this->once())->method('existsWithEmail')->with($email)->willReturn(true);
 
         $this->expectException(RuntimeException::class);
@@ -94,7 +98,7 @@ final class CreateUserHandlerTest extends TestCase
 
     public function testThrowsOnInvalidRole(): void
     {
-        $email = new Email('test@example.com');
+        $email = new Email('test@baander.app');
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Invalid role "ROLE_SUPERUSER"');
@@ -108,7 +112,7 @@ final class CreateUserHandlerTest extends TestCase
         $this->userRepository = $this->createMock(UserRepositoryInterface::class);
         $this->handler = $this->createCreateUserHandlerFixture();
 
-        $email = new Email('admin@example.com');
+        $email = new Email('admin@baander.app');
         $roles = ['ROLE_ADMIN'];
 
         $this->userRepository->expects($this->once())->method('existsWithEmail')->with($email)->willReturn(false);
@@ -128,7 +132,7 @@ final class CreateUserHandlerTest extends TestCase
         $this->userRepository = $this->createMock(UserRepositoryInterface::class);
         $this->handler = $this->createCreateUserHandlerFixture();
 
-        $email = new Email('user@example.com');
+        $email = new Email('user@baander.app');
         $roles = ['ROLE_USER'];
 
         $this->userRepository->expects($this->once())->method('existsWithEmail')->with($email)->willReturn(false);
@@ -148,7 +152,7 @@ final class CreateUserHandlerTest extends TestCase
         $this->bus = $this->createMessageBus(expectCalls: true);
         $this->handler = $this->createCreateUserHandlerFixture();
 
-        $email = new Email('test@example.com');
+        $email = new Email('test@baander.app');
         $this->userRepository->expects($this->once())->method('existsWithEmail')->with($email)->willReturn(false);
         $this->passwordHasher->method('hash')->willReturn('hashed-pw');
 
@@ -171,14 +175,14 @@ final class CreateUserHandlerTest extends TestCase
         $this->userRepository = $this->createMock(UserRepositoryInterface::class);
         $this->handler = $this->createCreateUserHandlerFixture();
 
-        $email = new Email('test@example.com');
+        $email = new Email('test@baander.app');
         $this->userRepository->expects($this->once())->method('existsWithEmail')->with($email)->willReturn(false);
         $this->passwordHasher->method('hash')->willReturn('hashed-pw');
 
         $this->eventDispatcher->expects($this->once())
             ->method('dispatch')
             ->with($this->callback(function (UserCreatedByOperator $event): bool {
-                $this->assertSame('test@example.com', $event->getEmail()->toString());
+                $this->assertSame('test@baander.app', $event->getEmail()->toString());
                 $this->assertSame('Alice', $event->getName());
                 $this->assertSame(['ROLE_USER'], $event->getRoles());
                 $this->assertSame('cli', $event->getSource());
@@ -186,5 +190,52 @@ final class CreateUserHandlerTest extends TestCase
             }));
 
         ($this->handler)(new CreateUserCommand($email, 'Alice', 'password123', ['ROLE_USER']));
+    }
+
+    public function testEventFailureEscapesTheTransaction(): void
+    {
+        $active = false;
+        $failure = new \RuntimeException('Outbox insertion failed.');
+        $this->transaction = $this->createMock(TransactionPortInterface::class);
+        $this->transaction->expects($this->once())->method('run')->willReturnCallback(
+            function (callable $operation) use (&$active, $failure): mixed {
+                $active = true;
+                try {
+                    return $operation();
+                } catch (\RuntimeException $exception) {
+                    $this->assertSame($failure, $exception);
+                    throw $exception;
+                } finally {
+                    $active = false;
+                }
+            },
+        );
+        $userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->userRepository = $userRepository;
+        $userRepository->expects($this->once())->method('save')->willReturnCallback(
+            function () use (&$active): void {
+                $this->assertTrue($active);
+            },
+        );
+        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        $this->eventDispatcher->expects($this->once())->method('dispatch')->willReturnCallback(
+            function () use (&$active, $failure): never {
+                $this->assertTrue($active);
+                throw $failure;
+            },
+        );
+        $this->passwordHasher = $this->createStub(PasswordHasherInterface::class);
+        $this->passwordHasher->method('hash')->willReturn('hashed-pw');
+        $this->bus = $this->createMock(MessageBusInterface::class);
+        $this->bus->expects($this->once())->method('dispatch')->willReturnCallback(
+            function (object $message) use (&$active): Envelope {
+                $this->assertTrue($active);
+                return new Envelope($message);
+            },
+        );
+        $this->handler = $this->createCreateUserHandlerFixture();
+
+        $this->expectExceptionObject($failure);
+        ($this->handler)(new CreateUserCommand(new Email('alice@baander.app'), 'Alice', 'password123', ['ROLE_USER']));
     }
 }

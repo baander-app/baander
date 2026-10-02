@@ -11,6 +11,7 @@ use App\Auth\Domain\Exception\EmailVerificationException;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\EmailVerificationTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
@@ -22,6 +23,7 @@ final class VerifyEmailHandlerTest extends TestCase
     private EmailVerificationTokenRepositoryInterface $tokenRepository;
     private UserRepositoryInterface $userRepository;
     private EventDispatcherInterface $eventDispatcher;
+    private TransactionPortInterface $transaction;
     private VerifyEmailHandler $handler;
 
     protected function setUp(): void
@@ -29,6 +31,8 @@ final class VerifyEmailHandlerTest extends TestCase
         $this->tokenRepository = $this->createStub(EmailVerificationTokenRepositoryInterface::class);
         $this->userRepository = $this->createStub(UserRepositoryInterface::class);
         $this->eventDispatcher = $this->createStub(EventDispatcherInterface::class);
+        $this->transaction = $this->createStub(TransactionPortInterface::class);
+        $this->transaction->method('run')->willReturnCallback(static fn (callable $operation): mixed => $operation());
         $this->handler = $this->createVerifyEmailHandlerFixture();
     }
 
@@ -38,6 +42,7 @@ final class VerifyEmailHandlerTest extends TestCase
             $this->tokenRepository,
             $this->userRepository,
             $this->eventDispatcher,
+            $this->transaction,
         );
         return $fixture;
     }
@@ -50,7 +55,7 @@ final class VerifyEmailHandlerTest extends TestCase
         $this->handler = $this->createVerifyEmailHandlerFixture();
 
         $tokenString = 'valid-token';
-        $userEntity = new UserEntity(new PublicId(), 'Alice', 'alice@example.com', 'hashed-pw', '');
+        $userEntity = new UserEntity(new PublicId(), 'Alice', 'alice@baander.app', 'hashed-pw', '');
         $tokenEntity = new EmailVerificationTokenEntity(
             $userEntity,
             $tokenString,
@@ -59,7 +64,7 @@ final class VerifyEmailHandlerTest extends TestCase
 
         $this->tokenRepository->method('findByToken')->willReturn($tokenEntity);
         $this->userRepository->method('findByUuid')->willReturn(
-            \App\Auth\Domain\Model\User::register(new Email('alice@example.com'), 'hashed-pw', 'Alice'),
+            \App\Auth\Domain\Model\User::register(new Email('alice@baander.app'), 'hashed-pw', 'Alice'),
         );
         $this->userRepository->expects($this->once())->method('save');
         $this->tokenRepository->expects($this->once())->method('delete')->with($tokenEntity);
@@ -90,7 +95,7 @@ final class VerifyEmailHandlerTest extends TestCase
 
     public function testExpiredTokenThrows(): void
     {
-        $userEntity = new UserEntity(new PublicId(), 'Alice', 'alice@example.com', 'hashed-pw', '');
+        $userEntity = new UserEntity(new PublicId(), 'Alice', 'alice@baander.app', 'hashed-pw', '');
         $tokenEntity = new EmailVerificationTokenEntity(
             $userEntity,
             'expired-token',
@@ -106,7 +111,7 @@ final class VerifyEmailHandlerTest extends TestCase
 
     public function testUsedTokenThrows(): void
     {
-        $userEntity = new UserEntity(new PublicId(), 'Alice', 'alice@example.com', 'hashed-pw', '');
+        $userEntity = new UserEntity(new PublicId(), 'Alice', 'alice@baander.app', 'hashed-pw', '');
         $tokenEntity = new EmailVerificationTokenEntity(
             $userEntity,
             'used-token',
@@ -119,5 +124,54 @@ final class VerifyEmailHandlerTest extends TestCase
         $this->expectException(EmailVerificationException::class);
 
         ($this->handler)(new VerifyEmailCommand('used-token'));
+    }
+
+    public function testEventFailureEscapesTheTransaction(): void
+    {
+        $active = false;
+        $failure = new \RuntimeException('Outbox insertion failed.');
+        $this->transaction = $this->createMock(TransactionPortInterface::class);
+        $this->transaction->expects($this->once())->method('run')->willReturnCallback(
+            function (callable $operation) use (&$active, $failure): mixed {
+                $active = true;
+                try {
+                    return $operation();
+                } catch (\RuntimeException $exception) {
+                    $this->assertSame($failure, $exception);
+                    throw $exception;
+                } finally {
+                    $active = false;
+                }
+            },
+        );
+        $userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->userRepository = $userRepository;
+        $userRepository->expects($this->once())->method('save')->willReturnCallback(
+            function () use (&$active): void {
+                $this->assertTrue($active);
+            },
+        );
+        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        $this->eventDispatcher->expects($this->once())->method('dispatch')->willReturnCallback(
+            function () use (&$active, $failure): never {
+                $this->assertTrue($active);
+                throw $failure;
+            },
+        );
+        $token = new EmailVerificationTokenEntity(
+            new UserEntity(new PublicId(), 'Alice', 'alice@baander.app', 'hashed-pw', ''),
+            'valid-token',
+            new \DateTimeImmutable('+1 hour'),
+        );
+        $this->tokenRepository = $this->createMock(EmailVerificationTokenRepositoryInterface::class);
+        $this->tokenRepository->method('findByToken')->willReturn($token);
+        $this->tokenRepository->expects($this->never())->method('delete');
+        $userRepository->method('findByUuid')->willReturn(
+            \App\Auth\Domain\Model\User::register(new Email('alice@baander.app'), 'hashed-pw', 'Alice'),
+        );
+        $this->handler = $this->createVerifyEmailHandlerFixture();
+
+        $this->expectExceptionObject($failure);
+        ($this->handler)(new VerifyEmailCommand('valid-token'));
     }
 }

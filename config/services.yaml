@@ -1012,6 +1012,9 @@ services:
     App\Shared\Application\Port\AdminAlertPortInterface:
         alias: App\Shared\Infrastructure\Event\AdminAlertService
 
+    App\Shared\Application\Port\TransactionPortInterface:
+        alias: App\Shared\Infrastructure\Doctrine\DoctrineTransaction
+
     # --- Scheduler Domain Repository Aliases ---
     App\Scheduler\Domain\Repository\ScheduledJobRepositoryInterface:
         alias: App\Scheduler\Infrastructure\Doctrine\Repository\ScheduledJobRepository

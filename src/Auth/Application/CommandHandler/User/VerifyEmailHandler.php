@@ -9,6 +9,7 @@ use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
 use App\Auth\Domain\Event\EmailVerified;
 use App\Auth\Domain\Exception\EmailVerificationException;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -25,6 +26,7 @@ final class VerifyEmailHandler
         private readonly EmailVerificationTokenRepositoryInterface $emailVerificationTokenRepository,
         private readonly UserRepositoryInterface $userRepository,
         private readonly EventDispatcherInterface $eventDispatcher,
+        private readonly TransactionPortInterface $transaction,
     ) {
     }
 
@@ -37,36 +39,38 @@ final class VerifyEmailHandler
             throw EmailVerificationException::missing();
         }
 
-        $entity = $this->emailVerificationTokenRepository->findByToken($token);
+        return $this->transaction->run(function () use ($token): bool {
+            $entity = $this->emailVerificationTokenRepository->findByToken($token);
 
-        if ($entity === null) {
-            throw EmailVerificationException::invalid();
-        }
+            if ($entity === null) {
+                throw EmailVerificationException::invalid();
+            }
 
-        if ($entity->isExpired()) {
-            throw EmailVerificationException::expired();
-        }
+            if ($entity->isExpired()) {
+                throw EmailVerificationException::expired();
+            }
 
-        if ($entity->getUsedAt() !== null) {
-            throw EmailVerificationException::alreadyUsed();
-        }
+            if ($entity->getUsedAt() !== null) {
+                throw EmailVerificationException::alreadyUsed();
+            }
 
-        $user = $this->userRepository->findByUuid($entity->getUser()->getId());
+            $user = $this->userRepository->findByUuid($entity->getUser()->getId());
 
-        if ($user === null) {
-            throw EmailVerificationException::invalid();
-        }
+            if ($user === null) {
+                throw EmailVerificationException::invalid();
+            }
 
-        $user->verifyEmail();
-        $this->userRepository->save($user);
+            $user->verifyEmail();
+            $this->userRepository->save($user);
 
-        $this->eventDispatcher->dispatch(new EmailVerified(
-            userId: $user->getId(),
-            email: Email::fromString($user->getEmail()),
-        ));
+            $this->eventDispatcher->dispatch(new EmailVerified(
+                userId: $user->getId(),
+                email: Email::fromString($user->getEmail()),
+            ));
 
-        $this->emailVerificationTokenRepository->delete($entity);
+            $this->emailVerificationTokenRepository->delete($entity);
 
-        return true;
+            return true;
+        });
     }
 }

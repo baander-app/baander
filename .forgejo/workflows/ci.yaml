@@ -148,6 +148,13 @@ jobs:
                     BAANDER_TEST_CHECKOUT_IN_IMAGE=1 \
                       timeout 180 bash scripts/test-outbox-runtime-container.sh
 
+            -   name: Producer transaction rollback and recovery
+                run: |
+                    BAANDER_TEST_IMAGE="$CI_IMAGE" \
+                    BAANDER_TEST_POSTGRES_IMAGE="${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest" \
+                    BAANDER_TEST_CHECKOUT_IN_IMAGE=1 \
+                      timeout 180 bash scripts/test-producer-runtime-container.sh
+
             -   name: Extract coverage metrics
                 continue-on-error: true
                 run: |

@@ -103,8 +103,9 @@ exactly-once email, push, or webhook delivery. Intents use leased claims, retry
 backoff, and dead-letter state after five failed handoffs. Run
 `php bin/console app:outbox:consume --once` to process one batch of each queue.
 The existing health endpoints check the Redis consumer; they do not yet check
-the outbox worker. Domain mutation and event capture still need transaction
-boundaries at the producers.
+the outbox worker. Operator user creation, user registration, and email
+verification now commit their domain writes and event capture in one transaction.
+Other event producers still need transaction boundaries reviewed.
 
 Before applying migration `Version20261002120000`, stop producers and relay
 workers and let in-flight legacy tasks finish. Back up the database. Earlier
@@ -137,6 +138,15 @@ Run `bash scripts/test-outbox-runtime-container.sh` for the production outbox
 drill. It uses real ORM repositories, PostgreSQL, and Redis to check live capture,
 notification creation, committed delivery intents, and replay after a lost event
 acknowledgement. It does not send email, push, or webhooks to external services.
+
+Run `bash scripts/test-producer-runtime-container.sh` to check the production
+transaction boundary for operator user creation, registration, and email
+verification. The drill rejects outbox writes in disposable PostgreSQL, checks
+rollback through a second connection, and retries through the same message bus.
+It covers registration tokens and notification preferences, verification token
+retention on failure, and recovery after an ORM flush closes the entity manager.
+This runtime drill covers the three auth producers. CI requires both production
+outbox and producer drills to pass.
 
 ## License
 

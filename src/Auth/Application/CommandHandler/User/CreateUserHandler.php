@@ -10,6 +10,7 @@ use App\Auth\Domain\Event\UserCreatedByOperator;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Notification\Application\DTO\SeedDefaultPreferencesCommand;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
 use InvalidArgumentException;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -25,6 +26,7 @@ final class CreateUserHandler
         private readonly PasswordHasherInterface $passwordHasher,
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly MessageBusInterface $bus,
+        private readonly TransactionPortInterface $transaction,
     ) {
     }
 
@@ -53,20 +55,22 @@ final class CreateUserHandler
             $command->getRoles(),
         );
 
-        $this->userRepository->save($user);
+        return $this->transaction->run(function () use ($user): User {
+            $this->userRepository->save($user);
 
-        $this->bus->dispatch(new SeedDefaultPreferencesCommand(
-            userId: $user->getId(),
-        ));
+            $this->bus->dispatch(new SeedDefaultPreferencesCommand(
+                userId: $user->getId(),
+            ));
 
-        $this->eventDispatcher->dispatch(new UserCreatedByOperator(
-            userId: $user->getId(),
-            publicId: $user->getPublicId(),
-            email: Email::fromString($user->getEmail()),
-            name: $user->getName(),
-            roles: $user->getRoles(),
-        ));
+            $this->eventDispatcher->dispatch(new UserCreatedByOperator(
+                userId: $user->getId(),
+                publicId: $user->getPublicId(),
+                email: Email::fromString($user->getEmail()),
+                name: $user->getName(),
+                roles: $user->getRoles(),
+            ));
 
-        return $user;
+            return $user;
+        });
     }
 }
