@@ -20,13 +20,13 @@ All thirteen have explicit version-1 entries in
 | `Library/Application/Command/ScanLibraryCommand.php` | `swoole_task` | [ScanLibraryHandler](../src/Library/Application/CommandHandler/ScanLibraryHandler.php), Any | `library.scan` | Scaled `catalog`; filesystem scan, hash/probe work and directory batches |
 | `Library/Application/Message/FilesDiscovered.php` | `async` | [FilesDiscoveredHandler](../src/Catalog/Application/CommandHandler/FilesDiscoveredHandler.php), Any | `library.files_discovered` | Scaled `catalog`; ingestion/probing/persistence, cross-context Catalog handler |
 | `Metadata/Application/Command/ExtractAlbumCoverCommand.php` | `async` | [ExtractAlbumCoverHandler](../src/Metadata/Application/CommandHandler/ExtractAlbumCoverHandler.php), `async` | `metadata.extract_album_cover` | Scaled `media`; file/image conversion with CPU and memory reservation |
-| `Metadata/Application/Message/SyncSongMessage.php` | `swoole_task` | [SyncSongHandler](../src/Metadata/Application/MessageHandler/SyncSongHandler.php), `swoole_task` | `metadata.sync_song` | Scaled `metadata`; provider I/O |
-| `Metadata/Application/Message/SyncAlbumMessage.php` | `swoole_task` | [SyncAlbumHandler](../src/Metadata/Application/MessageHandler/SyncAlbumHandler.php), `swoole_task` | `metadata.sync_album` | Scaled `metadata`; provider I/O |
-| `Metadata/Application/Message/SyncLibraryMessage.php` | `swoole_task` | [SyncLibraryHandler](../src/Metadata/Application/MessageHandler/SyncLibraryHandler.php), `swoole_task` | `metadata.sync_library` | Scaled `metadata`; bounded fan-out coordination |
+| `Metadata/Application/Message/SyncSongMessage.php` | `swoole_task` | [SyncSongHandler](../src/Metadata/Application/MessageHandler/SyncSongHandler.php), `swoole_task` and `async` | `metadata.sync_song` | Scaled `metadata`; provider I/O |
+| `Metadata/Application/Message/SyncAlbumMessage.php` | `swoole_task` | [SyncAlbumHandler](../src/Metadata/Application/MessageHandler/SyncAlbumHandler.php), `swoole_task` and `async` | `metadata.sync_album` | Scaled `metadata`; provider I/O |
+| `Metadata/Application/Message/SyncLibraryMessage.php` | `swoole_task` | [SyncLibraryHandler](../src/Metadata/Application/MessageHandler/SyncLibraryHandler.php), `swoole_task` and `async` | `metadata.sync_library` | Scaled `metadata`; bounded fan-out coordination |
 | `Notification/Application/DTO/SendEmailCommand.php` | `swoole_task` | [SendEmailHandler](../src/Notification/Application/Handler/SendEmailHandler.php), `swoole_task` and `async` | `notification.send_email` | Scaled `notifications`; provider I/O and delivery limits |
 | `Notification/Application/DTO/SendPushCommand.php` | `swoole_task` | [SendPushHandler](../src/Notification/Application/Handler/SendPushHandler.php), `swoole_task` and `async` | `notification.send_push` | Scaled `notifications`; subscription fan-out/provider I/O |
 | `Media/Application/Command/PruneMissingImagesCommand.php` | `swoole_task` | [PruneMissingImagesHandler](../src/Media/Application/CommandHandler/PruneMissingImagesHandler.php), Any | `media.prune_missing_images` | Scaled `catalog`; filesystem/persistence maintenance |
-| `Radio/Application/Command/SyncCountryStationsCommand.php` | `swoole_task` | [SyncCountryStationsHandler](../src/Radio/Application/CommandHandler/SyncCountryStationsHandler.php), `swoole_task` | `radio.sync_country_stations` | Scaled `metadata`; remote provider I/O |
+| `Radio/Application/Command/SyncCountryStationsCommand.php` | `swoole_task` | [SyncCountryStationsHandler](../src/Radio/Application/CommandHandler/SyncCountryStationsHandler.php), `swoole_task` and `async` | `radio.sync_country_stations` | Scaled `metadata`; remote provider I/O |
 | `Scheduler/Application/Command/ExecuteScheduledJobCommand.php` | `swoole_task` | [ExecuteScheduledJobHandler](../src/Scheduler/Application/CommandHandler/ExecuteScheduledJobHandler.php), Any | `scheduler.execute_job` | Fixed scheduler service dispatches occurrences; actual payload selects queue/resource class |
 | `Shared/Domain/Event/Outbox/RelayOutboxCommand.php` | `swoole_task` | [RelayOutboxHandler](../src/Shared/Domain/Event/Outbox/RelayOutboxHandler.php), Any | `outbox.relay` | Fixed outbox service; direct bounded relay calls, not recursive relay queue |
 | `Transcode/Application/Command/UpdateTranscodePositionCommand.php` | `swoole_task` | [UpdateTranscodePositionHandler](../src/Transcode/Application/CommandHandler/UpdateTranscodePositionHandler.php), Any | `transcode.update_position` | Scaled `control` with reserved capacity; persist position and signal session owner |
@@ -153,8 +153,8 @@ Reserved control capacity is required, but its measured minimum and every family
 limit remain implementation configuration, not asserted defaults here.
 
 1. Change routing and transport-restricted handlers together. Metadata song/album/
-   library and radio handlers currently accept only `swoole_task`; the Redis fallback
-   can place them on `async`, whose received transport will not match registration.
+   library and radio handlers now accept both `swoole_task` and `async`, so Redis
+   fallback deliveries match their actual received transport.
    Preserve and drain old `messages`, retries and failures during cutover.
 2. [SwooleTaskWithRedisFallbackSender](../src/Shared/Infrastructure/Messenger/SwooleTaskWithRedisFallbackSender.php)
    builds a task envelope with `ReceivedStamp` and sends that envelope to Redis if
@@ -212,6 +212,18 @@ image/album link after the same handler retries. DAMA rollback is explicitly dis
 for that case. Focused production PHPStan and syntax checks pass. These checks do
 not certify uncertain-commit reconciliation, concurrent extraction serialization,
 or the future supervisor's resource and shutdown behavior.
+
+The next delivery correction adds explicit `async` registration to the song,
+album, library and radio synchronization handlers while retaining `swoole_task`.
+Sixteen registration cases compile their actual attributes through Symfony's
+configurator and MessengerPass, checking both transports, unrelated-transport
+rejection and synchronous deduplication. Four real Redis fallback cases verify
+JSON payload preservation, production-handler invocation and acknowledgement;
+metadata ports return missing/empty aggregates to avoid external provider calls.
+The combined unit/rule suite now passes 3,122 tests with 8,772 assertions, and the
+messaging runner passes 26 tests with 389 assertions. Focused production PHPStan
+passes. Provider integration and future queue-family registration remain separate
+gates.
 
 This is source inspection of routing, all application Bootable implementations,
 timer/coroutine creation sites, tagged CPU handlers, scheduler providers, private

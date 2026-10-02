@@ -22,6 +22,7 @@ final class SyncLibraryHandler
     }
 
     #[AsMessageHandler(fromTransport: 'swoole_task')]
+    #[AsMessageHandler(fromTransport: 'async')]
     public function __invoke(SyncLibraryMessage $message): void
     {
         $libraryId = $message->libraryId;
