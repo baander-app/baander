@@ -298,6 +298,33 @@ Dependency versions remain unchanged; production Docker dependency setup now
 copies the patch lockfile. Composer validation has only the existing loose-version
 constraint warnings. This does not certify the full production image build.
 
+The independent supervisor's lifecycle primitives now live in
+`src/Shared/Infrastructure/Worker/`: a direct-child process adapter, a local
+duplicate-start lock and a bounded restart policy. Children use fresh argv-based
+execution with inherited output descriptors, so logs are not accumulated in the
+supervisor. Monotonic polling supports concurrent TERM drains, deadline escalation
+to KILL and one-time reaping with preserved exit/signal information. The restart
+policy has capped exponential backoff, jitter, a sliding attempt budget and explicit
+exhaustion. These objects are excluded from automatic service registration; their
+configuration and lifetime belong to the future supervisor.
+
+The lock uses a persistent inode in a trusted directory and close-on-exec handles.
+A real regression reproduced a live child retaining the lock after its supervisor
+was killed, then passed for both creation and reopening after the handle fix.
+The combined unit/rule suite passes 3,211 tests with 11,706 assertions, including
+50 new lifecycle/lock/restart cases. Focused production PHPStan passes. Process
+tests exercise real children, cooperative and ignored TERM, independent drain
+deadlines, signal exits and 32 MiB of output without supervisor buffering.
+
+This is a stage-2 foundation, not a deployment supervisor. No command or deployment
+configuration uses the primitives yet. Local locking does not provide the fenced
+deployment lease, predecessor containment, parent-death cleanup or descendant
+resource accounting required by the plan. The direct-child adapter's destructor
+is last-resort cleanup, not a bounded process-tree shutdown guarantee. Those
+contracts, role-specific boot, health aggregation and scheduler/media ownership
+must be implemented before the two-command cutover. Defaults are policy examples,
+not measured production capacity.
+
 This is source inspection of routing, all application Bootable implementations,
 timer/coroutine creation sites, tagged CPU handlers, scheduler providers, private
 outbox wiring and deployment programs. GitNexus 1.6.12 query/context resolved the
@@ -312,6 +339,7 @@ Before selecting defaults, measure idle/active RSS and native memory for each ch
 CPU time, FFmpeg/device concurrency, queue wait/service rates, real process ancestry,
 result-store limits and shutdown under load in the deployment image. The focused
 corrections above do not complete stage 1: durable execution ownership and queue
-admission still require implementation. Keep independent-role, legacy-drain,
-failure/retry, occurrence recovery,
-shared admission and playback acceptance gates from the redesign plan.
+admission still require implementation. Keep independent-role, failure/retry,
+occurrence recovery, shared admission and playback acceptance gates from the
+redesign plan. There are no production deployments, so hypothetical legacy-queue
+migration machinery is not required.

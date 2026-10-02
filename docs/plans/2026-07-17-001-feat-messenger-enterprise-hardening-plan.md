@@ -301,9 +301,10 @@ last web-owned background service has moved.
    scheduler lifetime from HTTP. Test startup failure and duplicate invocation.
 3. **Queue separation and autoscaling.** Change routing and handler registration
    together, preserve wire compatibility, implement the bounded policy above, and
-   remove background Swoole task routes as their consumers migrate. Drain legacy
-   queues with an internal supervised compatibility consumer until empty; do not
-   abandon already accepted messages during deployment.
+   remove background Swoole task routes as their consumers migrate. There are no
+   production deployments, so do not build a legacy compatibility consumer for
+   hypothetical queues. Protect local developer data and test accepted-message
+   recovery across the supported runtime's restarts.
 4. **Media ownership.** Replace web-owned pool/session IPC with the worker service
    contract. Test playback/control, cancellation, reconnect and recovery. Enable
    HTTP-worker recycling only after child-lifetime regressions pass.
