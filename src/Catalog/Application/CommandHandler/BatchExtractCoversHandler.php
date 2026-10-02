@@ -24,11 +24,11 @@ final class BatchExtractCoversHandler
     public function __invoke(BatchExtractCoversCommand $command): int
     {
         $limit = 500;
-        $offset = 0;
+        $after = null;
         $dispatched = 0;
 
         while (true) {
-            $ids = $this->albumRepository->findCoverlessAlbumIds($limit, $offset);
+            $ids = $this->albumRepository->findCoverlessAlbumIdsAfter($after, $limit);
 
             if ($ids === []) {
                 break;
@@ -52,7 +52,7 @@ final class BatchExtractCoversHandler
                 }
             }
 
-            $offset += $limit;
+            $after = $ids[array_key_last($ids)];
         }
 
         $this->logger->info('Batch cover extraction completed', [

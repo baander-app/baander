@@ -271,6 +271,33 @@ final class AlbumRepository implements AlbumRepositoryInterface
     }
 
     /**
+     * @return list<Uuid>
+     */
+    public function findCoverlessAlbumIdsAfter(?Uuid $after = null, int $limit = 500): array
+    {
+        if ($limit < 1) {
+            throw new \InvalidArgumentException('Coverless album page size must be positive.');
+        }
+
+        $qb = $this->entityManager
+            ->getRepository(AlbumEntity::class)
+            ->createQueryBuilder('a')
+            ->select('a.id')
+            ->where('a.coverImage IS NULL')
+            ->orderBy('a.id', 'ASC')
+            ->setMaxResults($limit);
+
+        if ($after !== null) {
+            $qb->andWhere('a.id > :after')->setParameter('after', $after, 'uuid');
+        }
+
+        /** @var list<string> $ids */
+        $ids = $qb->getQuery()->getSingleColumnResult();
+
+        return array_map(static fn (string $id): Uuid => Uuid::fromString($id), $ids);
+    }
+
+    /**
      * @return Uuid[]
      */
     public function findCoverlessAlbumIdsByLibrary(Uuid $libraryId): array

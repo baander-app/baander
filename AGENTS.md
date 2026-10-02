@@ -34,6 +34,11 @@ Audit, remedy, and verify affected code; explain applicable exceptions. Do not
 ignore findings or expand into unrelated schema rewrites. This does not change
 the registry's SQLite/rqlite architecture.
 
+There are no production deployments (confirmed 2026-10-02). Schema redesigns and
+migration-history rewrites are allowed when justified by the task; do not preserve
+compatibility for hypothetical deployed data. Keep fresh-install tests and protect
+local user data unless its reset is authorized.
+
 Delegate substantial PostgreSQL work to the [postgres specialist](.codex/agents/postgres.toml).
 If named roles are unavailable, give a worker that profile's instructions. It
 maintains the skill's extension inventory from verified discoveries during tasks;

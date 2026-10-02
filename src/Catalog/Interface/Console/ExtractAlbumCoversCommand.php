@@ -6,7 +6,6 @@ namespace App\Catalog\Interface\Console;
 
 use App\Catalog\Domain\Repository\AlbumRepositoryInterface;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
-use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -42,11 +41,11 @@ final class ExtractAlbumCoversCommand extends Command
         $io->info(sprintf('Found %d album(s) without cover art.', $total));
 
         $limit = 500;
-        $offset = 0;
+        $after = null;
         $dispatched = 0;
 
         while (true) {
-            $ids = $this->albumRepository->findCoverlessAlbumIds($limit, $offset);
+            $ids = $this->albumRepository->findCoverlessAlbumIdsAfter($after, $limit);
 
             if ($ids === []) {
                 break;
@@ -58,7 +57,7 @@ final class ExtractAlbumCoversCommand extends Command
             }
 
             $io->text(sprintf('  Dispatched %d / %d', $dispatched, $total));
-            $offset += $limit;
+            $after = $ids[array_key_last($ids)];
         }
 
         $io->success(sprintf('Dispatched %d cover extraction job(s).', $dispatched));

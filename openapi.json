@@ -5227,7 +5227,7 @@
                     "Album Cover"
                 ],
                 "summary": "Extract cover art for all albums missing one",
-                "description": "Dispatches an async batch job to extract embedded cover art from audio files for all albums without a cover image.",
+                "description": "Queues individual extraction jobs for embedded cover art from audio files for all albums without a cover image.",
                 "operationId": "post_extract_covers_app_catalog_interface_extractcovers__invoke",
                 "responses": {
                     "202": {

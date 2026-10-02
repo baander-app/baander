@@ -13335,7 +13335,7 @@ export const useDeleteArtistCoverDelete = <TError = ErrorType<ApiError>,
     }
 
 /**
- * Dispatches an async batch job to extract embedded cover art from audio files for all albums without a cover image.
+ * Queues individual extraction jobs for embedded cover art from audio files for all albums without a cover image.
  * @summary Extract cover art for all albums missing one
  */
 export type postExtractCoversAppCatalogInterfaceExtractcoversInvokeResponse202 = {

@@ -23,6 +23,7 @@ bash scripts/test-unit-container.sh
 bash scripts/test-messaging-container.sh
 bash scripts/test-functional-container.sh tests/Functional/Controller/FavoritesControllerTest.php
 bash scripts/test-functional-container.sh tests/Integration/CoverExtractionPersistenceTest.php
+bash scripts/test-functional-container.sh tests/Integration/CoverlessAlbumKeysetTest.php
 ```
 
 These require Docker and installed Composer dependencies. The unit runner uses

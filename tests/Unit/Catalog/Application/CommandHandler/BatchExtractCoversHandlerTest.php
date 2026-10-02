@@ -23,7 +23,8 @@ final class BatchExtractCoversHandlerTest extends TestCase
     {
         $ids = [Uuid::v7(), Uuid::v7(), Uuid::v7()];
         $repository = $this->createMock(AlbumRepositoryInterface::class);
-        $repository->expects($this->once())->method('findCoverlessAlbumIds')->with(500, 0)->willReturn($ids);
+        $repository->expects($this->never())->method('findCoverlessAlbumIds');
+        $repository->expects($this->once())->method('findCoverlessAlbumIdsAfter')->with(null, 500)->willReturn($ids);
         $failure = new RuntimeException('Cover queue unavailable');
         $bus = $this->createMock(MessageBusInterface::class);
         $attempted = [];
@@ -62,17 +63,18 @@ final class BatchExtractCoversHandlerTest extends TestCase
         yield 'warning logger unavailable' => [true];
     }
 
-    public function testSuccessfulFanoutReturnsAcceptedCountAcrossCurrentOffsetPages(): void
+    public function testSuccessfulFanoutReturnsAcceptedCountAcrossCursorPages(): void
     {
-        // This pins existing pagination behavior; it does not certify shrinking-set safety.
         $ids = array_map(static fn (): Uuid => Uuid::v7(), range(1, 501));
         $repository = $this->createMock(AlbumRepositoryInterface::class);
-        $offsets = [];
-        $repository->expects($this->exactly(3))->method('findCoverlessAlbumIds')->willReturnCallback(
-            static function (int $limit, int $offset) use ($ids, &$offsets): array {
+        $cursors = [];
+        $repository->expects($this->never())->method('findCoverlessAlbumIds');
+        $repository->expects($this->exactly(3))->method('findCoverlessAlbumIdsAfter')->willReturnCallback(
+            static function (?Uuid $after, int $limit) use ($ids, &$cursors): array {
                 self::assertSame(500, $limit);
-                $offsets[] = $offset;
-                return array_slice($ids, $offset, $limit);
+                $cursors[] = $after;
+                $start = $after === null ? 0 : array_search($after, $ids, true) + 1;
+                return array_slice($ids, $start, $limit);
             },
         );
         $bus = $this->createMock(MessageBusInterface::class);
@@ -92,6 +94,48 @@ final class BatchExtractCoversHandlerTest extends TestCase
 
         self::assertSame(501, $count);
         self::assertSame($ids, $accepted);
-        self::assertSame([0, 500, 1000], $offsets);
+        self::assertSame([null, $ids[499], $ids[500]], $cursors);
     }
+    #[DataProvider('coverlessSetChanges')]
+    public function testEveryOriginalAlbumIsDispatchedOnceWhileTheCoverlessSetChanges(bool $shrinks): void
+    {
+        $ids = array_map(static fn (): Uuid => Uuid::v7(), range(1, 501));
+        usort($ids, static fn (Uuid $left, Uuid $right): int => strcmp($left->toString(), $right->toString()));
+        $remaining = array_combine(array_map(static fn (Uuid $id): string => $id->toString(), $ids), $ids);
+        $repository = $this->createMock(AlbumRepositoryInterface::class);
+        $repository->expects($this->never())->method('findCoverlessAlbumIds');
+        $cursors = [];
+        $repository->expects($this->exactly(3))->method('findCoverlessAlbumIdsAfter')->willReturnCallback(
+            static function (?Uuid $after, int $limit) use (&$remaining, &$cursors): array {
+                self::assertSame(500, $limit);
+                $cursors[] = $after;
+                $page = array_values(array_filter($remaining, static fn (Uuid $id): bool => $after === null || strcmp($id->toString(), $after->toString()) > 0));
+                return array_slice($page, 0, $limit);
+            },
+        );
+        $accepted = [];
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects($this->exactly(501))->method('dispatch')->willReturnCallback(
+            static function (object $message) use (&$accepted, &$remaining, $shrinks): Envelope {
+                self::assertInstanceOf(ExtractAlbumCoverCommand::class, $message);
+                $id = $message->getAlbumId()->toString();
+                $accepted[] = $id;
+                if ($shrinks) {
+                    unset($remaining[$id]);
+                }
+                return new Envelope($message);
+            },
+        );
+        $count = (new BatchExtractCoversHandler($repository, $bus, new \Psr\Log\NullLogger()))(new BatchExtractCoversCommand());
+        self::assertSame(501, $count);
+        self::assertSame(array_map(static fn (Uuid $id): string => $id->toString(), $ids), $accepted);
+        self::assertSame([null, $ids[499], $ids[500]], $cursors);
+    }
+
+    public static function coverlessSetChanges(): iterable
+    {
+        yield 'accepted jobs immediately acquire covers' => [true];
+        yield 'albums permanently remain coverless' => [false];
+    }
+
 }

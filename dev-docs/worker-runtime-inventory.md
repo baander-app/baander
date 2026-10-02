@@ -97,10 +97,13 @@ to Redis.
 
 Batch cover dispatch stops on the first rejected dispatch and preserves its
 original exception if diagnostics also fail. Earlier accepted messages may run
-again when the batch is retried. Its current offset pagination can still skip
-albums when completed extractions shrink the coverless set; the standalone
-extraction command uses the same pattern. Replace both loops with a bounded
-keyset query, with PostgreSQL regression coverage, before certifying bulk coverage.
+again when the batch is retried. Both the handler and standalone extraction command
+now use pages of 500 ordered by UUID, advancing strictly beyond the last UUID.
+Completed extractions cannot shift an offset and skip remaining albums, and albums
+without embedded art do not prevent cursor advancement. This is a live traversal,
+not a snapshot: concurrent inserts or eligibility changes behind the cursor wait
+for a later run. The API controller dispatches the actual Catalog batch command;
+the coordinator runs synchronously and queues individual extraction jobs.
 
 Console execution uses
 [SchedulerConsolePoolWorker](../src/Scheduler/Infrastructure/Swoole/SchedulerConsolePoolWorker.php)
@@ -253,6 +256,15 @@ The full unit/rule runner passes 3,153 tests with 9,504 assertions; focused prod
 PHPStan passes. The ports and bus are test doubles: these tests do not certify
 cross-connection persistence visibility or bulk pagination under concurrent work.
 
+Cursor traversal and the API entry-point correction pass the combined unit/rule
+suite: 3,161 tests with 11,564 assertions. Five PostgreSQL tests (34 assertions) use
+the production kernel/repository and a separate writer to change cover eligibility
+between pages, verify permanent coverless rows terminate, and check covered,
+missing/deleted cursor and strict UUID boundaries. The fresh and repeat migration
+runs pass; no schema change was needed. Focused production PHPStan passes with a
+512-MiB analysis limit. API/client changes outside the import fix are matching
+description-only corrections, with response schemas and generated types unchanged.
+
 This is source inspection of routing, all application Bootable implementations,
 timer/coroutine creation sites, tagged CPU handlers, scheduler providers, private
 outbox wiring and deployment programs. GitNexus 1.6.12 query/context resolved the
@@ -266,7 +278,7 @@ or process-parentage claim was validated by a runtime load test.
 Before selecting defaults, measure idle/active RSS and native memory for each child,
 CPU time, FFmpeg/device concurrency, queue wait/service rates, real process ancestry,
 result-store limits and shutdown under load in the deployment image. The focused
-corrections above do not complete stage 1: stable batch pagination and durable
-execution ownership still require remediation. Keep independent-role, legacy-drain,
+corrections above do not complete stage 1: durable execution ownership and queue
+admission still require implementation. Keep independent-role, legacy-drain,
 failure/retry, occurrence recovery,
 shared admission and playback acceptance gates from the redesign plan.

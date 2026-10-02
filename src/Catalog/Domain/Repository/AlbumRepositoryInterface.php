@@ -50,6 +50,11 @@ interface AlbumRepositoryInterface extends Searchable
     public function findCoverlessAlbumIds(int $limit = 500, int $offset = 0): array;
 
     /**
+     * @return list<Uuid>
+     */
+    public function findCoverlessAlbumIdsAfter(?Uuid $after = null, int $limit = 500): array;
+
+    /**
      * @return Uuid[]
      */
     public function findCoverlessAlbumIdsByLibrary(Uuid $libraryId): array;
