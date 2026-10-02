@@ -25,11 +25,11 @@ A user-specified voice overrides these defaults.
   instructions focused on running an instance; explain implementation details where
   the reader needs them to understand or develop the system.
 - `docs-book/part-2-developer-guide/contributing.md` records documentation maintenance
-  rules. It names `.claude/rules/ddd-*.md` as the authoritative coding conventions and
+  rules. It names `.agents/rules/` as the authoritative coding conventions and
   describes regeneration of CLI documentation. Read the relevant source when editing
   derived guidance; flag disagreements rather than resolving them through rewording.
-- `docs-book/` and `dev-docs/` coexist. `CLAUDE.md` is maintained independently of the
-  documentation book. Editing one document does not authorize synchronizing the
+- `docs-book/` and `dev-docs/` coexist. `AGENTS.md` points agents to the canonical
+  rules and repository skills. Editing one document does not authorize synchronizing the
   others or changing application configuration, commands, API schemas, or code.
 - Preserve the distinction between proposed behavior in `docs/plans/` and implemented
   behavior in guides. Keep plan frontmatter, dates, status, acceptance criteria,

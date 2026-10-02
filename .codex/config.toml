@@ -1,0 +1,5 @@
+# Delegation workflow is defined in ../AGENTS.md.
+# Inherit model and reasoning defaults from the user's Codex configuration.
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 3

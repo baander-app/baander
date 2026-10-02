@@ -15,5 +15,5 @@ Documentation for Baander, a self-hosted media library server for music, movies,
 
 ## Other Resources
 
-- [CLAUDE.md](../CLAUDE.md) — AI coding assistant reference (Claude Code, Cursor, etc.). Overlaps with Part II but is maintained independently.
+- [AGENTS.md](../AGENTS.md) — Agent instructions and pointers to canonical rules and repository skills.
 - OpenAPI spec — available at `/api/doc` in dev mode, export via `app:export-openapi-spec`

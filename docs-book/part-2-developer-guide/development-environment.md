@@ -125,6 +125,6 @@ The `XDEBUG_VERSION` variable controls which Xdebug version is installed (defaul
 
 The web frontend lives in `ui/web/`. See the [Frontend Development](frontend-development.md) page for setup and commands.
 
-## Relationship to CLAUDE.md
+## Agent instructions
 
-This page is the canonical human-readable development guide. CLAUDE.md serves the same purpose for AI coding assistants (Claude Code, Cursor). They overlap but are maintained independently — changes to one don't automatically update the other.
+This page is the human-readable development guide. [AGENTS.md](../../AGENTS.md) gives agents repository instructions and links to canonical rules in `.agents/rules/`. Update the affected guide and rule when a convention changes so their requirements stay consistent.

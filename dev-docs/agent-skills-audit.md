@@ -1,0 +1,152 @@
+# Agent skills migration and code audit
+
+The October 2026 review replaces 32 local Claude skill entrypoints with ten
+maintained project skills, alongside `postgres-remediation` and `prose-fix`.
+The source tree was ignored by Git. Before retirement, it was archived with a
+SHA-256 file manifest under the operator's
+`~/.local/state/baander/retired-agent-config/` directory. Local permissions and
+vendored browser dependencies are not part of the migrated library.
+
+This is a bounded review of instructions against representative code and checks,
+not certification of the entire application. Existing violations and baseline
+entries do not authorize new violations. The recommendations below do not claim
+that application defects were repaired by this documentation migration.
+
+## Skill disposition
+
+Source names refer to the retired `.claude/skills` tree. Destinations are relative
+to `.agents/skills`; detailed procedures are loaded only when relevant.
+
+| Source entrypoint | Disposition and destination | Reason |
+|---|---|---|
+| architecture-guardian | Merge into architecture-review | Duplicate review flow; stale context inventory and wiring assumptions. |
+| boundary-review | Merge into architecture-review | Preserve boundary analysis; remove false Shared-layer assumptions. |
+| context-review-backend | Merge into architecture-review | Preserve semantic review; remove mandatory four-worker and obsolete tool flow. |
+| dddlint | Merge into architecture-review references | Heuristics need semantic verification, not automatic violations. |
+| context-analyzer | Merge into documentation-maintainer references | Preserve read-only inventory; discover nested layouts. |
+| entity-scaffold | Merge into backend-scaffold | Retain aggregate/mapping workflow with current persistence rules. |
+| endpoint-scaffold | Merge into backend-scaffold | Correct broken examples; preserve authorization and contract checks. |
+| cached-repository | Update, same name | Cache contracts and failure semantics need explicit verification. |
+| migrate-to-state-object | Update, same name | Useful migration; fixed class inventory is obsolete. |
+| migrate-application-to-port | Retire entrypoint; retain architecture-review reference | Named ApplicationService backlog is completed. |
+| context-review-frontend | Update as frontend-review | Actual styling, native worker requests, tests, and tooling differ. |
+| documentation-maintainer | Update, same name | Preserve code-derived documentation and handwritten sections. |
+| phpstorm-config-keeper | Merge into documentation-maintainer references | Overlaps IDE documentation refresh. |
+| update-command-docs | Merge into documentation-maintainer references | Preserve operator command documentation and read-only check mode. |
+| forgejo | Update, same name | Retain project integration; remove credential sourcing and fixed host assumptions. |
+| reli | Update, same name | Retain profiler workflow; accurately describe wrapper limitations. |
+| sync-github | Rewrite, same name, with tested helper | Old dry run modified refs; publishing must preserve local branches and detect remote races. |
+| feature-pipeline | Retire; replace companion delivery guide | Obsolete pi tools, CI bypass, branch-only checks, and local merge fallback. |
+| test-fix | Retire; preserve project details in testing guide | Generic loop duplicates debugging guidance; changed-file bookkeeping was incorrect. |
+| test-scaffold | Retire; preserve project details in testing guide | Generic recipes and confirmation gates add little; retain real fixture contracts. |
+| playwright-skill | Retire; retain project E2E guidance in testing guide | Use maintained browser tooling and project Playwright; old runner raced, installed dependencies, and swallowed failures. |
+| gitnexus-guide | Merge into gitnexus references | Preserve tool/schema guidance and actual CLI alternatives. |
+| gitnexus-cli | Merge into gitnexus references | Refresh must use index-only mode. |
+| gitnexus-exploring | Merge into gitnexus references | Preserve repository binding and incomplete-index caveats. |
+| gitnexus-debugging | Merge into gitnexus references | Preserve evidence-led flow tracing. |
+| gitnexus-impact-analysis | Merge into gitnexus references | Preserve UNKNOWN/partial-result handling and required impact reporting. |
+| gitnexus-refactoring | Merge into gitnexus references | Preserve semantic rename and change-scope review. |
+| gitnexus/gitnexus-cli | Retire duplicate | Older than top-level source. |
+| gitnexus/gitnexus-exploring | Retire duplicate | Older than top-level source. |
+| gitnexus/gitnexus-debugging | Retire duplicate | Older than top-level source. |
+| gitnexus/gitnexus-impact-analysis | Retire duplicate | Older than top-level source. |
+| gitnexus/gitnexus-refactoring | Retire duplicate | Older than top-level source. |
+
+The six coding-rule documents now live in `.agents/rules`. `AGENTS.md` supplies
+explicit loading pointers; directory placement does not imply automatic loading.
+The existing prose and PostgreSQL skills remain authoritative in their scopes.
+
+## Rule and code evidence
+
+Paths below are repository-relative. “Debt” means recommended application or
+checker work, not permission to copy the implementation into new scaffolds.
+
+| Finding and evidence | Classification | Adopted guidance or recommended remedy |
+|---|---|---|
+| `src/Playlist/Domain/Model/Playlist.php` and NotificationPreference retain positional reconstruction; User uses `register()`. | Intended migration exception | Prefer state objects for new aggregates; preserve legacy behavior and semantic factories. |
+| Notification commands/handlers use `Application/DTO` and `Application/Handler`. | Supported layout | Discover contracts recursively; do not require directory-only migrations. |
+| `PlaylistResource` maps a domain model, as the old resource rule prescribed, but Deptrac baselines that dependency. | Rule/check mismatch | Permit narrow presentation mapping; recommend narrow enforcement alignment. Keep repository injection prohibited. |
+| Catalog AlbumService consumes Media ports, while Deptrac rejects even these contracts. | Rule/check mismatch | Preserve ports/events as cross-context boundaries; recommend dedicated port allowances rather than entire-context exemptions. |
+| Auth repositories use multiple infrastructure paths and explicit cache aliases. | Stale instruction | Resolve full interface contracts and container wiring; resource registration does not ensure an unambiguous alias. |
+| Shared OutboxRepository imports DBAL; OutboxSubscriberPass is a compiler adapter in Domain. | Placement debt | Remove blanket Shared exemptions; propose moving adapters through ports in separate work. |
+| Shared Uuid wraps Symfony UID. | Narrow existing primitive boundary | Do not confuse use of an immutable primitive with permission for persistence, container, or serializer dependencies. |
+| Outbox uses internal integer identifiers; authentication entities retain timezone-free datetime mappings. | Overbroad policy plus persistence debt | Scope UUID defaults to domain identities; apply PostgreSQL remediation and forward migrations to actual defects. |
+| Web Button and NowPlayingBar use styled-components; web dependencies contain no Tailwind. | Stale instruction | Follow actual styling primitives and `ui/DESIGN.md`; do not adopt arbitrary existing design violations. |
+| Auth streaming worker forwards native requests; WASM loader fetches binaries. | Narrow platform exception | Shared Axios for ordinary API calls; explicit worker/asset request handling with credential-origin boundaries. |
+| Web tests exist under both source and test trees; Vite excludes E2E suites. | Stale instruction | Discover current tests/configuration; do not claim an empty test suite. |
+| Props-free components and React.ComponentProps intersections are correctly typed without named Props interfaces. | False-positive heuristic | Review actual types and behavior; do not require decorative interfaces or automatic memoization. |
+| Async::sleep selects coroutine/blocking behavior; child-process loops and CLI consumers use blocking sleeps. | Execution-context exception | Avoid blocking request coroutine work; allow deliberate CLI/child-process behavior. |
+| Unit/runtime container scripts isolate resources differently and have different timeout policies. | Overstated testing guarantees | Name the actual runner and its limits; independent-connection drills prove persistence visibility. |
+| Swoole task workers share a queue; comments do not implement workload affinity. | Stale operational explanation | Describe actual routing and verify production lifecycle settings separately. |
+
+## Recommended follow-up changes
+
+These are separate reviewable changes. No baseline expansion or suppression is a
+remedy. Priorities order investigation; they do not imply every static finding has
+been reproduced end to end.
+
+| Priority | Evidence | Proposed change and acceptance |
+|---|---|---|
+| High | `packages/baander-phpstan-rules/src/Rules/MapRequestPayloadObjectTypeRule.php` checks Node\\Name for bare object. A parsed-source probe returned Node\\Identifier and zero violations; existing tests manufacture Name nodes. | Fix DTO type enforcement using parsed-source RuleTestCase fixtures. Reject bare object and missing types; accept a real DTO, including imported attribute aliases. |
+| High | `CachedAccessTokenRepository::setRevoked()` uses cache get rather than unconditional replacement. Cached null remains a hit; active-save deletion can throw after DB persistence. | Reproduce with a real cache adapter, fix write/invalidation semantics, and test failures plus commit/rollback effects. DB fallback remains present; this review did not establish revoked-token acceptance. |
+| High | AddFavoriteRequest lacks Choice validation; the handler calls FavoriteType::from and a functional test characterizes HTTP 500. | Add executable validation and replace the characterization with the intended client-error contract. Verify through the firewall. |
+| Medium | Independent skill trial found NotBlank on UpdatePreferenceRequest.enabled and an undefined-key expression in PreferenceController's missing-filter path. | Reproduce disabling with false and reading without category/channel through the firewall; correct validation and optional-input handling. These are static findings, not executed endpoint failures. |
+| Medium | PlaylistResource documents publicId as UUID, while the shared PublicId generates a 21-character NanoID. | Correct identifier schemas and regenerate affected clients together; verify actual identifier formats in contract tests. |
+| Medium | useAudioPlayback destroys its service during cleanup but keeps an initialized guard; the app uses StrictMode. | Add a StrictMode setup/cleanup/replay regression, reproduce the lifecycle failure, and restore symmetric ownership. Static finding pending runtime reproduction. |
+| Medium | Independent trial of the actual player-store setters reproduced slider volume 40% but audio volume 80% after changing volume while muted and unmuting. | Add a store/audio integration regression and synchronize volume on unmute. This setter-level reproduction is not a browser playback test. |
+| Medium | The streaming worker emits SW_AUTH_EXPIRED; the bridge has no matching handling branch. | Trace expired streaming credentials end to end and add a browser regression before choosing the refresh/logout behavior. Static integration finding. |
+| Medium | ProcessExecutor calls Swoole before checking extension availability, omits the timeout in its coroutine branch, and omits proc_close on normal fallback completion. | Reproduce extension-absent, deadline, and normal cleanup behavior in isolated process tests; fix without weakening execution limits. |
+| Medium | Deptrac omits QoL, Radio, Scheduler, Session and ignores uncovered internal classes. | Add scoped collectors and allowed port/presentation edges; expose real violations and resolve them without expanding baselines. |
+| Medium | Shared adapter placement and controller cross-context repository dependencies remain. | Refactor one boundary at a time with impact analysis and integration coverage. Do not mass-move classes during skill migration. |
+| Medium | Functional fixtures use placeholder email domains; E2E defaults to baander.test. | Use baander.app names with mocked HTTP/DNS or explicitly routed disposable services; verify tests cannot contact production. |
+| Medium | App TypeScript configuration is not strict; Playwright is not in the web CI step. | Propose a scoped strictness migration and isolated browser CI gate; do not describe current checks as enforcing either. |
+| Medium | Existing timezone/identity mappings and production Swoole lifecycle settings need review. | Apply the PostgreSQL skill and measured runtime tests; do not rewrite applied migrations or promise bounded memory from comments. |
+| Low | Documentation check mode found no operator page/index entry for app:outbox:consume. | Document both relay stages, once/continuous modes, time-limit bounds, signals, and exit behavior from the command source. |
+
+## Verification and maintenance
+
+Migration verification completed:
+
+- All 12 skills passed the skill validator and appeared in fresh Codex discovery
+  after retirement. Local Markdown links in the skills, rules, and changed guides
+  resolved; diff whitespace checks passed.
+- The snapshot helper's reproducible suite passed 12 tests against temporary local
+  Git repositories. Run it with
+  `python3 .agents/skills/sync-github/scripts/test_sync_github.py`.
+- Independent snapshot review/trial verified preview and export preservation and
+  identified the missing source-commit guard. Apply now requires both the previewed
+  source commit and remote SHA; the suite verifies rejection before writes when
+  the source changes or the source pin is omitted.
+- Independent backend review/scaffold trials accepted resource mapping and internal
+  ports while reporting repository coupling and identifier-contract defects.
+- An independent frontend trial accepted native worker fetches and stable selectors,
+  passed targeted ESLint and 11 worker/bridge tests, and reported the separate
+  playback findings above. It did not run a browser or contact a live application.
+- Documentation check mode reported the missing outbox command page without changing
+  reviewed command documentation. Concurrent documentation edits by another worker
+  were accounted for rather than claiming the entire working tree was unchanged.
+- Index-only GitNexus analysis passed in a disposable fixture checkout without
+  recreating retired files or changing maintained instructions and a sentinel skill.
+
+Validate skill frontmatter and relative references, then run realistic independent
+trials against representative code. Skill reviews must distinguish an intentional
+exception from a defect, and report incomplete evidence rather than manufacture a
+passing result. Syntax validation alone is not behavioral verification.
+
+Test snapshot publishing against disposable local bare repositories only. Dry run
+must leave objects, refs, index, and worktree unchanged; apply must preserve local
+branches and dirty files and reject a stale expected remote SHA or source commit.
+The export contains every committed path, including any committed environment or
+development credential files; it has no automatic public-export filter. Review the
+exact source tree before publication. No production
+publishing is part of migration validation.
+
+Refresh GitNexus with `analyze --index-only`. Verify in a disposable checkout that
+it neither recreates the retired Claude files nor overwrites maintained skills or
+instructions. Keep ignore entries for retired local artifacts; they are defensive
+exclusions, not runtime dependencies.
+
+Use the [testing guide](../docs-book/part-2-developer-guide/testing.md),
+[architecture rules](../.agents/rules/architecture-rules.md), and
+[frontend rules](../.agents/rules/frontend.md) as maintained entrypoints. Update this
+report's findings when the corresponding code fixes are independently verified.

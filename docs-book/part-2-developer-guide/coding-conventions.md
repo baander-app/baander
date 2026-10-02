@@ -1,6 +1,6 @@
 # Coding Conventions
 
-This page documents the core patterns used across the Baander codebase. These conventions are derived from the authoritative rules files in `.claude/rules/ddd-*.md`.
+This page documents the core patterns used across the Baander codebase. These conventions are derived from the authoritative rules files in [`.agents/rules/`](../../.agents/rules/). [AGENTS.md](../../AGENTS.md) points agents to the applicable rules.
 
 ## Domain Models
 

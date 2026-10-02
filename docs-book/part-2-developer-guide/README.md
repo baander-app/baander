@@ -20,7 +20,7 @@ Understand the architecture, write code following project conventions, and contr
 | [CQRS and Messaging](cqrs-and-messaging.md) | Commands, handlers, domain events, and async processing |
 | [Search](search.md) | PGroonga full-text search, making a context searchable |
 | [Testing](testing.md) | PHPUnit suites, conventions, and code examples |
-| [Frontend Development](frontend-development.md) | React + TypeScript + Vite + Tailwind CSS v4 |
+| [Frontend Development](frontend-development.md) | React + TypeScript + Vite + styled-components |
 
 ## Bounded Contexts
 
@@ -60,4 +60,4 @@ Understand the architecture, write code following project conventions, and contr
 ## See Also
 
 - [Part I — Operator's Guide](../part-1-operator-guide/README.md) — Prerequisite reading for developers (you need to run the app before you can develop on it).
-- [CLAUDE.md](../../CLAUDE.md) — AI coding assistant reference. Overlaps with this guide but is maintained independently.
+- [AGENTS.md](../../AGENTS.md) — Agent instructions and pointers to canonical rules and repository skills.

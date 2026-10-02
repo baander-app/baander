@@ -8,6 +8,10 @@ description: "Baander UI design language. Binding rules for all frontend impleme
 **Audience:** Anyone writing frontend code for Baander.
 **Status:** Authoritative. When in doubt, this document wins.
 
+The product requirements below govern the web implementation. Implement them
+with styled-components, shared UI primitives, and theme tokens as described in
+`.agents/rules/frontend.md`; existing code deviations are not design exceptions.
+
 ---
 
 ## Philosophy
@@ -37,31 +41,31 @@ The main content area adapts to context — it is not a fixed page. It reshapes 
 - No gradients. No drop shadows except on context menus and overlays (subtle, `0 4px 24px rgba(0,0,0,0.4)`).
 
 ### Border radius
-- Cards: `rounded-lg` (12px). Do not use `rounded-xl` (16px) for card surfaces.
-- Buttons/inputs: `rounded-lg` (8px) — set by shadcn primitives.
-- Overlays (dialogs, popovers): `rounded-xl` (16px) — set by shadcn primitives.
-- Context menus: `rounded-md` (6px) — set by shadcn primitives.
+- Cards: 12px radius. Do not use 16px for card surfaces.
+- Buttons/inputs: 8px radius — set by shared primitives.
+- Overlays (dialogs, popovers): 16px radius — set by shared primitives.
+- Context menus: 6px radius — set by shared primitives.
 - Do not invent new radius values.
 
 ### Spacing
-- Page padding: `24px` (`px-6`) — applied by each page, not the AppShell.
-- Section gap: `32px` (`gap-8`)
-- Item gap: `16px` (`gap-4`) for grids, `2px` (`gap-0.5`) for lists
-- Compact mode lists: `4px` vertical padding (`py-1`)
-- Header height: `48px` (`h-12`)
+- Page padding: `24px` — applied by each page, not the AppShell.
+- Section gap: `32px`
+- Item gap: `16px` for grids, `2px` for lists
+- Compact mode lists: `4px` vertical padding
+- Header height: `48px`
 - Context panel width: `360px` max
-- Do not invent gap values. Use `gap-4` (16px), `gap-6` (24px), or `gap-8` (32px).
+- Do not invent gap values. Use 16px, 24px, or 32px.
 
 ---
 
 ## Typography
 
 - **Font:** Inter (`var(--font-sans)`)
-- **Tracking:** `-0.01em` (`tracking-tight` on headings)
-- **Body:** `14px` / `0.875rem` (`text-sm`)
-- **Labels:** `11px` / `0.6875rem` (`text-[11px]`), uppercase, `tracking-wider`, `font-medium`
+- **Tracking:** `-0.01em` on headings
+- **Body:** `14px` / `0.875rem`
+- **Labels:** `11px` / `0.6875rem`, uppercase, wider tracking, medium weight
 - **Muted text:** `var(--color-muted-foreground)` (`#8b8d97`)
-- **Headings:** semibold (`font-semibold`), never bold
+- **Headings:** semibold, never bold
 - **Monospace:** JetBrains Mono for metadata values (bitrate, format, durations, IDs)
 
 ---
@@ -69,7 +73,8 @@ The main content area adapts to context — it is not a fixed page. It reshapes 
 ## Color
 
 ### Static palette
-Use CSS variables from `app.css`. Never hardcode hex values.
+Use theme CSS variables emitted by `ui/web/src/shared/theme/GlobalStyles.tsx` and
+the design-token CSS imported by `ui/web/src/index.css`. Never hardcode hex values.
 
 | Token | Use |
 |-------|-----|
@@ -142,14 +147,15 @@ Motion communicates *where things went*, not *how fancy the UI is*.
 - If you can name the animation, it's too slow.
 - No bounces. No overshoots. No elastic.
 - Selection must feel instant — zero delay between input and visual response.
-- CSS: `transition-[opacity,transform] duration-[80ms] ease-out`
+- CSS: `transition-property: opacity, transform; transition-duration: 80ms; transition-timing-function: ease-out`
 
 ---
 
 ## Components
 
 ### Primitives
-Use shadcn/ui components from `@/shared/components/ui/`:
+Use shared UI components from `@/shared/components/ui/`; their styling uses
+styled-components and their accessible interactions retain Radix primitives:
 - `Button` for all interactive buttons. Never raw `<button>`.
 - `ContextMenu` for right-click menus.
 - `Dialog` for modals (playlist picker, metadata editor).
@@ -185,12 +191,12 @@ When every item has an icon, none of them stand out. A sea of icons is visual no
 
 ### Loading states
 - Skeleton placeholders that match the layout of the loaded content.
-- Skeleton color: `var(--color-muted)` with `animate-pulse`.
+- Skeleton color: `var(--color-muted)` with the shared Skeleton's pulse animation.
 - Never show empty state while loading.
 
 ### Error states
 - Error message in `var(--color-destructive)`.
-- Retry button (shadcn `Button variant="ghost"`).
+- Retry button (shared `Button variant="ghost"`).
 - Never silently show empty state on error.
 
 ### Empty states
@@ -236,8 +242,8 @@ View mode preference persists across sessions (Zustand + localStorage).
 | Anti-pattern | Instead |
 |-------------|---------|
 | `as any` type casts | Define proper interfaces. Use generated types. |
-| `fetch()` directly | Use shared `AXIOS_INSTANCE` from `@/shared/api-client/axios-instance` |
-| Raw `<button>` elements | Use shadcn `Button` component |
+| Backend JSON API calls made with `fetch()` | Use shared `AXIOS_INSTANCE` from `@/shared/api-client/axios-instance` or generated hooks |
+| Raw `<button>` elements | Use shared `Button` component |
 | `../../..` cross-feature imports | Use `@/` path aliases |
 | `useState` for derived state | Use `useMemo` or derive in the render |
 | `getState()` calls in render body | Wrap in `useEffect` |
@@ -252,3 +258,8 @@ View mode preference persists across sessions (Zustand + localStorage).
 | Client-side filtering on paginated data | Server-side filtering via API params |
 | Inline component definitions in pages | Extract to `components/` |
 | Inline "Add to playlist"/"Add to queue" buttons on list rows | Play button replacing index number on hover; other actions in context menu |
+
+Native fetch exceptions are limited to service-worker request forwarding and
+streaming interception, and binary/static asset loading such as WASM. They do
+not relax origin, client, credential, redirect, or authentication requirements.
+See `.agents/rules/frontend.md` for the implementation boundary.

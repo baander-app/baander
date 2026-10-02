@@ -1,0 +1,21 @@
+# {{COMMAND_NAME}}
+
+{{OPERATOR_OVERVIEW}}
+
+## Quick start
+
+```bash
+make exec cmd="php bin/console {{COMMAND_NAME}} {{SAFE_EXAMPLE_ARGUMENTS}}"
+```
+
+{{ARGUMENTS_SECTION_IF_PRESENT}}
+
+{{OPTIONS_SECTION_IF_PRESENT}}
+
+## Details
+
+{{BEHAVIOR_PREREQUISITES_AND_FAILURES}}
+
+## Exit codes
+
+{{EXIT_CODE_TABLE}}

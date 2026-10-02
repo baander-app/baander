@@ -66,17 +66,16 @@ When you change code, update the corresponding documentation:
 
 | Code Change | Documentation to Update |
 |-------------|------------------------|
-| Add or modify a CLI command | Run `/update-command-docs` to regenerate [CLI Reference](../part-1-operator-guide/commands/README.md) |
-| Change a DDD convention | Update `.claude/rules/ddd-*.md`, then regenerate [Coding Conventions](coding-conventions.md) |
+| Add or modify a CLI command | Use the [documentation-maintainer](../../.agents/skills/documentation-maintainer/SKILL.md) CLI mode to update [CLI Reference](../part-1-operator-guide/commands/README.md) |
+| Change a DDD convention | Update `.agents/rules/ddd-*.md`, then update [Coding Conventions](coding-conventions.md) |
 | Add or change an environment variable | Update `.env.example`, then update [Configuration](../part-1-operator-guide/configuration.md) |
 | Add or change an API endpoint | Update [API Reference](api-reference.md) |
 | Add a new bounded context | Update [Architecture Overview](architecture.md) and [Shared Kernel](shared-kernel.md) |
 | Change the build process | Update [Development Environment](development-environment.md) and [Getting Started](../part-1-operator-guide/getting-started.md) |
-| Add a CLI command | Run `/update-command-docs` to regenerate the [CLI Reference](../part-1-operator-guide/commands/README.md) |
 
 ### Convention Synchronization
 
-`.claude/rules/ddd-*.md` files are the authoritative source for coding conventions. When conventions change:
+The files in [`.agents/rules/`](../../.agents/rules/) are the authoritative source for coding conventions. [AGENTS.md](../../AGENTS.md) points agents to the applicable rules. When conventions change:
 
 1. Update the relevant rules file
 2. Regenerate `coding-conventions.md` from the rules files

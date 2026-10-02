@@ -1,6 +1,7 @@
 # Baander — Pi Quick Reference
 
-This file is auto-loaded by pi. CLAUDE.md contains the full rules; this is the cheat sheet.
+Pi loads this quick reference. Read [AGENTS.md](AGENTS.md) for project instructions
+and scoped coding rules; maintained skills live in `.agents/skills/`.
 
 ## Make commands
 | Command | Action |
@@ -12,7 +13,7 @@ This file is auto-loaded by pi. CLAUDE.md contains the full rules; this is the c
 | `./vendor/bin/paratest --processes auto --tmp-dir var` | Parallel tests |
 
 ## Forgejo
-- API: `http://192.168.50.151:3000/api/v1/repos/martin/baander`
-- Token: `FORGEJO_TOKEN` env var (from `~/.zshrc`)
+- Connection: configured API base and repository; inspect the current Git remote.
+- Token: supplied `FORGEJO_TOKEN` environment variable; do not source shell startup files.
 - CI: Forgejo Actions (`.forgejo/workflows/`)
-- Skill: `/forgejo`
+- Skill: [forgejo](.agents/skills/forgejo/SKILL.md)

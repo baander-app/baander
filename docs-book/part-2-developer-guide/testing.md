@@ -1,18 +1,32 @@
 # Testing
 
-Baander uses PHPUnit 13 with three test suites. Tests run inside the Docker container.
+Baander uses PHPUnit 13 with three test suites. Disposable container runners
+exercise the application's PHP runtime without using the development database
+or Redis instance. The Makefile commands remain available for a configured
+development test environment.
 
 ## Test Suites
 
 | Suite | Directory | Scope |
 |-------|-----------|-------|
-| **Unit** | `tests/Unit/` | Pure domain logic, no container, no framework |
+| **Unit** | `tests/Unit/` | Domain behavior and application/infrastructure contracts; no Symfony kernel boot |
 | **Functional** | `tests/Functional/` | With Symfony kernel container, database, and services |
-| **Integration** | `tests/Integration/` | External service integration tests |
+| **Integration** | `tests/Integration/` | Database, transport, and other integration contracts against configured test services |
 
 ## Running Tests
 
-All commands run inside the app container via `make exec`:
+For strict unit and messaging checks, run from the checkout:
+
+```bash
+bash scripts/test-unit-container.sh
+bash scripts/test-messaging-container.sh
+```
+
+These require Docker and installed Composer dependencies. The unit runner uses
+the application image with networking disabled. The messaging runner provisions
+disposable PostgreSQL and Redis for its selected transport and outbox integration
+tests. Both fail on PHPUnit notices and skipped tests. They do not run the whole
+functional suite. A configured development test environment can use `make exec`:
 
 ```bash
 # Run all tests
@@ -47,6 +61,8 @@ make exec cmd="XDEBUG_MODE=off ./vendor/bin/phpunit"
 - **Manual object construction** — tests build domain objects directly (e.g., `Album::create(...)`) rather than using factories. Zenstruck Foundry is available but not the default convention.
 - **Test file structure** mirrors `src/` — a test for `src/Catalog/Domain/Model/Album.php` lives in `tests/Unit/Catalog/Domain/Model/AlbumTest.php`.
 - **No mocks in domain tests** — unit tests exercise real domain logic. Mocks are reserved for infrastructure and external dependencies.
+- Use `createStub()` when configuring return values without interaction expectations; use `createMock()` when the test asserts calls. Strict runs treat PHPUnit notices as failures.
+- Use `baander.app` or its subdomains for test domains and email addresses. Keep HTTP/DNS mocked or explicitly routed to disposable local services; the project domain does not authorize production traffic. Preserve literal IP cases that test network boundaries. Some inherited fixtures still use other domains; do not copy those examples into new tests.
 
 ### Example: Unit Test (Domain Logic)
 
@@ -188,11 +204,41 @@ PostgreSQL `jsonb` stores numbers without type annotations. A whole-number float
 
 ### DAMA Transaction Isolation
 
-Each test is wrapped in a transaction that is rolled back on teardown. This means:
+Functional tests using the configured DAMA extension are wrapped in a transaction
+that is rolled back on teardown. This means:
 
 - **No cleanup needed** — inserted rows vanish automatically.
 - **Single connection** — all tests share one DB connection within a test run.
 - **`$client->disableReboot()`** — the base class calls this to prevent the kernel from rebooting between requests, which would break the transaction.
+
+This shared test connection cannot prove what another connection sees after a
+producer commits or rolls back. Production runtime drills use independent
+connections and disposable services for that purpose; their fixtures are not
+DAMA-wrapped functional tests.
+
+## Production Runtime Drills
+
+```bash
+timeout 180 bash scripts/test-worker-runtime-container.sh
+bash scripts/test-outbox-runtime-container.sh
+bash scripts/test-producer-runtime-container.sh
+```
+
+These run the production kernel and actual repositories against disposable
+PostgreSQL and Redis on isolated networks, with cleanup on exit. The worker
+drill checks the real consumer and Supervisor recovery. The outbox drill checks
+notification projections, receipts, channel handoffs, and replay after a lost
+acknowledgement. The producer drill rejects outbox writes, verifies rollback
+through a second connection, and retries through the same bus. It covers operator
+user creation, registration tokens/preferences, email verification token retention,
+and recovery after an ORM flush closes the entity manager. This is coverage of
+three auth producers, not every event producer or a whole-schema audit.
+
+Fixtures under `tests/Fixtures/` prepare and observe only those disposable
+databases. Do not invoke them against an application database. The runtime runners
+accept `BAANDER_TEST_IMAGE` and `BAANDER_TEST_POSTGRES_IMAGE`; CI sets
+`BAANDER_TEST_CHECKOUT_IN_IMAGE=1` to test the checkout already built into its image.
+Outbox and producer runners also enforce their own 180-second timeout.
 
 ### Example: Functional Test (Full Pattern)
 

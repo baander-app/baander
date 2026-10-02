@@ -1,75 +1,70 @@
-## Test domains
+# Project instructions
 
-Use `baander.app` or its subdomains for domain names in test code, fixtures,
-and test email addresses. Do not use placeholder domains
-such as `example.com`, `example.org`, or `example.net`. Keep HTTP and DNS mocked
-or explicitly routed to disposable local services; using the project domain does
-not authorize contacting production. Preserve literal IP-address cases needed
-to test networking and security boundaries.
+## Delegation
 
-## PostgreSQL
+Use subagents proactively for substantial, separable work; no further user request
+is needed. Keep small or tightly coupled tasks local. Start useful workers early,
+with at most three active workers across the team; the lead continues independent
+work. `.codex/config.toml` enables delegation and inherits user model defaults.
 
-When designing, reviewing, or changing PostgreSQL schemas, migrations, queries,
-or connection configuration, follow the PostgreSQL wiki's
-[Don't Do This](https://wiki.postgresql.org/wiki/Don%27t_Do_This) guidance, including
-its documented exceptions. Use the repository's
-[postgres-remediation skill](.agents/skills/postgres-remediation/SKILL.md) to audit
-affected code and prepare, implement, and verify remedies. Explain any applicable
-exception; do not silently ignore a finding or expand the task into unrelated
-schema rewrites. These PostgreSQL rules do not change the registry's SQLite/rqlite
-architecture.
+- Give concise briefs: objective, owned files or read-only scope, dependencies,
+  checks, and deliverable. Fork full history only when needed. All workers follow
+  these instructions and applicable skills.
+- Delegate exploration, implementation, and independent review as useful. Assign
+  non-overlapping edits and agree on interfaces first. Coordinate scope changes
+  and nested delegation; never overwrite others' work. Workers do not stage or
+  commit. The lead owns shared configuration, index refreshes, and integration.
+- Reuse workers, resolve dependencies by message, and avoid duplicate work.
+  Workers report files, evidence, check results, and blockers. The lead reviews
+  diffs and runs combined checks; repeat checks only for changes or unresolved
+  failures. Serialize expensive/shared-state tests or isolate their resources.
+- Report assignments and meaningful results in progress updates. If delegation
+  is unavailable, explain briefly and continue locally.
 
-<pi-intercom>
-Coordinate with other local pi sessions on related codebases. Use `/skill:pi-intercom` for patterns.
+## Tests and PostgreSQL
 
-**When:** Same codebase (parallel work), reference codebase (consulting patterns), related repos (shared libraries).
+Use `baander.app` or its subdomains in test code, fixtures, and email addresses;
+no placeholder domains. Mock HTTP/DNS or route to disposable local services,
+never production. Preserve literal IP cases for network/security tests.
 
-**Not when:** Unrelated codebases, trivial questions, or when you can proceed independently.
+For PostgreSQL schema, migration, query, and connection work, follow
+[Don't Do This](https://wiki.postgresql.org/wiki/Don%27t_Do_This) and use the
+[postgres-remediation skill](.agents/skills/postgres-remediation/SKILL.md).
+Audit, remedy, and verify affected code; explain applicable exceptions. Do not
+ignore findings or expand into unrelated schema rewrites. This does not change
+the registry's SQLite/rqlite architecture.
 
-**Principle:** Prefer `send` for notifications; `ask` only when blocked waiting for input.
-</pi-intercom>
+## Coding guidance
+
+For backend changes, read [architecture rules](.agents/rules/architecture-rules.md)
+and the relevant `ddd-*.md` reference in `.agents/rules/`. For web changes, read
+[frontend rules](.agents/rules/frontend.md) and `ui/DESIGN.md`. Use the
+[testing guide](docs-book/part-2-developer-guide/testing.md) for current runners.
+Treat documented exceptions narrowly; existing violations and baselines do not
+authorize new ones. Project skills live in `.agents/skills/`.
+
+## Other local sessions
+
+When installed, use `/skill:pi-intercom` to coordinate relevant parallel or related-repository
+sessions. Prefer `send`; use `ask` only when blocked. Skip unrelated work,
+trivial questions, and tasks you can proceed with independently.
 
 <!-- gitnexus:start -->
-# GitNexus — Code Intelligence
+## GitNexus
 
-This project is indexed by GitNexus as **baander** (36220 symbols, 82116 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+Repository: `baander`. Refresh with `node .gitnexus/run.cjs analyze --index-only`.
+Use the [GitNexus skill](.agents/skills/gitnexus/SKILL.md) for runner fallback and
+CLI equivalents. Index-only refresh preserves maintained instructions and skills.
 
-> Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
-
-## Always Do
-
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
-- **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "master"})`.
-- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
-- When exploring unfamiliar code, use `query({search_query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
-- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.
-- For security review, `explain({target: "fileOrSymbol"})` lists taint findings (source→sink flows; needs `analyze --pdg`).
-
-## Never Do
-
-- NEVER edit a function, class, or method without first running `impact` on it.
-- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
-- NEVER rename symbols with find-and-replace — use `rename` which understands the call graph.
-- NEVER commit changes without running `detect_changes()` to check affected scope.
-
-## Resources
-
-| Resource | Use for |
-|----------|---------|
-| `gitnexus://repo/baander/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/baander/clusters` | All functional areas |
-| `gitnexus://repo/baander/processes` | All execution flows |
-| `gitnexus://repo/baander/process/{name}` | Step-by-step execution trace |
-
-## CLI
-
-| Task | Read this skill file |
-|------|---------------------|
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+- Before editing any function, class, or method, **must** run
+  `impact({target: "symbolName", direction: "upstream"})`. Report callers,
+  affected processes, and risk; warn before HIGH/CRITICAL changes. Never ignore
+  these warnings.
+- Before committing, **must** run `detect_changes()` and verify expected scope.
+  For regression review: `detect_changes({scope: "compare", base_ref: "master"})`.
+- Explore unfamiliar flows with `query({search_query: "concept"})`; use
+  `context({name: "symbolName"})` for callers/callees. For security review use
+  `explain({target: "fileOrSymbol"})` (requires `analyze --pdg`).
+- Rename symbols with `rename`, never find-and-replace.
 
 <!-- gitnexus:end -->
