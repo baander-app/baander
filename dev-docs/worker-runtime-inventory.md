@@ -37,12 +37,21 @@ matching handler registration, explicit retry/failure policy, codec compatibilit
 and measured execution budget before activation.
 
 Redis currently uses stream `messages`, group `baander`, per-process consumer names,
-`delete_after_ack: true`, `stream_max_entries: 100000`, a 3600-second redelivery
+`delete_after_ack: true`, `stream_max_entries: 0`, a 3600-second redelivery
 timeout, a 60000-ms claim interval and three retries with exponential delay. Failed
 messages use a separate `failed_messages` stream/group `failed`. These settings
-apply to direct Redis and fallback traffic; they are not a retention or keepalive
-certification. Swoole task dispatch does not itself supply the same durable
-consumer-group/retry contract.
+apply to direct Redis and fallback traffic. Length-based trimming is disabled
+because it can remove unread and pending payloads. Existing consumer launchers
+request transport keepalive every 30 seconds. Swoole task dispatch does not itself
+supply the same durable consumer-group/retry contract. The current local busy
+heartbeat still ages out after an hour; renewable long-job health belongs in the
+supervisor lifecycle work.
+
+The installed Redis transport promotes delayed retries with separate `ZPOPMIN`
+and stream-add operations. A crash or rejected stream write between those steps
+can lose an accepted retry. Atomic or recoverable promotion, explicit admission
+limits and Redis crash persistence remain release gates; disabling stream trimming
+does not resolve those durability boundaries.
 
 ## Nested dispatch and durable delivery
 
@@ -264,6 +273,17 @@ missing/deleted cursor and strict UUID boundaries. The fresh and repeat migratio
 runs pass; no schema change was needed. Focused production PHPStan passes with a
 512-MiB analysis limit. API/client changes outside the import fix are matching
 description-only corrections, with response schemas and generated types unchanged.
+
+The retention regression reproduced actual pending-payload loss after 100,500
+successful sends with the previous 100,000-entry cap. With trimming disabled, the
+canonical messaging runner passes 28 tests with 613 assertions: all accepted IDs,
+including unread and pending entries, remain until acknowledgement. The test uses
+real production transport options and JSON delivery, then verifies acknowledgement
+cleanup. A separate case verifies transport keepalive protects the active owner and
+an abandoned delivery can be reclaimed with its original payload. Application-image
+probes confirm PCNTL alarm support with Swoole loaded in ordinary CLI mode. These
+checks do not certify Redis host-crash persistence, delayed-retry promotion or
+full supervisor shutdown and containment.
 
 This is source inspection of routing, all application Bootable implementations,
 timer/coroutine creation sites, tagged CPU handlers, scheduler providers, private

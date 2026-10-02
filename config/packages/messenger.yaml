@@ -7,7 +7,7 @@ framework:
             swoole_task:
                 dsn: 'swoole://task'
 
-            # Redis transport — fallback only when Swoole task queue is full
+            # Redis transport — durable async routes and Swoole fallback
             async:
                 dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
                 options:
@@ -15,7 +15,10 @@ framework:
                     group: baander
                     consumer: '%env(MESSENGER_CONSUMER_NAME)%'
                     delete_after_ack: true
-                    stream_max_entries: 100000
+                    # MAXLEN trims unread and pending deliveries indiscriminately.
+                    # Retain accepted entries until acknowledgement; admission and
+                    # Redis noeviction must reject new work under resource pressure.
+                    stream_max_entries: 0
                     redeliver_timeout: 3600
                     claim_interval: 60000
                 retry_strategy:
