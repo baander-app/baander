@@ -316,14 +316,37 @@ The combined unit/rule suite passes 3,211 tests with 11,706 assertions, includin
 tests exercise real children, cooperative and ignored TERM, independent drain
 deadlines, signal exits and 32 MiB of output without supervisor buffering.
 
-This is a stage-2 foundation, not a deployment supervisor. No command or deployment
-configuration uses the primitives yet. Local locking does not provide the fenced
-deployment lease, predecessor containment, parent-death cleanup or descendant
-resource accounting required by the plan. The direct-child adapter's destructor
-is last-resort cleanup, not a bounded process-tree shutdown guarantee. Those
-contracts, role-specific boot, health aggregation and scheduler/media ownership
-must be implemented before the two-command cutover. Defaults are policy examples,
-not measured production capacity.
+`WorkerSupervisor` now composes these primitives for a fixed admitted child set.
+It validates count and memory reservations before launching, preserves a separate
+restart budget per child, exposes sanitized lifecycle snapshots and requires
+external PID-matched heartbeat evidence for readiness. Loss of authority closes
+admission permanently and drains every child; a management failure attempts sibling
+shutdown before surfacing its original exception. Reservations are accounting,
+not enforcement of native memory or descendant limits.
+The combined application-image unit/rule suite passes 3,228 tests with 11,783
+assertions; focused production PHPStan passes. Seventeen supervisor cases cover
+real child exits/restarts, launch failure, restart exhaustion, admission budgets,
+PID-matched readiness, authority loss, concurrent drain and a restart-policy
+exception that must still stop a live sibling and preserve the original error.
+
+`scripts/test-worker-containment-container.sh` exercises this core as PID 1 in a
+dedicated container with a child and a TERM-ignoring descendant. TERM and supervisor
+SIGKILL both stop descendant activity and the container within the deadline,
+without privileged mode, host mounts or networking. Its one-CPU/256-MiB test limit
+is a fixture budget, not measured application capacity. Whole-container cleanup
+does not prove descendant cleanup before restarting an individual worker. Host
+systemd containment remains untested.
+
+This is a stage-2 foundation, not a deployment supervisor. No application command
+or deployment configuration uses it yet. Local locking does not provide the fenced
+deployment lease or proof that a predecessor is contained. Lease expiry alone must
+not authorize takeover. The direct-child adapter's destructor is last-resort
+cleanup, not a bounded process-tree shutdown guarantee. Before deployment wiring,
+bind heartbeat evidence to supervisor boot and child launch generation as well as
+PID, so PID reuse cannot validate stale evidence. Those contracts, per-child
+descendant containment, role-specific boot, health aggregation and scheduler/media
+ownership must be implemented before the two-command cutover. Defaults are policy
+examples, not measured production capacity.
 
 This is source inspection of routing, all application Bootable implementations,
 timer/coroutine creation sites, tagged CPU handlers, scheduler providers, private

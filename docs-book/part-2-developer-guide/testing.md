@@ -21,6 +21,7 @@ For strict unit and messaging checks, run from the checkout:
 ```bash
 bash scripts/test-unit-container.sh
 bash scripts/test-messaging-container.sh
+bash scripts/test-worker-containment-container.sh
 bash scripts/test-functional-container.sh tests/Functional/Controller/FavoritesControllerTest.php
 bash scripts/test-functional-container.sh tests/Integration/CoverExtractionPersistenceTest.php
 bash scripts/test-functional-container.sh tests/Integration/CoverlessAlbumKeysetTest.php
@@ -66,6 +67,15 @@ make exec cmd="./vendor/bin/phpunit -c phpunit.xml.dist --filter testCreateAlbum
 # Run with Xdebug off (faster)
 make exec cmd="XDEBUG_MODE=off ./vendor/bin/phpunit -c phpunit.xml.dist"
 ```
+
+The worker containment runner creates dedicated, disposable containers with one
+CPU, 256 MiB of memory, no networking, no added capabilities, and no host mounts.
+It runs the supervisor core as PID 1 with a child and a TERM-ignoring descendant.
+Both graceful TERM and supervisor SIGKILL must stop the container and descendant
+activity within the test deadline. The runner fails on unexpected exit status or
+OOM and removes its containers on exit. It tests the proposed container boundary;
+it does not certify per-child descendant cleanup on restart, host systemd behavior,
+deployment lease takeover, or measured production resource defaults.
 
 The functional runner creates an isolated PostgreSQL/Redis network, extracts the
 checkout into a fresh directory, and runs all migrations twice before executing the
