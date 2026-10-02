@@ -71,4 +71,6 @@ done
 docker_binary=$(command -v docker)
 endpoint=$(docker context inspect --format '{{.Endpoints.docker.Host}}')
 timeout 60s php tests/Fixtures/Worker/recover-deployment.php "$docker_binary" "$endpoint" "$predecessor_id" "$wrong_label_id"
+image_id=$(docker image inspect --format '{{.Id}}' "${BAANDER_TEST_IMAGE:-martinjuul/baander-app:latest}")
+timeout 60s php tests/Fixtures/Worker/create-deployment.php "$docker_binary" "$endpoint" "$image_id"
 echo 'PASS: real Docker + PostgreSQL external-controller recovery (not LeasedWorkerRuntime end to end)'

@@ -21,6 +21,25 @@ final class DoctrineDeploymentInventory
         }
     }
 
+    /** Commit one creation attempt before contacting Docker. Uncertain outcomes never permit a retry. */
+    public function claimCreate(DeploymentContainerRecipe $recipe): bool
+    {
+        return $this->operation(fn (): bool => $this->connection->executeStatement(<<<'SQL'
+            INSERT INTO worker_deployment_creations (namespace, boot_id, daemon_id, recipe_hash)
+            VALUES (:namespace, :boot, :daemon, :recipe)
+            ON CONFLICT DO NOTHING
+            SQL, ['namespace' => $recipe->namespace, 'boot' => $recipe->bootId, 'daemon' => $recipe->daemonId, 'recipe' => $recipe->fingerprint()]) === 1);
+    }
+
+    /** Reconciliation may observe the exact reserved recipe; matching never grants another create attempt. */
+    public function matchesCreate(DeploymentContainerRecipe $recipe): bool
+    {
+        return $this->operation(fn (): bool => $this->connection->fetchOne(<<<'SQL'
+            SELECT 1 FROM worker_deployment_creations
+            WHERE namespace = :namespace AND boot_id = :boot AND daemon_id = :daemon AND recipe_hash = :recipe
+            SQL, ['namespace' => $recipe->namespace, 'boot' => $recipe->bootId, 'daemon' => $recipe->daemonId, 'recipe' => $recipe->fingerprint()]) !== false);
+    }
+
     /** Register after creating a stopped container, before starting it. Exact retries are idempotent; no rebind is permitted. */
     public function register(DeploymentContainer $container): bool
     {

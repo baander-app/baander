@@ -109,7 +109,10 @@ controller startup and recovery, not a complete `LeasedWorkerRuntime` deployment
 The predecessor is created with restart disabled and remains unstarted until its
 inventory binding and one-shot start claim commit. The fixture checks visibility
 through an independent PostgreSQL connection at the real Docker start call, then
-verifies that a repeated controller start cannot restart the predecessor.
+verifies that a repeated controller start cannot restart the predecessor. A second
+fixture makes Docker create a real container and then discards its acknowledgment.
+It verifies durable creation admission, refusal to recreate, exact-recipe
+reconciliation without process activity, and registered startup/recovery.
 
 The functional runner creates an isolated PostgreSQL/Redis network, extracts the
 checkout into a fresh directory, and runs all migrations twice before executing the

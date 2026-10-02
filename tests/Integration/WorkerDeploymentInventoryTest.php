@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Shared\Infrastructure\Worker\DeploymentContainer;
+use App\Shared\Infrastructure\Worker\DeploymentContainerRecipe;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
@@ -61,6 +62,62 @@ final class WorkerDeploymentInventoryTest extends TestCase
         self::assertSame(1, (int) $this->second->fetchOne('SELECT count(*) FROM worker_deployment_containers'));
         self::assertSame($timestamp, $this->second->fetchOne('SELECT created_at FROM worker_deployment_containers'));
         self::assertSame('timestamp with time zone', $this->second->fetchOne("SELECT data_type FROM information_schema.columns WHERE table_schema = :schema AND table_name = 'worker_deployment_containers' AND column_name = 'created_at'", ['schema' => $this->schema]));
+    }
+
+    public function testCreationClaimCommitsOnceWithoutContainerBindingAndPreservesTimestamp(): void
+    {
+        $first = new DoctrineDeploymentInventory($this->first);
+        $second = new DoctrineDeploymentInventory($this->second);
+        $recipe = $this->recipe();
+        self::assertFalse($first->matchesCreate($recipe));
+        self::assertTrue($first->claimCreate($recipe));
+        self::assertSame(0, $this->first->getTransactionNestingLevel());
+        self::assertTrue($second->matchesCreate($recipe));
+        $reservedAt = $this->second->fetchOne('SELECT created_at FROM worker_deployment_creations');
+        self::assertNotNull($reservedAt);
+        self::assertFalse($second->claimCreate($recipe));
+        self::assertFalse($first->claimCreate($recipe));
+        self::assertSame($reservedAt, $this->second->fetchOne('SELECT created_at FROM worker_deployment_creations'));
+        self::assertSame(1, (int) $this->second->fetchOne('SELECT count(*) FROM worker_deployment_creations'));
+        self::assertSame(0, (int) $this->second->fetchOne('SELECT count(*) FROM worker_deployment_containers'), 'An absent or removed unregistered container cannot free the durable creation attempt.');
+        self::assertSame('timestamp with time zone', $this->second->fetchOne("SELECT data_type FROM information_schema.columns WHERE table_schema = :schema AND table_name = 'worker_deployment_creations' AND column_name = 'created_at'", ['schema' => $this->schema]));
+    }
+
+    public function testMismatchedCreationRecipeCannotReconcileOrConsumeAnotherAttempt(): void
+    {
+        $inventory = new DoctrineDeploymentInventory($this->first);
+        $recipe = $this->recipe();
+        self::assertTrue($inventory->claimCreate($recipe));
+        foreach ([$this->recipe(daemon: 'baander.app:other-daemon'), $this->recipe(memory: 512 * 1024 * 1024)] as $wrong) {
+            self::assertFalse($inventory->matchesCreate($wrong));
+            self::assertFalse($inventory->claimCreate($wrong));
+        }
+        self::assertTrue($inventory->matchesCreate($recipe));
+        self::assertSame($recipe->fingerprint(), $this->second->fetchOne('SELECT recipe_hash FROM worker_deployment_creations'));
+    }
+
+    public function testUncertainCommittedCreationClaimBurnsPermissionBeforeAnyBindingExists(): void
+    {
+        $params = $this->params;
+        $params['wrapperClass'] = InventoryCommitThenThrowConnection::class;
+        $connection = DriverManager::getConnection($params);
+        self::assertInstanceOf(InventoryCommitThenThrowConnection::class, $connection);
+        $this->extras[] = $connection;
+        $connection->executeStatement('SET search_path TO ' . $this->schema);
+        $connection->throwAfterCommit = true;
+        $permission = null;
+        try {
+            $permission = (new DoctrineDeploymentInventory($connection))->claimCreate($this->recipe());
+            self::fail('Uncertain commit acknowledgment must not grant another creation attempt.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('Inventory commit acknowledgment is uncertain.', $error->getMessage());
+        }
+        self::assertNull($permission);
+        self::assertFalse($connection->isConnected());
+        $observer = new DoctrineDeploymentInventory($this->second);
+        self::assertTrue($observer->matchesCreate($this->recipe()));
+        self::assertFalse($observer->claimCreate($this->recipe()));
+        self::assertNull($observer->find($this->recipe()->namespace, $this->recipe()->bootId));
     }
 
     public function testStartClaimCommitsOnceAndRegistrationRetriesPreserveItsTimestamp(): void
@@ -126,7 +183,19 @@ final class WorkerDeploymentInventoryTest extends TestCase
 
     public function testConcurrentFreshProcessesReceiveExactlyOneStartPermission(): void
     {
-        self::assertTrue((new DoctrineDeploymentInventory($this->first))->register($this->binding()));
+        $this->assertConcurrentClaims('start');
+    }
+
+    public function testConcurrentFreshProcessesReceiveExactlyOneCreationPermission(): void
+    {
+        $this->assertConcurrentClaims('create');
+    }
+
+    private function assertConcurrentClaims(string $action): void
+    {
+        if ($action === 'start') {
+            self::assertTrue((new DoctrineDeploymentInventory($this->first))->register($this->binding()));
+        }
         $gate = sys_get_temp_dir() . '/baander-start-claim-' . bin2hex(random_bytes(12));
         $code = <<<'PHP'
 require $argv[1];
@@ -137,7 +206,9 @@ file_put_contents($argv[3].'.ready', 'ready');
 $deadline = microtime(true) + 3;
 while (!is_file($argv[4])) { if (microtime(true) > $deadline) { exit(2); } usleep(1000); }
 $binding = new \App\Shared\Infrastructure\Worker\DeploymentContainer('baander.app:workers', str_repeat('a', 32), 'baander.app:daemon', str_repeat('c', 64));
-echo json_encode((new \App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory($connection))->claimStart($binding));
+$inventory = new \App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory($connection);
+$permission = $argv[5] === 'start' ? $inventory->claimStart($binding) : $inventory->claimCreate(new \App\Shared\Infrastructure\Worker\DeploymentContainerRecipe('baander.app:workers', str_repeat('a', 32), 'baander.app:daemon', 'sha256:'.str_repeat('d', 64), ['/usr/local/bin/php', 'bin/console', 'app:worker'], 'none', 256 * 1024 * 1024, 1_000_000_000, 32));
+echo json_encode($permission);
 PHP;
         $processes = [];
         $outputs = [];
@@ -146,7 +217,7 @@ PHP;
                 $output = tmpfile();
                 self::assertIsResource($output);
                 $outputs[] = $output;
-                $process = proc_open([PHP_BINARY, '-r', $code, '--', dirname(__DIR__, 2) . '/vendor/autoload.php', $this->schema, $gate . $i, $gate], [0 => ['file', '/dev/null', 'r'], 1 => $output, 2 => $output], $pipes);
+                $process = proc_open([PHP_BINARY, '-r', $code, '--', dirname(__DIR__, 2) . '/vendor/autoload.php', $this->schema, $gate . $i, $gate, $action], [0 => ['file', '/dev/null', 'r'], 1 => $output, 2 => $output], $pipes);
                 self::assertIsResource($process);
                 $processes[] = $process;
             }
@@ -171,7 +242,7 @@ PHP;
             }
             sort($results);
             self::assertSame([false, true], $results);
-            self::assertNotNull($this->second->fetchOne('SELECT start_claimed_at FROM worker_deployment_containers'));
+            self::assertNotNull($this->second->fetchOne($action === 'start' ? 'SELECT start_claimed_at FROM worker_deployment_containers' : 'SELECT created_at FROM worker_deployment_creations'));
         } finally {
             foreach ($processes as $process) {
                 if (is_resource($process)) {
@@ -295,6 +366,11 @@ PHP;
     private function binding(string $namespace = 'baander.app:workers', string $boot = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', string $daemon = 'baander.app:daemon', string $container = 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'): DeploymentContainer
     {
         return new DeploymentContainer($namespace, $boot, $daemon, $container);
+    }
+
+    private function recipe(string $daemon = 'baander.app:daemon', int $memory = 256 * 1024 * 1024): DeploymentContainerRecipe
+    {
+        return new DeploymentContainerRecipe('baander.app:workers', str_repeat('a', 32), $daemon, 'sha256:' . str_repeat('d', 64), ['/usr/local/bin/php', 'bin/console', 'app:worker'], 'none', $memory, 1_000_000_000, 32);
     }
 
     protected function tearDown(): void

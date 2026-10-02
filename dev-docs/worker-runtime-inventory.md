@@ -355,10 +355,11 @@ helper described below supplies the parent-side deadline; observing a database
 token alone is not permission to launch. A real kernel/introspection check
 confirms ORM schema diffs exclude the DBAL-owned lease table, while normal entity
 tables remain visible. Fresh installation and repeat migration runs pass.
-The canonical messaging/PostgreSQL suite passes 96 tests with 1,217 assertions,
+The canonical messaging/PostgreSQL suite passes 124 tests with 1,395 assertions,
 including seven database lease cases, 14 fresh-process lease-helper cases and
-nine external-controller database coordination cases, 12 inventory cases, seven registered-recovery cases and
-14 startup cases. The schema check passes one test with seven assertions
+nine external-controller database coordination cases, 16 inventory cases, seven registered-recovery cases and
+14 startup cases plus 24 creation/reconciliation cases. The schema check passes one
+test with nine assertions
 after all 16 migrations and a repeat no-op migration run. Two real-process cases
 also verify blocked replacement with a surviving descendant and after a launcher
 throws following process creation. Both container shutdown scenarios pass.
@@ -389,7 +390,7 @@ without acknowledging containment or releasing the deployment lease. Invalid clo
 readings still trigger initial stop attempts, then propagate to the outer owner
 for containment. Real-process tests cover delayed acquisition, denied grants,
 hung renewal, expiry during sibling launches and clock failure. The combined unit
-and static-analysis-rule suite passes 3,324 tests with 12,063 assertions; focused
+and static-analysis-rule suite passes 3,362 tests with 12,122 assertions; focused
 production PHPStan passes. These are correctness checks, not capacity measurements.
 
 `scripts/test-worker-containment-container.sh` exercises this core as PID 1 in a
@@ -456,10 +457,22 @@ start. Binding values remain immutable; only the start timestamp changes, once.
 A failed post-claim check burns the attempt and requires explicit recovery. A
 successful return confirms Docker acknowledged startup; it does not establish
 application readiness or a valid runtime lease. An uncertain create response must not cause a second
-container to be created for the same boot: use a deterministic boot-specific Docker
-name to reconcile creation before recording the immutable ID, or fail closed.
-The external controller must still own deterministic container creation and its
-uncertain-outcome reconciliation. The combined acceptance fixture now leaves the
+container to be created for the same boot. The persistent creation intent and
+explicit deterministic-name reconciliation below enforce that rule.
+`DockerDeploymentCreate` now performs deterministic creation and explicit
+reconciliation. A committed `worker_deployment_creations` row consumes creation
+permission for the namespace/boot before Docker is called, recording daemon identity
+and a fingerprint of the complete bounded recipe. Neither a lost reply nor an
+absent container permits another create. Reconciliation requires the same committed
+recipe and verifies the actual immutable image, argv, identity environment,
+isolation, network attachments, resource limits and never-started state before
+registering the full ID. It never starts or recreates a container.
+
+`DeploymentContainerRecipe` uses a local immutable image ID (`--pull=never`), an
+absolute executable and bounded argument vector, explicit CPU/memory/swap/PID
+ceilings, and a named isolated network. It does not yet support media mounts, device
+access or secret injection. The controller still needs application deployment
+configuration and command wiring. The combined acceptance fixture now leaves the
 predecessor unstarted and uses the startup adapter; an independent PostgreSQL
 connection verifies the committed claim before the real Docker start. It then
 exercises inventory-backed retirement. This validates external startup/recovery,
