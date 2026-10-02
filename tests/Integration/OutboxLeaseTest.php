@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Shared\Domain\Event\Outbox\OutboxRepository;
+use App\Shared\Domain\Event\Outbox\OutboxRelayException;
+use App\Shared\Domain\Event\Outbox\RelayOutboxCommand;
+use App\Shared\Domain\Event\Outbox\RelayOutboxHandler;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
@@ -103,5 +106,50 @@ final class OutboxLeaseTest extends TestCase
         self::assertSame([], $second->fetchPending(1));
         self::assertTrue($first->renewLease((int) $a['id'], $a['lease_token']));
         self::assertFalse($second->renewLease((int) $a['id'], $b['lease_token']));
+    }
+
+    public function testPoisonEventRetriesThenDeadLettersWithoutBlockingHealthyRows(): void
+    {
+        $repository = new OutboxRepository($this->first);
+        $repository->append('App\\MissingOutboxEvent', 'missing.event', ['value' => 'poison']);
+        $event = new \App\Auth\Domain\Event\UserRegistered(
+            \App\Shared\Domain\Model\Uuid::v4(),
+            \App\Shared\Domain\Model\PublicId::fromString('aaaaaaaaaaaaaaaaaaaaa'),
+            \App\Shared\Domain\Model\Email::fromString('outbox@example.com'),
+            'Outbox test',
+        );
+        $repository->append($event::class, $event->eventName(), $event->toPayload());
+        $dispatcher = $this->createMock(\Symfony\Component\EventDispatcher\EventDispatcherInterface::class);
+        $dispatcher->expects($this->once())->method('dispatch')
+            ->with($this->isInstanceOf($event::class), $this->anything())->willReturnArgument(0);
+        $handler = new RelayOutboxHandler($repository, $dispatcher, new \Psr\Log\NullLogger());
+
+        for ($attempt = 1; $attempt <= 5; ++$attempt) {
+            try {
+                $handler(new RelayOutboxCommand());
+                self::fail('Poison events must report a relay failure.');
+            } catch (OutboxRelayException $error) {
+                self::assertCount(1, $error->getFailures());
+                self::assertSame('missing.event', $error->getFailures()[0]['event']);
+            }
+            $row = $this->second->fetchAssociative("SELECT * FROM domain_event_outbox WHERE event_name = 'missing.event'");
+            self::assertNotFalse($row);
+            self::assertSame($attempt, (int) $row['attempts']);
+            self::assertNull($row['relayed_at']);
+            self::assertNull($row['lease_token']);
+            self::assertNull($row['lease_until']);
+            self::assertSame([], (new OutboxRepository($this->second))->fetchPending());
+            if ($attempt < 5) {
+                self::assertNotNull($row['next_attempt_at']);
+                self::assertNull($row['dead_lettered_at']);
+                // Advance only the retry deadline, without sleeping or bypassing claims.
+                $this->first->executeStatement("UPDATE domain_event_outbox SET next_attempt_at = NOW() - INTERVAL '1 second' WHERE event_name = 'missing.event'");
+            } else {
+                self::assertNull($row['next_attempt_at']);
+                self::assertNotNull($row['dead_lettered_at']);
+            }
+        }
+        self::assertSame(1, (int) $this->second->fetchOne('SELECT COUNT(*) FROM domain_event_outbox WHERE relayed_at IS NOT NULL'));
+        self::assertSame(0, $handler(new RelayOutboxCommand()));
     }
 }

@@ -10,13 +10,9 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 final class OutboxSubscriber implements EventSubscriberInterface
 {
-    /**
-     * @param class-string<AbstractDomainEvent>[] $eventClasses
-     */
     public function __construct(
         private readonly OutboxRepository $outboxRepository,
         private readonly LoggerInterface $logger,
-        private readonly array $eventClasses = [],
     ) {
     }
 
@@ -41,7 +37,7 @@ final class OutboxSubscriber implements EventSubscriberInterface
                 'error' => $e->getMessage(),
             ]);
 
-            return;
+            throw $e;
         }
 
         $this->outboxRepository->append(

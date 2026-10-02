@@ -37,23 +37,39 @@ final class RelayOutboxHandler
             }
 
             try {
+                $decodedPayload = json_decode($row['payload'], false, 512, JSON_THROW_ON_ERROR);
+                if (!$decodedPayload instanceof \stdClass) {
+                    throw new \UnexpectedValueException('Outbox payload must be a JSON object.');
+                }
                 $payload = json_decode($row['payload'], true, 512, JSON_THROW_ON_ERROR);
 
                 /** @var class-string<DomainEventInterface> $eventClass */
                 $eventClass = $row['event_class'];
 
-                if (method_exists($eventClass, 'fromPayload')) {
-                    $event = $eventClass::fromPayload($payload);
-                    // Dispatch with 'outbox.relay' event name to avoid re-triggering OutboxSubscriber
-                    $this->eventDispatcher->dispatch($event, 'outbox.relay');
+                if (!class_exists($eventClass) || !is_subclass_of($eventClass, DomainEventInterface::class)
+                    || (new \ReflectionClass($eventClass))->isAbstract()
+                    || !method_exists($eventClass, 'fromPayload')) {
+                    throw new \UnexpectedValueException(sprintf('Unsupported outbox event class: %s.', $eventClass));
                 }
+                $factory = new \ReflectionMethod($eventClass, 'fromPayload');
+                if (!$factory->isPublic() || !$factory->isStatic()) {
+                    throw new \UnexpectedValueException('Outbox event factory must be public and static.');
+                }
+
+                $event = $eventClass::fromPayload($payload);
+                if (!$event instanceof DomainEventInterface || $event::class !== $eventClass
+                    || $event->eventName() !== $row['event_name']) {
+                    throw new \UnexpectedValueException('Reconstructed outbox event does not match its stored class and name.');
+                }
+                // Dispatch with 'outbox.relay' event name to avoid re-triggering OutboxSubscriber
+                $this->eventDispatcher->dispatch($event, 'outbox.relay');
 
                 if (!$this->outboxRepository->markRelayed($id, $leaseToken)) {
                     throw new \RuntimeException('Outbox lease expired before acknowledgement.');
                 }
                 ++$relayed;
             } catch (\Throwable $e) {
-                $attempts = ((int) ($row['attempts'] ?? 0)) + 1;
+                $attempts = ((int) $row['attempts']) + 1;
 
                 if ($attempts >= self::MAX_ATTEMPTS) {
                     $this->outboxRepository->recordFailure($id, $attempts, null, new \DateTimeImmutable(), $leaseToken);
