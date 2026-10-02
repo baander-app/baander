@@ -27,6 +27,7 @@ final class SendEmailHandler
     }
 
     #[AsMessageHandler(fromTransport: 'swoole_task')]
+    #[AsMessageHandler(fromTransport: 'async')]
     public function __invoke(SendEmailCommand $command): void
     {
         if (!$this->preferenceRepository->isEnabled(

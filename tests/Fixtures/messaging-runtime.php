@@ -25,6 +25,12 @@ if ($mode === 'prepare') {
         attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at TIMESTAMPTZ, dead_lettered_at TIMESTAMPTZ,
         lease_token TEXT, lease_until TIMESTAMPTZ
     )');
+    require_once dirname(__DIR__, 2) . '/migrations/Version20261002120000.php';
+    $migration = new DoctrineMigrations\Version20261002120000($db, new Psr\Log\NullLogger());
+    $migration->up(new Doctrine\DBAL\Schema\Schema());
+    foreach ($migration->getSql() as $query) {
+        $db->executeStatement($query->getStatement());
+    }
 } elseif ($mode === 'hold-lock') {
     $db->beginTransaction();
     try {

@@ -6,7 +6,6 @@ namespace App\Shared\Domain\Event\Outbox;
 
 use App\Shared\Domain\Event\DomainEventInterface;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 final class RelayOutboxHandler
@@ -16,7 +15,7 @@ final class RelayOutboxHandler
 
     public function __construct(
         private readonly OutboxRepository $outboxRepository,
-        private readonly EventDispatcherInterface $eventDispatcher,
+        private readonly OutboxEventDispatcherInterface $eventDispatcher,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -61,8 +60,7 @@ final class RelayOutboxHandler
                     || $event->eventName() !== $row['event_name']) {
                     throw new \UnexpectedValueException('Reconstructed outbox event does not match its stored class and name.');
                 }
-                // Dispatch with 'outbox.relay' event name to avoid re-triggering OutboxSubscriber
-                $this->eventDispatcher->dispatch($event, 'outbox.relay');
+                $this->eventDispatcher->dispatch($event, $id);
 
                 if (!$this->outboxRepository->markRelayed($id, $leaseToken)) {
                     throw new \RuntimeException('Outbox lease expired before acknowledgement.');

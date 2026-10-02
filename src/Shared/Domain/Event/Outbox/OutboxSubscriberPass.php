@@ -32,7 +32,6 @@ final class OutboxSubscriberPass implements CompilerPassInterface
         // for each discovered concrete event class.
         $subscriberIds = [
             OutboxSubscriber::class,
-            'App\Shared\Infrastructure\Event\NotificationBridgeSubscriber',
         ];
 
         foreach ($subscriberIds as $subscriberId) {

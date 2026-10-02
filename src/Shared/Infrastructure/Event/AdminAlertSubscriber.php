@@ -7,7 +7,6 @@ namespace App\Shared\Infrastructure\Event;
 use App\Auth\Domain\Event\UserRegistered;
 use App\Shared\Application\Port\AdminAlertPortInterface;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 
 /**
  * Listens for domain events that should generate admin alerts.
@@ -23,7 +22,6 @@ final class AdminAlertSubscriber
     ) {
     }
 
-    #[AsEventListener]
     public function onUserRegistered(UserRegistered $event): void
     {
         try {
@@ -40,6 +38,7 @@ final class AdminAlertSubscriber
             $this->logger->error('Failed to send admin alert for user registration: {error}', [
                 'error' => $e->getMessage(),
             ]);
+            throw $e;
         }
     }
 }

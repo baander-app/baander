@@ -11,8 +11,7 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
- * Bridge subscriber that forwards synchronous domain events into the
- * async Messenger pipeline for notification processing.
+ * Runs notification projection synchronously inside an outbox replay transaction.
  *
  * Only forwards events that have a notification category mapping.
  * Unmapped events are silently dropped.
@@ -35,12 +34,12 @@ final class NotificationBridgeSubscriber
         }
 
         if (!method_exists($event, 'toPayload')) {
-            $this->logger->warning('Notification-mapped event {class} lacks toPayload(), skipping.', [
+            $this->logger->warning('Notification-mapped event {class} lacks toPayload().', [
                 'class' => $eventClass,
                 'event' => $event->eventName(),
             ]);
 
-            return;
+            throw new \UnexpectedValueException('Notification event lacks a payload contract.');
         }
 
         try {
@@ -52,7 +51,7 @@ final class NotificationBridgeSubscriber
                 'error' => $e->getMessage(),
             ]);
 
-            return;
+            throw $e;
         }
 
         $command = new CreateNotificationCommand(

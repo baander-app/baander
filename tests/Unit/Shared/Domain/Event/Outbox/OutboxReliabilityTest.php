@@ -20,7 +20,7 @@ use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use App\Shared\Domain\Event\Outbox\OutboxEventDispatcherInterface;
 
 /**
  * Concrete event class used to prove that OutboxSubscriberPass only sees
@@ -109,7 +109,7 @@ final class OutboxReliabilityTest extends TestCase
 
         $repository = new OutboxRepository($connection);
 
-        $dispatcher = $this->createMock(EventDispatcherInterface::class);
+        $dispatcher = $this->createMock(OutboxEventDispatcherInterface::class);
         $dispatcher->method('dispatch')->willThrowException(new RuntimeException('Dispatch transport unavailable'));
 
         $handler = new RelayOutboxHandler($repository, $dispatcher, new NullLogger());
@@ -167,7 +167,7 @@ final class OutboxReliabilityTest extends TestCase
 
         $repository = new OutboxRepository($connection);
 
-        $dispatcher = $this->createMock(EventDispatcherInterface::class);
+        $dispatcher = $this->createMock(OutboxEventDispatcherInterface::class);
         $dispatcher->method('dispatch')->willThrowException(new RuntimeException('Dispatch transport unavailable'));
 
         $handler = new RelayOutboxHandler($repository, $dispatcher, new NullLogger());

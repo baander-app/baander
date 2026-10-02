@@ -1067,6 +1067,14 @@ services:
     App\Shared\Domain\Event\Outbox\OutboxRepository: ~
     App\Shared\Domain\Event\Outbox\OutboxSubscriber: ~
     App\Shared\Domain\Event\Outbox\RelayOutboxHandler: ~
+    App\Shared\Domain\Event\Outbox\OutboxEventDispatcherInterface:
+        alias: App\Shared\Infrastructure\Event\OutboxEventDispatcher
+    App\Shared\Infrastructure\Event\OutboxEventDispatcher:
+        arguments:
+            $dispatcher: '@App\Shared\Infrastructure\Event\NotificationReplayDispatcher'
+    App\Notification\Application\Handler\CreateNotificationHandler:
+        arguments:
+            $bus: '@App\Shared\Infrastructure\Event\NotificationDeliveryBus'
 
     # --- QoL Governor ---
     App\QoL\Domain\Service\StreamGovernor:

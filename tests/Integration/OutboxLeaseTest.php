@@ -119,9 +119,9 @@ final class OutboxLeaseTest extends TestCase
             'Outbox test',
         );
         $repository->append($event::class, $event->eventName(), $event->toPayload());
-        $dispatcher = $this->createMock(\Symfony\Component\EventDispatcher\EventDispatcherInterface::class);
+        $dispatcher = $this->createMock(\App\Shared\Domain\Event\Outbox\OutboxEventDispatcherInterface::class);
         $dispatcher->expects($this->once())->method('dispatch')
-            ->with($this->isInstanceOf($event::class), $this->anything())->willReturnArgument(0);
+            ->with($this->isInstanceOf($event::class), $this->greaterThan(0));
         $handler = new RelayOutboxHandler($repository, $dispatcher, new \Psr\Log\NullLogger());
 
         for ($attempt = 1; $attempt <= 5; ++$attempt) {

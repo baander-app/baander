@@ -14,7 +14,7 @@ use Doctrine\DBAL\Result;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use App\Shared\Domain\Event\Outbox\OutboxEventDispatcherInterface;
 
 final class OutboxPayloadValidationTest extends TestCase
 {
@@ -73,10 +73,9 @@ final class OutboxPayloadValidationTest extends TestCase
 
                 return 1;
             });
-        $dispatcher = $this->createMock(EventDispatcherInterface::class);
+        $dispatcher = $this->createMock(OutboxEventDispatcherInterface::class);
         $dispatcher->expects($this->once())->method('dispatch')
-            ->with($this->isInstanceOf(PayloadValidEvent::class), $this->anything())
-            ->willReturnArgument(0);
+            ->with($this->isInstanceOf(PayloadValidEvent::class), 2);
         $handler = new RelayOutboxHandler(new OutboxRepository($connection), $dispatcher, new NullLogger());
 
         try {
