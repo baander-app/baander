@@ -46,6 +46,11 @@ app_gid="$(docker run --rm --entrypoint id "$app_image" -g)"
 docker run --rm "${common[@]}" --user 0 --entrypoint sh "$app_image" -c 'touch /workspace/.fixture-ready; chown "$1:$2" /workspace' sh "$app_uid" "$app_gid"
 archive_paths=(vendor src tests config packages migrations bin docker/general templates public
     .env .env.test composer.json composer.lock translations)
+if [ "${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" = 1 ]; then
+    # CI source and dependencies live in the built image, not the host checkout.
+    docker run --rm --name "$run_id-prepare" "${common[@]}" --entrypoint sh "$app_image" -c 'set -eu; cd /var/www/html; tar -cf /tmp/worker-command-checkout.tar .; tar -xf /tmp/worker-command-checkout.tar -C /workspace; rm /tmp/worker-command-checkout.tar'
+    archive_paths=(--files-from /dev/null)
+fi
 tar -cf - "${archive_paths[@]}" |
     docker run --rm --name "$run_id-prepare" "${common[@]}" -i --entrypoint sh "$app_image" -c '
         set -eu
@@ -53,6 +58,7 @@ tar -cf - "${archive_paths[@]}" |
         php -d memory_limit=512M bin/console cache:clear --env=prod --no-debug
         php -d memory_limit=512M bin/console doctrine:migrations:migrate --no-interaction --env=prod
         php -d memory_limit=512M bin/console doctrine:migrations:migrate --no-interaction --env=prod
+        php -d memory_limit=256M tests/Fixtures/Worker/worker-command-check.php seed-outbox baander.app:commandtest aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     '
 
 launch() {
@@ -119,15 +125,34 @@ PYSUMMARY
     # A stopped PID-1 deployment has no running descendants in its private namespace.
     test "$(docker inspect --format '{{.State.Pid}}' "$container")" = 0
 }
+await_outbox() {
+    local container="$1"
+    for attempt in $(seq 1 30); do
+        if docker exec "$container" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php verify-outbox baander.app:commandtest aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa > "/tmp/$container-outbox" 2>&1; then
+            cat "/tmp/$container-outbox"
+            rm -f "/tmp/$container-outbox"
+            return
+        fi
+        sleep 0.2
+    done
+    cat "/tmp/$container-outbox" >&2
+    rm -f "/tmp/$container-outbox"
+    docker logs --tail 60 "$container" >&2
+    echo 'Real worker outbox projection/handoff did not complete within the bounded check.' >&2
+    exit 1
+}
 reserved() {
     docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_image" \
         -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php reserved "$1" "$2"
 }
 
-boot="$(php -r 'echo bin2hex(random_bytes(16));')"
+boot="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
 namespace=baander.app:commandtest
 launch "$run_id-crash" "$namespace" "$boot"
 await_ready "$run_id-crash" "$namespace" "$boot"
+await_outbox "$run_id-crash"
+docker exec "$run_id-crash" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php replay-outbox "$namespace" "$boot"
+await_outbox "$run_id-crash"
 docker exec "$run_id-crash" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php kill-consumer "$namespace" "$boot"
 await_exit "$run_id-crash" 1 2
 reserved "$namespace" "$boot"
@@ -137,14 +162,14 @@ launch "$run_id-denied" "$namespace" "$boot"
 await_exit "$run_id-denied" 1 0
 reserved "$namespace" "$boot"
 
-term_boot="$(php -r 'echo bin2hex(random_bytes(16));')"
+term_boot="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
 term_namespace=baander.app:commandterm
 launch "$run_id-term" "$term_namespace" "$term_boot"
 await_ready "$run_id-term" "$term_namespace" "$term_boot"
 docker kill --signal=TERM "$run_id-term" >/dev/null
 await_exit "$run_id-term" 0 2
 reserved "$term_namespace" "$term_boot"
-expiry_boot="$(php -r 'echo bin2hex(random_bytes(16));')"
+expiry_boot="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
 expiry_namespace=baander.app:commandexpiry
 launch "$run_id-expiry" "$expiry_namespace" "$expiry_boot"
 await_ready "$run_id-expiry" "$expiry_namespace" "$expiry_boot"

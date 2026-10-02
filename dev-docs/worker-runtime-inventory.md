@@ -504,6 +504,13 @@ The command acceptance runner uses disposable production-mode PostgreSQL and Red
 It verifies actual consumer/relay parentage and the registered Redis identity, then
 checks child-crash draining, TERM, denial with zero launch attempts, and database
 lease-expiry draining. Every case retains the original active lease reservation.
+It seeds a real registration event before the supervisor starts, then independently
+observes the notification, consumer receipt, two channel handoffs and Redis
+acknowledgments. Replaying a lost event acknowledgment must preserve those counts
+with no pending, delayed or failed messages. External delivery is prevented by
+disabled push preferences, an unverified user and an empty webhook endpoint table.
+CI runs the command drill as
+a blocking step with source and dependencies copied from the built image.
 The functional web-command test resolves both names to the same real command.
 These checks establish lifecycle behavior, not end-to-end media or scheduler work.
 
@@ -513,6 +520,17 @@ full-identity health publication and deployment configuration cutover remain ope
 The external creation/start/recovery controller must still be wired into deployment
 operations. Its low-level lease acknowledgment does not itself verify cleanup, and
 host-systemd and per-child containment remain unqualified.
+
+The scheduler poller is the next small lifetime to extract, but its execution
+dependencies must be resolved first. Console jobs still dispatch into the CPU pool
+booted by the web server; starting the poller in an ordinary CLI child does not
+provide that pool. Its Redis lock-before-dispatch also has no durable occurrence
+intent, so a crash can lose a due minute. Establish a unique job/scheduled-instant
+occurrence with atomic dispatch intent under the current poller, then provide
+bounded console execution independent of HTTP boot before transferring ownership.
+Keep the web boot/shutdown tags until those prerequisites pass concurrent-claim,
+restart-recovery and console-execution checks. A long-lived polling child also
+needs explicit Doctrine reset handling between ticks.
 
 This is source inspection of routing, all application Bootable implementations,
 timer/coroutine creation sites, tagged CPU handlers, scheduler providers, private

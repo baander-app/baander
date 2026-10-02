@@ -121,8 +121,15 @@ two direct child roles and the namespace/boot-qualified Redis consumer, kills th
 consumer to require whole-container draining, tests TERM and forced database lease
 expiry, and confirms a duplicate
 lease claim exits with zero launch attempts. It checks that ownership remains
-reserved after shutdown. This verifies lifecycle and consumer registration; it does
-not establish application readiness, autoscaling or scheduler/media ownership.
+reserved after shutdown. It also seeds a real registration event before startup,
+requires the supervised relay to commit the notification, receipt and channel
+handoffs, requires Redis acknowledgment with no pending, delayed or failed work,
+and repeats the checks after clearing the event acknowledgment. Outbound
+preferences are disabled, the disposable user is unverified and no webhook
+endpoints exist; no external delivery is requested. These checks do not establish application readiness,
+autoscaling or scheduler/media ownership.
+CI runs this as a blocking step using `BAANDER_TEST_CHECKOUT_IN_IMAGE=1`, which
+copies source and Composer dependencies from the built application image.
 The functional `Console/ServeCommandTest` verifies that `app:serve` and the legacy
 server name resolve to the same real command and preserve its options.
 
@@ -322,6 +329,7 @@ DAMA-wrapped functional tests.
 
 ```bash
 timeout 180 bash scripts/test-worker-runtime-container.sh
+bash scripts/test-worker-command-container.sh
 bash scripts/test-outbox-runtime-container.sh
 bash scripts/test-producer-runtime-container.sh
 ```
