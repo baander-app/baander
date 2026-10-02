@@ -26,7 +26,9 @@ final class WorkerDeploymentLeaseSchemaTest extends TestCase
             self::assertSame('worker_deployment_leases', $connection->fetchOne("SELECT to_regclass('worker_deployment_leases')::text"));
             self::assertSame('worker_deployment_containers', $connection->fetchOne("SELECT to_regclass('worker_deployment_containers')::text"));
             self::assertSame('worker_deployment_creations', $connection->fetchOne("SELECT to_regclass('worker_deployment_creations')::text"));
+            self::assertSame('scheduler_occurrences', $connection->fetchOne("SELECT to_regclass('scheduler_occurrences')::text"));
             $tables = $connection->createSchemaManager()->listTableNames();
+            self::assertNotContains('scheduler_occurrences', $tables, 'ORM introspection must preserve durable scheduler intents.');
             self::assertNotContains('worker_deployment_creations', $tables, 'ORM introspection must preserve creation intents.');
             self::assertNotContains('worker_deployment_containers', $tables, 'ORM introspection must preserve the immutable DBAL-owned inventory.');
             self::assertContains('albums', $tables, 'Ordinary ORM-managed tables remain visible.');

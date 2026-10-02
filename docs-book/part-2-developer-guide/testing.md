@@ -138,6 +138,18 @@ checkout into a fresh directory, and runs all migrations twice before executing 
 requested PHPUnit paths or options. With no arguments it selects `tests/Functional`.
 The second migration run checks that the recorded history produces no pending work.
 
+Scheduler occurrence persistence can be checked with:
+
+```bash
+bash scripts/test-functional-container.sh tests/Integration/SchedulerOccurrenceStoreTest.php tests/Integration/WorkerDeploymentLeaseSchemaTest.php
+```
+
+These checks cover immutable snapshots, independent-connection visibility,
+competing inserts, rollback and a lost commit acknowledgment. The actual migration
+also enforces command/JSON bounds and minute-aligned instants; Doctrine's schema
+filter preserves the table. This is persistence coverage, not scheduler dispatch
+or execution recovery. No occurrence relay is enabled yet.
+
 The functional runner also supplies the isolated PostgreSQL/Redis environment
 aliases used by integration tests that need the full migrated schema and kernel.
 `CoverExtractionPersistenceTest` disables DAMA rollback with its supported attribute

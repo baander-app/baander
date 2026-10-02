@@ -391,7 +391,7 @@ without acknowledging containment or releasing the deployment lease. Invalid clo
 readings still trigger initial stop attempts, then propagate to the outer owner
 for containment. Real-process tests cover delayed acquisition, denied grants,
 hung renewal, expiry during sibling launches and clock failure. The combined unit
-and static-analysis-rule suite passes 3,393 tests with 12,190 assertions; focused
+and static-analysis-rule suite passes 3,414 tests with 12,225 assertions; focused
 production PHPStan passes. These are correctness checks, not capacity measurements.
 
 `scripts/test-worker-containment-container.sh` exercises this core as PID 1 in a
@@ -531,6 +531,33 @@ bounded console execution independent of HTTP boot before transferring ownership
 Keep the web boot/shutdown tags until those prerequisites pass concurrent-claim,
 restart-recovery and console-execution checks. A long-lived polling child also
 needs explicit Doctrine reset handling between ticks.
+
+The first persistence prerequisite is `SchedulerOccurrenceStoreInterface`, backed
+by the migration-owned `scheduler_occurrences` table. One immutable row represents
+both a job's UTC due minute and its pending dispatch intent. The job/minute pair
+is unique; a retry with the same payload preserves the original occurrence ID,
+while a changed snapshot is rejected. No foreign key cascades away this history
+when a schedule is deleted. A future dispatcher must recheck execution authority;
+the retained snapshot is not permission to run a deleted or paused schedule.
+
+Parameters use bounded native PostgreSQL `json`, deliberately preserving lexical
+numbers and argument order rather than normalizing them through `jsonb`. The
+application snapshot rejects non-JSON values and detaches nested references.
+The adapter requires a dedicated idle autocommit connection, commits before
+returning success and discards a failed connection, including an uncertain commit.
+Statement and lock timeouts do not bound connection setup or network I/O.
+
+This store is not yet wired into the poller or a relay. Occurrence-aware command
+metadata, execution receipts and explicit handling of uncertain side effects must
+precede automatic dispatch recovery. It does not resolve missed ticks, authorize
+execution, or provide exactly-once effects by itself.
+
+The occurrence and schema-introspection checks pass 19 tests with 91 assertions on
+disposable PostgreSQL after all 17 migrations and a repeat no-op migration run.
+They cover actual unique-key contention, independent visibility, failed and
+uncertain commits, immutable retry snapshots and physical schema constraints.
+Baseline-free PHPStan level 6 passes for the new production code, migration and
+tests.
 
 This is source inspection of routing, all application Bootable implementations,
 timer/coroutine creation sites, tagged CPU handlers, scheduler providers, private
