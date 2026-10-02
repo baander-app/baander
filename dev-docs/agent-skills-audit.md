@@ -150,6 +150,26 @@ The root OpenAPI export remains stale: Favorites routes are absent, and the exis
 201 response documentation/client envelope disagrees with the flat API response.
 The source annotation now documents 422; full contract regeneration remains open.
 
+## Notification preference correction
+
+`UpdatePreferenceRequest` now accepts both JSON boolean values while rejecting
+missing, null, and non-boolean values. Its OpenAPI array item uses the correct
+`Items` attribute. Real-validator regressions reproduced the false-value rejection
+before the fix; all 13 focused tests pass afterward.
+
+The GET defect concerns missing stored preferences, not optional query filters:
+this endpoint has no filters. Its timestamp placeholder read an absent array key
+before returning null. The HTTP regression triggered 16 warnings before the fix.
+Initializing the placeholder directly to null preserves the later stored timestamp
+merge. Seven functional tests now pass with 608 assertions, covering all 16 default
+rows, partial stored preferences, enable/disable persistence, the 12 writable
+combinations, authentication, and user isolation. The tests use the test firewall.
+Focused PHPStan for both changed production files passes. The full unit/rule suite
+passes 2,939 tests with 8,487 assertions. That run exposed a rate-limit test whose
+exact assertion crossed a wall-clock second; controlled-clock cases now verify
+both the original deadline and one second of elapsed time without changing
+production behavior.
+
 ## Recommended follow-up changes
 
 These are separate reviewable changes. No baseline expansion or suppression is a
@@ -158,7 +178,9 @@ been reproduced end to end.
 
 | Priority | Evidence | Proposed change and acceptance |
 |---|---|---|
-| Medium | Independent skill trial found NotBlank on UpdatePreferenceRequest.enabled and an undefined-key expression in PreferenceController's missing-filter path. | Reproduce disabling with false and reading without category/channel through the firewall; correct validation and optional-input handling. These are static findings, not executed endpoint failures. |
+| High | NotificationPreferenceRepository::isEnabled defaults missing rows to true, while GET displays most missing preferences as disabled; email and push handlers use the repository result. | Define one default policy and verify display and delivery agree for unseeded and partially seeded users. |
+| High | Existing NotificationController functional tests characterize cross-user mark-read and delete operations without ownership checks. | Reproduce through the firewall and enforce owner/admin policy with negative regressions. |
+| Medium | Notification preference GET includes admin_operations, while writes/seeding support three categories; PUT also manually decodes input and documents a different response envelope. | Resolve category policy and contract drift; verify malformed JSON and wrong-shaped preference input return client errors before persistence. |
 | Medium | PlaylistResource documents publicId as UUID, while the shared PublicId generates a 21-character NanoID. | Correct identifier schemas and regenerate affected clients together; verify actual identifier formats in contract tests. |
 | Medium | useAudioPlayback destroys its service during cleanup but keeps an initialized guard; the app uses StrictMode. | Add a StrictMode setup/cleanup/replay regression, reproduce the lifecycle failure, and restore symmetric ownership. Static finding pending runtime reproduction. |
 | Medium | Independent trial of the actual player-store setters reproduced slider volume 40% but audio volume 80% after changing volume while muted and unmuting. | Add a store/audio integration regression and synchronize volume on unmute. This setter-level reproduction is not a browser playback test. |

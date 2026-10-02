@@ -14,7 +14,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         new OA\Property(
             property: 'preferences',
             type: 'array',
-            items: new OA\Schema(
+            items: new OA\Items(
                 required: ['category', 'channel', 'enabled'],
                 properties: [
                     new OA\Property(property: 'category', type: 'string', enum: ['security',
@@ -46,7 +46,7 @@ final readonly class UpdatePreferenceRequest
                     new Assert\Choice(choices: ['in_app', 'email', 'push', 'webhook']),
                 ],
                 'enabled'  => [
-                    new Assert\NotBlank(),
+                    new Assert\NotNull(),
                     new Assert\Type('bool'),
                 ],
             ]),

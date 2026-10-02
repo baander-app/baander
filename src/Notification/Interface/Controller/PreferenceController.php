@@ -72,7 +72,7 @@ final class PreferenceController
                     'category'  => $category->value,
                     'channel'   => $channel->value,
                     'enabled'   => $enabled,
-                    'updatedAt' => $existingMap[$key] !== null ? null : null,
+                    'updatedAt' => null,
                 ];
             }
         }

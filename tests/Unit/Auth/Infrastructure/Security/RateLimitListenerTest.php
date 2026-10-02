@@ -6,9 +6,11 @@ namespace App\Tests\Unit\Auth\Infrastructure\Security;
 
 use App\Auth\Infrastructure\Security\RateLimitListener;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Symfony\Bridge\PhpUnit\ClockMock;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
@@ -31,6 +33,10 @@ final class RateLimitListenerTest extends TestCase
 
     protected function setUp(): void
     {
+        // Register before any call resolves time() to PHP's global function.
+        ClockMock::register(self::class);
+        ClockMock::register(RateLimitListener::class);
+
         $this->loginIpLimiter = $this->createMock(RateLimiterFactoryInterface::class);
         $this->loginIpEmailLimiter = $this->createMock(RateLimiterFactoryInterface::class);
         $this->registerIpLimiter = $this->createMock(RateLimiterFactoryInterface::class);
@@ -103,7 +109,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testLoginUnderLimitPassesThrough(): void
     {
-        $request = $this->createJsonRequest('/api/auth/login', body: ['email' => 'user@example.com', 'password' => 'pass']);
+        $request = $this->createJsonRequest('/api/auth/login', body: ['email' => 'user@baander.app', 'password' => 'pass']);
         $event = $this->createRequestEvent($request);
 
         $this->loginIpLimiter->method('create')->willReturn($this->createAcceptedLimit(4));
@@ -118,7 +124,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testLoginOverLimitThrowsTooManyRequests(): void
     {
-        $request = $this->createJsonRequest('/api/auth/login', body: ['email' => 'user@example.com', 'password' => 'pass']);
+        $request = $this->createJsonRequest('/api/auth/login', body: ['email' => 'user@baander.app', 'password' => 'pass']);
         $event = $this->createRequestEvent($request);
 
         $this->loginIpLimiter->method('create')->willReturn($this->createRejectedLimit(120));
@@ -135,7 +141,7 @@ final class RateLimitListenerTest extends TestCase
     public function testLoginPerEmailOverLimitThrowsTooManyRequests(): void
     {
         // IP limit passes but IP+email limit rejects
-        $request = $this->createJsonRequest('/api/auth/login', body: ['email' => 'target@example.com', 'password' => 'pass']);
+        $request = $this->createJsonRequest('/api/auth/login', body: ['email' => 'target@baander.app', 'password' => 'pass']);
         $event = $this->createRequestEvent($request);
 
         $this->loginIpLimiter->method('create')->willReturn($this->createAcceptedLimit(4));
@@ -163,7 +169,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testRegisterUnderLimitPassesThrough(): void
     {
-        $request = $this->createJsonRequest('/api/auth/register', body: ['email' => 'new@example.com', 'name' => 'Test', 'password' => 'pass']);
+        $request = $this->createJsonRequest('/api/auth/register', body: ['email' => 'new@baander.app', 'name' => 'Test', 'password' => 'pass']);
         $event = $this->createRequestEvent($request);
 
         $this->registerIpLimiter->method('create')->willReturn($this->createAcceptedLimit(2));
@@ -173,7 +179,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testRegisterOverLimitThrowsTooManyRequests(): void
     {
-        $request = $this->createJsonRequest('/api/auth/register', body: ['email' => 'new@example.com', 'name' => 'Test', 'password' => 'pass']);
+        $request = $this->createJsonRequest('/api/auth/register', body: ['email' => 'new@baander.app', 'name' => 'Test', 'password' => 'pass']);
         $event = $this->createRequestEvent($request);
 
         $this->registerIpLimiter->method('create')->willReturn($this->createRejectedLimit(600));
@@ -187,7 +193,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testPasswordResetUnderLimitPassesThrough(): void
     {
-        $request = $this->createJsonRequest('/api/auth/password/reset-request', body: ['email' => 'user@example.com']);
+        $request = $this->createJsonRequest('/api/auth/password/reset-request', body: ['email' => 'user@baander.app']);
         $event = $this->createRequestEvent($request);
 
         $this->passwordResetIpLimiter->method('create')->willReturn($this->createAcceptedLimit(4));
@@ -197,7 +203,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testPasswordResetOverLimitThrowsTooManyRequests(): void
     {
-        $request = $this->createJsonRequest('/api/auth/password/reset-request', body: ['email' => 'user@example.com']);
+        $request = $this->createJsonRequest('/api/auth/password/reset-request', body: ['email' => 'user@baander.app']);
         $event = $this->createRequestEvent($request);
 
         $this->passwordResetIpLimiter->method('create')->willReturn($this->createRejectedLimit(300));
@@ -282,10 +288,10 @@ final class RateLimitListenerTest extends TestCase
 
     public function testDifferentIpsHaveIndependentLoginLimits(): void
     {
-        $requestIp1 = $this->createJsonRequest('/api/auth/login', body: ['email' => 'user@example.com', 'password' => 'pass'], ip: '10.0.0.1');
+        $requestIp1 = $this->createJsonRequest('/api/auth/login', body: ['email' => 'user@baander.app', 'password' => 'pass'], ip: '10.0.0.1');
         $eventIp1 = $this->createRequestEvent($requestIp1);
 
-        $requestIp2 = $this->createJsonRequest('/api/auth/login', body: ['email' => 'user@example.com', 'password' => 'pass'], ip: '10.0.0.2');
+        $requestIp2 = $this->createJsonRequest('/api/auth/login', body: ['email' => 'user@baander.app', 'password' => 'pass'], ip: '10.0.0.2');
         $eventIp2 = $this->createRequestEvent($requestIp2);
 
         // IP1 is rate limited
@@ -313,7 +319,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testDifferentIpsHaveIndependentLimitsSecondIpAllowed(): void
     {
-        $requestIp2 = $this->createJsonRequest('/api/auth/login', body: ['email' => 'user@example.com', 'password' => 'pass'], ip: '10.0.0.2');
+        $requestIp2 = $this->createJsonRequest('/api/auth/login', body: ['email' => 'user@baander.app', 'password' => 'pass'], ip: '10.0.0.2');
         $eventIp2 = $this->createRequestEvent($requestIp2);
 
         $this->loginIpLimiter->method('create')->willReturn($this->createAcceptedLimit(4));
@@ -340,7 +346,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testSubRequestsAreNotRateLimited(): void
     {
-        $request = $this->createJsonRequest('/api/auth/login', body: ['email' => 'user@example.com', 'password' => 'pass']);
+        $request = $this->createJsonRequest('/api/auth/login', body: ['email' => 'user@baander.app', 'password' => 'pass']);
         $kernel = $this->createMock(HttpKernelInterface::class);
 
         // Sub-request
@@ -360,7 +366,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testRateLimitExceededLogsWarning(): void
     {
-        $request = $this->createJsonRequest('/api/auth/register', body: ['email' => 'new@example.com', 'name' => 'Test', 'password' => 'pass']);
+        $request = $this->createJsonRequest('/api/auth/register', body: ['email' => 'new@baander.app', 'name' => 'Test', 'password' => 'pass']);
         $event = $this->createRequestEvent($request);
 
         $this->registerIpLimiter->method('create')->willReturn($this->createRejectedLimit(300));
@@ -382,19 +388,34 @@ final class RateLimitListenerTest extends TestCase
 
     // --- TooManyRequestsHttpException has correct Retry-After ---
 
-    public function testRetryAfterHeaderFromRateLimit(): void
+    /** @return iterable<string, array{int, int}> */
+    public static function retryAfterTimings(): iterable
     {
-        $request = $this->createJsonRequest('/api/auth/login', body: ['email' => 'user@example.com', 'password' => 'pass']);
-        $event = $this->createRequestEvent($request);
+        yield 'same second' => [0, 237];
+        yield 'next second' => [1, 236];
+    }
 
-        $this->loginIpLimiter->method('create')->willReturn($this->createRejectedLimit(237));
+    #[DataProvider('retryAfterTimings')]
+    public function testRetryAfterHeaderFromRateLimit(int $elapsedSeconds, int $expectedSeconds): void
+    {
+        ClockMock::withClockMock(1700000000);
 
         try {
-            $this->listener->onKernelRequest($event);
-            $this->fail('Expected TooManyRequestsHttpException');
-        } catch (TooManyRequestsHttpException $e) {
-            $this->assertSame(237, $e->getHeaders()['Retry-After']);
-            $this->assertSame(429, $e->getStatusCode());
+            $request = $this->createJsonRequest('/api/auth/login', body: ['email' => 'user@baander.app', 'password' => 'pass']);
+            $event = $this->createRequestEvent($request);
+
+            $this->loginIpLimiter->method('create')->willReturn($this->createRejectedLimit(237));
+            ClockMock::withClockMock(1700000000 + $elapsedSeconds);
+
+            try {
+                $this->listener->onKernelRequest($event);
+                $this->fail('Expected TooManyRequestsHttpException');
+            } catch (TooManyRequestsHttpException $e) {
+                $this->assertSame($expectedSeconds, $e->getHeaders()['Retry-After']);
+                $this->assertSame(429, $e->getStatusCode());
+            }
+        } finally {
+            ClockMock::withClockMock(false);
         }
     }
 }
