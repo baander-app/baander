@@ -154,6 +154,7 @@ final class WebhookDeliveryService
             $timestamp = (string) time();
             $signature = $this->hmacSigner->sign($timestamp . '.' . $payload, $signingSecret);
             $statusCode = null;
+            $response = null;
 
             try {
                 $response = $this->httpClient->request('POST', $url, [
@@ -166,6 +167,7 @@ final class WebhookDeliveryService
                         'User-Agent' => 'Baander-Webhook/1.0',
                     ],
                     'body' => $payload,
+                    'buffer' => false,
                     'timeout' => 10,
                     'max_duration' => 10,
                     'resolve' => $resolve,
@@ -184,6 +186,10 @@ final class WebhookDeliveryService
                     'attempt' => $attempt,
                     'exception' => $e->getMessage(),
                 ]);
+            } finally {
+                // Only the status is used. Release the response before database
+                // work or backoff, including failures while reading headers.
+                $response?->cancel();
             }
 
             // Persistence failures must escape to Messenger without sending an
