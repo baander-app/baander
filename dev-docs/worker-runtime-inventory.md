@@ -609,6 +609,15 @@ through retries and configuration installation. Cache failures and uncertain
 commits require offline recovery; there is no automatic global fence or online
 atomic cutover. See the operator rotation runbook for installation and recovery.
 
+A subsequent source audit found that `/api/oauth/token` still executes League's
+standard refresh grant, bypassing the custom transactional refresh handlers. The
+active path needs PostgreSQL concurrency, rollback, and replay tests before refresh
+rotation is qualified. The custom handlers' SQLite/stub tests do not establish
+that endpoint's behavior. Filesystem acceptance also remains open: the general
+`LocalFilesystem`/`ReadOnlyFilesystem` wrappers and transcode directory deletion
+have separate symlink-boundary gaps beyond the media storage adapter's tests.
+These findings block a claim that authentication or storage remediation is complete.
+
 The first command facade is now wired. `app:serve` is the canonical name of the
 existing `ServerRunCommand`, retaining `swoole:server:run` as an alias and preserving
 its options, signal handling and BootManager behavior. `app:worker` uses an

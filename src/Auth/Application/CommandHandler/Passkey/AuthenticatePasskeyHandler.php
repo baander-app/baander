@@ -7,6 +7,7 @@ namespace App\Auth\Application\CommandHandler\Passkey;
 use App\Auth\Application\Command\Passkey\AuthenticatePasskeyCommand;
 use App\Auth\Application\Port\PasskeyVerifierInterface;
 use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
+use App\Shared\Domain\Model\Uuid;
 use RuntimeException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
@@ -30,9 +31,7 @@ final class AuthenticatePasskeyHandler
     {
         $response = $command->getResponse();
 
-        // Extract credential ID from the response (base64url-decode rawId)
-        $rawId = $response['rawId'] ?? $response['id'] ?? '';
-        $credentialId = self::base64UrlEncode(base64_decode($rawId, true) ?: $rawId);
+        $credentialId = self::credentialId($response);
 
         $passkey = $this->passkeyRepository->ofCredentialId($credentialId);
         if ($passkey === null) {
@@ -61,22 +60,51 @@ final class AuthenticatePasskeyHandler
             throw new RuntimeException('Possible cloned authenticator detected: signature counter did not increase.');
         }
 
-        $passkey->updateCounter($updatedCredential->counter);
-
-        // Mark the passkey as used
-        $this->passkeyRepository->markUsed($passkey);
-
-        // If userId was provided (username-less flow with discovery), return it directly.
-        if ($command->getUserId() !== null) {
-            return $command->getUserId();
-        }
-
         $userId = $this->passkeyRepository->userIdForCredentialId($credentialId);
         if ($userId === null) {
             throw new RuntimeException('Unable to resolve user for the given credential ID.');
         }
+        // Registration stores the owner's UUID string as the WebAuthn user handle.
+        if (!hash_equals($userId->toString(), $storedCredential->userHandle)) {
+            throw new RuntimeException('Credential owner does not match its registered user handle.');
+        }
+        $claimedUserId = $command->getUserId();
+        if ($claimedUserId !== null) {
+            try {
+                $claimed = Uuid::fromString($claimedUserId);
+            } catch (\InvalidArgumentException) {
+                throw new RuntimeException('Invalid claimed credential owner.');
+            }
+            if (!$userId->equals($claimed)) {
+                throw new RuntimeException('Claimed user does not own the verified credential.');
+            }
+        }
+
+        // Rejected owner hints never update or persist the credential's counter.
+        $passkey->updateCounter($updatedCredential->counter);
+        $this->passkeyRepository->markUsed($passkey);
 
         return $userId->toString();
+    }
+
+    /** @param array<string,mixed> $response */
+    private static function credentialId(array $response): string
+    {
+        $rawId = $response['rawId'] ?? $response['id'] ?? null;
+        if (!is_string($rawId) || $rawId === '' || strlen($rawId) > 2048
+            || preg_match('~\A[A-Za-z0-9+/_-]+={0,2}\z~D', $rawId) !== 1
+        ) {
+            throw new RuntimeException('Invalid credential identifier.');
+        }
+        $decoded = base64_decode(strtr($rawId, '-_', '+/'), true);
+        if ($decoded === false || $decoded === '') {
+            throw new RuntimeException('Invalid credential identifier.');
+        }
+        $canonical = self::base64UrlEncode($decoded);
+        if ($canonical !== rtrim(strtr($rawId, '+/', '-_'), '=')) {
+            throw new RuntimeException('Invalid credential identifier.');
+        }
+        return $canonical;
     }
 
     private static function base64UrlEncode(string $data): string

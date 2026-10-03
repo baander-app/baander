@@ -6,6 +6,7 @@ namespace App\Auth\Infrastructure\Security\Passkey;
 
 use App\Auth\Application\Command\Passkey\AuthenticatePasskeyCommand;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
+use App\Auth\Infrastructure\Security\SecurityUser;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -32,7 +33,7 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
     ) {
     }
 
-    public function supports(Request $request): ?bool
+    public function supports(Request $request): bool
     {
         return $request->getPathInfo() === '/api/auth/login/passkey'
             && $request->isMethod('POST');
@@ -40,23 +41,36 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
 
     public function authenticate(Request $request): Passport
     {
-        $data = $this->jsonEncoder->decode((string) $request->getContent(), 'json');
+        try {
+            $data = $this->jsonEncoder->decode((string) $request->getContent(), 'json');
+        } catch (\Throwable) {
+            throw new BadCredentialsException('Invalid credentials.');
+        }
+        if (!is_array($data)) {
+            throw new BadCredentialsException('Invalid credentials.');
+        }
 
         $challengeKey = $data['challengeKey'] ?? '';
         $response = $data['response'] ?? null;
+        $claimedUserId = $data['userId'] ?? null;
 
-        if ($challengeKey === '' || !is_array($response)) {
+        if (!is_string($challengeKey) || $challengeKey === '' || !is_array($response)
+            || ($claimedUserId !== null && !is_string($claimedUserId))) {
             throw new BadCredentialsException('Invalid credentials.');
         }
 
         $command = new AuthenticatePasskeyCommand(
-            userId: $data['userId'] ?? null,
+            userId: $claimedUserId,
             challengeKey: $challengeKey,
             response: $response,
         );
 
         try {
             $userId = $this->commandBus->dispatch($command)->last(HandledStamp::class)?->getResult();
+            if (!is_string($userId)) {
+                throw new BadCredentialsException('Invalid credentials.');
+            }
+            $uuid = Uuid::fromString($userId);
         } catch (\Throwable $e) {
             $this->logger->debug('Passkey authentication failed.', ['exception' => $e]);
             throw new BadCredentialsException('Invalid credentials.', 0, $e);
@@ -64,7 +78,6 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
 
         // The handler returns a user ID UUID string; use a custom loader that resolves
         // via UUID instead of going through UserProvider (which expects an email).
-        $uuid = Uuid::fromString($userId);
         return new SelfValidatingPassport(
             new UserBadge((string) $userId, function () use ($uuid): SecurityUser {
                 $user = $this->userRepository->findByUuid($uuid);
@@ -86,7 +99,7 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
         return null;
     }
 
-    public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
+    public function onAuthenticationFailure(Request $request, AuthenticationException $exception): Response
     {
         return new JsonResponse([
             'error' => [

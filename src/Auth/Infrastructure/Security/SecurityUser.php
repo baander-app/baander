@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Auth\Infrastructure\Security;
 
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 
-final class SecurityUser implements UserInterface, PasswordAuthenticatedUserInterface
+final class SecurityUser implements UserInterface, PasswordAuthenticatedUserInterface, AuthenticatedUserIdentityInterface
 {
     /**
      * @param string[] $roles
@@ -30,7 +31,7 @@ final class SecurityUser implements UserInterface, PasswordAuthenticatedUserInte
         return $this->email;
     }
 
-    public function getPassword(): ?string
+    public function getPassword(): string
     {
         return $this->password;
     }

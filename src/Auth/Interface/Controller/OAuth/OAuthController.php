@@ -13,6 +13,8 @@ use App\Auth\Domain\Repository\OAuth\AuthCodeRepositoryInterface as DomainAuthCo
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface as DomainClientRepository;
 use App\Auth\Domain\Repository\OAuth\DeviceCodeRepositoryInterface as DomainDeviceCodeRepository;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
+use App\Auth\Interface\OAuth\AuthorizationUser;
 use App\Auth\Infrastructure\Security\OAuth\DpopNonceManager;
 use App\Auth\Infrastructure\Security\OAuth\DpopProofValidator;
 use App\Auth\Interface\Request\OAuth\DeviceApproveRequest;
@@ -139,7 +141,7 @@ final class OAuthController
             $authRequest = $this->authorizationServer->validateAuthorizationRequest($psrRequest);
 
             $securityUser = $this->security->getUser();
-            if ($securityUser === null) {
+            if (!$securityUser instanceof AuthenticatedUserIdentityInterface) {
                 return $this->unauthorized();
             }
 
@@ -151,8 +153,8 @@ final class OAuthController
                 return $this->errorResponse($this->trans('errors.user_not_found', domain: 'auth'), Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 
-            $authRequest->setUser(new \League\OAuth2\Server\Entities\UserEntity(
-                $user->getId()->toString(),
+            $authRequest->setUser(new AuthorizationUser(
+                $user->getId(),
             ));
 
             $authRequest->setAuthorizationApproved(true);
@@ -171,7 +173,7 @@ final class OAuthController
 
                 // Persist the PKCE challenge on the issued authorization code so
                 // the domain token handler can verify the code_verifier later.
-                if ($codeChallenge !== null && $codeChallengeMethod !== null) {
+                if ($codeChallenge !== null) {
                     $this->persistCodeChallenge($location, $codeChallenge, $codeChallengeMethod);
                 }
             }
@@ -548,7 +550,7 @@ final class OAuthController
 
         if ($payload->action === 'approve') {
             $securityUser = $this->security->getUser();
-            if ($securityUser === null) {
+            if (!$securityUser instanceof AuthenticatedUserIdentityInterface) {
                 return $this->unauthorized();
             }
 
