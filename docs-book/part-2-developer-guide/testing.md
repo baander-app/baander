@@ -117,7 +117,8 @@ reconciliation without process activity, and registered startup/recovery.
 
 The worker-command runner boots the actual `app:worker` as PID 1 against disposable
 production-mode PostgreSQL and Redis after fresh and repeat migrations. It verifies
-two direct child roles and the namespace/boot-qualified Redis consumer, kills the
+two direct child roles, their exact committed deployment tuple (overriding a bogus
+inherited epoch), and the namespace/boot-qualified Redis consumer. It kills the
 consumer to require whole-container draining, tests TERM and forced database lease
 expiry, and confirms a duplicate
 lease claim exits with zero launch attempts. It checks that ownership remains
@@ -152,8 +153,14 @@ the nested effect, verify the configured Kernel services, and force a failure
 after an effect through actual Redis/Messenger retries. Redelivery must leave the
 consumed attempt intact without repeating the effect. Missing/future occurrences,
 lost commit acknowledgments and wrong-owner return markers cannot grant execution.
-This does not test automatic polling, deployment fencing or native console/media
-execution. No occurrence relay is enabled yet.
+Admission also rejects absent, malformed, expired or replaced deployment authority
+without consuming an attempt. Tests cover lease-row contention, authority lost
+during insertion with transaction rollback, and exact historical-owner receipts
+after expiry or replacement. The existing fresh-install execution migration
+requires the deployment tuple; this rewrites undeployed history and does not
+upgrade or reset an existing local database.
+This does not test automatic polling, fencing effects after lease expiry or native
+console/media execution. No occurrence relay is enabled yet.
 
 The functional runner also supplies the isolated PostgreSQL/Redis environment
 aliases used by integration tests that need the full migrated schema and kernel.

@@ -105,6 +105,33 @@ foreach (glob('/proc/[0-9]*/cmdline') ?: [] as $path) {
     if (isset($roles[$role])) {
         throw new RuntimeException('Duplicate production worker role.');
     }
+    $environment = @file_get_contents(dirname($path) . '/environ');
+    if ($environment === false) {
+        throw new RuntimeException('Could not inspect production role launch identity.');
+    }
+    $identity = [];
+    $expectedIdentity = [
+        'BAANDER_WORKER_NAMESPACE' => $namespace,
+        'BAANDER_WORKER_BOOT_ID' => $bootId,
+        'BAANDER_WORKER_LEASE_EPOCH' => (string) $row['epoch'],
+        'BAANDER_WORKER_ID' => $role,
+        'BAANDER_WORKER_GENERATION' => '1',
+        'MESSENGER_CONSUMER_NAME' => 'worker-' . substr(hash('sha256', $namespace), 0, 16) . '-' . $bootId . '-' . $role . '-1',
+    ];
+    foreach (explode("\0", $environment) as $entry) {
+        $pair = explode('=', $entry, 2);
+        if (count($pair) === 2 && array_key_exists($pair[0], $expectedIdentity)) {
+            if (array_key_exists($pair[0], $identity)) {
+                throw new RuntimeException('Duplicate production role launch identity field.');
+            }
+            $identity[$pair[0]] = $pair[1];
+        }
+    }
+    foreach ($expectedIdentity as $name => $expectedValue) {
+        if (($identity[$name] ?? null) !== $expectedValue) {
+            throw new RuntimeException('Production role has incorrect launch identity field: ' . $name);
+        }
+    }
     $roles[$role] = $pid;
 }
 if (count($roles) !== 2 || !isset($roles['consumer'], $roles['relay'])) {

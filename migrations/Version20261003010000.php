@@ -21,6 +21,9 @@ final class Version20261003010000 extends AbstractMigration
             CREATE TABLE scheduler_occurrence_executions (
                 occurrence_id UUID PRIMARY KEY REFERENCES scheduler_occurrences(id) ON DELETE RESTRICT,
                 attempt_id UUID NOT NULL UNIQUE,
+                deployment_namespace TEXT NOT NULL CHECK (deployment_namespace ~ '^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$'),
+                deployment_boot_id TEXT NOT NULL CHECK (deployment_boot_id ~ '^[0-9a-f]{32}$'),
+                deployment_epoch BIGINT NOT NULL CHECK (deployment_epoch > 0),
                 started_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
                 returned_at TIMESTAMPTZ DEFAULT NULL
             )

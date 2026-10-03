@@ -22,6 +22,8 @@ use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPoolInterface;
+use App\Shared\Infrastructure\Worker\DeploymentLease;
+use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
@@ -57,6 +59,7 @@ final class SchedulerOccurrenceGuardTest extends TestCase
     private Connection $writer;
     private Connection $observer;
     private string $schema;
+    private DeploymentLease $authority;
     /** @var list<RedisConnection> */
     private array $redisConnections = [];
 
@@ -74,7 +77,7 @@ final class SchedulerOccurrenceGuardTest extends TestCase
         foreach ([$this->writer, $this->observer] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema);
         }
-        foreach (['Version20261002230000', 'Version20261003010000'] as $version) {
+        foreach (['Version20261002210000', 'Version20261002230000', 'Version20261003010000'] as $version) {
             require_once dirname(__DIR__, 2) . '/migrations/' . $version . '.php';
             $class = 'DoctrineMigrations\\' . $version;
             $migration = new $class($this->writer, new NullLogger());
@@ -83,6 +86,9 @@ final class SchedulerOccurrenceGuardTest extends TestCase
                 $this->writer->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
             }
         }
+        $authority = (new DoctrineDeploymentLease($this->writer))->acquire('baander.app:scheduler-guard', str_repeat('a', 32), 300);
+        self::assertInstanceOf(DeploymentLease::class, $authority);
+        $this->authority = $authority;
     }
 
     public function testCommittedClaimPrecedesEffectAndRepeatedCommandDoesNotExecuteAgain(): void
@@ -107,18 +113,77 @@ final class SchedulerOccurrenceGuardTest extends TestCase
     public function testRealKernelResolvesConfiguredGuardAndDedicatedExecutionStore(): void
     {
         $kernel = new Kernel('test', false);
+        $variables = ['BAANDER_WORKER_NAMESPACE', 'BAANDER_WORKER_BOOT_ID', 'BAANDER_WORKER_LEASE_EPOCH'];
+        $server = $_SERVER;
+        $environment = $_ENV;
+        $actual = [];
+        foreach ($variables as $name) {
+            $actual[$name] = getenv($name);
+            unset($_SERVER[$name], $_ENV[$name]);
+            putenv($name);
+        }
         try {
             $kernel->boot();
             $container = $kernel->getContainer()->get('test.service_container');
             self::assertInstanceOf(SchedulerOccurrenceExecutionStoreInterface::class, $container->get(SchedulerOccurrenceExecutionStoreInterface::class));
             $handler = $container->get(ExecuteScheduledOccurrenceHandler::class);
             self::assertInstanceOf(ExecuteScheduledOccurrenceHandler::class, $handler);
-            // The configured DSN reaches the fully migrated disposable database.
-            // Missing intent performs no execution, including no console/CPU work.
-            $handler(new ExecuteScheduledOccurrenceCommand(Uuid::v7()));
+            // Maintenance/web boot remains available without worker authority,
+            // but even a missing occurrence cannot bypass the admission gate.
+            try {
+                $handler(new ExecuteScheduledOccurrenceCommand(Uuid::v7()));
+                self::fail('Configured execution without deployment authority must be denied.');
+            } catch (\RuntimeException $error) {
+                self::assertSame('Scheduler execution admission requires active deployment authority.', $error->getMessage());
+            }
         } finally {
-            $kernel->shutdown();
+            try {
+                $kernel->shutdown();
+            } finally {
+                foreach ($variables as $name) {
+                    if (array_key_exists($name, $server)) {
+                        $_SERVER[$name] = $server[$name];
+                    } else {
+                        unset($_SERVER[$name]);
+                    }
+                    if (array_key_exists($name, $environment)) {
+                        $_ENV[$name] = $environment[$name];
+                    } else {
+                        unset($_ENV[$name]);
+                    }
+                    putenv($actual[$name] === false ? $name : $name . '=' . $actual[$name]);
+                }
+            }
         }
+    }
+
+    public function testExpiredAuthorityDeniesBeforeReadingJobOrInvokingEffectAndRetainsIntent(): void
+    {
+        [$occurrence] = $this->recordOccurrence();
+        $jobs = $this->createMock(ScheduledJobPortInterface::class);
+        $jobs->expects(self::never())->method('getById');
+        $jobs->expects(self::never())->method('save');
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::never())->method('dispatch');
+        $pool = $this->createMock(CpuProcessPoolInterface::class);
+        $pool->expects(self::never())->method('dispatch');
+        $redis = $this->createMock(RedisClientFactory::class);
+        $redis->expects(self::never())->method('borrow');
+        $executor = new ExecuteScheduledJobHandler($jobs, new SchedulerRegistry([], []), $bus, $pool, $redis, new NullLogger());
+        $guard = new ExecuteScheduledOccurrenceHandler(new DoctrineSchedulerOccurrenceExecutionStore($this->writer, $this->authority), $executor);
+        $this->observer->executeStatement("UPDATE worker_deployment_leases SET expires_at = clock_timestamp() - INTERVAL '1 second' WHERE namespace = :namespace", ['namespace' => $this->authority->namespace]);
+
+        try {
+            $guard(new ExecuteScheduledOccurrenceCommand($occurrence->id));
+            self::fail('Expired authority must never reach the executor.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('Scheduler execution admission requires active deployment authority.', $error->getMessage());
+        }
+        self::assertSame(0, (int) $this->observer->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions'));
+        self::assertSame(1, (int) $this->observer->fetchOne('SELECT count(*) FROM scheduler_occurrences'));
+        $retained = (new DoctrineSchedulerOccurrenceStore($this->observer))->find($occurrence->jobId, $occurrence->scheduledFor);
+        self::assertNotNull($retained);
+        self::assertSame($occurrence->parametersJson(), $retained->parametersJson());
     }
 
     public function testFailurePersistingAfterEffectLeavesAdmissionConsumedAndRedeliveryDoesNotRepeatEffect(): void
@@ -238,6 +303,9 @@ final class SchedulerOccurrenceGuardTest extends TestCase
             $receipt = $this->receipt($occurrence);
             self::assertNotNull($receipt['started_at'], 'Independent connection must observe committed admission before the effect.');
             self::assertNull($receipt['returned_at']);
+            self::assertSame($this->authority->namespace, $receipt['deployment_namespace']);
+            self::assertSame($this->authority->bootId, $receipt['deployment_boot_id']);
+            self::assertSame($this->authority->epoch, (int) $receipt['deployment_epoch']);
             ++$effects;
             return new Envelope($message, $stamps);
         });
@@ -247,13 +315,13 @@ final class SchedulerOccurrenceGuardTest extends TestCase
         $pool->expects(self::never())->method('dispatch');
         $executor = new ExecuteScheduledJobHandler($jobs, new SchedulerRegistry([new GuardedSchedulerMessage('worker@baander.app', 1.0)], []),
             $bus, $pool, $redis, new NullLogger());
-        return new ExecuteScheduledOccurrenceHandler(new DoctrineSchedulerOccurrenceExecutionStore($this->writer), $executor);
+        return new ExecuteScheduledOccurrenceHandler(new DoctrineSchedulerOccurrenceExecutionStore($this->writer, $this->authority), $executor);
     }
 
     /** @return array<string, mixed> */
     private function receipt(SchedulerOccurrence $occurrence): array
     {
-        $row = $this->observer->fetchAssociative('SELECT attempt_id, started_at, returned_at FROM scheduler_occurrence_executions WHERE occurrence_id = :id', ['id' => $occurrence->id->toString()]);
+        $row = $this->observer->fetchAssociative('SELECT attempt_id, started_at, returned_at, deployment_namespace, deployment_boot_id, deployment_epoch FROM scheduler_occurrence_executions WHERE occurrence_id = :id', ['id' => $occurrence->id->toString()]);
         self::assertIsArray($row);
         self::assertNotSame('', $row['attempt_id']);
         return $row;

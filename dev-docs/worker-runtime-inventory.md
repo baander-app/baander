@@ -550,8 +550,13 @@ Statement and lock timeouts do not bound connection setup or network I/O.
 `scheduler.execute_occurrence` now carries only an occurrence UUID through the
 explicit JSON codec. Its registered handler loads the stored snapshot while
 committing a one-shot attempt in `scheduler_occurrence_executions`, using a
-dedicated connection. Missing and future occurrences grant no attempt; due-time
-admission uses the database clock. A duplicate never grants another invocation,
+dedicated connection. Admission requires the supervised child’s exact deployment
+namespace, boot ID and lease epoch. The supervisor supplies the committed epoch
+at each child launch, overriding any inherited value. The store locks the lease
+row, then checks active ownership and expiry using the database clock, and checks
+again after inserting and loading the snapshot. Denial rolls back the attempt.
+Missing or malformed authority fails closed; missing and future occurrences grant
+no attempt to an otherwise authorized caller. Due-time admission uses the database clock. A duplicate never grants another invocation,
 even with the same attempt ID or after an uncertain commit. No timeout reclaims
 an attempt. A foreign key prevents deletion of an already consumed intent.
 
@@ -563,7 +568,12 @@ messages retain their existing execution and lock behavior. These are point-in-t
 schedule checks, not a deployment-lease fence or protection against a concurrent
 schedule edit after the check.
 
-Only the exact attempt owner can record `returned_at`. This records a normal
+The existing fresh-install execution migration now requires the deployment tuple
+on every attempt. Historical ownership has no foreign key to the mutable lease
+row. No local database is reset or automatically upgraded by this history rewrite.
+
+Only the exact attempt and deployment owner can record `returned_at`, including
+after its lease expires or is replaced. This records a normal
 handler return, including cancellation or caught failure; it does not certify
 successful effects or stopped descendants. Exceptions and failed receipts leave
 the attempt consumed. In particular, an unknown console result may leave a child
@@ -571,19 +581,23 @@ running. Inspection and explicit outcome reconciliation remain necessary; no
 automatic reset or retry is authorized by either receipt state.
 
 The poller and relay do not yet produce occurrence messages, and no queue route
-has been enabled for them. Missed-tick recovery, deployment authority and bounded
-console execution independent of the web CPU pool remain open before cutover.
+has been enabled for them. Missed-tick recovery and bounded console execution
+independent of the web CPU pool remain open before cutover. Lease validation
+controls admission; it cannot stop effects already running after expiry.
 The guard prevents repeated wrapper invocation, not duplicate side effects from
 retries of downstream messages or exactly-once external delivery. It also does not
 serialize different occurrences of the same job; shared resource admission and
 long-running execution ownership remain cutover prerequisites.
 
-The occurrence, execution guard and schema-introspection checks pass 33 tests with
-259 assertions on disposable PostgreSQL/Redis after all 18 migrations and a repeat
+The occurrence, execution guard and schema-introspection checks pass 52 tests with
+372 assertions on disposable PostgreSQL/Redis after all 18 migrations and a repeat
 no-op migration run. They cover actual unique-key contention, independent
 visibility, failed and uncertain commits, immutable retry snapshots, future intent
 rejection, physical schema constraints and real Messenger redelivery after an
-effect. The configured Kernel resolves the guard and its dedicated store.
+effect. Lease admission checks cover stale and expired authority, contention,
+rollback when authority is lost during insertion, and historical-owner receipts.
+The configured Kernel resolves the guard and its dedicated store without granting
+authority to an unsupervised process.
 Baseline-free PHPStan level 6 passes for the new production code, migration and
 tests.
 

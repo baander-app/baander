@@ -52,9 +52,10 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
                     'app:outbox:consume', '--time-limit=86400', '--no-interaction'],
                     $this->projectDirectory, $configuration->relayReservationBytes, 30.0),
             ];
+            $authority = new LeaseAuthority($configuration->namespace, $configuration->bootId, 30, 10, 1);
             $runtime = new LeasedWorkerRuntime($definitions, 3, $configuration->memoryLimitBytes, $configuration->managementReservationBytes,
-                new LeaseAuthority($configuration->namespace, $configuration->bootId, 30, 10, 1),
-                static function (WorkerDefinition $definition, WorkerLaunchIdentity $identity) use ($environment, &$stopRequested, &$launchAttempts): WorkerChildProcess {
+                $authority,
+                static function (WorkerDefinition $definition, WorkerLaunchIdentity $identity) use ($authority, $environment, &$stopRequested, &$launchAttempts): WorkerChildProcess {
                     if ($stopRequested) {
                         throw new \RuntimeException('Worker admission stopped.');
                     }
@@ -62,6 +63,11 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
                     $childEnvironment['BAANDER_WORKER_ID'] = $identity->workerId;
                     $childEnvironment['BAANDER_WORKER_GENERATION'] = (string) $identity->generation;
                     $childEnvironment['MESSENGER_CONSUMER_NAME'] = 'worker-' . substr(hash('sha256', $identity->deploymentId), 0, 16) . '-' . $identity->supervisorBootId . '-' . $identity->workerId . '-' . $identity->generation;
+                    $lease = $authority->lease(hrtime(true) / 1e9);
+                    if ($lease === null || $lease->namespace !== $identity->deploymentId || $lease->bootId !== $identity->supervisorBootId) {
+                        throw new \RuntimeException('Worker admission requires current committed deployment authority.');
+                    }
+                    $childEnvironment['BAANDER_WORKER_LEASE_EPOCH'] = (string) $lease->epoch;
                     ++$launchAttempts;
                     return WorkerChildProcess::start($definition->argv, $definition->directory, STDOUT, STDERR, $childEnvironment);
                 },

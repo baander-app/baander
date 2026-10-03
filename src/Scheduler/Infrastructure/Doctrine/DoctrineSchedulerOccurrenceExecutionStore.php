@@ -8,6 +8,7 @@ use App\Scheduler\Application\DTO\SchedulerOccurrence;
 use App\Scheduler\Application\Port\SchedulerOccurrenceExecutionStoreInterface;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Worker\DeploymentLease;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
@@ -20,6 +21,7 @@ final class DoctrineSchedulerOccurrenceExecutionStore implements SchedulerOccurr
 {
     public function __construct(
         private readonly Connection $connection,
+        private readonly ?DeploymentLease $authority = null,
         private readonly int $statementTimeoutMs = 1000,
         private readonly int $lockTimeoutMs = 250,
     ) {
@@ -33,19 +35,39 @@ final class DoctrineSchedulerOccurrenceExecutionStore implements SchedulerOccurr
         if ($databaseUrl === '' || str_contains($databaseUrl, "\0")) {
             throw new \InvalidArgumentException('Scheduler execution store requires an explicit database URL.');
         }
-        return new self(DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($databaseUrl)));
+        $namespace = getenv('BAANDER_WORKER_NAMESPACE');
+        $bootId = getenv('BAANDER_WORKER_BOOT_ID');
+        $epoch = getenv('BAANDER_WORKER_LEASE_EPOCH');
+        $authority = null;
+        if ($namespace !== false && $bootId !== false && $epoch !== false) {
+            $epochValue = filter_var($epoch, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            try {
+                if (preg_match('/\A[1-9][0-9]*\z/D', $epoch) !== 1 || $epochValue === false) {
+                    throw new \InvalidArgumentException();
+                }
+                $authority = new DeploymentLease($namespace, $bootId, $epochValue);
+            } catch (\InvalidArgumentException) {
+                throw new \RuntimeException('Scheduler execution authority context is invalid.');
+            }
+        }
+        return new self(DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($databaseUrl)), $authority);
     }
 
     public function begin(Uuid $occurrenceId, Uuid $attemptId): ?SchedulerOccurrence
     {
-        return $this->operation(function () use ($occurrenceId, $attemptId): ?SchedulerOccurrence {
+        $authority = $this->authority;
+        if ($authority === null) {
+            throw new \RuntimeException('Scheduler execution admission requires active deployment authority.');
+        }
+        return $this->operation(function () use ($occurrenceId, $attemptId, $authority): ?SchedulerOccurrence {
+            $this->requireActiveAuthority($authority);
             $parameters = ['occurrence' => $occurrenceId->toString(), 'attempt' => $attemptId->toString()];
             $inserted = $this->connection->executeStatement(<<<'SQL'
-                INSERT INTO scheduler_occurrence_executions (occurrence_id, attempt_id)
-                SELECT id, CAST(:attempt AS UUID) FROM scheduler_occurrences
+                INSERT INTO scheduler_occurrence_executions (occurrence_id, attempt_id, deployment_namespace, deployment_boot_id, deployment_epoch)
+                SELECT id, CAST(:attempt AS UUID), :namespace, :boot, :epoch FROM scheduler_occurrences
                 WHERE id = :occurrence AND scheduled_for <= clock_timestamp()
                 ON CONFLICT DO NOTHING
-                SQL, $parameters);
+                SQL, $parameters + ['namespace' => $authority->namespace, 'boot' => $authority->bootId, 'epoch' => $authority->epoch]);
             if ($inserted !== 1) {
                 return null;
             }
@@ -62,24 +84,49 @@ final class DoctrineSchedulerOccurrenceExecutionStore implements SchedulerOccurr
             if (!is_array($snapshot)) {
                 throw new \UnexpectedValueException('Persisted scheduler parameters must be an array or object.');
             }
-            return new SchedulerOccurrence(Uuid::fromString($row['id']), Uuid::fromString($row['job_id']), new DateTimeImmutable($row['scheduled_for']), JobType::from($row['job_type']), $row['command'], $snapshot);
+            $occurrence = new SchedulerOccurrence(Uuid::fromString($row['id']), Uuid::fromString($row['job_id']), new DateTimeImmutable($row['scheduled_for']), JobType::from($row['job_type']), $row['command'], $snapshot);
+            $this->requireActiveAuthority($authority);
+            return $occurrence;
         });
     }
 
     /** A returned adapter is not proof of successful work or stopped descendants. */
     public function markReturned(Uuid $occurrenceId, Uuid $attemptId): bool
     {
-        return $this->operation(function () use ($occurrenceId, $attemptId): bool {
-            $parameters = ['occurrence' => $occurrenceId->toString(), 'attempt' => $attemptId->toString()];
+        $authority = $this->authority;
+        if ($authority === null) {
+            return false;
+        }
+        return $this->operation(function () use ($occurrenceId, $attemptId, $authority): bool {
+            $parameters = ['occurrence' => $occurrenceId->toString(), 'attempt' => $attemptId->toString(), 'namespace' => $authority->namespace, 'boot' => $authority->bootId, 'epoch' => $authority->epoch];
             $updated = $this->connection->executeStatement(<<<'SQL'
                 UPDATE scheduler_occurrence_executions SET returned_at = clock_timestamp()
-                WHERE occurrence_id = :occurrence AND attempt_id = :attempt AND returned_at IS NULL
+                WHERE occurrence_id = :occurrence AND attempt_id = :attempt
+                    AND deployment_namespace = :namespace AND deployment_boot_id = :boot AND deployment_epoch = :epoch
+                    AND returned_at IS NULL
                 SQL, $parameters);
             return $updated === 1 || $this->connection->fetchOne(<<<'SQL'
                 SELECT 1 FROM scheduler_occurrence_executions
-                WHERE occurrence_id = :occurrence AND attempt_id = :attempt AND returned_at IS NOT NULL
+                WHERE occurrence_id = :occurrence AND attempt_id = :attempt
+                    AND deployment_namespace = :namespace AND deployment_boot_id = :boot AND deployment_epoch = :epoch
+                    AND returned_at IS NOT NULL
                 SQL, $parameters) !== false;
         });
+    }
+
+    /** The lock serializes admission with lease replacement; it cannot fence effects after commit. */
+    private function requireActiveAuthority(DeploymentLease $authority): void
+    {
+        $locked = $this->connection->fetchOne('SELECT 1 FROM worker_deployment_leases WHERE namespace = :namespace FOR UPDATE', ['namespace' => $authority->namespace]);
+        // Evaluate database time after lock acquisition, not in a pre-wait predicate.
+        $active = $locked !== false && $this->connection->fetchOne(<<<'SQL'
+            SELECT 1 FROM worker_deployment_leases
+            WHERE namespace = :namespace AND owner_boot_id = :boot AND epoch = :epoch
+                AND state = 'active' AND expires_at > clock_timestamp()
+            SQL, ['namespace' => $authority->namespace, 'boot' => $authority->bootId, 'epoch' => $authority->epoch]) !== false;
+        if (!$active) {
+            throw new \RuntimeException('Scheduler execution admission requires active deployment authority.');
+        }
     }
 
     /**

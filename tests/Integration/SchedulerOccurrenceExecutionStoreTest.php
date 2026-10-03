@@ -9,6 +9,8 @@ use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceExecutionStore;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceStore;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Worker\DeploymentLease;
+use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
@@ -25,6 +27,7 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
     private Connection $first;
     private Connection $second;
     private string $schema;
+    private DeploymentLease $authority;
     /** @var array<string, mixed> */
     private array $params;
     /** @var list<Connection> */
@@ -44,21 +47,25 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         foreach ([$this->first, $this->second] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema);
         }
+        require_once dirname(__DIR__, 2) . '/migrations/Version20261002210000.php';
         require_once dirname(__DIR__, 2) . '/migrations/Version20261002230000.php';
         require_once dirname(__DIR__, 2) . '/migrations/Version20261003010000.php';
-        foreach ([new \DoctrineMigrations\Version20261002230000($this->first, new NullLogger()), new \DoctrineMigrations\Version20261003010000($this->first, new NullLogger())] as $migration) {
+        foreach ([new \DoctrineMigrations\Version20261002210000($this->first, new NullLogger()), new \DoctrineMigrations\Version20261002230000($this->first, new NullLogger()), new \DoctrineMigrations\Version20261003010000($this->first, new NullLogger())] as $migration) {
             $migration->up(new Schema());
             foreach ($migration->getSql() as $query) {
                 $this->first->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
             }
         }
+        $authority = (new DoctrineDeploymentLease($this->first))->acquire('baander.app:scheduler-test', str_repeat('a', 32), 3600);
+        self::assertNotNull($authority);
+        $this->authority = $authority;
     }
 
     public function testOneCommittedWinnerReturnsAuthoritativeTypedSnapshotAndEveryDuplicateIsDenied(): void
     {
         $occurrence = $this->seed();
         $attempt = Uuid::v7();
-        $store = new DoctrineSchedulerOccurrenceExecutionStore($this->first);
+        $store = new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority);
         $claimed = $store->begin($occurrence->id, $attempt);
         self::assertNotNull($claimed);
         self::assertSame($occurrence->id->toString(), $claimed->id->toString());
@@ -67,12 +74,15 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         self::assertSame($occurrence->jobType, $claimed->jobType);
         self::assertSame($occurrence->command, $claimed->command);
         self::assertSame(0, $this->first->getTransactionNestingLevel());
-        $row = $this->second->fetchAssociative('SELECT attempt_id, started_at, returned_at FROM scheduler_occurrence_executions');
+        $row = $this->second->fetchAssociative('SELECT attempt_id, started_at, returned_at, deployment_namespace, deployment_boot_id, deployment_epoch FROM scheduler_occurrence_executions');
         self::assertIsArray($row);
         self::assertSame($attempt->toString(), $row['attempt_id']);
+        self::assertSame($this->authority->namespace, $row['deployment_namespace']);
+        self::assertSame($this->authority->bootId, $row['deployment_boot_id']);
+        self::assertSame($this->authority->epoch, (int) $row['deployment_epoch']);
         self::assertNotNull($row['started_at']);
         self::assertNull($row['returned_at']);
-        $observer = new DoctrineSchedulerOccurrenceExecutionStore($this->second);
+        $observer = new DoctrineSchedulerOccurrenceExecutionStore($this->second, $this->authority);
         self::assertNull($observer->begin($occurrence->id, $attempt));
         self::assertNull($observer->begin(Uuid::fromString(strtoupper($occurrence->id->toString())), Uuid::v7()));
         self::assertSame(1, (int) $this->second->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions'));
@@ -82,7 +92,7 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
     {
         $occurrence = $this->seed();
         $attempt = Uuid::v7();
-        $store = new DoctrineSchedulerOccurrenceExecutionStore($this->first);
+        $store = new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority);
         self::assertNotNull($store->begin($occurrence->id, $attempt));
         self::assertFalse($store->markReturned($occurrence->id, Uuid::v7()));
         self::assertFalse($store->markReturned(Uuid::v7(), $attempt));
@@ -90,14 +100,14 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         self::assertTrue($store->markReturned($occurrence->id, $attempt));
         $returned = $this->second->fetchOne('SELECT returned_at FROM scheduler_occurrence_executions');
         self::assertNotNull($returned);
-        self::assertTrue((new DoctrineSchedulerOccurrenceExecutionStore($this->second))->markReturned($occurrence->id, $attempt));
+        self::assertTrue((new DoctrineSchedulerOccurrenceExecutionStore($this->second, $this->authority))->markReturned($occurrence->id, $attempt));
         self::assertSame($returned, $this->second->fetchOne('SELECT returned_at FROM scheduler_occurrence_executions'));
         self::assertNull($store->begin($occurrence->id, Uuid::v7()));
     }
 
     public function testMissingOccurrenceAndAttemptRebindingAreDeniedWithoutRows(): void
     {
-        $store = new DoctrineSchedulerOccurrenceExecutionStore($this->first);
+        $store = new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority);
         $attempt = Uuid::v7();
         self::assertNull($store->begin(Uuid::v7(), $attempt));
         self::assertSame(0, (int) $this->second->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions'));
@@ -114,9 +124,9 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         $future = new DateTimeImmutable($this->second->fetchOne("SELECT date_trunc('minute', clock_timestamp(), 'UTC') + INTERVAL '1 day'"));
         $occurrence = new SchedulerOccurrence(Uuid::v7(), Uuid::v7(), $future, JobType::Console, 'app:baander-check', []);
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->first))->record($occurrence));
-        $store = new DoctrineSchedulerOccurrenceExecutionStore($this->first);
+        $store = new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority);
         self::assertNull($store->begin($occurrence->id, Uuid::v7()));
-        self::assertNull((new DoctrineSchedulerOccurrenceExecutionStore($this->second))->begin($occurrence->id, Uuid::v7()));
+        self::assertNull((new DoctrineSchedulerOccurrenceExecutionStore($this->second, $this->authority))->begin($occurrence->id, Uuid::v7()));
         self::assertSame(0, (int) $this->second->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions'));
         self::assertSame(1, (int) $this->second->fetchOne('SELECT count(*) FROM scheduler_occurrences'));
     }
@@ -124,13 +134,13 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
     public function testPhysicalForeignKeyRejectsUnknownOccurrenceAndDeletionOfConsumedIntent(): void
     {
         try {
-            $this->first->executeStatement('INSERT INTO scheduler_occurrence_executions (occurrence_id, attempt_id) VALUES (:occurrence, :attempt)', ['occurrence' => Uuid::v7()->toString(), 'attempt' => Uuid::v7()->toString()]);
+            $this->first->executeStatement('INSERT INTO scheduler_occurrence_executions (occurrence_id, attempt_id, deployment_namespace, deployment_boot_id, deployment_epoch) VALUES (:occurrence, :attempt, :namespace, :boot, :epoch)', ['occurrence' => Uuid::v7()->toString(), 'attempt' => Uuid::v7()->toString(), 'namespace' => $this->authority->namespace, 'boot' => $this->authority->bootId, 'epoch' => $this->authority->epoch]);
             self::fail('Physical admission row must reference a retained occurrence.');
         } catch (DriverException $error) {
             self::assertSame('23503', $error->getSQLState());
         }
         $occurrence = $this->seed();
-        self::assertNotNull((new DoctrineSchedulerOccurrenceExecutionStore($this->first))->begin($occurrence->id, Uuid::v7()));
+        self::assertNotNull((new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority))->begin($occurrence->id, Uuid::v7()));
         try {
             $this->second->executeStatement('DELETE FROM scheduler_occurrences WHERE id = :id', ['id' => $occurrence->id->toString()]);
             self::fail('Consumed intent must not be deleted by a cascading relationship.');
@@ -148,13 +158,13 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         $attempt = Uuid::v7();
         $connection = $this->uncertainConnection($after);
         try {
-            (new DoctrineSchedulerOccurrenceExecutionStore($connection))->begin($occurrence->id, $attempt);
+            (new DoctrineSchedulerOccurrenceExecutionStore($connection, $this->authority))->begin($occurrence->id, $attempt);
             self::fail('A failed commit cannot acknowledge admission.');
         } catch (\RuntimeException $error) {
             self::assertSame('Fixture execution commit failed.', $error->getMessage());
         }
         self::assertFalse($connection->isConnected());
-        $observer = new DoctrineSchedulerOccurrenceExecutionStore($this->second);
+        $observer = new DoctrineSchedulerOccurrenceExecutionStore($this->second, $this->authority);
         if ($after) {
             self::assertSame($attempt->toString(), $this->second->fetchOne('SELECT attempt_id FROM scheduler_occurrence_executions'));
             self::assertNull($observer->begin($occurrence->id, $attempt));
@@ -176,10 +186,10 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
     {
         $occurrence = $this->seed();
         $attempt = Uuid::v7();
-        self::assertNotNull((new DoctrineSchedulerOccurrenceExecutionStore($this->first))->begin($occurrence->id, $attempt));
+        self::assertNotNull((new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority))->begin($occurrence->id, $attempt));
         $connection = $this->uncertainConnection(true);
         try {
-            (new DoctrineSchedulerOccurrenceExecutionStore($connection))->markReturned($occurrence->id, $attempt);
+            (new DoctrineSchedulerOccurrenceExecutionStore($connection, $this->authority))->markReturned($occurrence->id, $attempt);
             self::fail('Lost return commit cannot return acknowledged true.');
         } catch (\RuntimeException $error) {
             self::assertSame('Fixture execution commit failed.', $error->getMessage());
@@ -187,7 +197,7 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         self::assertFalse($connection->isConnected());
         $returned = $this->second->fetchOne('SELECT returned_at FROM scheduler_occurrence_executions');
         self::assertNotNull($returned);
-        $observer = new DoctrineSchedulerOccurrenceExecutionStore($this->second);
+        $observer = new DoctrineSchedulerOccurrenceExecutionStore($this->second, $this->authority);
         self::assertTrue($observer->markReturned($occurrence->id, $attempt));
         self::assertSame($returned, $this->second->fetchOne('SELECT returned_at FROM scheduler_occurrence_executions'));
         self::assertFalse($observer->markReturned($occurrence->id, Uuid::v7()));
@@ -199,10 +209,10 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         $occurrence = $this->seed();
         $winner = Uuid::v7();
         $this->second->beginTransaction();
-        $this->second->executeStatement('INSERT INTO scheduler_occurrence_executions (occurrence_id, attempt_id) VALUES (:occurrence, :attempt)', ['occurrence' => $occurrence->id->toString(), 'attempt' => $winner->toString()]);
+        $this->second->executeStatement('INSERT INTO scheduler_occurrence_executions (occurrence_id, attempt_id, deployment_namespace, deployment_boot_id, deployment_epoch) VALUES (:occurrence, :attempt, :namespace, :boot, :epoch)', ['occurrence' => $occurrence->id->toString(), 'attempt' => $winner->toString(), 'namespace' => $this->authority->namespace, 'boot' => $this->authority->bootId, 'epoch' => $this->authority->epoch]);
         $start = hrtime(true);
         try {
-            (new DoctrineSchedulerOccurrenceExecutionStore($this->first, 500, 50))->begin($occurrence->id, Uuid::v7());
+            (new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority, 500, 50))->begin($occurrence->id, Uuid::v7());
             self::fail('Uncommitted unique contender must block admission.');
         } catch (DriverException $error) {
             self::assertSame('55P03', $error->getSQLState());
@@ -211,7 +221,7 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         self::assertFalse($this->first->isConnected());
         $this->second->commit();
         $this->first->executeStatement('SET search_path TO ' . $this->schema);
-        self::assertNull((new DoctrineSchedulerOccurrenceExecutionStore($this->first))->begin($occurrence->id, Uuid::v7()));
+        self::assertNull((new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority))->begin($occurrence->id, Uuid::v7()));
         self::assertSame($winner->toString(), $this->second->fetchOne('SELECT attempt_id FROM scheduler_occurrence_executions'));
     }
 
@@ -219,7 +229,7 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
     {
         $occurrence = $this->seed();
         $this->first->beginTransaction();
-        $store = new DoctrineSchedulerOccurrenceExecutionStore($this->first);
+        $store = new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority);
         foreach ([fn () => $store->begin($occurrence->id, Uuid::v7()), fn () => $store->markReturned($occurrence->id, Uuid::v7())] as $operation) {
             try {
                 $operation();
@@ -232,6 +242,157 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         self::assertTrue($this->first->isConnected());
         self::assertSame(0, (int) $this->second->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions'));
         $this->first->rollBack();
+    }
+
+    public function testAbsentContextDeniesBeforeOpeningDatabaseAndCannotMarkReturn(): void
+    {
+        $occurrence = $this->seed();
+        $store = new DoctrineSchedulerOccurrenceExecutionStore($this->first);
+        self::assertFalse($store->markReturned($occurrence->id, Uuid::v7()));
+        try {
+            $store->begin($occurrence->id, Uuid::v7());
+            self::fail('Absent authority cannot admit any work.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('Scheduler execution admission requires active deployment authority.', $error->getMessage());
+        }
+        self::assertSame(0, (int) $this->second->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions'));
+    }
+
+    #[DataProvider('invalidLeaseStates')]
+    public function testInvalidLiveLeaseDeniesWithoutConsumingAttempt(string $state): void
+    {
+        $occurrence = $this->seed();
+        match ($state) {
+            'missing' => $this->second->executeStatement('DELETE FROM worker_deployment_leases'),
+            'expired' => $this->second->executeStatement("UPDATE worker_deployment_leases SET expires_at = clock_timestamp() - INTERVAL '1 second'"),
+            'boot' => $this->second->executeStatement('UPDATE worker_deployment_leases SET owner_boot_id = :boot', ['boot' => str_repeat('b', 32)]),
+            'epoch' => $this->second->executeStatement('UPDATE worker_deployment_leases SET epoch = epoch + 1'),
+            'retired' => $this->second->executeStatement("UPDATE worker_deployment_leases SET state = 'available'"),
+            default => throw new \LogicException('Unexpected test lease state.'),
+        };
+        try {
+            (new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority))->begin($occurrence->id, Uuid::v7());
+            self::fail('Only matching unexpired active lease can admit work.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('Scheduler execution admission requires active deployment authority.', $error->getMessage());
+        }
+        self::assertFalse($this->first->isConnected());
+        self::assertSame(0, (int) $this->second->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions'));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function invalidLeaseStates(): iterable
+    {
+        foreach (['missing', 'expired', 'boot', 'epoch', 'retired'] as $state) {
+            yield $state => [$state];
+        }
+    }
+
+    public function testHistoricalReceiptAllowsExpiredOwnerButRejectsDifferentContext(): void
+    {
+        $occurrence = $this->seed();
+        $attempt = Uuid::v7();
+        $store = new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority);
+        self::assertNotNull($store->begin($occurrence->id, $attempt));
+        $this->second->executeStatement("UPDATE worker_deployment_leases SET expires_at = clock_timestamp() - INTERVAL '1 second', owner_boot_id = :boot, epoch = epoch + 1, state = 'available'", ['boot' => str_repeat('b', 32)]);
+        foreach ([new DeploymentLease('baander.app:other-context', $this->authority->bootId, $this->authority->epoch), new DeploymentLease($this->authority->namespace, str_repeat('b', 32), $this->authority->epoch), new DeploymentLease($this->authority->namespace, $this->authority->bootId, $this->authority->epoch + 1)] as $wrong) {
+            self::assertFalse((new DoctrineSchedulerOccurrenceExecutionStore($this->second, $wrong))->markReturned($occurrence->id, $attempt));
+        }
+        self::assertNull($this->second->fetchOne('SELECT returned_at FROM scheduler_occurrence_executions'));
+        self::assertTrue($store->markReturned($occurrence->id, $attempt));
+        $returned = $this->second->fetchOne('SELECT returned_at FROM scheduler_occurrence_executions');
+        self::assertNotNull($returned);
+        self::assertTrue($store->markReturned($occurrence->id, $attempt));
+        self::assertSame($returned, $this->second->fetchOne('SELECT returned_at FROM scheduler_occurrence_executions'));
+    }
+
+    public function testAuthorityLostDuringInsertRollsBackAttemptBeforeGrant(): void
+    {
+        $occurrence = $this->seed();
+        $expiry = $this->second->fetchOne('SELECT expires_at FROM worker_deployment_leases');
+        $this->second->executeStatement(<<<'SQL'
+            CREATE FUNCTION expire_admission_lease() RETURNS trigger LANGUAGE plpgsql AS $$
+            BEGIN
+                UPDATE worker_deployment_leases SET expires_at = clock_timestamp() - INTERVAL '1 second';
+                RETURN NEW;
+            END $$
+            SQL);
+        $this->second->executeStatement('CREATE TRIGGER expire_admission BEFORE INSERT ON scheduler_occurrence_executions FOR EACH ROW EXECUTE FUNCTION expire_admission_lease()');
+        try {
+            (new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority))->begin($occurrence->id, Uuid::v7());
+            self::fail('Final database-clock check must reject authority lost during insertion.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('Scheduler execution admission requires active deployment authority.', $error->getMessage());
+        }
+        self::assertFalse($this->first->isConnected());
+        self::assertSame(0, (int) $this->second->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions'));
+        self::assertSame($expiry, $this->second->fetchOne('SELECT expires_at FROM worker_deployment_leases'), 'The rejected attempt and test trigger mutation both rolled back.');
+    }
+
+    public function testLeaseRowContentionIsBoundedAndCannotConsumeAdmission(): void
+    {
+        $occurrence = $this->seed();
+        $this->second->beginTransaction();
+        $this->second->fetchOne('SELECT 1 FROM worker_deployment_leases WHERE namespace = :namespace FOR UPDATE', ['namespace' => $this->authority->namespace]);
+        $started = hrtime(true);
+        try {
+            (new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority, 500, 50))->begin($occurrence->id, Uuid::v7());
+            self::fail('Lease-row contention must not bypass authority serialization.');
+        } catch (DriverException $error) {
+            self::assertSame('55P03', $error->getSQLState());
+        }
+        self::assertLessThan(2.0, (hrtime(true) - $started) / 1e9);
+        self::assertFalse($this->first->isConnected());
+        self::assertSame(0, (int) $this->second->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions'));
+        $this->second->rollBack();
+    }
+
+    #[DataProvider('environmentCases')]
+    public function testEnvironmentFactoryFailsClosedAndRestoresProcessValues(?string $namespace, ?string $bootId, ?string $epoch, bool $malformed): void
+    {
+        $values = ['BAANDER_WORKER_NAMESPACE' => $namespace, 'BAANDER_WORKER_BOOT_ID' => $bootId, 'BAANDER_WORKER_LEASE_EPOCH' => $epoch];
+        $previous = [];
+        foreach ($values as $key => $value) {
+            $previous[$key] = getenv($key);
+            putenv($value === null ? $key : $key . '=' . $value);
+        }
+        try {
+            if ($malformed) {
+                try {
+                    DoctrineSchedulerOccurrenceExecutionStore::fromDsn((string) getenv('OUTBOX_TEST_DATABASE_URL'));
+                    self::fail('Malformed complete context cannot construct an execution store.');
+                } catch (\RuntimeException $error) {
+                    self::assertSame('Scheduler execution authority context is invalid.', $error->getMessage());
+                }
+            } else {
+                $store = DoctrineSchedulerOccurrenceExecutionStore::fromDsn((string) getenv('OUTBOX_TEST_DATABASE_URL'));
+                self::assertFalse($store->markReturned(Uuid::v7(), Uuid::v7()));
+                try {
+                    $store->begin(Uuid::v7(), Uuid::v7());
+                    self::fail('Partial process context cannot authorize work.');
+                } catch (\RuntimeException $error) {
+                    self::assertSame('Scheduler execution admission requires active deployment authority.', $error->getMessage());
+                }
+            }
+        } finally {
+            foreach ($previous as $key => $value) {
+                putenv($value === false ? $key : $key . '=' . $value);
+            }
+        }
+    }
+
+    /** @return iterable<string, array{?string, ?string, ?string, bool}> */
+    public static function environmentCases(): iterable
+    {
+        yield 'no namespace' => [null, str_repeat('a', 32), '1', false];
+        yield 'no boot' => ['baander.app:scheduler-test', null, '1', false];
+        yield 'no epoch' => ['baander.app:scheduler-test', str_repeat('a', 32), null, false];
+        yield 'partial stale epoch' => [null, null, '9999', false];
+        yield 'bad namespace' => ['bad namespace', str_repeat('a', 32), '1', true];
+        yield 'bad boot' => ['baander.app:scheduler-test', 'invalid', '1', true];
+        yield 'zero epoch' => ['baander.app:scheduler-test', str_repeat('a', 32), '0', true];
+        yield 'overflow epoch' => ['baander.app:scheduler-test', str_repeat('a', 32), '99999999999999999999999', true];
+        yield 'fraction epoch' => ['baander.app:scheduler-test', str_repeat('a', 32), '1.0', true];
     }
 
     private function seed(): SchedulerOccurrence

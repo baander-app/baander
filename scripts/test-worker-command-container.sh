@@ -64,7 +64,7 @@ tar -cf - "${archive_paths[@]}" |
 launch() {
     local container="$1" namespace="$2" boot="$3"
     containers+=("$container")
-    docker run -d --name "$container" "${common[@]}" --memory=1024m --memory-swap=1024m \
+    docker run -d --name "$container" "${common[@]}" -e BAANDER_WORKER_LEASE_EPOCH=9999 --memory=1024m --memory-swap=1024m \
         --pids-limit=64 --restart=no --entrypoint sh "$app_image" -c '
             set -eu
             mkdir -m 700 /tmp/baander-worker-locks
