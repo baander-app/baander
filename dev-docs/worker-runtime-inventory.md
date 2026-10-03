@@ -806,7 +806,39 @@ and resource admission still need qualification before ownership cutover.
 
 No poller, relay loop or queue route has been enabled for occurrence messages.
 The per-job materializer now has a bounded, durable fair recovery pass.
-A supervised loop, resource admission and deployment wiring remain before cutover. Lease validation controls admission; it
+A callable CLI worker loop now combines recovery and relay with independent
+completion-based one-second intervals. Each pass retains its existing batch limits
+and durable retry deadlines. Recovery errors do not starve publication; either
+phase reports a static diagnostic and retries on its next interval. No exception
+payload or connection credential is copied into those diagnostics.
+
+The loop checks shutdown and fresh deployment authority before each phase, then
+checks shutdown again after the authority query. Authority loss or check failure
+exits the loop. The dedicated PostgreSQL checker requires the scheduler role and
+exact active, unexpired deployment token, without acquiring, renewing, releasing
+or locking that lease row. This is a committed preflight observation, not a fence
+against ownership changing after the check or while a batch runs. The loop waits
+in slices of at most 100 ms; database and transport I/O still have no hard wall-time
+bound here and require external process containment.
+
+The signal-owning entry method blocks TERM and INT while the loop runs and polls
+them synchronously between operations. Signals received during a native database
+wait remain pending until the next stop check, preventing the following phase.
+The original signal mask is restored on normal return and exceptions. A real
+child-process test holds a PostgreSQL table lock, sends TERM during recovery, and
+verifies normal exit without publishing a pending occurrence. This does not make
+blocked I/O interruptible or replace the supervisor shutdown deadline.
+
+The combined authority, worker-loop, recovery and relay integration checks pass
+55 tests with 366 assertions against disposable PostgreSQL and Redis. The full
+unit suite passes 3,506 tests with 12,763 assertions, including stale PCNTL error
+and signal-mask restoration regressions. Baseline-free PHPStan level 6 passes
+for this slice.
+
+This loop resolves in the container and runs in isolated process tests. It is not
+a Bootable service, public command or enabled supervisor role. Role reservation,
+manual-request recording at ingress, queue routing and an exclusive legacy shutdown
+boundary still need to be integrated together before cutover. Lease validation
 cannot stop effects already running after expiry.
 The guard prevents repeated wrapper invocation, not duplicate side effects from
 retries of downstream messages or exactly-once external delivery. Execution rows

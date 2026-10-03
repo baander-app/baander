@@ -1040,6 +1040,14 @@ services:
     App\Scheduler\Application\Port\SchedulerRecoveryScheduleStoreInterface:
         alias: App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerRecoveryScheduleStore
 
+    App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerWorkerAuthority:
+        factory: ['App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerWorkerAuthority', 'fromDsn']
+        arguments:
+            $databaseUrl: '%env(resolve:DATABASE_URL)%'
+
+    App\Scheduler\Application\Port\SchedulerWorkerAuthorityInterface:
+        alias: App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerWorkerAuthority
+
     App\Scheduler\Infrastructure\Process\BoundedScheduledConsoleExecutor:
         factory: ['App\Scheduler\Infrastructure\Process\BoundedScheduledConsoleExecutor', 'fromWorkerEnvironment']
         arguments:
@@ -1186,6 +1194,10 @@ services:
 
 when@test:
     services:
+        # Resolve the real loop without enabling a producer alongside legacy execution.
+        test.scheduler_worker_runner:
+            alias: App\Scheduler\Infrastructure\Process\SchedulerWorkerRunner
+            public: true
         test.scheduler_recovery_poller:
             alias: App\Scheduler\Application\Service\SchedulerRecoveryPoller
             public: true
