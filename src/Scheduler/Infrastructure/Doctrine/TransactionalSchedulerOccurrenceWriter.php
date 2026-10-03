@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Scheduler\Infrastructure\Doctrine;
 
+use App\Scheduler\Application\Exception\SchedulerOccurrenceConflict;
+
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
 use App\Scheduler\Application\DTO\SchedulerOccurrenceOrigin;
 use Doctrine\DBAL\Connection;
@@ -38,17 +40,17 @@ final readonly class TransactionalSchedulerOccurrenceWriter
             return true;
         }
         if ($this->connection->fetchOne('SELECT 1 FROM scheduler_occurrences WHERE id = :id AND (job_id <> :job OR scheduled_for <> :scheduled OR origin <> :origin)', ['id' => $parameters['id'], 'job' => $parameters['job'], 'scheduled' => $parameters['scheduled'], 'origin' => $parameters['origin']]) !== false) {
-            throw new \LogicException('Scheduler occurrence identifier is already assigned to another slot or origin.');
+            throw new SchedulerOccurrenceConflict('Scheduler occurrence identifier is already assigned to another slot or origin.');
         }
         $row = $occurrence->origin === SchedulerOccurrenceOrigin::Scheduled
             ? $this->connection->fetchAssociative("SELECT origin, job_type, command, parameters FROM scheduler_occurrences WHERE job_id = :job AND scheduled_for = :scheduled AND origin = 'scheduled'", ['job' => $parameters['job'], 'scheduled' => $parameters['scheduled']])
             : $this->connection->fetchAssociative('SELECT origin, job_type, command, parameters FROM scheduler_occurrences WHERE id = :id', ['id' => $parameters['id']]);
         if ($row === false || $row['origin'] !== $parameters['origin'] || $row['job_type'] !== $parameters['type'] || $row['command'] !== $parameters['command']) {
-            throw new \LogicException('Scheduler occurrence slot already has a different immutable snapshot.');
+            throw new SchedulerOccurrenceConflict('Scheduler occurrence slot already has a different immutable snapshot.');
         }
         $decoded = json_decode($row['parameters'], true, 32, JSON_THROW_ON_ERROR);
         if (!is_array($decoded) || json_encode($decoded, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION, 8) !== $parameters['parameters']) {
-            throw new \LogicException('Scheduler occurrence slot already has a different immutable snapshot.');
+            throw new SchedulerOccurrenceConflict('Scheduler occurrence slot already has a different immutable snapshot.');
         }
         // Scheduled retries preserve the original slot ID; manual retries reuse only their request ID.
         // Both preserve all dispatch/execution state.

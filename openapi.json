@@ -382,21 +382,18 @@
                 "tags": [
                     "Activity"
                 ],
-                "summary": "Record a play event for a song",
+                "summary": "Record a play event for a song or movie",
                 "operationId": "post_activity_play",
                 "requestBody": {
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
-                                "required": [
-                                    "songId"
-                                ],
                                 "properties": {
                                     "songId": {
                                         "description": "Public ID of the song being played",
                                         "type": "string",
-                                        "example": "aB3dE5fG7hJ9kL1mN3p"
+                                        "nullable": true
                                     },
                                     "albumId": {
                                         "description": "Public ID of the album",
@@ -6232,6 +6229,373 @@
                 }
             }
         },
+        "/api/discovery/register": {
+            "post": {
+                "tags": [
+                    "Discovery"
+                ],
+                "summary": "Register a self-hosted server",
+                "operationId": "post_discovery_register",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "serverUrl",
+                                    "name",
+                                    "version"
+                                ],
+                                "properties": {
+                                    "serverUrl": {
+                                        "type": "string",
+                                        "format": "uri"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "version": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Registered",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ServerInstanceResource"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/discovery/pairing-code": {
+            "post": {
+                "tags": [
+                    "Discovery"
+                ],
+                "summary": "Create a pairing code for a server",
+                "operationId": "post_discovery_pairing_code",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "serverPublicId",
+                                    "method"
+                                ],
+                                "properties": {
+                                    "serverPublicId": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                    },
+                                    "method": {
+                                        "type": "string",
+                                        "enum": [
+                                            "qr_code",
+                                            "email_url",
+                                            "server_code"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PairingSessionResource"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/discovery/qr-payload/{serverPublicId}": {
+            "get": {
+                "tags": [
+                    "Discovery"
+                ],
+                "summary": "Get QR payload for a pending pairing session",
+                "operationId": "get_discovery_qr_payload",
+                "parameters": [
+                    {
+                        "name": "serverPublicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "qrData": {
+                                                    "type": "string"
+                                                },
+                                                "pairingCode": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/discovery/complete-pairing": {
+            "post": {
+                "tags": [
+                    "Discovery"
+                ],
+                "summary": "Complete a pairing session",
+                "operationId": "post_discovery_complete_pairing",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "pairingCode",
+                                    "serverPublicId"
+                                ],
+                                "properties": {
+                                    "pairingCode": {
+                                        "type": "string"
+                                    },
+                                    "serverPublicId": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Completed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "serverUrl": {
+                                                    "type": "string",
+                                                    "format": "uri"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/favorites/": {
+            "get": {
+                "tags": [
+                    "Favorites"
+                ],
+                "summary": "List user favorites",
+                "operationId": "get_favorites_index",
+                "parameters": [
+                    {
+                        "name": "entityType",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "song",
+                                "album",
+                                "artist"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100,
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/FavoriteResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer"
+                                                },
+                                                "last_page": {
+                                                    "type": "integer"
+                                                },
+                                                "per_page": {
+                                                    "type": "integer"
+                                                },
+                                                "total": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Favorites"
+                ],
+                "summary": "Add a favorite",
+                "operationId": "post_favorites_add",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "entityType",
+                                    "entityPublicId"
+                                ],
+                                "properties": {
+                                    "entityType": {
+                                        "type": "string",
+                                        "enum": [
+                                            "song",
+                                            "album",
+                                            "artist"
+                                        ]
+                                    },
+                                    "entityPublicId": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/FavoriteResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid favorite payload"
+                    }
+                }
+            }
+        },
+        "/api/favorites/{publicId}": {
+            "delete": {
+                "tags": [
+                    "Favorites"
+                ],
+                "summary": "Remove a favorite",
+                "operationId": "delete_favorites_remove",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Removed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/libraries": {
             "get": {
                 "tags": [
@@ -9298,6 +9662,37 @@
                 }
             }
         },
+        "/api/webhooks/{id}/rotate-secret": {
+            "post": {
+                "tags": [
+                    "Webhooks"
+                ],
+                "summary": "Rotate a webhook secret and upgrade to signature version 2",
+                "operationId": "post_webhook_rotate_secret",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "New secret, returned once"
+                    },
+                    "403": {
+                        "description": "Administrator required"
+                    },
+                    "404": {
+                        "description": "Webhook not found"
+                    }
+                }
+            }
+        },
         "/api/party/sessions/{uuid}/members/": {
             "get": {
                 "tags": [
@@ -10433,6 +10828,121 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/qol/status": {
+            "get": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Get stream governor status",
+                "operationId": "get_admin_qol_status",
+                "responses": {
+                    "200": {
+                        "description": "Governor status"
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/qol/streams": {
+            "get": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "List active streams with budget allocations",
+                "operationId": "get_admin_qol_streams",
+                "responses": {
+                    "200": {
+                        "description": "Active streams"
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/qol/profile": {
+            "patch": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Update algorithm profile",
+                "operationId": "patch_admin_qol_profile",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "profile": {
+                                        "type": "string",
+                                        "enum": [
+                                            "conservative",
+                                            "balanced",
+                                            "aggressive"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Profile updated"
+                    },
+                    "400": {
+                        "description": "Invalid profile",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/qol/reset": {
+            "post": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Reset learning data and return to Learning state",
+                "operationId": "post_admin_qol_reset",
+                "responses": {
+                    "200": {
+                        "description": "Learning reset"
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -12636,9 +13146,19 @@
                 "tags": [
                     "Admin / Scheduler"
                 ],
-                "summary": "Manually trigger a scheduled job",
+                "summary": "Record a durable manual scheduled job request",
                 "operationId": "post_admin_scheduler_trigger",
                 "parameters": [
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "description": "Request UUID. Reuse this UUID after an uncertain response to recover the same occurrence. A UUID is generated if omitted.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
                     {
                         "name": "id",
                         "in": "path",
@@ -12649,14 +13169,33 @@
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "Job triggered",
+                    "202": {
+                        "description": "Manual request durably accepted; execution is asynchronous",
+                        "headers": {
+                            "Idempotency-Key": {
+                                "description": "Accepted request UUID",
+                                "schema": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                }
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/components/schemas/ScheduledJobResource"
+                                            "properties": {
+                                                "occurrenceId": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                },
+                                                "jobId": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
@@ -12664,8 +13203,28 @@
                             }
                         }
                     },
+                    "400": {
+                        "description": "Invalid request UUID",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Request UUID already belongs to another job or origin",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "404": {
-                        "description": "Job not found",
+                        "description": "Job not found for a new request",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -14995,7 +15554,7 @@
                 }
             }
         },
-        "/api/stream/{videoId}/master.m3u8": {
+        "/api/transcode/{videoId}/master.m3u8": {
             "get": {
                 "tags": [
                     "Streaming"
@@ -15024,7 +15583,7 @@
                 }
             }
         },
-        "/api/stream/{jobPublicId}/media.m3u8": {
+        "/api/transcode/{jobPublicId}/media.m3u8": {
             "get": {
                 "tags": [
                     "Streaming"
@@ -15052,7 +15611,7 @@
                 }
             }
         },
-        "/api/stream/{videoId}/manifest.mpd": {
+        "/api/transcode/{videoId}/manifest.mpd": {
             "get": {
                 "tags": [
                     "Streaming"
@@ -15081,7 +15640,7 @@
                 }
             }
         },
-        "/api/stream/{videoId}/quality-ladder": {
+        "/api/transcode/{videoId}/quality-ladder": {
             "get": {
                 "tags": [
                     "Streaming"
@@ -15133,13 +15692,13 @@
                 }
             }
         },
-        "/api/stream/{jobPublicId}/init.mp4": {
+        "/api/transcode/{jobPublicId}/subtitles/{language}/media.m3u8": {
             "get": {
                 "tags": [
-                    "Stream"
+                    "Streaming"
                 ],
-                "summary": "Get CMAF init segment",
-                "operationId": "get_stream_segment_init_segment",
+                "summary": "Get HLS subtitle playlist for a language",
+                "operationId": "get_stream_subtitle_manifest",
                 "parameters": [
                     {
                         "name": "jobPublicId",
@@ -15149,21 +15708,24 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "name": "language",
+                        "in": "path",
+                        "description": "BCP-47 language tag",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "fMP4 init segment",
+                        "description": "HLS subtitle manifest",
                         "content": {
-                            "video/mp4": {}
-                        }
-                    },
-                    "404": {
-                        "description": "Not found",
-                        "content": {
-                            "application/json": {
+                            "application/vnd.apple.mpegurl": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/ApiError"
+                                    "type": "string"
                                 }
                             }
                         }
@@ -15171,12 +15733,35 @@
                 }
             }
         },
-        "/api/stream/{jobPublicId}/seg_{index}.m4s": {
+        "/api/transcode/{jobPublicId}/init": {
             "get": {
                 "tags": [
                     "Stream"
                 ],
-                "summary": "Get a CMAF media segment",
+                "operationId": "get_stream_segment_init_segment",
+                "parameters": [
+                    {
+                        "name": "jobPublicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/transcode/{jobPublicId}/segment": {
+            "get": {
+                "tags": [
+                    "Stream"
+                ],
+                "summary": "Get fMP4 media segment (query-param routed)",
                 "operationId": "get_stream_segment_segment",
                 "parameters": [
                     {
@@ -15190,8 +15775,26 @@
                     },
                     {
                         "name": "index",
-                        "in": "path",
+                        "in": "query",
                         "description": "Segment index",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "sig",
+                        "in": "query",
+                        "description": "URL signature",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "exp",
+                        "in": "query",
+                        "description": "Expiry timestamp",
                         "required": true,
                         "schema": {
                             "type": "integer"
@@ -15208,6 +15811,9 @@
                     "202": {
                         "description": "Segment not yet encoded"
                     },
+                    "403": {
+                        "description": "Invalid or expired signature"
+                    },
                     "404": {
                         "description": "Not found",
                         "content": {
@@ -15217,6 +15823,135 @@
                                 }
                             }
                         }
+                    }
+                }
+            }
+        },
+        "/api/transcode/{jobPublicId}/subtitles/{language}/{segment}.vtt": {
+            "get": {
+                "tags": [
+                    "Stream"
+                ],
+                "summary": "Get subtitle segment (WebVTT)",
+                "operationId": "get_stream_segment_subtitle_segment",
+                "parameters": [
+                    {
+                        "name": "jobPublicId",
+                        "in": "path",
+                        "description": "Job public ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "language",
+                        "in": "path",
+                        "description": "BCP-47 language tag",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "segment",
+                        "in": "path",
+                        "description": "Segment name",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "sig",
+                        "in": "query",
+                        "description": "URL signature",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "exp",
+                        "in": "query",
+                        "description": "Expiry timestamp",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "WebVTT subtitle file",
+                        "content": {
+                            "text/vtt": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Invalid or expired signature"
+                    },
+                    "404": {
+                        "description": "Not found"
+                    }
+                }
+            }
+        },
+        "/api/stream/sign": {
+            "post": {
+                "tags": [
+                    "Stream"
+                ],
+                "summary": "Generate a signed URL for a stream resource",
+                "operationId": "post_stream_signing_sign",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "path": {
+                                        "type": "string",
+                                        "example": "/api/transcode/00000000-0000-4000-8000-000000000001/master.m3u8"
+                                    },
+                                    "expiresInSeconds": {
+                                        "type": "integer",
+                                        "example": 86400
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Signed URL generated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "url": {
+                                            "type": "string"
+                                        },
+                                        "sig": {
+                                            "type": "string"
+                                        },
+                                        "exp": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request"
                     }
                 }
             }
@@ -15338,6 +16073,72 @@
                                         }
                                     },
                                     "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/transcode/jobs/{publicId}/metrics": {
+            "get": {
+                "tags": [
+                    "Transcode"
+                ],
+                "summary": "Get transcode job metrics",
+                "operationId": "get_transcode_job_metrics",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "description": "Job public ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TranscodeMetricsResource"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/transcode/jobs/list": {
+            "get": {
+                "tags": [
+                    "Transcode"
+                ],
+                "summary": "List transcode jobs for the authenticated user",
+                "operationId": "get_transcode_job_list",
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -15587,6 +16388,77 @@
                         }
                     }
                 }
+            },
+            "patch": {
+                "tags": [
+                    "Transcode"
+                ],
+                "summary": "Update a transcode session",
+                "operationId": "patch_transcode_session_update",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Session UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "audioProfile": {
+                                        "type": "string",
+                                        "enum": [
+                                            "mobile_mono",
+                                            "mobile_stereo",
+                                            "streaming_stereo",
+                                            "streaming_5.1",
+                                            "broadcast_stereo",
+                                            "broadcast_5.1",
+                                            "hifi_stereo",
+                                            "opus_stereo"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/transcode/sessions/{uuid}/pause": {
@@ -15678,6 +16550,95 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/transcode/sessions/list": {
+            "get": {
+                "tags": [
+                    "Transcode"
+                ],
+                "summary": "List all transcode sessions for the authenticated user",
+                "operationId": "get_transcode_session_list",
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/transcode/sessions/{uuid}/position": {
+            "post": {
+                "tags": [
+                    "Transcode"
+                ],
+                "summary": "Update transcode session playback position (seek signal)",
+                "operationId": "post_transcode_session_position",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Session UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "position": {
+                                        "type": "number",
+                                        "format": "float"
+                                    },
+                                    "action": {
+                                        "type": "string",
+                                        "enum": [
+                                            "seek",
+                                            "pause",
+                                            "resume"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Position updated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string"
+                                        },
+                                        "position": {
+                                            "type": "number"
+                                        }
+                                    },
+                                    "type": "object"
                                 }
                             }
                         }
@@ -17373,20 +18334,116 @@
                     }
                 }
             }
+        },
+        "/api/user/theme-mood/": {
+            "get": {
+                "tags": [
+                    "User Preferences"
+                ],
+                "summary": "Get theme mood",
+                "description": "Returns the current theme mood for the authenticated user.",
+                "operationId": "get_theme_mood_index",
+                "responses": {
+                    "200": {
+                        "description": "Theme mood",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "mood": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "User Preferences"
+                ],
+                "summary": "Update theme mood",
+                "operationId": "put_theme_mood_update",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "mood"
+                                ],
+                                "properties": {
+                                    "mood": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Mood updated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "mood": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid input",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "components": {
         "schemas": {
             "PlayActivityRequest": {
-                "required": [
-                    "songId"
-                ],
                 "properties": {
                     "songId": {
                         "description": "Public ID of the song being played",
                         "type": "string",
-                        "example": "aB3dE5fG7hJ9kL1mN3p",
-                        "default": ""
+                        "nullable": true,
+                        "default": null
                     },
                     "albumId": {
                         "description": "Public ID of the album",
@@ -18201,6 +19258,91 @@
                 },
                 "type": "object"
             },
+            "RegisterServerRequest": {
+                "required": [
+                    "serverUrl",
+                    "name",
+                    "version"
+                ],
+                "properties": {
+                    "serverUrl": {
+                        "type": "string",
+                        "format": "uri",
+                        "default": ""
+                    },
+                    "name": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "version": {
+                        "type": "string",
+                        "default": ""
+                    }
+                },
+                "type": "object"
+            },
+            "CreatePairingCodeRequest": {
+                "required": [
+                    "serverPublicId",
+                    "method"
+                ],
+                "properties": {
+                    "serverPublicId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "default": ""
+                    },
+                    "method": {
+                        "type": "string",
+                        "default": "",
+                        "enum": [
+                            "qr_code",
+                            "email_url",
+                            "server_code"
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "CompletePairingRequest": {
+                "required": [
+                    "pairingCode",
+                    "serverPublicId"
+                ],
+                "properties": {
+                    "pairingCode": {
+                        "type": "string",
+                        "example": "BCDF-GHJK",
+                        "default": ""
+                    },
+                    "serverPublicId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "default": ""
+                    }
+                },
+                "type": "object"
+            },
+            "AddFavoriteRequest": {
+                "required": [
+                    "entityType",
+                    "entityPublicId"
+                ],
+                "properties": {
+                    "entityType": {
+                        "type": "string",
+                        "enum": [
+                            "song",
+                            "album",
+                            "artist"
+                        ]
+                    },
+                    "entityPublicId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "CreateLibraryRequest": {
                 "required": [
                     "name",
@@ -18858,6 +20000,27 @@
                             "normal",
                             "low",
                             "bulk"
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "UpdateTranscodeSessionRequest": {
+                "properties": {
+                    "audioProfile": {
+                        "type": "string",
+                        "example": "streaming_stereo",
+                        "nullable": true,
+                        "default": null,
+                        "enum": [
+                            "mobile_mono",
+                            "mobile_stereo",
+                            "streaming_stereo",
+                            "streaming_5.1",
+                            "broadcast_stereo",
+                            "broadcast_5.1",
+                            "hifi_stereo",
+                            "opus_stereo"
                         ]
                     }
                 },
@@ -19624,7 +20787,11 @@
                     "uuid",
                     "publicId",
                     "title",
-                    "createdAt"
+                    "videoIds",
+                    "genres",
+                    "videos",
+                    "createdAt",
+                    "updatedAt"
                 ],
                 "properties": {
                     "uuid": {
@@ -19651,8 +20818,95 @@
                         "type": "string",
                         "nullable": true
                     },
+                    "overview": {
+                        "description": "TMDB overview",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "tagline": {
+                        "description": "Movie tagline",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "posterUrl": {
+                        "description": "Poster image URL",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "backdropUrl": {
+                        "description": "Backdrop image URL",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "runtime": {
+                        "description": "Runtime in minutes",
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "rating": {
+                        "description": "TMDB vote average",
+                        "type": "number",
+                        "format": "float",
+                        "nullable": true
+                    },
+                    "originalLanguage": {
+                        "description": "Original language code",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "tmdbId": {
+                        "description": "TMDB ID",
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "imdbId": {
+                        "description": "IMDB ID",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "tmdbCollectionId": {
+                        "description": "TMDB collection ID",
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "collectionName": {
+                        "description": "Collection name",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "videoIds": {
+                        "description": "Video UUIDs",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "posterImage": {
+                        "description": "Poster image data",
+                        "type": "object",
+                        "nullable": true
+                    },
+                    "genres": {
+                        "description": "Genre list",
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    },
+                    "videos": {
+                        "description": "Video variants",
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    },
                     "createdAt": {
                         "description": "Creation timestamp",
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updatedAt": {
+                        "description": "Update timestamp",
                         "type": "string",
                         "format": "date-time"
                     }
@@ -19697,6 +20951,176 @@
                     },
                     "perPage": {
                         "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "ServerInstanceResource": {
+                "required": [
+                    "uuid",
+                    "publicId",
+                    "serverUrl",
+                    "name",
+                    "apiKey",
+                    "version",
+                    "status",
+                    "createdAt"
+                ],
+                "properties": {
+                    "uuid": {
+                        "description": "Server UUID",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "publicId": {
+                        "description": "Public identifier",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "serverUrl": {
+                        "description": "Server base URL",
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "name": {
+                        "description": "Server display name",
+                        "type": "string"
+                    },
+                    "apiKey": {
+                        "description": "Server API key (returned on registration only)",
+                        "type": "string"
+                    },
+                    "version": {
+                        "description": "Server version",
+                        "type": "string"
+                    },
+                    "status": {
+                        "description": "Server status",
+                        "type": "string",
+                        "enum": [
+                            "online",
+                            "offline",
+                            "maintenance"
+                        ]
+                    },
+                    "lastHeartbeatAt": {
+                        "description": "Last heartbeat timestamp",
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "createdAt": {
+                        "description": "Registration timestamp",
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "PairingSessionResource": {
+                "required": [
+                    "uuid",
+                    "publicId",
+                    "serverPublicId",
+                    "serverUrl",
+                    "serverName",
+                    "pairingCode",
+                    "method",
+                    "createdAt"
+                ],
+                "properties": {
+                    "uuid": {
+                        "description": "Pairing session UUID",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "publicId": {
+                        "description": "Public identifier",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "serverPublicId": {
+                        "description": "Server public ID",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "serverUrl": {
+                        "description": "Server base URL",
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "serverName": {
+                        "description": "Server display name",
+                        "type": "string"
+                    },
+                    "pairingCode": {
+                        "description": "Human-readable pairing code",
+                        "type": "string"
+                    },
+                    "method": {
+                        "description": "Authentication method",
+                        "type": "string",
+                        "enum": [
+                            "qr_code",
+                            "email_url",
+                            "server_code"
+                        ]
+                    },
+                    "expiresAt": {
+                        "description": "Expiration timestamp",
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "completedAt": {
+                        "description": "Completion timestamp",
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "createdAt": {
+                        "description": "Creation timestamp",
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "FavoriteResource": {
+                "required": [
+                    "uuid",
+                    "publicId",
+                    "entityType",
+                    "entityPublicId",
+                    "createdAt"
+                ],
+                "properties": {
+                    "uuid": {
+                        "description": "Favorite UUID",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "publicId": {
+                        "description": "Public identifier",
+                        "type": "string"
+                    },
+                    "entityType": {
+                        "description": "Entity type",
+                        "type": "string",
+                        "enum": [
+                            "song",
+                            "album",
+                            "artist"
+                        ]
+                    },
+                    "entityPublicId": {
+                        "description": "Entity public ID",
+                        "type": "string"
+                    },
+                    "createdAt": {
+                        "description": "Creation timestamp",
+                        "type": "string",
+                        "format": "date-time"
                     }
                 },
                 "type": "object"
@@ -20169,6 +21593,68 @@
                 },
                 "type": "object"
             },
+            "TranscodeMetricsResource": {
+                "required": [
+                    "uuid",
+                    "publicId",
+                    "videoId",
+                    "qualityTier",
+                    "status",
+                    "progress",
+                    "totalSegments",
+                    "completedSegments",
+                    "createdAt",
+                    "updatedAt"
+                ],
+                "properties": {
+                    "uuid": {
+                        "description": "Job UUID",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "publicId": {
+                        "description": "Public identifier",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "videoId": {
+                        "description": "Video UUID",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "qualityTier": {
+                        "description": "Quality tier name",
+                        "type": "string"
+                    },
+                    "status": {
+                        "description": "Job status",
+                        "type": "string"
+                    },
+                    "progress": {
+                        "description": "Progress from 0 to 1",
+                        "type": "number"
+                    },
+                    "totalSegments": {
+                        "description": "Total segments",
+                        "type": "integer"
+                    },
+                    "completedSegments": {
+                        "description": "Completed segments",
+                        "type": "integer"
+                    },
+                    "createdAt": {
+                        "description": "Creation timestamp",
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updatedAt": {
+                        "description": "Last update timestamp",
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
             "TranscodeSessionResource": {
                 "required": [
                     "uuid",
@@ -20409,6 +21895,14 @@
             "name": "Artist Cover"
         },
         {
+            "name": "Discovery",
+            "description": "Server discovery and pairing endpoints"
+        },
+        {
+            "name": "Favorites",
+            "description": "User favorites endpoints"
+        },
+        {
             "name": "Library",
             "description": "Media library management endpoints"
         },
@@ -20498,7 +21992,7 @@
         },
         {
             "name": "Stream",
-            "description": "HLS segment delivery endpoints"
+            "description": "HLS streaming endpoints"
         },
         {
             "name": "Transcode",

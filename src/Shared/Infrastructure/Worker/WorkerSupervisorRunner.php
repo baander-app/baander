@@ -14,9 +14,10 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
     {
         if (!str_starts_with($projectDirectory, '/') || realpath($projectDirectory) !== $projectDirectory
             || !is_file($projectDirectory . '/bin/console') || !is_file($projectDirectory . '/bin/worker-lease-agent.php')
+            || !is_file($projectDirectory . '/bin/worker-scheduler.php')
             || $databaseUrl === '' || str_contains($databaseUrl, "\0")
         ) {
-            throw new \InvalidArgumentException('Worker runner requires a trusted canonical project with console/lease entrypoints and a database URL.');
+            throw new \InvalidArgumentException('Worker runner requires a trusted canonical project with console/lease/scheduler entrypoints and a database URL.');
         }
     }
 
@@ -44,32 +45,15 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
             $environment['BAANDER_WORKER_NAMESPACE'] = $configuration->namespace;
             $environment['BAANDER_WORKER_BOOT_ID'] = $configuration->bootId;
             $launchAttempts = 0;
-            $definitions = [
-                new WorkerDefinition('consumer', [PHP_BINARY, '-d', 'memory_limit=256M', $this->projectDirectory . '/bin/console',
-                    'messenger:consume', 'async', '--memory-limit=256M', '--keepalive=30', '--no-interaction'],
-                    $this->projectDirectory, $configuration->consumerReservationBytes + $configuration->scheduledConsoleReservationBytes, 30.0,
-                    descendantProcessReservation: $configuration->scheduledConsoleReservationBytes === 0 ? 0 : 1),
-                new WorkerDefinition('relay', [PHP_BINARY, '-d', 'memory_limit=256M', $this->projectDirectory . '/bin/console',
-                    'app:outbox:consume', '--time-limit=86400', '--no-interaction'],
-                    $this->projectDirectory, $configuration->relayReservationBytes, 30.0),
-            ];
+            $definitions = $this->definitions($configuration);
             $authority = new LeaseAuthority($configuration->namespace, $configuration->bootId, 30, 10, 1);
-            $runtime = new LeasedWorkerRuntime($definitions, 3 + ($configuration->scheduledConsoleReservationBytes === 0 ? 0 : 1), $configuration->memoryLimitBytes, $configuration->managementReservationBytes,
+            $runtime = new LeasedWorkerRuntime($definitions, 4 + ($configuration->scheduledConsoleReservationBytes === 0 ? 0 : 1), $configuration->memoryLimitBytes, $configuration->managementReservationBytes,
                 $authority,
                 function (WorkerDefinition $definition, WorkerLaunchIdentity $identity) use ($authority, $environment, $configuration, &$stopRequested, &$launchAttempts): WorkerChildProcess {
                     if ($stopRequested) {
                         throw new \RuntimeException('Worker admission stopped.');
                     }
-                    $childEnvironment = $environment;
-                    $childEnvironment['BAANDER_WORKER_ID'] = $identity->workerId;
-                    $childEnvironment['BAANDER_WORKER_GENERATION'] = (string) $identity->generation;
-                    $childEnvironment['MESSENGER_CONSUMER_NAME'] = 'worker-' . substr(hash('sha256', $identity->deploymentId), 0, 16) . '-' . $identity->supervisorBootId . '-' . $identity->workerId . '-' . $identity->generation;
-                    $lease = $authority->lease(hrtime(true) / 1e9);
-                    if ($lease === null || $lease->namespace !== $identity->deploymentId || $lease->bootId !== $identity->supervisorBootId) {
-                        throw new \RuntimeException('Worker admission requires current committed deployment authority.');
-                    }
-                    $childEnvironment['BAANDER_WORKER_LEASE_EPOCH'] = (string) $lease->epoch;
-                    $childEnvironment = $this->roleEnvironment($childEnvironment, $definition, $configuration);
+                    $childEnvironment = $this->childEnvironment($environment, $definition, $configuration, $identity, $authority, hrtime(true) / 1e9);
                     ++$launchAttempts;
                     return WorkerChildProcess::start($definition->argv, $definition->directory, STDOUT, STDERR, $childEnvironment);
                 },
@@ -147,6 +131,44 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
         }
     }
 
+    /** @return list<WorkerDefinition> */
+    private function definitions(WorkerRuntimeConfiguration $configuration): array
+    {
+        return [
+            new WorkerDefinition('consumer', [PHP_BINARY, '-d', 'memory_limit=256M', $this->projectDirectory . '/bin/console',
+                'messenger:consume', 'async', 'scheduler', '--memory-limit=256M', '--keepalive=30', '--no-interaction'],
+                $this->projectDirectory, $configuration->consumerReservationBytes + $configuration->scheduledConsoleReservationBytes, 30.0,
+                descendantProcessReservation: $configuration->scheduledConsoleReservationBytes === 0 ? 0 : 1),
+            new WorkerDefinition('relay', [PHP_BINARY, '-d', 'memory_limit=256M', $this->projectDirectory . '/bin/console',
+                'app:outbox:consume', '--time-limit=86400', '--no-interaction'],
+                $this->projectDirectory, $configuration->relayReservationBytes, 30.0),
+            new WorkerDefinition('scheduler', [PHP_BINARY, '-d', 'memory_limit=256M', $this->projectDirectory . '/bin/worker-scheduler.php'],
+                $this->projectDirectory, $configuration->schedulerReservationBytes, 30.0),
+        ];
+    }
+
+    /**
+     * @param array<string, string> $environment
+     * @return array<string, string>
+     */
+    private function childEnvironment(array $environment, WorkerDefinition $definition, WorkerRuntimeConfiguration $configuration, WorkerLaunchIdentity $identity, LeaseAuthority $authority, float $now): array
+    {
+        $lease = $authority->lease($now);
+        if ($lease === null || $lease->namespace !== $identity->deploymentId || $lease->bootId !== $identity->supervisorBootId
+            || $identity->deploymentId !== $configuration->namespace || $identity->supervisorBootId !== $configuration->bootId
+            || $identity->workerId !== $definition->id
+        ) {
+            throw new \RuntimeException('Worker admission requires current committed deployment authority and matching launch identity.');
+        }
+        $environment['BAANDER_WORKER_NAMESPACE'] = $identity->deploymentId;
+        $environment['BAANDER_WORKER_BOOT_ID'] = $identity->supervisorBootId;
+        $environment['BAANDER_WORKER_ID'] = $identity->workerId;
+        $environment['BAANDER_WORKER_GENERATION'] = (string) $identity->generation;
+        $environment['BAANDER_WORKER_LEASE_EPOCH'] = (string) $lease->epoch;
+        $environment['MESSENGER_CONSUMER_NAME'] = 'worker-' . substr(hash('sha256', $identity->deploymentId), 0, 16) . '-' . $identity->supervisorBootId . '-' . $identity->workerId . '-' . $identity->generation;
+        return $this->roleEnvironment($environment, $definition, $configuration);
+    }
+
     /** @return array<string, string> */
     private function environment(): array
     {
@@ -154,7 +176,7 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
         foreach ([getenv(), $_ENV, $_SERVER] as $source) {
             foreach ($source as $name => $value) {
                 if (is_string($name) && preg_match('/\A[A-Za-z_][A-Za-z0-9_]*\z/D', $name) === 1 && is_scalar($value)) {
-                    $text = (string) $value;
+                    $text = is_bool($value) ? ($value ? '1' : '0') : (string) $value;
                     if (!str_contains($text, "\0")) {
                         $environment[$name] = $text;
                     }

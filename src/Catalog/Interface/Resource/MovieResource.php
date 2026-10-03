@@ -21,7 +21,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'posterUrl', type: 'string', nullable: true, description: 'Poster image URL'),
         new OA\Property(property: 'backdropUrl', type: 'string', nullable: true, description: 'Backdrop image URL'),
         new OA\Property(property: 'runtime', type: 'integer', nullable: true, description: 'Runtime in minutes'),
-        new OA\Property(property: 'rating', type: 'float', nullable: true, description: 'TMDB vote average'),
+        new OA\Property(property: 'rating', type: 'number', format: 'float', nullable: true, description: 'TMDB vote average'),
         new OA\Property(property: 'originalLanguage', type: 'string', nullable: true, description: 'Original language code'),
         new OA\Property(property: 'tmdbId', type: 'integer', nullable: true, description: 'TMDB ID'),
         new OA\Property(property: 'imdbId', type: 'string', nullable: true, description: 'IMDB ID'),

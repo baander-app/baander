@@ -1,16 +1,25 @@
 # Worker runtime inventory
 
-Verified against source on 2026-10-02 for stage 1 of the
+Verified against source on 2026-10-03 for stage 1 of the
 [web and worker runtime redesign](../docs/plans/2026-07-17-001-feat-messenger-enterprise-hardening-plan.md).
-`app:serve` now names the existing foreground web server, and `app:worker` runs an
-initial fixed Redis-consumer/outbox-relay supervisor. Queue families, autoscaling,
-role ownership transfers and deployment cutover below remain planned. This inventory
+`app:serve` now names the existing foreground web server, and `app:worker` runs a
+fixed consumer/outbox-relay/scheduler supervisor. Broader queue families, autoscaling,
+media ownership transfers and deployment packaging remain planned. This inventory
 does not certify runtime resource defaults.
+
+Scheduler activation verification passes 3,510 unit tests and 132 combined
+PostgreSQL/Redis integration and firewall tests. The actual PID-1 Docker drill
+passes committed-lease startup, manual dry-run execution, duplicate delivery,
+consumer and scheduler crash draining, TERM, lease expiry and denied admission.
+Focused baseline-free PHPStan, web/shared typechecks, ten API/auth retry tests
+and lint on the changed web files pass. OpenAPI and the generated web client
+were regenerated; source schema fixes remove invalid empty required lists and
+an invalid float type. A fresh export matches the checked-in specification.
 
 ## Current asynchronous routes
 
-[messenger.yaml](../config/packages/messenger.yaml) declares **13 routes**: eleven
-to `swoole_task`, two directly to Redis `async`. The table records current handler
+[messenger.yaml](../config/packages/messenger.yaml) declares **13 routes**: ten
+to `swoole_task`, two to Redis `async`, and one to Redis `scheduler`. The table records current handler
 registration separately from the proposed family. `Any` means no `fromTransport`
 restriction; it does not mean the handler is asynchronously routed everywhere.
 All thirteen have explicit version-1 entries in
@@ -28,7 +37,7 @@ All thirteen have explicit version-1 entries in
 | `Notification/Application/DTO/SendPushCommand.php` | `swoole_task` | [SendPushHandler](../src/Notification/Application/Handler/SendPushHandler.php), `swoole_task` and `async` | `notification.send_push` | Scaled `notifications`; subscription fan-out/provider I/O |
 | `Media/Application/Command/PruneMissingImagesCommand.php` | `swoole_task` | [PruneMissingImagesHandler](../src/Media/Application/CommandHandler/PruneMissingImagesHandler.php), Any | `media.prune_missing_images` | Scaled `catalog`; filesystem/persistence maintenance |
 | `Radio/Application/Command/SyncCountryStationsCommand.php` | `swoole_task` | [SyncCountryStationsHandler](../src/Radio/Application/CommandHandler/SyncCountryStationsHandler.php), `swoole_task` and `async` | `radio.sync_country_stations` | Scaled `metadata`; remote provider I/O |
-| `Scheduler/Application/Command/ExecuteScheduledJobCommand.php` | `swoole_task` | [ExecuteScheduledJobHandler](../src/Scheduler/Application/CommandHandler/ExecuteScheduledJobHandler.php), Any | `scheduler.execute_job` | Fixed scheduler service dispatches occurrences; actual payload selects queue/resource class |
+| `Scheduler/Application/Command/ExecuteScheduledOccurrenceCommand.php` | `scheduler` | [ExecuteScheduledOccurrenceHandler](../src/Scheduler/Application/CommandHandler/ExecuteScheduledOccurrenceHandler.php), Any; requires deployment authority | `scheduler.execute_occurrence` | Fixed scheduler records and publishes immutable occurrences |
 | `Shared/Domain/Event/Outbox/RelayOutboxCommand.php` | `swoole_task` | [RelayOutboxHandler](../src/Shared/Domain/Event/Outbox/RelayOutboxHandler.php), Any | `outbox.relay` | Fixed outbox service; direct bounded relay calls, not recursive relay queue |
 | `Transcode/Application/Command/UpdateTranscodePositionCommand.php` | `swoole_task` | [UpdateTranscodePositionHandler](../src/Transcode/Application/CommandHandler/UpdateTranscodePositionHandler.php), Any | `transcode.update_position` | Scaled `control` with reserved capacity; persist position and signal session owner |
 
@@ -80,13 +89,26 @@ between iterations, handles TERM/INT, and has bounded time/memory exit condition
 
 ## Scheduler payloads
 
-[SchedulerProcess](../src/Scheduler/Infrastructure/Swoole/SchedulerProcess.php)
-starts one Swoole child, checks active jobs every 60 seconds, takes per-job Redis
-NX/EX locks with a 3600-second default TTL, and dispatches the wrapper containing
-`jobId`, `jobType`, `command` and `parameters`. There is no immediate startup tick
-or persisted occurrence identity in that loop. Dispatch exceptions can leave the
-lock until expiry; lock release is an unconditional delete, not an ownership-token
-comparison. These are current recovery limits, not the proposed occurrence model.
+The supervisor's scheduler child recovers cron minutes into immutable database
+occurrences and publishes their UUIDs to stream `scheduler_occurrences`, group
+`baander`. Its explicit Redis DSN names that stream because a DSN path overrides
+transport stream options. Only the admitted consumer listens to this receiver in
+addition to `async`. The former web timer, shutdown handler and scheduled console
+pool worker have been removed. Retained `scheduler.execute_job` payloads remain
+decodable but their handler rejects them as unrecoverable before any effects.
+
+Manual HTTP requests return `202` with `{data: {occurrenceId, jobId}}`. An optional
+`Idempotency-Key` UUID identifies retries; the browser supplies it before sending
+and authentication retries retain it. If omitted, the server generates and echoes
+one, which cannot be recovered by a client that loses that first response. The
+one-shot CLI accepts `--request-id` and prints its UUID before recording. Reusing
+the identity recovers the original snapshot, even after the schedule is deleted.
+A fresh request is a new intent. Acceptance does not mean execution succeeded.
+
+New or changed cron configurations initialize at their first observed database
+minute and become eligible the following minute. Existing cursors retain bounded
+catch-up. Ordinary job result saves do not reset the cursor. The recorder does not
+backfill historical work before initial observation.
 
 [SchedulerRegistry](../src/Scheduler/Domain/Service/SchedulerRegistry.php) collects
 tagged implementations of the two schedulable interfaces. Current allowlisted
@@ -117,19 +139,12 @@ not a snapshot: concurrent inserts or eligibility changes behind the cursor wait
 for a later run. The API controller dispatches the actual Catalog batch command;
 the coordinator runs synchronously and queues individual extraction jobs.
 
-Console execution uses
-[SchedulerConsolePoolWorker](../src/Scheduler/Infrastructure/Swoole/SchedulerConsolePoolWorker.php)
-and positional arguments or `--key=value` options. The wrapper polls results for
-300 seconds by default and truncates returned output to 10000 characters. It
-always reads file-backed results, independently of the optional shared table, and
-uses a unique key per execution. Known child failures are recorded as failures.
-A timeout or result-read exception records unknown completion and pauses an active
-schedule without requesting a Messenger retry. Operators must reconcile the child
-process before resuming it; pausing does not cancel a child. Existing queued/manual
-commands and failure to persist the pause still need durable execution ownership.
-Console execution must remain allowlisted, with bounded output, cancellation,
-ownership renewal and descendant cleanup; the generic wrapper cannot bypass media
-budgets.
+Console occurrences use the bounded CLI executor under the admitted consumer.
+`--scheduled-console-mib=0` disables console execution and accepted console intents
+record a failure; provide at least 192 MiB to enable one synchronous child. Unknown
+completion pauses an active schedule and stops the consumer, draining the whole
+deployment. Permanent execution receipts prevent the wrapper from running twice;
+these do not provide exactly-once effects for downstream asynchronous messages.
 
 ## Swoole lifecycle and background ownership
 
@@ -142,10 +157,10 @@ only inside the existing process ancestry; they are not independent-service IPC.
 | [HardwareCapabilitiesProber](../src/Transcode/Infrastructure/FFmpeg/HardwareCapabilitiesProber.php) `boot()` | Probes encoder/device support; lazily boots from `getProfile()` too | Worker owns probing/device reservations; publish admission/profile state needed by web |
 | [SegmentAvailabilityTable](../src/Transcode/Infrastructure/Swoole/SegmentAvailabilityTable.php) `boot()` | Pre-fork Swoole table, configured 16384 rows; readiness with file-stat fallback | Worker publishes shared readiness by session generation; web reads it |
 | [CpuProcessPool](../src/Shared/Infrastructure/Swoole/ProcessPool/CpuProcessPool.php) `boot()` | Six configured Swoole pipe children; 8192-row result table plus result files under `/tmp/baander_cpu_pool_results`; JSON registry instantiates handlers without container arguments | Worker owns all CPU children and IPC/results; resource reservations include their subprocesses |
-| SchedulerProcess `boot()` | One pipe child/timer; two-second shutdown wait before KILL | Fixed scheduler child under worker supervisor |
+| Scheduler child | Private CLI recovery/relay loop with TERM/INT handling | Fixed admitted role under worker supervisor |
 | [CpuGpuSampler](../src/QoL/Infrastructure/Swoole/CpuGpuSampler.php) `boot()` | Pre-fork sampling table; timer deferred to HTTP worker 0 | Fixed worker sampling/control service |
 | [SwooleWorkerEventSubscriber](../src/Shared/Infrastructure/Swoole/SwooleWorkerEventSubscriber.php) | HTTP worker 0 starts pool health, sampler and [MidStreamMonitor](../src/QoL/Infrastructure/Swoole/MidStreamMonitor.php); imports governor learning state; server SIGINT hook stops pool and server | Worker owns health/sampling/governor timers. Web keeps connection registry/pusher and HTTP lifecycle |
-| [CpuProcessPoolShutdownHandler](../src/Shared/Infrastructure/Swoole/ProcessPool/CpuProcessPoolShutdownHandler.php) / [SchedulerProcessShutdownHandler](../src/Scheduler/Infrastructure/Swoole/SchedulerProcessShutdownHandler.php) | Web/server shutdown stops background children | Replace with worker-owned drain/reaping; no competing shutdown owner |
+| [CpuProcessPoolShutdownHandler](../src/Shared/Infrastructure/Swoole/ProcessPool/CpuProcessPoolShutdownHandler.php) | Web/server shutdown stops background children | Replace with worker-owned drain/reaping; no competing shutdown owner |
 | [TranscodeSessionSubscriber](../src/Transcode/Infrastructure/Swoole/TranscodeSessionSubscriber.php) | `TranscodeSessionAttached` starts a CoWrapper coroutine (inline fallback), Redis loop lock and renewal timer; drives encodes/completion/failure | Worker media session service; durable intent and recoverable control |
 | [TranscodeStreamManager](../src/Transcode/Infrastructure/Swoole/TranscodeStreamManager.php) | Long-lived FFmpeg through ProcOpenSpawner, outside one-shot CPU pool; four-stream limit per manager instance; poll/drain output and STOP/CONT/KILL control | Worker media descendants with global deployment budget and cancellation |
 | [SeekSignalBroker](../src/Transcode/Infrastructure/Swoole/SeekSignalBroker.php) | In-process per-job Coroutine Channels, capacity 16; missing channels drop signals | Worker-owned session control with explicit delivery/ownership semantics |
@@ -156,7 +171,7 @@ only inside the existing process ancestry; they are not independent-service IPC.
 CPU pool handlers are [TranscodePoolWorker](../src/Transcode/Infrastructure/Swoole/TranscodePoolWorker.php)
 (`encode_segment`, `encode_init_segment`, `analyze_loudness`, `extract_subtitles`),
 [RecommendationPoolWorker](../src/Recommendation/Infrastructure/Swoole/RecommendationPoolWorker.php)
-(`generate_recommendations`) and SchedulerConsolePoolWorker (`scheduled_console`).
+(`generate_recommendations`); the former scheduled console pool worker is retired.
 [GenerateRecommendationsHandler](../src/Recommendation/Application/CommandHandler/GenerateRecommendationsHandler.php)
 also uses this pool and has inline fallback; moving the pool affects recommendation
 execution as well as media. These internal JSON job payloads are distinct from the
@@ -214,6 +229,11 @@ limit remain implementation configuration, not asserted defaults here.
    and all encoder/console descendants belong to the worker budget.
 
 ## Verification and open measurements
+
+The following records incremental implementation evidence. Earlier stage boundaries
+and counts describe those historical checks; the current scheduler activation
+contract is summarized above. Production capacity and broader media ownership
+still require qualification.
 
 The first delivery correction makes `ExtractAlbumCoverHandler` propagate read,
 storage and persistence failures to Messenger. Logging and failed cleanup cannot
@@ -726,8 +746,8 @@ not change schedule status, advance recovery or dispatch work.
 The caller must retain the same request UUID across uncertain responses. Successful
 recording means durable intent, not completed execution; the execution guard still
 checks whether the schedule exists and matches before invoking it. Authorization
-belongs at the eventual HTTP/CLI ingress. This recorder is container-wired but has
-no live producer calling it yet.
+is enforced at HTTP ingress; the one-shot CLI is an operator command. Both
+entrypoints now use the recorder.
 
 The recorder and existing occurrence, materializer, recovery and guard checks pass
 119 integration tests with 1,130 assertions on disposable PostgreSQL/Redis. These
@@ -735,11 +755,8 @@ include real concurrent processes, a retry blocked behind a deleting transaction
 commit uncertainty and transaction-local isolation. All 3,506 unit tests and
 baseline-free PHPStan level 6 for this slice pass.
 
-This is the durable contract for a later cutover. HTTP/CLI manual entrypoints and the
-legacy web producer still use their existing path. No manual intents are written
-alongside legacy execution, and no new producer or route is enabled. Cutover still
-requires the supervised producer/relay role and an exclusive boundary that handles
-queued legacy wrappers before activating the replacement.
+The manual recorder is now used by both HTTP and CLI ingress. The legacy producer
+has been removed, and retained legacy wrappers fail without invoking work.
 The manual-origin slice passes 3,489 unit tests and 211 combined PostgreSQL/Redis
 integration/functional tests (1,977 assertions), with fresh and repeat migrations.
 Tests cover coexistence, immutable identity conflicts, origin constraints, commit
@@ -817,15 +834,16 @@ and rethrows the uncertainty, leaving its consumed attempt without a return
 receipt. Failure to save the paused state retains the uncertainty classification.
 The Messenger subscriber stops this consumer before another queued job is handled;
 the supervisor's existing child-exit policy then drains the deployment. Legacy
-messages retain the web CPU-pool path and its existing pause behavior.
+messages now fail unrecoverably without using the removed web CPU-pool path.
 
 A PHP heap limit does not bound native or total deployment memory. Direct-child
 reaping does not certify descendant containment. Kernel-stalled system calls and
 PHP resource teardown can exceed userspace deadlines. The executor rejects active
 Swoole coroutines and is intended for a supervised CLI child. Deployment containment
-and resource admission still need qualification before ownership cutover.
+and production resource limits still need load qualification.
 
-No poller, relay loop or queue route has been enabled for occurrence messages.
+The poller and relay loop now run in the admitted scheduler child, using the
+dedicated occurrence receiver.
 The per-job materializer now has a bounded, durable fair recovery pass.
 A callable CLI worker loop now combines recovery and relay with independent
 completion-based one-second intervals. Each pass retains its existing batch limits
@@ -856,11 +874,12 @@ unit suite passes 3,506 tests with 12,763 assertions, including stale PCNTL erro
 and signal-mask restoration regressions. Baseline-free PHPStan level 6 passes
 for this slice.
 
-This loop resolves in the container and runs in isolated process tests. It is not
-a Bootable service, public command or enabled supervisor role. Role reservation,
-manual-request recording at ingress, queue routing and an exclusive legacy shutdown
-boundary still need to be integrated together before cutover. Lease validation
-cannot stop effects already running after expiry.
+The loop runs through the private `bin/worker-scheduler.php` entrypoint under
+`app:worker`; no separate public daemon command was added. The mandatory scheduler
+reservation is at least 320 MiB. Total admission starts at 1088 MiB for management
+and three roles, plus at least 192 MiB if console execution is enabled. These are
+reservation policies, not measured capacity. Lease validation cannot stop effects
+already running after expiry.
 The guard prevents repeated wrapper invocation, not duplicate side effects from
 retries of downstream messages or exactly-once external delivery. Execution rows
 also reserve one unresolved wrapper invocation per job across deployment namespaces.
@@ -880,8 +899,8 @@ and deployment replacement do not authorize another invocation of that job.
 This serializes scheduler adapters, not downstream work: a Messenger adapter can
 return after sending an asynchronous command, before its effects complete. A console
 adapter's return does not prove descendant containment. Shared resource admission,
-downstream execution ownership and the legacy scheduler cutover remain prerequisites
-for enabling the producer and relay loops.
+downstream execution ownership and production capacity remain broader remediation
+work even though the scheduler producer and relay now run under the supervisor.
 
 The per-job admission change passes 177 combined integration/functional tests with
 1,689 assertions on disposable PostgreSQL/Redis, including fresh migrations and a

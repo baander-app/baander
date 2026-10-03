@@ -15,6 +15,8 @@ use Symfony\Component\Messenger\Stamp\TransportMessageIdStamp;
 
 final class WorkerHeartbeatSubscriber implements EventSubscriberInterface
 {
+    private const array DURABLE_TRANSPORTS = ['async', 'scheduler'];
+
     private bool $active = false;
     private int $lastWrite = 0;
     private ?float $queueAge = null;
@@ -34,7 +36,7 @@ final class WorkerHeartbeatSubscriber implements EventSubscriberInterface
 
     public function onStarted(WorkerStartedEvent $event): void
     {
-        $this->active = in_array('async', $event->getWorker()->getMetadata()->getTransportNames(), true);
+        $this->active = array_intersect(self::DURABLE_TRANSPORTS, $event->getWorker()->getMetadata()->getTransportNames()) !== [];
         if ($this->active) {
             $this->queueAge = null;
             $this->lastDeliveryAt = null;
@@ -55,7 +57,7 @@ final class WorkerHeartbeatSubscriber implements EventSubscriberInterface
 
     public function onReceived(WorkerMessageReceivedEvent $event): void
     {
-        if (!$this->active || $event->getReceiverName() !== 'async') {
+        if (!$this->active || !in_array($event->getReceiverName(), self::DURABLE_TRANSPORTS, true)) {
             return;
         }
         $now = $this->clock->now();

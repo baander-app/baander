@@ -59,17 +59,18 @@ tar -cf - "${archive_paths[@]}" |
         php -d memory_limit=512M bin/console doctrine:migrations:migrate --no-interaction --env=prod
         php -d memory_limit=512M bin/console doctrine:migrations:migrate --no-interaction --env=prod
         php -d memory_limit=256M tests/Fixtures/Worker/worker-command-check.php seed-outbox baander.app:commandtest aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        php -d memory_limit=256M tests/Fixtures/Worker/worker-command-check.php seed-scheduler baander.app:commandtest aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     '
 
 launch() {
     local container="$1" namespace="$2" boot="$3"
     containers+=("$container")
-    docker run -d --name "$container" "${common[@]}" -e BAANDER_WORKER_LEASE_EPOCH=9999 --memory=1024m --memory-swap=1024m \
+    docker run -d --name "$container" "${common[@]}" -e BAANDER_WORKER_LEASE_EPOCH=9999 --memory=1664m --memory-swap=1664m \
         --pids-limit=64 --restart=no --entrypoint sh "$app_image" -c '
             set -eu
             mkdir -m 700 /tmp/baander-worker-locks
             exec php -d memory_limit=256M bin/console app:worker --deployment="$1" --boot-id="$2" \
-                --memory-mib=1024 --management-mib=256 --consumer-mib=384 --relay-mib=384 \
+                --memory-mib=1664 --management-mib=256 --consumer-mib=384 --relay-mib=384 --scheduler-mib=320 --scheduled-console-mib=320 \
                 --lock-dir=/tmp/baander-worker-locks --no-interaction
         ' sh "$namespace" "$boot" >/dev/null
 }
@@ -106,7 +107,7 @@ await_exit() {
         echo "Expected worker exit $expected, got $code." >&2
         exit 1
     fi
-    # This summary is emitted only after all direct handles are reaped; two launches
+    # This summary is emitted only after all direct handles are reaped; three launches
     # prove the crashed child was not replaced, and denial must have launched none.
     docker logs "$container" > "/tmp/$container-summary" 2>&1
     python3 - "/tmp/$container-summary" "$expected" "$launches" <<'PYSUMMARY'
@@ -141,6 +142,22 @@ await_outbox() {
     echo 'Real worker outbox projection/handoff did not complete within the bounded check.' >&2
     exit 1
 }
+await_scheduler() {
+    local container="$1" namespace="$2" boot="$3"
+    for attempt in $(seq 1 50); do
+        if docker exec "$container" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php verify-scheduler "$namespace" "$boot" > "/tmp/$container-scheduler" 2>&1; then
+            cat "/tmp/$container-scheduler"
+            rm -f "/tmp/$container-scheduler"
+            return
+        fi
+        sleep 0.2
+    done
+    cat "/tmp/$container-scheduler" >&2
+    rm -f "/tmp/$container-scheduler"
+    docker logs --tail 60 "$container" >&2
+    echo 'Real manual scheduler occurrence did not finish and acknowledge exactly once.' >&2
+    exit 1
+}
 reserved() {
     docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_image" \
         -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php reserved "$1" "$2"
@@ -151,10 +168,13 @@ namespace=baander.app:commandtest
 launch "$run_id-crash" "$namespace" "$boot"
 await_ready "$run_id-crash" "$namespace" "$boot"
 await_outbox "$run_id-crash"
+await_scheduler "$run_id-crash" "$namespace" "$boot"
 docker exec "$run_id-crash" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php replay-outbox "$namespace" "$boot"
 await_outbox "$run_id-crash"
+docker exec "$run_id-crash" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php replay-scheduler "$namespace" "$boot"
+await_scheduler "$run_id-crash" "$namespace" "$boot"
 docker exec "$run_id-crash" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php kill-consumer "$namespace" "$boot"
-await_exit "$run_id-crash" 1 2
+await_exit "$run_id-crash" 1 3
 reserved "$namespace" "$boot"
 
 # An active predecessor reservation denies even its original boot; admission has no retry shortcut.
@@ -162,12 +182,20 @@ launch "$run_id-denied" "$namespace" "$boot"
 await_exit "$run_id-denied" 1 0
 reserved "$namespace" "$boot"
 
+scheduler_boot="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
+scheduler_namespace=baander.app:commandschedulercrash
+launch "$run_id-scheduler-crash" "$scheduler_namespace" "$scheduler_boot"
+await_ready "$run_id-scheduler-crash" "$scheduler_namespace" "$scheduler_boot"
+docker exec "$run_id-scheduler-crash" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php kill-scheduler "$scheduler_namespace" "$scheduler_boot"
+await_exit "$run_id-scheduler-crash" 1 3
+reserved "$scheduler_namespace" "$scheduler_boot"
+
 term_boot="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
 term_namespace=baander.app:commandterm
 launch "$run_id-term" "$term_namespace" "$term_boot"
 await_ready "$run_id-term" "$term_namespace" "$term_boot"
 docker kill --signal=TERM "$run_id-term" >/dev/null
-await_exit "$run_id-term" 0 2
+await_exit "$run_id-term" 0 3
 reserved "$term_namespace" "$term_boot"
 expiry_boot="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
 expiry_namespace=baander.app:commandexpiry
@@ -176,6 +204,6 @@ await_ready "$run_id-expiry" "$expiry_namespace" "$expiry_boot"
 docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_image" \
     -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php expire "$expiry_namespace" "$expiry_boot"
 # Allow the renewal schedule plus its bounded 35-second drain and harness headroom.
-await_exit "$run_id-expiry" 1 2 60
+await_exit "$run_id-expiry" 1 3 60
 reserved "$expiry_namespace" "$expiry_boot"
-echo 'Real app:worker crash, TERM, same-boot denial, and renewal loss acceptance passed; reservations remain active.'
+echo 'Real app:worker manual occurrence/replay, consumer/scheduler crash, TERM, same-boot denial, and renewal loss acceptance passed; reservations remain active.'

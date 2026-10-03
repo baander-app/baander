@@ -27,6 +27,24 @@ framework:
                     multiplier: 2
                     max_delay: 60000
 
+            # Occurrences require deployment authority; generic async consumers must not receive them.
+            scheduler:
+                # The DSN path overrides options.stream in the Redis transport.
+                dsn: '%env(REDIS_URL)%/scheduler_occurrences/baander'
+                options:
+                    stream: scheduler_occurrences
+                    group: baander
+                    consumer: '%env(MESSENGER_CONSUMER_NAME)%'
+                    delete_after_ack: true
+                    stream_max_entries: 0
+                    redeliver_timeout: 3600
+                    claim_interval: 60000
+                retry_strategy:
+                    max_retries: 3
+                    delay: 1000
+                    multiplier: 2
+                    max_delay: 60000
+
             # Failure transport — separate stream so it does not create a second
             # consumer group on "messages" (which would block delete_after_ack).
             # DSN path is parsed as /stream/group: stream=failed_messages, group=failed.
@@ -57,7 +75,7 @@ framework:
             'App\Radio\Application\Command\SyncCountryStationsCommand': swoole_task
 
             # Scheduler
-            'App\Scheduler\Application\Command\ExecuteScheduledJobCommand': swoole_task
+            'App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand': scheduler
 
             # Outbox
             'App\Shared\Domain\Event\Outbox\RelayOutboxCommand': swoole_task
@@ -77,4 +95,5 @@ when@test:
                 # Override to use in-memory transport for tests
                 swoole_task: 'in-memory://'
                 async: 'in-memory://'
+                scheduler: 'in-memory://'
                 failed: 'in-memory://'

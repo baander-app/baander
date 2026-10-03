@@ -7,8 +7,12 @@ use Doctrine\DBAL\Tools\DsnParser;
 
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
 
-[$script, $mode, $namespace, $bootId] = $argv + [null, null, null, null];
-if (!in_array($mode, ['ready', 'kill-consumer', 'reserved', 'expire', 'seed-outbox', 'verify-outbox', 'replay-outbox'], true)
+$arguments = $_SERVER['argv'] ?? [];
+if (!is_array($arguments)) {
+    throw new RuntimeException('Invalid isolated worker command arguments.');
+}
+[$script, $mode, $namespace, $bootId] = $arguments + [null, null, null, null];
+if (!in_array($mode, ['ready', 'kill-consumer', 'kill-scheduler', 'reserved', 'expire', 'seed-outbox', 'verify-outbox', 'replay-outbox', 'seed-scheduler', 'verify-scheduler', 'replay-scheduler'], true)
     || !is_string($namespace) || !is_string($bootId)) {
     throw new RuntimeException('Invalid isolated worker check request.');
 }
@@ -18,6 +22,58 @@ if (!$url) {
     throw new RuntimeException('Disposable DATABASE_URL is required.');
 }
 $db = DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url));
+if ($mode === 'seed-scheduler') {
+    $job = App\Shared\Domain\Model\Uuid::v7();
+    $request = App\Shared\Domain\Model\Uuid::v7();
+    $db->executeStatement(<<<'SQL'
+        INSERT INTO scheduled_jobs (id, revision, name, expression, job_type, command, status, parameters, created_at, updated_at, run_count)
+        VALUES (:id, :revision, 'Worker command scheduler fixture', '* * * * *', 'console', 'app:transcode:cache-sweep', 'paused', '{"dry-run":true}', clock_timestamp(), clock_timestamp(), 0)
+        SQL, ['id' => $job->toString(), 'revision' => App\Shared\Domain\Model\Uuid::v7()->toString()]);
+    if ((new App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder($db))->record($job, $request) === null
+        || (int) $db->fetchOne('SELECT count(*) FROM scheduler_occurrences WHERE dispatched_at IS NOT NULL') !== 0
+        || (int) $db->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions') !== 0) {
+        throw new RuntimeException('Manual request must remain durable and undispatched before lease admission.');
+    }
+    echo "Real manual occurrence captured before worker lease admission.\n";
+    exit(0);
+}
+if ($mode === 'verify-scheduler' || $mode === 'replay-scheduler') {
+    $occurrence = $db->fetchAssociative(<<<'SQL'
+        SELECT o.id, o.dispatched_at, e.returned_at, e.deployment_namespace, e.deployment_boot_id, e.deployment_epoch
+        FROM scheduler_occurrences o JOIN scheduler_occurrence_executions e ON e.occurrence_id = o.id
+        WHERE o.origin = 'manual' AND o.command = 'app:transcode:cache-sweep'
+        SQL);
+    if ($occurrence === false || $occurrence['dispatched_at'] === null || $occurrence['returned_at'] === null
+        || $occurrence['deployment_namespace'] !== $namespace || $occurrence['deployment_boot_id'] !== $bootId
+        || (int) $occurrence['deployment_epoch'] !== 1
+        || (int) $db->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions') !== 1
+        || (int) $db->fetchOne('SELECT run_count FROM scheduled_jobs WHERE command = :command', ['command' => 'app:transcode:cache-sweep']) !== 1
+        || $db->fetchOne("SELECT 1 FROM scheduled_jobs WHERE command = 'app:transcode:cache-sweep' AND last_error IS NULL AND last_result LIKE '%DRY RUN%'") === false) {
+        $job = $db->fetchAssociative("SELECT run_count, last_error IS NULL AS no_error, last_result LIKE '%DRY RUN%' AS dry_run FROM scheduled_jobs WHERE command = 'app:transcode:cache-sweep'");
+        throw new RuntimeException('Real scheduler/consumer must finish the manual console occurrence exactly once under its admitted lease: ' . json_encode(['receipt' => $occurrence, 'job' => $job], JSON_THROW_ON_ERROR));
+    }
+    $redis = new Redis();
+    $redis->connect('redis', 6379, 1.0);
+    $redis->auth(['default', 'test-only']);
+    $pending = $redis->xPending('scheduler_occurrences', 'baander');
+    if (!is_array($pending) || ($pending[0] ?? null) !== 0 || $redis->xLen('scheduler_occurrences') !== 0
+        || $redis->zCard('scheduler_occurrences__queue') !== 0 || $redis->xLen('failed_messages') !== 0) {
+        throw new RuntimeException('Scheduler occurrence must be acknowledged without retries or dead letters.');
+    }
+    if ($mode === 'replay-scheduler') {
+        // A returned occurrence is never claimed again by the relay. Exercise the
+        // consumer's retained deduplication guard with an actual duplicate delivery.
+        $transport = new Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport(
+            Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn('redis://default:test-only@redis:6379/scheduler_occurrences/baander'),
+            new App\Shared\Infrastructure\Messenger\JsonTransportSerializer(new App\Shared\Infrastructure\Messaging\JsonMessageCodec()),
+        );
+        $transport->send(new Symfony\Component\Messenger\Envelope(new App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand(App\Shared\Domain\Model\Uuid::fromString($occurrence['id']))));
+        echo "Replayed duplicate scheduler envelope after confirmed execution.\n";
+    } else {
+        echo "Independent observer verified one scheduler execution and clean dedicated-stream acknowledgment.\n";
+    }
+    exit(0);
+}
 if ($mode === 'seed-outbox') {
     (new Symfony\Component\Dotenv\Dotenv())->bootEnv(dirname(__DIR__, 3) . '/.env');
     $kernel = new App\Kernel('prod', false);
@@ -94,9 +150,13 @@ foreach (glob('/proc/[0-9]*/cmdline') ?: [] as $path) {
     }
     $arguments = explode("\0", rtrim($command, "\0"));
     $role = in_array('messenger:consume', $arguments, true) ? 'consumer'
-        : (in_array('app:outbox:consume', $arguments, true) ? 'relay' : null);
+        : (in_array('app:outbox:consume', $arguments, true) ? 'relay'
+            : (in_array(dirname(__DIR__, 3) . '/bin/worker-scheduler.php', $arguments, true) ? 'scheduler' : null));
     if ($role === null) {
         continue;
+    }
+    if ($role === 'consumer' && (!in_array('async', $arguments, true) || !in_array('scheduler', $arguments, true))) {
+        throw new RuntimeException('Consumer must receive both durable async and scheduler transports.');
     }
     $status = @file_get_contents(dirname($path) . '/status');
     if ($status === false || preg_match('/^PPid:\s+(\d+)$/m', $status, $matches) !== 1 || (int) $matches[1] !== 1) {
@@ -134,8 +194,8 @@ foreach (glob('/proc/[0-9]*/cmdline') ?: [] as $path) {
     }
     $roles[$role] = $pid;
 }
-if (count($roles) !== 2 || !isset($roles['consumer'], $roles['relay'])) {
-    throw new RuntimeException('Both production roles have not started.');
+if (count($roles) !== 3 || !isset($roles['consumer'], $roles['relay'], $roles['scheduler'])) {
+    throw new RuntimeException('All three production roles have not started.');
 }
 $redis = new Redis();
 $redis->connect('redis', 6379, 1.0);
@@ -148,4 +208,7 @@ if (!is_array($consumers) || !in_array($expected, array_column($consumers, 'name
 if ($mode === 'kill-consumer' && !posix_kill($roles['consumer'], SIGKILL)) {
     throw new RuntimeException('Could not kill the disposable consumer fixture.');
 }
-echo json_encode(['namespace' => $namespace, 'bootId' => $bootId, 'consumer' => $roles['consumer'], 'relay' => $roles['relay']], JSON_THROW_ON_ERROR) . "\n";
+if ($mode === 'kill-scheduler' && !posix_kill($roles['scheduler'], SIGKILL)) {
+    throw new RuntimeException('Could not kill the disposable scheduler fixture.');
+}
+echo json_encode(['namespace' => $namespace, 'bootId' => $bootId, ...$roles], JSON_THROW_ON_ERROR) . "\n";

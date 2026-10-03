@@ -71,7 +71,7 @@ final class ActivityController
     public function history(Request $request): JsonResponse
     {
         $user = $this->security->getUser();
-        if ($user === null) {
+        if (!$user instanceof SecurityUser) {
             return $this->unauthorized();
         }
 
@@ -99,7 +99,6 @@ final class ActivityController
         path: '/api/activity/play',
         summary: 'Record a play event for a song or movie',
         requestBody: new OA\RequestBody(required: true, content: new OA\MediaType(mediaType: 'application/json', schema: new OA\Schema(
-            required: [],
             properties: [
                 new OA\Property(property: 'songId', description: 'Public ID of the song being played', type: 'string', nullable: true),
                 new OA\Property(property: 'albumId', description: 'Public ID of the album', type: 'string', nullable: true),
@@ -124,7 +123,7 @@ final class ActivityController
     public function play(#[MapRequestPayload] PlayActivityRequest $payload): JsonResponse
     {
         $user = $this->security->getUser();
-        if ($user === null) {
+        if (!$user instanceof SecurityUser) {
             return $this->unauthorized();
         }
 
@@ -271,7 +270,7 @@ final class ActivityController
     public function loved(): JsonResponse
     {
         $user = $this->security->getUser();
-        if ($user === null) {
+        if (!$user instanceof SecurityUser) {
             return $this->unauthorized();
         }
 

@@ -8,7 +8,6 @@ use OpenApi\Attributes as OA;
 
 #[OA\Schema(
     schema: 'PlayActivityRequest',
-    required: [],
     properties: [
         new OA\Property(property: 'songId', description: 'Public ID of the song being played', type: 'string', nullable: true),
         new OA\Property(property: 'albumId', description: 'Public ID of the album', type: 'string', nullable: true),

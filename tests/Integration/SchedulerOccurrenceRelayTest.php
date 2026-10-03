@@ -176,7 +176,7 @@ final class SchedulerOccurrenceRelayTest extends TestCase
         $this->assertQueuedIds($transport, [$publishedId->toString()]);
     }
 
-    public function testConfiguredPublisherSendsUuidOnlyToAsyncWithoutInvokingGuard(): void
+    public function testConfiguredPublisherSendsUuidOnlyToSchedulerWithoutInvokingGuard(): void
     {
         $kernel = new Kernel('test', false);
         try {
@@ -185,9 +185,12 @@ final class SchedulerOccurrenceRelayTest extends TestCase
             self::assertInstanceOf(SchedulerOccurrenceRelay::class, $container->get(SchedulerOccurrenceRelay::class));
             $publisher = $container->get(SchedulerOccurrencePublisherInterface::class);
             self::assertInstanceOf(MessengerSchedulerOccurrencePublisher::class, $publisher);
-            $transport = $container->get('messenger.transport.async');
+            $transport = $container->get('messenger.transport.scheduler');
             self::assertInstanceOf(InMemoryTransport::class, $transport);
             $transport->reset();
+            $genericAsync = $container->get('messenger.transport.async');
+            self::assertInstanceOf(InMemoryTransport::class, $genericAsync);
+            $genericAsync->reset();
             $id = Uuid::generate();
             // No occurrence or execution authority exists for this ID. A synchronous guard invocation would fail.
             $publisher->publish($id);
@@ -197,6 +200,7 @@ final class SchedulerOccurrenceRelayTest extends TestCase
             self::assertInstanceOf(ExecuteScheduledOccurrenceCommand::class, $message);
             self::assertTrue($id->equals($message->occurrenceId));
             self::assertSame(['occurrenceId'], array_keys(get_object_vars($message)));
+            self::assertCount(0, $genericAsync->getSent());
         } finally {
             $kernel->shutdown();
         }

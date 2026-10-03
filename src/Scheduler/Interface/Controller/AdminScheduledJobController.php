@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Scheduler\Interface\Controller;
 
-use App\Scheduler\Application\Command\ExecuteScheduledJobCommand;
+use App\Scheduler\Application\Exception\SchedulerOccurrenceConflict;
+
+use App\Scheduler\Application\Port\SchedulerManualOccurrenceRecorderInterface;
 use App\Scheduler\Application\Port\ScheduledJobPortInterface;
 use App\Scheduler\Domain\Service\SchedulerRegistry;
 use App\Scheduler\Domain\ValueObject\JobType;
@@ -18,7 +20,7 @@ use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
-use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -32,7 +34,7 @@ final class AdminScheduledJobController
     public function __construct(
         private readonly ScheduledJobPortInterface $scheduledJobService,
         private readonly SchedulerRegistry $registry,
-        private readonly MessageBusInterface $messageBus,
+        private readonly SchedulerManualOccurrenceRecorderInterface $manualOccurrences,
     ) {
     }
 
@@ -221,31 +223,50 @@ final class AdminScheduledJobController
 
     #[OA\Post(
         path: '/api/admin/scheduler/jobs/{id}/trigger',
-        summary: 'Manually trigger a scheduled job',
+        summary: 'Record a durable manual scheduled job request',
+        parameters: [new OA\Parameter(
+            name: 'Idempotency-Key', in: 'header', required: false,
+            description: 'Request UUID. Reuse this UUID after an uncertain response to recover the same occurrence. A UUID is generated if omitted.',
+            schema: new OA\Schema(type: 'string', format: 'uuid'),
+        )],
         responses: [
-            new OA\Response(response: '200', description: 'Job triggered', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', ref: new Model(type: ScheduledJobResource::class)),
-            ])),
-            new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '202', description: 'Manual request durably accepted; execution is asynchronous',
+                headers: [new OA\Header(header: 'Idempotency-Key', description: 'Accepted request UUID', schema: new OA\Schema(type: 'string', format: 'uuid'))],
+                content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [
+                    new OA\Property(property: 'occurrenceId', type: 'string', format: 'uuid'),
+                    new OA\Property(property: 'jobId', type: 'string', format: 'uuid'),
+                ])])),
+            new OA\Response(response: '400', description: 'Invalid request UUID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '409', description: 'Request UUID already belongs to another job or origin', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '404', description: 'Job not found for a new request', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/{id}/trigger', name: 'trigger', methods: ['POST'])]
-    public function trigger(string $id): JsonResponse
+    public function trigger(string $id, Request $request): JsonResponse
     {
-        $job = $this->scheduledJobService->getById(Uuid::fromString($id));
-        if ($job === null) {
+        try {
+            $jobId = Uuid::fromString($id);
+            $header = $request->headers->get('Idempotency-Key');
+            $requestId = $header === null ? Uuid::generate() : Uuid::fromString($header);
+        } catch (\InvalidArgumentException) {
+            return $this->errorResponse('Job and request identifiers must be UUIDs.');
+        }
+
+        try {
+            $occurrence = $this->manualOccurrences->record($jobId, $requestId);
+        } catch (SchedulerOccurrenceConflict) {
+            return $this->errorResponse('Request UUID already belongs to another job or origin.', Response::HTTP_CONFLICT);
+        }
+        if ($occurrence === null) {
             return $this->notFound('Scheduled job not found.');
         }
 
-        // Dispatch to messenger for immediate execution
-        $this->messageBus->dispatch(new ExecuteScheduledJobCommand(
-            jobId: $job->getId()->toString(),
-            jobType: $job->getJobType()->value,
-            command: $job->getCommand(),
-            parameters: $job->getParameters(),
-        ));
-
-        return $this->successResponse(ScheduledJobResource::from($job));
+        $response = $this->successResponse([
+            'occurrenceId' => $occurrence->id->toString(),
+            'jobId' => $occurrence->jobId->toString(),
+        ], Response::HTTP_ACCEPTED);
+        $response->headers->set('Idempotency-Key', $requestId->toString());
+        return $response;
     }
 
     #[OA\Post(

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Scheduler\Application\Port;
 
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
+use App\Scheduler\Application\Exception\SchedulerOccurrenceConflict;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 
@@ -16,7 +17,7 @@ interface SchedulerOccurrenceStoreInterface
      * Manual occurrences deduplicate only by request ID, allowing distinct requests
      * in the same job/minute alongside its scheduled occurrence. Identical retries return false.
      *
-     * @throws \LogicException If the occurrence key or ID conflicts with a different immutable snapshot, job, minute or origin.
+     * @throws SchedulerOccurrenceConflict If the occurrence key or ID conflicts with a different immutable snapshot, job, minute or origin.
      */
     public function record(SchedulerOccurrence $occurrence): bool;
 

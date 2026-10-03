@@ -19,6 +19,11 @@ export interface ScheduledJob {
   updatedAt: string
 }
 
+export interface ScheduledJobReceipt {
+  occurrenceId: string
+  jobId: string
+}
+
 export interface SchedulableCommand {
   description: string
   parameters: Record<string, {
@@ -91,8 +96,11 @@ export const schedulerAdminApi = {
     return data.data
   },
 
-  trigger: async (id: string): Promise<ScheduledJob> => {
-    const { data } = await AXIOS_INSTANCE.post(`/api/admin/scheduler/jobs/${id}/trigger`)
+  trigger: async (id: string): Promise<ScheduledJobReceipt> => {
+    // Axios authentication retries retain the original request configuration and identity.
+    const { data } = await AXIOS_INSTANCE.post(`/api/admin/scheduler/jobs/${id}/trigger`, undefined, {
+      headers: { 'Idempotency-Key': crypto.randomUUID() },
+    })
     return data.data
   },
 

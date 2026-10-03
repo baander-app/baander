@@ -20,8 +20,6 @@ use App\Scheduler\Domain\Service\SchedulerRegistry;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Domain\ValueObject\ScheduleStatus;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Redis\RedisClientFactory;
-use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPoolInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -43,13 +41,9 @@ final class ExecuteScheduledOccurrenceHandlerTest extends TestCase
 
     private function handler(SchedulerOccurrenceExecutionStoreInterface $store, ScheduledJobPortInterface $jobs, MessageBusInterface $bus, ?SchedulerRegistry $registry = null): ExecuteScheduledOccurrenceHandler
     {
-        $redis = $this->createMock(RedisClientFactory::class);
-        $redis->expects(self::never())->method('borrow');
-        $pool = $this->createMock(CpuProcessPoolInterface::class);
-        $pool->expects(self::never())->method('dispatch');
 
         return new ExecuteScheduledOccurrenceHandler($store, new ExecuteScheduledJobHandler(
-            $jobs, $registry ?? new SchedulerRegistry([new OccurrenceTestMessage()], []), $bus, $pool, $redis, new NullLogger(), $this->createStub(ScheduledConsoleExecutorInterface::class),
+            $jobs, $registry ?? new SchedulerRegistry([new OccurrenceTestMessage()], []), $bus, new NullLogger(), $this->createStub(ScheduledConsoleExecutorInterface::class),
         ));
     }
 
@@ -297,9 +291,6 @@ final class ExecuteScheduledOccurrenceHandlerTest extends TestCase
         $jobs->expects(self::exactly(2))->method('save');
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
-        $pool = $this->createMock(CpuProcessPoolInterface::class);
-        $pool->expects(self::never())->method('dispatch');
-        $pool->expects(self::never())->method('readResult');
         $executor = $this->createMock(ScheduledConsoleExecutorInterface::class);
         $unknown = new ScheduledConsoleCompletionUnknown('Console completion unknown: containment required.');
         $executor->expects(self::once())->method('execute')->willReturnCallback(function (string $command, array $actual) use ($parameters, $timeout, $unknown): string {
@@ -311,10 +302,8 @@ final class ExecuteScheduledOccurrenceHandlerTest extends TestCase
             }
             return 'completed';
         });
-        $redis = $this->createMock(RedisClientFactory::class);
-        $redis->expects(self::never())->method('borrow');
         $handler = new ExecuteScheduledOccurrenceHandler($store, new ExecuteScheduledJobHandler(
-            $jobs, new SchedulerRegistry([], [$console]), $bus, $pool, $redis, new NullLogger(), $executor, consoleResultTimeoutSeconds: 0.001,
+            $jobs, new SchedulerRegistry([], [$console]), $bus, new NullLogger(), $executor,
         ));
         $command = new ExecuteScheduledOccurrenceCommand($occurrence->id);
         if ($timeout) {

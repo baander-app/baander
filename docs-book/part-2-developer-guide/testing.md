@@ -117,9 +117,9 @@ reconciliation without process activity, and registered startup/recovery.
 
 The worker-command runner boots the actual `app:worker` as PID 1 against disposable
 production-mode PostgreSQL and Redis after fresh and repeat migrations. It verifies
-two direct child roles, their exact committed deployment tuple (overriding a bogus
+three direct child roles, their exact committed deployment tuple (overriding a bogus
 inherited epoch), and the namespace/boot-qualified Redis consumer. It kills the
-consumer to require whole-container draining, tests TERM and forced database lease
+consumer and scheduler separately to require whole-container draining, tests TERM and forced database lease
 expiry, and confirms a duplicate
 lease claim exits with zero launch attempts. It checks that ownership remains
 reserved after shutdown. It also seeds a real registration event before startup,
@@ -127,8 +127,10 @@ requires the supervised relay to commit the notification, receipt and channel
 handoffs, requires Redis acknowledgment with no pending, delayed or failed work,
 and repeats the checks after clearing the event acknowledgment. Outbound
 preferences are disabled, the disposable user is unverified and no webhook
-endpoints exist; no external delivery is requested. These checks do not establish application readiness,
-autoscaling or scheduler/media ownership.
+endpoints exist; no external delivery is requested. A paused manual console request
+runs the registered cache sweep in dry-run mode through the dedicated scheduler
+stream; duplicate delivery must not invoke it twice. These checks do not establish
+application readiness, autoscaling, production capacity or media ownership.
 CI runs this as a blocking step using `BAANDER_TEST_CHECKOUT_IN_IMAGE=1`, which
 copies source and Composer dependencies from the built application image.
 The functional `Console/ServeCommandTest` verifies that `app:serve` and the legacy

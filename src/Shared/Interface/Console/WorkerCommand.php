@@ -13,7 +13,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-#[AsCommand(name: 'app:worker', description: 'Run the container worker supervisor for Redis async delivery and outbox relay.')]
+#[AsCommand(name: 'app:worker', description: 'Run the container worker supervisor for Redis async delivery, outbox relay and scheduler polling.')]
 final class WorkerCommand extends Command
 {
     public function __construct(private readonly WorkerSupervisorRunnerInterface $runner)
@@ -29,9 +29,10 @@ final class WorkerCommand extends Command
             ->addOption('management-mib', null, InputOption::VALUE_REQUIRED, 'Required supervisor/helper reservation in MiB (at least 128).')
             ->addOption('consumer-mib', null, InputOption::VALUE_REQUIRED, 'Required Redis consumer reservation in MiB (at least 320).')
             ->addOption('relay-mib', null, InputOption::VALUE_REQUIRED, 'Required outbox relay reservation in MiB (at least 320).')
+            ->addOption('scheduler-mib', null, InputOption::VALUE_REQUIRED, 'Required scheduler reservation in MiB (at least 320).')
             ->addOption('scheduled-console-mib', null, InputOption::VALUE_REQUIRED, 'Reservation for one synchronous scheduled console child in MiB (0 disables, otherwise at least 192).', '0')
             ->addOption('lock-dir', null, InputOption::VALUE_REQUIRED, 'Private local lock directory.', '/tmp/baander-worker-locks');
-        $this->setHelp('This initial fixed-set supervisor requires container PID 1. Child exit or lost authority drains the deployment. Scheduled console execution is disabled unless explicitly reserved; its child reservation is additional to the consumer budget. Scheduler/media ownership and autoscaling are not yet part of this command. Reservations are admission limits, not measured capacity or OS enforcement.');
+        $this->setHelp('This initial fixed-set supervisor requires container PID 1. Child exit or lost authority drains the deployment. Scheduled console execution is disabled unless explicitly reserved; its child reservation is additional to the consumer budget. Media ownership and autoscaling are not yet part of this command. Reservations are admission limits, not measured capacity or OS enforcement.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -45,6 +46,7 @@ final class WorkerCommand extends Command
                 $this->bytes($input, 'consumer-mib'), $this->bytes($input, 'relay-mib'),
                 $this->stringOption($input, 'lock-dir'),
                 $input->getOption('scheduled-console-mib') === '0' ? 0 : $this->bytes($input, 'scheduled-console-mib'),
+                $this->bytes($input, 'scheduler-mib'),
             );
         } catch (\InvalidArgumentException $error) {
             $io->error($error->getMessage());

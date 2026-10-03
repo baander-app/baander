@@ -17,8 +17,6 @@ use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceStore;
 use App\Scheduler\Infrastructure\Doctrine\Entity\ScheduledJobEntity;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Redis\RedisClientFactory;
-use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPoolInterface;
 use DAMA\DoctrineTestBundle\PHPUnit\SkipDatabaseRollback;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
@@ -109,14 +107,10 @@ final class ScheduledJobParameterPersistenceTest extends TestCase
             self::assertSame($encoded, json_encode(get_object_vars($message), JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION));
             return new Envelope($message);
         });
-        $pool = $this->createMock(CpuProcessPoolInterface::class);
-        $pool->expects(self::never())->method('dispatch');
-        $redis = $this->createMock(RedisClientFactory::class);
-        $redis->expects(self::never())->method('borrow');
         $console = $this->createMock(ScheduledConsoleExecutorInterface::class);
         $console->expects(self::never())->method('execute');
         $executor = new ExecuteScheduledJobHandler($jobPort, new SchedulerRegistry([new PersistedSchedulerParametersMessage(1, 1.0, -0.0, 1.0e18, [], 'scheduler@baander.app')], []),
-            $bus, $pool, $redis, new NullLogger(), $console);
+            $bus, new NullLogger(), $console);
         $executor->executeOccurrence($snapshot);
         self::assertSame('dispatched', $rehydrated->getLastResult(), 'The unchanged persisted configuration must not falsely cancel its exact snapshot.');
 

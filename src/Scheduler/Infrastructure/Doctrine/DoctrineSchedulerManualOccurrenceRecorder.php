@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Scheduler\Infrastructure\Doctrine;
 
+use App\Scheduler\Application\Exception\SchedulerOccurrenceConflict;
+
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
 use App\Scheduler\Application\DTO\SchedulerOccurrenceOrigin;
 use App\Scheduler\Application\Port\SchedulerManualOccurrenceRecorderInterface;
@@ -91,7 +93,7 @@ final class DoctrineSchedulerManualOccurrenceRecorder implements SchedulerManual
             return null;
         }
         if ($row['origin'] !== SchedulerOccurrenceOrigin::Manual->value || $row['job_id'] !== $jobId->toString()) {
-            throw new \LogicException('Scheduler manual request identifier is already assigned to another job or origin.');
+            throw new SchedulerOccurrenceConflict('Scheduler manual request identifier is already assigned to another job or origin.');
         }
         if ($row['job_type'] === null || $row['command'] === null || $row['parameters'] === null) {
             throw new \UnexpectedValueException('Persisted scheduler manual snapshot exceeds its supported bounds.');

@@ -1023,7 +1023,7 @@ services:
     App\Scheduler\Application\Port\ScheduledJobPortInterface:
         alias: App\Scheduler\Infrastructure\Service\ScheduledJobService
 
-    # Durable manual-request primitive; ingress changes together with the scheduler cutover.
+    # Manual ingress records durable intent before publication.
     App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder:
         factory: ['App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder', 'fromDsn']
         arguments:
@@ -1032,7 +1032,7 @@ services:
     App\Scheduler\Application\Port\SchedulerManualOccurrenceRecorderInterface:
         alias: App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder
 
-    # Callable recovery services; no producer loop or occurrence queue route is enabled yet.
+    # Recovery and relay run only in the admitted scheduler child.
     App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceMaterializer:
         factory: ['App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceMaterializer', 'fromDsn']
         arguments:
@@ -1085,7 +1085,7 @@ services:
 
     App\Scheduler\Infrastructure\Messenger\MessengerSchedulerOccurrencePublisher:
         arguments:
-            $sender: '@messenger.transport.async'
+            $sender: '@messenger.transport.scheduler'
 
     App\Scheduler\Application\Port\SchedulerOccurrencePublisherInterface:
         alias: App\Scheduler\Infrastructure\Messenger\MessengerSchedulerOccurrencePublisher
@@ -1096,22 +1096,10 @@ services:
             $messengerCommandProviders: !tagged_iterator 'scheduler.messenger_command'
             $consoleCommandProviders: !tagged_iterator 'scheduler.console_command'
 
-    # --- Scheduler CPU Pool Worker (console execution) ---
-    App\Scheduler\Infrastructure\Swoole\SchedulerConsolePoolWorker:
-        tags:
-            - { name: 'swoole.cpu_pool_worker' }
-
-    # --- Scheduler Swoole Process (single timer) ---
-    App\Scheduler\Infrastructure\Swoole\SchedulerProcess:
-        tags:
-            - { name: 'swoole_bundle.bootable_service' }
-
-    App\Scheduler\Infrastructure\Swoole\SchedulerProcessShutdownHandler:
-        arguments:
-            $schedulerProcessLocator: !service_locator
-                App\Scheduler\Infrastructure\Swoole\SchedulerProcess: '@App\Scheduler\Infrastructure\Swoole\SchedulerProcess'
-        tags:
-            - { name: 'swoole_bundle.server_shutdown_handler' }
+    # Private child entrypoint; not a separately exposed console command.
+    scheduler.worker_runner:
+        alias: App\Scheduler\Infrastructure\Process\SchedulerWorkerRunner
+        public: true
 
     # --- Discovery Domain Repository Aliases ---
     App\Discovery\Domain\Repository\ServerInstanceRepositoryInterface:
@@ -1206,14 +1194,14 @@ when@test:
         test.scheduler_manual_recorder:
             alias: App\Scheduler\Application\Port\SchedulerManualOccurrenceRecorderInterface
             public: true
-        # Resolve the real loop without enabling a producer alongside legacy execution.
+        # Resolve the production scheduler graph for integration checks.
         test.scheduler_worker_runner:
             alias: App\Scheduler\Infrastructure\Process\SchedulerWorkerRunner
             public: true
         test.scheduler_recovery_poller:
             alias: App\Scheduler\Application\Service\SchedulerRecoveryPoller
             public: true
-        # Keep the real relay graph available for integration checks before its loop is enabled.
+        # Keep the real relay graph available for integration checks.
         test.scheduler_occurrence_relay:
             alias: App\Scheduler\Application\Service\SchedulerOccurrenceRelay
             public: true

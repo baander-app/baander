@@ -19,7 +19,8 @@ final readonly class WorkerRuntimeConfiguration
         public int $consumerReservationBytes,
         public int $relayReservationBytes,
         public string $lockDirectory,
-        public int $scheduledConsoleReservationBytes = 0,
+        public int $scheduledConsoleReservationBytes,
+        public int $schedulerReservationBytes,
     ) {
         if (preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}\z/D', $namespace) !== 1
             || preg_match('/\A[0-9a-f]{32}\z/D', $bootId) !== 1
@@ -29,12 +30,14 @@ final readonly class WorkerRuntimeConfiguration
             || $managementReservationBytes > $memoryLimitBytes
             || $consumerReservationBytes > $memoryLimitBytes - $managementReservationBytes
             || $relayReservationBytes > $memoryLimitBytes - $managementReservationBytes - $consumerReservationBytes
+            || $schedulerReservationBytes < 320 * 1024 * 1024
+            || $schedulerReservationBytes > $memoryLimitBytes - $managementReservationBytes - $consumerReservationBytes - $relayReservationBytes
             || $scheduledConsoleReservationBytes < 0
             || ($scheduledConsoleReservationBytes !== 0 && $scheduledConsoleReservationBytes < 192 * 1024 * 1024)
-            || $scheduledConsoleReservationBytes > $memoryLimitBytes - $managementReservationBytes - $consumerReservationBytes - $relayReservationBytes
+            || $scheduledConsoleReservationBytes > $memoryLimitBytes - $managementReservationBytes - $consumerReservationBytes - $relayReservationBytes - $schedulerReservationBytes
             || !str_starts_with($lockDirectory, '/') || strlen($lockDirectory) > 4096 || str_contains($lockDirectory, "\0")
         ) {
-            throw new InvalidArgumentException('Worker runtime requires bounded identity, an absolute lock directory, management reservation at least 128 MiB, role reservations at least 320 MiB, and scheduled console reservation either disabled or at least 192 MiB, all fitting its memory ceiling.');
+            throw new InvalidArgumentException('Worker runtime requires bounded identity, an absolute lock directory, management reservation at least 128 MiB, consumer, relay and scheduler reservations at least 320 MiB, and scheduled console reservation either disabled or at least 192 MiB, all fitting its memory ceiling.');
         }
     }
 }

@@ -14,16 +14,16 @@ final class WorkerRuntimeConfigurationTest extends TestCase
     public function testInclusiveMinimumReservationsFitExactCeiling(): void
     {
         $configuration = $this->configuration();
-        self::assertSame(768 * 1024 * 1024, $configuration->memoryLimitBytes);
-        self::assertSame($configuration->memoryLimitBytes, $configuration->managementReservationBytes + $configuration->consumerReservationBytes + $configuration->relayReservationBytes);
+        self::assertSame(1088 * 1024 * 1024, $configuration->memoryLimitBytes);
+        self::assertSame($configuration->memoryLimitBytes, $configuration->managementReservationBytes + $configuration->consumerReservationBytes + $configuration->relayReservationBytes + $configuration->schedulerReservationBytes);
         self::assertSame(0, $configuration->scheduledConsoleReservationBytes);
     }
 
     public function testConsoleReservationIsAdditionalAndFitsAnExactCeiling(): void
     {
-        $configuration = $this->configuration(['memoryLimitBytes' => 960 * 1024 * 1024, 'scheduledConsoleReservationBytes' => 192 * 1024 * 1024]);
+        $configuration = $this->configuration(['memoryLimitBytes' => 1280 * 1024 * 1024, 'scheduledConsoleReservationBytes' => 192 * 1024 * 1024]);
         self::assertSame($configuration->memoryLimitBytes,
-            $configuration->managementReservationBytes + $configuration->consumerReservationBytes + $configuration->relayReservationBytes + $configuration->scheduledConsoleReservationBytes);
+            $configuration->managementReservationBytes + $configuration->consumerReservationBytes + $configuration->relayReservationBytes + $configuration->schedulerReservationBytes + $configuration->scheduledConsoleReservationBytes);
     }
 
     #[DataProvider('invalidFields')]
@@ -41,9 +41,12 @@ final class WorkerRuntimeConfigurationTest extends TestCase
         yield 'uppercase boot' => ['bootId', str_repeat('A', 32)];
         yield 'zero total' => ['memoryLimitBytes', 0];
         yield 'unbounded total' => ['memoryLimitBytes', 1024 * 1024 * 1024 * 1024 + 1];
-        yield 'sum exceeds ceiling' => ['memoryLimitBytes', 768 * 1024 * 1024 - 1];
+        yield 'sum exceeds ceiling' => ['memoryLimitBytes', 1088 * 1024 * 1024 - 1];
         yield 'insufficient management' => ['managementReservationBytes', 128 * 1024 * 1024 - 1];
         yield 'insufficient consumer' => ['consumerReservationBytes', 320 * 1024 * 1024 - 1];
+        yield 'legacy total excludes scheduler' => ['memoryLimitBytes', 768 * 1024 * 1024];
+        yield 'insufficient scheduler' => ['schedulerReservationBytes', 320 * 1024 * 1024 - 1];
+        yield 'oversized scheduler' => ['schedulerReservationBytes', PHP_INT_MAX];
         yield 'insufficient relay' => ['relayReservationBytes', 320 * 1024 * 1024 - 1];
         yield 'oversized management' => ['managementReservationBytes', PHP_INT_MAX];
         yield 'oversized consumer' => ['consumerReservationBytes', PHP_INT_MAX];
@@ -61,8 +64,9 @@ final class WorkerRuntimeConfigurationTest extends TestCase
     private function configuration(array $overrides = []): WorkerRuntimeConfiguration
     {
         return new WorkerRuntimeConfiguration(...array_replace([
-            'namespace' => 'worker.baander.app', 'bootId' => str_repeat('a', 32), 'memoryLimitBytes' => 768 * 1024 * 1024,
+            'namespace' => 'worker.baander.app', 'bootId' => str_repeat('a', 32), 'memoryLimitBytes' => 1088 * 1024 * 1024,
             'managementReservationBytes' => 128 * 1024 * 1024, 'consumerReservationBytes' => 320 * 1024 * 1024,
+            'scheduledConsoleReservationBytes' => 0, 'schedulerReservationBytes' => 320 * 1024 * 1024,
             'relayReservationBytes' => 320 * 1024 * 1024, 'lockDirectory' => '/tmp/baander-worker',
         ], $overrides));
     }

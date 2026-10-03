@@ -21,9 +21,10 @@ final class WorkerCommandTest extends TestCase
         self::assertNotNull($runner->configuration);
         self::assertSame('baander.app:workers', $runner->configuration->namespace);
         self::assertSame(str_repeat('a', 32), $runner->configuration->bootId);
-        self::assertSame(1024 * 1024 * 1024, $runner->configuration->memoryLimitBytes);
+        self::assertSame(1344 * 1024 * 1024, $runner->configuration->memoryLimitBytes);
         self::assertSame(384 * 1024 * 1024, $runner->configuration->consumerReservationBytes);
         self::assertSame(0, $runner->configuration->scheduledConsoleReservationBytes);
+        self::assertSame(320 * 1024 * 1024, $runner->configuration->schedulerReservationBytes);
     }
 
     public function testExplicitConsoleReservationCanFitWithoutIncreasingTotalCeiling(): void
@@ -33,7 +34,7 @@ final class WorkerCommandTest extends TestCase
         $options = array_replace($this->options(), ['--management-mib' => '128', '--consumer-mib' => '320', '--relay-mib' => '320', '--scheduled-console-mib' => '192']);
         self::assertSame(7, $tester->execute($options));
         self::assertNotNull($runner->configuration);
-        self::assertSame(1024 * 1024 * 1024, $runner->configuration->memoryLimitBytes);
+        self::assertSame(1344 * 1024 * 1024, $runner->configuration->memoryLimitBytes);
         self::assertSame(192 * 1024 * 1024, $runner->configuration->scheduledConsoleReservationBytes);
     }
 
@@ -55,6 +56,9 @@ final class WorkerCommandTest extends TestCase
     /** @return iterable<string, array{string, mixed}> */
     public static function invalidOptions(): iterable
     {
+        yield 'missing scheduler budget' => ['--scheduler-mib', null];
+        yield 'scheduler below minimum' => ['--scheduler-mib', '319'];
+        yield 'legacy total excludes scheduler' => ['--memory-mib', '1024'];
         yield 'missing budget' => ['--memory-mib', null];
         yield 'fractional budget' => ['--memory-mib', '1024.5'];
         yield 'negative budget' => ['--memory-mib', '-1'];
@@ -101,7 +105,7 @@ final class WorkerCommandTest extends TestCase
     private function options(): array
     {
         return ['--deployment' => 'baander.app:workers', '--boot-id' => str_repeat('a', 32),
-            '--memory-mib' => '1024', '--management-mib' => '256', '--consumer-mib' => '384', '--relay-mib' => '384',
+            '--memory-mib' => '1344', '--management-mib' => '256', '--consumer-mib' => '384', '--relay-mib' => '384', '--scheduler-mib' => '320',
             '--lock-dir' => '/tmp/baander-worker-locks'];
     }
 }
