@@ -10,9 +10,24 @@ interface CustomAxiosRequestConfig extends AxiosRequestConfig {
   _didRetry?: boolean;
   _dpopRetryCount?: number;
   _authToken?: string | null;
+  _authSession?: number;
 }
 
 const MAX_DPOP_NONCE_RETRIES = 1;
+
+// Scalar metadata survives Axios config cloning without retaining crypto objects.
+const authSessions = new WeakMap<object, number>();
+let nextAuthSession = 1;
+
+function getAuthSession(keyPair = getDpopKeyPair()): number {
+  if (!keyPair) return 0;
+  let session = authSessions.get(keyPair);
+  if (session === undefined) {
+    session = nextAuthSession++;
+    authSessions.set(keyPair, session);
+  }
+  return session;
+}
 
 export const AXIOS_INSTANCE = Axios.create({
   baseURL: window.__BAANDER_API_URL__,
@@ -56,6 +71,11 @@ AXIOS_INSTANCE.interceptors.request.use(async (config: InternalAxiosRequestConfi
   if (!isApiRequest(config)) return config;
   const {accessToken} = getAuthStore();
   const keyPair = getDpopKeyPair();
+  const session = getAuthSession(keyPair);
+  if (customConfig._authSession !== undefined && customConfig._authSession !== session) {
+    throw new Axios.CanceledError('Authentication changed before request retry');
+  }
+  customConfig._authSession = session;
   customConfig._authToken = accessToken;
 
   if (keyPair) {
@@ -81,20 +101,25 @@ AXIOS_INSTANCE.interceptors.request.use(async (config: InternalAxiosRequestConfi
 
 // --- Response interceptor: extract DPoP-Nonce from responses ---
 AXIOS_INSTANCE.interceptors.response.use((response) => {
+  if (!isApiRequest(response.config)) return response;
+  const config = response.config as CustomAxiosRequestConfig;
+  if (config._authSession !== getAuthSession()) {
+    throw new Axios.CanceledError('Authentication changed before response received');
+  }
   const nonce = response.headers?.['dpop-nonce'];
-  if (isApiRequest(response.config) && typeof nonce === 'string' && nonce !== '') {
+  if (typeof nonce === 'string' && nonce !== '') {
     setDpopNonce(nonce);
   }
   return response;
 });
 
 // --- Token refresh: queue concurrent 401s, retry after refresh ---
-let refreshInFlight: Promise<void> | null = null;
+let refreshInFlight: { session: number; promise: Promise<void> } | null = null;
 
-async function refreshSession(): Promise<void> {
+async function refreshSession(session: number): Promise<void> {
   const {accessToken, refreshToken} = getAuthStore();
   const keyPair = getDpopKeyPair();
-  const isCurrentSession = () => getAuthStore().refreshToken === refreshToken &&
+  const isCurrentSession = () => getAuthSession() === session && getAuthStore().refreshToken === refreshToken &&
     getAuthStore().accessToken === accessToken && getDpopKeyPair() === keyPair;
   try {
     if (!refreshToken || !keyPair) throw new Error('No refresh credentials');
@@ -142,6 +167,10 @@ async function refreshSession(): Promise<void> {
 AXIOS_INSTANCE.interceptors.response.use(undefined, async (error) => {
   const originalRequest = error.config as CustomAxiosRequestConfig | undefined;
   if (!originalRequest || !isApiRequest(originalRequest)) return Promise.reject(error);
+  const session = getAuthSession();
+  if (originalRequest._authSession !== session) {
+    return Promise.reject(new Axios.CanceledError('Authentication changed before response received'));
+  }
   if (originalRequest._authToken !== getAuthStore().accessToken && !getAuthStore().accessToken) {
     return Promise.reject(error);
   }
@@ -169,10 +198,17 @@ AXIOS_INSTANCE.interceptors.response.use(undefined, async (error) => {
   originalRequest._didRetry = true;
   // A late 401 for the old token must reuse the already rotated session.
   if (originalRequest._authToken === getAuthStore().accessToken) {
-    if (!refreshInFlight) {
-      refreshInFlight = refreshSession().finally(() => { refreshInFlight = null; });
+    if (!refreshInFlight || refreshInFlight.session !== session) {
+      const pending = { session, promise: refreshSession(session) };
+      refreshInFlight = pending;
+      pending.promise = pending.promise.finally(() => {
+        if (refreshInFlight === pending) refreshInFlight = null;
+      });
     }
-    await refreshInFlight;
+    await refreshInFlight.promise;
+  }
+  if (originalRequest._authSession !== getAuthSession()) {
+    throw new Axios.CanceledError('Authentication changed before request retry');
   }
   return AXIOS_INSTANCE(originalRequest);
 });

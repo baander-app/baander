@@ -89,3 +89,110 @@ it('retains a manual scheduler request identity across authentication refresh', 
   expect(api.history.post[1].headers?.['Idempotency-Key']).toBe(key);
   expect(refresh.history.post).toHaveLength(1);
 });
+
+it('does not replay an old session mutation with a new account’s credentials', async () => {
+  api.onPost('/private-action').replyOnce(() => {
+    crypto.key = {};
+    auth.accessToken = 'other-access';
+    auth.refreshToken = 'other-refresh';
+    return [401];
+  }).onPost('/private-action').reply(200);
+
+  await expect(AXIOS_INSTANCE.post('/private-action', { value: 'old-account-action' })).rejects.toThrow();
+  expect(api.history.post).toHaveLength(1);
+  expect(refresh.history.post).toHaveLength(0);
+  expect(auth.accessToken).toBe('other-access');
+  expect(auth.clearAuth).not.toHaveBeenCalled();
+});
+
+it('discards an old session response and its nonce after account replacement', async () => {
+  api.onGet('/private').reply(() => {
+    crypto.key = {};
+    auth.accessToken = 'other-access';
+    auth.refreshToken = 'other-refresh';
+    return [200, { privateData: 'previous-account' }, { 'dpop-nonce': 'old-session-nonce' }];
+  });
+
+  await expect(AXIOS_INSTANCE.get('/private')).rejects.toThrow();
+  expect(crypto.nonce).toBeNull();
+  expect(auth.accessToken).toBe('other-access');
+});
+
+it('starts a new session refresh independently of a pending old session refresh', async () => {
+  let releaseOld!: (reply: [number, object]) => void;
+  const oldReply = new Promise<[number, object]>(resolve => { releaseOld = resolve; });
+  api.onGet('/old-private').reply(401);
+  api.onGet('/new-private').replyOnce(401).onGet('/new-private').reply(200);
+  refresh.onPost().replyOnce(() => oldReply)
+    .onPost().reply(200, { accessToken: 'other-rotated', refreshToken: 'other-rotated-refresh' });
+  const oldRequest = AXIOS_INSTANCE.get('/old-private').catch(error => error);
+  let newRequest: Promise<unknown> | undefined;
+  try {
+    await vi.waitFor(() => expect(refresh.history.post).toHaveLength(1));
+    crypto.key = {};
+    auth.accessToken = 'other-access';
+    auth.refreshToken = 'other-refresh';
+    newRequest = AXIOS_INSTANCE.get('/new-private').catch(error => error);
+    await vi.waitFor(() => expect(refresh.history.post).toHaveLength(2));
+    await expect(newRequest).resolves.toHaveProperty('status', 200);
+  } finally {
+    releaseOld([200, { accessToken: 'old-late', refreshToken: 'old-late-refresh' }]);
+    await Promise.all([oldRequest, newRequest]);
+  }
+  expect(auth.accessToken).toBe('other-rotated');
+  expect(auth.clearAuth).not.toHaveBeenCalled();
+});
+
+it('keeps the new refresh slot when an obsolete refresh finishes', async () => {
+  let releaseOld!: (reply: [number, object]) => void;
+  let releaseNew!: (reply: [number, object]) => void;
+  const oldReply = new Promise<[number, object]>(resolve => { releaseOld = resolve; });
+  const newReply = new Promise<[number, object]>(resolve => { releaseNew = resolve; });
+  api.onGet('/old-private').reply(401);
+  api.onGet('/new-private').replyOnce(401).onGet('/new-private').reply(200);
+  api.onGet('/queued-new-private').replyOnce(401).onGet('/queued-new-private').reply(200);
+  refresh.onPost().replyOnce(() => oldReply).onPost().replyOnce(() => newReply)
+    .onPost().reply(500);
+  const oldRequest = AXIOS_INSTANCE.get('/old-private').catch(error => error);
+  let newRequest: Promise<unknown> | undefined;
+  let queuedRequest: Promise<unknown> | undefined;
+  try {
+    await vi.waitFor(() => expect(refresh.history.post).toHaveLength(1));
+    crypto.key = {};
+    auth.accessToken = 'other-access';
+    auth.refreshToken = 'other-refresh';
+    newRequest = AXIOS_INSTANCE.get('/new-private').catch(error => error);
+    await vi.waitFor(() => expect(refresh.history.post).toHaveLength(2));
+    releaseOld([200, { accessToken: 'old-late', refreshToken: 'old-late-refresh' }]);
+    await oldRequest;
+    queuedRequest = AXIOS_INSTANCE.get('/queued-new-private').catch(error => error);
+    await vi.waitFor(() => expect(api.history.get).toHaveLength(3));
+    releaseNew([200, { accessToken: 'other-rotated', refreshToken: 'other-rotated-refresh' }]);
+    await expect(newRequest).resolves.toHaveProperty('status', 200);
+    await expect(queuedRequest).resolves.toHaveProperty('status', 200);
+    expect(refresh.history.post).toHaveLength(2);
+    expect(auth.clearAuth).not.toHaveBeenCalled();
+  } finally {
+    releaseOld([200, { accessToken: 'old-late', refreshToken: 'old-late-refresh' }]);
+    releaseNew([200, { accessToken: 'other-rotated', refreshToken: 'other-rotated-refresh' }]);
+    await Promise.all([oldRequest, newRequest, queuedRequest]);
+  }
+});
+
+it('reuses a completed rotation for a late 401 in the same session', async () => {
+  let releaseLate!: (reply: [number]) => void;
+  const lateReply = new Promise<[number]>(resolve => { releaseLate = resolve; });
+  api.onGet('/late-private').replyOnce(() => lateReply).onGet('/late-private').reply(200);
+  api.onGet('/private').replyOnce(401).onGet('/private').reply(200);
+  refresh.onPost().reply(200, { accessToken: 'new-access', refreshToken: 'new-refresh' });
+  const lateRequest = AXIOS_INSTANCE.get('/late-private');
+  try {
+    await vi.waitFor(() => expect(api.history.get).toHaveLength(1));
+    await AXIOS_INSTANCE.get('/private');
+  } finally {
+    releaseLate([401]);
+  }
+  await expect(lateRequest).resolves.toHaveProperty('status', 200);
+  expect(refresh.history.post).toHaveLength(1);
+  expect(api.history.get.at(-1)?.headers?.Authorization).toBe('DPoP new-access');
+});
