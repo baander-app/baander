@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Transcode\Infrastructure\Storage;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Filesystem\StoragePathBoundary;
+use InvalidArgumentException;
 use App\Transcode\Domain\ValueObject\QualityTier;
 
 final class SegmentFileResolver
@@ -29,6 +31,7 @@ final class SegmentFileResolver
      */
     public function getVideoDirectories(): array
     {
+        $this->resolvePath($this->basePath);
         if (!is_dir($this->basePath)) {
             return [];
         }
@@ -38,7 +41,7 @@ final class SegmentFileResolver
             if ($entry === '.' || $entry === '..') {
                 continue;
             }
-            if (is_dir($this->basePath . '/' . $entry)) {
+            if (!is_link($this->basePath . '/' . $entry) && is_dir($this->basePath . '/' . $entry)) {
                 $dirs[] = $entry;
             }
         }
@@ -48,7 +51,7 @@ final class SegmentFileResolver
 
     public function resolveJobDirectory(Uuid $videoId, QualityTier $qualityTier): string
     {
-        return sprintf('%s/%s/%s', $this->basePath, $videoId->toString(), $qualityTier->name);
+        return $this->buildPath($videoId->toString(), $qualityTier->name);
     }
 
     /**
@@ -63,12 +66,13 @@ final class SegmentFileResolver
      */
     public function segmentPrefix(int $videoStreamIndex, int $audioStreamIndex, QualityTier $qualityTier): string
     {
+        self::assertComponent($qualityTier->name);
         return sprintf('v%d_a%d_%s', $videoStreamIndex, $audioStreamIndex, $qualityTier->name);
     }
 
     public function resolveInitSegmentPath(Uuid $videoId, QualityTier $qualityTier): string
     {
-        return sprintf('%s/%s/%s/init.mp4', $this->basePath, $videoId->toString(), $qualityTier->name);
+        return $this->buildPath($videoId->toString(), $qualityTier->name, 'init.mp4');
     }
 
     public function resolveSegmentPath(Uuid $videoId, QualityTier $qualityTier, int $segmentIndex): string
@@ -91,35 +95,65 @@ final class SegmentFileResolver
     ): string {
         $prefix = $this->segmentPrefix($videoStreamIndex, $audioStreamIndex, $qualityTier);
 
-        return sprintf('%s/%s/%s/%s_%d.m4s', $this->basePath, $videoId->toString(), $qualityTier->name, $prefix, $segmentIndex);
+        return $this->buildPath($videoId->toString(), $qualityTier->name, sprintf('%s_%d.m4s', $prefix, $segmentIndex));
     }
 
     // --- Audio Paths ---
 
     public function resolveAudioDirectory(Uuid $videoId, string $language): string
     {
-        return sprintf('%s/%s/audio/%s', $this->basePath, $videoId->toString(), $language);
+        return $this->buildPath($videoId->toString(), 'audio', $language);
     }
 
     public function resolveAudioInitSegmentPath(Uuid $videoId, string $language): string
     {
-        return sprintf('%s/%s/audio/%s/init.mp4', $this->basePath, $videoId->toString(), $language);
+        return $this->buildPath($videoId->toString(), 'audio', $language, 'init.mp4');
     }
 
     public function resolveAudioSegmentPath(Uuid $videoId, string $language, int $segmentIndex): string
     {
-        return sprintf('%s/%s/audio/%s/seg_%d.m4s', $this->basePath, $videoId->toString(), $language, $segmentIndex);
+        return $this->buildPath($videoId->toString(), 'audio', $language, sprintf('seg_%d.m4s', $segmentIndex));
     }
 
     // --- Subtitle Paths ---
 
     public function resolveSubtitleDirectory(Uuid $videoId, string $language): string
     {
-        return sprintf('%s/%s/subtitles/%s', $this->basePath, $videoId->toString(), $language);
+        return $this->buildPath($videoId->toString(), 'subtitles', $language);
     }
 
     public function resolveSubtitleSegmentPath(Uuid $videoId, string $language, string $segmentName): string
     {
-        return sprintf('%s/%s/subtitles/%s/%s.vtt', $this->basePath, $videoId->toString(), $language, $segmentName);
+        self::assertComponent($segmentName);
+        return $this->buildPath($videoId->toString(), 'subtitles', $language, $segmentName . '.vtt');
+    }
+
+    public function resolvePath(string $path): string
+    {
+        if (!str_starts_with($path, '/') || str_contains($path, "\0")
+            || preg_match('~(?:^|/)\.{1,2}(?:/|$)~', $path) === 1) {
+            throw new InvalidArgumentException('Transcode paths must be absolute and contain no traversal components.');
+        }
+        StoragePathBoundary::resolve($this->basePath, $path);
+
+        // Keep the configured root spelling: deletion walks beneath that root
+        // without following links, including when the configured root is an alias.
+        return $path;
+    }
+
+    private function buildPath(string ...$components): string
+    {
+        foreach ($components as $component) {
+            self::assertComponent($component);
+        }
+        return $this->resolvePath(rtrim($this->basePath, '/') . '/' . implode('/', $components));
+    }
+
+    private static function assertComponent(string $component): void
+    {
+        if ($component === '' || $component === '.' || $component === '..'
+            || strpbrk($component, "/\\\0") !== false) {
+            throw new InvalidArgumentException('Transcode path components must be nonempty names without separators or null bytes.');
+        }
     }
 }

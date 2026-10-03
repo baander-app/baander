@@ -15,6 +15,8 @@ use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\SessionPriority;
 use App\Transcode\Domain\ValueObject\TranscodeStatus;
+use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
+use App\Transcode\Infrastructure\Storage\TranscodeFileStorage;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
@@ -34,7 +36,9 @@ final class SweepTranscodeCacheHandlerTest extends TestCase
     private TranscodeJobPortInterface $jobPort;
     private TranscodeSessionPortInterface $sessionPort;
     private TranscodeStoragePortInterface $storage;
+    /** @var array<string, list<TranscodeJob>> */
     private array $jobsByVideo = [];
+    /** @var array<string, list<TranscodeSession>> */
     private array $sessionsByJob = [];
 
     protected function setUp(): void
@@ -48,7 +52,6 @@ final class SweepTranscodeCacheHandlerTest extends TestCase
 
         $this->jobPort = $this->createStub(TranscodeJobPortInterface::class);
         $this->sessionPort = $this->createStub(TranscodeSessionPortInterface::class);
-        $this->jobsByVideo = [];
 
         $this->jobPort->method('findActiveByVideo')->willReturnCallback(fn (Uuid $v) => $this->jobsByVideo[$v->toString()] ?? []);
         $this->sessionPort->method('findByJob')->willReturnCallback(function (Uuid $jobId) {
@@ -74,6 +77,31 @@ final class SweepTranscodeCacheHandlerTest extends TestCase
         $this->assertFileDoesNotExist($dir);
         $this->assertSame(4, $result->bytesFreed);
         $this->assertFalse($result->dryRun);
+    }
+
+    public function testLinkedOutsideFileDoesNotExtendCacheLifetimeOrContributeBytes(): void
+    {
+        $videoId = Uuid::v7();
+        $dir = $this->cacheRoot . '/' . $videoId->toString();
+        $this->writeSegment($dir . '/p1080', 'old.m4s', 'data', 3600 * 26);
+        $outside = $this->cacheRoot . '-outside';
+        file_put_contents($outside, 'outside content');
+        $link = $dir . '/p1080/recent.m4s';
+        symlink($outside, $link);
+
+        try {
+            $result = $this->buildHandler()->sweep(['ttl_hours' => 24]);
+
+            self::assertContains($videoId->toString(), $result->deletedVideoIds);
+            self::assertSame(4, $result->bytesFreed);
+            self::assertDirectoryDoesNotExist($dir);
+            self::assertSame('outside content', file_get_contents($outside));
+        } finally {
+            if (is_link($link)) {
+                unlink($link);
+            }
+            unlink($outside);
+        }
     }
 
     public function testDoesNotDeleteVideoDirectoryWithActiveJob(): void
@@ -205,107 +233,7 @@ final class SweepTranscodeCacheHandlerTest extends TestCase
 
     private function buildRealStorage(): TranscodeStoragePortInterface
     {
-        return new class($this->cacheRoot) implements TranscodeStoragePortInterface {
-            public function __construct(private readonly string $root)
-            {
-            }
-
-            public function resolveJobDirectory(Uuid $videoId, QualityTier $qualityTier): string
-            {
-                return sprintf('%s/%s/%s', $this->root, $videoId->toString(), $qualityTier->name);
-            }
-
-            public function resolveInitSegmentPath(Uuid $videoId, QualityTier $qualityTier): string
-            {
-                return $this->resolveJobDirectory($videoId, $qualityTier) . '/init.mp4';
-            }
-
-            public function resolveSegmentPath(Uuid $videoId, QualityTier $qualityTier, int $segmentIndex): string
-            {
-                return sprintf('%s/%s_%d.m4s', $this->resolveJobDirectory($videoId, $qualityTier), $qualityTier->name, $segmentIndex);
-            }
-
-            public function resolveAudioDirectory(Uuid $videoId, string $language): string
-            {
-                return sprintf('%s/%s/audio/%s', $this->root, $videoId->toString(), $language);
-            }
-
-            public function resolveAudioInitSegmentPath(Uuid $videoId, string $language): string
-            {
-                return $this->resolveAudioDirectory($videoId, $language) . '/init.mp4';
-            }
-
-            public function resolveAudioSegmentPath(Uuid $videoId, string $language, int $segmentIndex): string
-            {
-                return sprintf('%s/seg_%d.m4s', $this->resolveAudioDirectory($videoId, $language), $segmentIndex);
-            }
-
-            public function resolveSubtitleDirectory(Uuid $videoId, string $language): string
-            {
-                return sprintf('%s/%s/subtitles/%s', $this->root, $videoId->toString(), $language);
-            }
-
-            public function resolveSubtitleSegmentPath(Uuid $videoId, string $language, string $segmentName): string
-            {
-                return sprintf('%s/%s.vtt', $this->resolveSubtitleDirectory($videoId, $language), $segmentName);
-            }
-
-            public function exists(string $path): bool
-            {
-                return file_exists($path);
-            }
-
-            public function deleteDirectory(string $path): void
-            {
-                if (!is_dir($path)) {
-                    return;
-                }
-                $it = new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS);
-                $files = new \RecursiveIteratorIterator($it, \RecursiveIteratorIterator::CHILD_FIRST);
-                foreach ($files as $file) {
-                    $file->isDir() ? rmdir($file->getRealPath()) : unlink($file->getRealPath());
-                }
-                rmdir($path);
-            }
-
-            public function getDirectorySize(string $path): int
-            {
-                if (!is_dir($path)) {
-                    return 0;
-                }
-                $size = 0;
-                $it = new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS);
-                $files = new \RecursiveIteratorIterator($it);
-                foreach ($files as $file) {
-                    if ($file->isFile()) {
-                        $size += $file->getSize();
-                    }
-                }
-                return $size;
-            }
-
-            public function getBasePath(): string
-            {
-                return $this->root;
-            }
-
-            public function getVideoDirectories(): array
-            {
-                if (!is_dir($this->root)) {
-                    return [];
-                }
-                $dirs = [];
-                foreach (scandir($this->root) ?: [] as $entry) {
-                    if ($entry === '.' || $entry === '..') {
-                        continue;
-                    }
-                    if (is_dir($this->root . '/' . $entry)) {
-                        $dirs[] = $entry;
-                    }
-                }
-                return $dirs;
-            }
-        };
+        return new TranscodeFileStorage(new SegmentFileResolver($this->cacheRoot));
     }
 
     private function rmrf(string $path): void
@@ -317,7 +245,7 @@ final class SweepTranscodeCacheHandlerTest extends TestCase
         $it = new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS);
         $files = new \RecursiveIteratorIterator($it, \RecursiveIteratorIterator::CHILD_FIRST);
         foreach ($files as $file) {
-            $file->isDir() ? rmdir($file->getRealPath()) : unlink($file->getRealPath());
+            !$file->isLink() && $file->isDir() ? rmdir($file->getPathname()) : unlink($file->getPathname());
         }
         rmdir($path);
     }

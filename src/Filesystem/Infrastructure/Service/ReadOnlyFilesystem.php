@@ -6,6 +6,7 @@ namespace App\Filesystem\Infrastructure\Service;
 
 use App\Filesystem\Application\Port\FileHandle;
 use App\Filesystem\Application\Port\LocalFilesystemPortInterface;
+use App\Shared\Infrastructure\Filesystem\StoragePathBoundary;
 use App\Filesystem\Application\Port\ReadOnlyFilesystemPortInterface;
 
 final readonly class ReadOnlyFilesystem implements ReadOnlyFilesystemPortInterface
@@ -28,7 +29,7 @@ final readonly class ReadOnlyFilesystem implements ReadOnlyFilesystemPortInterfa
             throw new \InvalidArgumentException(sprintf('Library base path does not exist: %s', $this->basePath));
         }
 
-        return FilesystemPathBoundary::resolve($realBase, $resolved);
+        return StoragePathBoundary::resolve($realBase, $resolved);
     }
 
     public function exists(string $path): bool

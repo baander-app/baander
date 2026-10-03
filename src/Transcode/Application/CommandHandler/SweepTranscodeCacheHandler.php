@@ -197,7 +197,7 @@ final class SweepTranscodeCacheHandler
         $files = new \RecursiveIteratorIterator($it);
 
         foreach ($files as $file) {
-            if ($file->isFile()) {
+            if (!$file->isLink() && $file->isFile()) {
                 $mtime = $file->getMTime();
                 if ($newest === null || $mtime > $newest) {
                     $newest = $mtime;
@@ -208,6 +208,7 @@ final class SweepTranscodeCacheHandler
         return $newest;
     }
 
+    /** @param list<string> $deleted */
     private function deleteVideoDir(
         string $videoId,
         string $dir,

@@ -6,6 +6,7 @@ namespace App\Filesystem\Infrastructure\Service;
 
 use App\Filesystem\Application\Port\FileHandle;
 use App\Filesystem\Application\Port\LocalFilesystemPortInterface;
+use App\Shared\Infrastructure\Filesystem\StoragePathBoundary;
 use Swoole\Coroutine\System;
 
 final class LocalFilesystem implements LocalFilesystemPortInterface
@@ -23,7 +24,7 @@ final class LocalFilesystem implements LocalFilesystemPortInterface
 
         $normalized = $this->normalizeRelativePath($path);
 
-        return FilesystemPathBoundary::resolve($this->basePath, $this->basePath . '/' . $normalized);
+        return StoragePathBoundary::resolve($this->basePath, $this->basePath . '/' . $normalized);
     }
 
     private function normalizeRelativePath(string $path): string

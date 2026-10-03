@@ -843,6 +843,21 @@ root aliases, and ordinary cleanup. These pathname checks do not provide a fence
 against hostile concurrent filesystem renames; the broader storage boundary and
 execution-ownership work remains necessary.
 
+Transcode path builders now validate language tags, subtitle stems, and quality
+names as single path components before resolving beneath the cache root. They
+use the canonical boundary checker shared with the general filesystem adapters,
+including for missing targets beneath existing symlinks. Valid language tags and
+subtitle stems keep their names. Generated paths retain the configured root's
+spelling so cleanup still handles configured root aliases without following links.
+
+Existence checks and directory sizing enforce the same root boundary. Cache
+enumeration skips symbolic directory entries, and size/eviction age calculations
+ignore linked files. A recent outside file reached by a symlink therefore cannot
+inflate cache usage or extend an expired video's lifetime. The eviction suite now
+uses the real storage adapter instead of a duplicate implementation and verifies
+that cleanup preserves the outside file. These checks retain the pathname-race
+limitation described above; they do not provide encoding-attempt isolation.
+
 The first command facade is now wired. `app:serve` is the canonical name of the
 existing `ServerRunCommand`, retaining `swoole:server:run` as an alias and preserving
 its options, signal handling and BootManager behavior. `app:worker` uses an

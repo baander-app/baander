@@ -59,7 +59,7 @@ final class TranscodeFileStorage implements TranscodeStoragePortInterface
 
     public function exists(string $path): bool
     {
-        return file_exists($path);
+        return file_exists($this->resolver->resolvePath($path));
     }
 
     public function deleteDirectory(string $path): void
@@ -125,6 +125,7 @@ final class TranscodeFileStorage implements TranscodeStoragePortInterface
 
     public function getDirectorySize(string $path): int
     {
+        $path = $this->resolver->resolvePath($path);
         if (!is_dir($path)) {
             return 0;
         }
@@ -134,7 +135,7 @@ final class TranscodeFileStorage implements TranscodeStoragePortInterface
         $files = new \RecursiveIteratorIterator($it);
 
         foreach ($files as $file) {
-            if ($file->isFile()) {
+            if (!$file->isLink() && $file->isFile()) {
                 $size += $file->getSize();
             }
         }

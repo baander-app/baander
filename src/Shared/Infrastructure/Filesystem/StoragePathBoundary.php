@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Filesystem\Infrastructure\Service;
+namespace App\Shared\Infrastructure\Filesystem;
 
 use InvalidArgumentException;
 
 /** Canonical path checks, including the existing ancestors of missing targets. */
-final class FilesystemPathBoundary
+final class StoragePathBoundary
 {
     public static function resolve(string $basePath, string $candidate): string
     {
