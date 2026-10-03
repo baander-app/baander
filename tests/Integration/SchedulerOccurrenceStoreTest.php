@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
+use App\Scheduler\Application\DTO\SchedulerOccurrenceOrigin;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceStore;
 use App\Shared\Domain\Model\Uuid;
@@ -249,6 +250,169 @@ final class SchedulerOccurrenceStoreTest extends TestCase
         self::assertSame($first->id->toString(), $observer->find($first->jobId, $first->scheduledFor)?->id->toString());
         self::assertSame($next->id->toString(), $observer->find($next->jobId, $next->scheduledFor)?->id->toString());
         self::assertSame(2, (int) $this->second->fetchOne('SELECT count(*) FROM scheduler_occurrences'));
+    }
+
+    public function testManualIntentsCoexistWithScheduledSlotAndLookupPreservesEachSnapshot(): void
+    {
+        $scheduled = $this->occurrence();
+        $manual = new SchedulerOccurrence(Uuid::v7(), $scheduled->jobId, $scheduled->scheduledFor, JobType::Console,
+            'app:baander-manual', ['address' => 'manual@baander.app', 'float' => 1.0, 'negativeZero' => -0.0], SchedulerOccurrenceOrigin::Manual);
+        $nextManual = new SchedulerOccurrence(Uuid::v7(), $scheduled->jobId, $scheduled->scheduledFor, JobType::Messenger,
+            'app:baander-next-manual', ['second' => 2, 'first' => 1], SchedulerOccurrenceOrigin::Manual);
+        $store = new DoctrineSchedulerOccurrenceStore($this->first);
+        $observer = new DoctrineSchedulerOccurrenceStore($this->second);
+        self::assertTrue($store->record($manual));
+        self::assertTrue($store->record($nextManual));
+        self::assertNull($observer->find($scheduled->jobId, $scheduled->scheduledFor), 'Manual intents never stand in for a scheduled slot.');
+        self::assertTrue($store->record($scheduled));
+        $observer = new DoctrineSchedulerOccurrenceStore($this->second);
+        $foundScheduled = $observer->find($scheduled->jobId, $scheduled->scheduledFor);
+        self::assertNotNull($foundScheduled);
+        self::assertSame($scheduled->id->toString(), $foundScheduled->id->toString());
+        foreach ([$scheduled, $manual, $nextManual] as $original) {
+            $found = $observer->findById($original->id);
+            self::assertNotNull($found);
+            self::assertSame($original->origin, $found->origin);
+            self::assertSame($original->jobId->toString(), $found->jobId->toString());
+            self::assertSame($original->scheduledFor->format('c'), $found->scheduledFor->format('c'));
+            self::assertSame($original->jobType, $found->jobType);
+            self::assertSame($original->command, $found->command);
+            self::assertSame($original->parametersJson(), $found->parametersJson());
+        }
+        self::assertFalse($observer->record($manual), 'Only the same immutable manual ID is a duplicate.');
+        self::assertNull($observer->findById(Uuid::v7()));
+        self::assertSame(3, (int) $this->second->fetchOne('SELECT count(*) FROM scheduler_occurrences'));
+    }
+
+    #[DataProvider('manualIdentityConflicts')]
+    public function testManualIdCannotBeReboundToDifferentIdentityOrConfiguration(string $change): void
+    {
+        $base = $this->occurrence();
+        $manual = new SchedulerOccurrence($base->id, $base->jobId, $base->scheduledFor, $base->jobType, $base->command, $base->parameters, SchedulerOccurrenceOrigin::Manual);
+        $store = new DoctrineSchedulerOccurrenceStore($this->first);
+        self::assertTrue($store->record($manual));
+        $conflict = new SchedulerOccurrence($manual->id,
+            $change === 'job' ? Uuid::v7() : $manual->jobId,
+            $change === 'minute' ? $manual->scheduledFor->modify('+1 minute') : $manual->scheduledFor,
+            $change === 'type' ? JobType::Messenger : $manual->jobType,
+            $change === 'command' ? 'app:baander-changed' : $manual->command,
+            $change === 'parameters' ? ['first' => 1.0, 'second' => 2] : $manual->parameters,
+            $change === 'origin' ? SchedulerOccurrenceOrigin::Scheduled : SchedulerOccurrenceOrigin::Manual);
+        try {
+            $store->record($conflict);
+            self::fail('Manual ID must retain its first identity and configuration.');
+        } catch (\LogicException) {
+            self::assertFalse($this->first->isConnected());
+        }
+        $found = (new DoctrineSchedulerOccurrenceStore($this->second))->findById($manual->id);
+        self::assertNotNull($found);
+        self::assertSame(SchedulerOccurrenceOrigin::Manual, $found->origin);
+        self::assertSame($manual->jobId->toString(), $found->jobId->toString());
+        self::assertSame($manual->scheduledFor->format('c'), $found->scheduledFor->format('c'));
+        self::assertSame($manual->jobType, $found->jobType);
+        self::assertSame($manual->command, $found->command);
+        self::assertSame($manual->parametersJson(), $found->parametersJson());
+        self::assertSame(1, (int) $this->second->fetchOne('SELECT count(*) FROM scheduler_occurrences'));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function manualIdentityConflicts(): iterable
+    {
+        foreach (['job', 'minute', 'origin', 'type', 'command', 'parameters'] as $change) {
+            yield $change => [$change];
+        }
+    }
+
+    public function testMatchingScheduledSlotCannotHideManualIdReboundToScheduledOrigin(): void
+    {
+        $scheduled = $this->occurrence();
+        $manual = new SchedulerOccurrence(Uuid::v7(), $scheduled->jobId, $scheduled->scheduledFor, $scheduled->jobType,
+            $scheduled->command, $scheduled->parameters, SchedulerOccurrenceOrigin::Manual);
+        $store = new DoctrineSchedulerOccurrenceStore($this->first);
+        self::assertTrue($store->record($scheduled));
+        self::assertTrue($store->record($manual));
+        try {
+            $store->record($this->occurrence(id: $manual->id));
+            self::fail('A matching scheduled slot must not classify an ID belonging to a manual intent as a retry.');
+        } catch (\LogicException) {
+            self::assertFalse($this->first->isConnected());
+        }
+        $observer = new DoctrineSchedulerOccurrenceStore($this->second);
+        self::assertSame($scheduled->id->toString(), $observer->find($scheduled->jobId, $scheduled->scheduledFor)?->id->toString());
+        self::assertSame(SchedulerOccurrenceOrigin::Manual, $observer->findById($manual->id)?->origin);
+        self::assertSame(2, (int) $this->second->fetchOne('SELECT count(*) FROM scheduler_occurrences'));
+    }
+
+    public function testPhysicalScheduledUniquenessAllowsMultipleManualRowsForSameSlot(): void
+    {
+        $scheduled = $this->occurrence();
+        self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->first))->record($scheduled));
+        $sql = 'INSERT INTO scheduler_occurrences (id, job_id, scheduled_for, job_type, command, parameters, origin) SELECT :id, job_id, scheduled_for, job_type, command, parameters, :origin FROM scheduler_occurrences WHERE id = :original';
+        foreach ([Uuid::v7(), Uuid::v7()] as $id) {
+            self::assertSame(1, $this->second->executeStatement($sql, ['id' => $id->toString(), 'origin' => 'manual', 'original' => $scheduled->id->toString()]));
+        }
+        try {
+            $this->second->executeStatement($sql, ['id' => Uuid::v7()->toString(), 'origin' => 'scheduled', 'original' => $scheduled->id->toString()]);
+            self::fail('The scheduled partial unique index must reject a second scheduled row for the slot.');
+        } catch (DriverException $error) {
+            self::assertSame('23505', $error->getSQLState());
+        }
+        self::assertSame(3, (int) $this->first->fetchOne('SELECT count(*) FROM scheduler_occurrences'));
+    }
+
+    #[DataProvider('invalidPhysicalOrigins')]
+    public function testPhysicalOriginConstraintRejectsUnsupportedOrNullValues(?string $origin, string $sqlState): void
+    {
+        $occurrence = $this->occurrence();
+        try {
+            $this->first->executeStatement('INSERT INTO scheduler_occurrences (id, job_id, scheduled_for, job_type, command, parameters, origin) VALUES (:id, :job, :at, :type, :command, CAST(:parameters AS JSON), :origin)',
+                ['id' => $occurrence->id->toString(), 'job' => $occurrence->jobId->toString(), 'at' => $occurrence->scheduledFor->format('c'), 'type' => $occurrence->jobType->value, 'command' => $occurrence->command, 'parameters' => $occurrence->parametersJson(), 'origin' => $origin]);
+            self::fail('Origin constraints must hold independently of application enums.');
+        } catch (DriverException $error) {
+            self::assertSame($sqlState, $error->getSQLState());
+        }
+        self::assertSame(0, (int) $this->second->fetchOne('SELECT count(*) FROM scheduler_occurrences'));
+    }
+
+    /** @return iterable<string, array{?string, string}> */
+    public static function invalidPhysicalOrigins(): iterable
+    {
+        yield 'unsupported' => ['ad-hoc', '23514'];
+        yield 'null' => [null, '23502'];
+    }
+
+    #[DataProvider('commitFailures')]
+    public function testManualCommitUncertaintyReconcilesByOriginalIdWithoutClaimingScheduledSlot(bool $afterCommit): void
+    {
+        $params = $this->params;
+        $params['wrapperClass'] = OccurrenceCommitFailureConnection::class;
+        $connection = DriverManager::getConnection($params);
+        self::assertInstanceOf(OccurrenceCommitFailureConnection::class, $connection);
+        $this->extras[] = $connection;
+        $connection->executeStatement('SET search_path TO ' . $this->schema);
+        $connection->failure = $afterCommit ? 'after' : 'before';
+        $base = $this->occurrence();
+        $manual = new SchedulerOccurrence($base->id, $base->jobId, $base->scheduledFor, $base->jobType, $base->command, $base->parameters, SchedulerOccurrenceOrigin::Manual);
+        try {
+            (new DoctrineSchedulerOccurrenceStore($connection))->record($manual);
+            self::fail('An uncertain manual commit cannot acknowledge creation.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('Fixture commit failed.', $error->getMessage());
+        }
+        self::assertFalse($connection->isConnected());
+        $observer = new DoctrineSchedulerOccurrenceStore($this->second);
+        self::assertNull($observer->find($manual->jobId, $manual->scheduledFor));
+        $found = $observer->findById($manual->id);
+        if ($afterCommit) {
+            self::assertNotNull($found);
+            self::assertSame(SchedulerOccurrenceOrigin::Manual, $found->origin);
+            self::assertSame($manual->parametersJson(), $found->parametersJson());
+            self::assertFalse($observer->record($manual));
+        } else {
+            self::assertNull($found);
+            self::assertTrue($observer->record($manual));
+        }
+        self::assertSame(1, (int) $this->second->fetchOne('SELECT count(*) FROM scheduler_occurrences'));
     }
 
     /** @param array<array-key, scalar|null|array<array-key, scalar|null|array<string, string>>> $parameters */

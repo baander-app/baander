@@ -9,6 +9,7 @@ use App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand;
 use App\Scheduler\Application\CommandHandler\ExecuteScheduledJobHandler;
 use App\Scheduler\Application\CommandHandler\ExecuteScheduledOccurrenceHandler;
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
+use App\Scheduler\Application\DTO\SchedulerOccurrenceOrigin;
 use App\Scheduler\Application\Exception\ScheduledOccurrenceJobBusy;
 use App\Scheduler\Application\Port\ScheduledJobPortInterface;
 use App\Scheduler\Application\Port\ScheduledConsoleExecutorInterface;
@@ -335,6 +336,26 @@ final class SchedulerOccurrenceGuardTest extends TestCase
         self::assertSame(0, $failed->getMessageCount());
         self::assertSame(0, $async->getMessageCount());
         self::assertNull($owner->begin($blocker->id, Uuid::v7()), 'A released job slot never reopens the consumed occurrence.');
+    }
+
+    public function testPersistedManualOriginRunsPausedJobAndCannotRepeatItsAttempt(): void
+    {
+        [$scheduled, $job] = $this->recordOccurrence();
+        $manual = new SchedulerOccurrence(Uuid::v7(), $job->getId(), $scheduled->scheduledFor,
+            $scheduled->jobType, $scheduled->command, $scheduled->parameters, SchedulerOccurrenceOrigin::Manual);
+        self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->writer))->record($manual));
+        $job->pause();
+        $effects = 0;
+        $guard = $this->guard($manual, $job, $effects);
+        $command = new ExecuteScheduledOccurrenceCommand($manual->id);
+        $guard($command);
+        $guard($command);
+        self::assertSame(1, $effects);
+        self::assertSame(1, $job->getRunCount());
+        self::assertSame(\App\Scheduler\Domain\ValueObject\ScheduleStatus::Paused, $job->getStatus());
+        self::assertNotNull($this->receipt($manual)['returned_at']);
+        self::assertSame(1, (int) $this->observer->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions'));
+        self::assertSame($scheduled->id->toString(), (new DoctrineSchedulerOccurrenceStore($this->writer))->find($job->getId(), $scheduled->scheduledFor)?->id->toString());
     }
 
     private function redisTransport(): RedisTransport

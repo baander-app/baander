@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Scheduler\Infrastructure\Doctrine;
 
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
+use App\Scheduler\Application\DTO\SchedulerOccurrenceOrigin;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
@@ -24,29 +25,33 @@ final readonly class TransactionalSchedulerOccurrenceWriter
         $parameters = [
             'id' => $occurrence->id->toString(), 'job' => $occurrence->jobId->toString(),
             'scheduled' => $occurrence->scheduledFor->format('Y-m-d H:i:s.uP'),
+            'origin' => $occurrence->origin->value,
             'type' => $occurrence->jobType->value, 'command' => $occurrence->command,
             'parameters' => $occurrence->parametersJson(),
         ];
         $inserted = $this->connection->executeStatement(<<<'SQL'
-            INSERT INTO scheduler_occurrences (id, job_id, scheduled_for, job_type, command, parameters)
-            VALUES (:id, :job, :scheduled, :type, :command, CAST(:parameters AS JSON))
+            INSERT INTO scheduler_occurrences (id, job_id, scheduled_for, origin, job_type, command, parameters)
+            VALUES (:id, :job, :scheduled, :origin, :type, :command, CAST(:parameters AS JSON))
             ON CONFLICT DO NOTHING
             SQL, $parameters);
         if ($inserted === 1) {
             return true;
         }
-        if ($this->connection->fetchOne('SELECT 1 FROM scheduler_occurrences WHERE id = :id AND (job_id <> :job OR scheduled_for <> :scheduled)', ['id' => $parameters['id'], 'job' => $parameters['job'], 'scheduled' => $parameters['scheduled']]) !== false) {
-            throw new \LogicException('Scheduler occurrence identifier is already assigned to another slot.');
+        if ($this->connection->fetchOne('SELECT 1 FROM scheduler_occurrences WHERE id = :id AND (job_id <> :job OR scheduled_for <> :scheduled OR origin <> :origin)', ['id' => $parameters['id'], 'job' => $parameters['job'], 'scheduled' => $parameters['scheduled'], 'origin' => $parameters['origin']]) !== false) {
+            throw new \LogicException('Scheduler occurrence identifier is already assigned to another slot or origin.');
         }
-        $row = $this->connection->fetchAssociative('SELECT job_type, command, parameters FROM scheduler_occurrences WHERE job_id = :job AND scheduled_for = :scheduled', ['job' => $parameters['job'], 'scheduled' => $parameters['scheduled']]);
-        if ($row === false || $row['job_type'] !== $parameters['type'] || $row['command'] !== $parameters['command']) {
+        $row = $occurrence->origin === SchedulerOccurrenceOrigin::Scheduled
+            ? $this->connection->fetchAssociative("SELECT origin, job_type, command, parameters FROM scheduler_occurrences WHERE job_id = :job AND scheduled_for = :scheduled AND origin = 'scheduled'", ['job' => $parameters['job'], 'scheduled' => $parameters['scheduled']])
+            : $this->connection->fetchAssociative('SELECT origin, job_type, command, parameters FROM scheduler_occurrences WHERE id = :id', ['id' => $parameters['id']]);
+        if ($row === false || $row['origin'] !== $parameters['origin'] || $row['job_type'] !== $parameters['type'] || $row['command'] !== $parameters['command']) {
             throw new \LogicException('Scheduler occurrence slot already has a different immutable snapshot.');
         }
         $decoded = json_decode($row['parameters'], true, 32, JSON_THROW_ON_ERROR);
         if (!is_array($decoded) || json_encode($decoded, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION, 8) !== $parameters['parameters']) {
             throw new \LogicException('Scheduler occurrence slot already has a different immutable snapshot.');
         }
-        // An identical retry preserves the originally admitted ID and dispatch/execution state.
+        // Scheduled retries preserve the original slot ID; manual retries reuse only their request ID.
+        // Both preserve all dispatch/execution state.
         return false;
     }
 }

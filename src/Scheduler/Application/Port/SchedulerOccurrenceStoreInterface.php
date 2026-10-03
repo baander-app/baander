@@ -11,14 +11,18 @@ use DateTimeImmutable;
 interface SchedulerOccurrenceStoreInterface
 {
     /**
-     * True only after the first committed occurrence for this job/UTC minute.
-     * An identical snapshot retry returns false and preserves the first ID,
-     * including when the retry supplies a newly generated candidate ID.
+     * True only after the first committed insertion. Scheduled occurrences deduplicate
+     * by job/UTC minute; identical retries preserve the first ID even with a new candidate ID.
+     * Manual occurrences deduplicate only by request ID, allowing distinct requests
+     * in the same job/minute alongside its scheduled occurrence. Identical retries return false.
      *
-     * @throws \LogicException If the occurrence key or ID conflicts with a different immutable snapshot.
+     * @throws \LogicException If the occurrence key or ID conflicts with a different immutable snapshot, job, minute or origin.
      */
     public function record(SchedulerOccurrence $occurrence): bool;
 
-    /** Lookup requires an exact minute; equivalent timezone offsets identify the same UTC instant. */
+    /** Scheduled-only lookup requires an exact minute; equivalent timezone offsets identify the same UTC instant. */
     public function find(Uuid $jobId, DateTimeImmutable $dueMinute): ?SchedulerOccurrence;
+
+    /** Authoritative immutable snapshot for either scheduled or manual request identity. */
+    public function findById(Uuid $occurrenceId): ?SchedulerOccurrence;
 }

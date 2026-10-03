@@ -6,6 +6,7 @@ namespace App\Scheduler\Application\CommandHandler;
 
 use App\Scheduler\Application\Command\ExecuteScheduledJobCommand;
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
+use App\Scheduler\Application\DTO\SchedulerOccurrenceOrigin;
 use App\Scheduler\Application\Port\ScheduledJobPortInterface;
 use App\Scheduler\Application\Port\ScheduledConsoleExecutorInterface;
 use App\Scheduler\Application\Exception\ScheduledConsoleCompletionUnknown;
@@ -52,10 +53,10 @@ final class ExecuteScheduledJobHandler
             $occurrence->jobType->value,
             $occurrence->command,
             $occurrence->parameters,
-        ), false);
+        ), false, $occurrence->origin === SchedulerOccurrenceOrigin::Manual);
     }
 
-    private function execute(ExecuteScheduledJobCommand $command, bool $legacyLock): void
+    private function execute(ExecuteScheduledJobCommand $command, bool $legacyLock, bool $manual = false): void
     {
         $job = $this->scheduledJobService->getById(Uuid::fromString($command->jobId));
         if ($job === null) {
@@ -65,7 +66,7 @@ final class ExecuteScheduledJobHandler
         }
 
         if (!$legacyLock && (
-            $job->getStatus() !== ScheduleStatus::Active
+            (!$manual && $job->getStatus() !== ScheduleStatus::Active)
             || $job->getJobType()->value !== $command->jobType
             || $job->getCommand() !== $command->command
             || $job->getParameters() !== $command->parameters

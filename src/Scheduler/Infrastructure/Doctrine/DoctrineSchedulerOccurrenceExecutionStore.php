@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Scheduler\Infrastructure\Doctrine;
 
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
+use App\Scheduler\Application\DTO\SchedulerOccurrenceOrigin;
 use App\Scheduler\Application\Exception\ScheduledOccurrenceJobBusy;
 use App\Scheduler\Application\Port\SchedulerOccurrenceExecutionStoreInterface;
 use App\Scheduler\Domain\ValueObject\JobType;
@@ -90,7 +91,7 @@ final class DoctrineSchedulerOccurrenceExecutionStore implements SchedulerOccurr
                 return null;
             }
             $row = $this->connection->fetchAssociative(<<<'SQL'
-                SELECT occurrence.id, occurrence.job_id, occurrence.scheduled_for, occurrence.job_type, occurrence.command, occurrence.parameters
+                SELECT occurrence.id, occurrence.job_id, occurrence.scheduled_for, occurrence.origin, occurrence.job_type, occurrence.command, occurrence.parameters
                 FROM scheduler_occurrences occurrence
                 JOIN scheduler_occurrence_executions execution ON execution.occurrence_id = occurrence.id
                 WHERE execution.occurrence_id = :occurrence AND execution.attempt_id = :attempt
@@ -102,7 +103,7 @@ final class DoctrineSchedulerOccurrenceExecutionStore implements SchedulerOccurr
             if (!is_array($snapshot)) {
                 throw new \UnexpectedValueException('Persisted scheduler parameters must be an array or object.');
             }
-            $occurrence = new SchedulerOccurrence(Uuid::fromString($row['id']), Uuid::fromString($row['job_id']), new DateTimeImmutable($row['scheduled_for']), JobType::from($row['job_type']), $row['command'], $snapshot);
+            $occurrence = new SchedulerOccurrence(Uuid::fromString($row['id']), Uuid::fromString($row['job_id']), new DateTimeImmutable($row['scheduled_for']), JobType::from($row['job_type']), $row['command'], $snapshot, SchedulerOccurrenceOrigin::from($row['origin']));
             $this->requireActiveAuthority($authority);
             return $occurrence;
         });

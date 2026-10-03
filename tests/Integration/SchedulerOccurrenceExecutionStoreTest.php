@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
+use App\Scheduler\Application\DTO\SchedulerOccurrenceOrigin;
 use App\Scheduler\Application\Exception\ScheduledOccurrenceJobBusy;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceExecutionStore;
@@ -548,6 +549,80 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         self::assertNotNull($store->begin($pending->id, Uuid::v7()));
         self::assertTrue($store->markReturned($running->id, $attempt));
         self::assertNull($store->begin($running->id, Uuid::v7()));
+    }
+
+    #[DataProvider('originsSharingJob')]
+    public function testManualAndScheduledOriginsShareUnresolvedGuardAndRetainDuplicateNoop(SchedulerOccurrenceOrigin $runningOrigin, SchedulerOccurrenceOrigin $pendingOrigin): void
+    {
+        $jobId = Uuid::v7();
+        $minute = new DateTimeImmutable('2026-10-02 12:00:00Z');
+        $running = new SchedulerOccurrence(Uuid::v7(), $jobId, $minute, JobType::Console, 'app:baander-check', ['first' => 1.0, 'second' => 2], $runningOrigin);
+        $pending = new SchedulerOccurrence(Uuid::v7(), $jobId, $minute, JobType::Messenger, 'app:baander-next', ['manual' => 'scheduler@baander.app'], $pendingOrigin);
+        $intents = new DoctrineSchedulerOccurrenceStore($this->first);
+        self::assertTrue($intents->record($running));
+        self::assertTrue($intents->record($pending));
+        $attempt = Uuid::v7();
+        $store = new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority);
+        $granted = $store->begin($running->id, $attempt);
+        self::assertNotNull($granted);
+        self::assertSame($runningOrigin, $granted->origin);
+        self::assertSame($running->parametersJson(), $granted->parametersJson());
+        self::assertNull($store->begin($running->id, $attempt));
+        self::assertNull($store->begin($running->id, Uuid::v7()));
+        $this->assertJobBusy($pending, $this->authority);
+        try {
+            $this->second->executeStatement('INSERT INTO scheduler_occurrence_executions (occurrence_id, job_id, attempt_id, deployment_namespace, deployment_boot_id, deployment_epoch) VALUES (:occurrence, :job, :attempt, :namespace, :boot, :epoch)',
+                ['occurrence' => $pending->id->toString(), 'job' => $jobId->toString(), 'attempt' => Uuid::v7()->toString(), 'namespace' => $this->authority->namespace, 'boot' => $this->authority->bootId, 'epoch' => $this->authority->epoch]);
+            self::fail('Physical unresolved-job uniqueness must also cover different origins.');
+        } catch (DriverException $error) {
+            self::assertSame('23505', $error->getSQLState());
+        }
+        self::assertTrue($store->markReturned($running->id, $attempt));
+        $nextAttempt = Uuid::v7();
+        $next = $store->begin($pending->id, $nextAttempt);
+        self::assertNotNull($next);
+        self::assertSame($pendingOrigin, $next->origin);
+        self::assertSame($pending->command, $next->command);
+        self::assertSame($pending->parametersJson(), $next->parametersJson());
+        self::assertNull($store->begin($pending->id, $nextAttempt));
+        self::assertNull($store->begin($running->id, Uuid::v7()));
+        self::assertSame(2, (int) $this->second->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions'));
+    }
+
+    /** @return iterable<string, array{SchedulerOccurrenceOrigin, SchedulerOccurrenceOrigin}> */
+    public static function originsSharingJob(): iterable
+    {
+        yield 'scheduled blocks manual' => [SchedulerOccurrenceOrigin::Scheduled, SchedulerOccurrenceOrigin::Manual];
+        yield 'manual blocks scheduled' => [SchedulerOccurrenceOrigin::Manual, SchedulerOccurrenceOrigin::Scheduled];
+        yield 'manual blocks manual' => [SchedulerOccurrenceOrigin::Manual, SchedulerOccurrenceOrigin::Manual];
+    }
+
+    #[DataProvider('commitFailures')]
+    public function testManualExecutionCommitUncertaintyNeverReexecutesCommittedAttempt(bool $after): void
+    {
+        $manual = new SchedulerOccurrence(Uuid::v7(), Uuid::v7(), new DateTimeImmutable('2026-10-02 12:00:00Z'), JobType::Console,
+            'app:baander-check', ['address' => 'manual@baander.app'], SchedulerOccurrenceOrigin::Manual);
+        self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->first))->record($manual));
+        $attempt = Uuid::v7();
+        $connection = $this->uncertainConnection($after);
+        try {
+            (new DoctrineSchedulerOccurrenceExecutionStore($connection, $this->authority))->begin($manual->id, $attempt);
+            self::fail('Uncertain admission never grants an executable manual snapshot.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('Fixture execution commit failed.', $error->getMessage());
+        }
+        self::assertFalse($connection->isConnected());
+        $observer = new DoctrineSchedulerOccurrenceExecutionStore($this->second, $this->authority);
+        if ($after) {
+            self::assertSame($attempt->toString(), $this->second->fetchOne('SELECT attempt_id FROM scheduler_occurrence_executions'));
+            self::assertNull($observer->begin($manual->id, $attempt));
+            self::assertNull($observer->begin($manual->id, Uuid::v7()));
+        } else {
+            self::assertSame(0, (int) $this->second->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions'));
+            $granted = $observer->begin($manual->id, $attempt);
+            self::assertNotNull($granted);
+            self::assertSame(SchedulerOccurrenceOrigin::Manual, $granted->origin);
+        }
     }
 
     private function assertJobBusy(SchedulerOccurrence $occurrence, DeploymentLease $authority): void

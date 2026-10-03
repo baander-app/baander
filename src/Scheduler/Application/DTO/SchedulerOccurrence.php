@@ -11,7 +11,7 @@ use DateTimeZone;
 use InvalidArgumentException;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
-/** Immutable due-minute execution snapshot; parameter iteration order is invocation order. */
+/** Immutable minute execution snapshot; manual IDs identify requests, parameter order is invocation order. */
 #[Exclude]
 final readonly class SchedulerOccurrence
 {
@@ -28,6 +28,7 @@ final readonly class SchedulerOccurrence
         public JobType $jobType,
         public string $command,
         array $parameters,
+        public SchedulerOccurrenceOrigin $origin = SchedulerOccurrenceOrigin::Scheduled,
     ) {
         $utc = $scheduledFor->setTimezone(new DateTimeZone('UTC'));
         if ($utc->format('s.u') !== '00.000000') {

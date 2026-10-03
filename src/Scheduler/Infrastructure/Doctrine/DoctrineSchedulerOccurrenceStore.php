@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Scheduler\Infrastructure\Doctrine;
 
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
+use App\Scheduler\Application\DTO\SchedulerOccurrenceOrigin;
 use App\Scheduler\Application\Port\SchedulerOccurrenceStoreInterface;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Shared\Domain\Model\Uuid;
@@ -40,9 +41,20 @@ final class DoctrineSchedulerOccurrenceStore implements SchedulerOccurrenceStore
         return $this->operation(fn (): ?SchedulerOccurrence => $this->select($jobId, $dueMinute));
     }
 
+    public function findById(Uuid $occurrenceId): ?SchedulerOccurrence
+    {
+        return $this->operation(fn (): ?SchedulerOccurrence => $this->hydrate($this->connection->fetchAssociative('SELECT id, job_id, scheduled_for, origin, job_type, command, parameters FROM scheduler_occurrences WHERE id = :id', ['id' => $occurrenceId->toString()])));
+    }
+
     private function select(Uuid $jobId, DateTimeImmutable $scheduledFor): ?SchedulerOccurrence
     {
-        $row = $this->connection->fetchAssociative('SELECT id, job_id, scheduled_for, job_type, command, parameters FROM scheduler_occurrences WHERE job_id = :job AND scheduled_for = :scheduled', ['job' => $jobId->toString(), 'scheduled' => $scheduledFor->format('Y-m-d H:i:s.uP')]);
+        $row = $this->connection->fetchAssociative("SELECT id, job_id, scheduled_for, origin, job_type, command, parameters FROM scheduler_occurrences WHERE job_id = :job AND scheduled_for = :scheduled AND origin = 'scheduled'", ['job' => $jobId->toString(), 'scheduled' => $scheduledFor->format('Y-m-d H:i:s.uP')]);
+        return $this->hydrate($row);
+    }
+
+    /** @param array<string, mixed>|false $row */
+    private function hydrate(array|false $row): ?SchedulerOccurrence
+    {
         if ($row === false) {
             return null;
         }
@@ -50,7 +62,7 @@ final class DoctrineSchedulerOccurrenceStore implements SchedulerOccurrenceStore
         if (!is_array($parameters)) {
             throw new \UnexpectedValueException('Persisted scheduler parameters must be an array or object.');
         }
-        return new SchedulerOccurrence(Uuid::fromString($row['id']), Uuid::fromString($row['job_id']), new DateTimeImmutable($row['scheduled_for']), JobType::from($row['job_type']), $row['command'], $parameters);
+        return new SchedulerOccurrence(Uuid::fromString($row['id']), Uuid::fromString($row['job_id']), new DateTimeImmutable($row['scheduled_for']), JobType::from($row['job_type']), $row['command'], $parameters, SchedulerOccurrenceOrigin::from($row['origin']));
     }
 
     /**

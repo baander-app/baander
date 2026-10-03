@@ -697,6 +697,34 @@ The adapter requires a dedicated idle autocommit connection, commits before
 returning success and discards a failed connection, including an uncertain commit.
 Statement and lock timeouts do not bound connection setup or network I/O.
 
+Occurrence snapshots now distinguish `scheduled` from `manual` origin. Scheduled
+snapshots retain one intent per job/UTC minute through a partial unique index.
+Manual snapshots use their occurrence UUID as request identity, so separate manual
+requests in the same minute coexist with each other and the scheduled occurrence.
+An identical request retry preserves the original snapshot and delivery/execution
+state; reusing its UUID for another origin, job, minute or payload is rejected.
+The existing job/minute lookup returns scheduled occurrences only; ID lookup returns
+either retained snapshot. A manual retry must reuse its original ID and snapshot,
+including its minute, rather than constructing a new timestamp after uncertainty.
+
+The execution guard reads origin from PostgreSQL, never from the queued command.
+Manual invocations may run paused or disabled schedules without changing that status,
+matching existing manual-trigger behavior. They still require a present schedule,
+an unchanged execution snapshot and a registered command. Scheduled invocations
+still require active status. Both origins share permanent one-attempt admission and
+the same unresolved-job exclusion; origin cannot bypass an uncertain prior attempt.
+
+This is the durable contract for a later cutover. HTTP/CLI manual entrypoints and the
+legacy web producer still use their existing path. No manual intents are written
+alongside legacy execution, and no new producer or route is enabled. Cutover still
+requires the supervised producer/relay role and an exclusive boundary that handles
+queued legacy wrappers before activating the replacement.
+The manual-origin slice passes 3,489 unit tests and 211 combined PostgreSQL/Redis
+integration/functional tests (1,977 assertions), with fresh and repeat migrations.
+Tests cover coexistence, immutable identity conflicts, origin constraints, commit
+uncertainty, cross-origin job admission and a real persisted manual invocation of a
+paused schedule. Focused PHPStan passes without suppressions.
+
 `scheduler.execute_occurrence` now carries only an occurrence UUID through the
 explicit JSON codec. Its registered handler loads the stored snapshot while
 committing a one-shot attempt in `scheduler_occurrence_executions`, using a

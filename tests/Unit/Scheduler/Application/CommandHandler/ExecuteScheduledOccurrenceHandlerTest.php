@@ -8,6 +8,7 @@ use App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand;
 use App\Scheduler\Application\CommandHandler\ExecuteScheduledJobHandler;
 use App\Scheduler\Application\CommandHandler\ExecuteScheduledOccurrenceHandler;
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
+use App\Scheduler\Application\DTO\SchedulerOccurrenceOrigin;
 use App\Scheduler\Application\Exception\ScheduledConsoleCompletionUnknown;
 use App\Scheduler\Application\Port\ScheduledConsoleExecutorInterface;
 use App\Scheduler\Application\Port\ScheduledJobPortInterface;
@@ -188,6 +189,54 @@ final class ExecuteScheduledOccurrenceHandlerTest extends TestCase
         $bus->expects(self::never())->method('dispatch');
         ($this->handler($store, $jobs, $bus))(new ExecuteScheduledOccurrenceCommand($occurrence->id));
         self::assertSame(0, $job->getRunCount());
+    }
+
+    /** @return iterable<string, array{string, bool}> */
+    public static function manualConfigurations(): iterable
+    {
+        foreach (['active', 'paused', 'disabled'] as $status) {
+            yield $status => [$status, true];
+        }
+        foreach (['deleted', 'type', 'command', 'parameters', 'parameter_type', 'parameter_order', 'zero_sign'] as $change) {
+            yield $change => [$change, false];
+        }
+    }
+
+    #[DataProvider('manualConfigurations')]
+    public function testManualOriginBypassesOnlyScheduleStatus(string $change, bool $executes): void
+    {
+        $job = $this->job();
+        if ($change === 'parameter_order') {
+            $job->getState()->parameters = ['value' => 1.0, 'other' => 2];
+        }
+        if ($change === 'zero_sign') {
+            $job->getState()->parameters = ['value' => -0.0];
+        }
+        $occurrence = new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-03T12:00:00Z'),
+            $job->getJobType(), $job->getCommand(), $job->getParameters(), SchedulerOccurrenceOrigin::Manual);
+        match ($change) {
+            'paused' => $job->pause(),
+            'disabled' => $job->disable(),
+            'type' => $job->getState()->jobType = JobType::Console,
+            'command' => $job->getState()->command = 'app:different',
+            'parameters' => $job->getState()->parameters = ['value' => 2.0],
+            'parameter_type' => $job->getState()->parameters = ['value' => 1],
+            'parameter_order' => $job->getState()->parameters = ['other' => 2, 'value' => 1.0],
+            'zero_sign' => $job->getState()->parameters = ['value' => 0.0],
+            default => null,
+        };
+        $status = $job->getStatus();
+        $store = $this->createMock(SchedulerOccurrenceExecutionStoreInterface::class);
+        $store->expects(self::once())->method('begin')->willReturn($occurrence);
+        $store->expects(self::once())->method('markReturned')->willReturn(true);
+        $jobs = $this->createMock(ScheduledJobPortInterface::class);
+        $jobs->expects(self::once())->method('getById')->willReturn($change === 'deleted' ? null : $job);
+        $jobs->expects(self::exactly($executes ? 2 : 0))->method('save');
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::exactly($executes ? 1 : 0))->method('dispatch')->willReturnCallback(fn (object $message): Envelope => new Envelope($message));
+        ($this->handler($store, $jobs, $bus))(new ExecuteScheduledOccurrenceCommand($occurrence->id));
+        self::assertSame($executes ? 1 : 0, $job->getRunCount());
+        self::assertSame($status, $job->getStatus(), 'A manual invocation must not enable cron scheduling.');
     }
 
     public function testRegistryRemovalRecordsFailureWithoutLegacyLockRelease(): void
