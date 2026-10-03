@@ -7,6 +7,8 @@ namespace App\Transcode\Infrastructure\Storage;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\ValueObject\QualityTier;
+use InvalidArgumentException;
+use RuntimeException;
 
 final class TranscodeFileStorage implements TranscodeStoragePortInterface
 {
@@ -62,22 +64,63 @@ final class TranscodeFileStorage implements TranscodeStoragePortInterface
 
     public function deleteDirectory(string $path): void
     {
-        if (!is_dir($path)) {
+        $basePath = self::normalizeDeletionPath($this->resolver->getBasePath());
+        $path = self::normalizeDeletionPath($path);
+        $prefix = rtrim($basePath, '/') . '/';
+        if ($path === $basePath || !str_starts_with($path, $prefix)) {
+            throw new InvalidArgumentException('Only directories below the transcode storage root may be deleted.');
+        }
+
+        $root = realpath($basePath);
+        if ($root === false || !is_dir($root)) {
             return;
         }
 
-        $it = new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS);
-        $files = new \RecursiveIteratorIterator($it, \RecursiveIteratorIterator::CHILD_FIRST);
+        // Resolve the trusted configured root once, then inspect every component
+        // below it without following links (including links to another cache dir).
+        $components = explode('/', substr($path, strlen($prefix)));
+        $target = rtrim($root, '/');
+        foreach ($components as $index => $component) {
+            $target .= '/' . $component;
+            clearstatcache(true, $target);
+            if (is_link($target)) {
+                if ($index !== count($components) - 1) {
+                    throw new InvalidArgumentException('A deletion path must not traverse a symbolic link.');
+                }
+                self::removeEntry($target, false);
 
-        foreach ($files as $file) {
-            if ($file->isDir()) {
-                rmdir($file->getRealPath());
-            } else {
-                unlink($file->getRealPath());
+                return;
+            }
+            if (!is_dir($target)) {
+                return;
             }
         }
 
-        rmdir($path);
+        $iterator = new \RecursiveDirectoryIterator($target, \RecursiveDirectoryIterator::SKIP_DOTS);
+        $entries = new \RecursiveIteratorIterator($iterator, \RecursiveIteratorIterator::CHILD_FIRST);
+        foreach ($entries as $entry) {
+            // getRealPath() would resolve a link and remove its target instead.
+            self::removeEntry($entry->getPathname(), !$entry->isLink() && $entry->isDir());
+        }
+        self::removeEntry($target, true);
+    }
+
+    private static function normalizeDeletionPath(string $path): string
+    {
+        if (!str_starts_with($path, '/') || str_contains($path, "\0")
+            || preg_match('~(?:^|/)\.{1,2}(?:/|$)~', $path) === 1) {
+            throw new InvalidArgumentException('A deletion path must be absolute and contain no traversal components.');
+        }
+
+        return rtrim(preg_replace('~/+~', '/', $path) ?? $path, '/') ?: '/';
+    }
+
+    private static function removeEntry(string $path, bool $directory): void
+    {
+        $removed = $directory ? @rmdir($path) : @unlink($path);
+        if (!$removed) {
+            throw new RuntimeException('Unable to remove a transcode cache entry.');
+        }
     }
 
     public function getDirectorySize(string $path): int

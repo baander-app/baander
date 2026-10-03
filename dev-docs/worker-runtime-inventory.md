@@ -614,9 +614,16 @@ standard refresh grant, bypassing the custom transactional refresh handlers. The
 active path needs PostgreSQL concurrency, rollback, and replay tests before refresh
 rotation is qualified. The custom handlers' SQLite/stub tests do not establish
 that endpoint's behavior. Filesystem acceptance also remains open: the general
-`LocalFilesystem`/`ReadOnlyFilesystem` wrappers and transcode directory deletion
-have separate symlink-boundary gaps beyond the media storage adapter's tests.
-These findings block a claim that authentication or storage remediation is complete.
+`LocalFilesystem`/`ReadOnlyFilesystem` wrappers have separate symlink-boundary gaps
+beyond the media storage adapter's tests. These findings block a claim that
+authentication or storage remediation is complete.
+
+Transcode directory deletion now rejects root/outside/traversal paths and symlink
+ancestors, and removes terminal or nested links without following their targets.
+Fourteen regression cases cover retained outside files, directory/dangling links,
+root aliases, and ordinary cleanup. These pathname checks do not provide a fence
+against hostile concurrent filesystem renames; the broader storage boundary and
+execution-ownership work remains necessary.
 
 The first command facade is now wired. `app:serve` is the canonical name of the
 existing `ServerRunCommand`, retaining `swoole:server:run` as an alias and preserving
