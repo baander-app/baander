@@ -13,8 +13,11 @@ final class TranscodeLoopOwnershipTest extends TestCase
 {
     public function testFreshLoopOwnsItsLease(): void
     {
-        $ownership = new TranscodeLoopOwnership($this->createStub(TranscodeLoopLeaseInterface::class));
+        $lease = $this->createStub(TranscodeLoopLeaseInterface::class);
+        $lease->method('renew')->willReturn(true);
+        $ownership = new TranscodeLoopOwnership($lease);
 
+        self::assertTrue($ownership->renew(60));
         $ownership->assertOwned();
 
         self::assertTrue($ownership->isActive());
@@ -49,10 +52,13 @@ final class TranscodeLoopOwnershipTest extends TestCase
     public function testReplacementLoopHasIndependentOwnershipIdentity(): void
     {
         $old = new TranscodeLoopOwnership($this->createStub(TranscodeLoopLeaseInterface::class));
-        $replacement = new TranscodeLoopOwnership($this->createStub(TranscodeLoopLeaseInterface::class));
+        $lease = $this->createStub(TranscodeLoopLeaseInterface::class);
+        $lease->method('renew')->willReturn(true);
+        $replacement = new TranscodeLoopOwnership($lease);
         $old->markLost();
         $old->close();
 
+        self::assertTrue($replacement->renew(60));
         $replacement->assertOwned();
 
         self::assertNotSame($old, $replacement);

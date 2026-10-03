@@ -749,8 +749,19 @@ currently have no source callers. Recovery tests exercise the service directly.
 These local identities are not persisted encoding-attempt identities. A database
 write already in flight can still complete after loss, dispatched pool work can
 continue, and shared output directories remain unisolated. Conditional persistence
-and attempt-qualified output paths remain required. The timer does not independently
-fence a lease when its event loop stalls past expiry.
+and attempt-qualified output paths remain required.
+
+Local ownership now requires a confirmed renewal and a monotonic deadline. Every
+ownership guard checks elapsed time independently of renewal timer scheduling,
+so resumed work fails closed after a stall beyond the deadline. Renewal charges
+request and response time against the TTL from request start, and a late response
+cannot restore continuity after the previous deadline. Overlapping timer callbacks
+share the existing confirmed interval rather than issuing concurrent renewals.
+Expiry, failed renewal, and observed loss remain permanent for that loop; cleanup
+or replacement during Redis I/O cannot reactivate it. Tests cover deadline edges,
+late responses, overlapping callbacks, and resumed encoding without timer delivery.
+This is a conservative local execution bound, not persisted write fencing or an
+independent mechanism to stop an encoder while the entire event loop is stalled.
 
 The CPU pool now sends a nonempty shutdown control message and drains direct
 children for up to two seconds before killing stragglers and allowing one further

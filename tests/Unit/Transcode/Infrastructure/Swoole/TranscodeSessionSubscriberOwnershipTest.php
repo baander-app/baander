@@ -88,6 +88,13 @@ final class TranscodeSessionSubscriberOwnershipTest extends TestCase
         });
     }
 
+    public function testExpiredDeadlineStopsResumedWorkBeforeTheRenewalTimerRuns(): void
+    {
+        $this->runInCoroutine(function (): void {
+            $this->runFixture('expired poll', false);
+        });
+    }
+
     public function testNormalCompletionStillPersistsAndEmitsCompleted(): void
     {
         $this->runInCoroutine(function (): void {
@@ -168,11 +175,22 @@ final class TranscodeSessionSubscriberOwnershipTest extends TestCase
         $stateFile = $stateDir . '/' . $job->getPublicId()->toString() . '.json';
         $persister = new JobStatePersister($this->createStub(TranscodeJobRepositoryInterface::class), $storage, $logger, $stateDir, $json);
         file_put_contents($stateFile, 'preexisting state');
-        $lose = function () use (&$lost, &$jobAtLoss, &$sessionAtLoss, &$stateAtLoss, $job, $session, $stateFile, $timer): void {
+        $runtime = new class {
+            public TranscodeSessionSubscriber $subscriber;
+        };
+        $lose = function () use (&$lost, &$jobAtLoss, &$sessionAtLoss, &$stateAtLoss, $job, $session, $stateFile, $timer, $boundary, $runtime): void {
             $lost = true;
             $jobAtLoss = clone $job->getState();
             $sessionAtLoss = clone $session->getState();
             $stateAtLoss = file_exists($stateFile) ? file_get_contents($stateFile) : null;
+            if ($boundary === 'expired poll') {
+                // Advance only the local deadline, without firing a timer or
+                // changing the lease response. The resumed guard must stop work.
+                $owners = (new ReflectionProperty($runtime->subscriber, 'loopOwnership'))->getValue($runtime->subscriber);
+                (new ReflectionProperty($owners[$job->getId()->toString()], 'deadline'))
+                    ->setValue($owners[$job->getId()->toString()], hrtime(true));
+                return;
+            }
             $timer->fire();
         };
         if ($boundary === 'cached fragment') {
@@ -247,6 +265,7 @@ final class TranscodeSessionSubscriberOwnershipTest extends TestCase
             $events, $logger, $json, streamManager: $manager, availability: $availability,
             renewalTimer: $timer,
         );
+        $runtime->subscriber = $subscriber;
         $ffmpeg->method('probeVideo')->willReturnCallback(function () use ($boundary, $lose, $probe, $subscriber, $job): VideoProbeResult {
             if ($boundary === 'probe') {
                 $lose();
@@ -273,7 +292,7 @@ final class TranscodeSessionSubscriberOwnershipTest extends TestCase
                     $lose();
                     $broker->signal($job->getId(), 20, 'seek');
                 });
-            } elseif (in_array($boundary, ['poll', 'error after loss'], true)) {
+            } elseif (in_array($boundary, ['poll', 'expired poll', 'error after loss'], true)) {
                 $lose();
                 // A producer may finish a fragment while shutdown is observed.
                 // The retired poll must not publish this late file.
@@ -304,7 +323,7 @@ final class TranscodeSessionSubscriberOwnershipTest extends TestCase
             if ($boundary === 'pool wait') {
                 self::assertFileExists($this->directory . '/results/' . sha1('ownership-result') . '.json');
             }
-            if (in_array($boundary, ['poll', 'seek wait', 'error after loss'], true)) {
+            if (in_array($boundary, ['poll', 'expired poll', 'seek wait', 'error after loss'], true)) {
                 self::assertSame(1, $spawner->spawnCount);
                 self::assertContains(9, $spawner->signals);
             }
@@ -328,6 +347,9 @@ final class TranscodeSessionSubscriberOwnershipTest extends TestCase
             self::assertNull($timer->lastCallback);
 
             return;
+        }
+        if ($boundary === 'expired poll') {
+            self::assertSame(1, $renewals, 'Expiry must stop work without another Redis call.');
         }
         $renewalsAfterCleanup = $renewals;
         $actionsAfterCleanup = $actions;

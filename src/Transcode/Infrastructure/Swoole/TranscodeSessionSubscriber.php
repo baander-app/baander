@@ -404,16 +404,12 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
 
     private function renewLoopLock(Uuid $jobId, TranscodeLoopOwnership $ownership): void
     {
-        if (!$this->ownsLoop($jobId, $ownership)) {
+        if (!$this->isCurrentLoop($jobId, $ownership)) {
             return;
         }
-        try {
-            $renewed = $ownership->lease->renew(self::LOOP_LOCK_TTL_SECONDS);
-        } catch (Throwable) {
-            $renewed = false;
-        }
+        $renewed = $ownership->renew(self::LOOP_LOCK_TTL_SECONDS);
         // Redis I/O may have yielded to cleanup or a replacement loop.
-        if (!$this->ownsLoop($jobId, $ownership) || $renewed === true) {
+        if (!$this->isCurrentLoop($jobId, $ownership) || $renewed) {
             return;
         }
         $ownership->markLost();
@@ -427,6 +423,14 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
         $this->logger->warning('Transcode loop ownership lost; stopping local work', [
             'jobId' => $jobId->toString(),
         ]);
+    }
+
+    /** Redis renewal may yield to cleanup or replacement of the current loop.
+     * @phpstan-impure
+     */
+    private function isCurrentLoop(Uuid $jobId, TranscodeLoopOwnership $ownership): bool
+    {
+        return ($this->loopOwnership[$jobId->toString()] ?? null) === $ownership && !$ownership->isClosed();
     }
 
     /** Coroutine callbacks can change this state while Redis or filesystem I/O yields.
