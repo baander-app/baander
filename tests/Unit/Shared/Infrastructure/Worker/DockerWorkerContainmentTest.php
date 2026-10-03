@@ -45,6 +45,141 @@ final class DockerWorkerContainmentTest extends TestCase
         self::assertSame(self::ID, $calls[0][4]);
     }
 
+    public function testDurableRemovalReconciliationAcceptsSuccessfulEmptyListing(): void
+    {
+        $calls = [];
+        $containment = new DockerWorkerContainment(static function (array $argv) use (&$calls): string {
+            $calls[] = $argv;
+            return '';
+        });
+        $containment->reconcileRemoval(self::ID, 'worker.baander.app', self::BOOT);
+        self::assertSame([[
+            'container', 'ls', '--all', '--no-trunc', '--filter', 'id=' . self::ID, '--format', '{{.ID}}',
+        ]], $calls);
+    }
+
+    public function testDurableRemovalReconciliationRechecksIsolationAndRemovesRemainingContainer(): void
+    {
+        $calls = [];
+        $containment = new DockerWorkerContainment(static function (array $argv) use (&$calls): string {
+            $calls[] = $argv;
+            return count($calls) === 2 ? json_encode(self::inspection(), JSON_THROW_ON_ERROR) : self::ID . "\n";
+        });
+        $containment->reconcileRemoval(self::ID, 'worker.baander.app', self::BOOT);
+        self::assertCount(3, $calls);
+        self::assertSame('ls', $calls[0][1]);
+        self::assertSame('inspect', $calls[1][1]);
+        self::assertSame(self::ID, $calls[1][4]);
+        self::assertSame(['container', 'rm', '--force', self::ID], $calls[2]);
+    }
+
+    #[DataProvider('invalidReconciliationListings')]
+    public function testDurableRemovalReconciliationRejectsAmbiguousListingWithoutInspection(string $output): void
+    {
+        $calls = 0;
+        $containment = new DockerWorkerContainment(static function (array $argv) use ($output, &$calls): string {
+            ++$calls;
+            self::assertSame('ls', $argv[1], 'Untrusted listing cannot progress to inspection or removal.');
+            return $output;
+        });
+        try {
+            $containment->reconcileRemoval(self::ID, 'worker.baander.app', self::BOOT);
+            self::fail('Ambiguous listing cannot reconcile removal.');
+        } catch (RuntimeException) {
+            self::assertSame(1, $calls);
+        }
+    }
+
+    /** @return iterable<string,array{string}> */
+    public static function invalidReconciliationListings(): iterable
+    {
+        yield 'other ID' => [str_repeat('f', 64)];
+        yield 'truncated ID' => [substr(self::ID, 0, 12)];
+        yield 'multiple matching IDs' => [self::ID . "\n" . self::ID];
+        yield 'extra ID' => [self::ID . "\n" . str_repeat('f', 64)];
+        yield 'diagnostic text' => ['Cannot connect to the Docker daemon'];
+    }
+
+    #[DataProvider('reconciliationFailureSteps')]
+    public function testDurableRemovalReconciliationTransportFailureStopsAtFailedStep(int $step): void
+    {
+        $original = new RuntimeException('pinned daemon command failed');
+        $calls = 0;
+        $containment = new DockerWorkerContainment(static function () use ($step, $original, &$calls): string {
+            if (++$calls === $step) {
+                throw $original;
+            }
+            return $calls === 2 ? json_encode(self::inspection(), JSON_THROW_ON_ERROR) : self::ID;
+        });
+        try {
+            $containment->reconcileRemoval(self::ID, 'worker.baander.app', self::BOOT);
+            self::fail('Transport failure cannot reconcile removal.');
+        } catch (RuntimeException $error) {
+            self::assertSame($original, $error);
+            self::assertSame($step, $calls);
+        }
+    }
+
+    /** @return iterable<string,array{int}> */
+    public static function reconciliationFailureSteps(): iterable
+    {
+        yield 'listing fails' => [1];
+        yield 'inspection fails' => [2];
+        yield 'removal fails' => [3];
+    }
+
+    #[DataProvider('unsafeInspections')]
+    public function testDurableRemovalReconciliationNeverRemovesUnsafeRemainingContainer(string $field, mixed $value): void
+    {
+        $inspection = self::inspection();
+        $inspection[$field] = $value;
+        $calls = 0;
+        $containment = new DockerWorkerContainment(static function (array $argv) use ($inspection, &$calls): string {
+            ++$calls;
+            self::assertNotSame('rm', $argv[1]);
+            return $calls === 1 ? self::ID : json_encode($inspection, JSON_THROW_ON_ERROR);
+        });
+        try {
+            $containment->reconcileRemoval(self::ID, 'worker.baander.app', self::BOOT);
+            self::fail('Unsafe remaining container cannot reconcile removal.');
+        } catch (RuntimeException) {
+            self::assertSame(2, $calls);
+        }
+    }
+
+    #[DataProvider('unconfirmedRemovalOutputs')]
+    public function testDurableRemovalReconciliationRequiresExactRemovalReceipt(string $output): void
+    {
+        $calls = 0;
+        $containment = new DockerWorkerContainment(static function () use ($output, &$calls): string {
+            return match (++$calls) {
+                1 => self::ID,
+                2 => json_encode(self::inspection(), JSON_THROW_ON_ERROR),
+                default => $output,
+            };
+        });
+        $this->expectException(RuntimeException::class);
+        $containment->reconcileRemoval(self::ID, 'worker.baander.app', self::BOOT);
+    }
+
+    #[DataProvider('invalidReconciliationIdentities')]
+    public function testInvalidReconciliationIdentityNeverReachesDocker(string $containerId, string $namespace, string $bootId): void
+    {
+        $containment = new DockerWorkerContainment(static function (): string {
+            self::fail('Invalid identity must not reach Docker.');
+        });
+        $this->expectException(InvalidArgumentException::class);
+        $containment->reconcileRemoval($containerId, $namespace, $bootId);
+    }
+
+    /** @return iterable<string,array{string,string,string}> */
+    public static function invalidReconciliationIdentities(): iterable
+    {
+        yield 'unsafe ID' => ['--all', 'worker.baander.app', self::BOOT];
+        yield 'unsafe namespace' => [self::ID, 'unsafe namespace', self::BOOT];
+        yield 'unsafe boot ID' => [self::ID, 'worker.baander.app', 'unsafe'];
+    }
+
     public function testPrestartIsolationVerificationRejectsWrongBoot(): void
     {
         $calls = 0;

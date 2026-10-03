@@ -43,11 +43,14 @@ final class SchedulerWorkerAuthorityTest extends TestCase
         foreach ([$this->first, $this->second] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema);
         }
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261002210000.php';
-        $migration = new \DoctrineMigrations\Version20261002210000($this->first, new NullLogger());
-        $migration->up(new Schema());
-        foreach ($migration->getSql() as $query) {
-            $this->first->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
+        foreach (['Version20261002210000', 'Version20261003020000'] as $version) {
+            require_once dirname(__DIR__, 2) . '/migrations/' . $version . '.php';
+            $class = 'DoctrineMigrations\\' . $version;
+            $migration = new $class($this->first, new NullLogger());
+            $migration->up(new Schema());
+            foreach ($migration->getSql() as $query) {
+                $this->first->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
+            }
         }
         $this->lease = new DeploymentLease('baander.app:scheduler-authority-test', str_repeat('a', 32), 1);
         $this->first->executeStatement("INSERT INTO worker_deployment_leases (namespace, owner_boot_id, epoch, state, expires_at) VALUES (:namespace, :boot, :epoch, 'active', clock_timestamp() + interval '1 hour')", ['namespace' => $this->lease->namespace, 'boot' => $this->lease->bootId, 'epoch' => $this->lease->epoch]);

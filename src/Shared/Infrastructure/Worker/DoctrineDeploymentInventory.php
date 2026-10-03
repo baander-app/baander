@@ -61,11 +61,17 @@ final class DoctrineDeploymentInventory
      */
     public function claimStart(DeploymentContainer $container): bool
     {
-        return $this->operation(fn (): bool => $this->connection->executeStatement(<<<'SQL'
+        return $this->operation(function () use ($container): bool {
+            DeploymentNamespaceLock::acquire($this->connection, $container->namespace);
+            if ($this->connection->fetchOne('SELECT 1 FROM worker_deployment_retirements WHERE namespace = :namespace AND boot_id = :boot', ['namespace' => $container->namespace, 'boot' => $container->bootId]) !== false) {
+                return false;
+            }
+            return $this->connection->executeStatement(<<<'SQL'
             UPDATE worker_deployment_containers SET start_claimed_at = clock_timestamp()
             WHERE namespace = :namespace AND boot_id = :boot AND daemon_id = :daemon
                 AND container_id = :container AND start_claimed_at IS NULL
-            SQL, ['namespace' => $container->namespace, 'boot' => $container->bootId, 'daemon' => $container->daemonId, 'container' => $container->containerId]) === 1);
+            SQL, ['namespace' => $container->namespace, 'boot' => $container->bootId, 'daemon' => $container->daemonId, 'container' => $container->containerId]) === 1;
+        });
     }
 
     public function find(string $namespace, string $bootId): ?DeploymentContainer
@@ -93,6 +99,7 @@ final class DoctrineDeploymentInventory
         }
         try {
             $this->connection->beginTransaction();
+            $this->connection->executeStatement('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
             $this->connection->executeQuery("SELECT set_config('statement_timeout', :statement, true), set_config('lock_timeout', :lock, true)", ['statement' => $this->statementTimeoutMs . 'ms', 'lock' => $this->lockTimeoutMs . 'ms'])->free();
             $result = $operation();
             $this->connection->commit();

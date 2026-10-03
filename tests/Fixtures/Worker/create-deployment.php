@@ -7,6 +7,7 @@ declare(strict_types=1);
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
 require dirname(__DIR__, 3) . '/migrations/Version20261002210000.php';
 require dirname(__DIR__, 3) . '/migrations/Version20261002220000.php';
+require dirname(__DIR__, 3) . '/migrations/Version20261003020000.php';
 
 use App\Shared\Infrastructure\Worker\DeploymentContainerRecipe;
 use App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment;
@@ -14,12 +15,14 @@ use App\Shared\Infrastructure\Worker\DockerDeploymentCreate;
 use App\Shared\Infrastructure\Worker\DockerWorkerCommand;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
+use App\Shared\Infrastructure\Worker\DoctrineDeploymentRetirement;
 use App\Shared\Infrastructure\Worker\RegisteredDeploymentRecovery;
 use App\Shared\Infrastructure\Worker\RegisteredDeploymentStart;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Schema\Schema;
 use DoctrineMigrations\Version20261002210000;
 use DoctrineMigrations\Version20261002220000;
+use DoctrineMigrations\Version20261003020000;
 use Psr\Log\NullLogger;
 
 if (PHP_SAPI !== 'cli' || !isset($argv) || count($argv) !== 4) {
@@ -36,12 +39,14 @@ $namespace = 'baander.app:create-test';
 $boot = bin2hex(random_bytes(16));
 $name = RegisteredDeploymentStart::containerName($namespace, $boot);
 $createdId = null;
+$preleaseId = null;
+$preleaseName = null;
 $connection->executeStatement('CREATE SCHEMA ' . $schema);
 try {
     foreach ([$connection, $observer] as $session) {
         $session->executeStatement('SET search_path TO ' . $schema);
     }
-    foreach ([Version20261002210000::class, Version20261002220000::class] as $migrationClass) {
+    foreach ([Version20261002210000::class, Version20261002220000::class, Version20261003020000::class] as $migrationClass) {
         $migration = new $migrationClass($connection, new NullLogger());
         $migration->up(new Schema());
         foreach ($migration->getSql() as $query) {
@@ -135,13 +140,54 @@ try {
     // Lease acquisition here verifies the external controller protocol, not the
     // sleeper's admission or LeasedWorkerRuntime integration.
     $lease = $leases->acquire($namespace, $boot, 60);
-    if ($lease === null || !(new RegisteredDeploymentRecovery($inventory, $leases, $command->execute(...)))->recover($namespace, $boot)) {
+    if ($lease === null) {
+        throw new RuntimeException('Fixture owner could not acquire its lease.');
+    }
+    $retirements = new DoctrineDeploymentRetirement($connection);
+    $lostRemoval = new RuntimeException('Simulated lost successful Docker removal reply.');
+    $uncertainRecovery = new RegisteredDeploymentRecovery($inventory, $retirements,
+        static function (array $arguments) use ($command, $lostRemoval): string {
+            $result = $command->execute($arguments);
+            if (array_slice($arguments, 0, 3) === ['container', 'rm', '--force']) {
+                throw $lostRemoval;
+            }
+            return $result;
+        });
+    try {
+        $uncertainRecovery->recover($namespace, $boot);
+        throw new LogicException('Lost removal reply unexpectedly completed retirement.');
+    } catch (RuntimeException $error) {
+        if ($error !== $lostRemoval) {
+            throw $error;
+        }
+    }
+    if ((new DoctrineDeploymentLease($observer))->findForContainment($namespace) != $lease
+        || (new DoctrineDeploymentRetirement($observer))->find($namespace, $boot)?->completed !== false) {
+        throw new RuntimeException('Uncertain removal did not preserve ownership and pending intent.');
+    }
+    $registeredRecovery = new RegisteredDeploymentRecovery($inventory, $retirements, $command->execute(...));
+    if (!$registeredRecovery->recover($namespace, $boot)) {
         throw new RuntimeException('Registered recovery did not remove and release the created deployment.');
     }
     $replacement = $leases->acquire($namespace, bin2hex(random_bytes(16)), 60);
     if ($replacement === null || $replacement->epoch !== 2) {
         throw new RuntimeException('Created deployment recovery did not permit epoch 2.');
     }
+    // A never-started binding has no lease, but still needs permanent retirement.
+    $preleaseBoot = bin2hex(random_bytes(16));
+    $preleaseName = RegisteredDeploymentStart::containerName($namespace, $preleaseBoot);
+    $preleaseRecipe = new DeploymentContainerRecipe($namespace, $preleaseBoot, $daemon, $recipe->imageId,
+        $recipe->command, $recipe->network, $recipe->memoryBytes, $recipe->nanoCpus, $recipe->pidsLimit, $runtime);
+    $preleaseId = (new DockerDeploymentCreate($inventory, $command->execute(...)))->create($preleaseRecipe)->containerId;
+    if (!$registeredRecovery->recover($namespace, $preleaseBoot)
+        || !$registeredRecovery->recover($namespace, $boot)
+        || (new DoctrineDeploymentLease($observer))->findForContainment($namespace) != $replacement) {
+        throw new RuntimeException('Prelease or repeated retirement modified another boot ownership.');
+    }
+    if ($leases->acquire($namespace, $preleaseBoot, 60) !== null) {
+        throw new RuntimeException('Retired boot unexpectedly acquired ownership.');
+    }
+    echo "PASS: lost removal reply reconciles by durable intent; prelease retirement and completed retries preserve replacement ownership\n";
     echo "PASS: reconciled immutable recipe starts once; real registered removal releases ownership for epoch 2\n";
 } finally {
     // A lost create reply can leave only a known deterministic name. Cleanup must
@@ -150,6 +196,12 @@ try {
         $command->execute(['container', 'rm', '--force', $createdId ?? $name]);
     } catch (RuntimeException) {
         // A successfully recovered container is already absent.
+    }
+    if ($preleaseName !== null) {
+        try {
+            $command->execute(['container', 'rm', '--force', $preleaseId ?? $preleaseName]);
+        } catch (RuntimeException) {
+        }
     }
     $observer->close();
     $connection->executeStatement('SET search_path TO public');

@@ -31,14 +31,20 @@ final class DoctrineDeploymentLease
     {
         DeploymentLease::validateIdentity($namespace, $bootId);
         $this->validateTtl($ttlSeconds);
-        $row = $this->operation(fn (): array|false => $this->connection->fetchAssociative(<<<'SQL'
+        $row = $this->operation(function () use ($namespace, $bootId, $ttlSeconds): array|false {
+            DeploymentNamespaceLock::acquire($this->connection, $namespace);
+            if ($this->connection->fetchOne('SELECT 1 FROM worker_deployment_retirements WHERE namespace = :namespace AND boot_id = :boot', ['namespace' => $namespace, 'boot' => $bootId]) !== false) {
+                return false;
+            }
+            return $this->connection->fetchAssociative(<<<'SQL'
             INSERT INTO worker_deployment_leases (namespace, owner_boot_id, epoch, state, expires_at)
             VALUES (:namespace, :boot, 1, 'active', clock_timestamp() + make_interval(secs => :ttl))
             ON CONFLICT (namespace) DO UPDATE SET owner_boot_id = EXCLUDED.owner_boot_id,
                 epoch = worker_deployment_leases.epoch + 1, state = 'active', expires_at = clock_timestamp() + make_interval(secs => :ttl)
             WHERE worker_deployment_leases.state = 'available'
             RETURNING epoch
-            SQL, ['namespace' => $namespace, 'boot' => $bootId, 'ttl' => $ttlSeconds]));
+            SQL, ['namespace' => $namespace, 'boot' => $bootId, 'ttl' => $ttlSeconds]);
+        });
 
         return $row === false ? null : new DeploymentLease($namespace, $bootId, (int) $row['epoch']);
     }
@@ -104,6 +110,7 @@ final class DoctrineDeploymentLease
         }
         try {
             $this->connection->beginTransaction();
+            $this->connection->executeStatement('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
             $this->connection->executeQuery("SELECT set_config('statement_timeout', :statement, true), set_config('lock_timeout', :lock, true)", [
                 'statement' => $this->statementTimeoutMs . 'ms', 'lock' => $this->lockTimeoutMs . 'ms',
             ])->free();

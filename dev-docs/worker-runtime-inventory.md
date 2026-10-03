@@ -184,8 +184,8 @@ the mixed Supervisor startup. The `worker` image target starts `app:worker`
 directly as PID 1 and requires explicit identity and memory reservations.
 Compose currently starts only the web role; background delivery requires a
 separate admitted worker. Do not add an automatically restarting Compose worker:
-the external creation/start/recovery controller still needs an operator entrypoint
-and complete retirement reconciliation. Use an immutable image, no automatic
+the external creation/start/recovery controller still needs an operator entrypoint.
+Use an immutable image, no automatic
 restart, and a stop grace period longer than the 35-second worker drain deadline.
 The worker image disables the inherited web/dependency health check; readiness
 requires the committed lease and child-role evidence.
@@ -201,12 +201,25 @@ values in command arguments. Reconciliation checks each admitted value exactly
 once. Trusted Docker daemon operators can still inspect the container environment.
 This is configuration transport, not encrypted secret storage.
 
-Recovery still requires a matching acquired lease. Created-only containers and
-workers that fail before acquiring a lease need a separate retirement path.
-A lost successful removal reply or lost database acknowledgment also needs durable
-reconciliation; absence alone currently cannot release ownership. These remain
-operator-orchestration blockers, even though creation and runtime configuration
-have real Docker and PostgreSQL coverage.
+Registered recovery now verifies isolation and commits an irreversible retirement
+record before removal. Lease acquisition and start claims share its transaction
+lock and reject that boot after the record commits, including when no lease was
+ever acquired. Transactions explicitly use Read Committed so admission checks
+after lock waits see the committed retirement record. Docker work runs outside
+database transactions.
+
+After a lost removal reply, recovery may establish absence using a successful
+exact-ID listing on the recorded daemon, but only with the prior verified record.
+Missing containers without that record, ambiguous listings and unavailable daemons
+remain errors. Completion records the removal and releases only that boot's lease
+in one transaction. Repeated completion cannot release a replacement owner. The
+forward migration preserves all earlier ownership and creation history.
+
+Real Docker/PostgreSQL drills cover lost removal replies and retirement before
+lease acquisition. Database tests cover acquisition/start races, an in-flight
+acquisition that commits before retirement, and lost intent/completion commit
+acknowledgments. This does not yet provide an operator entrypoint or readiness
+acceptance for an actual worker image launched through that entrypoint.
 
 Production source and local Composer packages are copied before dependency
 installation. Dependency installation runs as the application user and does not

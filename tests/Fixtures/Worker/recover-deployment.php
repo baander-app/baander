@@ -7,6 +7,7 @@ declare(strict_types=1);
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
 require dirname(__DIR__, 3) . '/migrations/Version20261002210000.php';
 require dirname(__DIR__, 3) . '/migrations/Version20261002220000.php';
+require dirname(__DIR__, 3) . '/migrations/Version20261003020000.php';
 
 use App\Shared\Infrastructure\Worker\DeploymentContainmentController;
 use App\Shared\Infrastructure\Worker\DeploymentContainer;
@@ -14,12 +15,14 @@ use App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory;
 use App\Shared\Infrastructure\Worker\RegisteredDeploymentRecovery;
 use App\Shared\Infrastructure\Worker\RegisteredDeploymentStart;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
+use App\Shared\Infrastructure\Worker\DoctrineDeploymentRetirement;
 use App\Shared\Infrastructure\Worker\DockerWorkerCommand;
 use App\Shared\Infrastructure\Worker\DockerWorkerContainment;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Schema\Schema;
 use DoctrineMigrations\Version20261002210000;
 use DoctrineMigrations\Version20261002220000;
+use DoctrineMigrations\Version20261003020000;
 use Psr\Log\NullLogger;
 
 $connectionParameters = [
@@ -32,7 +35,7 @@ $schema = 'worker_recovery_' . bin2hex(random_bytes(8));
 $connection->executeStatement('CREATE SCHEMA ' . $schema);
 try {
     $connection->executeStatement('SET search_path TO ' . $schema);
-    foreach ([Version20261002210000::class, Version20261002220000::class] as $migrationClass) {
+    foreach ([Version20261002210000::class, Version20261002220000::class, Version20261003020000::class] as $migrationClass) {
         $migration = new $migrationClass($connection, new NullLogger());
         $migration->up(new Schema());
         foreach ($migration->getSql() as $query) {
@@ -97,7 +100,7 @@ try {
     echo "PASS: committed inventory and one-shot claim precede initial process activity; repeated start refused\n";
     // The mechanical namespace fixture does not consult a lease. The controller
     // acquires the real database lease AFTER its registered startup acceptance.
-    $registeredRecovery = new RegisteredDeploymentRecovery($inventory, $leases, $command->execute(...));
+    $registeredRecovery = new RegisteredDeploymentRecovery($inventory, new DoctrineDeploymentRetirement($connection), $command->execute(...));
     $initial = $leases->acquire($namespace, $boot, 60);
     if ($initial === null || $initial->epoch !== 1) {
         throw new RuntimeException('Initial committed acquisition failed.');

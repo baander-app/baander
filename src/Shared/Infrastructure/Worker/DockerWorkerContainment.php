@@ -39,6 +39,35 @@ FORMAT;
         }
     }
 
+    /**
+     * Trusted recovery callers must first read durable retirement intent recording
+     * verified isolation for this exact namespace, boot and immutable container ID.
+     * The executor must be pinned to that intent's Docker daemon. Only then can a
+     * successful empty listing reconcile a prior removal; absence alone is not
+     * ordinary containment proof. A remaining container must still pass isolation.
+     */
+    public function reconcileRemoval(string $containerId, string $namespace, string $bootId): void
+    {
+        DeploymentLease::validateIdentity($namespace, $bootId);
+        if (preg_match('/\A[0-9a-f]{64}\z/D', $containerId) !== 1) {
+            throw new InvalidArgumentException('Containment requires a full immutable lowercase 64-hex container ID.');
+        }
+        $listed = ($this->execute)([
+            'container', 'ls', '--all', '--no-trunc', '--filter', 'id=' . $containerId, '--format', '{{.ID}}',
+        ]);
+        if (trim($listed) === '') {
+            return;
+        }
+        if (trim($listed) !== $containerId) {
+            throw new RuntimeException('Container listing did not confirm the exact immutable ID.');
+        }
+        $this->verifyIsolation($containerId, $namespace, $bootId);
+        $removed = ($this->execute)(['container', 'rm', '--force', $containerId]);
+        if (trim($removed) !== $containerId) {
+            throw new RuntimeException('Immutable container removal was not confirmed.');
+        }
+    }
+
     /** Inspection verifies identity and isolation only; it supplies no retirement or start receipt. */
     public function verifyIsolation(string $containerId, string $namespace, string $bootId): void
     {

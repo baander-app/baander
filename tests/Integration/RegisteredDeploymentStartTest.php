@@ -37,7 +37,7 @@ final class RegisteredDeploymentStartTest extends TestCase
         foreach ([$this->first, $this->second] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema);
         }
-        foreach (['Version20261002210000', 'Version20261002220000'] as $version) {
+        foreach (['Version20261002210000', 'Version20261002220000', 'Version20261003020000'] as $version) {
             require_once dirname(__DIR__, 2) . '/migrations/' . $version . '.php';
             $class = 'DoctrineMigrations\\' . $version;
             $migration = new $class($this->first, new NullLogger());

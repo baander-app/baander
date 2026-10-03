@@ -52,7 +52,8 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         require_once dirname(__DIR__, 2) . '/migrations/Version20261002210000.php';
         require_once dirname(__DIR__, 2) . '/migrations/Version20261002230000.php';
         require_once dirname(__DIR__, 2) . '/migrations/Version20261003010000.php';
-        foreach ([new \DoctrineMigrations\Version20261002210000($this->first, new NullLogger()), new \DoctrineMigrations\Version20261002230000($this->first, new NullLogger()), new \DoctrineMigrations\Version20261003010000($this->first, new NullLogger())] as $migration) {
+        require_once dirname(__DIR__, 2) . '/migrations/Version20261003020000.php';
+        foreach ([new \DoctrineMigrations\Version20261002210000($this->first, new NullLogger()), new \DoctrineMigrations\Version20261002230000($this->first, new NullLogger()), new \DoctrineMigrations\Version20261003010000($this->first, new NullLogger()), new \DoctrineMigrations\Version20261003020000($this->first, new NullLogger())] as $migration) {
             $migration->up(new Schema());
             foreach ($migration->getSql() as $query) {
                 $this->first->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());

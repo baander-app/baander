@@ -17,17 +17,31 @@ final readonly class RegisteredDeploymentRecovery
      */
     public function __construct(
         private DoctrineDeploymentInventory $inventory,
-        private DoctrineDeploymentLease $leases,
+        private DoctrineDeploymentRetirement $retirements,
         private Closure $dockerExecutor,
     ) {
     }
 
+    /**
+     * Mutates Docker and durable ownership state; repeated calls re-observe committed outcomes.
+     * @phpstan-impure
+     */
     public function recover(string $namespace, string $expectedBootId): bool
     {
         DeploymentLease::validateIdentity($namespace, $expectedBootId);
         $binding = $this->inventory->find($namespace, $expectedBootId);
         if ($binding === null) {
             return false;
+        }
+        $retirement = $this->retirements->find($namespace, $expectedBootId);
+        if ($retirement !== null && ($retirement->binding->namespace !== $binding->namespace
+            || $retirement->binding->bootId !== $binding->bootId
+            || $retirement->binding->daemonId !== $binding->daemonId
+            || $retirement->binding->containerId !== $binding->containerId)) {
+            throw new \RuntimeException('Retirement intent does not match immutable deployment inventory.');
+        }
+        if ($retirement?->completed === true) {
+            return true;
         }
         $containment = new DockerWorkerContainment(function (array $arguments) use ($binding): string {
             // Recheck before both inspection and removal; a daemon change after
@@ -38,7 +52,18 @@ final readonly class RegisteredDeploymentRecovery
             }
             return ($this->dockerExecutor)($arguments);
         });
-        $controller = new DeploymentContainmentController($this->leases, $containment->retire(...));
-        return $controller->recover($namespace, $expectedBootId, $binding->containerId);
+        if ($retirement === null) {
+            // Absence without a committed, previously verified binding supplies
+            // no containment evidence. Never interpret an inspect error as absence.
+            $containment->verifyIsolation($binding->containerId, $namespace, $expectedBootId);
+            if (!$this->retirements->begin($binding)) {
+                return false;
+            }
+        }
+        // The intent blocks further admission for this boot before any removal.
+        // A lost removal reply can now be reconciled by exact-ID absence on the
+        // same daemon. Completion and own-boot lease release commit together.
+        $containment->reconcileRemoval($binding->containerId, $namespace, $expectedBootId);
+        return $this->retirements->complete($binding);
     }
 }

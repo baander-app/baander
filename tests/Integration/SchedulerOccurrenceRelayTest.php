@@ -54,7 +54,7 @@ final class SchedulerOccurrenceRelayTest extends TestCase
         foreach ([$this->writer, $this->observer] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema);
         }
-        foreach (['Version20261002210000', 'Version20261002230000', 'Version20261003010000'] as $version) {
+        foreach (['Version20261002210000', 'Version20261002230000', 'Version20261003010000', 'Version20261003020000'] as $version) {
             require_once dirname(__DIR__, 2) . '/migrations/' . $version . '.php';
             $class = 'DoctrineMigrations\\' . $version;
             $migration = new $class($this->writer, new NullLogger());
