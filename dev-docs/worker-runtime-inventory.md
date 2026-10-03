@@ -642,9 +642,14 @@ credential delivery, cookie omission, Range/HEAD preservation, foreign-origin
 isolation and redirect rejection. The production build regenerates the checked-in
 worker asset. CI runs this browser suite separately from Vitest.
 
-These checks do not qualify backend proof verification or deployed CORS policy.
-The current API CORS method lists omit HEAD, which needs separate backend coverage
-for a web/API split across origins.
+These browser checks do not qualify backend proof verification or deployed CORS
+policy. Separate production-container listener regressions now cover literal web
+origin matching, denial for unconfigured paths, protected media HEAD/Range
+preflights and response-header exposure. OAuth authorization denies CORS even for
+encoded paths and trailing-slash redirects. Partial media responses vary by Origin,
+including requests without that header; Nelmio's cache listener alone skips 206.
+These checks exercise real compiled listener wiring, not full firewall dispatch.
+Stream byte-range validation and If-Range semantics still need separate remediation.
 
 Native media now requests refresh from its own window after an authenticated 401,
 shares that window's refresh queue with Axios, and retries once with a new proof.

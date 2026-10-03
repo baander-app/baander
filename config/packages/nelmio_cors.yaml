@@ -1,7 +1,7 @@
 nelmio_cors:
     defaults:
-        origin_regex: true
-        allow_origin: ['%env(APP_URL)%']
+        origin_regex: false
+        allow_origin: []
         allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
         allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'Accept', 'Origin']
         expose_headers: ['Link', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'DPoP-Nonce']
@@ -13,7 +13,7 @@ nelmio_cors:
             allow_methods: []
             allow_headers: []
 
-        # OAuth endpoints: allow configured origins
+        # OAuth protocol endpoints: allow cross-origin clients
         '^/api/oauth/token$':
             allow_origin: ['*']
             allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'Accept', 'Origin']
@@ -50,7 +50,7 @@ nelmio_cors:
             expose_headers: ['DPoP-Nonce']
             max_age: 3600
 
-        # Discovery endpoints: public (no auth required for registration/pairing)
+        # Discovery CORS policy; endpoint authentication still applies
         '^/api/discovery/':
             allow_origin: ['*']
             allow_methods: ['GET', 'OPTIONS', 'POST']
@@ -65,6 +65,13 @@ nelmio_cors:
             allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'Accept', 'Origin']
             expose_headers: ['Link', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'DPoP-Nonce']
             max_age: 3600
+
+        # Native media uses proof headers and byte-range requests.
+        '^/api/(images/|stream/(track|media)$)':
+            allow_origin: ['%env(APP_URL)%']
+            allow_methods: ['GET', 'HEAD', 'OPTIONS']
+            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'Accept', 'Origin', 'Range', 'If-Range']
+            expose_headers: ['Link', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'DPoP-Nonce', 'Content-Range', 'Accept-Ranges', 'ETag', 'Last-Modified']
 
         # Catch-all for all other API routes (SPA, auth, etc.)
         '^/api/':
