@@ -7,7 +7,6 @@ namespace App\Transcode\Infrastructure\Swoole;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
-use App\Transcode\Application\Port\BudgetGuardInterface;
 use App\Transcode\Application\Port\FFmpegPortInterface;
 use App\Transcode\Application\Port\SegmentAvailabilityInterface;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
@@ -58,9 +57,6 @@ final class TranscodeSessionSubscriber
     /** Persist job/session state every N completed segments */
     private const PERSIST_INTERVAL_SEGMENTS = 10;
 
-    /** Or every T seconds, whichever comes first */
-    private const PERSIST_INTERVAL_SECONDS = 5.0;
-
     /** Loop lock TTL/renew cadence */
     private const LOOP_LOCK_TTL_SECONDS = 30;
     private const LOOP_LOCK_RENEW_INTERVAL_SECONDS = 20;
@@ -72,14 +68,14 @@ final class TranscodeSessionSubscriber
     /** Seek restart headroom: start this many segments before the requested position */
     private const SEEK_HEADROOM_SEGMENTS = 3;
 
-    /** @var array<string, array{count: int, time: float}> Per-job persist tracking */
-    private array $persistCounters = [];
-
     /** @var array<string, bool> Jobs with an encoding loop running in this worker */
     private array $runningJobs = [];
 
     /** @var array<string, int> Swoole timer IDs for per-job lock renewal */
     private array $lockRenewTimers = [];
+
+    /** @var array<string, TranscodeLoopOwnership> */
+    private array $loopOwnership = [];
 
     public function __construct(
         private readonly TranscodeJobPortInterface $jobPort,
@@ -94,11 +90,11 @@ final class TranscodeSessionSubscriber
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
-        private readonly ?BudgetGuardInterface $budgetGuard = null,
         private readonly ?\SwooleBundle\SwooleBundle\Bridge\Symfony\Container\CoWrapper $coWrapper = null,
         private readonly ?TranscodeLoopLockInterface $loopLock = null,
         private readonly ?TranscodeStreamManager $streamManager = null,
         private readonly ?SegmentAvailabilityInterface $availability = null,
+        private readonly LoopLockRenewalTimerInterface $renewalTimer = new SwooleLoopLockRenewalTimer(),
     )
     {
     }
@@ -140,48 +136,57 @@ final class TranscodeSessionSubscriber
 
     private function runEncodingLoop(TranscodeSessionAttached $event): void
     {
-        $job = $this->jobPort->findByUuid($event->getJobId());
-        if ($job === null) {
-            $this->logger->error('Transcode job not found', ['jobId' => $event->getJobId()->toString()]);
-
-            return;
-        }
-
-        if (in_array($job->getStatus(), [TranscodeStatus::Completed,
-                                         TranscodeStatus::Cancelled,
-                                         TranscodeStatus::Failed], true)) {
-            $this->logger->debug('Job already completed or cancelled, skipping', [
-                'jobId'  => $job->getId()->toString(),
-                'status' => $job->getStatus()->value,
-            ]);
-
-            return;
-        }
-
-        $session = $this->loadSessionForJob($event, $job);
-        if ($session === null) {
-            $this->logger->warning('No active session found for job', ['jobId' => $job->getId()->toString()]);
-
-            return;
-        }
-
-        $video = $this->videoRepository->findByUuid($job->getVideoId());
-        if ($video === null) {
-            $this->failJob($job, 'Source video not found');
-            return;
-        }
-
-        $sourcePath = $video->getPath();
-        if (!file_exists($sourcePath)) {
-            $this->failJob($job, sprintf('Source file not found: %s', $sourcePath));
-            return;
-        }
-
-        $tier = QualityTier::fromString($job->getQualityTierName());
-        $this->seekSignalBroker->open($job->getId());
-        $this->startLockRenewal($job->getId());
+        $jobId = $event->getJobId();
+        $jobKey = $jobId->toString();
+        $ownership = new TranscodeLoopOwnership();
+        $this->loopOwnership[$jobKey] = $ownership;
+        $job = null;
 
         try {
+            $this->startLockRenewal($jobId, $ownership);
+            $job = $this->jobPort->findByUuid($event->getJobId());
+            $this->assertLoopOwnership($jobId, $ownership);
+            if ($job === null) {
+                $this->logger->error('Transcode job not found', ['jobId' => $event->getJobId()->toString()]);
+
+                return;
+            }
+
+            if (in_array($job->getStatus(), [TranscodeStatus::Completed,
+                                             TranscodeStatus::Cancelled,
+                                             TranscodeStatus::Failed], true)) {
+                $this->logger->debug('Job already completed or cancelled, skipping', [
+                    'jobId'  => $job->getId()->toString(),
+                    'status' => $job->getStatus()->value,
+                ]);
+
+                return;
+            }
+
+            $session = $this->loadSessionForJob($event, $job);
+            $this->assertLoopOwnership($jobId, $ownership);
+            if ($session === null) {
+                $this->logger->warning('No active session found for job', ['jobId' => $job->getId()->toString()]);
+
+                return;
+            }
+
+            $video = $this->videoRepository->findByUuid($job->getVideoId());
+            $this->assertLoopOwnership($jobId, $ownership);
+            if ($video === null) {
+                $this->failJob($job, 'Source video not found', $ownership);
+                return;
+            }
+
+            $sourcePath = $video->getPath();
+            if (!file_exists($sourcePath)) {
+                $this->failJob($job, sprintf('Source file not found: %s', $sourcePath), $ownership);
+                return;
+            }
+
+            $tier = QualityTier::fromString($job->getQualityTierName());
+            $this->seekSignalBroker->open($job->getId());
+
             $isResume = $job->getStatus() === TranscodeStatus::InProgress;
 
             // Step 1: Probe video (skip if resuming — data already set)
@@ -191,6 +196,7 @@ final class TranscodeSessionSubscriber
                 $totalSegments = $job->getTotalSegments();
             } else {
                 $probe = $this->ffmpeg->probeVideo($sourcePath);
+                $this->assertLoopOwnership($jobId, $ownership);
                 $job->updateProbeData($probe->jsonSerialize());
                 $totalSegments = (int)ceil($probe->duration / SegmentEncoder::getSegmentDuration());
                 $job->setTotalSegments($totalSegments);
@@ -201,12 +207,18 @@ final class TranscodeSessionSubscriber
             // a session left in any state by a previous run, and blind transitions
             // would throw and fail the whole job.
             if (!$isResume) {
+                $this->assertLoopOwnership($job->getId(), $ownership);
                 $job->markInProgress();
+                $this->assertLoopOwnership($job->getId(), $ownership);
                 $this->jobPort->save($job);
+                $this->assertLoopOwnership($job->getId(), $ownership);
             }
             if ($session->getSessionState() === SessionState::Pending) {
+                $this->assertLoopOwnership($job->getId(), $ownership);
                 $session->markPreparing();
+                $this->assertLoopOwnership($job->getId(), $ownership);
                 $this->sessionPort->save($session);
+                $this->assertLoopOwnership($job->getId(), $ownership);
             }
 
             $this->logger->info('Starting transcode job', [
@@ -232,17 +244,22 @@ final class TranscodeSessionSubscriber
             $initPath = $this->storage->resolveInitSegmentPath($job->getVideoId(), $tier);
             $useStreamManagerForInit = $this->streamManager !== null;
             if (!$useStreamManagerForInit && (!$isResume || !$this->storage->exists($initPath))) {
+                $this->assertLoopOwnership($job->getId(), $ownership);
                 $this->processPool->encodeInitSegment($job, $sourcePath, $tier, $initPath, $videoFilters);
+                $this->assertLoopOwnership($job->getId(), $ownership);
 
                 $initKey = CpuProcessPool::resultKey('encode_init_segment', $job->getId()->toString());
-                $this->waitForResult($initKey, 120, 0.5);
+                $this->waitForResult($jobId, $initKey, 120, 0.5, $ownership);
 
                 if (!file_exists($initPath)) {
                     throw new RuntimeException('Init segment encoding failed — output file not found');
                 }
 
+                $this->assertLoopOwnership($jobId, $ownership);
                 $job->setInitSegmentPath($initPath);
+                $this->assertLoopOwnership($job->getId(), $ownership);
                 $this->jobPort->save($job);
+                $this->assertLoopOwnership($job->getId(), $ownership);
             }
 
             // Step 5: Two-pass loudness analysis. Loudness is a property of the
@@ -262,7 +279,9 @@ final class TranscodeSessionSubscriber
                     $loudnessFilter = AudioProcessingRules::loudnessFilter(
                         $session->getAudioProfile()->loudnessStandard,
                     );
+                    $this->assertLoopOwnership($job->getId(), $ownership);
                     $this->processPool->analyzeLoudness($sourcePath, $loudnessFilter, $job->getId()->toString());
+                    $this->assertLoopOwnership($job->getId(), $ownership);
 
                     // Do not block the encoding loop on a full-file loudness
                     // analysis. It is queued in the background; this session
@@ -278,19 +297,23 @@ final class TranscodeSessionSubscriber
 
             // Step 7: Mark session active.
             if ($session->getSessionState() === SessionState::Pending) {
+                $this->assertLoopOwnership($job->getId(), $ownership);
                 $session->markPreparing();
             }
             if (in_array($session->getSessionState(), [SessionState::Preparing, SessionState::Paused], true)) {
+                $this->assertLoopOwnership($job->getId(), $ownership);
                 $session->markActive();
             }
+            $this->assertLoopOwnership($job->getId(), $ownership);
             $this->sessionPort->save($session);
+            $this->assertLoopOwnership($job->getId(), $ownership);
 
             // Step 9: Start the long-lived video stream and poll until completion.
             // The stream manager spawns ONE FFmpeg process that produces all video
             // segments continuously. Seek/throttle are handled inside dispatchLongStream
             // per KTD-3 (SIGSTOP/SIGCONT for throttle, kill+restart for seek).
             $this->dispatchLongStream(
-                $job, $session, $sourcePath, $tier, $videoFilters, $totalSegments,
+                $job, $session, $sourcePath, $tier, $videoFilters, $totalSegments, $ownership,
             );
 
             // Step 10: Extract subtitle tracks
@@ -305,10 +328,12 @@ final class TranscodeSessionSubscriber
 
                     $outputPath = $this->storage->resolveSubtitleSegmentPath($job->getVideoId(), $language, 'full');
                     if (!$this->storage->exists($outputPath)) {
+                        $this->assertLoopOwnership($job->getId(), $ownership);
                         $this->processPool->extractSubtitles($job, $sourcePath, $language, $outputPath);
+                        $this->assertLoopOwnership($job->getId(), $ownership);
 
                         $subKey = sprintf('extract_subtitles:%s:%s', $job->getId()->toString(), $language);
-                        $this->waitForResult($subKey, 120, 0.5);
+                        $this->waitForResult($jobId, $subKey, 120, 0.5, $ownership);
 
                         if (!file_exists($outputPath)) {
                             $this->logger->warning(sprintf('Subtitle extraction failed for language "%s"', $language));
@@ -320,12 +345,18 @@ final class TranscodeSessionSubscriber
 
             // Step 11: Mark completed
             if ($job->getCompletedSegments() >= $totalSegments) {
+                $this->assertLoopOwnership($job->getId(), $ownership);
                 $job->markCompleted();
-                $this->forcePersistState($job, $session);
+                $this->forcePersistState($job, $session, $ownership);
+                $this->assertLoopOwnership($job->getId(), $ownership);
                 $this->statePersister->cleanup($job->getPublicId());
+                $this->assertLoopOwnership($job->getId(), $ownership);
                 $session->markCompleted();
+                $this->assertLoopOwnership($job->getId(), $ownership);
                 $this->sessionPort->save($session);
+                $this->assertLoopOwnership($job->getId(), $ownership);
 
+                $this->assertLoopOwnership($jobId, $ownership);
                 $this->eventDispatcher->dispatch(new TranscodeJobCompleted(
                     jobId: $job->getId(),
                     videoId: $job->getVideoId(),
@@ -338,47 +369,132 @@ final class TranscodeSessionSubscriber
                     'segments' => $totalSegments,
                 ]);
             }
+        } catch (TranscodeLoopOwnershipLost $e) {
+            $this->logger->warning('Transcode loop stopped after ownership loss', ['jobId' => $jobKey]);
         } catch (Throwable $e) {
-            $this->failJob($job, $e->getMessage());
-            $this->logger->error('Transcode job failed', [
-                'jobId' => $job->getId()->toString(),
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
+            // Stopping the process from the renewal callback can surface an
+            // ordinary FFmpeg/I/O error in the suspended encoding coroutine.
+            // Never turn that error into a stale job failure write.
+            if ($this->ownsLoop($jobId, $ownership)) {
+                try {
+                    if ($job !== null) {
+                        $this->failJob($job, $e->getMessage(), $ownership);
+                    }
+                } catch (TranscodeLoopOwnershipLost) {
+                    // Ownership can also be lost during failure persistence.
+                }
+                $this->logger->error('Transcode job failed', [
+                    'jobId' => $jobKey,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         } finally {
-            $this->streamManager?->stopStream($job->getId());
-            $this->stopLockRenewal($job->getId());
-            $this->loopLock?->release($job->getId());
-            $this->clearPersistCounter($job->getId());
-            $this->seekSignalBroker->close($job->getId());
+            $this->cleanupLoop($jobId, $ownership);
         }
     }
 
-    private function startLockRenewal(\App\Shared\Domain\Model\Uuid $jobId): void
+    private function startLockRenewal(Uuid $jobId, TranscodeLoopOwnership $ownership): void
     {
         if ($this->loopLock === null) {
             return;
         }
 
-        $jobKey = $jobId->toString();
-        $timerId = \Swoole\Timer::tick(self::LOOP_LOCK_RENEW_INTERVAL_SECONDS * 1000, function () use ($jobId, $jobKey): void {
-            $renewed = $this->loopLock?->renew($jobId, self::LOOP_LOCK_TTL_SECONDS);
-            if ($renewed === false) {
-                $this->logger->warning('Transcode loop lock renewal failed; another worker may have taken over', [
-                    'jobId' => $jobKey,
-                ]);
-            }
-        });
-
-        $this->lockRenewTimers[$jobKey] = $timerId;
+        // The lease may have expired between session creation and execution.
+        $this->renewLoopLock($jobId, $ownership);
+        $this->assertLoopOwnership($jobId, $ownership);
+        $this->lockRenewTimers[$jobId->toString()] = $this->renewalTimer->tick(
+            self::LOOP_LOCK_RENEW_INTERVAL_SECONDS * 1000,
+            function () use ($jobId, $ownership): void {
+                $this->renewLoopLock($jobId, $ownership);
+            },
+        );
     }
 
-    private function stopLockRenewal(\App\Shared\Domain\Model\Uuid $jobId): void
+    private function renewLoopLock(Uuid $jobId, TranscodeLoopOwnership $ownership): void
+    {
+        if (!$this->ownsLoop($jobId, $ownership)) {
+            return;
+        }
+        try {
+            $renewed = $this->loopLock?->renew($jobId, self::LOOP_LOCK_TTL_SECONDS);
+        } catch (Throwable) {
+            $renewed = false;
+        }
+        // Redis I/O may have yielded to cleanup or a replacement loop.
+        if (!$this->ownsLoop($jobId, $ownership) || $renewed === true) {
+            return;
+        }
+        $ownership->markLost();
+        try {
+            $this->streamManager?->stopStream($jobId);
+        } catch (Throwable $error) {
+            $this->logger->error('Could not stop encoder after ownership loss', [
+                'jobId' => $jobId->toString(), 'error' => $error->getMessage(),
+            ]);
+        }
+        $this->logger->warning('Transcode loop ownership lost; stopping local work', [
+            'jobId' => $jobId->toString(),
+        ]);
+    }
+
+    /** Coroutine callbacks can change this state while Redis or filesystem I/O yields.
+     * @phpstan-impure
+     */
+    private function ownsLoop(Uuid $jobId, TranscodeLoopOwnership $ownership): bool
+    {
+        return ($this->loopOwnership[$jobId->toString()] ?? null) === $ownership && $ownership->isActive();
+    }
+
+    private function assertLoopOwnership(Uuid $jobId, TranscodeLoopOwnership $ownership): void
+    {
+        if (($this->loopOwnership[$jobId->toString()] ?? null) !== $ownership) {
+            throw new TranscodeLoopOwnershipLost();
+        }
+        $ownership->assertOwned();
+    }
+
+    private function stopLockRenewal(Uuid $jobId): void
     {
         $jobKey = $jobId->toString();
         if (isset($this->lockRenewTimers[$jobKey])) {
-            \Swoole\Timer::clear($this->lockRenewTimers[$jobKey]);
+            $timerId = $this->lockRenewTimers[$jobKey];
             unset($this->lockRenewTimers[$jobKey]);
+            $this->renewalTimer->clear($timerId);
+        }
+    }
+
+    private function cleanupLoop(Uuid $jobId, TranscodeLoopOwnership $ownership): void
+    {
+        $jobKey = $jobId->toString();
+        if (($this->loopOwnership[$jobKey] ?? null) !== $ownership) {
+            return;
+        }
+        $ownership->close();
+        // Cleanup must continue if a timer, process or transport cleanup fails.
+        $actions = [
+            fn() => $this->stopLockRenewal($jobId),
+            fn() => $this->streamManager?->stopStream($jobId),
+            function () use ($jobId, $ownership): void {
+                if (!$ownership->isLost()) {
+                    $this->loopLock?->release($jobId);
+                }
+            },
+            fn() => $this->seekSignalBroker->close($jobId),
+        ];
+        foreach ($actions as $action) {
+            if (($this->loopOwnership[$jobKey] ?? null) !== $ownership) {
+                return;
+            }
+            try {
+                $action();
+            } catch (Throwable $error) {
+                $this->logger->error('Transcode loop cleanup failed', [
+                    'jobId' => $jobKey, 'error' => $error->getMessage(),
+                ]);
+            }
+        }
+        if (($this->loopOwnership[$jobKey] ?? null) === $ownership) {
+            unset($this->loopOwnership[$jobKey]);
         }
     }
 
@@ -387,12 +503,17 @@ final class TranscodeSessionSubscriber
         return $this->sessionPort->findByUuid($event->getSessionId());
     }
 
-    private function failJob(TranscodeJob $job, string $reason): void
+    private function failJob(TranscodeJob $job, string $reason, TranscodeLoopOwnership $ownership): void
     {
+        $this->assertLoopOwnership($job->getId(), $ownership);
         $job->markFailed($reason);
+        $this->assertLoopOwnership($job->getId(), $ownership);
         $this->jobPort->save($job);
+        $this->assertLoopOwnership($job->getId(), $ownership);
         $this->statePersister->cleanup($job->getPublicId());
+        $this->assertLoopOwnership($job->getId(), $ownership);
 
+        $this->assertLoopOwnership($job->getId(), $ownership);
         $this->eventDispatcher->dispatch(new TranscodeJobFailed(
             jobId: $job->getId(),
             videoId: $job->getVideoId(),
@@ -400,11 +521,13 @@ final class TranscodeSessionSubscriber
         ));
     }
 
-    private function waitForResult(string $key, int $maxWaitSeconds, float $intervalSec): void
+    private function waitForResult(Uuid $jobId, string $key, int $maxWaitSeconds, float $intervalSec, TranscodeLoopOwnership $ownership): void
     {
         $elapsed = 0.0;
         while ($elapsed < $maxWaitSeconds) {
+            $this->assertLoopOwnership($jobId, $ownership);
             $result = $this->processPool->readResult($key);
+            $this->assertLoopOwnership($jobId, $ownership);
             if ($result !== null) {
                 if ($result['status'] === 'error') {
                     throw new RuntimeException($this->extractErrorMessage($result));
@@ -419,6 +542,7 @@ final class TranscodeSessionSubscriber
 
         throw new RuntimeException(sprintf('Timed out waiting for pool result: %s', $key));
     }
+    /** @return array<string, mixed> */
     private function findSiblingLoudness(TranscodeJob $job): array
     {
         foreach ($this->jobPort->findActiveByVideo($job->getVideoId()) as $sibling) {
@@ -487,6 +611,7 @@ final class TranscodeSessionSubscriber
         QualityTier $tier,
         string $videoFilters,
         int $totalSegments,
+        TranscodeLoopOwnership $ownership,
     ): void {
         if ($this->streamManager === null) {
             throw new RuntimeException('TranscodeStreamManager is not available');
@@ -497,12 +622,18 @@ final class TranscodeSessionSubscriber
 
         // Skip segments already on disk from a prior run (resume path)
         for ($i = 0; $i < $totalSegments; $i++) {
-            if (isset($job->getSegmentMap()[(string) $i])) {
+            if (array_key_exists((string) $i, $job->getSegmentMap())) {
                 continue;
             }
             $outputPath = $this->storage->resolveSegmentPath($job->getVideoId(), $tier, $i);
-            if ($this->storage->exists($outputPath) && filesize($outputPath) > 0) {
-                $job->markSegmentCompleted($i, $outputPath, filesize($outputPath), $segmentDuration);
+            $exists = $this->storage->exists($outputPath);
+            $this->assertLoopOwnership($jobId, $ownership);
+            if ($exists) {
+                $size = filesize($outputPath);
+                $this->assertLoopOwnership($jobId, $ownership);
+                if ($size > 0) {
+                    $job->markSegmentCompleted($i, $outputPath, $size, $segmentDuration);
+                }
             }
         }
 
@@ -511,7 +642,9 @@ final class TranscodeSessionSubscriber
         }
 
         // Start the stream
+        $this->assertLoopOwnership($job->getId(), $ownership);
         $outputDir = $this->streamManager->startStream($job, $sourcePath, $tier, $videoFilters);
+        $this->assertLoopOwnership($job->getId(), $ownership);
 
         $isPaused = false;
         $isThrottled = false;
@@ -522,24 +655,32 @@ final class TranscodeSessionSubscriber
         // what lets the SIGSTOP/SIGCONT feedback loop actually close.
         $lastPlaybackPosition = 0.0;
 
-        while ($this->streamManager->pollOnce($jobId)) {
+        while (true) {
+            $this->assertLoopOwnership($jobId, $ownership);
+            $running = $this->streamManager->pollOnce($jobId);
+            $this->assertLoopOwnership($jobId, $ownership);
+            if (!$running) {
+                break;
+            }
             $lastProducedSegment = max($lastProducedSegment, $this->getLastProducedSegmentIndex($outputDir));
 
             // Check for seek/pause/resume signals
             $signal = $this->seekSignalBroker->waitForSignal($jobId, 0.1);
+            $this->assertLoopOwnership($jobId, $ownership);
             if ($signal !== null) {
                 // Every signal carries the latest playback position; track it
                 // so the buffer-depth throttle has a real cursor to compare
                 // against (fixes the P0 throttle deadlock).
-                if (isset($signal['position'])) {
-                    $lastPlaybackPosition = max($lastPlaybackPosition, (float) $signal['position']);
-                }
+                $lastPlaybackPosition = max($lastPlaybackPosition, $signal['position']);
                 if ($signal['action'] === 'pause') {
+                    $this->assertLoopOwnership($job->getId(), $ownership);
                     $this->streamManager->pauseStream($jobId);
+                    $this->assertLoopOwnership($job->getId(), $ownership);
                     $isPaused = true;
                     $isThrottled = false;
+                    $this->assertLoopOwnership($job->getId(), $ownership);
                     $session->markPaused();
-                    $this->forcePersistState($job, $session);
+                    $this->forcePersistState($job, $session, $ownership);
                     $this->logger->debug('Video stream paused', ['jobId' => $jobId->toString()]);
 
                     continue;
@@ -547,18 +688,24 @@ final class TranscodeSessionSubscriber
 
                 if ($signal['action'] === 'seek') {
                     // KTD-3: kill + restart-with-headroom
+                    $this->assertLoopOwnership($job->getId(), $ownership);
                     $this->streamManager->stopStream($jobId);
+                    $this->assertLoopOwnership($job->getId(), $ownership);
                     $this->availability?->clearJob($jobId);
+                    $this->assertLoopOwnership($job->getId(), $ownership);
                     $isPaused = false;
                     $isThrottled = false;
 
                     $targetSegment = (int) floor($signal['position'] / $segmentDuration);
                     $startSegment = max(0, $targetSegment - self::SEEK_HEADROOM_SEGMENTS);
 
+                    $this->assertLoopOwnership($job->getId(), $ownership);
                     $session->markResumed();
-                    $this->forcePersistState($job, $session);
+                    $this->forcePersistState($job, $session, $ownership);
 
+                    $this->assertLoopOwnership($job->getId(), $ownership);
                     $this->streamManager->startStream($job, $sourcePath, $tier, $videoFilters, $startSegment);
+                    $this->assertLoopOwnership($job->getId(), $ownership);
                     $lastProducedSegment = $startSegment - 1;
 
                     $this->logger->debug('Video stream seeked (kill+restart)', [
@@ -573,10 +720,13 @@ final class TranscodeSessionSubscriber
 
                 // Resume signal
                 if ($isPaused || $isThrottled) {
+                    $this->assertLoopOwnership($job->getId(), $ownership);
                     $this->streamManager->resumeStream($jobId);
+                    $this->assertLoopOwnership($job->getId(), $ownership);
                     $isPaused = false;
                     $isThrottled = false;
                     if ($session->getSessionState() === SessionState::Paused) {
+                        $this->assertLoopOwnership($job->getId(), $ownership);
                         $session->markResumed();
                     }
                     $this->logger->debug('Video stream resumed', ['jobId' => $jobId->toString()]);
@@ -593,14 +743,18 @@ final class TranscodeSessionSubscriber
             $aheadSegments = $lastProducedSegment - $playbackSegment;
 
             if (!$isThrottled && $aheadSegments >= self::THROTTLE_HIGH_SEGMENTS) {
+                $this->assertLoopOwnership($job->getId(), $ownership);
                 $this->streamManager->pauseStream($jobId);
+                $this->assertLoopOwnership($job->getId(), $ownership);
                 $isThrottled = true;
                 $this->logger->debug('Video stream throttled (SIGSTOP)', [
                     'jobId' => $jobId->toString(),
                     'aheadSegments' => $aheadSegments,
                 ]);
             } elseif ($isThrottled && $aheadSegments <= self::THROTTLE_LOW_SEGMENTS) {
+                $this->assertLoopOwnership($job->getId(), $ownership);
                 $this->streamManager->resumeStream($jobId);
+                $this->assertLoopOwnership($job->getId(), $ownership);
                 $isThrottled = false;
                 $this->logger->debug('Video stream un-throttled (SIGCONT)', [
                     'jobId' => $jobId->toString(),
@@ -611,63 +765,16 @@ final class TranscodeSessionSubscriber
             // Batch persistence as segments are produced
             $producedCount = $this->countProducedSegments($outputDir);
             if ($producedCount > 0 && $producedCount % self::PERSIST_INTERVAL_SEGMENTS === 0) {
+                $this->assertLoopOwnership($job->getId(), $ownership);
                 $session->updateCurrentSegment($lastProducedSegment);
-                $this->persistState($job, $session);
+                $this->persistState($job, $session, $ownership);
             }
         }
 
         // Stream finished — mark all produced segments complete on the job
-        $this->markProducedSegmentsComplete($job, $tier, $outputDir, $segmentDuration);
-        $this->forcePersistState($job, $session);
-    }
-
-    /**
-     * Scan the result store for any in-flight key that has completed.
-     *
-     * Returns the matching key and parsed result data, or null if none found.
-     * Throws immediately on error status so the encoding loop can fail the job.
-     *
-     * Used by the audio dispatch path (init, first segment, remaining segments)
-     * which still runs through the CPU process pool.
-     *
-     * @param array<string, array{index: int, path: string}> $inFlight
-     *
-     * @return array{key: string, data: array<string, mixed>}|null
-     */
-    private function scanForCompletedResult(array $inFlight): ?array
-    {
-        foreach ($inFlight as $key => $entry) {
-            $result = $this->processPool->readResult($key);
-            if ($result === null) {
-                continue;
-            }
-
-            if ($result['status'] === 'error') {
-                throw new RuntimeException($this->extractErrorMessage($result));
-            }
-
-            if ($result['data'] === '') {
-                throw new RuntimeException(sprintf(
-                    'CPU pool result for key "%s" has empty data',
-                    $key,
-                ));
-            }
-
-            try {
-                $parsed = $this->jsonEncoder->decode($result['data'], 'json');
-            } catch (Throwable $e) {
-                throw new RuntimeException(sprintf(
-                    'Failed to decode pool result for key "%s": %s — raw data: %s',
-                    $key,
-                    $e->getMessage(),
-                    substr($result['data'], 0, 300),
-                ));
-            }
-
-            return ['key' => $key, 'data' => is_array($parsed) ? $parsed : []];
-        }
-
-        return null;
+        $this->assertLoopOwnership($jobId, $ownership);
+        $this->markProducedSegmentsComplete($job, $tier, $outputDir, $segmentDuration, $ownership);
+        $this->forcePersistState($job, $session, $ownership);
     }
 
     /**
@@ -710,12 +817,6 @@ final class TranscodeSessionSubscriber
     }
 
     /**
-     * Estimate the playback segment from the job's completed-segment count.
-     *
-     * The SeekSignalBroker tracks playback position signals, but the subscriber
-     * does not persist the exact position between polls. We approximate the
-     * playback segment as the job's completed-segment count — conservative
-    /**
      * Convert a playback position (seconds) to a segment index.
      *
      * Drives the buffer-depth throttle. Unlike the previous estimatePlaybackSegment
@@ -745,6 +846,7 @@ final class TranscodeSessionSubscriber
         QualityTier $tier,
         string $outputDir,
         float $segmentDuration,
+        TranscodeLoopOwnership $ownership,
     ): void {
         $files = glob($outputDir . '/*.m4s') ?: [];
         sort($files);
@@ -759,80 +861,37 @@ final class TranscodeSessionSubscriber
             $index = (int) $m[1];
 
             // Skip already-marked segments (from resume or prior marking)
-            if (isset($job->getSegmentMap()[(string) $index])) {
+            if (array_key_exists((string) $index, $job->getSegmentMap())) {
                 continue;
             }
 
-            $job->markSegmentCompleted($index, $file, filesize($file), $segmentDuration);
+            $size = filesize($file);
+            $this->assertLoopOwnership($job->getId(), $ownership);
+            $job->markSegmentCompleted($index, $file, $size, $segmentDuration);
         }
-    }
-
-    private function incrementPersistCounter(Uuid $jobId): void
-    {
-        $key = $jobId->toString();
-        if (!isset($this->persistCounters[$key])) {
-            $this->persistCounters[$key] = ['count' => 0, 'time' => microtime(true)];
-        }
-        $this->persistCounters[$key]['count']++;
-    }
-
-    /**
-     * Check if enough segments have completed (or enough time elapsed) to warrant a DB write.
-     */
-    private function shouldPersist(Uuid $jobId): bool
-    {
-        $key = $jobId->toString();
-        $counter = $this->persistCounters[$key] ?? null;
-        if ($counter === null) {
-            return true;
-        }
-
-        if ($counter['count'] >= self::PERSIST_INTERVAL_SEGMENTS) {
-            return true;
-        }
-
-        if ((microtime(true) - $counter['time']) >= self::PERSIST_INTERVAL_SECONDS) {
-            return true;
-        }
-
-        return false;
     }
 
     /**
      * Persist job and session state (batched write).
      */
-    private function persistState(TranscodeJob $job, TranscodeSession $session): void
+    private function persistState(TranscodeJob $job, TranscodeSession $session, TranscodeLoopOwnership $ownership): void
     {
+        $this->assertLoopOwnership($job->getId(), $ownership);
         $this->sessionPort->save($session);
+        $this->assertLoopOwnership($job->getId(), $ownership);
         $this->jobPort->save($job);
+        $this->assertLoopOwnership($job->getId(), $ownership);
         $this->statePersister->persist($job);
-
-        // Reset counter
-        $key = $job->getId()->toString();
-        $this->persistCounters[$key] = ['count' => 0, 'time' => microtime(true)];
+        $this->assertLoopOwnership($job->getId(), $ownership);
     }
 
     /**
      * Force-immediate persist — used on job completion, seek, and pause events
      * to ensure crash recovery works.
      */
-    private function forcePersistState(TranscodeJob $job, TranscodeSession $session): void
+    private function forcePersistState(TranscodeJob $job, TranscodeSession $session, TranscodeLoopOwnership $ownership): void
     {
-        $this->sessionPort->save($session);
-        $this->jobPort->save($job);
-        $this->statePersister->persist($job);
-
-        // Reset counter
-        $key = $job->getId()->toString();
-        $this->persistCounters[$key] = ['count' => 0, 'time' => microtime(true)];
-    }
-
-    /**
-     * Clean up persist counter after job finishes.
-     */
-    private function clearPersistCounter(Uuid $jobId): void
-    {
-        unset($this->persistCounters[$jobId->toString()]);
+        $this->persistState($job, $session, $ownership);
     }
 
     /**
@@ -840,10 +899,11 @@ final class TranscodeSessionSubscriber
      *
      * The 'data' field may be a plain string (from RuntimeException::getMessage())
      * or a JSON string containing an 'error' key. Handles both cases.
+     * @param array{data: string, status: string} $result
      */
     private function extractErrorMessage(array $result): string
     {
-        $error = $result['data'] ?? 'Unknown pool error';
+        $error = $result['data'];
 
         try {
             $decoded = $this->jsonEncoder->decode($error, 'json');

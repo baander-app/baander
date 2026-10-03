@@ -43,7 +43,7 @@ final class TranscodeStreamManager
     private const int DEFAULT_MAX_CONCURRENT = 4;
     private const float POLL_INTERVAL_SECONDS = 0.1;
 
-    /** @var array<string, array{resource: mixed, pipes: array<int, mixed>, pid: int, output_dir: string, tier_name: string, marked: array<int, bool>, init_marked: bool, stderr_buffer: string}> */
+    /** @var array<string, array{identity: \stdClass, resource: mixed, pipes: array<int, mixed>, pid: int, output_dir: string, tier_name: string, marked: array<int, bool>, init_marked: bool, stderr_buffer: string}> */
     private array $streams = [];
 
     public function __construct(
@@ -107,6 +107,7 @@ final class TranscodeStreamManager
         $spawned = $this->spawner->spawn($command);
 
         $this->streams[$jobKey] = [
+            'identity' => new \stdClass(),
             'resource' => $spawned['resource'],
             'pipes' => $spawned['pipes'],
             'pid' => $spawned['pid'],
@@ -138,35 +139,44 @@ final class TranscodeStreamManager
             return false;
         }
 
-        $this->scanForNewSegments($jobKey, $entry);
-
-        // Write back the modified entry (marked indices, init_marked, stderr_buffer)
-        $this->streams[$jobKey] = $entry;
-
-        $running = $this->spawner->isRunning($entry['resource']);
-
-        if (!$running) {
-            // Final scan to catch segments written after the last poll
+        try {
             $this->scanForNewSegments($jobKey, $entry);
+            $this->assertStreamIdentity($jobKey, $entry['identity']);
+
+            // Write back the modified entry (marked indices, init_marked, stderr_buffer)
             $this->streams[$jobKey] = $entry;
 
-            // Only a confirmed zero exit can acknowledge completion. Existing
-            // cache fragments or an init hint cannot hide failure/unknown status.
-            $exitCode = $this->spawner->exitCode($entry['resource']);
-            $producedCount = $this->countProducedSegments($entry['output_dir'], $entry['tier_name']);
-            if ($exitCode !== 0) {
-                throw new FFmpegProcessFailedException(
-                    $exitCode === -1 ? 'FFmpeg exited without a confirmed exit status.' : sprintf('FFmpeg exited with code %d.', $exitCode),
-                    $entry['stderr_buffer'],
-                    $exitCode,
-                );
-            }
-            if ($producedCount === 0) {
-                throw FFmpegProcessFailedException::fromProcess($entry['stderr_buffer'], $exitCode);
-            }
-        }
+            $running = $this->spawner->isRunning($entry['resource']);
+            $this->assertStreamIdentity($jobKey, $entry['identity']);
 
-        return $running;
+            if (!$running) {
+                // Final scan to catch segments written after the last poll
+                $this->scanForNewSegments($jobKey, $entry);
+                $this->assertStreamIdentity($jobKey, $entry['identity']);
+                $this->streams[$jobKey] = $entry;
+
+                // Only a confirmed zero exit can acknowledge completion. Existing
+                // cache fragments or an init hint cannot hide failure/unknown status.
+                $exitCode = $this->spawner->exitCode($entry['resource']);
+                $this->assertStreamIdentity($jobKey, $entry['identity']);
+                $producedCount = $this->countProducedSegments($entry['output_dir'], $entry['tier_name']);
+                $this->assertStreamIdentity($jobKey, $entry['identity']);
+                if ($exitCode !== 0) {
+                    throw new FFmpegProcessFailedException(
+                        $exitCode === -1 ? 'FFmpeg exited without a confirmed exit status.' : sprintf('FFmpeg exited with code %d.', $exitCode),
+                        $entry['stderr_buffer'],
+                        $exitCode,
+                    );
+                }
+                if ($producedCount === 0) {
+                    throw FFmpegProcessFailedException::fromProcess($entry['stderr_buffer'], $exitCode);
+                }
+            }
+
+            return $running;
+        } catch (TranscodeStreamReplaced) {
+            return false;
+        }
     }
 
     /**
@@ -194,14 +204,17 @@ final class TranscodeStreamManager
             return;
         }
 
-        $this->logger->info('Stopping video stream', ['jobId' => $jobKey]);
-
-        if ($this->spawner->isRunning($entry['resource'])) {
-            $this->spawner->signal($entry['pid'], self::SIGKILL);
-        }
-
-        $this->spawner->close($entry['resource']);
+        // Detach before any callback/I/O can yield and start a replacement.
+        // This stop operation owns only the captured process, not the job slot.
         unset($this->streams[$jobKey]);
+        try {
+            $this->logger->info('Stopping video stream', ['jobId' => $jobKey]);
+            if ($this->spawner->isRunning($entry['resource'])) {
+                $this->spawner->signal($entry['pid'], self::SIGKILL);
+            }
+        } finally {
+            $this->spawner->close($entry['resource']);
+        }
     }
 
     /**
@@ -257,11 +270,20 @@ final class TranscodeStreamManager
         }
     }
 
+    /** Stop an abandoned poll without touching a replacement process. */
+    private function assertStreamIdentity(string $jobKey, \stdClass $identity): void
+    {
+        if (($this->streams[$jobKey]['identity'] ?? null) !== $identity) {
+            throw new TranscodeStreamReplaced();
+        }
+    }
+
     /**
-     * @param array{resource: mixed, pipes: array<int, mixed>, pid: int, output_dir: string, tier_name: string, marked: array<int, bool>, init_marked: bool, stderr_buffer: string} $entry
+     * @param array{identity: \stdClass, resource: mixed, pipes: array<int, mixed>, pid: int, output_dir: string, tier_name: string, marked: array<int, bool>, init_marked: bool, stderr_buffer: string} $entry
      */
     private function scanForNewSegments(string $jobKey, array &$entry): void
     {
+        $this->assertStreamIdentity($jobKey, $entry['identity']);
         // Drain FFmpeg stdout/stderr pipes to prevent pipe-buffer deadlock on
         // long encodes. FFmpeg writes progress/stats continuously; if the pipe
         // buffer (~64KB) fills and is never read, FFmpeg blocks on its next
@@ -276,7 +298,9 @@ final class TranscodeStreamManager
             }
             stream_set_blocking($pipe, false);
             while (true) {
+                $this->assertStreamIdentity($jobKey, $entry['identity']);
                 $chunk = fread($pipe, 65536);
+                $this->assertStreamIdentity($jobKey, $entry['identity']);
                 if ($chunk === '' || $chunk === false) {
                     break;
                 }
@@ -309,12 +333,14 @@ final class TranscodeStreamManager
         // Only the current encoder's default source identity belongs to this
         // tier. Existing final files remain cache entries, not job generations.
         foreach ($this->findSegments($dir, $entry['tier_name']) as $index => $file) {
+            $this->assertStreamIdentity($jobKey, $entry['identity']);
             if (isset($entry['marked'][$index])) {
                 continue;
             }
 
             // The encoder's start_number makes the filename index absolute.
             $this->availability->markReady($jobId, $entry['tier_name'], $index, $file);
+            $this->assertStreamIdentity($jobKey, $entry['identity']);
             $entry['marked'][$index] = true;
 
             $this->logger->debug('Segment available', [

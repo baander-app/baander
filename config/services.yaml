@@ -930,6 +930,7 @@ services:
             $loopLock: '@App\Transcode\Application\Port\TranscodeLoopLockInterface'
             $streamManager: '@App\Transcode\Infrastructure\Swoole\TranscodeStreamManager'
             $availability: '@App\Transcode\Application\Port\SegmentAvailabilityInterface'
+            $renewalTimer: '@App\Transcode\Infrastructure\Swoole\LoopLockRenewalTimerInterface'
         tags:
             - { name: 'kernel.event_listener', event: 'App\Transcode\Domain\Event\TranscodeSessionAttached' }
 
@@ -938,6 +939,9 @@ services:
         alias: App\Transcode\Infrastructure\Redis\RedisTranscodeLoopLock
 
     App\Transcode\Infrastructure\Redis\RedisTranscodeLoopLock: ~
+
+    App\Transcode\Infrastructure\Swoole\LoopLockRenewalTimerInterface:
+        alias: App\Transcode\Infrastructure\Swoole\SwooleLoopLockRenewalTimer
 
     App\Transcode\Infrastructure\Swoole\GracefulRestartHandler:
         arguments:

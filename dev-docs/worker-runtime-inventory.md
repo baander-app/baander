@@ -718,12 +718,24 @@ Job lookup/creation still precedes lock acquisition and may persist a new pendin
 job. Session creation and both list endpoints now reject absent users or users
 without a UUID accessor before invoking their application operations.
 
-The encoding loop's ownership contract remains incomplete. The subscriber only
-logs renewal failure while encoding continues, and its general failure handler
-saves stale job state. Ownership-loss cleanup must avoid job mutation. The current
-lock API stores one token per job in the service instance: a successful reacquisition
-replaces that token, so an older coroutine in the same instance can act on the new
-lease. Per-loop identity and conditional persistence remain required.
+The subscriber now checks the lease before starting the loop. A refused or throwing
+renewal permanently marks that loop as lost and stops its local encoder. Guards
+after waits and between persistence calls prevent further work after observed loss;
+even an ordinary FFmpeg error raised during shutdown bypasses the job-failure write.
+Captured loop identities make obsolete timer callbacks inert. Cleanup closes the
+context first, attempts remaining cleanup if one step fails, and does not release a
+lease after observing its loss. The manager gives each local process a distinct
+identity so an interrupted poll cannot restore a stopped process entry, publish a
+further readiness hint after detecting shutdown, or remove a replacement process
+during cleanup.
+
+These local identities are not persisted encoding-attempt identities. A database
+write already in flight can still complete after loss, dispatched pool work can
+continue, and shared output directories remain unisolated. The Redis lock API still
+stores one token per job in the service instance: successful reacquisition replaces
+that token, so an older coroutine can use the newer token before observing loss.
+Per-acquisition lock handles and conditional persistence remain required. The timer
+does not independently fence a lease when its event loop stalls past expiry.
 
 Native media now requests refresh from its own window after an authenticated 401,
 shares that window's refresh queue with Axios, and retries once with a new proof.
