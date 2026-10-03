@@ -12,16 +12,9 @@ namespace App\Transcode\Infrastructure\Swoole;
  */
 final class ProcOpenSpawner implements ProcessSpawnerInterface
 {
-    private const string FFMPEG_PATH = '/usr/bin/ffmpeg';
-
     /**
-     * Cached proc_get_status() result per resource.
-     *
-     * proc_get_status() has a gotcha: the first call that reports
-     * running=false triggers an internal pcntl_waitpid and the exit code is
-     * captured, but subsequent calls return stale data (exitcode always -1,
-     * running always false). We cache the first-seen terminal status so
-     * exitCode() can still return the real code after isRunning() has run.
+     * Swoole's coroutine process hooks can consume terminal status on the first
+     * read, unlike native PHP 8.5. Retain it only until this handle is closed.
      *
      * @var array<int, array{running: bool, exitcode: int}>
      */
@@ -56,7 +49,8 @@ final class ProcOpenSpawner implements ProcessSpawnerInterface
         stream_set_blocking($pipes[2], false);
 
         $status = proc_get_status($resource);
-        $pid = $status !== false ? $status['pid'] : -1;
+        $pid = $status['pid'];
+        $this->rememberTerminalStatus($resource, $status);
 
         return ['resource' => $resource, 'pipes' => $pipes, 'pid' => $pid];
     }
@@ -64,26 +58,26 @@ final class ProcOpenSpawner implements ProcessSpawnerInterface
     public function isRunning(mixed $resource): bool
     {
         if (!is_resource($resource)) {
-            return isset($this->terminalStatus[$this->key($resource)])
-                ? $this->terminalStatus[$this->key($resource)]['running']
-                : false;
+            return false;
         }
-
-        $status = proc_get_status($resource);
-
-        if ($status === false) {
+        if (isset($this->terminalStatus[$this->key($resource)])) {
             return false;
         }
 
-        // Cache the terminal status on the first running=false observation.
+        $status = proc_get_status($resource);
+        $this->rememberTerminalStatus($resource, $status);
+        return $status['running'];
+    }
+
+    /** @param array{running: bool, exitcode: int} $status */
+    private function rememberTerminalStatus(mixed $resource, array $status): void
+    {
         if (!$status['running'] && !isset($this->terminalStatus[$this->key($resource)])) {
             $this->terminalStatus[$this->key($resource)] = [
                 'running' => false,
-                'exitcode' => $status['exitcode'] ?? -1,
+                'exitcode' => $status['exitcode'],
             ];
         }
-
-        return $status['running'];
     }
 
     public function exitCode(mixed $resource): int
@@ -109,7 +103,12 @@ final class ProcOpenSpawner implements ProcessSpawnerInterface
     public function close(mixed $resource): void
     {
         if (is_resource($resource)) {
-            proc_close($resource);
+            $key = $this->key($resource);
+            try {
+                proc_close($resource);
+            } finally {
+                unset($this->terminalStatus[$key]);
+            }
         }
     }
 }

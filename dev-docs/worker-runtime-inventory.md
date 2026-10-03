@@ -795,6 +795,16 @@ Health is observed on the timer cadence; a worker can still die between a health
 read and dispatch. A failed or incomplete pipe write now reports failure, but a
 successful write is not a completion acknowledgement or a durable queue.
 
+The long-running encoder's process spawner now retains terminal status only until
+its process handle closes. Previously each completed process, including seek
+restarts, left a cache entry behind. The cache is still necessary: Swoole's
+coroutine hooks can consume the first exit-status read even though native PHP 8.5
+preserves it. Initial spawn status and later polls use the same terminal-status
+capture. Real-process regressions verify repeated status reads, nonzero and
+signalled exits, closed handles, coroutine hooks, and bounded retained PHP heap
+across repeated spawn/poll/close cycles. This does not qualify native allocator
+RSS or FFmpeg process-descendant cleanup.
+
 Native media now requests refresh from its own window after an authenticated 401,
 shares that window's refresh queue with Axios, and retries once with a new proof.
 A second 401 or failed refresh ends recovery. Complete credential snapshots carry
