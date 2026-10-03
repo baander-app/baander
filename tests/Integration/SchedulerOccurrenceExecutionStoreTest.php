@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
+use App\Scheduler\Application\Exception\ScheduledOccurrenceJobBusy;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceExecutionStore;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceStore;
@@ -134,7 +135,7 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
     public function testPhysicalForeignKeyRejectsUnknownOccurrenceAndDeletionOfConsumedIntent(): void
     {
         try {
-            $this->first->executeStatement('INSERT INTO scheduler_occurrence_executions (occurrence_id, attempt_id, deployment_namespace, deployment_boot_id, deployment_epoch) VALUES (:occurrence, :attempt, :namespace, :boot, :epoch)', ['occurrence' => Uuid::v7()->toString(), 'attempt' => Uuid::v7()->toString(), 'namespace' => $this->authority->namespace, 'boot' => $this->authority->bootId, 'epoch' => $this->authority->epoch]);
+            $this->first->executeStatement('INSERT INTO scheduler_occurrence_executions (occurrence_id, job_id, attempt_id, deployment_namespace, deployment_boot_id, deployment_epoch) VALUES (:occurrence, :job, :attempt, :namespace, :boot, :epoch)', ['occurrence' => Uuid::v7()->toString(), 'job' => Uuid::v7()->toString(), 'attempt' => Uuid::v7()->toString(), 'namespace' => $this->authority->namespace, 'boot' => $this->authority->bootId, 'epoch' => $this->authority->epoch]);
             self::fail('Physical admission row must reference a retained occurrence.');
         } catch (DriverException $error) {
             self::assertSame('23503', $error->getSQLState());
@@ -209,7 +210,7 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         $occurrence = $this->seed();
         $winner = Uuid::v7();
         $this->second->beginTransaction();
-        $this->second->executeStatement('INSERT INTO scheduler_occurrence_executions (occurrence_id, attempt_id, deployment_namespace, deployment_boot_id, deployment_epoch) VALUES (:occurrence, :attempt, :namespace, :boot, :epoch)', ['occurrence' => $occurrence->id->toString(), 'attempt' => $winner->toString(), 'namespace' => $this->authority->namespace, 'boot' => $this->authority->bootId, 'epoch' => $this->authority->epoch]);
+        $this->second->executeStatement('INSERT INTO scheduler_occurrence_executions (occurrence_id, job_id, attempt_id, deployment_namespace, deployment_boot_id, deployment_epoch) VALUES (:occurrence, :job, :attempt, :namespace, :boot, :epoch)', ['occurrence' => $occurrence->id->toString(), 'job' => $occurrence->jobId->toString(), 'attempt' => $winner->toString(), 'namespace' => $this->authority->namespace, 'boot' => $this->authority->bootId, 'epoch' => $this->authority->epoch]);
         $start = hrtime(true);
         try {
             (new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority, 500, 50))->begin($occurrence->id, Uuid::v7());
@@ -395,9 +396,178 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         yield 'fraction epoch' => ['baander.app:scheduler-test', str_repeat('a', 32), '1.0', true];
     }
 
-    private function seed(): SchedulerOccurrence
+    public function testDatabaseRejectsConcurrentUnresolvedJobAndMismatchedOccurrenceJob(): void
     {
-        $occurrence = new SchedulerOccurrence(Uuid::v7(), Uuid::v7(), new DateTimeImmutable('2026-10-03 00:00:00Z'), JobType::Console, 'app:baander-check', ['integral' => 1.0, 'negativeZero' => -0.0, 'large' => 1.0e18, 'nested' => [false, null, 'worker@baander.app']]);
+        $running = $this->seed();
+        $pending = $this->seed($running->jobId, $running->scheduledFor->modify('+1 minute'));
+        $differentJob = $this->seed();
+        self::assertNotNull((new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority))->begin($running->id, Uuid::v7()));
+        foreach ([[$pending, $running->jobId, '23505'], [$differentJob, Uuid::v7(), '23503']] as [$occurrence, $jobId, $sqlState]) {
+            try {
+                $this->second->executeStatement(<<<'SQL'
+                    INSERT INTO scheduler_occurrence_executions (occurrence_id, job_id, attempt_id, deployment_namespace, deployment_boot_id, deployment_epoch)
+                    VALUES (:occurrence, :job, :attempt, :namespace, :boot, :epoch)
+                    SQL, ['occurrence' => $occurrence->id->toString(), 'job' => $jobId->toString(), 'attempt' => Uuid::v7()->toString(), 'namespace' => $this->authority->namespace, 'boot' => $this->authority->bootId, 'epoch' => $this->authority->epoch]);
+                self::fail('Database constraints must reject an invalid invocation independently of store SQL.');
+            } catch (DriverException $error) {
+                self::assertSame($sqlState, $error->getSQLState());
+            }
+        }
+        self::assertSame(1, (int) $this->second->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions'));
+    }
+
+    public function testUnresolvedJobBlocksDistinctOccurrenceAcrossDeploymentNamespacesButAllowsOtherJobs(): void
+    {
+        $running = $this->seed();
+        $pending = $this->seed($running->jobId, $running->scheduledFor->modify('+1 minute'));
+        $otherJob = $this->seed();
+        self::assertNotNull((new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority))->begin($running->id, Uuid::v7()));
+        $otherAuthority = (new DoctrineDeploymentLease($this->second))->acquire('baander.app:other-scheduler', str_repeat('b', 32), 3600);
+        self::assertNotNull($otherAuthority);
+        $this->assertJobBusy($pending, $this->authority);
+        $this->assertJobBusy($pending, $otherAuthority);
+        self::assertNotNull((new DoctrineSchedulerOccurrenceExecutionStore($this->second, $otherAuthority))->begin($otherJob->id, Uuid::v7()));
+        self::assertSame(2, (int) $this->first->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions'));
+        self::assertFalse($this->first->fetchOne('SELECT 1 FROM scheduler_occurrence_executions WHERE occurrence_id = :id', ['id' => $pending->id->toString()]));
+    }
+
+    public function testOnlyExactReturnReleasesJobAndOldReturnCannotReleaseNewInvocation(): void
+    {
+        $running = $this->seed();
+        $pending = $this->seed($running->jobId, $running->scheduledFor->modify('+1 minute'));
+        $later = $this->seed($running->jobId, $running->scheduledFor->modify('+2 minutes'));
+        $attempt = Uuid::v7();
+        $store = new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority);
+        self::assertNotNull($store->begin($running->id, $attempt));
+        self::assertFalse($store->markReturned($running->id, Uuid::v7()));
+        self::assertFalse($store->markReturned($pending->id, $attempt));
+        foreach ([new DeploymentLease('baander.app:other-context', $this->authority->bootId, $this->authority->epoch), new DeploymentLease($this->authority->namespace, str_repeat('b', 32), $this->authority->epoch), new DeploymentLease($this->authority->namespace, $this->authority->bootId, $this->authority->epoch + 1)] as $wrong) {
+            self::assertFalse((new DoctrineSchedulerOccurrenceExecutionStore($this->second, $wrong))->markReturned($running->id, $attempt));
+            $this->assertJobBusy($pending, $this->authority);
+        }
+        self::assertTrue($store->markReturned($running->id, $attempt));
+        $nextAttempt = Uuid::v7();
+        self::assertNotNull($store->begin($pending->id, $nextAttempt));
+        self::assertNull($store->begin($running->id, Uuid::v7()));
+        self::assertTrue($store->markReturned($running->id, $attempt));
+        $this->assertJobBusy($later, $this->authority);
+        self::assertTrue($store->markReturned($pending->id, $nextAttempt));
+        self::assertNotNull($store->begin($later->id, Uuid::v7()));
+    }
+
+    public function testLeaseExpiryAndReplacementCannotReclaimUnresolvedJob(): void
+    {
+        $running = $this->seed();
+        $pending = $this->seed($running->jobId, $running->scheduledFor->modify('+1 minute'));
+        $attempt = Uuid::v7();
+        $store = new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority);
+        self::assertNotNull($store->begin($running->id, $attempt));
+        $this->second->executeStatement("UPDATE worker_deployment_leases SET expires_at = clock_timestamp() - INTERVAL '1 second'");
+        $leaseStore = new DoctrineDeploymentLease($this->second);
+        self::assertNull($leaseStore->acquire($this->authority->namespace, str_repeat('b', 32), 3600));
+        self::assertTrue($leaseStore->acknowledgeContainment($this->authority));
+        $replacement = $leaseStore->acquire($this->authority->namespace, str_repeat('b', 32), 3600);
+        self::assertNotNull($replacement);
+        self::assertGreaterThan($this->authority->epoch, $replacement->epoch);
+        $this->assertJobBusy($pending, $replacement);
+        self::assertFalse((new DoctrineSchedulerOccurrenceExecutionStore($this->second, $replacement))->markReturned($running->id, $attempt));
+        $this->assertJobBusy($pending, $replacement);
+        self::assertTrue($store->markReturned($running->id, $attempt));
+        self::assertNotNull((new DoctrineSchedulerOccurrenceExecutionStore($this->second, $replacement))->begin($pending->id, Uuid::v7()));
+    }
+
+    #[DataProvider('commitFailures')]
+    public function testUncertainAdmissionCommitPreservesJobBlockOnlyWhenCommitted(bool $after): void
+    {
+        $running = $this->seed();
+        $pending = $this->seed($running->jobId, $running->scheduledFor->modify('+1 minute'));
+        $attempt = Uuid::v7();
+        $connection = $this->uncertainConnection($after);
+        try {
+            (new DoctrineSchedulerOccurrenceExecutionStore($connection, $this->authority))->begin($running->id, $attempt);
+            self::fail('Uncertain commit cannot acknowledge admission.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('Fixture execution commit failed.', $error->getMessage());
+        }
+        self::assertFalse($connection->isConnected());
+        if ($after) {
+            $this->assertJobBusy($pending, $this->authority);
+            self::assertTrue((new DoctrineSchedulerOccurrenceExecutionStore($this->second, $this->authority))->markReturned($running->id, $attempt));
+        } else {
+            self::assertSame(0, (int) $this->second->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions'));
+        }
+        self::assertNotNull((new DoctrineSchedulerOccurrenceExecutionStore($this->second, $this->authority))->begin($pending->id, Uuid::v7()));
+    }
+
+    public function testIndependentNamespaceContenderWaitsForUncommittedJobClaimAndCannotBypassIt(): void
+    {
+        $running = $this->seed();
+        $pending = $this->seed($running->jobId, $running->scheduledFor->modify('+1 minute'));
+        $otherAuthority = (new DoctrineDeploymentLease($this->first))->acquire('baander.app:other-scheduler', str_repeat('b', 32), 3600);
+        self::assertNotNull($otherAuthority);
+        $this->second->beginTransaction();
+        $this->second->executeStatement(<<<'SQL'
+            INSERT INTO scheduler_occurrence_executions (occurrence_id, job_id, attempt_id, deployment_namespace, deployment_boot_id, deployment_epoch)
+            VALUES (:occurrence, :job, :attempt, :namespace, :boot, :epoch)
+            SQL, ['occurrence' => $running->id->toString(), 'job' => $running->jobId->toString(), 'attempt' => Uuid::v7()->toString(), 'namespace' => $this->authority->namespace, 'boot' => $this->authority->bootId, 'epoch' => $this->authority->epoch]);
+        $started = hrtime(true);
+        try {
+            (new DoctrineSchedulerOccurrenceExecutionStore($this->first, $otherAuthority, 500, 50))->begin($pending->id, Uuid::v7());
+            self::fail('Uncommitted claim for another occurrence must block this job in every namespace.');
+        } catch (DriverException $error) {
+            self::assertSame('55P03', $error->getSQLState());
+        }
+        self::assertLessThan(2.0, (hrtime(true) - $started) / 1e9);
+        self::assertFalse($this->first->isConnected());
+        $this->second->rollBack();
+        $this->first->executeStatement('SET search_path TO ' . $this->schema);
+        self::assertNotNull((new DoctrineSchedulerOccurrenceExecutionStore($this->first, $otherAuthority))->begin($pending->id, Uuid::v7()));
+        self::assertSame(1, (int) $this->first->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions'));
+    }
+
+    #[DataProvider('commitFailures')]
+    public function testUncertainReturnCommitReleasesJobOnlyWhenCommitted(bool $after): void
+    {
+        $running = $this->seed();
+        $pending = $this->seed($running->jobId, $running->scheduledFor->modify('+1 minute'));
+        $attempt = Uuid::v7();
+        self::assertNotNull((new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority))->begin($running->id, $attempt));
+        $connection = $this->uncertainConnection($after);
+        try {
+            (new DoctrineSchedulerOccurrenceExecutionStore($connection, $this->authority))->markReturned($running->id, $attempt);
+            self::fail('Uncertain return commit cannot acknowledge release.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('Fixture execution commit failed.', $error->getMessage());
+        }
+        self::assertFalse($connection->isConnected());
+        if (!$after) {
+            $this->assertJobBusy($pending, $this->authority);
+            self::assertTrue((new DoctrineSchedulerOccurrenceExecutionStore($this->second, $this->authority))->markReturned($running->id, $attempt));
+        }
+        $store = new DoctrineSchedulerOccurrenceExecutionStore($this->second, $this->authority);
+        self::assertNotNull($store->begin($pending->id, Uuid::v7()));
+        self::assertTrue($store->markReturned($running->id, $attempt));
+        self::assertNull($store->begin($running->id, Uuid::v7()));
+    }
+
+    private function assertJobBusy(SchedulerOccurrence $occurrence, DeploymentLease $authority): void
+    {
+        try {
+            (new DoctrineSchedulerOccurrenceExecutionStore($this->second, $authority))->begin($occurrence->id, Uuid::v7());
+            self::fail('A distinct occurrence must retry while its job has an unresolved invocation.');
+        } catch (ScheduledOccurrenceJobBusy $error) {
+            self::assertSame($occurrence->jobId->toString(), $error->jobId->toString());
+            self::assertSame(0, $this->second->getTransactionNestingLevel());
+        }
+        // The dedicated store discards failed-operation connections. Reapply only this fixture's schema on reconnect.
+        if (!$this->second->isConnected()) {
+            $this->second->executeStatement('SET search_path TO ' . $this->schema);
+        }
+    }
+
+    private function seed(?Uuid $jobId = null, ?DateTimeImmutable $scheduledFor = null): SchedulerOccurrence
+    {
+        $occurrence = new SchedulerOccurrence(Uuid::v7(), $jobId ?? Uuid::v7(), $scheduledFor ?? new DateTimeImmutable('2026-10-03 00:00:00Z'), JobType::Console, 'app:baander-check', ['integral' => 1.0, 'negativeZero' => -0.0, 'large' => 1.0e18, 'nested' => [false, null, 'worker@baander.app']]);
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->first))->record($occurrence));
         return $occurrence;
     }

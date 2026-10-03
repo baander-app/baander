@@ -9,6 +9,7 @@ use App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand;
 use App\Scheduler\Application\CommandHandler\ExecuteScheduledJobHandler;
 use App\Scheduler\Application\CommandHandler\ExecuteScheduledOccurrenceHandler;
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
+use App\Scheduler\Application\Exception\ScheduledOccurrenceJobBusy;
 use App\Scheduler\Application\Port\ScheduledJobPortInterface;
 use App\Scheduler\Application\Port\ScheduledConsoleExecutorInterface;
 use App\Scheduler\Application\Port\SchedulerOccurrenceExecutionStoreInterface;
@@ -39,6 +40,8 @@ use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Messenger\Bridge\Redis\Transport\Connection as RedisConnection;
 use Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport;
 use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
+use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
+use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\Event\WorkerMessageRetriedEvent;
 use Symfony\Component\Messenger\Event\WorkerRunningEvent;
 use Symfony\Component\Messenger\EventListener\AddErrorDetailsStampListener;
@@ -259,6 +262,79 @@ final class SchedulerOccurrenceGuardTest extends TestCase
         self::assertSame(1, (int) $this->observer->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions'));
         self::assertSame(0, $async->getMessageCount());
         self::assertSame(0, $failed->getMessageCount());
+    }
+
+    public function testBusyJobExhaustsBoundedRetriesWithoutConsumptionAndCanBeExplicitlyRetriedAfterReturn(): void
+    {
+        [$blocker, $job] = $this->recordOccurrence();
+        $pending = new SchedulerOccurrence(Uuid::v7(), $job->getId(), $blocker->scheduledFor->modify('+1 minute'),
+            $blocker->jobType, $blocker->command, $blocker->parameters);
+        self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->writer))->record($pending));
+        $attempt = Uuid::v7();
+        $owner = new DoctrineSchedulerOccurrenceExecutionStore($this->observer, $this->authority);
+        self::assertNotNull($owner->begin($blocker->id, $attempt));
+        $effects = 0;
+        $guard = $this->guard($pending, $job, $effects);
+        $async = $this->redisTransport();
+        $failed = $this->redisTransport();
+        // Admission closes its dedicated connection on failures. Restore only this
+        // fixture's isolated schema on reconnect; production uses its normal schema.
+        $invoke = function (ExecuteScheduledOccurrenceCommand $command) use ($guard): void {
+            $this->writer->executeStatement('SET search_path TO ' . $this->schema);
+            $guard($command);
+        };
+        $bus = new MessageBus([
+            new SendMessageMiddleware(new SendersLocator([ExecuteScheduledOccurrenceCommand::class => ['async']], new ServiceLocator(['async' => static fn () => $async]))),
+            new HandleMessageMiddleware(new HandlersLocator([ExecuteScheduledOccurrenceCommand::class => [new HandlerDescriptor($invoke, ['from_transport' => 'async'])]])),
+        ]);
+        $events = new EventDispatcher();
+        $deliveries = 0;
+        $events->addListener(WorkerMessageReceivedEvent::class, static function () use (&$deliveries): void { ++$deliveries; });
+        $events->addListener(WorkerMessageFailedEvent::class, static function (WorkerMessageFailedEvent $event): void {
+            $error = $event->getThrowable();
+            self::assertInstanceOf(HandlerFailedException::class, $error);
+            self::assertInstanceOf(ScheduledOccurrenceJobBusy::class, $error->getPrevious());
+        });
+        $events->addSubscriber(new AddErrorDetailsStampListener());
+        $events->addSubscriber(new SendFailedMessageForRetryListener(
+            new ServiceLocator(['async' => static fn () => $async]),
+            new ServiceLocator(['async' => static fn () => new MultiplierRetryStrategy(3, 0)]),
+            eventDispatcher: $events,
+        ));
+        $events->addSubscriber(new SendFailedMessageToFailureTransportListener(new ServiceLocator(['async' => static fn () => $failed])));
+        $deadline = hrtime(true) / 1e9 + 3.0;
+        $events->addListener(WorkerRunningEvent::class, static function (WorkerRunningEvent $event) use (&$deadline): void {
+            if ($event->isWorkerIdle() || hrtime(true) / 1e9 >= $deadline) {
+                $event->getWorker()->stop();
+            }
+        });
+        $bus->dispatch(new ExecuteScheduledOccurrenceCommand($pending->id));
+        (new Worker(['async' => $async], $bus, $events))->run(['sleep' => 1000]);
+        self::assertSame(4, $deliveries, 'Initial attempt and exactly three retries, never an infinite recoverable retry.');
+        self::assertSame(0, $effects);
+        self::assertSame(0, $async->getMessageCount());
+        self::assertSame(1, $failed->getMessageCount());
+        self::assertSame(0, (int) $this->observer->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions WHERE occurrence_id = :id', ['id' => $pending->id->toString()]));
+        self::assertNull($this->receipt($blocker)['returned_at']);
+
+        self::assertTrue($owner->markReturned($blocker->id, $attempt));
+        $retained = iterator_to_array($failed->get());
+        self::assertCount(1, $retained);
+        $envelope = reset($retained);
+        self::assertInstanceOf(Envelope::class, $envelope);
+        $command = $envelope->getMessage();
+        self::assertInstanceOf(ExecuteScheduledOccurrenceCommand::class, $command);
+        self::assertSame($pending->id->toString(), $command->occurrenceId->toString());
+        $deadline = hrtime(true) / 1e9 + 3.0;
+        $bus->dispatch($command); // Explicit operator retry preserves occurrence identity.
+        (new Worker(['async' => $async], $bus, $events))->run(['sleep' => 1000]);
+        self::assertSame(5, $deliveries);
+        self::assertSame(1, $effects);
+        self::assertNotNull($this->receipt($pending)['returned_at']);
+        $failed->ack($envelope);
+        self::assertSame(0, $failed->getMessageCount());
+        self::assertSame(0, $async->getMessageCount());
+        self::assertNull($owner->begin($blocker->id, Uuid::v7()), 'A released job slot never reopens the consumed occurrence.');
     }
 
     private function redisTransport(): RedisTransport

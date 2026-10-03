@@ -757,9 +757,34 @@ The per-job materializer now has a bounded, durable fair recovery pass.
 A supervised loop, resource admission and deployment wiring remain before cutover. Lease validation controls admission; it
 cannot stop effects already running after expiry.
 The guard prevents repeated wrapper invocation, not duplicate side effects from
-retries of downstream messages or exactly-once external delivery. It also does not
-serialize different occurrences of the same job; shared resource admission and
-long-running execution ownership remain cutover prerequisites.
+retries of downstream messages or exactly-once external delivery. Execution rows
+also reserve one unresolved wrapper invocation per job across deployment namespaces.
+A composite occurrence/job foreign key prevents claiming a different job's slot,
+and a partial unique index rejects overlapping unresolved invocations. Admission
+derives job identity from the stored occurrence; a busy job does not consume the
+waiting occurrence. Previously consumed occurrences remain no-ops.
+
+A busy invocation follows the existing three retries and then the failure transport.
+It is not acknowledged as completed or retried indefinitely. After the blocker has
+returned, an operator can explicitly retry the retained command with its original
+occurrence ID. Publication receipts are not cleared to manufacture automatic retries.
+An exact-owner normal-return receipt releases only the per-job wrapper slot, never
+the permanent occurrence claim. Missing receipts, uncertain commits, lease expiry
+and deployment replacement do not authorize another invocation of that job.
+
+This serializes scheduler adapters, not downstream work: a Messenger adapter can
+return after sending an asynchronous command, before its effects complete. A console
+adapter's return does not prove descendant containment. Shared resource admission,
+downstream execution ownership and the legacy scheduler cutover remain prerequisites
+for enabling the producer and relay loops.
+
+The per-job admission change passes 177 combined integration/functional tests with
+1,689 assertions on disposable PostgreSQL/Redis, including fresh migrations and a
+repeat no-op migration run. Coverage includes independent uncommitted contention,
+cross-namespace blocking, wrong/stale receipts, lease replacement, uncertain
+admission/return commits, physical foreign-key/unique constraints and real Redis
+retry exhaustion followed by explicit retry. All 3,460 unit tests and focused
+baseline-free PHPStan level 6 also pass.
 
 The occurrence, dispatch, console-process, worker-stop and schema-introspection
 checks pass 89 tests with 758 assertions on disposable PostgreSQL/Redis after all 18 migrations and a repeat

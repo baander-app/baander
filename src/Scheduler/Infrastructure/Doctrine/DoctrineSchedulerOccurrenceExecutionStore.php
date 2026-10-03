@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Scheduler\Infrastructure\Doctrine;
 
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
+use App\Scheduler\Application\Exception\ScheduledOccurrenceJobBusy;
 use App\Scheduler\Application\Port\SchedulerOccurrenceExecutionStoreInterface;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Shared\Domain\Model\Uuid;
@@ -15,7 +16,7 @@ use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
-/** Permanent one-shot admission, on a dedicated idle autocommit connection; no automatic reclaim. */
+/** Permanent occurrence admission with durable per-job wrapper serialization; no automatic reclaim. */
 #[Exclude]
 final class DoctrineSchedulerOccurrenceExecutionStore implements SchedulerOccurrenceExecutionStoreInterface
 {
@@ -63,12 +64,29 @@ final class DoctrineSchedulerOccurrenceExecutionStore implements SchedulerOccurr
             $this->requireActiveAuthority($authority);
             $parameters = ['occurrence' => $occurrenceId->toString(), 'attempt' => $attemptId->toString()];
             $inserted = $this->connection->executeStatement(<<<'SQL'
-                INSERT INTO scheduler_occurrence_executions (occurrence_id, attempt_id, deployment_namespace, deployment_boot_id, deployment_epoch)
-                SELECT id, CAST(:attempt AS UUID), :namespace, :boot, :epoch FROM scheduler_occurrences
+                INSERT INTO scheduler_occurrence_executions (occurrence_id, job_id, attempt_id, deployment_namespace, deployment_boot_id, deployment_epoch)
+                SELECT id, job_id, CAST(:attempt AS UUID), :namespace, :boot, :epoch FROM scheduler_occurrences
                 WHERE id = :occurrence AND scheduled_for <= clock_timestamp()
                 ON CONFLICT DO NOTHING
                 SQL, $parameters + ['namespace' => $authority->namespace, 'boot' => $authority->bootId, 'epoch' => $authority->epoch]);
             if ($inserted !== 1) {
+                // A conflicting insert may have committed after the INSERT snapshot.
+                // Read again before classifying: every consumed occurrence/attempt is a no-op.
+                $duplicate = $this->connection->fetchOne(<<<'SQL'
+                    SELECT 1 FROM scheduler_occurrence_executions
+                    WHERE occurrence_id = :occurrence OR attempt_id = :attempt
+                    SQL, $parameters) !== false;
+                if (!$duplicate) {
+                    $job = $this->connection->fetchOne(<<<'SQL'
+                        SELECT job_id FROM scheduler_occurrences
+                        WHERE id = :occurrence AND scheduled_for <= clock_timestamp()
+                        SQL, ['occurrence' => $occurrenceId->toString()]);
+                    if ($job !== false) {
+                        // The blocker may already have returned. Retry conservatively;
+                        // acknowledging here would discard an unconsumed due occurrence.
+                        throw new ScheduledOccurrenceJobBusy(Uuid::fromString($job));
+                    }
+                }
                 return null;
             }
             $row = $this->connection->fetchAssociative(<<<'SQL'

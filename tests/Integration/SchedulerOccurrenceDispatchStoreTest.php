@@ -83,7 +83,7 @@ final class SchedulerOccurrenceDispatchStoreTest extends TestCase
         $this->seed(new \DateTimeImmutable('tomorrow UTC'));
         $executed = $this->seed();
         $this->second->executeStatement('UPDATE scheduler_occurrences SET dispatch_after = clock_timestamp() + INTERVAL \'1 day\' WHERE id = :id', ['id' => $retry->toString()]);
-        $this->second->executeStatement("INSERT INTO scheduler_occurrence_executions (occurrence_id, attempt_id, deployment_namespace, deployment_boot_id, deployment_epoch) VALUES (:id, :attempt, 'baander.app:dispatch-test', :boot, 1)", ['id' => $executed->toString(), 'attempt' => Uuid::v7()->toString(), 'boot' => str_repeat('a', 32)]);
+        $this->second->executeStatement("INSERT INTO scheduler_occurrence_executions (occurrence_id, job_id, attempt_id, deployment_namespace, deployment_boot_id, deployment_epoch) SELECT id, job_id, :attempt, 'baander.app:dispatch-test', :boot, 1 FROM scheduler_occurrences WHERE id = :id", ['id' => $executed->toString(), 'attempt' => Uuid::v7()->toString(), 'boot' => str_repeat('a', 32)]);
         self::assertSame([], (new DoctrineSchedulerOccurrenceDispatchStore($this->first))->claimPending());
         self::assertSame(1, (int) $this->second->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions'));
     }
