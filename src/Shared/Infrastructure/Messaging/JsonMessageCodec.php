@@ -19,6 +19,7 @@ use App\Notification\Application\DTO\SendWebhookCommand;
 use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Radio\Application\Command\SyncCountryStationsCommand;
 use App\Scheduler\Application\Command\ExecuteScheduledJobCommand;
+use App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand;
 use App\Shared\Domain\Event\Outbox\RelayOutboxCommand;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\Command\UpdateTranscodePositionCommand;
@@ -39,6 +40,7 @@ final readonly class JsonMessageCodec
         'media.prune_missing_images' => [],
         'radio.sync_country_stations' => ['source_id', 'country_code'],
         'scheduler.execute_job' => ['job_id', 'job_type', 'command', 'parameters'],
+        'scheduler.execute_occurrence' => ['occurrence_id'],
         'outbox.relay' => ['batch_size'],
         'transcode.update_position' => ['session_id', 'position', 'action'],
     ];
@@ -68,6 +70,7 @@ final readonly class JsonMessageCodec
             $message instanceof PruneMissingImagesCommand => ['media.prune_missing_images', []],
             $message instanceof SyncCountryStationsCommand => ['radio.sync_country_stations', [$message->getSourceId()->toString(), $message->getCountryCode()]],
             $message instanceof ExecuteScheduledJobCommand => ['scheduler.execute_job', [$message->jobId, $message->jobType, $message->command, $message->parameters]],
+            $message instanceof ExecuteScheduledOccurrenceCommand => ['scheduler.execute_occurrence', [$message->occurrenceId->toString()]],
             $message instanceof RelayOutboxCommand => ['outbox.relay', [$message->batchSize]],
             $message instanceof UpdateTranscodePositionCommand => ['transcode.update_position', [$message->sessionId->toString(), $message->position, $message->action]],
             default => throw new \InvalidArgumentException('Unsupported message type.'),
@@ -116,6 +119,7 @@ final readonly class JsonMessageCodec
                 'media.prune_missing_images' => new PruneMissingImagesCommand(),
                 'radio.sync_country_stations' => new SyncCountryStationsCommand(Uuid::fromString($p['source_id']), $p['country_code']),
                 'scheduler.execute_job' => new ExecuteScheduledJobCommand($p['job_id'], $p['job_type'], $p['command'], $p['parameters']),
+                'scheduler.execute_occurrence' => new ExecuteScheduledOccurrenceCommand(Uuid::fromString($p['occurrence_id'])),
                 'outbox.relay' => new RelayOutboxCommand($p['batch_size']),
                 'transcode.update_position' => new UpdateTranscodePositionCommand(Uuid::fromString($p['session_id']), $p['position'], $p['action']),
             };

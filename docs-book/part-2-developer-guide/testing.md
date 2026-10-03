@@ -141,14 +141,19 @@ The second migration run checks that the recorded history produces no pending wo
 Scheduler occurrence persistence can be checked with:
 
 ```bash
-bash scripts/test-functional-container.sh tests/Integration/SchedulerOccurrenceStoreTest.php tests/Integration/WorkerDeploymentLeaseSchemaTest.php
+bash scripts/test-functional-container.sh tests/Integration/SchedulerOccurrenceStoreTest.php tests/Integration/SchedulerOccurrenceExecutionStoreTest.php tests/Integration/SchedulerOccurrenceGuardTest.php tests/Integration/WorkerDeploymentLeaseSchemaTest.php
 ```
 
 These checks cover immutable snapshots, independent-connection visibility,
 competing inserts, rollback and a lost commit acknowledgment. The actual migration
 also enforces command/JSON bounds and minute-aligned instants; Doctrine's schema
-filter preserves the table. This is persistence coverage, not scheduler dispatch
-or execution recovery. No occurrence relay is enabled yet.
+filter preserves the tables. Execution checks require a committed attempt before
+the nested effect, verify the configured Kernel services, and force a failure
+after an effect through actual Redis/Messenger retries. Redelivery must leave the
+consumed attempt intact without repeating the effect. Missing/future occurrences,
+lost commit acknowledgments and wrong-owner return markers cannot grant execution.
+This does not test automatic polling, deployment fencing or native console/media
+execution. No occurrence relay is enabled yet.
 
 The functional runner also supplies the isolated PostgreSQL/Redis environment
 aliases used by integration tests that need the full migrated schema and kernel.

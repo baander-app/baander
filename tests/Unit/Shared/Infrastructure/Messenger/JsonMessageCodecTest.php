@@ -19,6 +19,7 @@ use App\Notification\Application\DTO\SendWebhookCommand;
 use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Radio\Application\Command\SyncCountryStationsCommand;
 use App\Scheduler\Application\Command\ExecuteScheduledJobCommand;
+use App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand;
 use App\Shared\Domain\Event\Outbox\RelayOutboxCommand;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
@@ -44,6 +45,7 @@ final class JsonMessageCodecTest extends TestCase
         yield [new PruneMissingImagesCommand()];
         yield [new SyncCountryStationsCommand($id, 'de')];
         yield [new ExecuteScheduledJobCommand('job-id', 'command', 'command-name', ['limit' => 3])];
+        yield [new ExecuteScheduledOccurrenceCommand($id)];
         yield [new RelayOutboxCommand(50)];
         yield [new UpdateTranscodePositionCommand($id, 12.5, 'seek')];
     }
@@ -67,6 +69,27 @@ final class JsonMessageCodecTest extends TestCase
         $json = '{"format":"baander.message","version":1,"type":"metadata.extract_album_cover","payload":{"album_id":"00000000-0000-4000-8000-000000000001"},"metadata":{}}';
         self::assertSame($json, $codec->encode(new ExtractAlbumCoverCommand(Uuid::fromString('00000000-0000-4000-8000-000000000001'))));
         self::assertInstanceOf(ExtractAlbumCoverCommand::class, $codec->decode($json)->message);
+    }
+
+    public function testOccurrenceWireCarriesOnlyItsIdentity(): void
+    {
+        $id = Uuid::v7();
+        $codec = new JsonMessageCodec();
+        $wire = json_decode($codec->encode(new ExecuteScheduledOccurrenceCommand($id)), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('scheduler.execute_occurrence', $wire['type']);
+        self::assertSame(['occurrence_id' => $id->toString()], $wire['payload']);
+        $wire['payload']['command'] = 'app:untrusted-override';
+        $this->expectException(\InvalidArgumentException::class);
+        $codec->decode(json_encode($wire, JSON_THROW_ON_ERROR));
+    }
+
+    public function testOccurrenceWireRejectsInvalidIdentity(): void
+    {
+        $codec = new JsonMessageCodec();
+        $wire = json_decode($codec->encode(new ExecuteScheduledOccurrenceCommand(Uuid::v7())), true, flags: JSON_THROW_ON_ERROR);
+        $wire['payload']['occurrence_id'] = 'not-a-uuid';
+        $this->expectException(\InvalidArgumentException::class);
+        $codec->decode(json_encode($wire, JSON_THROW_ON_ERROR));
     }
 
     public function testSchedulerParametersPreserveNumericTypesAndArgumentOrder(): void

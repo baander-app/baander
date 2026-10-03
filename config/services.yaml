@@ -1023,6 +1023,15 @@ services:
     App\Scheduler\Application\Port\ScheduledJobPortInterface:
         alias: App\Scheduler\Infrastructure\Service\ScheduledJobService
 
+    # Occurrence admission must commit independently before effects; never share the ORM transaction.
+    App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceExecutionStore:
+        factory: ['App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceExecutionStore', 'fromDsn']
+        arguments:
+            $databaseUrl: '%env(resolve:DATABASE_URL)%'
+
+    App\Scheduler\Application\Port\SchedulerOccurrenceExecutionStoreInterface:
+        alias: App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceExecutionStore
+
     # --- Scheduler Registry ---
     App\Scheduler\Domain\Service\SchedulerRegistry:
         arguments:

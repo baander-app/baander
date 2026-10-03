@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Scheduler\Application\CommandHandler;
 
 use App\Scheduler\Application\Command\ExecuteScheduledJobCommand;
+use App\Scheduler\Application\DTO\SchedulerOccurrence;
 use App\Scheduler\Application\Port\ScheduledJobPortInterface;
 use App\Scheduler\Application\Exception\ScheduledConsoleCompletionUnknown;
 use App\Scheduler\Domain\Service\SchedulerRegistry;
@@ -38,10 +39,37 @@ final class ExecuteScheduledJobHandler
 
     public function __invoke(ExecuteScheduledJobCommand $command): void
     {
+        $this->execute($command, true);
+    }
+
+    /** Normal return includes cancellation and recorded failure; it is not a success receipt. */
+    public function executeOccurrence(SchedulerOccurrence $occurrence): void
+    {
+        $this->execute(new ExecuteScheduledJobCommand(
+            $occurrence->jobId->toString(),
+            $occurrence->jobType->value,
+            $occurrence->command,
+            $occurrence->parameters,
+        ), false);
+    }
+
+    private function execute(ExecuteScheduledJobCommand $command, bool $legacyLock): void
+    {
         $job = $this->scheduledJobService->getById(Uuid::fromString($command->jobId));
         if ($job === null) {
             $this->logger->warning('Scheduled job not found', ['jobId' => $command->jobId]);
 
+            return;
+        }
+
+        if (!$legacyLock && (
+            $job->getStatus() !== ScheduleStatus::Active
+            || $job->getJobType()->value !== $command->jobType
+            || $job->getCommand() !== $command->command
+            || $job->getParameters() !== $command->parameters
+            || json_encode($job->getParameters(), JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION)
+                !== json_encode($command->parameters, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION)
+        )) {
             return;
         }
 
@@ -61,7 +89,9 @@ final class ExecuteScheduledJobHandler
 
             $job->markFailed(sprintf('Command "%s" is not registered as schedulable.', $command->command));
             $this->scheduledJobService->save($job);
-            $this->releaseLock($command->jobId);
+            if ($legacyLock) {
+                $this->releaseLock($command->jobId);
+            }
 
             return;
         }
@@ -93,7 +123,9 @@ final class ExecuteScheduledJobHandler
         }
 
         $this->scheduledJobService->save($job);
-        $this->releaseLock($command->jobId);
+        if ($legacyLock) {
+            $this->releaseLock($command->jobId);
+        }
     }
 
     private function dispatchMessenger(ExecuteScheduledJobCommand $command): string
@@ -116,7 +148,7 @@ final class ExecuteScheduledJobHandler
             'type' => 'scheduled_console',
             'command' => $command->command,
             'parameters' => $command->parameters,
-        ], JSON_THROW_ON_ERROR);
+        ], JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION);
 
         $key = sprintf('scheduled_console:%s:%s', $command->jobId, Uuid::generate()->toString());
 
