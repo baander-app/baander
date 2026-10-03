@@ -706,11 +706,21 @@ expiry; it cannot recreate a missing key. Real Redis regressions force a success
 to take ownership at the old read/write boundary and verify that stale renewal
 and release leave its token and expiry intact.
 
-This fixes the Redis command race, not the encoding loop's ownership contract.
-The session handler still falls through after failed lock acquisition when no live
-session appears, and the subscriber only logs renewal failure while encoding
-continues. Its general failure handler also saves stale job state. Those paths need
-explicit rejection and ownership-loss cleanup without job mutation. The current
+Session startup now rejects failed lock acquisition if no live session appears
+during its bounded wait. It does not change retry state, save sessions or dispatch
+encoding work on that path. Retry and audio-language changes occur only after
+acquisition and the second live-session check. Both session creation and stream URL
+signing return a documented 503 with Retry-After when this refusal reaches HTTP,
+including through a single Messenger handler-failure chain. Mixed handler failures
+retain generic error handling. Signing starts tiers sequentially, so this does not
+roll back tiers already started before another tier refuses startup.
+Job lookup/creation still precedes lock acquisition and may persist a new pending
+job. Session creation and both list endpoints now reject absent users or users
+without a UUID accessor before invoking their application operations.
+
+The encoding loop's ownership contract remains incomplete. The subscriber only
+logs renewal failure while encoding continues, and its general failure handler
+saves stale job state. Ownership-loss cleanup must avoid job mutation. The current
 lock API stores one token per job in the service instance: a successful reacquisition
 replaces that token, so an older coroutine in the same instance can act on the new
 lease. Per-loop identity and conditional persistence remain required.

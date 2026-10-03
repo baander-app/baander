@@ -70,13 +70,18 @@ final class TranscodeSessionController
             new OA\Response(response: '201', description: 'Created', content: new OA\JsonContent(ref: new Model(type: TranscodeSessionResource::class))),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '503', description: 'Transcode startup is temporarily unavailable', headers: [
+                new OA\Header(header: 'Retry-After', schema: new OA\Schema(type: 'integer', example: 2)),
+            ], content: new OA\JsonContent(required: ['error'], properties: [
+                new OA\Property(property: 'error', ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ])),
         ],
     )]
     #[Route('/', name: 'create', methods: ['POST'])]
     public function create(#[MapRequestPayload] CreateTranscodeSessionRequest $payload): JsonResponse
     {
         $user = $this->security->getUser();
-        if ($user === null) {
+        if ($user === null || !method_exists($user, 'getId')) {
             return $this->unauthorized();
         }
 
@@ -108,7 +113,7 @@ final class TranscodeSessionController
     public function index(): JsonResponse
     {
         $user = $this->security->getUser();
-        if ($user === null) {
+        if ($user === null || !method_exists($user, 'getId')) {
             return $this->unauthorized();
         }
 
@@ -260,6 +265,9 @@ final class TranscodeSessionController
     public function listSessions(TranscodeSessionQueryPort $queryPort): JsonResponse
     {
         $user = $this->security->getUser();
+        if ($user === null || !method_exists($user, 'getId')) {
+            return $this->unauthorized();
+        }
         $sessions = $queryPort->findByUser(Uuid::fromString($user->getId()));
         return $this->successResponse(array_map(fn($d) => $d->toArray(), $sessions));
     }

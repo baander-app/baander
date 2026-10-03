@@ -5257,6 +5257,10 @@ export type PostStreamSigningSign200 = {
   exp?: number;
 };
 
+export type PostStreamSigningSign503 = {
+  error: ApiError;
+};
+
 export type GetTranscodeJobIndex200DataItem = {
   publicId?: string;
   status?: string;
@@ -5332,6 +5336,10 @@ export type PostTranscodeSessionCreateBody = {
   qualityTier?: PostTranscodeSessionCreateBodyQualityTier;
   audioProfile?: PostTranscodeSessionCreateBodyAudioProfile;
   priority?: PostTranscodeSessionCreateBodyPriority;
+};
+
+export type PostTranscodeSessionCreate503 = {
+  error: ApiError;
 };
 
 export type GetTranscodeSessionShow200Data = {
@@ -32130,10 +32138,15 @@ export type postStreamSigningSignResponse400 = {
   status: 400
 }
 
+export type postStreamSigningSignResponse503 = {
+  data: PostStreamSigningSign503
+  status: 503
+}
+
 export type postStreamSigningSignResponseSuccess = (postStreamSigningSignResponse200) & {
   headers: Headers;
 };
-export type postStreamSigningSignResponseError = (postStreamSigningSignResponse400) & {
+export type postStreamSigningSignResponseError = (postStreamSigningSignResponse400 | postStreamSigningSignResponse503) & {
   headers: Headers;
 };
 
@@ -32164,7 +32177,7 @@ export const postStreamSigningSign = async (postStreamSigningSignBody: PostStrea
 
 
 
-export const getPostStreamSigningSignMutationOptions = <TError = ErrorType<void>,
+export const getPostStreamSigningSignMutationOptions = <TError = ErrorType<void | PostStreamSigningSign503>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postStreamSigningSign>>, TError,{data: BodyType<PostStreamSigningSignBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postStreamSigningSign>>, TError,{data: BodyType<PostStreamSigningSignBody>}, TContext> => {
 
@@ -32193,12 +32206,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostStreamSigningSignMutationResult = NonNullable<Awaited<ReturnType<typeof postStreamSigningSign>>>
     export type PostStreamSigningSignMutationBody = BodyType<PostStreamSigningSignBody>
-    export type PostStreamSigningSignMutationError = ErrorType<void>
+    export type PostStreamSigningSignMutationError = ErrorType<void | PostStreamSigningSign503>
 
     /**
  * @summary Generate a signed URL for a stream resource
  */
-export const usePostStreamSigningSign = <TError = ErrorType<void>,
+export const usePostStreamSigningSign = <TError = ErrorType<void | PostStreamSigningSign503>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postStreamSigningSign>>, TError,{data: BodyType<PostStreamSigningSignBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postStreamSigningSign>>,
@@ -32899,10 +32912,15 @@ export type postTranscodeSessionCreateResponse422 = {
   status: 422
 }
 
+export type postTranscodeSessionCreateResponse503 = {
+  data: PostTranscodeSessionCreate503
+  status: 503
+}
+
 export type postTranscodeSessionCreateResponseSuccess = (postTranscodeSessionCreateResponse201) & {
   headers: Headers;
 };
-export type postTranscodeSessionCreateResponseError = (postTranscodeSessionCreateResponse401 | postTranscodeSessionCreateResponse422) & {
+export type postTranscodeSessionCreateResponseError = (postTranscodeSessionCreateResponse401 | postTranscodeSessionCreateResponse422 | postTranscodeSessionCreateResponse503) & {
   headers: Headers;
 };
 
@@ -32933,7 +32951,7 @@ export const postTranscodeSessionCreate = async (postTranscodeSessionCreateBody:
 
 
 
-export const getPostTranscodeSessionCreateMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+export const getPostTranscodeSessionCreateMutationOptions = <TError = ErrorType<ApiError | ValidationError | PostTranscodeSessionCreate503>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionCreate>>, TError,{data: BodyType<PostTranscodeSessionCreateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionCreate>>, TError,{data: BodyType<PostTranscodeSessionCreateBody>}, TContext> => {
 
@@ -32962,12 +32980,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostTranscodeSessionCreateMutationResult = NonNullable<Awaited<ReturnType<typeof postTranscodeSessionCreate>>>
     export type PostTranscodeSessionCreateMutationBody = BodyType<PostTranscodeSessionCreateBody>
-    export type PostTranscodeSessionCreateMutationError = ErrorType<ApiError | ValidationError>
+    export type PostTranscodeSessionCreateMutationError = ErrorType<ApiError | ValidationError | PostTranscodeSessionCreate503>
 
     /**
  * @summary Create a new transcode session
  */
-export const usePostTranscodeSessionCreate = <TError = ErrorType<ApiError | ValidationError>,
+export const usePostTranscodeSessionCreate = <TError = ErrorType<ApiError | ValidationError | PostTranscodeSessionCreate503>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionCreate>>, TError,{data: BodyType<PostTranscodeSessionCreateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postTranscodeSessionCreate>>,

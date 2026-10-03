@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Transcode\Application\CommandHandler;
 
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
+use App\Transcode\Application\Exception\TranscodeStartupUnavailableException;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\TranscodeLoopLockInterface;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
@@ -48,18 +49,6 @@ final class CreateTranscodeSessionHandler
             $command->getAudioLanguages(),
         );
 
-        // Set audio track languages on job if not already set
-        if (empty($job->getAudioTrackLanguages()) && !empty($command->getAudioLanguages())) {
-            $job->setAudioTrackLanguages($command->getAudioLanguages());
-        }
-
-        // A failed or cancelled job becomes runnable again when a new session
-        // attaches — the encoding loop reuses any segments already on disk.
-        $wasRetried = in_array($job->getStatus(), [TranscodeStatus::Failed, TranscodeStatus::Cancelled], true);
-        if ($wasRetried) {
-            $job->retry();
-        }
-
         // Fast path: if a live session already exists, reuse it immediately.
         $liveSession = $this->findLiveSession($job->getId());
         if ($liveSession !== null) {
@@ -75,8 +64,7 @@ final class CreateTranscodeSessionHandler
                 return $liveSession;
             }
 
-            // No session appeared — fallback to the stale-session recovery path
-            // below, which may mark old sessions failed and start a new loop.
+            throw new TranscodeStartupUnavailableException();
         }
 
         // We hold the lock. Re-check the DB: another worker may have created a
@@ -86,6 +74,16 @@ final class CreateTranscodeSessionHandler
             $this->loopLock->release($job->getId());
 
             return $liveSession;
+        }
+
+        // Mutate retry state only after obtaining ownership and confirming that
+        // another startup has not already supplied a live session.
+        if (empty($job->getAudioTrackLanguages()) && !empty($command->getAudioLanguages())) {
+            $job->setAudioTrackLanguages($command->getAudioLanguages());
+        }
+        $wasRetried = in_array($job->getStatus(), [TranscodeStatus::Failed, TranscodeStatus::Cancelled], true);
+        if ($wasRetried) {
+            $job->retry();
         }
 
         // A retried job skips the stale-session recovery: old sessions are

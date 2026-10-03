@@ -42,6 +42,11 @@ final class StreamSigningController
         responses: [
             new OA\Response(response: '200', description: 'Signed URL generated', content: new OA\JsonContent(properties: [new OA\Property(property: 'url', type: 'string'), new OA\Property(property: 'sig', type: 'string'), new OA\Property(property: 'exp', type: 'integer')])),
             new OA\Response(response: '400', description: 'Invalid request'),
+            new OA\Response(response: '503', description: 'Transcode startup is temporarily unavailable', headers: [
+                new OA\Header(header: 'Retry-After', schema: new OA\Schema(type: 'integer', example: 2)),
+            ], content: new OA\JsonContent(required: ['error'], properties: [
+                new OA\Property(property: 'error', ref: new \Nelmio\ApiDocBundle\Attribute\Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ])),
         ],
     )]
     #[Route('/sign', name: 'sign', methods: ['POST'])]
