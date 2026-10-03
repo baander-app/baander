@@ -48,41 +48,22 @@ make stop && make start
 
 OAuth keys sign JWT access tokens. Rotating them invalidates all existing access and refresh tokens — all API clients must re-authenticate.
 
-### Using the command (recommended)
+### Staged offline rotation
 
-The `app:auth:rotate-secrets` command automates the full rotation:
+Use [the rotation runbook](commands/app-auth-rotate-secrets.md) to prepare and
+validate a protected bundle without touching active secrets. Drain traffic and
+stop every issuer, resource server, and background worker before running
+`invalidate --offline`. This flag is an operator assertion, not an automatic fence.
 
-```bash
-make exec cmd="php bin/console app:auth:rotate-secrets"
-```
+The command deletes OAuth grants and metadata in one PostgreSQL transaction, then
+clears the token cache. Keep all instances stopped through retries and installation
+of the bundle's three `OAUTH_*` configuration values. Restart and verify fresh
+authentication before resuming traffic. Never retry invalidation after resuming.
 
-This backs up existing keys, generates a new key pair, truncates OAuth token tables, invalidates the token cache, and outputs the new encryption key. Follow the printed instructions to add the encryption key and restart.
-
-### Manual rotation
-
-For zero-downtime key rotation (where existing tokens remain valid until they naturally expire), manual key replacement is required:
-
-1. **Generate a new key pair:**
-
-```bash
-openssl genrsa -out config/secrets/oauth/private-new.key 2048
-openssl rsa -in config/secrets/oauth/private-new.key -pubout > config/secrets/oauth/public-new.key
-```
-
-2. **Replace the keys:**
-
-```bash
-mv config/secrets/oauth/private.key config/secrets/oauth/private-old.key
-mv config/secrets/oauth/public.key config/secrets/oauth/public-old.key
-mv config/secrets/oauth/private-new.key config/secrets/oauth/private.key
-mv config/secrets/oauth/public-new.key config/secrets/oauth/public.key
-```
-
-3. **Restart:**
-
-```bash
-make stop && make start
-```
+The command retains active files unchanged and prints no new secret. Preserve the
+old configuration for startup recovery; restoring keys cannot restore deleted
+grants. This procedure requires downtime. Replacing the signing key alone does
+not provide a zero-downtime transition for existing tokens.
 
 ## Rotating Redis Password
 
@@ -188,8 +169,8 @@ There is no shortcut — rotate everything:
 NEW_SECRET=$(php -r 'echo bin2hex(random_bytes(32));')
 echo "Rotate APP_SECRET to: $NEW_SECRET"
 
-# 2. Rotate OAuth keys (also generates new encryption key and invalidates tokens)
-make exec cmd="php bin/console app:auth:rotate-secrets"
+# 2. Follow the staged offline OAuth rotation runbook linked above.
+# Keep every instance stopped through invalidation and configuration replacement.
 
 # 3. Generate new VAPID keys
 make exec cmd="php bin/console app:generate-vapid-keys"

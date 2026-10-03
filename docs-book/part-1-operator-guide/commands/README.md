@@ -105,7 +105,7 @@ own exit code without JSON. Error output contains no credentials or raw diagnost
 
 | Command | Description |
 |---------|-------------|
-| [app:auth:rotate-secrets](app-auth-rotate-secrets.md) | Rotate OAuth keys and invalidate all tokens |
+| [app:auth:rotate-secrets](app-auth-rotate-secrets.md) | Prepare an OAuth bundle and invalidate grants during offline cutover |
 | [app:auth:setup-clients](app-auth-setup-clients.md) | Create OAuth2 password clients for the SPA and Electron app |
 | [app:oauth:generate-keys](app-oauth-generate-keys.md) | Generate OAuth2 private and public keys for JWT signing |
 | [app:user:create](app-user-create.md) | Create a new user account |

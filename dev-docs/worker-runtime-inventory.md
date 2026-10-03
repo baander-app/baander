@@ -601,8 +601,13 @@ RSA keys. Health diagnostics use the injected secret rather than requiring a sec
 copy in `getenv()`. Non-production fallback keys remain unsuitable across workers.
 The strict worker recipe currently admits no key mounts, so authenticated web/OAuth
 deployment remains a separate configuration and acceptance task. Secret rotation
-also remains unfinished: `RotateSecretsCommand` writes new key files before token
-invalidation and incorrectly calls `rowCount()` on DBAL's integer return value.
+now prepares a separate validated bundle without overwriting active files. Explicit
+`invalidate --offline` deletes all five OAuth grant/metadata tables transactionally,
+then clears the same tagged cache used by token repositories. The flag is an
+operator assertion: every issuer, resource server and worker must remain stopped
+through retries and configuration installation. Cache failures and uncertain
+commits require offline recovery; there is no automatic global fence or online
+atomic cutover. See the operator rotation runbook for installation and recovery.
 
 The first command facade is now wired. `app:serve` is the canonical name of the
 existing `ServerRunCommand`, retaining `swoole:server:run` as an alias and preserving

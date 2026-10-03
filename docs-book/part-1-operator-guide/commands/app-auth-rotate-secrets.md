@@ -1,58 +1,76 @@
 # app:auth:rotate-secrets
 
-Rotate OAuth 2.0 keys, generate a new encryption key, and invalidate all existing tokens. Use this when you suspect a secret leak, when a team member with key access leaves, or as part of regular security maintenance.
+Prepare a new OAuth secret bundle and invalidate existing grants during an offline
+cutover. This is a one-shot operator command. It does not stop services, install
+configuration, or replace active key files.
 
-## Quick start
+## Prepare and inspect
 
-```bash
-make exec cmd="php bin/console app:auth:rotate-secrets"
-```
-
-With a larger key size:
-
-```bash
-make exec cmd="php bin/console app:auth:rotate-secrets --key-size=4096"
-```
-
-## Options
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--key-size` | `2048` | RSA key size in bits: `2048` or `4096` |
-
-## What the command does
-
-1. **Backs up** the existing private and public keys to `.old` files
-2. **Generates** a new RSA key pair and replaces the key files
-3. **Generates** a new encryption key (for authorization code encryption)
-4. **Truncates** all OAuth token tables (`oauth_access_tokens`, `oauth_refresh_tokens`, `oauth_auth_codes`)
-5. **Invalidates** the OAuth token cache
-6. **Outputs** the new encryption key and next steps
-
-## Action required after running
-
-The command generates a new encryption key that you must add to your configuration. It will be printed in the output — add it to your `.env` file:
-
-```
-AUTH_ENCRYPTION_KEY=<printed_value>
-```
-
-Then restart the application:
+Run the command as the account that will own the secret files. Use a new absolute
+bundle directory under an existing, canonical parent owned by that account and
+not writable by its group or others. Paths may contain ASCII letters, digits,
+slashes, underscores, dots, and hyphens. Symlink paths are rejected.
 
 ```bash
-make stop && make start
+php bin/console app:auth:rotate-secrets prepare --directory=/srv/baander/secrets/oauth-2026-10 --key-size=2048
+php bin/console app:auth:rotate-secrets validate --directory=/srv/baander/secrets/oauth-2026-10
 ```
 
-## Exit codes
+The supported RSA sizes are 2048 (default) and 4096 bits. The command creates a
+private directory containing `private.key`, `public.key`, `encryption.key`,
+`oauth.env`, and a versioned checksum manifest. Validation checks file ownership,
+permissions, file types, checksums, the RSA pair, the encryption key, and the exact
+configuration entries. It prints the configuration path, never secret values.
+The bundle is never overwritten by this command; a failed preparation requires a
+new directory. Keep any incomplete bundle private while investigating.
 
-| Code | Meaning |
-|------|---------|
-| 0 | Secrets rotated successfully |
-| 1 | Invalid key size, missing key files, or generation failure |
+`oauth.env` contains `OAUTH_PRIVATE_KEY_PATH`, `OAUTH_PUBLIC_KEY_PATH`, and
+`OAUTH_ENCRYPTION_KEY`. Provision these values through the deployment's secret
+provider. The paths must resolve to the same validated files in every application
+instance; container deployments must mount them at those paths. Preserve the old
+configuration and files securely before changing anything.
 
-## Tips
+## Offline cutover
 
-- All users will be logged out and must re-authenticate after running this command.
-- The old keys are backed up to `<keyfile>.old` — remove them once you've confirmed everything works.
-- For zero-downtime key rotation (where existing tokens remain valid), manual key replacement is required instead. See the [security guide](../security.md#rotating-oauth-20-keys).
-- Running this in production will immediately invalidate every active API session.
+1. Drain incoming traffic and stop **all** token issuers, resource servers, and
+   background workers across every instance. Keep them stopped through database
+   invalidation, any retries, and configuration replacement.
+2. Run the operator command with PostgreSQL and the configured token cache
+   reachable:
+
+   ```bash
+   php bin/console app:auth:rotate-secrets invalidate --directory=/srv/baander/secrets/oauth-2026-10 --offline
+   ```
+
+   `--offline` is your assertion that all application processes are stopped. The
+   command cannot detect or fence another running instance. It validates the
+   bundle, deletes access tokens, refresh tokens, authorization codes, device
+   codes, and token metadata in one database transaction, then invalidates the
+   token cache. The reported count includes metadata rows. Clients, scopes, and
+   users are preserved.
+3. After success, install all three values from `oauth.env` while applications
+   remain stopped. Deploy the same bundle to every instance.
+4. Restart every instance, verify fresh authentication and protected API access,
+   then resume traffic. Existing clients must authenticate again. Never repeat
+   `invalidate` after service resumes: it would delete newly issued grants.
+
+This procedure requires downtime. Database deletion, cache cleanup, and installing
+configuration are separate operations; there is no distributed atomic cutover.
+Replacing a signing key alone does not preserve tokens signed by the old key.
+
+## Failure and recovery
+
+| Result | Operator action |
+|---|---|
+| Bundle preparation or validation fails | No token invalidation was attempted. Inspect permissions and files; use a new directory for another preparation. |
+| Token invalidation is unconfirmed | Keep all instances offline. A lost commit acknowledgement may mean deletion committed. Restore database connectivity and repeat invalidation with the same validated bundle. |
+| Database committed, cache cleanup unconfirmed | Keep all instances offline. Restore cache connectivity and repeat invalidation with the same bundle. A zero-row retry still clears the token cache. |
+| Configuration installation or restart fails | Keep traffic drained. Correct the configuration or restore the retained old configuration and key files consistently across all instances. Deleted grants cannot be recovered by restoring keys; clients still need fresh authentication. |
+
+Offline retries are safe only while no process can issue new grants. Do not switch
+configuration or resume service after an unconfirmed invalidation. Retain the old
+bundle according to your secret-retention policy after verifying recovery.
+
+Exit status is `0` for a confirmed successful action, `1` for an operational
+failure, and `2` for invalid action/options. `--offline` is required only for
+`invalidate`; `--key-size` applies only to `prepare`.

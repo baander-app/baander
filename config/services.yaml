@@ -344,10 +344,15 @@ services:
             $publicKeyPath: '%auth.public_key_path%'
             $resourceServerUri: '%auth.oauth.issuer%'
 
-    App\Auth\Interface\Console\RotateSecretsCommand:
+    App\Auth\Application\Port\OAuthSecretBundleInterface:
+        alias: App\Auth\Infrastructure\Security\OAuth\StagedOAuthSecretBundle
+
+    App\Auth\Application\Port\OAuthTokenInvalidatorInterface:
+        alias: App\Auth\Infrastructure\Security\OAuth\DoctrineOAuthTokenInvalidator
+
+    App\Auth\Infrastructure\Security\OAuth\DoctrineOAuthTokenInvalidator:
         arguments:
-            $privateKeyPath: '%auth.private_key_path%'
-            $publicKeyPath: '%auth.public_key_path%'
+            $cache: '@cache.tags'
 
     # --- Scope Allowlist ---
     App\Auth\Application\ScopeAllowlist:
