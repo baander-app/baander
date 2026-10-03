@@ -7,7 +7,8 @@ namespace App\Scheduler\Infrastructure\Doctrine\Entity;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
 
-#[ORM\Entity]
+// Updates/deletes belong to the revision-checking DBAL repository, never managed-entity flush.
+#[ORM\Entity(readOnly: true)]
 #[ORM\Table(name: 'scheduled_jobs')]
 #[ORM\Index(name: 'idx_scheduled_jobs_status', columns: ['status'])]
 #[ORM\Index(name: 'idx_scheduled_jobs_next_run_at', columns: ['next_run_at'])]
@@ -17,6 +18,9 @@ class ScheduledJobEntity
     #[ORM\Column(type: 'uuid')]
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
+
+    #[ORM\Column(type: 'uuid')]
+    private Uuid $revision;
 
     #[ORM\Column(type: 'text')]
     private string $name;
@@ -68,11 +72,17 @@ class ScheduledJobEntity
     public function __construct(Uuid $id)
     {
         $this->id = $id;
+        $this->revision = Uuid::v7();
     }
 
     public function getId(): Uuid
     {
         return $this->id;
+    }
+
+    public function getRevision(): Uuid
+    {
+        return $this->revision;
     }
 
     public function getName(): string

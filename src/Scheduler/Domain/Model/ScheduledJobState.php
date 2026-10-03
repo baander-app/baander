@@ -30,6 +30,8 @@ final class ScheduledJobState
         public int $runCount = 0,
         public ?DateTimeImmutable $lastFailureAt = null,
         public ?string $lastError = null,
+        /** Null only for an unsaved job; discard snapshots after transaction rollback. */
+        public ?Uuid $revision = null,
     ) {
     }
 }

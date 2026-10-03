@@ -25667,10 +25667,15 @@ export type putAdminSchedulerUpdateResponse404 = {
   status: 404
 }
 
+export type putAdminSchedulerUpdateResponse409 = {
+  data: ApiError
+  status: 409
+}
+
 export type putAdminSchedulerUpdateResponseSuccess = (putAdminSchedulerUpdateResponse200) & {
   headers: Headers;
 };
-export type putAdminSchedulerUpdateResponseError = (putAdminSchedulerUpdateResponse404) & {
+export type putAdminSchedulerUpdateResponseError = (putAdminSchedulerUpdateResponse404 | putAdminSchedulerUpdateResponse409) & {
   headers: Headers;
 };
 
@@ -25758,10 +25763,15 @@ export type deleteAdminSchedulerDeleteResponse404 = {
   status: 404
 }
 
+export type deleteAdminSchedulerDeleteResponse409 = {
+  data: ApiError
+  status: 409
+}
+
 export type deleteAdminSchedulerDeleteResponseSuccess = (deleteAdminSchedulerDeleteResponse204) & {
   headers: Headers;
 };
-export type deleteAdminSchedulerDeleteResponseError = (deleteAdminSchedulerDeleteResponse404) & {
+export type deleteAdminSchedulerDeleteResponseError = (deleteAdminSchedulerDeleteResponse404 | deleteAdminSchedulerDeleteResponse409) & {
   headers: Headers;
 };
 
@@ -25847,10 +25857,15 @@ export type postAdminSchedulerPauseResponse404 = {
   status: 404
 }
 
+export type postAdminSchedulerPauseResponse409 = {
+  data: ApiError
+  status: 409
+}
+
 export type postAdminSchedulerPauseResponseSuccess = (postAdminSchedulerPauseResponse200) & {
   headers: Headers;
 };
-export type postAdminSchedulerPauseResponseError = (postAdminSchedulerPauseResponse404) & {
+export type postAdminSchedulerPauseResponseError = (postAdminSchedulerPauseResponse404 | postAdminSchedulerPauseResponse409) & {
   headers: Headers;
 };
 
@@ -25936,10 +25951,15 @@ export type postAdminSchedulerResumeResponse404 = {
   status: 404
 }
 
+export type postAdminSchedulerResumeResponse409 = {
+  data: ApiError
+  status: 409
+}
+
 export type postAdminSchedulerResumeResponseSuccess = (postAdminSchedulerResumeResponse200) & {
   headers: Headers;
 };
-export type postAdminSchedulerResumeResponseError = (postAdminSchedulerResumeResponse404) & {
+export type postAdminSchedulerResumeResponseError = (postAdminSchedulerResumeResponse404 | postAdminSchedulerResumeResponse409) & {
   headers: Headers;
 };
 
@@ -26114,10 +26134,15 @@ export type postAdminSchedulerEnableResponse404 = {
   status: 404
 }
 
+export type postAdminSchedulerEnableResponse409 = {
+  data: ApiError
+  status: 409
+}
+
 export type postAdminSchedulerEnableResponseSuccess = (postAdminSchedulerEnableResponse200) & {
   headers: Headers;
 };
-export type postAdminSchedulerEnableResponseError = (postAdminSchedulerEnableResponse404) & {
+export type postAdminSchedulerEnableResponseError = (postAdminSchedulerEnableResponse404 | postAdminSchedulerEnableResponse409) & {
   headers: Headers;
 };
 
@@ -26203,10 +26228,15 @@ export type postAdminSchedulerDisableResponse404 = {
   status: 404
 }
 
+export type postAdminSchedulerDisableResponse409 = {
+  data: ApiError
+  status: 409
+}
+
 export type postAdminSchedulerDisableResponseSuccess = (postAdminSchedulerDisableResponse200) & {
   headers: Headers;
 };
-export type postAdminSchedulerDisableResponseError = (postAdminSchedulerDisableResponse404) & {
+export type postAdminSchedulerDisableResponseError = (postAdminSchedulerDisableResponse404 | postAdminSchedulerDisableResponse409) & {
   headers: Headers;
 };
 

@@ -26,11 +26,12 @@ use Doctrine\DBAL\Tools\DsnParser;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Psr\Log\NullLogger;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 
-/** Real configured ORM and independently committed JSON observation; only uniquely owned rows are cleaned up. */
+/** Configured revision-checking DBAL repository, ORM metadata and committed JSON observation; only owned rows are cleaned up. */
 #[SkipDatabaseRollback]
 final class ScheduledJobParameterPersistenceTest extends TestCase
 {
@@ -117,9 +118,9 @@ final class ScheduledJobParameterPersistenceTest extends TestCase
         $executor = new ExecuteScheduledJobHandler($jobPort, new SchedulerRegistry([new PersistedSchedulerParametersMessage(1, 1.0, -0.0, 1.0e18, [], 'scheduler@baander.app')], []),
             $bus, $pool, $redis, new NullLogger(), $console);
         $executor->executeOccurrence($snapshot);
-        self::assertSame('dispatched', $rehydrated->getLastResult(), 'The unchanged ORM configuration must not falsely cancel its exact snapshot.');
+        self::assertSame('dispatched', $rehydrated->getLastResult(), 'The unchanged persisted configuration must not falsely cancel its exact snapshot.');
 
-        // Exercise detectable type/order updates; signed-zero-only dirty checking is a separate ORM limitation.
+        // Exercise type/order updates separately from the signed-zero-only regression below.
         $updated = ['address' => $parameters['address'], 'nested' => $parameters['nested'], 'exponent' => 1.0e18, 'zero' => -0.0, 'alpha' => 1, 'zeta' => 1.0];
         $rehydrated->getState()->parameters = $updated;
         $this->jobs->save($rehydrated);
@@ -142,10 +143,41 @@ final class ScheduledJobParameterPersistenceTest extends TestCase
         $actual = $schemaManager->introspectTable('scheduled_jobs');
         $difference = $schemaManager->createComparator()->compareTables($actual, $expected);
         self::assertArrayNotHasKey('parameters', $difference->getChangedColumns(), 'Only parameter mapping drift is in scope; unrelated existing column differences are not suppressed globally.');
+        self::assertArrayNotHasKey('revision', $difference->getChangedColumns(), 'The revision mapping must match its physical UUID column.');
+        self::assertTrue($actual->getColumn('revision')->getNotnull());
         foreach ([...$difference->getAddedColumns(), ...$difference->getDroppedColumns()] as $column) {
             self::assertNotSame('parameters', $column->getName());
+            self::assertNotSame('revision', $column->getName());
         }
         self::assertSame('json', $this->observer->fetchOne("SELECT format_type(a.atttypid, a.atttypmod) FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = current_schema() AND c.relname = 'scheduled_jobs' AND a.attname = 'parameters' AND NOT a.attisdropped"));
+        self::assertSame('uuid', $this->observer->fetchOne("SELECT format_type(a.atttypid, a.atttypmod) FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = current_schema() AND c.relname = 'scheduled_jobs' AND a.attname = 'revision' AND NOT a.attisdropped"));
+    }
+
+    /** @return iterable<string, array{float, float}> */
+    public static function signedZeroChanges(): iterable
+    {
+        yield 'positive to negative' => [0.0, -0.0];
+        yield 'negative to positive' => [-0.0, 0.0];
+    }
+
+    #[DataProvider('signedZeroChanges')]
+    public function testSignedZeroOnlyParameterSaveIsCommittedAndReloaded(float $before, float $after): void
+    {
+        $job = ScheduledJob::create('Signed zero ' . bin2hex(random_bytes(6)), '* * * * *', JobType::Console, 'app:zero-fixture', parameters: ['zero' => $before]);
+        $this->jobId = $job->getId();
+        $this->jobs->save($job);
+        $this->manager->clear();
+        $loaded = $this->jobs->findByUuid($job->getId());
+        self::assertInstanceOf(ScheduledJob::class, $loaded);
+        // Deliberately change no other field: PHP/Doctrine strict array equality treats both signed zeros as equal.
+        $loaded->getState()->parameters = ['zero' => $after];
+        $this->jobs->save($loaded);
+        $expected = json_encode(['zero' => $after], JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION);
+        self::assertSame($expected, $this->observer->fetchOne('SELECT parameters::text FROM scheduled_jobs WHERE id = :id', ['id' => $job->getId()->toString()]));
+        $this->manager->clear();
+        $fresh = $this->jobs->findByUuid($job->getId());
+        self::assertInstanceOf(ScheduledJob::class, $fresh);
+        self::assertSame($expected, json_encode($fresh->getParameters(), JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION));
     }
 
     protected function tearDown(): void

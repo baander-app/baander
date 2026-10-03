@@ -121,6 +121,7 @@ final class AdminScheduledJobController
             new OA\Response(response: '200', description: 'Job updated', content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'data', ref: new Model(type: ScheduledJobResource::class)),
             ])),
+            new OA\Response(response: '409', description: 'Job changed concurrently; reload before retrying', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
@@ -151,6 +152,7 @@ final class AdminScheduledJobController
         summary: 'Delete a scheduled job',
         responses: [
             new OA\Response(response: '204', description: 'Job deleted'),
+            new OA\Response(response: '409', description: 'Job changed concurrently; reload before retrying', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
@@ -174,6 +176,7 @@ final class AdminScheduledJobController
             new OA\Response(response: '200', description: 'Job paused', content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'data', ref: new Model(type: ScheduledJobResource::class)),
             ])),
+            new OA\Response(response: '409', description: 'Job changed concurrently; reload before retrying', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
@@ -198,6 +201,7 @@ final class AdminScheduledJobController
             new OA\Response(response: '200', description: 'Job resumed', content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'data', ref: new Model(type: ScheduledJobResource::class)),
             ])),
+            new OA\Response(response: '409', description: 'Job changed concurrently; reload before retrying', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
@@ -251,6 +255,7 @@ final class AdminScheduledJobController
             new OA\Response(response: '200', description: 'Job enabled', content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'data', ref: new Model(type: ScheduledJobResource::class)),
             ])),
+            new OA\Response(response: '409', description: 'Job changed concurrently; reload before retrying', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
@@ -275,6 +280,7 @@ final class AdminScheduledJobController
             new OA\Response(response: '200', description: 'Job disabled', content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'data', ref: new Model(type: ScheduledJobResource::class)),
             ])),
+            new OA\Response(response: '409', description: 'Job changed concurrently; reload before retrying', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]

@@ -12454,6 +12454,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "Job changed concurrently; reload before retrying",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Job not found",
                         "content": {
@@ -12485,6 +12495,16 @@
                 "responses": {
                     "204": {
                         "description": "Job deleted"
+                    },
+                    "409": {
+                        "description": "Job changed concurrently; reload before retrying",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     },
                     "404": {
                         "description": "Job not found",
@@ -12532,6 +12552,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "Job changed concurrently; reload before retrying",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Job not found",
                         "content": {
@@ -12574,6 +12604,16 @@
                                         }
                                     },
                                     "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Job changed concurrently; reload before retrying",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -12670,6 +12710,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "Job changed concurrently; reload before retrying",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Job not found",
                         "content": {
@@ -12712,6 +12762,16 @@
                                         }
                                     },
                                     "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Job changed concurrently; reload before retrying",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }

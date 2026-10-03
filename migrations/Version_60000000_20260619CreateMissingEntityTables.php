@@ -95,6 +95,7 @@ final class Version620260619CreateMissingEntityTables extends AbstractMigration
 
         $this->addSql('CREATE TABLE IF NOT EXISTS scheduled_jobs (
             id UUID NOT NULL,
+            revision UUID NOT NULL,
             name TEXT NOT NULL,
             expression TEXT NOT NULL,
             job_type TEXT NOT NULL,

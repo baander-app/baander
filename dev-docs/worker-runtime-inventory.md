@@ -541,7 +541,7 @@ when a schedule is deleted. A future dispatcher must recheck execution authority
 the retained snapshot is not permission to run a deleted or paused schedule.
 
 Scheduled-job parameter storage now also uses native PostgreSQL `json`, so the
-source ORM snapshot preserves argument order, integral exponent floats and signed
+source schedule snapshot preserves argument order, integral exponent floats and signed
 zero before an occurrence is recorded. Installed and locked DBAL 4.4.3 already
 encode with `JSON_PRESERVE_ZERO_FRACTION`; no custom serializer is needed. The
 fresh-install schedule migration and ORM mapping agree. This history rewrite does
@@ -551,16 +551,35 @@ The source-parameter, occurrence, guard and schema checks pass 26 tests with
 observer, cleared ORM state, type/order updates, immutable intent retention and
 parameter-column schema comparison.
 
+Schedule persistence now uses a UUID revision carried by each domain snapshot.
+New snapshots insert only; saves and deletes compare the expected revision in the
+same PostgreSQL statement. Every successful save rotates the token, including an
+otherwise unchanged save. Deleted records cannot be recreated by stale execution
+saves, and recreating an identifier does not revive an old token. Administrative
+conflicts return HTTP 409 and require reloading before retrying.
+
+The repository reads and writes through the entity manager's DBAL connection,
+bypassing its identity map and array dirty checking. Explicit JSON encoding retains
+signed-zero-only parameter edits. Entity metadata remains for schema tooling;
+schedule writes belong to this repository. A save inside a caller transaction is
+provisional until commit. After rollback or uncertain commit, discard affected
+snapshots and reload; the repository does not commit the caller's transaction.
+
+Revision persistence, signed-zero edits, existing repository behavior and occurrence
+execution pass 108 integration/functional tests with 943 assertions on disposable
+PostgreSQL/Redis after fresh and repeat migrations. The handler race test edits and
+pauses through an independent repository during console execution, then verifies
+that the final stale result cannot overwrite the newer row. The unit suite passes
+3,449 tests with 12,455 assertions, including HTTP conflict mapping; focused PHPStan
+and web/shared TypeScript checks also pass.
+
 Recovery cursors still need their own transactional design. `updatedAt` changes
 when execution starts or finishes, and `nextRunAt` is recalculated from the current
-time; neither is an evaluated-minute watermark. A stale execution save can still
-overwrite a concurrent schedule edit or pause. Add revision protection before
-materializing missed ticks, and advance a durable UTC cursor in the same transaction
-as all intents for the evaluated range. Schedule edits and resumes need an explicit
-policy for unrecorded earlier minutes, rather than inferring historical settings.
-Doctrine's array dirty checking also treats a signed-zero-only edit as unchanged;
-that separate change-detection limitation remains to be addressed with versioned
-schedule persistence.
+time; neither is an evaluated-minute watermark. Advance a durable UTC cursor in the
+same transaction as all intents for the evaluated range. Schedule edits and resumes
+need an explicit policy for unrecorded earlier minutes, rather than inferring
+historical settings. Revision conflicts preserve newer settings but do not stop
+already running effects or authorize retrying an execution.
 
 Parameters use bounded native PostgreSQL `json`, deliberately preserving lexical
 numbers and argument order rather than normalizing them through `jsonb`. The
