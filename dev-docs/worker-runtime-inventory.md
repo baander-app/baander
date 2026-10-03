@@ -356,7 +356,7 @@ helper described below supplies the parent-side deadline; observing a database
 token alone is not permission to launch. A real kernel/introspection check
 confirms ORM schema diffs exclude the DBAL-owned lease table, while normal entity
 tables remain visible. Fresh installation and repeat migration runs pass.
-The canonical messaging/PostgreSQL suite passes 124 tests with 1,395 assertions,
+The canonical messaging/PostgreSQL suite passes 125 tests with 1,413 assertions,
 including seven database lease cases, 14 fresh-process lease-helper cases and
 nine external-controller database coordination cases, 16 inventory cases, seven registered-recovery cases and
 14 startup cases plus 24 creation/reconciliation cases. The schema check passes one
@@ -391,7 +391,7 @@ without acknowledging containment or releasing the deployment lease. Invalid clo
 readings still trigger initial stop attempts, then propagate to the outer owner
 for containment. Real-process tests cover delayed acquisition, denied grants,
 hung renewal, expiry during sibling launches and clock failure. The combined unit
-and static-analysis-rule suite passes 3,414 tests with 12,225 assertions; focused
+and static-analysis-rule suite passes 3,416 tests with 12,232 assertions; focused
 production PHPStan passes. These are correctness checks, not capacity measurements.
 
 `scripts/test-worker-containment-container.sh` exercises this core as PID 1 in a
@@ -552,12 +552,28 @@ metadata, execution receipts and explicit handling of uncertain side effects mus
 precede automatic dispatch recovery. It does not resolve missed ticks, authorize
 execution, or provide exactly-once effects by itself.
 
+Occurrence execution must also be separated from the legacy handler's lock
+cleanup: that handler unconditionally deletes `scheduler:lock:<jobId>`, which an
+occurrence consumer would not own. Reusing it directly could unlock unrelated
+work. The existing handler checks the command registry, but not paused/disabled
+status or deployment authority. These checks need an explicit occurrence execution
+policy. A normal return does not prove completion: the handler catches failures,
+and an unknown console result can leave a child running. A committed one-shot
+attempt must therefore remain consumed after uncertain outcomes; a return receipt
+must not be treated as successful effects or permission to retry.
+
 The occurrence and schema-introspection checks pass 19 tests with 91 assertions on
 disposable PostgreSQL after all 17 migrations and a repeat no-op migration run.
 They cover actual unique-key contention, independent visibility, failed and
 uncertain commits, immutable retry snapshots and physical schema constraints.
 Baseline-free PHPStan level 6 passes for the new production code, migration and
 tests.
+
+The shared message codec now preserves integral float tokens as well as signed
+zero when encoding JSON. Without this, Redis deliveries could turn a stored
+`1.0` parameter into integer `1`, changing invocation types or conflicting with
+an immutable occurrence snapshot. Argument order is retained. The wire format and
+field schema remain version 1; this does not add occurrence execution metadata.
 
 This is source inspection of routing, all application Bootable implementations,
 timer/coroutine creation sites, tagged CPU handlers, scheduler providers, private

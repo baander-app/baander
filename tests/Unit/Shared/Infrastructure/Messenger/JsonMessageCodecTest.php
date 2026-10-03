@@ -38,7 +38,7 @@ final class JsonMessageCodecTest extends TestCase
         yield [new SyncSongMessage($id, true)];
         yield [new SyncAlbumMessage($id)];
         yield [new SyncLibraryMessage($id, true, true, true)];
-        yield [new SendEmailCommand($id, 'test@example.com', NotificationCategory::Security, 'title', 'body', new \DateTimeImmutable('2026-10-01T12:00:00.000+00:00'))];
+        yield [new SendEmailCommand($id, 'test@baander.app', NotificationCategory::Security, 'title', 'body', new \DateTimeImmutable('2026-10-01T12:00:00.000+00:00'))];
         yield [new SendPushCommand($id, NotificationCategory::Security, 'title', 'body', 'notification')];
         yield [new SendWebhookCommand($id, NotificationCategory::Security, 'title', 'body', 'notification')];
         yield [new PruneMissingImagesCommand()];
@@ -67,6 +67,51 @@ final class JsonMessageCodecTest extends TestCase
         $json = '{"format":"baander.message","version":1,"type":"metadata.extract_album_cover","payload":{"album_id":"00000000-0000-4000-8000-000000000001"},"metadata":{}}';
         self::assertSame($json, $codec->encode(new ExtractAlbumCoverCommand(Uuid::fromString('00000000-0000-4000-8000-000000000001'))));
         self::assertInstanceOf(ExtractAlbumCoverCommand::class, $codec->decode($json)->message);
+    }
+
+    public function testSchedulerParametersPreserveNumericTypesAndArgumentOrder(): void
+    {
+        $parameters = [
+            'integer' => 1,
+            'integral_float' => 1.0,
+            'fraction' => 1.25,
+            'large_exponent' => 1.0e18,
+            'small_exponent' => 1.0e-7,
+            'zero' => 0.0,
+            'negative_zero' => -0.0,
+            'nested' => [
+                'list' => [1, 1.0, -0.0],
+                'positional' => [2 => 'first', 0 => 'second'],
+                'named' => ['z' => 1.0, 'a' => 2.0],
+            ],
+        ];
+        $codec = new JsonMessageCodec();
+        $encoded = $codec->encode(new ExecuteScheduledJobCommand('job-id', 'command', 'command-name', $parameters));
+        $decoded = $codec->decode($encoded)->message;
+
+        self::assertInstanceOf(ExecuteScheduledJobCommand::class, $decoded);
+        self::assertSame($parameters, $decoded->parameters);
+        // Strict array equality does not distinguish the sign of floating-point zero.
+        self::assertSame(
+            json_encode($parameters, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION),
+            json_encode($decoded->parameters, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION),
+        );
+        self::assertStringContainsString('"negative_zero":-0.0', $encoded);
+    }
+
+    public function testMetadataPreservesFloatTokensAndNestedOrder(): void
+    {
+        $metadata = ['integral' => 1.0, 'negative_zero' => -0.0, 'nested' => ['z' => 1.0e18, 'a' => [1.25, 0.0]]];
+        $codec = new JsonMessageCodec();
+        $encoded = $codec->encode(new RelayOutboxCommand(1), $metadata);
+        $decoded = $codec->decode($encoded);
+
+        self::assertSame($metadata, $decoded->metadata);
+        self::assertSame(
+            json_encode($metadata, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION),
+            json_encode($decoded->metadata, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION),
+        );
+        self::assertStringContainsString('"negative_zero":-0.0', $encoded);
     }
 
     /** @return iterable<array{string}> */

@@ -22,6 +22,7 @@ use App\Radio\Application\Command\SyncCountryStationsCommand;
 use App\Radio\Application\CommandHandler\SyncCountryStationsHandler;
 use App\Radio\Application\Port\RadioStationPortInterface;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
+use App\Scheduler\Application\Command\ExecuteScheduledJobCommand;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
@@ -144,6 +145,69 @@ final class MessengerJsonDeliveryTest extends TestCase
         self::assertSame(0, $envelope->last(RedeliveryStamp::class)?->getRetryCount());
         self::assertSame('async', $envelope->last(SentToFailureTransportStamp::class)?->getOriginalReceiverName());
         self::assertSame('Poison message', $envelope->last(ErrorDetailsStamp::class)?->getExceptionMessage());
+        $failed->ack($envelope);
+        self::assertSame(0, $failed->getMessageCount());
+    }
+
+    public function testScheduledParameterNumericTypesSurviveRedisRetryAndDeadLetter(): void
+    {
+        $async = $this->transport([ExecuteScheduledJobCommand::class]);
+        $failed = $this->transport([ExecuteScheduledJobCommand::class]);
+        $parameters = ['integer' => 1, 'integralFloat' => 1.0, 'negativeZero' => -0.0, 'largeFloat' => 1.0e18, 'nested' => [1.0, -0.0, false, null, 'worker@baander.app']];
+        $command = new ExecuteScheduledJobCommand(Uuid::v7()->toString(), 'console', 'app:baander-numeric-check', $parameters);
+        $attempts = [];
+        $bus = new MessageBus([
+            new SendMessageMiddleware(new SendersLocator([ExecuteScheduledJobCommand::class => ['async']], new ServiceLocator(['async' => static fn () => $async]))),
+            new HandleMessageMiddleware(new HandlersLocator([ExecuteScheduledJobCommand::class => [new HandlerDescriptor(
+                static function (ExecuteScheduledJobCommand $delivered) use (&$attempts): never {
+                    $attempts[] = $delivered->parameters;
+                    throw new \RuntimeException('Fixture scheduled numeric delivery failure.');
+                }, ['from_transport' => 'async'],
+            )]])),
+        ]);
+        $bus->dispatch($command);
+        self::assertSame([], $attempts, 'The real send middleware must enqueue without handling inline.');
+        self::assertSame(1, $async->getMessageCount());
+        $events = new EventDispatcher();
+        $retries = [];
+        $events->addListener(WorkerMessageRetriedEvent::class, static function (WorkerMessageRetriedEvent $event) use (&$retries): void {
+            $retries[] = $event->getEnvelope()->last(RedeliveryStamp::class)?->getRetryCount();
+        });
+        $events->addSubscriber(new AddErrorDetailsStampListener());
+        $events->addSubscriber(new SendFailedMessageForRetryListener(
+            new ServiceLocator(['async' => static fn () => $async]),
+            new ServiceLocator(['async' => static fn () => new MultiplierRetryStrategy(1, 0)]),
+            eventDispatcher: $events,
+        ));
+        $events->addSubscriber(new SendFailedMessageToFailureTransportListener(new ServiceLocator(['async' => static fn () => $failed])));
+        $deadline = hrtime(true) / 1e9 + 3.0;
+        $events->addListener(WorkerRunningEvent::class, static function (WorkerRunningEvent $event) use ($deadline): void {
+            if ($event->isWorkerIdle() || hrtime(true) / 1e9 >= $deadline) {
+                $event->getWorker()->stop();
+            }
+        });
+        (new Worker(['async' => $async], $bus, $events))->run(['sleep' => 1000]);
+        self::assertCount(2, $attempts);
+        foreach ($attempts as $attempt) {
+            self::assertSame($parameters, $attempt, 'PHP scalar types must survive every actual Redis delivery.');
+            self::assertSame(json_encode($parameters, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION), json_encode($attempt, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION), 'Signed zero must also survive each serialization hop.');
+        }
+        self::assertSame([1], $retries);
+        self::assertSame(0, $async->getMessageCount());
+        self::assertSame(1, $failed->getMessageCount());
+        $messages = iterator_to_array($failed->get());
+        if ($messages === []) {
+            $messages = iterator_to_array($failed->get());
+        }
+        self::assertCount(1, $messages);
+        $envelope = array_values($messages)[0];
+        $deadLetter = $envelope->getMessage();
+        self::assertInstanceOf(ExecuteScheduledJobCommand::class, $deadLetter);
+        self::assertSame($command->jobId, $deadLetter->jobId);
+        self::assertSame($parameters, $deadLetter->parameters);
+        self::assertSame(json_encode($parameters, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION), json_encode($deadLetter->parameters, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION));
+        self::assertSame('async', $envelope->last(SentToFailureTransportStamp::class)?->getOriginalReceiverName());
+        self::assertSame('Fixture scheduled numeric delivery failure.', $envelope->last(ErrorDetailsStamp::class)?->getExceptionMessage());
         $failed->ack($envelope);
         self::assertSame(0, $failed->getMessageCount());
     }

@@ -77,7 +77,7 @@ final readonly class JsonMessageCodec
         $data = json_encode([
             'format' => 'baander.message', 'version' => 1, 'type' => $type,
             'payload' => (object) array_combine(self::FIELDS[$type], $payload), 'metadata' => (object) $metadata,
-        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES, 32);
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION, 32);
         if (strlen($data) > $this->maxPayloadSize) {
             throw new \InvalidArgumentException('Message exceeds the payload limit.');
         }
