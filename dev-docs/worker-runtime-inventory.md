@@ -752,10 +752,23 @@ continue, and shared output directories remain unisolated. Conditional persisten
 and attempt-qualified output paths remain required. The timer does not independently
 fence a lease when its event loop stalls past expiry.
 
-The runtime handoff test uses real coroutines and a controlled process for pool
-readiness. It does not qualify CPU-pool shutdown: an attempted full-pool fixture
-exposed `Process::write('')` emitting an empty-write warning, plus shutdown output.
-The shutdown protocol and process reaping still need their own regression coverage.
+The CPU pool now sends a nonempty shutdown control message and drains direct
+children for up to two seconds before killing stragglers and allowing one further
+second to reap them. It waits for specific owned PIDs, leaves unrelated children
+alone, and destroys the result table only after all workers are accounted for.
+If exit remains unconfirmed, shutdown reports failure and retains pending state.
+Only the process that booted the pool may shut it down. Boot requires the project's
+existing `pcntl_waitpid` dependency and cleans up partially started workers.
+
+Shutdown clears only its own health timer and emits lifecycle logs through the
+logger. A completed shutdown permits reboot of the same instance, including
+round-robin indexes and dead-worker state. The pool's unused Symfony serializer
+dependency has been removed; its existing JSON wire format is unchanged.
+Real-process regressions cover idle shutdown, cooperative work, forced termination,
+reboot and dispatch, full IPC queues, unrelated resources (including an exited
+sibling), disabled reaping support, and inherited shutdown rejection. These tests qualify direct children, not FFmpeg descendants.
+Worker 0's existing health monitor still cannot distinguish a zombie via
+`posix_kill(pid, 0)`; moving health ownership to the parent remains separate work.
 
 Native media now requests refresh from its own window after an authenticated 401,
 shares that window's refresh queue with Axios, and retries once with a new proof.

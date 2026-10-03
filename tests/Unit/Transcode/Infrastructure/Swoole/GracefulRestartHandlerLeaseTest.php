@@ -108,7 +108,7 @@ final class GracefulRestartHandlerLeaseTest extends TestCase
                     }
                 });
         }
-        $pool = new TranscodeProcessPool(new CpuProcessPool([], 1, $logger, $json), $logger, $json, EncoderProfile::software());
+        $pool = new TranscodeProcessPool(new CpuProcessPool([], 1, $logger), $logger, $json, EncoderProfile::software());
         $handler = new GracefulRestartHandler($jobs, $sessions, $persister, $pool, $events, $lock, $starter, $logger);
         try {
             if (in_array($outcome, ['event', 'starter'], true)) {

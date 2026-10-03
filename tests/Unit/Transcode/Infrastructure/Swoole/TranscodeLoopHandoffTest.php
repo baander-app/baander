@@ -50,7 +50,7 @@ final class TranscodeLoopHandoffTest extends TestCase
         $storage = $this->createStub(TranscodeStoragePortInterface::class);
         $ffmpeg = $this->createStub(FFmpegPortInterface::class);
         $this->jobs = $this->createMock(TranscodeJobPortInterface::class);
-        $this->pool = new CpuProcessPool([], 1, $logger, $json, 16, $this->directory);
+        $this->pool = new CpuProcessPool([], 1, $logger, 16, $this->directory);
         $this->runtime = new TranscodeSessionSubscriber(
             $this->jobs, $this->createStub(TranscodeSessionPortInterface::class), $storage,
             new TranscodeProcessPool($this->pool, $logger, $json, EncoderProfile::software('libx264')),

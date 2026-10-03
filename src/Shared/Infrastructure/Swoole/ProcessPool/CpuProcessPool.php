@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Swoole\ProcessPool;
 
+use App\Shared\Infrastructure\Swoole\Async;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Swoole\Process;
 use Swoole\Table;
 use SwooleBundle\SwooleBundle\Server\Runtime\Bootable;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Throwable;
 
 /**
@@ -27,6 +27,12 @@ use Throwable;
  */
 final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
 {
+    private const string SHUTDOWN_MESSAGE = "\0baander:cpu-pool:shutdown";
+    private ?int $ownerPid = null;
+    private ?int $healthTimerId = null;
+    private ?int $healthTimerOwnerPid = null;
+    private bool $shutdownActive = false;
+
     /** @var array<int, Process> */
     private array $workers = [];
     private bool $booted = false;
@@ -46,11 +52,11 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
     /** @var string Directory where worker results are written as JSON files. */
     private readonly string $resultDir;
 
+    /** @param iterable<ProcessPoolWorkerInterface> $handlers */
     public function __construct(
         private readonly iterable $handlers,
         private readonly int $workerCount,
         private readonly LoggerInterface $logger,
-        private readonly JsonEncoder $jsonEncoder,
         private readonly int $resultTableSize = 8192,
         ?string $resultDir = null,
     )
@@ -73,7 +79,20 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
             return;
         }
 
-        $this->booted = true;
+        if (!function_exists('pcntl_waitpid')) {
+            throw new RuntimeException('CPU process pool requires pcntl_waitpid for owned-child reaping.');
+        }
+        if ($this->workers !== [] || $this->shutdownActive) {
+            throw new RuntimeException('CPU process pool still has workers awaiting shutdown.');
+        }
+        if ($this->workerCount < 1) {
+            throw new RuntimeException('CPU process pool requires at least one worker.');
+        }
+        $this->workers = [];
+        $this->shuttingDown = false;
+        $this->deadWorkers = [];
+        $this->nextWorker = 0;
+        $this->handlerMap = [];
 
         foreach ($this->handlers as $handler) {
             foreach ($handler->supportedTypes() as $type) {
@@ -93,84 +112,95 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
         }
         $this->handlerRegistry = json_encode($registry, JSON_THROW_ON_ERROR);
 
-        // Shared result table must be created BEFORE fork.
-        // Workers write results directly to this table — no IPC needed.
-        $this->resultTable = new Table($this->resultTableSize);
-        $this->resultTable->column('data', Table::TYPE_STRING, 65536);
-        $this->resultTable->column('status', Table::TYPE_STRING, 32);
-        $this->resultTable->create();
+        $this->ownerPid = getmypid();
+        try {
+            // Shared result table must be created BEFORE fork.
+            // Workers write results directly to this table — no IPC needed.
+            $this->resultTable = new Table($this->resultTableSize);
+            $this->resultTable->column('data', Table::TYPE_STRING, 65536);
+            $this->resultTable->column('status', Table::TYPE_STRING, 32);
+            $this->resultTable->create();
 
-        // Results are also persisted as files: Swoole\Table can return corrupted
-        // or empty data under concurrent access, so the file acts as the source
-        // of truth. The table is kept as a fast hint for backwards compatibility.
-        if (!is_dir($this->resultDir)) {
-            @mkdir($this->resultDir, 0755, true);
-        }
+            // Results are also persisted as files: Swoole\Table can return corrupted
+            // or empty data under concurrent access, so the file acts as the source
+            // of truth. The table is kept as a fast hint for backwards compatibility.
+            if (!is_dir($this->resultDir)) {
+                @mkdir($this->resultDir, 0755, true);
+            }
 
-        for ($i = 0; $i < $this->workerCount; $i++) {
-            $registry = $this->handlerRegistry;
-            $encoder = $this->jsonEncoder;
-            $table = $this->resultTable;
+            for ($i = 0; $i < $this->workerCount; $i++) {
+                $registry = $this->handlerRegistry;
+                $table = $this->resultTable;
 
-            $process = new Process(function (Process $worker) use ($registry, $encoder, $table): void {
-                $worker->name(sprintf('cpu-pool-worker-%d', $worker->id));
+                $process = new Process(function (Process $worker) use ($registry, $table): void {
+                    $worker->name(sprintf('cpu-pool-worker-%d', $worker->id));
 
-                $handlers = json_decode($registry, true, 512, JSON_THROW_ON_ERROR);
+                    $handlers = json_decode($registry, true, 512, JSON_THROW_ON_ERROR);
 
-                while (true) {
-                    $data = $worker->read();
-                    if ($data === '') {
-                        break;
-                    }
+                    while (true) {
+                        $data = $worker->read();
+                        if ($data === '' || $data === self::SHUTDOWN_MESSAGE) {
+                            break;
+                        }
 
-                    if ($data === false) {
-                        // Transient pipe read failure — do not treat as EOF.
-                        // The next read should either return data or the real EOF.
-                        error_log('[CpuProcessPool] Worker read returned false, retrying');
-                        usleep(10_000);
-                        continue;
-                    }
-
-                    $resultKey = '';
-
-                    try {
-                        $job = json_decode($data, true, 512, JSON_THROW_ON_ERROR);
-                        $type = $job['type'] ?? '';
-                        $resultKey = $job['_result_key'] ?? '';
-
-                        $entry = $handlers[$type] ?? null;
-                        if ($entry === null) {
-                            $this->writeResult($table, $resultKey, 'error', sprintf('No handler for job type: %s', $type));
+                        if ($data === false) {
+                            // Transient pipe read failure — do not treat as EOF.
+                            // The next read should either return data or the real EOF.
+                            error_log('[CpuProcessPool] Worker read returned false, retrying');
+                            usleep(10_000);
                             continue;
                         }
 
-                        $class = $entry['class'];
-                        if (!class_exists($class)) {
-                            $this->writeResult($table, $resultKey, 'error', sprintf('Handler class not found: %s', $class));
-                            continue;
-                        }
+                        $resultKey = '';
 
-                        /** @var ProcessPoolWorkerInterface $handler */
-                        $handler = new $class(...$entry['args']);
-                        $result = $handler->handle($data);
-                        $this->writeResult($table, $resultKey, 'ok', $result);
-                    } catch (Throwable $e) {
-                        $this->writeResult($table, $resultKey, 'error', $e->getMessage());
+                        try {
+                            $job = json_decode($data, true, 512, JSON_THROW_ON_ERROR);
+                            $type = $job['type'] ?? '';
+                            $resultKey = $job['_result_key'] ?? '';
+
+                            $entry = $handlers[$type] ?? null;
+                            if ($entry === null) {
+                                $this->writeResult($table, $resultKey, 'error', sprintf('No handler for job type: %s', $type));
+                                continue;
+                            }
+
+                            $class = $entry['class'];
+                            if (!class_exists($class)) {
+                                $this->writeResult($table, $resultKey, 'error', sprintf('Handler class not found: %s', $class));
+                                continue;
+                            }
+
+                            /** @var ProcessPoolWorkerInterface $handler */
+                            $handler = new $class(...$entry['args']);
+                            $result = $handler->handle($data);
+                            $this->writeResult($table, $resultKey, 'ok', $result);
+                        } catch (Throwable $e) {
+                            $this->writeResult($table, $resultKey, 'error', $e->getMessage());
+                        }
                     }
+                }, false, SWOOLE_IPC_UNIXSOCK);
+
+                $pid = $process->start();
+                if ($pid === false || $pid < 1) {
+                    $process->close();
+                    throw new RuntimeException('Unable to start CPU pool worker.');
                 }
-            }, false, SWOOLE_IPC_UNIXSOCK);
+                $this->workers[] = $process;
+            }
 
-            $process->start();
-            $this->workers[] = $process;
+            $this->booted = true;
+        } catch (Throwable $error) {
+            try {
+                $this->shutdown();
+            } catch (Throwable $cleanupError) {
+                $this->logger->error('CPU pool startup cleanup failed', ['error' => $cleanupError->getMessage()]);
+            }
+            throw $error;
         }
 
-        // Health-check coroutine is deferred to startHealthCheck() — called from
-        // a ServerStartedEvent listener — to avoid creating an event loop before
-        // the Swoole server starts, and because pcntl_waitpid may be disabled.
-        // Uses posix_kill(pid, 0) which only checks if a process exists.
-
+        // Worker 0 starts its own health timer after the HTTP server forks.
         $this->logger->info('CPU process pool started', [
-            'workers'  => $this->workerCount,
+            'workers' => count($this->workers),
             'handlers' => array_keys($this->handlerMap),
         ]);
     }
@@ -311,83 +341,127 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
 
     public function startHealthCheck(): void
     {
-        if (!$this->booted || $this->workers === []) {
+        if (!$this->booted || $this->workers === [] || $this->shuttingDown) {
+            return;
+        }
+        if ($this->healthTimerId !== null && $this->healthTimerOwnerPid === getmypid()) {
             return;
         }
 
-        \Swoole\Timer::tick(5000, function (): void {
-            if (!$this->booted) {
-                \Swoole\Timer::clearAll();
-
+        $this->healthTimerOwnerPid = getmypid();
+        $this->healthTimerId = \Swoole\Timer::tick(5000, function (): void {
+            if (!$this->booted || $this->shuttingDown) {
+                $this->stopHealthCheck();
                 return;
             }
-
-            foreach ($this->workers as $worker) {
-                if ($worker->pid <= 0) {
-                    continue;
-                }
-
-                // posix_kill with signal 0 checks if process exists without sending a signal
-                if (!@posix_kill($worker->pid, 0)) {
-                    $this->deadWorkers[$worker->id] = true;
-                    $this->logger->error('Worker process died', ['workerId' => $worker->id, 'pid' => $worker->pid]);
+            if ($this->ownerPid === getmypid()) {
+                $this->reapExitedWorkers();
+            }
+            foreach ($this->workers as $workerId => $worker) {
+                if ($worker->pid > 0 && !posix_kill($worker->pid, 0)) {
+                    $this->deadWorkers[$workerId] = true;
+                    $this->logger->error('Worker process died', ['workerId' => $workerId, 'pid' => $worker->pid]);
                 }
             }
         });
     }
 
-    public function shutdown(): void
+    private function stopHealthCheck(): void
     {
-        $this->shuttingDown = true;
-        $this->booted = false;
-
-        \Swoole\Timer::clearAll();
-
-        $alive = array_filter($this->workers, fn(Process $w) => $w->pid > 0 && !isset($this->deadWorkers[$w->id]));
-        if ($alive !== []) {
-            printf(" // Signaling %d pool worker(s) to exit...\n", count($alive));
+        if ($this->healthTimerId !== null && $this->healthTimerOwnerPid === getmypid()) {
+            \Swoole\Timer::clear($this->healthTimerId);
         }
-
-        foreach ($alive as $worker) {
-            try {
-                $worker->write(''); // Signal worker to exit
-            } catch (Throwable) {
-            }
-        }
-
-        $this->killAllWorkers();
-
-        if ($this->resultTable !== null) {
-            $this->resultTable->destroy();
-            $this->resultTable = null;
-        }
-
-        $this->logger->info('CPU process pool shut down');
+        $this->healthTimerId = null;
+        $this->healthTimerOwnerPid = null;
     }
 
-    /**
-     * Kill all worker processes. Used by both graceful shutdown and the
-     * register_shutdown_function safety net for abrupt termination (SIGINT).
-     */
-    private function killAllWorkers(): void
+    public function shutdown(): void
     {
-        $alive = array_filter($this->workers, fn(Process $w) => $w->pid > 0);
-        if ($alive === []) {
+        if ($this->ownerPid !== null && $this->ownerPid !== getmypid()) {
+            throw new RuntimeException('Only the CPU pool owner may shut down its workers.');
+        }
+        if ($this->shutdownActive) {
             return;
         }
+        $this->shutdownActive = true;
+        $this->shuttingDown = true;
+        $this->booted = false;
+        $this->stopHealthCheck();
 
-        $deadline = microtime(true) + 2.0;
-        foreach ($alive as $worker) {
-            while (microtime(true) < $deadline && @posix_kill($worker->pid, 0)) {
-                usleep(50_000);
+        try {
+            // Account for exited/reaped children before sending to any PID.
+            $this->reapExitedWorkers();
+            foreach ($this->workers as $worker) {
+                // A full datagram queue must not turn shutdown into a blocking
+                // write. Failure falls through to bounded kill and reap below.
+                try {
+                    $sent = $worker->setTimeout(0.01) && @$worker->write(self::SHUTDOWN_MESSAGE) !== false;
+                } catch (Throwable) {
+                    // Runtime error handlers can turn a full/closed pipe's
+                    // warning into an exception. Cleanup must still continue.
+                    $sent = false;
+                }
+                if (!$sent) {
+                    $this->logger->warning('Could not send CPU pool shutdown message', ['pid' => $worker->pid]);
+                }
             }
+            $this->killAllWorkers();
+            if ($this->resultTable !== null) {
+                $this->resultTable->destroy();
+                $this->resultTable = null;
+            }
+            $this->ownerPid = null;
+            $this->logger->info('CPU process pool shut down');
+        } finally {
+            $this->shutdownActive = false;
+        }
+    }
 
-            if (@posix_kill($worker->pid, 0)) {
-                echo " // Force-killing worker {$worker->id} (pid {$worker->pid})\n";
-                @posix_kill($worker->pid, SIGKILL);
+    /** Drain, then kill and reap only this pool's children within shared deadlines. */
+    private function killAllWorkers(): void
+    {
+        $this->waitForWorkers(2.0);
+        foreach ($this->workers as $worker) {
+            // reapExitedWorkers has just confirmed these are still our children.
+            // Unreaped child PIDs cannot be reused between this check and kill.
+            if (!posix_kill($worker->pid, SIGKILL)) {
+                $this->logger->warning('Could not kill CPU pool worker', ['pid' => $worker->pid]);
             }
         }
-        $this->workers = [];
+        $this->waitForWorkers(1.0);
+        if ($this->workers !== []) {
+            throw new RuntimeException('CPU pool shutdown could not confirm every child exit.');
+        }
+    }
+
+    private function waitForWorkers(float $seconds): void
+    {
+        $deadline = hrtime(true) + (int) ($seconds * 1_000_000_000);
+        do {
+            $this->reapExitedWorkers();
+            if ($this->workers === []) {
+                return;
+            }
+            Async::sleep(0.01);
+        } while (hrtime(true) < $deadline);
+        $this->reapExitedWorkers();
+    }
+
+    private function reapExitedWorkers(): void
+    {
+        foreach ($this->workers as $workerId => $worker) {
+            $status = 0;
+            $waited = pcntl_waitpid($worker->pid, $status, WNOHANG);
+            if ($waited === $worker->pid || ($waited === -1 && pcntl_get_last_error() === PCNTL_ECHILD)) {
+                // ECHILD includes a child already collected by Swoole. Never
+                // signal that PID: it is no longer ours and may be reused.
+                $worker->close();
+                unset($this->workers[$workerId]);
+                $this->deadWorkers[$workerId] = true;
+            } elseif ($waited === -1 && pcntl_get_last_error() !== PCNTL_EINTR) {
+                throw new RuntimeException('Unable to reap CPU pool child: ' . pcntl_strerror(pcntl_get_last_error()));
+            }
+        }
     }
 
     public function isRunning(): bool

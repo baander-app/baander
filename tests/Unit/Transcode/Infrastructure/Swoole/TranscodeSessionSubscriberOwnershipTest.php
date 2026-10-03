@@ -240,7 +240,7 @@ final class TranscodeSessionSubscriberOwnershipTest extends TestCase
         $ffmpeg = $this->createStub(FFmpegPortInterface::class);
         $encoder = new SegmentEncoder($ffmpeg, $storage, EncoderProfile::software('libx264'));
         $manager = new TranscodeStreamManager($availability, $storage, $encoder, $logger, $spawner);
-        $pool = new CpuProcessPool([], 1, $logger, $json, resultDir: $this->directory . '/results');
+        $pool = new CpuProcessPool([], 1, $logger, resultDir: $this->directory . '/results');
         $transcodePool = new TranscodeProcessPool($pool, $logger, $json, EncoderProfile::software('libx264'));
         $subscriber = new TranscodeSessionSubscriber(
             $jobs, $sessions, $storage, $transcodePool, $ffmpeg, $encoder, $videos, $persister, $broker,
