@@ -16,6 +16,14 @@ final class WorkerRuntimeConfigurationTest extends TestCase
         $configuration = $this->configuration();
         self::assertSame(768 * 1024 * 1024, $configuration->memoryLimitBytes);
         self::assertSame($configuration->memoryLimitBytes, $configuration->managementReservationBytes + $configuration->consumerReservationBytes + $configuration->relayReservationBytes);
+        self::assertSame(0, $configuration->scheduledConsoleReservationBytes);
+    }
+
+    public function testConsoleReservationIsAdditionalAndFitsAnExactCeiling(): void
+    {
+        $configuration = $this->configuration(['memoryLimitBytes' => 960 * 1024 * 1024, 'scheduledConsoleReservationBytes' => 192 * 1024 * 1024]);
+        self::assertSame($configuration->memoryLimitBytes,
+            $configuration->managementReservationBytes + $configuration->consumerReservationBytes + $configuration->relayReservationBytes + $configuration->scheduledConsoleReservationBytes);
     }
 
     #[DataProvider('invalidFields')]
@@ -40,6 +48,10 @@ final class WorkerRuntimeConfigurationTest extends TestCase
         yield 'oversized management' => ['managementReservationBytes', PHP_INT_MAX];
         yield 'oversized consumer' => ['consumerReservationBytes', PHP_INT_MAX];
         yield 'oversized relay' => ['relayReservationBytes', PHP_INT_MAX];
+        yield 'negative console reservation' => ['scheduledConsoleReservationBytes', -1];
+        yield 'insufficient console reservation' => ['scheduledConsoleReservationBytes', 192 * 1024 * 1024 - 1];
+        yield 'console exceeds remaining ceiling' => ['scheduledConsoleReservationBytes', 192 * 1024 * 1024];
+        yield 'oversized console reservation' => ['scheduledConsoleReservationBytes', PHP_INT_MAX];
         yield 'relative lock path' => ['lockDirectory', 'worker-lock'];
         yield 'NUL lock path' => ['lockDirectory', "/tmp/worker\0lock"];
         yield 'oversized lock path' => ['lockDirectory', '/' . str_repeat('x', 4096)];

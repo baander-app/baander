@@ -47,15 +47,16 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
             $definitions = [
                 new WorkerDefinition('consumer', [PHP_BINARY, '-d', 'memory_limit=256M', $this->projectDirectory . '/bin/console',
                     'messenger:consume', 'async', '--memory-limit=256M', '--keepalive=30', '--no-interaction'],
-                    $this->projectDirectory, $configuration->consumerReservationBytes, 30.0),
+                    $this->projectDirectory, $configuration->consumerReservationBytes + $configuration->scheduledConsoleReservationBytes, 30.0,
+                    descendantProcessReservation: $configuration->scheduledConsoleReservationBytes === 0 ? 0 : 1),
                 new WorkerDefinition('relay', [PHP_BINARY, '-d', 'memory_limit=256M', $this->projectDirectory . '/bin/console',
                     'app:outbox:consume', '--time-limit=86400', '--no-interaction'],
                     $this->projectDirectory, $configuration->relayReservationBytes, 30.0),
             ];
             $authority = new LeaseAuthority($configuration->namespace, $configuration->bootId, 30, 10, 1);
-            $runtime = new LeasedWorkerRuntime($definitions, 3, $configuration->memoryLimitBytes, $configuration->managementReservationBytes,
+            $runtime = new LeasedWorkerRuntime($definitions, 3 + ($configuration->scheduledConsoleReservationBytes === 0 ? 0 : 1), $configuration->memoryLimitBytes, $configuration->managementReservationBytes,
                 $authority,
-                static function (WorkerDefinition $definition, WorkerLaunchIdentity $identity) use ($authority, $environment, &$stopRequested, &$launchAttempts): WorkerChildProcess {
+                function (WorkerDefinition $definition, WorkerLaunchIdentity $identity) use ($authority, $environment, $configuration, &$stopRequested, &$launchAttempts): WorkerChildProcess {
                     if ($stopRequested) {
                         throw new \RuntimeException('Worker admission stopped.');
                     }
@@ -68,6 +69,7 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
                         throw new \RuntimeException('Worker admission requires current committed deployment authority.');
                     }
                     $childEnvironment['BAANDER_WORKER_LEASE_EPOCH'] = (string) $lease->epoch;
+                    $childEnvironment = $this->roleEnvironment($childEnvironment, $definition, $configuration);
                     ++$launchAttempts;
                     return WorkerChildProcess::start($definition->argv, $definition->directory, STDOUT, STDERR, $childEnvironment);
                 },
@@ -163,6 +165,18 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
         // child. Parent Dotenv provenance would incorrectly permit overriding
         // explicit launch identity when the child's kernel loads its own files.
         unset($environment['SYMFONY_DOTENV_VARS']);
+        // Only the admitted consumer may receive a nested console reservation.
+        $environment['BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES'] = '0';
+        return $environment;
+    }
+
+    /**
+     * @param array<string, string> $environment
+     * @return array<string, string>
+     */
+    private function roleEnvironment(array $environment, WorkerDefinition $definition, WorkerRuntimeConfiguration $configuration): array
+    {
+        $environment['BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES'] = (string) ($definition->id === 'consumer' ? $configuration->scheduledConsoleReservationBytes : 0);
         return $environment;
     }
 }

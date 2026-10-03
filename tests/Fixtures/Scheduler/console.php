@@ -20,6 +20,9 @@ switch ($argv[1] ?? '') {
     case 'app:fixture-echo':
         echo json_encode(['arguments' => $arguments, 'memoryLimit' => ini_get('memory_limit')], JSON_THROW_ON_ERROR);
         break;
+    case 'app:fixture-budget':
+        echo json_encode(['budget' => getenv('BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES'), 'dotenv' => getenv('SYMFONY_DOTENV_VARS')], JSON_THROW_ON_ERROR);
+        break;
     case 'app:fixture-flood':
         // Both writes exceed normal pipe capacity; a reader waiting on one pipe deadlocks.
         for ($chunk = 0; $chunk < 24; ++$chunk) {

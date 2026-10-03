@@ -18,6 +18,7 @@ final class BoundedScheduledConsoleExecutor implements ScheduledConsoleExecutorI
         private readonly int $outputLimitBytes = 10000,
         private readonly int $memoryLimitMiB = 128,
         private readonly float $terminationGraceSeconds = 1.0,
+        private readonly int $reservationBytes = 0,
     ) {
         if (!str_starts_with($projectDirectory, '/') || str_contains($projectDirectory, "\0") || !is_dir($projectDirectory)
             || !is_file($projectDirectory . '/bin/console') || !is_readable($projectDirectory . '/bin/console')) {
@@ -28,16 +29,41 @@ final class BoundedScheduledConsoleExecutor implements ScheduledConsoleExecutorI
             || !is_finite($terminationGraceSeconds) || $terminationGraceSeconds < 0 || $terminationGraceSeconds > 5) {
             throw new \InvalidArgumentException('Scheduled console process settings exceed bounded limits.');
         }
+        if ($reservationBytes < 0 || $reservationBytes > 1024 * 1024 * 1024 * 1024
+            || ($reservationBytes !== 0 && $reservationBytes < ($memoryLimitMiB + 64) * 1024 * 1024)) {
+            throw new \InvalidArgumentException('Scheduled console reservation must cover its PHP heap plus at least 64 MiB of native headroom.');
+        }
+    }
+
+    /** Supervisor declaration only: actual memory/process containment remains the deployment's responsibility. */
+    public static function fromWorkerEnvironment(string $projectDirectory): self
+    {
+        $raw = getenv('BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES');
+        if ($raw === false || $raw === '0') {
+            return new self($projectDirectory);
+        }
+        $bytes = filter_var($raw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1024 * 1024 * 1024 * 1024]]);
+        if (preg_match('/\A[1-9][0-9]*\z/D', $raw) !== 1 || $bytes === false || getenv('BAANDER_WORKER_ID') !== 'consumer') {
+            throw new \InvalidArgumentException('Scheduled console requires an explicit consumer subprocess reservation.');
+        }
+        return new self($projectDirectory, reservationBytes: $bytes);
     }
 
     /** @param array<int|string, mixed> $parameters */
     public function execute(string $command, array $parameters): string
     {
+        if ($this->reservationBytes === 0) {
+            throw new \RuntimeException('Scheduled console execution is disabled without a subprocess reservation.');
+        }
         if (PHP_SAPI !== 'cli' || (extension_loaded('swoole') && \Swoole\Coroutine::getCid() > 0)) {
             throw new \LogicException('Scheduled console executor requires CLI outside an active coroutine.');
         }
         $argv = $this->arguments($command, $parameters);
-        $process = proc_open($argv, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $this->projectDirectory);
+        $environment = getenv();
+        $environment['BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES'] = '0';
+        // Preserve explicit launch configuration when the child reloads Dotenv.
+        unset($environment['SYMFONY_DOTENV_VARS']);
+        $process = proc_open($argv, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $this->projectDirectory, $environment);
         if (!is_resource($process)) {
             throw new \RuntimeException('Scheduled console child could not be started.');
         }

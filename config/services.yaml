@@ -1041,6 +1041,7 @@ services:
         alias: App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerRecoveryScheduleStore
 
     App\Scheduler\Infrastructure\Process\BoundedScheduledConsoleExecutor:
+        factory: ['App\Scheduler\Infrastructure\Process\BoundedScheduledConsoleExecutor', 'fromWorkerEnvironment']
         arguments:
             $projectDirectory: '%kernel.project_dir%'
 

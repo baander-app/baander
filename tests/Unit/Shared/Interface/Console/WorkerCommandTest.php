@@ -23,6 +23,18 @@ final class WorkerCommandTest extends TestCase
         self::assertSame(str_repeat('a', 32), $runner->configuration->bootId);
         self::assertSame(1024 * 1024 * 1024, $runner->configuration->memoryLimitBytes);
         self::assertSame(384 * 1024 * 1024, $runner->configuration->consumerReservationBytes);
+        self::assertSame(0, $runner->configuration->scheduledConsoleReservationBytes);
+    }
+
+    public function testExplicitConsoleReservationCanFitWithoutIncreasingTotalCeiling(): void
+    {
+        $runner = new RecordingWorkerRunner();
+        $tester = new CommandTester(new WorkerCommand($runner));
+        $options = array_replace($this->options(), ['--management-mib' => '128', '--consumer-mib' => '320', '--relay-mib' => '320', '--scheduled-console-mib' => '192']);
+        self::assertSame(7, $tester->execute($options));
+        self::assertNotNull($runner->configuration);
+        self::assertSame(1024 * 1024 * 1024, $runner->configuration->memoryLimitBytes);
+        self::assertSame(192 * 1024 * 1024, $runner->configuration->scheduledConsoleReservationBytes);
     }
 
     #[DataProvider('invalidOptions')]
@@ -40,6 +52,7 @@ final class WorkerCommandTest extends TestCase
         self::assertNull($runner->configuration);
     }
 
+    /** @return iterable<string, array{string, mixed}> */
     public static function invalidOptions(): iterable
     {
         yield 'missing budget' => ['--memory-mib', null];
@@ -49,6 +62,12 @@ final class WorkerCommandTest extends TestCase
         yield 'overcommitted' => ['--memory-mib', '768'];
         yield 'no management reserve' => ['--management-mib', '64'];
         yield 'no native reserve' => ['--consumer-mib', '256'];
+        yield 'console without available capacity' => ['--scheduled-console-mib', '192'];
+        yield 'console below minimum' => ['--scheduled-console-mib', '191'];
+        yield 'negative console reservation' => ['--scheduled-console-mib', '-1'];
+        yield 'fractional console reservation' => ['--scheduled-console-mib', '192.5'];
+        yield 'noncanonical zero console reservation' => ['--scheduled-console-mib', '00'];
+        yield 'oversized console reservation' => ['--scheduled-console-mib', '1048577'];
         yield 'bad boot' => ['--boot-id', 'baander.app'];
         yield 'relative lock directory' => ['--lock-dir', 'locks'];
     }

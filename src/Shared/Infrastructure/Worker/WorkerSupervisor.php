@@ -22,8 +22,10 @@ final class WorkerSupervisor
 
     /**
      * Admission uses declared reservations only. Deployment containment must enforce actual resources and own descendants.
+     * Process and memory slots stay reserved for the fixed worker set, including while containment is pending.
      *
      * @param list<WorkerDefinition> $definitions
+     * @param int $maxChildren Ceiling for direct worker processes and their reserved descendants.
      * @param Closure(WorkerDefinition, WorkerLaunchIdentity): WorkerChildProcess $launcher
      */
     public function __construct(
@@ -42,6 +44,7 @@ final class WorkerSupervisor
             throw new InvalidArgumentException('Worker set and supervisor reservations must fit positive admission ceilings.');
         }
         $reserved = $supervisorReservationBytes;
+        $reservedProcesses = 0;
         $policies = [];
         foreach ($definitions as $definition) {
             new WorkerLaunchIdentity($deploymentId, $this->supervisorBootId, $definition->id, 1);
@@ -52,7 +55,12 @@ final class WorkerSupervisor
             if ($definition->memoryReservationBytes > $memoryLimitBytes - $reserved) {
                 throw new InvalidArgumentException('Worker memory reservations exceed the admission ceiling.');
             }
+            $processReservation = 1 + $definition->descendantProcessReservation;
+            if ($processReservation > $maxChildren - $reservedProcesses) {
+                throw new InvalidArgumentException('Worker process reservations exceed the admission ceiling.');
+            }
             $reserved += $definition->memoryReservationBytes;
+            $reservedProcesses += $processReservation;
             $policies[$policyId] = true;
             $this->workers[$definition->id] = [
                 'definition' => $definition,

@@ -653,8 +653,32 @@ a durable producer beside it would retain intents that could later duplicate tha
 legacy work when the relay is enabled. Cutover therefore needs a deliberate boundary
 between the two paths, not shadow history that is later treated as executable.
 The new producer also needs its own supervised child reservation. Occurrence console
-execution adds a 128 MiB PHP child to the consumer's heap and process allowance;
-that nested child must be included in admission budgets and containment qualification.
+execution adds a 128 MiB PHP child. `app:worker --scheduled-console-mib` now reserves
+that child explicitly, defaulting to zero (disabled). A positive reservation must be
+at least 192 MiB: the fixed 128 MiB PHP heap plus 64 MiB of declared native headroom.
+It is additional to management, consumer and relay reservations and must fit the
+existing total admission ceiling. For example, 128/320/320/192 MiB reservations
+fit a 1,024 MiB ceiling; this is arithmetic, not a qualified capacity recommendation.
+
+The consumer's role budget includes the child once, and the process ceiling reserves
+one descendant slot in addition to consumer, relay and lease helper. Generic worker
+definitions now declare descendant process reservations, retained with their role
+through pending containment. The runner overrides inherited console grants with
+zero and grants a positive budget only to the admitted consumer. The executor's
+container factory rejects malformed, insufficient or wrong-role grants, and a zero
+grant rejects execution before spawning. Console children receive a zero grant and
+cleared Dotenv provenance so normal configuration reload cannot authorize another
+scheduled console child. Existing direct executor callers must supply a reservation.
+
+These are declared admission budgets. They do not measure native memory or account
+for arbitrary descendants created by commands. Deployment cgroup memory/CPU/PID
+limits, containment qualification and downstream workload admission remain required.
+The reservation change passes 3,479 unit tests and 77 targeted integration tests
+(636 assertions), plus focused PHPStan without suppressions. A focused 28-test
+rerun passes after removing redundant test fixture lifetime storage. The real PID-1
+`app:worker` acceptance harness also passes outbox delivery/replay, consumer crash,
+same-boot rejection, TERM shutdown and lease-renewal loss with the default disabled
+console budget. These checks do not establish capacity under a scheduled workload.
 No command, timer or queue route was enabled by the recovery pass wiring.
 
 The combined scheduler checks pass 167 integration/functional tests with 1,525

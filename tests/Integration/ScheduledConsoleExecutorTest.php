@@ -30,7 +30,7 @@ final class ScheduledConsoleExecutorTest extends TestCase
     {
         $marker = $this->project . '/shell-executed';
         $text = 'scheduler@baander.app; touch ' . $marker . ' $(touch ' . $marker . ') `touch ' . $marker . '`';
-        $output = (new BoundedScheduledConsoleExecutor($this->project, memoryLimitMiB: 64))->execute('app:fixture-echo', [
+        $output = (new BoundedScheduledConsoleExecutor($this->project, memoryLimitMiB: 64, reservationBytes: 128 * 1024 * 1024))->execute('app:fixture-echo', [
             '--text' => $text, '--enabled' => true, '--omitted' => false,
             '--integer' => 7, '--fraction' => 1.0, '--negative-zero' => -0.0, '--empty' => '',
             0 => 'positional value', 1 => '--option-looking-positional',
@@ -55,7 +55,7 @@ final class ScheduledConsoleExecutorTest extends TestCase
 
     public function testBothOutputPipesAreDrainedWithoutDeadlock(): void
     {
-        $output = (new BoundedScheduledConsoleExecutor($this->project, timeoutSeconds: 2.0, outputLimitBytes: 262144))->execute('app:fixture-flood', []);
+        $output = (new BoundedScheduledConsoleExecutor($this->project, timeoutSeconds: 2.0, outputLimitBytes: 262144, reservationBytes: 192 * 1024 * 1024))->execute('app:fixture-flood', []);
         self::assertSame(24 * 4096, substr_count($output, 'O'));
         self::assertSame(0, substr_count($output, 'E'), 'Successful output contains stdout, while stderr is drained separately.');
         self::assertLessThanOrEqual(262144, strlen($output));
@@ -65,7 +65,7 @@ final class ScheduledConsoleExecutorTest extends TestCase
     {
         $pidFile = $this->project . '/child.pid';
         try {
-            (new BoundedScheduledConsoleExecutor($this->project))->execute('app:fixture-exit', ['--pid-file' => $pidFile]);
+            (new BoundedScheduledConsoleExecutor($this->project, reservationBytes: 192 * 1024 * 1024))->execute('app:fixture-exit', ['--pid-file' => $pidFile]);
             self::fail('Expected known nonzero console failure.');
         } catch (\RuntimeException $error) {
             self::assertNotInstanceOf(ScheduledConsoleCompletionUnknown::class, $error);
@@ -88,7 +88,7 @@ final class ScheduledConsoleExecutorTest extends TestCase
         $pidFile = $this->project . '/child.pid';
         $started = hrtime(true) / 1e9;
         try {
-            (new BoundedScheduledConsoleExecutor($this->project, timeoutSeconds: 0.5, outputLimitBytes: 4096, terminationGraceSeconds: 0.1))
+            (new BoundedScheduledConsoleExecutor($this->project, timeoutSeconds: 0.5, outputLimitBytes: 4096, terminationGraceSeconds: 0.1, reservationBytes: 192 * 1024 * 1024))
                 ->execute($command, ['--pid-file' => $pidFile]);
             self::fail('Expected uncertain console completion.');
         } catch (ScheduledConsoleCompletionUnknown $error) {
@@ -102,7 +102,7 @@ final class ScheduledConsoleExecutorTest extends TestCase
     {
         $pidFile = $this->project . '/child.pid';
         try {
-            (new BoundedScheduledConsoleExecutor($this->project))->execute('app:fixture-invalid-utf8', ['--pid-file' => $pidFile]);
+            (new BoundedScheduledConsoleExecutor($this->project, reservationBytes: 192 * 1024 * 1024))->execute('app:fixture-invalid-utf8', ['--pid-file' => $pidFile]);
             self::fail('Expected invalid text failure.');
         } catch (\RuntimeException $error) {
             self::assertNotInstanceOf(ScheduledConsoleCompletionUnknown::class, $error);
@@ -129,12 +129,79 @@ final class ScheduledConsoleExecutorTest extends TestCase
     {
         $pidFile = $this->project . '/child.pid';
         try {
-            (new BoundedScheduledConsoleExecutor($this->project))->execute($command, ['--pid-file' => $pidFile] + $parameters);
+            (new BoundedScheduledConsoleExecutor($this->project, reservationBytes: 192 * 1024 * 1024))->execute($command, ['--pid-file' => $pidFile] + $parameters);
             self::fail('Expected input validation before spawning.');
         } catch (\InvalidArgumentException $error) {
             self::assertNotSame('', $error->getMessage());
         }
         self::assertFileDoesNotExist($pidFile);
+    }
+
+    public function testMissingReservationRejectsBeforeSpawn(): void
+    {
+        $pidFile = $this->project . '/unadmitted.pid';
+        try {
+            (new BoundedScheduledConsoleExecutor($this->project))->execute('app:fixture-echo', ['--pid-file' => $pidFile]);
+            self::fail('No child is admitted by default.');
+        } catch (\RuntimeException $error) {
+            self::assertStringContainsString('disabled', $error->getMessage());
+        }
+        self::assertFileDoesNotExist($pidFile);
+    }
+
+    /** @return iterable<string, array{?string, ?string, bool}> */
+    public static function environmentBudgets(): iterable
+    {
+        yield 'absent' => [null, 'consumer', false];
+        yield 'disabled' => ['0', 'consumer', false];
+        yield 'empty' => ['', 'consumer', false];
+        yield 'negative' => ['-1', 'consumer', false];
+        yield 'fraction' => ['201326592.0', 'consumer', false];
+        yield 'leading zero' => ['0201326592', 'consumer', false];
+        yield 'too small' => [(string) (192 * 1024 * 1024 - 1), 'consumer', false];
+        yield 'no native headroom' => [(string) (128 * 1024 * 1024), 'consumer', false];
+        yield 'integer overflow' => ['9999999999999999999999999', 'consumer', false];
+        yield 'over ceiling' => [(string) (1024 * 1024 * 1024 * 1024 + 1), 'consumer', false];
+        yield 'wrong role' => [(string) (192 * 1024 * 1024), 'relay', false];
+        yield 'no role' => [(string) (192 * 1024 * 1024), null, false];
+        yield 'explicit minimum' => [(string) (192 * 1024 * 1024), 'consumer', true];
+    }
+
+    #[DataProvider('environmentBudgets')]
+    public function testEnvironmentGrantIsBoundedRoleSpecificAndNotInheritedByChild(?string $budget, ?string $role, bool $allowed): void
+    {
+        $variables = ['BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES' => $budget, 'BAANDER_WORKER_ID' => $role,
+            'SYMFONY_DOTENV_VARS' => 'BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES'];
+        $previous = [];
+        foreach ($variables as $key => $value) {
+            $previous[$key] = getenv($key);
+            putenv($value === null ? $key : $key . '=' . $value);
+        }
+        $pidFile = $this->project . '/admitted.pid';
+        try {
+            try {
+                $output = BoundedScheduledConsoleExecutor::fromWorkerEnvironment($this->project)->execute('app:fixture-budget', ['--pid-file' => $pidFile]);
+                self::assertTrue($allowed, 'Invalid or disabled budget must not create a process.');
+                self::assertSame(['budget' => '0', 'dotenv' => false], json_decode($output, true, 32, JSON_THROW_ON_ERROR));
+                $this->assertDirectChildStopped($pidFile);
+                self::assertSame($budget, getenv('BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES'), 'Grant remains available to the owning serial consumer.');
+            } catch (\InvalidArgumentException|\RuntimeException $error) {
+                if ($allowed) {
+                    throw $error;
+                }
+                self::assertFileDoesNotExist($pidFile);
+            }
+        } finally {
+            foreach ($previous as $key => $value) {
+                putenv($value === false ? $key : $key . '=' . $value);
+            }
+        }
+    }
+
+    public function testReservationMustCoverConfiguredHeapAsWellAsNativeHeadroom(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new BoundedScheduledConsoleExecutor($this->project, memoryLimitMiB: 256, reservationBytes: 192 * 1024 * 1024);
     }
 
     public function testConfiguredKernelResolvesActualExecutorPort(): void

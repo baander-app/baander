@@ -19,8 +19,6 @@ final class WorkerSupervisorTest extends TestCase
     private mixed $output;
     /** @var list<WorkerChildProcess> */
     private array $children = [];
-    /** @var list<WorkerSupervisor> */
-    private array $supervisors = [];
 
     protected function setUp(): void
     {
@@ -211,6 +209,57 @@ final class WorkerSupervisorTest extends TestCase
         new WorkerSupervisor([$worker], 1, PHP_INT_MAX, 100, $this->launch(...), 'unit-workers');
     }
 
+    public function testExactProcessCeilingIncludesDescendantsAndDefaultsToDirectChildrenOnly(): void
+    {
+        $first = new WorkerDefinition('first', [PHP_BINARY, '-r', 'exit(0);'], $this->directory, 100, descendantProcessReservation: 2);
+        $second = $this->definition('second');
+        self::assertSame(0, $second->descendantProcessReservation);
+        $supervisor = new WorkerSupervisor([$first, $second], 4, 300, 100, $this->launch(...), 'unit-workers');
+        self::assertCount(2, $supervisor->snapshot());
+        self::assertSame([], $this->children, 'Admission reserves descendant slots before launching.');
+        $supervisor->tick(0, true);
+        self::assertCount(2, $this->children);
+    }
+
+    public function testDescendantReservationRejectsProcessBudgetBeforeAnyLaunch(): void
+    {
+        $first = new WorkerDefinition('first', [PHP_BINARY, '-r', 'exit(0);'], $this->directory, 100, descendantProcessReservation: 2);
+        $second = $this->definition('second');
+        $launches = 0;
+        try {
+            new WorkerSupervisor([$first, $second], 3, 300, 100, static function () use (&$launches): WorkerChildProcess {
+                ++$launches;
+                throw new \RuntimeException('Admission must finish before launch.');
+            }, 'unit-workers');
+            self::fail('Direct workers and descendants exceed the process ceiling.');
+        } catch (\InvalidArgumentException $error) {
+            self::assertSame('Worker process reservations exceed the admission ceiling.', $error->getMessage());
+        }
+        self::assertSame(0, $launches);
+    }
+
+    #[DataProvider('invalidDescendantReservations')]
+    public function testDescendantReservationMustBeNonnegativeAndBounded(int $reservation): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new WorkerDefinition('worker', [PHP_BINARY, '-r', 'exit(0);'], $this->directory, 100, descendantProcessReservation: $reservation);
+    }
+
+    /** @return iterable<string, array{int}> */
+    public static function invalidDescendantReservations(): iterable
+    {
+        yield 'negative' => [-1];
+        yield 'above ceiling' => [4097];
+        yield 'integer maximum' => [PHP_INT_MAX];
+    }
+
+    public function testMaximumDescendantReservationFitsWithoutMultiplyingRoleMemory(): void
+    {
+        $worker = new WorkerDefinition('worker', [PHP_BINARY, '-r', 'exit(0);'], $this->directory, 100, descendantProcessReservation: 4096);
+        $supervisor = new WorkerSupervisor([$worker], 4097, 200, 100, $this->launch(...), 'unit-workers');
+        self::assertCount(1, $supervisor->snapshot());
+    }
+
     public function testChildrenCannotShareMutableRestartPolicy(): void
     {
         $policy = new RestartPolicy();
@@ -397,6 +446,7 @@ PHP;
         self::assertFalse($supervisor->isReady([]));
     }
 
+    /** @param list<string> $ids */
     #[DataProvider('invalidBudgets')]
     public function testRejectsImpossibleDesiredSets(array $ids, int $maximum, int $memory, int $reserved): void
     {
@@ -429,7 +479,6 @@ PHP;
     private function supervisor(array $definitions, ?\Closure $launcher = null): WorkerSupervisor
     {
         $supervisor = new WorkerSupervisor($definitions, count($definitions), 1000, 100, $launcher ?? $this->launch(...), 'unit-workers');
-        $this->supervisors[] = $supervisor;
         return $supervisor;
     }
 
@@ -475,7 +524,6 @@ PHP;
 
     protected function tearDown(): void
     {
-        $this->supervisors = [];
         $this->children = [];
         gc_collect_cycles();
         fclose($this->output);

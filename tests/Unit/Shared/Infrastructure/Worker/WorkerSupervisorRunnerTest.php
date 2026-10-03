@@ -14,7 +14,7 @@ final class WorkerSupervisorRunnerTest extends TestCase
         $project = dirname(__DIR__, 5);
         $path = tempnam(sys_get_temp_dir(), 'baander-worker-dotenv-');
         self::assertIsString($path);
-        file_put_contents($path, "MESSENGER_CONSUMER_NAME=dotenv-default.baander.app\n");
+        file_put_contents($path, "MESSENGER_CONSUMER_NAME=dotenv-default.baander.app\nBAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES=999999999\n");
         $previousEnv = $_ENV;
         $previousServer = $_SERVER;
         $stdout = tmpfile();
@@ -23,8 +23,10 @@ final class WorkerSupervisorRunnerTest extends TestCase
         self::assertIsResource($stderr);
         $child = null;
         try {
-            $_ENV['SYMFONY_DOTENV_VARS'] = 'MESSENGER_CONSUMER_NAME';
-            $_SERVER['SYMFONY_DOTENV_VARS'] = 'MESSENGER_CONSUMER_NAME';
+            $_ENV['SYMFONY_DOTENV_VARS'] = 'MESSENGER_CONSUMER_NAME,BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES';
+            $_SERVER['SYMFONY_DOTENV_VARS'] = 'MESSENGER_CONSUMER_NAME,BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES';
+            $_ENV['BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES'] = '999999999';
+            $_SERVER['BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES'] = '999999999';
             $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner($project, 'postgresql://worker:private@db.baander.app/worker');
             $environment = (new \ReflectionMethod($runner, 'environment'))->invoke($runner);
             $expected = 'worker-namespace-boot-consumer-1';
@@ -33,6 +35,7 @@ final class WorkerSupervisorRunnerTest extends TestCase
 require $argv[1] . '/vendor/autoload.php';
 (new \Symfony\Component\Dotenv\Dotenv())->usePutenv()->load($argv[2]);
 echo $_ENV['MESSENGER_CONSUMER_NAME'];
+echo ':' . $_ENV['BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES'];
 PHP;
             $child = WorkerChildProcess::start([PHP_BINARY, '-r', $code, '--', $project, $path], $project, $stdout, $stderr, $environment);
             $deadline = hrtime(true) / 1e9 + 5;
@@ -45,7 +48,7 @@ PHP;
             }
             $diagnostic = file_get_contents(stream_get_meta_data($stderr)['uri'], false, null, 0, 4096);
             self::assertSame(0, $child->exitCode(), $diagnostic === false ? 'Cannot read Dotenv diagnostics.' : $diagnostic);
-            self::assertSame($expected, file_get_contents(stream_get_meta_data($stdout)['uri'], false, null, 0, 4096));
+            self::assertSame($expected . ':0', file_get_contents(stream_get_meta_data($stdout)['uri'], false, null, 0, 4096));
         } finally {
             unset($child);
             $_ENV = $previousEnv;
@@ -53,6 +56,23 @@ PHP;
             fclose($stdout);
             fclose($stderr);
             unlink($path);
+        }
+    }
+
+    public function testConsoleReservationIsGrantedOnlyToConsumerAndDisabledByDefault(): void
+    {
+        $project = dirname(__DIR__, 5);
+        $runner = new \App\Shared\Infrastructure\Worker\WorkerSupervisorRunner($project, 'postgresql://worker:private@db.baander.app/worker');
+        $environment = ['BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES' => '999999999'];
+        $method = new \ReflectionMethod($runner, 'roleEnvironment');
+        foreach ([0, 192 * 1024 * 1024] as $reservation) {
+            $configuration = new \App\Shared\Application\DTO\WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 1024 * 1024 * 1024,
+                128 * 1024 * 1024, 320 * 1024 * 1024, 320 * 1024 * 1024, '/tmp/baander-worker-locks', $reservation);
+            foreach (['consumer', 'relay'] as $role) {
+                $definition = new \App\Shared\Infrastructure\Worker\WorkerDefinition($role, [PHP_BINARY, '-r', 'exit(0);'], $project, 320 * 1024 * 1024);
+                $granted = $method->invoke($runner, $environment, $definition, $configuration);
+                self::assertSame((string) ($role === 'consumer' ? $reservation : 0), $granted['BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES']);
+            }
         }
     }
 
