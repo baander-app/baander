@@ -10,12 +10,13 @@ use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
 use App\Transcode\Application\Port\FFmpegPortInterface;
 use App\Transcode\Application\Port\SegmentAvailabilityInterface;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
-use App\Transcode\Application\Port\TranscodeLoopLockInterface;
+use App\Transcode\Application\Port\TranscodeLoopLeaseInterface;
+use App\Transcode\Application\Port\TranscodeLoopStarterInterface;
+use App\Transcode\Application\Exception\TranscodeStartupUnavailableException;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\Event\TranscodeJobCompleted;
 use App\Transcode\Domain\Event\TranscodeJobFailed;
-use App\Transcode\Domain\Event\TranscodeSessionAttached;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\Service\AudioProcessingRules;
@@ -33,7 +34,7 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Throwable;
 
 /**
- * Listens for TranscodeSessionAttached events and orchestrates the full encoding loop.
+ * Accepts explicit session/lease handoffs and orchestrates the encoding loop.
  *
  * Runs in a Swoole coroutine (via CoWrapper::go()) to avoid blocking the HTTP worker.
  * Video segments are produced by ONE long-lived FFmpeg process per (job, tier),
@@ -52,7 +53,7 @@ use Throwable;
  *   cold-start ~0.6s is imperceptible). The availability table is cleared on
  *   restart so the HTTP layer doesn't serve stale-ready rows.
  */
-final class TranscodeSessionSubscriber
+final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
 {
     /** Persist job/session state every N completed segments */
     private const PERSIST_INTERVAL_SEGMENTS = 10;
@@ -91,7 +92,6 @@ final class TranscodeSessionSubscriber
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
         private readonly ?\SwooleBundle\SwooleBundle\Bridge\Symfony\Container\CoWrapper $coWrapper = null,
-        private readonly ?TranscodeLoopLockInterface $loopLock = null,
         private readonly ?TranscodeStreamManager $streamManager = null,
         private readonly ?SegmentAvailabilityInterface $availability = null,
         private readonly LoopLockRenewalTimerInterface $renewalTimer = new SwooleLoopLockRenewalTimer(),
@@ -99,55 +99,51 @@ final class TranscodeSessionSubscriber
     {
     }
 
-    public function __invoke(TranscodeSessionAttached $event): void
+    public function start(Uuid $sessionId, TranscodeLoopLeaseInterface $lease): void
     {
         if (!$this->processPool->isRunning()) {
-            $this->logger->warning('CPU process pool not running — skipping transcode job');
-
-            return;
+            throw new TranscodeStartupUnavailableException();
         }
 
-        $jobKey = $event->getJobId()->toString();
+        $jobKey = $lease->getJobId()->toString();
         if (isset($this->runningJobs[$jobKey])) {
-            $this->logger->debug('Encoding loop already running for job, skipping duplicate attach', [
-                'jobId' => $jobKey,
-            ]);
-
-            return;
+            throw new TranscodeStartupUnavailableException();
         }
         $this->runningJobs[$jobKey] = true;
 
-        if ($this->coWrapper !== null) {
-            $this->coWrapper->go(function () use ($event, $jobKey): void {
-                try {
-                    $this->runEncodingLoop($event);
-                } finally {
-                    unset($this->runningJobs[$jobKey]);
-                }
-            });
-        } else {
+        $run = function () use ($sessionId, $lease, $jobKey): void {
             try {
-                $this->runEncodingLoop($event);
+                $this->runEncodingLoop($sessionId, $lease);
             } finally {
                 unset($this->runningJobs[$jobKey]);
             }
+        };
+        try {
+            if ($this->coWrapper !== null) {
+                $this->coWrapper->go($run);
+            } else {
+                $run();
+            }
+        } catch (Throwable $error) {
+            unset($this->runningJobs[$jobKey]);
+            throw $error;
         }
     }
 
-    private function runEncodingLoop(TranscodeSessionAttached $event): void
+    private function runEncodingLoop(Uuid $sessionId, TranscodeLoopLeaseInterface $lease): void
     {
-        $jobId = $event->getJobId();
+        $jobId = $lease->getJobId();
         $jobKey = $jobId->toString();
-        $ownership = new TranscodeLoopOwnership();
+        $ownership = new TranscodeLoopOwnership($lease);
         $this->loopOwnership[$jobKey] = $ownership;
         $job = null;
 
         try {
             $this->startLockRenewal($jobId, $ownership);
-            $job = $this->jobPort->findByUuid($event->getJobId());
+            $job = $this->jobPort->findByUuid($jobId);
             $this->assertLoopOwnership($jobId, $ownership);
             if ($job === null) {
-                $this->logger->error('Transcode job not found', ['jobId' => $event->getJobId()->toString()]);
+                $this->logger->error('Transcode job not found', ['jobId' => $jobId->toString()]);
 
                 return;
             }
@@ -163,7 +159,7 @@ final class TranscodeSessionSubscriber
                 return;
             }
 
-            $session = $this->loadSessionForJob($event, $job);
+            $session = $this->sessionPort->findByUuid($sessionId);
             $this->assertLoopOwnership($jobId, $ownership);
             if ($session === null) {
                 $this->logger->warning('No active session found for job', ['jobId' => $job->getId()->toString()]);
@@ -395,10 +391,6 @@ final class TranscodeSessionSubscriber
 
     private function startLockRenewal(Uuid $jobId, TranscodeLoopOwnership $ownership): void
     {
-        if ($this->loopLock === null) {
-            return;
-        }
-
         // The lease may have expired between session creation and execution.
         $this->renewLoopLock($jobId, $ownership);
         $this->assertLoopOwnership($jobId, $ownership);
@@ -416,7 +408,7 @@ final class TranscodeSessionSubscriber
             return;
         }
         try {
-            $renewed = $this->loopLock?->renew($jobId, self::LOOP_LOCK_TTL_SECONDS);
+            $renewed = $ownership->lease->renew(self::LOOP_LOCK_TTL_SECONDS);
         } catch (Throwable) {
             $renewed = false;
         }
@@ -474,9 +466,9 @@ final class TranscodeSessionSubscriber
         $actions = [
             fn() => $this->stopLockRenewal($jobId),
             fn() => $this->streamManager?->stopStream($jobId),
-            function () use ($jobId, $ownership): void {
+            function () use ($ownership): void {
                 if (!$ownership->isLost()) {
-                    $this->loopLock?->release($jobId);
+                    $ownership->lease->release();
                 }
             },
             fn() => $this->seekSignalBroker->close($jobId),
@@ -496,11 +488,6 @@ final class TranscodeSessionSubscriber
         if (($this->loopOwnership[$jobKey] ?? null) === $ownership) {
             unset($this->loopOwnership[$jobKey]);
         }
-    }
-
-    private function loadSessionForJob(TranscodeSessionAttached $event, TranscodeJob $job): ?TranscodeSession
-    {
-        return $this->sessionPort->findByUuid($event->getSessionId());
     }
 
     private function failJob(TranscodeJob $job, string $reason, TranscodeLoopOwnership $ownership): void

@@ -48,6 +48,7 @@ final class RedisTranscodeLoopLockRaceTest extends TestCase
     protected function tearDown(): void
     {
         $this->connection->interleave = null;
+        $this->connection->afterEvaluation = null;
         try {
             $this->observer->del($this->key);
         } finally {
@@ -59,23 +60,27 @@ final class RedisTranscodeLoopLockRaceTest extends TestCase
 
     public function testStaleRenewalPreservesSuccessorOwnerAndExpiration(): void
     {
-        self::assertTrue($this->lock->acquire($this->jobId, 30));
+        $lease = $this->lock->acquire($this->jobId, 30);
+        self::assertNotNull($lease);
         $this->replaceOwnerBeforeMutation();
 
-        $renewed = $this->lock->renew($this->jobId, 300);
+        $renewed = $lease->renew(300);
 
         self::assertTrue($this->connection->interleaved, 'The ownership replacement must actually run.');
         self::assertSame('successor-owner', $this->observer->get($this->key));
         $this->assertSuccessorExpiration();
         self::assertFalse($renewed);
+        self::assertFalse($lease->renew(300));
+        self::assertSame(1, $this->connection->evaluationAttempts);
     }
 
     public function testStaleReleasePreservesSuccessorOwnerAndExpiration(): void
     {
-        self::assertTrue($this->lock->acquire($this->jobId, 30));
+        $lease = $this->lock->acquire($this->jobId, 30);
+        self::assertNotNull($lease);
         $this->replaceOwnerBeforeMutation();
 
-        $this->lock->release($this->jobId);
+        $lease->release();
 
         self::assertTrue($this->connection->interleaved, 'The ownership replacement must actually run.');
         self::assertSame('successor-owner', $this->observer->get($this->key));
@@ -84,61 +89,172 @@ final class RedisTranscodeLoopLockRaceTest extends TestCase
 
     public function testRenewalDoesNotReacquireMissingKey(): void
     {
-        self::assertTrue($this->lock->acquire($this->jobId, 30));
+        $lease = $this->lock->acquire($this->jobId, 30);
+        self::assertNotNull($lease);
         self::assertSame(1, $this->observer->del($this->key));
 
-        self::assertFalse($this->lock->renew($this->jobId, 30));
+        self::assertFalse($lease->renew(30));
         self::assertFalse($this->observer->get($this->key));
         self::assertSame(-2, $this->observer->pttl($this->key));
     }
 
     public function testValidOwnerRenewsExpirationAndReleases(): void
     {
-        self::assertTrue($this->lock->acquire($this->jobId, 1));
+        $lease = $this->lock->acquire($this->jobId, 1);
+        self::assertNotNull($lease);
         $token = $this->observer->get($this->key);
         self::assertIsString($token);
 
-        self::assertTrue($this->lock->renew($this->jobId, 30));
+        self::assertTrue($lease->renew(30));
         self::assertSame($token, $this->observer->get($this->key));
         self::assertGreaterThan(25000, $this->observer->pttl($this->key));
-        $this->lock->release($this->jobId);
+        $lease->release();
         self::assertFalse($this->observer->get($this->key));
-        self::assertFalse($this->lock->renew($this->jobId, 30));
+        $lease->release();
+        self::assertFalse($lease->renew(30));
+        self::assertSame(2, $this->connection->evaluationAttempts);
     }
 
     public function testExpiredOwnerCannotRenewOrReacquire(): void
     {
-        self::assertTrue($this->lock->acquire($this->jobId, 1));
+        $lease = $this->lock->acquire($this->jobId, 1);
+        self::assertNotNull($lease);
         sleep(2);
 
-        self::assertFalse($this->lock->renew($this->jobId, 30));
+        self::assertFalse($lease->renew(30));
         self::assertFalse($this->observer->get($this->key));
     }
 
     public function testFailedAcquisitionPreservesExistingOwnerToken(): void
     {
-        self::assertTrue($this->lock->acquire($this->jobId, 30));
+        $lease = $this->lock->acquire($this->jobId, 30);
+        self::assertNotNull($lease);
         $token = $this->observer->get($this->key);
 
-        self::assertFalse($this->lock->acquire($this->jobId, 30));
-        self::assertTrue($this->lock->renew($this->jobId, 30));
+        self::assertNull($this->lock->acquire($this->jobId, 30));
+        self::assertTrue($lease->renew(30));
         self::assertSame($token, $this->observer->get($this->key));
-        $this->lock->release($this->jobId);
+        $lease->release();
         self::assertFalse($this->observer->get($this->key));
+    }
+
+    public function testSameFactoryReacquiresExpiredJobWithoutGivingOldLeaseSuccessorOwnership(): void
+    {
+        $oldLease = $this->lock->acquire($this->jobId, 1);
+        self::assertNotNull($oldLease);
+        sleep(2);
+
+        $successor = $this->lock->acquire($this->jobId, 60);
+        self::assertNotNull($successor);
+        $token = $this->observer->get($this->key);
+
+        self::assertFalse($oldLease->renew(300));
+        $oldLease->release();
+
+        self::assertSame($token, $this->observer->get($this->key));
+        $this->assertSuccessorExpiration();
+        self::assertTrue($successor->renew(30));
+        $successor->release();
+        self::assertFalse($this->observer->get($this->key));
+    }
+
+    public function testSameFactoryReacquiresRemovedKeyWithoutGivingOldLeaseSuccessorOwnership(): void
+    {
+        $oldLease = $this->lock->acquire($this->jobId, 30);
+        self::assertNotNull($oldLease);
+        self::assertSame(1, $this->observer->del($this->key));
+
+        $successor = $this->lock->acquire($this->jobId, 60);
+        self::assertNotNull($successor);
+        $token = $this->observer->get($this->key);
+
+        $oldLease->release();
+        self::assertFalse($oldLease->renew(300));
+
+        self::assertSame($token, $this->observer->get($this->key));
+        $this->assertSuccessorExpiration();
+        self::assertTrue($successor->renew(30));
+    }
+
+    public function testLostLeaseNeverRenewsAgainEvenIfItsTokenIsRestored(): void
+    {
+        $lease = $this->lock->acquire($this->jobId, 30);
+        self::assertNotNull($lease);
+        $token = $this->observer->get($this->key);
+        self::assertIsString($token);
+        self::assertSame(1, $this->observer->del($this->key));
+        self::assertFalse($lease->renew(30));
+        self::assertTrue($this->observer->set($this->key, $token, ['EX' => 60]));
+
+        self::assertFalse($lease->renew(300));
+
+        self::assertSame(1, $this->connection->evaluationAttempts);
+        $this->assertSuccessorExpiration();
+    }
+
+    public function testLeaseDebugInfoOmitsOwnerTokenAndSerializationIsRejected(): void
+    {
+        $lease = $this->lock->acquire($this->jobId, 30);
+        self::assertNotNull($lease);
+        $token = $this->observer->get($this->key);
+        self::assertIsString($token);
+        self::assertStringNotContainsString($token, print_r($lease, true));
+
+        $this->expectException(\LogicException::class);
+        serialize($lease);
     }
 
     public function testRedisEvaluationFailureFailsRenewalClosedAndReleaseDoesNotThrow(): void
     {
-        self::assertTrue($this->lock->acquire($this->jobId, 30));
+        $lease = $this->lock->acquire($this->jobId, 30);
+        self::assertNotNull($lease);
         $token = $this->observer->get($this->key);
         $this->connection->failEvaluation = true;
 
-        self::assertFalse($this->lock->renew($this->jobId, 30));
-        $this->lock->release($this->jobId);
+        self::assertFalse($lease->renew(30));
+        $this->connection->failEvaluation = false;
+        self::assertFalse($lease->renew(30));
+        self::assertSame(1, $this->connection->evaluationAttempts);
+        $this->connection->failEvaluation = true;
+        $lease->release();
 
         self::assertSame(2, $this->connection->evaluationAttempts);
         self::assertSame($token, $this->observer->get($this->key));
-        self::assertFalse($this->lock->renew($this->jobId, 30));
+        self::assertFalse($lease->renew(30));
+        self::assertSame(2, $this->connection->evaluationAttempts);
+    }
+
+    public function testSuccessfulRenewalResponseAfterReleaseReportsLostOwnership(): void
+    {
+        $lease = $this->lock->acquire($this->jobId, 30);
+        self::assertNotNull($lease);
+        $this->connection->afterEvaluation = static function () use ($lease): void {
+            $lease->release();
+        };
+
+        self::assertFalse($lease->renew(30));
+
+        self::assertFalse($this->observer->get($this->key));
+        self::assertSame(2, $this->connection->evaluationAttempts);
+        self::assertFalse($lease->renew(30));
+        self::assertSame(2, $this->connection->evaluationAttempts);
+    }
+
+    public function testSuccessfulRenewalResponseAfterAnotherRenewalFailsReportsLostOwnership(): void
+    {
+        $lease = $this->lock->acquire($this->jobId, 30);
+        self::assertNotNull($lease);
+        $this->connection->afterEvaluation = function () use ($lease): void {
+            $this->connection->failEvaluation = true;
+            self::assertFalse($lease->renew(30));
+            $this->connection->failEvaluation = false;
+        };
+
+        self::assertFalse($lease->renew(30));
+
+        self::assertIsString($this->observer->get($this->key));
+        self::assertSame(2, $this->connection->evaluationAttempts);
+        self::assertFalse($lease->renew(30));
         self::assertSame(2, $this->connection->evaluationAttempts);
     }
 
@@ -161,6 +277,7 @@ final class RedisTranscodeLoopLockRaceTest extends TestCase
 final class InterleavingLoopLockRedis extends Redis
 {
     public ?Closure $interleave = null;
+    public ?Closure $afterEvaluation = null;
     public bool $interleaved = false;
     public bool $failEvaluation = false;
     public int $evaluationAttempts = 0;
@@ -184,7 +301,14 @@ final class InterleavingLoopLockRedis extends Redis
         // so the same regression still proves rejection of the stale owner.
         $this->runInterleaving();
 
-        return parent::eval($script, $args, $num_keys);
+        $result = parent::eval($script, $args, $num_keys);
+        $callback = $this->afterEvaluation;
+        $this->afterEvaluation = null;
+        if ($callback !== null) {
+            $callback();
+        }
+
+        return $result;
     }
 
     private function runInterleaving(): void

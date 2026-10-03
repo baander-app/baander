@@ -55,6 +55,8 @@ services:
         resource: '../src/'
         exclude:
             - '../src/Kernel.php'
+            - '../src/Transcode/Infrastructure/Redis/RedisTranscodeLoopLease.php'
+            - '../src/Transcode/Infrastructure/Swoole/TranscodeLoopOwnership.php'
             - '../src/**/Entity/'
             - '../src/**/ValueObject/'
             - '../src/Shared/Infrastructure/Messenger/AllowedClassNormalizer.php'
@@ -927,12 +929,12 @@ services:
         arguments:
             $videoRepository: '@App\Catalog\Domain\Repository\VideoRepositoryInterface'
             $jsonEncoder: '@json_encoder'
-            $loopLock: '@App\Transcode\Application\Port\TranscodeLoopLockInterface'
             $streamManager: '@App\Transcode\Infrastructure\Swoole\TranscodeStreamManager'
             $availability: '@App\Transcode\Application\Port\SegmentAvailabilityInterface'
             $renewalTimer: '@App\Transcode\Infrastructure\Swoole\LoopLockRenewalTimerInterface'
-        tags:
-            - { name: 'kernel.event_listener', event: 'App\Transcode\Domain\Event\TranscodeSessionAttached' }
+
+    App\Transcode\Application\Port\TranscodeLoopStarterInterface:
+        alias: App\Transcode\Infrastructure\Swoole\TranscodeSessionSubscriber
 
     # Distributed lock ensuring only one worker runs a transcode encoding loop.
     App\Transcode\Application\Port\TranscodeLoopLockInterface:

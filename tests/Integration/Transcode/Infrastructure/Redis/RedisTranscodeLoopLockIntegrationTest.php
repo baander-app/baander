@@ -38,10 +38,12 @@ final class RedisTranscodeLoopLockIntegrationTest extends TestCase
     {
         $jobId = Uuid::generate();
 
-        $this->assertTrue($this->lock->acquire($jobId, 10));
-        $this->assertTrue($this->lock->renew($jobId, 10));
+        $lease = $this->lock->acquire($jobId, 10);
+        $this->assertNotNull($lease);
+        $this->assertEquals($jobId, $lease->getJobId());
+        $this->assertTrue($lease->renew(10));
 
-        $this->lock->release($jobId);
+        $lease->release();
     }
 
     public function testAcquireReturnsFalseWhenLockIsHeldByAnotherInstance(): void
@@ -49,10 +51,11 @@ final class RedisTranscodeLoopLockIntegrationTest extends TestCase
         $jobId = Uuid::generate();
         $otherLock = new RedisTranscodeLoopLock($this->redisFactory, 'transcode:lock:test');
 
-        $this->assertTrue($this->lock->acquire($jobId, 10));
-        $this->assertFalse($otherLock->acquire($jobId, 10));
+        $lease = $this->lock->acquire($jobId, 10);
+        $this->assertNotNull($lease);
+        $this->assertNull($otherLock->acquire($jobId, 10));
 
-        $this->lock->release($jobId);
+        $lease->release();
     }
 
     public function testReleaseOnlyDeletesOwnLock(): void
@@ -60,21 +63,27 @@ final class RedisTranscodeLoopLockIntegrationTest extends TestCase
         $jobId = Uuid::generate();
         $otherLock = new RedisTranscodeLoopLock($this->redisFactory, 'transcode:lock:test');
 
-        $this->assertTrue($this->lock->acquire($jobId, 10));
-        $otherLock->release($jobId); // should be a no-op
+        $lease = $this->lock->acquire($jobId, 1);
+        $this->assertNotNull($lease);
+        sleep(2);
+        $successor = $otherLock->acquire($jobId, 10);
+        $this->assertNotNull($successor);
+        $lease->release();
 
-        $this->assertFalse($otherLock->acquire($jobId, 10));
-        $this->lock->release($jobId);
+        $this->assertNull($otherLock->acquire($jobId, 10));
+        $this->assertTrue($successor->renew(10));
+        $successor->release();
     }
 
     public function testRenewReturnsFalseWhenLockExpired(): void
     {
         $jobId = Uuid::generate();
 
-        $this->assertTrue($this->lock->acquire($jobId, 1));
+        $lease = $this->lock->acquire($jobId, 1);
+        $this->assertNotNull($lease);
         sleep(2);
 
-        $this->assertFalse($this->lock->renew($jobId, 10));
+        $this->assertFalse($lease->renew(10));
     }
 
     public function testDifferentJobsDoNotInterfere(): void
@@ -82,11 +91,14 @@ final class RedisTranscodeLoopLockIntegrationTest extends TestCase
         $jobA = Uuid::generate();
         $jobB = Uuid::generate();
 
-        $this->assertTrue($this->lock->acquire($jobA, 10));
-        $this->assertTrue($this->lock->acquire($jobB, 10));
+        $leaseA = $this->lock->acquire($jobA, 10);
+        $leaseB = $this->lock->acquire($jobB, 10);
+        $this->assertNotNull($leaseA);
+        $this->assertNotNull($leaseB);
 
-        $this->lock->release($jobA);
-        $this->lock->release($jobB);
+        $leaseA->release();
+        $this->assertTrue($leaseB->renew(10));
+        $leaseB->release();
     }
 
     private function clearTestKeys(): void
@@ -95,9 +107,7 @@ final class RedisTranscodeLoopLockIntegrationTest extends TestCase
             $this->redisFactory->borrow(function (\Redis $redis): void {
                 $iterator = null;
                 while ($keys = $redis->scan($iterator, 'transcode:lock:test:*', 100)) {
-                    if (is_array($keys) && $keys !== []) {
-                        $redis->del(...$keys);
-                    }
+                    $redis->del(...$keys);
                 }
             });
         } catch (\Throwable) {

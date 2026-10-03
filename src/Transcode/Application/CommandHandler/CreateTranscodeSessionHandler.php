@@ -8,6 +8,7 @@ use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\Exception\TranscodeStartupUnavailableException;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\TranscodeLoopLockInterface;
+use App\Transcode\Application\Port\TranscodeLoopStarterInterface;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\Event\TranscodeSessionAttached;
@@ -30,6 +31,7 @@ final class CreateTranscodeSessionHandler
         private readonly TranscodeStoragePortInterface $storagePort,
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly TranscodeLoopLockInterface $loopLock,
+        private readonly TranscodeLoopStarterInterface $loopStarter,
     )
     {
     }
@@ -58,7 +60,8 @@ final class CreateTranscodeSessionHandler
         // Only one worker may start the encoding loop for a job. Acquire a
         // distributed lock; if another worker is already starting it, wait
         // briefly for a live session to appear and then reuse it.
-        if (!$this->loopLock->acquire($job->getId(), self::LOOP_LOCK_TTL_SECONDS)) {
+        $lease = $this->loopLock->acquire($job->getId(), self::LOOP_LOCK_TTL_SECONDS);
+        if ($lease === null) {
             $liveSession = $this->waitForLiveSession($job->getId());
             if ($liveSession !== null) {
                 return $liveSession;
@@ -67,67 +70,75 @@ final class CreateTranscodeSessionHandler
             throw new TranscodeStartupUnavailableException();
         }
 
-        // We hold the lock. Re-check the DB: another worker may have created a
-        // session between our fast-path check and acquiring the lock.
-        $liveSession = $this->findLiveSession($job->getId());
-        if ($liveSession !== null) {
-            $this->loopLock->release($job->getId());
+        $handedOff = false;
+        try {
+            // We hold the lock. Re-check the DB: another worker may have created a
+            // session between our fast-path check and acquiring the lock.
+            $liveSession = $this->findLiveSession($job->getId());
+            if ($liveSession !== null) {
+                return $liveSession;
+            }
 
-            return $liveSession;
-        }
+            // Mutate retry state only after obtaining ownership and confirming that
+            // another startup has not already supplied a live session.
+            if (empty($job->getAudioTrackLanguages()) && !empty($command->getAudioLanguages())) {
+                $job->setAudioTrackLanguages($command->getAudioLanguages());
+            }
+            $wasRetried = in_array($job->getStatus(), [TranscodeStatus::Failed, TranscodeStatus::Cancelled], true);
+            if ($wasRetried) {
+                $job->retry();
+            }
 
-        // Mutate retry state only after obtaining ownership and confirming that
-        // another startup has not already supplied a live session.
-        if (empty($job->getAudioTrackLanguages()) && !empty($command->getAudioLanguages())) {
-            $job->setAudioTrackLanguages($command->getAudioLanguages());
-        }
-        $wasRetried = in_array($job->getStatus(), [TranscodeStatus::Failed, TranscodeStatus::Cancelled], true);
-        if ($wasRetried) {
-            $job->retry();
-        }
+            // A retried job skips the stale-session recovery: old sessions are
+            // leftovers from the failed run and a fresh loop must start.
+            if (!$wasRetried) {
+                foreach ($this->sessionPort->findByJob($job->getId()) as $existing) {
+                    $state = $existing->getSessionState();
+                    if (!in_array($state, [
+                        SessionState::Pending,
+                        SessionState::Preparing,
+                        SessionState::Active,
+                        SessionState::Paused,
+                    ], true)) {
+                        continue;
+                    }
 
-        // A retried job skips the stale-session recovery: old sessions are
-        // leftovers from the failed run and a fresh loop must start.
-        if (!$wasRetried) {
-            foreach ($this->sessionPort->findByJob($job->getId()) as $existing) {
-                $state = $existing->getSessionState();
-                if (!in_array($state, [
-                    SessionState::Pending,
-                    SessionState::Preparing,
-                    SessionState::Active,
-                    SessionState::Paused,
-                ], true)) {
-                    continue;
-                }
-
-                $idleSeconds = (new \DateTimeImmutable())->getTimestamp() - $existing->getUpdatedAt()->getTimestamp();
-                if ($idleSeconds > 60) {
-                    $existing->markFailed();
-                    $this->sessionPort->save($existing);
+                    $idleSeconds = (new \DateTimeImmutable())->getTimestamp() - $existing->getUpdatedAt()->getTimestamp();
+                    if ($idleSeconds > 60) {
+                        $existing->markFailed();
+                        $this->sessionPort->save($existing);
+                    }
                 }
             }
+
+            $job->attachSession();
+            $this->jobPort->save($job);
+
+            $session = $this->sessionPort->createSession(
+                $command->getUserId(),
+                $job->getId(),
+                $command->getVideoId(),
+                $command->getAudioProfile(),
+                $command->getPriority(),
+                $command->getAudioLanguages(),
+            );
+
+            $this->eventDispatcher->dispatch(new TranscodeSessionAttached(
+                sessionId: $session->getId(),
+                jobId: $job->getId(),
+                userId: $command->getUserId(),
+                qualityTier: $job->getQualityTierName(),
+            ));
+
+            $this->loopStarter->start($session->getId(), $lease);
+            $handedOff = true;
+
+            return $session;
+        } finally {
+            if (!$handedOff) {
+                $lease->release();
+            }
         }
-
-        $job->attachSession();
-        $this->jobPort->save($job);
-
-        $session = $this->sessionPort->createSession(
-            $command->getUserId(),
-            $job->getId(),
-            $command->getVideoId(),
-            $command->getAudioProfile(),
-            $command->getPriority(),
-            $command->getAudioLanguages(),
-        );
-
-        $this->eventDispatcher->dispatch(new TranscodeSessionAttached(
-            sessionId: $session->getId(),
-            jobId: $job->getId(),
-            userId: $command->getUserId(),
-            qualityTier: $job->getQualityTierName(),
-        ));
-
-        return $session;
     }
 
     private function findLiveSession(\App\Shared\Domain\Model\Uuid $jobId): ?TranscodeSession

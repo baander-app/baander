@@ -25,14 +25,15 @@ final class CoWrapper
     /**
      * Instead of Co::go(), CoWrapper::go() has to be used to run coroutines in Symfony apps, so Symfony
      * is able to reset all stateful service instances.
-     *
-     * @SuppressWarnings(PHPMD.ShortMethodName)
      */
     public function go(callable $fn): void
     {
-        Coroutine::create(function () use ($fn): void {
+        $id = Coroutine::create(function () use ($fn): void {
             $this->defer();
             $fn();
         });
+        if ($id === false) {
+            throw new \RuntimeException('Unable to create coroutine.');
+        }
     }
 }

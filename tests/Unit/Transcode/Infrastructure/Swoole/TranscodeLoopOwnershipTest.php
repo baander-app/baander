@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Transcode\Infrastructure\Swoole;
 
 use App\Transcode\Infrastructure\Swoole\TranscodeLoopOwnership;
+use App\Transcode\Application\Port\TranscodeLoopLeaseInterface;
 use App\Transcode\Infrastructure\Swoole\TranscodeLoopOwnershipLost;
 use PHPUnit\Framework\TestCase;
 
@@ -12,7 +13,7 @@ final class TranscodeLoopOwnershipTest extends TestCase
 {
     public function testFreshLoopOwnsItsLease(): void
     {
-        $ownership = new TranscodeLoopOwnership();
+        $ownership = new TranscodeLoopOwnership($this->createStub(TranscodeLoopLeaseInterface::class));
 
         $ownership->assertOwned();
 
@@ -22,7 +23,7 @@ final class TranscodeLoopOwnershipTest extends TestCase
 
     public function testObservedLossRemainsPermanentAfterRepeatedLossAndClosure(): void
     {
-        $ownership = new TranscodeLoopOwnership();
+        $ownership = new TranscodeLoopOwnership($this->createStub(TranscodeLoopLeaseInterface::class));
         $ownership->markLost();
         $ownership->markLost();
         $ownership->close();
@@ -35,7 +36,7 @@ final class TranscodeLoopOwnershipTest extends TestCase
 
     public function testClosureRejectsOwnershipWithoutInventingLeaseLoss(): void
     {
-        $ownership = new TranscodeLoopOwnership();
+        $ownership = new TranscodeLoopOwnership($this->createStub(TranscodeLoopLeaseInterface::class));
         $ownership->close();
         $ownership->close();
 
@@ -47,8 +48,8 @@ final class TranscodeLoopOwnershipTest extends TestCase
 
     public function testReplacementLoopHasIndependentOwnershipIdentity(): void
     {
-        $old = new TranscodeLoopOwnership();
-        $replacement = new TranscodeLoopOwnership();
+        $old = new TranscodeLoopOwnership($this->createStub(TranscodeLoopLeaseInterface::class));
+        $replacement = new TranscodeLoopOwnership($this->createStub(TranscodeLoopLeaseInterface::class));
         $old->markLost();
         $old->close();
 

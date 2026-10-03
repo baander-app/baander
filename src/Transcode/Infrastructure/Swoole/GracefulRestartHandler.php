@@ -7,7 +7,9 @@ namespace App\Transcode\Infrastructure\Swoole;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
-use App\Transcode\Application\Port\TranscodeStoragePortInterface;
+use App\Transcode\Application\Port\TranscodeLoopLockInterface;
+use App\Transcode\Application\Port\TranscodeLoopStarterInterface;
+use App\Transcode\Domain\ValueObject\SessionState;
 use App\Transcode\Domain\Event\TranscodeSessionAttached;
 use App\Transcode\Domain\ValueObject\TranscodeStatus;
 use App\Transcode\Domain\Repository\TranscodeSessionRepositoryInterface;
@@ -28,13 +30,16 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
  */
 final class GracefulRestartHandler
 {
+    private const LOOP_LOCK_TTL_SECONDS = 30;
+
     public function __construct(
         private readonly TranscodeJobPortInterface $jobPort,
         private readonly TranscodeSessionRepositoryInterface $sessionRepository,
-        private readonly TranscodeStoragePortInterface $storage,
         private readonly JobStatePersister $statePersister,
         private readonly TranscodeProcessPool $processPool,
         private readonly EventDispatcherInterface $eventDispatcher,
+        private readonly TranscodeLoopLockInterface $loopLock,
+        private readonly TranscodeLoopStarterInterface $loopStarter,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -108,13 +113,43 @@ final class GracefulRestartHandler
                 continue;
             }
 
-            $session = $sessions[0];
-            $this->eventDispatcher->dispatch(new TranscodeSessionAttached(
-                sessionId: $session->getId(),
-                jobId: $job->getId(),
-                userId: $session->getUserId(),
-                qualityTier: $job->getQualityTierName(),
-            ));
+            $session = null;
+            foreach ($sessions as $candidate) {
+                if (in_array($candidate->getSessionState(), [
+                    SessionState::Pending,
+                    SessionState::Preparing,
+                    SessionState::Active,
+                    SessionState::Paused,
+                ], true)) {
+                    $session = $candidate;
+                    break;
+                }
+            }
+            if ($session === null) {
+                continue;
+            }
+
+            $lease = $this->loopLock->acquire($job->getId(), self::LOOP_LOCK_TTL_SECONDS);
+            if ($lease === null) {
+                continue;
+            }
+            $handedOff = false;
+            try {
+                // Existing admission listeners still run on this notification;
+                // loop ownership is handed off directly, never through the event.
+                $this->eventDispatcher->dispatch(new TranscodeSessionAttached(
+                    sessionId: $session->getId(),
+                    jobId: $job->getId(),
+                    userId: $session->getUserId(),
+                    qualityTier: $job->getQualityTierName(),
+                ));
+                $this->loopStarter->start($session->getId(), $lease);
+                $handedOff = true;
+            } finally {
+                if (!$handedOff) {
+                    $lease->release();
+                }
+            }
 
             $this->logger->info('Resumed transcode job', [
                 'jobId' => $state['jobId'],

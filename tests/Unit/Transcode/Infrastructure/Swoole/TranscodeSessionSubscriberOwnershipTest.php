@@ -11,12 +11,11 @@ use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
 use App\Transcode\Application\Port\FFmpegPortInterface;
 use App\Transcode\Application\Port\SegmentAvailabilityInterface;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
-use App\Transcode\Application\Port\TranscodeLoopLockInterface;
+use App\Transcode\Application\Port\TranscodeLoopLeaseInterface;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\Event\TranscodeJobCompleted;
 use App\Transcode\Domain\Event\TranscodeJobFailed;
-use App\Transcode\Domain\Event\TranscodeSessionAttached;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\Repository\TranscodeJobRepositoryInterface;
@@ -201,7 +200,8 @@ final class TranscodeSessionSubscriberOwnershipTest extends TestCase
                 throw new RuntimeException('Injected timer cleanup failure.');
             };
         }
-        $lock = $this->createMock(TranscodeLoopLockInterface::class);
+        $lock = $this->createMock(TranscodeLoopLeaseInterface::class);
+        $lock->method('getJobId')->willReturn($job->getId());
         $renewals = 0;
         $lock->method('renew')->willReturnCallback(static function () use (&$renewals, &$lost, $throw): bool {
             ++$renewals;
@@ -215,7 +215,7 @@ final class TranscodeSessionSubscriberOwnershipTest extends TestCase
             return false;
         });
         $lock->expects(in_array($boundary, ['complete', 'ordinary error'], true) ? self::once() : self::never())
-            ->method('release')->with($job->getId());
+            ->method('release');
         $jobs->method('save')->willReturnCallback(function () use (&$actions, &$lost, $boundary, $lose): void {
             $actions[] = ['job save', $lost];
             if ($boundary === 'job save' && !$lost) {
@@ -244,7 +244,7 @@ final class TranscodeSessionSubscriberOwnershipTest extends TestCase
         $transcodePool = new TranscodeProcessPool($pool, $logger, $json, EncoderProfile::software('libx264'));
         $subscriber = new TranscodeSessionSubscriber(
             $jobs, $sessions, $storage, $transcodePool, $ffmpeg, $encoder, $videos, $persister, $broker,
-            $events, $logger, $json, loopLock: $lock, streamManager: $manager, availability: $availability,
+            $events, $logger, $json, streamManager: $manager, availability: $availability,
             renewalTimer: $timer,
         );
         $ffmpeg->method('probeVideo')->willReturnCallback(function () use ($boundary, $lose, $probe, $subscriber, $job): VideoProbeResult {
@@ -286,8 +286,7 @@ final class TranscodeSessionSubscriberOwnershipTest extends TestCase
                 $spawner->exitStatus = $boundary === 'complete' ? 0 : 7;
             }
         };
-        $event = new TranscodeSessionAttached($session->getId(), $job->getId(), $session->getUserId(), $tier->name);
-        (new ReflectionMethod($subscriber, 'runEncodingLoop'))->invoke($subscriber, $event);
+        (new ReflectionMethod($subscriber, 'runEncodingLoop'))->invoke($subscriber, $session->getId(), $lock);
 
         if ($boundary === 'complete') {
             self::assertSame(TranscodeStatus::Completed, $job->getStatus());

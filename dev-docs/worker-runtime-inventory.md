@@ -161,7 +161,7 @@ only inside the existing process ancestry; they are not independent-service IPC.
 | [CpuGpuSampler](../src/QoL/Infrastructure/Swoole/CpuGpuSampler.php) `boot()` | Pre-fork sampling table; timer deferred to HTTP worker 0 | Fixed worker sampling/control service |
 | [SwooleWorkerEventSubscriber](../src/Shared/Infrastructure/Swoole/SwooleWorkerEventSubscriber.php) | HTTP worker 0 starts pool health, sampler and [MidStreamMonitor](../src/QoL/Infrastructure/Swoole/MidStreamMonitor.php); imports governor learning state; server SIGINT hook stops pool and server | Worker owns health/sampling/governor timers. Web keeps connection registry/pusher and HTTP lifecycle |
 | [CpuProcessPoolShutdownHandler](../src/Shared/Infrastructure/Swoole/ProcessPool/CpuProcessPoolShutdownHandler.php) | Web/server shutdown stops background children | Replace with worker-owned drain/reaping; no competing shutdown owner |
-| [TranscodeSessionSubscriber](../src/Transcode/Infrastructure/Swoole/TranscodeSessionSubscriber.php) | `TranscodeSessionAttached` starts a CoWrapper coroutine (inline fallback), Redis loop lock and renewal timer; drives encodes/completion/failure | Worker media session service; durable intent and recoverable control |
+| [TranscodeSessionSubscriber](../src/Transcode/Infrastructure/Swoole/TranscodeSessionSubscriber.php) | Explicit starter port accepts an acquired Redis lease and starts a CoWrapper coroutine (inline fallback) with renewal; drives encodes/completion/failure | Worker media session service; durable intent and recoverable control |
 | [TranscodeStreamManager](../src/Transcode/Infrastructure/Swoole/TranscodeStreamManager.php) | Long-lived FFmpeg through ProcOpenSpawner, outside one-shot CPU pool; four-stream limit per manager instance; poll/drain output and STOP/CONT/KILL control | Worker media descendants with global deployment budget and cancellation |
 | [SeekSignalBroker](../src/Transcode/Infrastructure/Swoole/SeekSignalBroker.php) | In-process per-job Coroutine Channels, capacity 16; missing channels drop signals | Worker-owned session control with explicit delivery/ownership semantics |
 | [ImageController](../src/Media/Interface/Controller/ImageController.php) | Missing preset/WebP starts fire-and-forget conversion coroutine; serves original image immediately | Scaled `media` jobs; preserve original-response fallback |
@@ -729,13 +729,33 @@ identity so an interrupted poll cannot restore a stopped process entry, publish 
 further readiness hint after detecting shutdown, or remove a replacement process
 during cleanup.
 
+Each successful Redis acquisition now returns a separate runtime lease handle.
+Renewal and release use that handle's immutable token, including after the same
+lock service acquires a successor for the same job. A failed renewal permanently
+retires the handle. Tokens cannot be serialized and are omitted from debug output.
+Session creation passes the handle through an application starter port; domain
+notifications carry no lease. Before handoff, any failure releases the captured
+handle. Pool unavailability, a duplicate local loop, or coroutine scheduling
+failure rejects the handoff. The shared coroutine wrapper now throws when native
+coroutine creation fails instead of silently accepting work.
+
+Recovery also acquires a fresh handle and chooses a resumable session, preserving
+state files when acquisition is denied. Existing session-attached notifications
+still run budget admission before startup. This event's combined notification and
+admission role, allocation rollback after rejected startup, and actual lifecycle
+wiring for `GracefulRestartHandler` remain separate work; its resume/persist methods
+currently have no source callers. Recovery tests exercise the service directly.
+
 These local identities are not persisted encoding-attempt identities. A database
 write already in flight can still complete after loss, dispatched pool work can
-continue, and shared output directories remain unisolated. The Redis lock API still
-stores one token per job in the service instance: successful reacquisition replaces
-that token, so an older coroutine can use the newer token before observing loss.
-Per-acquisition lock handles and conditional persistence remain required. The timer
-does not independently fence a lease when its event loop stalls past expiry.
+continue, and shared output directories remain unisolated. Conditional persistence
+and attempt-qualified output paths remain required. The timer does not independently
+fence a lease when its event loop stalls past expiry.
+
+The runtime handoff test uses real coroutines and a controlled process for pool
+readiness. It does not qualify CPU-pool shutdown: an attempted full-pool fixture
+exposed `Process::write('')` emitting an empty-write warning, plus shutdown output.
+The shutdown protocol and process reaping still need their own regression coverage.
 
 Native media now requests refresh from its own window after an authenticated 401,
 shares that window's refresh queue with Axios, and retries once with a new proof.
