@@ -563,9 +563,15 @@ reconcile-create, start, status and recovery against disposable PostgreSQL/Redis
 It observes actual outbox delivery and scheduler execution, verifies the worker
 lease and child roles, retires the exact container and rejects reuse of its boot.
 The fixture image contains the checkout and generated test keys; this is not
-production-build certification. CI integration remains pending because its runner
-lacks the host PHP runtime and matching controller/database network setup. Status
-returns committed observations with `readiness: not_checked`, not a readiness grant.
+production-build certification. The runner also supports
+`BAANDER_TEST_OPERATOR_IN_CONTAINER=1`: a separate trusted controller container
+provides PHP and a verified static Docker CLI, receives the daemon socket and
+reaches PostgreSQL through its own network without publishing a database port.
+The worker retains its private network and receives no mounts or Docker authority.
+Forgejo now has a blocking operator lifecycle step using this mode and
+`BAANDER_TEST_CHECKOUT_IN_IMAGE=1`; this records the configured gate, not a passing
+Forgejo run. Status returns committed observations with `readiness: not_checked`,
+not a readiness grant.
 
 The first command facade is now wired. `app:serve` is the canonical name of the
 existing `ServerRunCommand`, retaining `swoole:server:run` as an alias and preserving

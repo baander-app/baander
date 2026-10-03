@@ -39,18 +39,37 @@ test order within dependency constraints and treats unexpected output as risky.
 The unit runner sets a 256 MiB PHP memory limit so the combined unit and PHPStan-rule
 suite can compile its analysis container. This budget applies only to that isolated
 runner; it does not change the tracked PHPUnit configuration or deployment settings.
-The operator runner additionally requires host PHP with `posix` and `pdo_pgsql`
-(`BAANDER_TEST_PHP_BINARY` selects its executable), Python 3 and a local Unix Docker
-endpoint (`BAANDER_TEST_DOCKER_ENDPOINT`). Its outer 240-second timeout bounds
-native database waits; DBAL `connect_timeout` is not a hard connection deadline.
-It creates disposable PostgreSQL/Redis services and an isolated fixture image,
-then exercises `bin/worker-deployment.php` create, reconciliation, start, status
-and recovery with canonical private credentials. The controller reaches a
-loopback-published database port while the worker uses its private network address;
-both address the same database. It verifies real outbox delivery, scheduler work,
-lease/child identities and retirement of the immutable boot. The local drill passes;
-the fixture image does not certify the production build, and CI integration remains
-pending its host PHP and controller-network setup. Status does not certify readiness.
+The operator runner requires Python 3 and Docker. Its default host mode also
+requires PHP with `posix` and `pdo_pgsql` (`BAANDER_TEST_PHP_BINARY` selects its
+executable) and a local Unix endpoint (`BAANDER_TEST_DOCKER_ENDPOINT`). The host
+controller reaches a loopback-published database port; the worker reaches the same
+database through its private network. Its outer 240-second timeout bounds native
+database waits; DBAL `connect_timeout` is not a hard connection deadline.
+
+`BAANDER_TEST_OPERATOR_IN_CONTAINER=1` runs the entrypoint in a separate trusted
+controller container with PHP and a verified static Docker CLI. The CLI comes from
+`docker:29.7.2-cli` by default (`BAANDER_TEST_DOCKER_CLI_IMAGE` overrides it). Only
+the controller receives the daemon socket mount. Its SELinux process label is
+disabled to access that socket without relabeling it; this exception applies only
+to the trusted test controller. Credentials are streamed into private files owned
+by its user, and it reaches PostgreSQL on a separate controller network with
+no published database port. The controller verifies that its socket reaches the
+same daemon before issuing an operator action. The worker keeps its private
+network and receives no
+mounts or Docker authority. With no explicit endpoint override, setup uses the
+runner's ambient Docker connection, supporting CI runners outside the daemon host.
+
+Both modes exercise `bin/worker-deployment.php` create, reconciliation, start,
+status and recovery against disposable PostgreSQL/Redis with canonical private
+credentials. They verify real outbox delivery, scheduler work, lease/child
+identities and retirement of the immutable boot. Both modes pass locally, including
+container mode from a workspace with only the runner script and no host PHP or
+Composer dependencies. The fixture image does not certify the production build.
+Forgejo now includes a
+blocking operator lifecycle step using container mode and
+`BAANDER_TEST_CHECKOUT_IN_IMAGE=1` to copy source and dependencies from the built
+image. Adding that gate does not establish a passing Forgejo run. Status does not
+certify readiness.
 The messaging runner waits for PostgreSQL TCP readiness (not its temporary
 initialization socket) and prints service logs on readiness timeout. It also
 explicitly selects `phpunit.xml.dist` and provisions

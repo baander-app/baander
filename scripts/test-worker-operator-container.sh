@@ -4,22 +4,44 @@ if [ "${BAANDER_WORKER_OPERATOR_TIMEOUT_ACTIVE:-0}" != 1 ]; then
     exec env BAANDER_WORKER_OPERATOR_TIMEOUT_ACTIVE=1 timeout 240s bash "$0" "$@"
 fi
 cd "$(dirname "$0")/.."
-test -f vendor/autoload.php || { echo 'Install Composer dependencies first.' >&2; exit 1; }
+if [ "${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" != 1 ]; then
+    test -f vendor/autoload.php || { echo 'Install Composer dependencies first.' >&2; exit 1; }
+fi
+operator_in_container="${BAANDER_TEST_OPERATOR_IN_CONTAINER:-0}"
+[[ "$operator_in_container" = 0 || "$operator_in_container" = 1 ]] || {
+    echo 'BAANDER_TEST_OPERATOR_IN_CONTAINER must be 0 or 1.' >&2; exit 1;
+}
 php_binary="${BAANDER_TEST_PHP_BINARY:-php}"
-"$php_binary" -r 'foreach (["posix", "pdo_pgsql"] as $extension) { if (!extension_loaded($extension)) { fwrite(STDERR, "Host operator requires PHP extension: " . $extension . "\n"); exit(1); } }'
+if [ "$operator_in_container" = 0 ]; then
+    test -f vendor/autoload.php || { echo 'Host operator requires Composer dependencies.' >&2; exit 1; }
+    "$php_binary" -r 'foreach (["posix", "pdo_pgsql"] as $extension) { if (!extension_loaded($extension)) { fwrite(STDERR, "Host operator requires PHP extension: " . $extension . "\n"); exit(1); } }'
+fi
 run_id="baander-worker-operator-$(date +%s)-$$"
 fixture_image="$run_id:fixture"
 fixture_base="$run_id:base"
+controller_image="$run_id:controller"
+controller_cli="$run_id:cli"
 work="$(mktemp -d /tmp/baander-worker-operator.XXXXXXXX)"
 chmod 700 "$work"
 worker_name=''
 docker_binary="$(command -v docker)"
 docker_endpoint="${BAANDER_TEST_DOCKER_ENDPOINT:-unix:///var/run/docker.sock}"
-# The fixture services and the controller must use the same explicit local daemon.
-docker_local() { "$docker_binary" --host "$docker_endpoint" "$@"; }
+# A CI runner can reach a remote daemon through its ambient Docker configuration.
+# The trusted controller receives that daemon's socket; the worker receives none.
+docker_local() {
+    if [ "$operator_in_container" = 1 ] && [ -z "${BAANDER_TEST_DOCKER_ENDPOINT:-}" ]; then
+        "$docker_binary" "$@"
+    else
+        "$docker_binary" --host "$docker_endpoint" "$@"
+    fi
+}
 cleanup() {
+    # Stop any in-flight operator before removing the worker it can control.
+    docker_local rm -f "$run_id-controller" >/dev/null 2>&1 || true
     if [ -n "$worker_name" ]; then docker_local rm -f "$worker_name" >/dev/null 2>&1 || true; fi
     docker_local rm -f "$run_id-prepare" "$run_id-source" "$run_id-redis" "$run_id-postgres" >/dev/null 2>&1 || true
+    docker_local image rm -f "$controller_image" >/dev/null 2>&1 || true
+    docker_local image rm "$controller_cli" >/dev/null 2>&1 || true
     docker_local image rm -f "$fixture_image" >/dev/null 2>&1 || true
     docker_local image rm "$fixture_base" >/dev/null 2>&1 || true
     docker_local network rm "$run_id" >/dev/null 2>&1 || true
@@ -68,14 +90,45 @@ docker_local build --pull=false --build-arg "FIXTURE_BASE=$fixture_base" --tag "
     tail -40 "$work/build.log" >&2; exit 1;
 }
 image_id="$(docker_local image inspect --format '{{.Id}}' "$fixture_image")"
+if [ "$operator_in_container" = 1 ]; then
+    # Docker's official CLI releases use static binaries. Check both that property
+    # and execution in the application image before granting access to the socket.
+    cli_source="${BAANDER_TEST_DOCKER_CLI_IMAGE:-docker:29.7.2-cli}"
+    if ! docker_local image inspect "$cli_source" >/dev/null 2>&1; then
+        docker_local pull "$cli_source" > "$work/cli-pull.log" 2>&1 || {
+            tail -20 "$work/cli-pull.log" >&2; exit 1;
+        }
+    fi
+    cli_id="$(docker_local image inspect --format '{{.Id}}' "$cli_source")"
+    docker_local image tag "$cli_id" "$controller_cli"
+    mkdir "$work/controller"
+    cat > "$work/controller/Dockerfile" <<'DOCKERFILE'
+ARG CONTROLLER_BASE=scratch
+ARG DOCKER_CLI=scratch
+FROM ${DOCKER_CLI} AS dockercli
+FROM ${CONTROLLER_BASE}
+USER root
+COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
+RUN file /usr/local/bin/docker | grep -Eq 'statically linked|static-pie linked' \
+    && /usr/local/bin/docker --version \
+    && php -r 'foreach (["posix", "pdo_pgsql"] as $extension) { if (!extension_loaded($extension)) { exit(1); } }'
+DOCKERFILE
+    docker_local build --pull=false --build-arg "CONTROLLER_BASE=$fixture_image" --build-arg "DOCKER_CLI=$controller_cli" \
+        --tag "$controller_image" "$work/controller" > "$work/controller-build.log" 2>&1 || {
+        tail -40 "$work/controller-build.log" >&2; exit 1;
+    }
+    controller_id="$(docker_local image inspect --format '{{.Id}}' "$controller_image")"
+fi
 docker_local network create --internal "$run_id" >/dev/null
 # Docker 29 suppresses published ports on internal bridges. Only the disposable
 # database joins this controller bridge; the worker keeps its sole private network.
 docker_local network create "$run_id-control" >/dev/null
 docker_local run -d --name "$run_id-redis" --network "$run_id" --network-alias redis \
     -e REDIS_ARGS='--requirepass test-only' redis/redis-stack-server:edge >/dev/null
-docker_local run -d --name "$run_id-postgres" --network "$run_id-control" \
-    --publish 127.0.0.1::5432 -e POSTGRES_USER=baander -e POSTGRES_PASSWORD=test-only -e POSTGRES_DB=worker_operator_test \
+pg_publish=()
+if [ "$operator_in_container" = 0 ]; then pg_publish=(--publish 127.0.0.1::5432); fi
+docker_local run -d --name "$run_id-postgres" --network "$run_id-control" --network-alias postgres \
+    "${pg_publish[@]}" -e POSTGRES_USER=baander -e POSTGRES_PASSWORD=test-only -e POSTGRES_DB=worker_operator_test \
     "${BAANDER_TEST_POSTGRES_IMAGE:-baander-database:latest}" >/dev/null
 docker_local network connect --alias postgres "$run_id" "$run_id-postgres"
 ready=false
@@ -87,8 +140,18 @@ for attempt in $(seq 1 30); do
     sleep 1
 done
 if [ "$ready" != true ]; then echo 'Disposable operator services did not become ready.' >&2; exit 1; fi
-pg_port="$(docker_local port "$run_id-postgres" 5432/tcp)"
-pg_port="${pg_port##*:}"
+if [ "$operator_in_container" = 1 ]; then
+    controller_db_host=postgres
+    pg_port=5432
+    manifest_docker_binary=/usr/local/bin/docker
+    manifest_docker_endpoint=unix:///var/run/docker.sock
+else
+    controller_db_host=127.0.0.1
+    pg_port="$(docker_local port "$run_id-postgres" 5432/tcp)"
+    pg_port="${pg_port##*:}"
+    manifest_docker_binary="$docker_binary"
+    manifest_docker_endpoint="$docker_endpoint"
+fi
 daemon_id="$(docker_local info --format '{{.ID}}')"
 boot="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
 namespace=baander.app:commandtest
@@ -97,9 +160,9 @@ import hashlib, sys
 print('baander-worker-' + hashlib.sha256(sys.argv[1].encode()).hexdigest()[:32] + '-' + sys.argv[2])
 PY
 )"
-python3 - "$work" "$namespace" "$boot" "$daemon_id" "$image_id" "$run_id" "$docker_binary" "$docker_endpoint" "$pg_port" <<'PY'
+python3 - "$work" "$namespace" "$boot" "$daemon_id" "$image_id" "$run_id" "$manifest_docker_binary" "$manifest_docker_endpoint" "$pg_port" "$controller_db_host" <<'PY'
 import json, os, sys
-work, namespace, boot, daemon, image, network, binary, endpoint, port = sys.argv[1:]
+work, namespace, boot, daemon, image, network, binary, endpoint, port, host = sys.argv[1:]
 manifest = dict(version=1, namespace=namespace, bootId=boot, daemonId=daemon, imageId=image,
     network=network, dockerBinary=binary, dockerEndpoint=endpoint, memoryMiB=1664, managementMiB=256,
     consumerMiB=384, relayMiB=384, schedulerMiB=320, scheduledConsoleMiB=320, nanoCpus=1000000000, pidsLimit=64)
@@ -107,7 +170,7 @@ runtime = dict(APP_ENV='prod', APP_DEBUG='0', APP_SECRET='operator-test-only',
     DATABASE_URL='postgresql://baander:test-only@postgres:5432/worker_operator_test?serverVersion=18&charset=utf8',
     REDIS_URL='redis://default:test-only@redis:6379', REDIS_PASSWORD='test-only',
     MESSENGER_TRANSPORT_DSN='redis://default:test-only@redis:6379/messages')
-credentials = dict(controllerDatabaseUrl=f'postgresql://baander:test-only@127.0.0.1:{port}/worker_operator_test?serverVersion=18&charset=utf8', runtimeEnvironment=runtime)
+credentials = dict(controllerDatabaseUrl=f'postgresql://baander:test-only@{host}:{port}/worker_operator_test?serverVersion=18&charset=utf8', runtimeEnvironment=runtime)
 for name, content in [('manifest', manifest), ('credentials', credentials)]:
     fd = os.open(work + '/' + name + '.json', os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, 'w') as stream: json.dump(content, stream)
@@ -126,9 +189,33 @@ docker_local run --rm --name "$run_id-prepare" --network "$run_id" --env-file "$
     ' sh "$namespace" "$boot" > "$work/prepare.log" 2>&1 || {
     tail -40 "$work/prepare.log" >&2; exit 1;
 }
+if [ "$operator_in_container" = 1 ]; then
+    # This trusted controller needs the host socket's existing SELinux label.
+    # Do not relabel the daemon socket or apply this exception to the worker.
+    docker_local run -d --name "$run_id-controller" --network "$run_id-control" --user 0 \
+        --cap-drop ALL --security-opt no-new-privileges --security-opt label=disable \
+        --mount "type=bind,source=${BAANDER_TEST_DOCKER_SOCKET_PATH:-/var/run/docker.sock},target=/var/run/docker.sock" \
+        --entrypoint /usr/local/bin/php "$controller_id" -r 'while (true) { usleep(100000); }' >/dev/null
+    # Verify the mounted socket before the first durable creation intent.
+    test "$(docker_local exec "$run_id-controller" /usr/local/bin/docker --host unix:///var/run/docker.sock info --format '{{.ID}}')" = "$daemon_id" || {
+        echo 'Controller socket reaches a different Docker daemon.' >&2; exit 1;
+    }
+    docker_local exec "$run_id-controller" mkdir -m 700 /tmp/operator
+    # docker cp can preserve the host UID. Create files as the controller user
+    # instead, without granting ownership-changing capabilities or exposing data.
+    for config_file in manifest credentials; do
+        docker_local exec -i "$run_id-controller" /bin/sh -c 'umask 077; cat > "$1"' sh \
+            "/tmp/operator/$config_file.json" < "$work/$config_file.json"
+    done
+fi
 operator() {
     local action="$1" expected="$2" code=0
-    "$php_binary" bin/worker-deployment.php "$action" "$work/manifest.json" "$work/credentials.json" > "$work/$action.json" 2> "$work/$action.stderr" || code=$?
+    if [ "$operator_in_container" = 1 ]; then
+        docker_local exec "$run_id-controller" /usr/local/bin/php /var/www/html/bin/worker-deployment.php \
+            "$action" /tmp/operator/manifest.json /tmp/operator/credentials.json > "$work/$action.json" 2> "$work/$action.stderr" || code=$?
+    else
+        "$php_binary" bin/worker-deployment.php "$action" "$work/manifest.json" "$work/credentials.json" > "$work/$action.json" 2> "$work/$action.stderr" || code=$?
+    fi
     if [ "$code" != "$expected" ]; then
         cat "$work/$action.json" >&2
         cat "$work/$action.stderr" >&2
@@ -200,4 +287,4 @@ PY
 operator create 3
 operator start 3
 test -z "$(docker_local container ls --all --no-trunc --filter "name=^/$worker_name$" --format '{{.ID}}')"
-echo 'PASS: host operator created and reconciled one stopped immutable fixture, started real application roles, processed outbox/scheduler effects, and retired the exact deployment without same-boot reuse.'
+echo 'PASS: trusted operator created and reconciled one stopped immutable fixture, started real application roles, processed outbox/scheduler effects, and retired the exact deployment without same-boot reuse.'

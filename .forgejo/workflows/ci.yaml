@@ -151,6 +151,14 @@ jobs:
                     BAANDER_TEST_CHECKOUT_IN_IMAGE=1 \
                       bash scripts/test-worker-command-container.sh
 
+            -   name: Worker deployment operator lifecycle
+                run: |
+                    BAANDER_TEST_IMAGE="$CI_IMAGE" \
+                    BAANDER_TEST_POSTGRES_IMAGE="${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest" \
+                    BAANDER_TEST_CHECKOUT_IN_IMAGE=1 \
+                    BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \
+                      bash scripts/test-worker-operator-container.sh
+
             -   name: Outbox notification replay
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
