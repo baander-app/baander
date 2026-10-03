@@ -29,9 +29,13 @@ class ScheduledJobEntity
     private ?\DateTimeImmutable $evaluatedThrough = null;
 
     // Generated from the database clock, then owned by durable recovery selection.
-    #[ORM\Column(type: 'datetime_immutable', insertable: false, updatable: false, generated: 'INSERT',
+    #[ORM\Column(
+        type: 'datetime_immutable',
+        insertable: false,
+        updatable: false,
         options: ['default' => 'clock_timestamp()'],
-        columnDefinition: 'TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp() CHECK (isfinite(recovery_after))')]
+        columnDefinition: 'TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp() CHECK (isfinite(recovery_after))',
+        generated: 'INSERT')]
     private \DateTimeImmutable $recoveryAfter;
 
     #[ORM\Column(type: 'text')]
