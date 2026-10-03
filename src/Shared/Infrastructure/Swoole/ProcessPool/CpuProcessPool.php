@@ -39,9 +39,8 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
     private bool $shuttingDown = false;
     private ?Table $resultTable = null;
     private int $nextWorker = 0;
-
-    /** @var array<int, bool> Worker IDs that have crashed or become unresponsive */
-    private array $deadWorkers = [];
+    private ?Table $healthTable = null;
+    private int $bootGeneration = 0;
 
     /** @var array<string, ProcessPoolWorkerInterface> */
     private array $handlerMap = [];
@@ -79,8 +78,8 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
             return;
         }
 
-        if (!function_exists('pcntl_waitpid')) {
-            throw new RuntimeException('CPU process pool requires pcntl_waitpid for owned-child reaping.');
+        if (!function_exists('pcntl_waitid')) {
+            throw new RuntimeException('CPU process pool requires pcntl_waitid for owned-child reaping.');
         }
         if ($this->workers !== [] || $this->shutdownActive) {
             throw new RuntimeException('CPU process pool still has workers awaiting shutdown.');
@@ -90,7 +89,6 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
         }
         $this->workers = [];
         $this->shuttingDown = false;
-        $this->deadWorkers = [];
         $this->nextWorker = 0;
         $this->handlerMap = [];
 
@@ -114,6 +112,20 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
 
         $this->ownerPid = getmypid();
         try {
+            // Keep this table across reboots: inherited HTTP workers must see
+            // shutdown and must never mistake a later generation for their own.
+            if ($this->healthTable === null) {
+                $this->healthTable = new Table($this->workerCount + 1);
+                foreach (['generation', 'alive', 'pid'] as $column) {
+                    $this->healthTable->column($column, Table::TYPE_INT);
+                }
+                if (!$this->healthTable->create()) {
+                    throw new RuntimeException('Unable to create CPU pool health table.');
+                }
+            }
+            ++$this->bootGeneration;
+            $this->publishHealth('pool', false);
+
             // Shared result table must be created BEFORE fork.
             // Workers write results directly to this table — no IPC needed.
             $this->resultTable = new Table($this->resultTableSize);
@@ -185,10 +197,12 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
                     $process->close();
                     throw new RuntimeException('Unable to start CPU pool worker.');
                 }
-                $this->workers[] = $process;
+                $this->workers[$i] = $process;
+                $this->publishHealth((string) $i, true, $pid);
             }
 
             $this->booted = true;
+            $this->publishHealth('pool', true);
         } catch (Throwable $error) {
             try {
                 $this->shutdown();
@@ -198,7 +212,7 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
             throw $error;
         }
 
-        // Worker 0 starts its own health timer after the HTTP server forks.
+        // The boot-owning server process starts monitoring after the HTTP server forks.
         $this->logger->info('CPU process pool started', [
             'workers' => count($this->workers),
             'handlers' => array_keys($this->handlerMap),
@@ -296,7 +310,7 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
 
     public function dispatch(string $payload, string $key): void
     {
-        if ($this->workers === []) {
+        if (!$this->isRunning()) {
             throw new RuntimeException('CPU process pool is not running. Call boot() first.');
         }
 
@@ -317,19 +331,21 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
         // Round-robin with dead-worker skip
         $workerId = $this->nextWorker % $this->workerCount;
         for ($attempt = 0; $attempt < $this->workerCount; $attempt++) {
-            if (!isset($this->deadWorkers[$workerId])) {
+            if ($this->workerIsAvailable($workerId)) {
                 break;
             }
             $this->nextWorker++;
             $workerId = $this->nextWorker % $this->workerCount;
         }
 
-        if (isset($this->deadWorkers[$workerId])) {
+        if (!$this->acceptingWork() || !$this->workerIsAvailable($workerId)) {
             throw new RuntimeException('All CPU pool workers are dead');
         }
 
         $this->nextWorker++;
-        $this->workers[$workerId]->write($payload);
+        if ($this->workers[$workerId]->write($payload) !== strlen($payload)) {
+            throw new RuntimeException('CPU pool worker did not accept the complete job.');
+        }
     }
 
     public function registerShutdownSignals(): void
@@ -341,6 +357,9 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
 
     public function startHealthCheck(): void
     {
+        if ($this->ownerPid !== null && $this->ownerPid !== getmypid()) {
+            throw new RuntimeException('Only the CPU pool owner may monitor its workers.');
+        }
         if (!$this->booted || $this->workers === [] || $this->shuttingDown) {
             return;
         }
@@ -354,15 +373,7 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
                 $this->stopHealthCheck();
                 return;
             }
-            if ($this->ownerPid === getmypid()) {
-                $this->reapExitedWorkers();
-            }
-            foreach ($this->workers as $workerId => $worker) {
-                if ($worker->pid > 0 && !posix_kill($worker->pid, 0)) {
-                    $this->deadWorkers[$workerId] = true;
-                    $this->logger->error('Worker process died', ['workerId' => $workerId, 'pid' => $worker->pid]);
-                }
-            }
+            $this->reapExitedWorkers();
         });
     }
 
@@ -386,9 +397,11 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
         $this->shutdownActive = true;
         $this->shuttingDown = true;
         $this->booted = false;
-        $this->stopHealthCheck();
-
         try {
+            if ($this->healthTable !== null) {
+                $this->publishHealth('pool', false);
+            }
+            $this->stopHealthCheck();
             // Account for exited/reaped children before sending to any PID.
             $this->reapExitedWorkers();
             foreach ($this->workers as $worker) {
@@ -450,15 +463,21 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
     private function reapExitedWorkers(): void
     {
         foreach ($this->workers as $workerId => $worker) {
-            $status = 0;
-            $waited = pcntl_waitpid($worker->pid, $status, WNOHANG);
-            if ($waited === $worker->pid || ($waited === -1 && pcntl_get_last_error() === PCNTL_ECHILD)) {
+            // Explicit PID and WNOHANG keep this safe in the server reactor.
+            // Unlike waitpid, waitid remains available during Swoole coroutines.
+            $info = [];
+            $waited = pcntl_waitid(P_PID, $worker->pid, $info, WEXITED | WNOHANG);
+            if (($waited && ($info['pid'] ?? 0) === $worker->pid)
+                || (!$waited && pcntl_get_last_error() === PCNTL_ECHILD)) {
                 // ECHILD includes a child already collected by Swoole. Never
                 // signal that PID: it is no longer ours and may be reused.
+                $this->publishHealth((string) $workerId, false, $worker->pid);
                 $worker->close();
                 unset($this->workers[$workerId]);
-                $this->deadWorkers[$workerId] = true;
-            } elseif ($waited === -1 && pcntl_get_last_error() !== PCNTL_EINTR) {
+                if (!$this->shuttingDown) {
+                    $this->logger->error('CPU pool worker exited', ['workerId' => $workerId, 'pid' => $worker->pid]);
+                }
+            } elseif (!$waited && pcntl_get_last_error() !== PCNTL_EINTR) {
                 throw new RuntimeException('Unable to reap CPU pool child: ' . pcntl_strerror(pcntl_get_last_error()));
             }
         }
@@ -466,7 +485,40 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
 
     public function isRunning(): bool
     {
-        return $this->booted && array_any($this->workers, fn(Process $w) => $w->pid > 0);
+        if (!$this->acceptingWork()) {
+            return false;
+        }
+        foreach (array_keys($this->workers) as $workerId) {
+            if ($this->workerIsAvailable($workerId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function publishHealth(string $key, bool $alive, int $pid = 0): void
+    {
+        if ($this->healthTable === null || !$this->healthTable->set($key, [
+            'generation' => $this->bootGeneration, 'alive' => (int) $alive, 'pid' => $pid,
+        ])) {
+            throw new RuntimeException('Unable to publish CPU pool health.');
+        }
+    }
+
+    private function acceptingWork(): bool
+    {
+        $state = $this->healthTable?->get('pool');
+        return $this->booted && !$this->shuttingDown && is_array($state)
+            && $state['generation'] === $this->bootGeneration && $state['alive'] === 1;
+    }
+
+    private function workerIsAvailable(int $workerId): bool
+    {
+        $worker = $this->workers[$workerId] ?? null;
+        $state = $this->healthTable?->get((string) $workerId);
+        return $worker !== null && is_array($state)
+            && $state['generation'] === $this->bootGeneration && $state['alive'] === 1
+            && $state['pid'] === $worker->pid;
     }
 
     public function getWorkerCount(): int

@@ -46,11 +46,9 @@ final class SwooleWorkerEventSubscriber implements EventSubscriberInterface
         $server = $event->getServer();
         $pool = null;
 
-        try {
-            if ($this->cpuProcessPoolLocator !== null && $this->cpuProcessPoolLocator->has(CpuProcessPool::class)) {
-                $pool = $this->cpuProcessPoolLocator->get(CpuProcessPool::class);
-            }
-        } catch (\Throwable) {
+        if ($this->cpuProcessPoolLocator !== null && $this->cpuProcessPoolLocator->has(CpuProcessPool::class)) {
+            $pool = $this->cpuProcessPoolLocator->get(CpuProcessPool::class);
+            $pool->startHealthCheck();
         }
 
         \Swoole\Process::signal(SIGINT, function () use ($server, $pool): void {
@@ -58,7 +56,7 @@ final class SwooleWorkerEventSubscriber implements EventSubscriberInterface
             $t = microtime(true);
             echo "\n // Shutting down server...\n";
 
-            if ($pool !== null && $pool->isRunning()) {
+            if ($pool !== null) {
                 echo " // Stopping CPU process pool...\n";
                 $pool->shutdown();
                 printf(" // CPU process pool stopped (%dms)\n", (int) ((microtime(true) - $t) * 1000));
@@ -85,13 +83,6 @@ final class SwooleWorkerEventSubscriber implements EventSubscriberInterface
         $this->logger?->info('Swoole worker started', ['workerId' => $workerId]);
 
         if ($workerId === 0) {
-            try {
-                if ($this->cpuProcessPoolLocator !== null && $this->cpuProcessPoolLocator->has(CpuProcessPool::class)) {
-                    $this->cpuProcessPoolLocator->get(CpuProcessPool::class)->startHealthCheck();
-                }
-            } catch (\Throwable) {
-            }
-
             // QoL Governor — start sampler and monitor on worker 0
             try {
                 if ($this->qolServicesLocator !== null) {
@@ -130,10 +121,8 @@ final class SwooleWorkerEventSubscriber implements EventSubscriberInterface
         }
 
         $server = $event->getServer();
-        if ($server !== null) {
-            $this->webSocketPusher?->setServer($server);
-            $this->webSocketRegistry?->setWorkerId($server->worker_id);
-        }
+        $this->webSocketPusher?->setServer($server);
+        $this->webSocketRegistry?->setWorkerId($server->worker_id);
     }
 
     public function onWorkerStopped(WorkerStoppedEvent $event): void

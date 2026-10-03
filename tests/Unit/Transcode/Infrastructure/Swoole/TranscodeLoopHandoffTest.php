@@ -176,6 +176,14 @@ final class TranscodeLoopHandoffTest extends TestCase
         self::assertGreaterThan(0, $this->worker->start());
         (new \ReflectionProperty($this->pool, 'booted'))->setValue($this->pool, true);
         (new \ReflectionProperty($this->pool, 'workers'))->setValue($this->pool, [$this->worker]);
+        $health = new \Swoole\Table(2);
+        foreach (['generation', 'alive', 'pid'] as $column) {
+            $health->column($column, \Swoole\Table::TYPE_INT);
+        }
+        self::assertTrue($health->create());
+        $health->set('pool', ['generation' => 0, 'alive' => 1, 'pid' => 0]);
+        $health->set('0', ['generation' => 0, 'alive' => 1, 'pid' => $this->worker->pid]);
+        (new \ReflectionProperty($this->pool, 'healthTable'))->setValue($this->pool, $health);
         self::assertTrue($this->pool->isRunning());
     }
 

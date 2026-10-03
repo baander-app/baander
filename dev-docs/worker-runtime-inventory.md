@@ -758,7 +758,7 @@ second to reap them. It waits for specific owned PIDs, leaves unrelated children
 alone, and destroys the result table only after all workers are accounted for.
 If exit remains unconfirmed, shutdown reports failure and retains pending state.
 Only the process that booted the pool may shut it down. Boot requires the project's
-existing `pcntl_waitpid` dependency and cleans up partially started workers.
+PHP 8.4+ `pcntl_waitid` support and cleans up partially started workers.
 
 Shutdown clears only its own health timer and emits lifecycle logs through the
 logger. A completed shutdown permits reboot of the same instance, including
@@ -767,8 +767,22 @@ dependency has been removed; its existing JSON wire format is unchanged.
 Real-process regressions cover idle shutdown, cooperative work, forced termination,
 reboot and dispatch, full IPC queues, unrelated resources (including an exited
 sibling), disabled reaping support, and inherited shutdown rejection. These tests qualify direct children, not FFmpeg descendants.
-Worker 0's existing health monitor still cannot distinguish a zombie via
-`posix_kill(pid, 0)`; moving health ownership to the parent remains separate work.
+The boot-owning server process now starts the five-second health monitor from
+`ServerStartedEvent`; HTTP workers cannot start it. Nonblocking, PID-specific
+`pcntl_waitid` works while Swoole's coroutine reactor is active. An exit already
+collected by Swoole is also treated as unavailable, without signalling its PID.
+Shared health rows publish worker availability and a boot generation. Inherited
+HTTP workers skip dead slots, reject stopped pools, and remain unavailable after
+the owner reboots. Missing health rows fail closed. Shutdown publishes admission
+closure before draining, even when every worker has already exited. The shared
+health table stays allocated for the pool instance lifetime so inherited readers
+can observe shutdown and cannot accept a later generation as their own.
+
+Real-process health tests cover inherited dispatch after a crash, all-dead state,
+stopped and stale generations, and native process-mode server lifecycle wiring.
+Health is observed on the timer cadence; a worker can still die between a health
+read and dispatch. A failed or incomplete pipe write now reports failure, but a
+successful write is not a completion acknowledgement or a durable queue.
 
 Native media now requests refresh from its own window after an authenticated 401,
 shares that window's refresh queue with Axios, and retries once with a new proof.

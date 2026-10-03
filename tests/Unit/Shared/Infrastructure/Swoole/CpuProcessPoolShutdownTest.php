@@ -16,13 +16,13 @@ require $argv[1];
 $pool = new App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool([], 1, new Psr\Log\NullLogger());
 try {
     $pool->boot();
-    throw new RuntimeException('Boot accepted unavailable pcntl_waitpid');
+    throw new RuntimeException('Boot accepted unavailable pcntl_waitid');
 } catch (RuntimeException $error) {
-    if (!str_contains($error->getMessage(), 'requires pcntl_waitpid')) { throw $error; }
+    if (!str_contains($error->getMessage(), 'requires pcntl_waitid')) { throw $error; }
 }
 if ($pool->isRunning() || $pool->getResultTable() !== null) { exit(1); }
 PHP;
-        $process = new Process([PHP_BINARY, '-d', 'disable_functions=pcntl_waitpid', '-r', $script, dirname(__DIR__, 5) . '/vendor/autoload.php']);
+        $process = new Process([PHP_BINARY, '-d', 'disable_functions=pcntl_waitid', '-r', $script, dirname(__DIR__, 5) . '/vendor/autoload.php']);
         $process->setTimeout(5);
         $process->run();
 
