@@ -1,6 +1,7 @@
 import { getAuthSnapshot } from '@/features/auth/stores/auth-store';
 import { getDpopKeyPair, getDpopNonce, setDpopNonce } from '@/shared/crypto/dpop-store';
 import { createDpopProof } from '@/shared/crypto/dpop-proof';
+import { ensureFreshAccessToken, getAuthSession } from '@/shared/api-client/axios-instance';
 
 /** Push credentials only while they still belong to this window's current session. */
 export async function postTokenToWorker(token: string | null): Promise<void> {
@@ -9,12 +10,24 @@ export async function postTokenToWorker(token: string | null): Promise<void> {
   sendAuthState(registration.active);
 }
 
-function sendAuthState(worker: ServiceWorker): void {
-  worker.postMessage({
-    type: 'SW_SET_API_URL',
+interface WorkerAuthState {
+  apiUrl: string;
+  token: string | null;
+  session: number;
+  revision: number;
+}
+
+let authRevision = 0;
+
+function sendAuthState(worker: ServiceWorker): WorkerAuthState {
+  const state = {
     apiUrl: window.__BAANDER_API_URL__ || window.location.origin,
-  });
-  worker.postMessage({ type: 'SW_SET_TOKEN', token: getAuthSnapshot().accessToken });
+    token: getAuthSnapshot().accessToken,
+    session: getAuthSession(),
+    revision: ++authRevision,
+  };
+  worker.postMessage({ type: 'SW_SET_AUTH', ...state });
+  return state;
 }
 
 /** Initialize both pieces of state, including after a worker restart. */
@@ -41,6 +54,8 @@ export function initServiceWorkerListener(): void {
   listenerRegistered = true;
   navigator.serviceWorker.addEventListener('message', async event => {
     const replyPort = event.ports[0];
+    const refreshing = event.data?.type === 'SW_REFRESH_AUTH';
+    const failure = refreshing ? { type: 'SW_AUTH_REFRESHED', auth: null } : { type: 'SW_DPOP_PROOF', proof: null };
     try {
       const registration = await navigator.serviceWorker.getRegistration();
       if (!registration?.active || event.source !== registration.active) return;
@@ -48,14 +63,27 @@ export function initServiceWorkerListener(): void {
         sendAuthState(registration.active);
         return;
       }
-      if (event.data?.type !== 'SW_SIGN_DPOP' || !replyPort) return;
+      if ((!refreshing && event.data?.type !== 'SW_SIGN_DPOP') || !replyPort) return;
 
-      const { method, url, nonce, token } = event.data;
+      const { method, url, nonce, token, session } = event.data;
       const keyPair = getDpopKeyPair();
       const { accessToken } = getAuthSnapshot();
-      if (!keyPair || !accessToken || token !== accessToken ||
+      if (!keyPair || !accessToken || typeof token !== 'string' || !token ||
+          session !== getAuthSession() || (!refreshing && token !== accessToken) ||
           !['GET', 'HEAD'].includes(method) || typeof url !== 'string' || !isAllowedSignUrl(url)) {
-        replyPort.postMessage({ type: 'SW_DPOP_PROOF', proof: null });
+        replyPort.postMessage(failure);
+        return;
+      }
+      if (refreshing) {
+        await ensureFreshAccessToken(session, token);
+        if (getAuthSession() !== session || getDpopKeyPair() !== keyPair || !getAuthSnapshot().accessToken) {
+          replyPort.postMessage(failure);
+          return;
+        }
+        // Global worker messages and port replies may arrive in either order.
+        // Send the same revision through both; the worker keeps the newest state.
+        const state = sendAuthState(registration.active);
+        replyPort.postMessage({ type: 'SW_AUTH_REFRESHED', auth: state });
         return;
       }
       if (typeof nonce === 'string' && nonce) setDpopNonce(nonce);
@@ -64,13 +92,13 @@ export function initServiceWorkerListener(): void {
         accessToken, nonce: getDpopNonce() ?? undefined,
       });
       // Signing may finish after logout, login, or token rotation.
-      if (getAuthSnapshot().accessToken !== accessToken || getDpopKeyPair() !== keyPair) {
+      if (getAuthSnapshot().accessToken !== accessToken || getDpopKeyPair() !== keyPair || getAuthSession() !== session) {
         replyPort.postMessage({ type: 'SW_DPOP_PROOF', proof: null });
         return;
       }
       replyPort.postMessage({ type: 'SW_DPOP_PROOF', proof, nonce: getDpopNonce() });
     } catch {
-      replyPort?.postMessage({ type: 'SW_DPOP_PROOF', proof: null });
+      replyPort?.postMessage(failure);
     } finally {
       replyPort?.close();
     }

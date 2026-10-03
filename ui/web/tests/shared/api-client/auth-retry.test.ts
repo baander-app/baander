@@ -14,7 +14,7 @@ vi.mock('@/shared/crypto/dpop-store', () => ({
   setDpopNonce: (nonce: string) => { crypto.nonce = nonce; },
 }));
 vi.mock('@/shared/crypto/dpop-proof', () => ({ createDpopProof: crypto.proof }));
-import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance';
+import { AXIOS_INSTANCE, ensureFreshAccessToken, getAuthSession } from '@/shared/api-client/axios-instance';
 import { schedulerAdminApi } from '@/features/admin/api/scheduler-admin-api';
 
 let api: MockAdapter;
@@ -195,4 +195,39 @@ it('reuses a completed rotation for a late 401 in the same session', async () =>
   await expect(lateRequest).resolves.toHaveProperty('status', 200);
   expect(refresh.history.post).toHaveLength(1);
   expect(api.history.get.at(-1)?.headers?.Authorization).toBe('DPoP new-access');
+});
+
+
+it('shares one refresh between a native caller and an Axios 401', async () => {
+  let release!: (reply: [number, object]) => void;
+  const pending = new Promise<[number, object]>(resolve => { release = resolve; });
+  refresh.onPost().reply(() => pending);
+  api.onGet('/private').replyOnce(401).onGet('/private').reply(200);
+  const native = ensureFreshAccessToken(getAuthSession(), 'old-access');
+  const request = AXIOS_INSTANCE.get('/private');
+  try {
+    await vi.waitFor(() => expect(api.history.get).toHaveLength(1));
+    expect(refresh.history.post).toHaveLength(1);
+  } finally {
+    release([200, { accessToken: 'new-access', refreshToken: 'new-refresh' }]);
+  }
+  await expect(native).resolves.toBe('new-access');
+  await expect(request).resolves.toHaveProperty('status', 200);
+  expect(refresh.history.post).toHaveLength(1);
+});
+
+it('rejects a direct refresh from an old session without HTTP or clearing the new login', async () => {
+  const session = getAuthSession();
+  crypto.key = {};
+  auth.accessToken = 'other-access'; auth.refreshToken = 'other-refresh';
+  await expect(ensureFreshAccessToken(session, 'old-access')).rejects.toThrow();
+  expect(refresh.history.post).toHaveLength(0);
+  expect(auth.clearAuth).not.toHaveBeenCalled();
+});
+
+it('returns the current token to a late native failure without rotating again', async () => {
+  const session = getAuthSession();
+  auth.accessToken = 'new-access'; auth.refreshToken = 'new-refresh';
+  await expect(ensureFreshAccessToken(session, 'old-access')).resolves.toBe('new-access');
+  expect(refresh.history.post).toHaveLength(0);
 });

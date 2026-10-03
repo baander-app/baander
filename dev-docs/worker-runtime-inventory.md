@@ -644,10 +644,23 @@ worker asset. CI runs this browser suite separately from Vitest.
 
 These checks do not qualify backend proof verification or deployed CORS policy.
 The current API CORS method lists omit HEAD, which needs separate backend coverage
-for a web/API split across origins. Worker expiry recovery also remains open:
-`SW_AUTH_EXPIRED` has no bridge consumer, so native media cannot yet refresh and
-retry an expired token. Multi-tab persistence and worker-restart acceptance remain
-necessary.
+for a web/API split across origins.
+
+Native media now requests refresh from its own window after an authenticated 401,
+shares that window's refresh queue with Axios, and retries once with a new proof.
+A second 401 or failed refresh ends recovery. Complete credential snapshots carry
+session IDs and increasing revisions; publication and reply channels may deliver
+in either order without replacing newer credentials. Proof and refresh channels
+have bounded capacity, deadlines and cleanup. Logout or account replacement cannot
+substitute another session's credentials for the retry.
+
+The browser recovery suite bundles the actual worker, bridge and Axios client with
+tab-local auth/proof fixtures and a disposable HTTP refresh endpoint. It exercises
+success, repeated 401s, refresh failure, overlapping requests, logout, account
+replacement and isolation between independently authenticated tabs. Proof generation
+is mocked; this does not qualify backend cryptography or shared persistent login
+state across tabs. Same-account cross-tab refresh coordination, persistence races,
+and complete worker-restart acceptance remain open.
 
 Filesystem acceptance also remains open: the general
 `LocalFilesystem`/`ReadOnlyFilesystem` wrappers have separate symlink-boundary gaps

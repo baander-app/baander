@@ -19,7 +19,7 @@ const MAX_DPOP_NONCE_RETRIES = 1;
 const authSessions = new WeakMap<object, number>();
 let nextAuthSession = 1;
 
-function getAuthSession(keyPair = getDpopKeyPair()): number {
+export function getAuthSession(keyPair = getDpopKeyPair()): number {
   if (!keyPair) return 0;
   let session = authSessions.get(keyPair);
   if (session === undefined) {
@@ -164,6 +164,36 @@ async function refreshSession(session: number): Promise<void> {
   }
 }
 
+/** Share one refresh between API requests and native media in this window. */
+export async function ensureFreshAccessToken(expectedSession: number, failedAccessToken: string): Promise<string> {
+  const assertCurrent = () => {
+    if (expectedSession !== getAuthSession() || !expectedSession) {
+      throw new Axios.CanceledError('Authentication changed before refresh');
+    }
+    const { accessToken, refreshToken } = getAuthStore();
+    if (!accessToken || !refreshToken || !getDpopKeyPair() || !failedAccessToken) {
+      throw new Axios.CanceledError('No refresh credentials');
+    }
+    return accessToken;
+  };
+  const currentToken = assertCurrent();
+  // A late 401 for the old token reuses the already rotated session.
+  if (failedAccessToken !== currentToken) return currentToken;
+  if (!refreshInFlight || refreshInFlight.session !== expectedSession) {
+    const pending = { session: expectedSession, promise: refreshSession(expectedSession) };
+    refreshInFlight = pending;
+    pending.promise = pending.promise.finally(() => {
+      if (refreshInFlight === pending) refreshInFlight = null;
+    });
+  }
+  await refreshInFlight.promise;
+  const freshToken = assertCurrent();
+  if (freshToken === failedAccessToken) {
+    throw new Axios.CanceledError('Refresh did not replace the access token');
+  }
+  return freshToken;
+}
+
 AXIOS_INSTANCE.interceptors.response.use(undefined, async (error) => {
   const originalRequest = error.config as CustomAxiosRequestConfig | undefined;
   if (!originalRequest || !isApiRequest(originalRequest)) return Promise.reject(error);
@@ -196,20 +226,7 @@ AXIOS_INSTANCE.interceptors.response.use(undefined, async (error) => {
 
   // Every participant spends its one refresh retry, including queued requests.
   originalRequest._didRetry = true;
-  // A late 401 for the old token must reuse the already rotated session.
-  if (originalRequest._authToken === getAuthStore().accessToken) {
-    if (!refreshInFlight || refreshInFlight.session !== session) {
-      const pending = { session, promise: refreshSession(session) };
-      refreshInFlight = pending;
-      pending.promise = pending.promise.finally(() => {
-        if (refreshInFlight === pending) refreshInFlight = null;
-      });
-    }
-    await refreshInFlight.promise;
-  }
-  if (originalRequest._authSession !== getAuthSession()) {
-    throw new Axios.CanceledError('Authentication changed before request retry');
-  }
+  await ensureFreshAccessToken(session, originalRequest._authToken ?? '');
   return AXIOS_INSTANCE(originalRequest);
 });
 
