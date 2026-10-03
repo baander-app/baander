@@ -101,7 +101,7 @@ final class Version620260619CreateMissingEntityTables extends AbstractMigration
             command TEXT NOT NULL,
             status TEXT DEFAULT \'active\' NOT NULL,
             description TEXT DEFAULT NULL,
-            parameters JSONB DEFAULT \'[]\' NOT NULL,
+            parameters JSON DEFAULT \'[]\' NOT NULL,
             created_at TIMESTAMP(0) WITH TIME ZONE NOT NULL,
             updated_at TIMESTAMP(0) WITH TIME ZONE NOT NULL,
             last_run_at TIMESTAMP(0) WITH TIME ZONE DEFAULT NULL,

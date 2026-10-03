@@ -170,6 +170,17 @@ This does not test automatic polling, fencing effects after lease expiry, broker
 crash durability or native console/media execution. No occurrence relay loop is
 enabled yet.
 
+Scheduled-job source parameters can be checked against the real ORM and PostgreSQL:
+
+```bash
+bash scripts/test-functional-container.sh tests/Integration/ScheduledJobParameterPersistenceTest.php
+```
+
+These checks verify the physical JSON column, fresh ORM reads, parameter order and
+numeric representation before materializing an occurrence, plus the relevant schema
+comparison. Native JSON preserves the encoded values; it does not solve stale
+schedule writes or Doctrine's signed-zero-only dirty-checking limitation.
+
 The occurrence console adapter and worker-stop policy can be checked with:
 
 ```bash

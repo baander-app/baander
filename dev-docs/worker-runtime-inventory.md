@@ -540,6 +540,28 @@ while a changed snapshot is rejected. No foreign key cascades away this history
 when a schedule is deleted. A future dispatcher must recheck execution authority;
 the retained snapshot is not permission to run a deleted or paused schedule.
 
+Scheduled-job parameter storage now also uses native PostgreSQL `json`, so the
+source ORM snapshot preserves argument order, integral exponent floats and signed
+zero before an occurrence is recorded. Installed and locked DBAL 4.4.3 already
+encode with `JSON_PRESERVE_ZERO_FRACTION`; no custom serializer is needed. The
+fresh-install schedule migration and ORM mapping agree. This history rewrite does
+not convert existing local JSONB data or recover information it already lost.
+The source-parameter, occurrence, guard and schema checks pass 26 tests with
+237 assertions after fresh and repeat migrations. They include an independent
+observer, cleared ORM state, type/order updates, immutable intent retention and
+parameter-column schema comparison.
+
+Recovery cursors still need their own transactional design. `updatedAt` changes
+when execution starts or finishes, and `nextRunAt` is recalculated from the current
+time; neither is an evaluated-minute watermark. A stale execution save can still
+overwrite a concurrent schedule edit or pause. Add revision protection before
+materializing missed ticks, and advance a durable UTC cursor in the same transaction
+as all intents for the evaluated range. Schedule edits and resumes need an explicit
+policy for unrecorded earlier minutes, rather than inferring historical settings.
+Doctrine's array dirty checking also treats a signed-zero-only edit as unchanged;
+that separate change-detection limitation remains to be addressed with versioned
+schedule persistence.
+
 Parameters use bounded native PostgreSQL `json`, deliberately preserving lexical
 numbers and argument order rather than normalizing them through `jsonb`. The
 application snapshot rejects non-JSON values and detaches nested references.

@@ -36,7 +36,9 @@ class ScheduledJobEntity
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
-    #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '[]'])]
+    /** @var array<array-key, mixed> */
+    // Native JSON preserves numeric lexemes and argument order used by PHP invocation.
+    #[ORM\Column(type: 'json', options: ['default' => '[]'])]
     private array $parameters = [];
 
     #[ORM\Column(type: 'datetime_immutable')]
@@ -133,11 +135,13 @@ class ScheduledJobEntity
         $this->description = $description;
     }
 
+    /** @return array<array-key, mixed> */
     public function getParameters(): array
     {
         return $this->parameters;
     }
 
+    /** @param array<array-key, mixed> $parameters */
     public function setParameters(array $parameters): void
     {
         $this->parameters = $parameters;
