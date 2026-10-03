@@ -649,7 +649,20 @@ preflights and response-header exposure. OAuth authorization denies CORS even fo
 encoded paths and trailing-slash redirects. Partial media responses vary by Origin,
 including requests without that header; Nelmio's cache listener alone skips 206.
 These checks exercise real compiled listener wiring, not full firewall dispatch.
-Stream byte-range validation and If-Range semantics still need separate remediation.
+Track streaming now validates single byte ranges before response preparation,
+including overflowing decimal offsets, suffixes, empty files and unsatisfiable
+ranges. Malformed and multipart ranges fall back to the full response. If-Range
+uses the response validator; stale or weak validators fall back to the full file.
+The Swoole adapter emits only the prepared offset and length and suppresses bodies
+for HEAD and unsatisfiable ranges. Protected streams use private, no-store caching.
+The deprecated raw-path endpoint has been removed; streaming by public ID checks
+library access first. The specification and generated web client reflect removal.
+Other callers of plain BinaryFileResponse still use the old Swoole emission branch
+and need separate audit; this change does not certify all binary responses.
+Contract checks also corrected the transcode init route description and webhook
+rotation response schema. The transcode file-stability helper still rereads file
+size without clearing PHP's stat cache; its three existing PHPStan findings and
+runtime stability behavior remain open.
 
 Native media now requests refresh from its own window after an authenticated 401,
 shares that window's refresh queue with Axios, and retries once with a new proof.

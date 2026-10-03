@@ -19,7 +19,7 @@ final class MediaCorsVaryListener
 
         $path = rawurldecode($event->getRequest()->getPathInfo());
         if (!str_starts_with($path, '/api/images/')
-            && !in_array(rtrim($path, '/'), ['/api/stream/track', '/api/stream/media'], true)) {
+            && rtrim($path, '/') !== '/api/stream/track') {
             return;
         }
 

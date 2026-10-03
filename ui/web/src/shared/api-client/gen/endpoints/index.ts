@@ -3396,13 +3396,6 @@ format?: string;
 bitrate?: number;
 };
 
-export type GetStreamMediaParams = {
-/**
- * Relative path to the media file within the media base directory
- */
-path: string;
-};
-
 export type GetAdminMetadataSyncStatus200DataSourcesItem = {
   name?: string;
   synced?: number;
@@ -3860,6 +3853,28 @@ export type PutWebhookUpdate200Data = {
 
 export type PutWebhookUpdate200 = {
   data?: PutWebhookUpdate200Data;
+};
+
+export type PostWebhookRotateSecret200DataSigningVersion = typeof PostWebhookRotateSecret200DataSigningVersion[keyof typeof PostWebhookRotateSecret200DataSigningVersion];
+
+
+export const PostWebhookRotateSecret200DataSigningVersion = {
+  NUMBER_2: 2,
+} as const;
+
+export type PostWebhookRotateSecret200Data = {
+  id: string;
+  /**
+     * @minLength 64
+     * @maxLength 64
+     * @pattern ^[a-f0-9]{64}$
+     */
+  secret: string;
+  signing_version: PostWebhookRotateSecret200DataSigningVersion;
+};
+
+export type PostWebhookRotateSecret200 = {
+  data: PostWebhookRotateSecret200Data;
 };
 
 export type GetPartyMemberIndex200DataItem = {
@@ -5188,6 +5203,21 @@ export type GetStreamQualityLadder200DataItem = {
 
 export type GetStreamQualityLadder200 = {
   data?: GetStreamQualityLadder200DataItem[];
+};
+
+export type GetStreamSegmentInitSegmentParams = {
+/**
+ * URL signature
+ */
+sig: string;
+/**
+ * Expiry timestamp
+ */
+exp: number;
+};
+
+export type GetStreamSegmentInitSegment403 = {
+  error: string;
 };
 
 export type GetStreamSegmentSegmentParams = {
@@ -18682,10 +18712,15 @@ export type getStreamTrackResponse404 = {
   status: 404
 }
 
+export type getStreamTrackResponse416 = {
+  data: void
+  status: 416
+}
+
 export type getStreamTrackResponseSuccess = (getStreamTrackResponse200 | getStreamTrackResponse206) & {
   headers: Headers;
 };
-export type getStreamTrackResponseError = (getStreamTrackResponse404) & {
+export type getStreamTrackResponseError = (getStreamTrackResponse404 | getStreamTrackResponse416) & {
   headers: Headers;
 };
 
@@ -18731,7 +18766,7 @@ export const getGetStreamTrackQueryKey = (params?: GetStreamTrackParams,) => {
     }
 
 
-export const getGetStreamTrackQueryOptions = <TData = Awaited<ReturnType<typeof getStreamTrack>>, TError = ErrorType<ApiError>>(params: GetStreamTrackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamTrack>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetStreamTrackQueryOptions = <TData = Awaited<ReturnType<typeof getStreamTrack>>, TError = ErrorType<ApiError | void>>(params: GetStreamTrackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamTrack>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -18750,10 +18785,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetStreamTrackQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamTrack>>>
-export type GetStreamTrackQueryError = ErrorType<ApiError>
+export type GetStreamTrackQueryError = ErrorType<ApiError | void>
 
 
-export function useGetStreamTrack<TData = Awaited<ReturnType<typeof getStreamTrack>>, TError = ErrorType<ApiError>>(
+export function useGetStreamTrack<TData = Awaited<ReturnType<typeof getStreamTrack>>, TError = ErrorType<ApiError | void>>(
  params: GetStreamTrackParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamTrack>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamTrack>>,
@@ -18763,7 +18798,7 @@ export function useGetStreamTrack<TData = Awaited<ReturnType<typeof getStreamTra
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamTrack<TData = Awaited<ReturnType<typeof getStreamTrack>>, TError = ErrorType<ApiError>>(
+export function useGetStreamTrack<TData = Awaited<ReturnType<typeof getStreamTrack>>, TError = ErrorType<ApiError | void>>(
  params: GetStreamTrackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamTrack>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamTrack>>,
@@ -18773,7 +18808,7 @@ export function useGetStreamTrack<TData = Awaited<ReturnType<typeof getStreamTra
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamTrack<TData = Awaited<ReturnType<typeof getStreamTrack>>, TError = ErrorType<ApiError>>(
+export function useGetStreamTrack<TData = Awaited<ReturnType<typeof getStreamTrack>>, TError = ErrorType<ApiError | void>>(
  params: GetStreamTrackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamTrack>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -18781,146 +18816,12 @@ export function useGetStreamTrack<TData = Awaited<ReturnType<typeof getStreamTra
  * @summary Stream a track by PublicId with HTTP Range support
  */
 
-export function useGetStreamTrack<TData = Awaited<ReturnType<typeof getStreamTrack>>, TError = ErrorType<ApiError>>(
+export function useGetStreamTrack<TData = Awaited<ReturnType<typeof getStreamTrack>>, TError = ErrorType<ApiError | void>>(
  params: GetStreamTrackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamTrack>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetStreamTrackQueryOptions(params,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
-export type getStreamMediaResponse200 = {
-  data: void
-  status: 200
-}
-
-export type getStreamMediaResponse206 = {
-  data: void
-  status: 206
-}
-
-export type getStreamMediaResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getStreamMediaResponseSuccess = (getStreamMediaResponse200 | getStreamMediaResponse206) & {
-  headers: Headers;
-};
-export type getStreamMediaResponseError = (getStreamMediaResponse404) & {
-  headers: Headers;
-};
-
-export type getStreamMediaResponse = (getStreamMediaResponseSuccess | getStreamMediaResponseError)
-
-export const getGetStreamMediaUrl = (params: GetStreamMediaParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value))
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/api/stream/media?${stringifiedParams}` : `/api/stream/media`
-}
-
-/**
- * @deprecated
- * @summary Stream a media file by path with HTTP Range support (deprecated)
- */
-export const getStreamMedia = async (params: GetStreamMediaParams, options?: RequestInit): Promise<getStreamMediaResponse> => {
-
-  return customInstance<getStreamMediaResponse>(getGetStreamMediaUrl(params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetStreamMediaQueryKey = (params?: GetStreamMediaParams,) => {
-    return [
-    `/api/stream/media`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getGetStreamMediaQueryOptions = <TData = Awaited<ReturnType<typeof getStreamMedia>>, TError = ErrorType<ApiError>>(params: GetStreamMediaParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMedia>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetStreamMediaQueryKey(params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamMedia>>> = ({ signal }) => getStreamMedia(params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStreamMedia>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetStreamMediaQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamMedia>>>
-export type GetStreamMediaQueryError = ErrorType<ApiError>
-
-
-export function useGetStreamMedia<TData = Awaited<ReturnType<typeof getStreamMedia>>, TError = ErrorType<ApiError>>(
- params: GetStreamMediaParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMedia>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getStreamMedia>>,
-          TError,
-          Awaited<ReturnType<typeof getStreamMedia>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamMedia<TData = Awaited<ReturnType<typeof getStreamMedia>>, TError = ErrorType<ApiError>>(
- params: GetStreamMediaParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMedia>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getStreamMedia>>,
-          TError,
-          Awaited<ReturnType<typeof getStreamMedia>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamMedia<TData = Awaited<ReturnType<typeof getStreamMedia>>, TError = ErrorType<ApiError>>(
- params: GetStreamMediaParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMedia>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @deprecated
- * @summary Stream a media file by path with HTTP Range support (deprecated)
- */
-
-export function useGetStreamMedia<TData = Awaited<ReturnType<typeof getStreamMedia>>, TError = ErrorType<ApiError>>(
- params: GetStreamMediaParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMedia>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetStreamMediaQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -21439,17 +21340,17 @@ export const useDeleteWebhookDelete = <TError = ErrorType<ApiError>,
     }
 
 export type postWebhookRotateSecretResponse200 = {
-  data: void
+  data: PostWebhookRotateSecret200
   status: 200
 }
 
 export type postWebhookRotateSecretResponse403 = {
-  data: void
+  data: ApiError
   status: 403
 }
 
 export type postWebhookRotateSecretResponse404 = {
-  data: void
+  data: ApiError
   status: 404
 }
 
@@ -21487,7 +21388,7 @@ export const postWebhookRotateSecret = async (id: string, options?: RequestInit)
 
 
 
-export const getPostWebhookRotateSecretMutationOptions = <TError = ErrorType<void>,
+export const getPostWebhookRotateSecretMutationOptions = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postWebhookRotateSecret>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postWebhookRotateSecret>>, TError,{id: string}, TContext> => {
 
@@ -21516,12 +21417,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostWebhookRotateSecretMutationResult = NonNullable<Awaited<ReturnType<typeof postWebhookRotateSecret>>>
 
-    export type PostWebhookRotateSecretMutationError = ErrorType<void>
+    export type PostWebhookRotateSecretMutationError = ErrorType<ApiError>
 
     /**
  * @summary Rotate a webhook secret and upgrade to signature version 2
  */
-export const usePostWebhookRotateSecret = <TError = ErrorType<void>,
+export const usePostWebhookRotateSecret = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postWebhookRotateSecret>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postWebhookRotateSecret>>,
@@ -31773,29 +31674,58 @@ export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof g
 
 
 
-export type getStreamSegmentInitSegmentResponseDefault = {
-  data: void
-  status: number
+export type getStreamSegmentInitSegmentResponse200 = {
+  data: Blob
+  status: 200
 }
 
-;
-export type getStreamSegmentInitSegmentResponseError = (getStreamSegmentInitSegmentResponseDefault) & {
+export type getStreamSegmentInitSegmentResponse403 = {
+  data: GetStreamSegmentInitSegment403
+  status: 403
+}
+
+export type getStreamSegmentInitSegmentResponse404 = {
+  data: ApiError
+  status: 404
+}
+
+export type getStreamSegmentInitSegmentResponse503 = {
+  data: Blob
+  status: 503
+}
+
+export type getStreamSegmentInitSegmentResponseSuccess = (getStreamSegmentInitSegmentResponse200) & {
+  headers: Headers;
+};
+export type getStreamSegmentInitSegmentResponseError = (getStreamSegmentInitSegmentResponse403 | getStreamSegmentInitSegmentResponse404 | getStreamSegmentInitSegmentResponse503) & {
   headers: Headers;
 };
 
-export type getStreamSegmentInitSegmentResponse = (getStreamSegmentInitSegmentResponseError)
+export type getStreamSegmentInitSegmentResponse = (getStreamSegmentInitSegmentResponseSuccess | getStreamSegmentInitSegmentResponseError)
 
-export const getGetStreamSegmentInitSegmentUrl = (jobPublicId: string,) => {
+export const getGetStreamSegmentInitSegmentUrl = (jobPublicId: string,
+    params: GetStreamSegmentInitSegmentParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/transcode/${jobPublicId}/init`
+  return stringifiedParams.length > 0 ? `/api/transcode/${jobPublicId}/init?${stringifiedParams}` : `/api/transcode/${jobPublicId}/init`
 }
 
-export const getStreamSegmentInitSegment = async (jobPublicId: string, options?: RequestInit): Promise<getStreamSegmentInitSegmentResponse> => {
+/**
+ * @summary Get CMAF init segment
+ */
+export const getStreamSegmentInitSegment = async (jobPublicId: string,
+    params: GetStreamSegmentInitSegmentParams, options?: RequestInit): Promise<getStreamSegmentInitSegmentResponse> => {
 
-  return customInstance<getStreamSegmentInitSegmentResponse>(getGetStreamSegmentInitSegmentUrl(jobPublicId),
+  return customInstance<getStreamSegmentInitSegmentResponse>(getGetStreamSegmentInitSegmentUrl(jobPublicId,params),
   {
     ...options,
     method: 'GET'
@@ -31808,23 +31738,25 @@ export const getStreamSegmentInitSegment = async (jobPublicId: string, options?:
 
 
 
-export const getGetStreamSegmentInitSegmentQueryKey = (jobPublicId: string,) => {
+export const getGetStreamSegmentInitSegmentQueryKey = (jobPublicId: string,
+    params?: GetStreamSegmentInitSegmentParams,) => {
     return [
-    `/api/transcode/${jobPublicId}/init`
+    `/api/transcode/${jobPublicId}/init`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetStreamSegmentInitSegmentQueryOptions = <TData = Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError = ErrorType<void>>(jobPublicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetStreamSegmentInitSegmentQueryOptions = <TData = Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError = ErrorType<GetStreamSegmentInitSegment403 | ApiError | Blob>>(jobPublicId: string,
+    params: GetStreamSegmentInitSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetStreamSegmentInitSegmentQueryKey(jobPublicId);
+  const queryKey =  queryOptions?.queryKey ?? getGetStreamSegmentInitSegmentQueryKey(jobPublicId,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>> = ({ signal }) => getStreamSegmentInitSegment(jobPublicId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>> = ({ signal }) => getStreamSegmentInitSegment(jobPublicId,params, { signal, ...requestOptions });
 
 
 
@@ -31834,11 +31766,12 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetStreamSegmentInitSegmentQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>>
-export type GetStreamSegmentInitSegmentQueryError = ErrorType<void>
+export type GetStreamSegmentInitSegmentQueryError = ErrorType<GetStreamSegmentInitSegment403 | ApiError | Blob>
 
 
-export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError = ErrorType<void>>(
- jobPublicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError, TData>> & Pick<
+export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError = ErrorType<GetStreamSegmentInitSegment403 | ApiError | Blob>>(
+ jobPublicId: string,
+    params: GetStreamSegmentInitSegmentParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamSegmentInitSegment>>,
           TError,
@@ -31847,8 +31780,9 @@ export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError = ErrorType<void>>(
- jobPublicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError, TData>> & Pick<
+export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError = ErrorType<GetStreamSegmentInitSegment403 | ApiError | Blob>>(
+ jobPublicId: string,
+    params: GetStreamSegmentInitSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamSegmentInitSegment>>,
           TError,
@@ -31857,17 +31791,22 @@ export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError = ErrorType<void>>(
- jobPublicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError = ErrorType<GetStreamSegmentInitSegment403 | ApiError | Blob>>(
+ jobPublicId: string,
+    params: GetStreamSegmentInitSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get CMAF init segment
+ */
 
-export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError = ErrorType<void>>(
- jobPublicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError = ErrorType<GetStreamSegmentInitSegment403 | ApiError | Blob>>(
+ jobPublicId: string,
+    params: GetStreamSegmentInitSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetStreamSegmentInitSegmentQueryOptions(jobPublicId,options)
+  const queryOptions = getGetStreamSegmentInitSegmentQueryOptions(jobPublicId,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

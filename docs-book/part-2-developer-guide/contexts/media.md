@@ -28,7 +28,7 @@ All endpoints are prefixed with `/api`.
 | `GET` | `/api/images/{publicId}` | Get image metadata (dimensions, MIME type, size) |
 | `GET` | `/api/images/{publicId}/file` | Serve the image file binary |
 | `GET` | `/api/images/{publicId}/blurhash` | Get the BlurHash placeholder string for progressive image loading |
-| `GET` | `/api/stream/media` | Stream a media file (supports range requests for video/audio seeking) |
+| `GET` | `/api/stream/track` | Stream a track by public ID after checking library access; supports byte ranges |
 
 ## Infrastructure
 

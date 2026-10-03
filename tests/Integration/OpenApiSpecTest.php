@@ -10,6 +10,7 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 final class OpenApiSpecTest extends KernelTestCase
 {
+    /** @return array<string, mixed> */
     private function getSpec(): array
     {
         self::bootKernel();
@@ -24,11 +25,18 @@ final class OpenApiSpecTest extends KernelTestCase
         return $spec;
     }
 
-    public function test_spec_is_valid_json(): void
+    public function test_raw_path_stream_is_absent_from_contract(): void
     {
         $spec = $this->getSpec();
+        self::assertArrayNotHasKey('/api/stream/media', $spec['paths']);
+    }
 
-        $this->assertIsArray($spec);
+    public function test_spec_is_valid_json(): void
+    {
+        self::bootKernel();
+        $renderer = self::getContainer()->get(RenderOpenApi::class);
+        self::assertInstanceOf(RenderOpenApi::class, $renderer);
+        self::assertJson($renderer->render('json', 'default'));
     }
 
     public function test_spec_is_openapi_3(): void
@@ -146,7 +154,6 @@ final class OpenApiSpecTest extends KernelTestCase
         // Endpoints that legitimately return no JSON schema (streaming, SSE, 204)
         $skipPaths = [
             'GET /api/images/{publicId}/file',  // Binary file response
-            'GET /api/stream/media',            // Binary stream response
             // Streaming/binary endpoints
             'GET /api/stream/track',            // Binary audio stream
             'GET /api/stream/{videoId}/master.m3u8',  // HLS manifest

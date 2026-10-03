@@ -239,9 +239,16 @@ final class WebhookController
         summary: 'Rotate a webhook secret and upgrade to signature version 2',
         parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))],
         responses: [
-            new OA\Response(response: '200', description: 'New secret, returned once'),
-            new OA\Response(response: '403', description: 'Administrator required'),
-            new OA\Response(response: '404', description: 'Webhook not found'),
+            new OA\Response(response: '200', description: 'New secret, returned once', content: new OA\JsonContent(
+                required: ['data'],
+                properties: [new OA\Property(property: 'data', type: 'object', required: ['id', 'secret', 'signing_version'], properties: [
+                    new OA\Property(property: 'id', type: 'string', format: 'uuid'),
+                    new OA\Property(property: 'secret', type: 'string', minLength: 64, maxLength: 64, pattern: '^[a-f0-9]{64}$'),
+                    new OA\Property(property: 'signing_version', type: 'integer', enum: [2]),
+                ])],
+            )),
+            new OA\Response(response: '403', description: 'Administrator required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '404', description: 'Webhook not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/{id}/rotate-secret', name: 'rotate_secret', methods: ['POST'])]

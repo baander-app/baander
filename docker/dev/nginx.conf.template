@@ -117,10 +117,10 @@ server {
     # Streaming: audio (music) with HTTP Range / seek support
     # ============================================================
 
-    # /api/stream/track and /api/stream/media — BinaryFileResponse / StreamedResponse
+    # /api/stream/track — bounded binary file response
     # with HTTP 206 Partial Content. No buffering: the app handles byte-range slicing
     # and 206 responses must pass through unmodified.
-    location ~ ^/api/stream/(track|media)$ {
+    location = /api/stream/track {
         proxy_buffering off;
         proxy_request_buffering off;
         proxy_pass http://upstream_backend_php;

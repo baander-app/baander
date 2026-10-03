@@ -7999,7 +7999,10 @@
                         "description": "Full file (audio/video stream)"
                     },
                     "206": {
-                        "description": "Partial content (byte range request)"
+                        "description": "Partial content (single byte range request)"
+                    },
+                    "416": {
+                        "description": "Requested byte range is not satisfiable"
                     },
                     "404": {
                         "description": "Track not found",
@@ -8012,92 +8015,6 @@
                         }
                     }
                 }
-            }
-        },
-        "/api/stream/media": {
-            "get": {
-                "tags": [
-                    "Media"
-                ],
-                "summary": "Stream a media file by path with HTTP Range support (deprecated)",
-                "operationId": "get_stream_media",
-                "parameters": [
-                    {
-                        "name": "path",
-                        "in": "query",
-                        "description": "Relative path to the media file within the media base directory",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        },
-                        "example": "music/Album/song.flac"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Full file (audio/video stream)",
-                        "headers": {
-                            "Content-Type": {
-                                "description": "MIME type of the media file",
-                                "schema": {
-                                    "type": "string"
-                                }
-                            },
-                            "Content-Length": {
-                                "description": "Total file size in bytes",
-                                "schema": {
-                                    "type": "integer"
-                                }
-                            },
-                            "Accept-Ranges": {
-                                "description": "Supported range unit (bytes)",
-                                "schema": {
-                                    "type": "string"
-                                }
-                            }
-                        }
-                    },
-                    "206": {
-                        "description": "Partial content (byte range request)",
-                        "headers": {
-                            "Content-Type": {
-                                "description": "MIME type of the media file",
-                                "schema": {
-                                    "type": "string"
-                                }
-                            },
-                            "Content-Range": {
-                                "description": "Byte range being served, e.g. bytes 0-8191/102400",
-                                "schema": {
-                                    "type": "string"
-                                }
-                            },
-                            "Content-Length": {
-                                "description": "Size of the returned byte range",
-                                "schema": {
-                                    "type": "integer"
-                                }
-                            },
-                            "Accept-Ranges": {
-                                "description": "Supported range unit (bytes)",
-                                "schema": {
-                                    "type": "string"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "File not found or path outside media directory",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ApiError"
-                                }
-                            }
-                        }
-                    }
-                },
-                "deprecated": true
             }
         },
         "/api/admin/metadata/sync-status": {
@@ -9682,13 +9599,65 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "New secret, returned once"
+                        "description": "New secret, returned once",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "required": [
+                                                "id",
+                                                "secret",
+                                                "signing_version"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                },
+                                                "secret": {
+                                                    "type": "string",
+                                                    "pattern": "^[a-f0-9]{64}$",
+                                                    "maxLength": 64,
+                                                    "minLength": 64
+                                                },
+                                                "signing_version": {
+                                                    "type": "integer",
+                                                    "enum": [
+                                                        2
+                                                    ]
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "403": {
-                        "description": "Administrator required"
+                        "description": "Administrator required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     },
                     "404": {
-                        "description": "Webhook not found"
+                        "description": "Webhook not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -15738,20 +15707,95 @@
                 "tags": [
                     "Stream"
                 ],
+                "summary": "Get CMAF init segment",
                 "operationId": "get_stream_segment_init_segment",
                 "parameters": [
                     {
                         "name": "jobPublicId",
                         "in": "path",
+                        "description": "Job public ID",
                         "required": true,
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "name": "sig",
+                        "in": "query",
+                        "description": "URL signature",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "exp",
+                        "in": "query",
+                        "description": "Expiry timestamp",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
                     }
                 ],
                 "responses": {
-                    "default": {
-                        "description": ""
+                    "200": {
+                        "description": "fMP4 init segment",
+                        "content": {
+                            "video/mp4": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Invalid or expired signature",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "error"
+                                    ],
+                                    "properties": {
+                                        "error": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Init segment is not ready; empty response body",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "integer",
+                                    "example": 2
+                                }
+                            }
+                        },
+                        "content": {
+                            "video/mp4": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
                     }
                 }
             }

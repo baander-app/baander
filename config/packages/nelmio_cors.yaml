@@ -67,7 +67,7 @@ nelmio_cors:
             max_age: 3600
 
         # Native media uses proof headers and byte-range requests.
-        '^/api/(images/|stream/(track|media)$)':
+        '^/api/(images/|stream/track$)':
             allow_origin: ['%env(APP_URL)%']
             allow_methods: ['GET', 'HEAD', 'OPTIONS']
             allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'Accept', 'Origin', 'Range', 'If-Range']

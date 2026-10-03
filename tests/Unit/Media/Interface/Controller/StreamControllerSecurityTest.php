@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Media\Interface\Controller;
 
 use App\Auth\Infrastructure\Security\SecurityUser;
-use App\Filesystem\Mime\MimeDetector;
 use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Media\Application\Port\StreamPortInterface;
 use App\Media\Domain\Model\TrackStreamMetadata;
@@ -13,25 +12,18 @@ use App\Media\Interface\Controller\StreamController;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\MockObject\Stub;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
-/**
- * Security-focused tests for StreamController.
- *
- * The streaming endpoints currently perform no authorization checks and the
- * path-based endpoint uses a realpath() guard that can be bypassed for
- * non-existent traversal paths. These tests assert the expected secure
- * behaviour and fail against the current production code.
- */
+/** Authentication and library authorization for the PublicId track endpoint. */
 final class StreamControllerSecurityTest extends TestCase
 {
     private string $mediaBasePath;
-    private StreamPortInterface $streamService;
-    private MimeDetector $mimeDetector;
+    private StreamPortInterface&Stub $streamService;
     private LibraryAccessPortInterface $libraryAccess;
     private StreamController $controller;
 
@@ -41,7 +33,6 @@ final class StreamControllerSecurityTest extends TestCase
         mkdir($this->mediaBasePath, 0o755, true);
 
         $this->streamService = $this->createStub(StreamPortInterface::class);
-        $this->mimeDetector = new MimeDetector();
         $this->libraryAccess = $this->createStub(LibraryAccessPortInterface::class);
 
         $this->controller = $this->createStreamControllerFixture();
@@ -50,8 +41,6 @@ final class StreamControllerSecurityTest extends TestCase
     private function createStreamControllerFixture(): StreamController
     {
         $fixture = new StreamController(
-            mediaBasePath: $this->mediaBasePath,
-            mimeDetector: $this->mimeDetector,
             streamService: $this->streamService,
             security: null,
             libraryAccess: $this->libraryAccess,
@@ -93,8 +82,6 @@ final class StreamControllerSecurityTest extends TestCase
         $request = new Request(['id' => $trackId->toString()]);
         $response = $this->controller->streamById($request);
 
-        // The endpoint should reject unauthenticated requests before serving
-        // media. Currently it returns the file successfully.
         $this->assertNotInstanceOf(BinaryFileResponse::class, $response);
         $this->assertSame(Response::HTTP_UNAUTHORIZED, $response->getStatusCode());
     }
@@ -136,13 +123,11 @@ final class StreamControllerSecurityTest extends TestCase
         $security = $this->createStub(Security::class);
         $security->method('getUser')->willReturn(new SecurityUser(
             id: $userId->toString(),
-            email: 'user@example.com',
+            email: 'user@baander.app',
             password: 'password',
         ));
 
         $controller = new StreamController(
-            mediaBasePath: $this->mediaBasePath,
-            mimeDetector: $this->mimeDetector,
             streamService: $this->streamService,
             security: $security,
             libraryAccess: $this->libraryAccess,
@@ -196,13 +181,11 @@ final class StreamControllerSecurityTest extends TestCase
         $security = $this->createStub(Security::class);
         $security->method('getUser')->willReturn(new SecurityUser(
             id: $userId->toString(),
-            email: 'user@example.com',
+            email: 'user@baander.app',
             password: 'password',
         ));
 
         $controller = new StreamController(
-            mediaBasePath: $this->mediaBasePath,
-            mimeDetector: $this->mimeDetector,
             streamService: $this->streamService,
             security: $security,
             libraryAccess: $this->libraryAccess,
@@ -217,31 +200,6 @@ final class StreamControllerSecurityTest extends TestCase
 
         $this->assertInstanceOf(BinaryFileResponse::class, $response);
         $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
-    }
-
-    public function testStreamByPathRequiresAuthentication(): void
-    {
-        file_put_contents($this->mediaBasePath . '/song.mp3', "\xFF\xFB" . str_repeat("\x00", 100));
-
-        $request = new Request(['path' => 'song.mp3']);
-        $response = $this->controller->stream($request);
-
-        // The endpoint should reject unauthenticated requests before serving
-        // media. Currently it returns the file successfully.
-        $this->assertNotInstanceOf(BinaryFileResponse::class, $response);
-        $this->assertSame(Response::HTTP_UNAUTHORIZED, $response->getStatusCode());
-    }
-
-    public function testStreamByPathRejectsTraversalToNonExistentOutsidePath(): void
-    {
-        $request = new Request(['path' => '../../../etc/passwd-does-not-exist']);
-        $response = $this->controller->stream($request);
-
-        // The realpath() guard returns false for non-existent paths and the
-        // fallback to '' makes str_starts_with() pass. The request then fails
-        // on file_exists() with a 404 instead of being rejected as a traversal
-        // attempt. A secure implementation should reject the traversal up front.
-        $this->assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode());
     }
 
     private function removeTree(string $path): void

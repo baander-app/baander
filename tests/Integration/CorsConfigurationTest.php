@@ -76,7 +76,7 @@ final class CorsConfigurationTest extends TestCase
     /** @return iterable<string,array{string,string}> */
     public static function mediaRequests(): iterable
     {
-        foreach (['/api/images/image', '/api/images/image/file', '/api/stream/track', '/api/stream/media'] as $path) {
+        foreach (['/api/images/image', '/api/images/image/file', '/api/stream/track'] as $path) {
             foreach (['GET', 'HEAD'] as $method) {
                 yield $method . ' ' . $path => [$path, $method];
             }
@@ -133,7 +133,7 @@ final class CorsConfigurationTest extends TestCase
     /** @return iterable<string,array{string,?string}> */
     public static function partialContentRequests(): iterable
     {
-        foreach (['/api/images/image/file', '/api/stream/track', '/api/stream/media'] as $path) {
+        foreach (['/api/images/image/file', '/api/stream/track'] as $path) {
             yield 'CORS ' . $path => [$path, self::ORIGIN];
             yield 'without Origin ' . $path => [$path, null];
         }
@@ -197,6 +197,15 @@ final class CorsConfigurationTest extends TestCase
         self::assertContains([$listener, '__invoke'], $dispatcher->getListeners(KernelEvents::RESPONSE));
     }
 
+    public function testRawPathStreamRouteIsRemoved(): void
+    {
+        $router = self::$kernel->getContainer()->get('cors.production.router');
+        self::assertInstanceOf(\Symfony\Component\Routing\RouterInterface::class, $router);
+        $routes = $router->getRouteCollection();
+        self::assertNull($routes->get('stream_media'));
+        self::assertNotNull($routes->get('stream_track'));
+    }
+
     private function preflight(string $path, string $method, string $headers, string $origin = self::ORIGIN): Response
     {
         $request = Request::create('https://api.baander.app' . $path, 'OPTIONS');
@@ -254,6 +263,7 @@ final class CorsConfigurationKernel extends Kernel
     protected function build(ContainerBuilder $container): void
     {
         parent::build($container);
+        $container->setAlias('cors.production.router', 'router')->setPublic(true);
         $container->setAlias('cors.production.listener', 'nelmio_cors.cors_listener')->setPublic(true);
         $container->setAlias('cors.production.media_vary', MediaCorsVaryListener::class)->setPublic(true);
         $container->setAlias('cors.production.vary', 'nelmio_cors.cacheable_response_vary_listener')->setPublic(true);

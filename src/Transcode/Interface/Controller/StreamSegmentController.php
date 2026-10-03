@@ -34,7 +34,7 @@ final class StreamSegmentController
     }
 
     #[OA\Get(
-        path: '/api/transcode/{jobPublicId}/init.mp4',
+        path: '/api/transcode/{jobPublicId}/init',
         summary: 'Get CMAF init segment',
         parameters: [
             new OA\Parameter(name: 'jobPublicId', description: 'Job public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
@@ -42,9 +42,15 @@ final class StreamSegmentController
             new OA\Parameter(name: 'exp', description: 'Expiry timestamp', in: 'query', required: true, schema: new OA\Schema(type: 'integer')),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'fMP4 init segment', content: new OA\MediaType(mediaType: 'video/mp4')),
-            new OA\Response(response: '403', description: 'Invalid or expired signature'),
+            new OA\Response(response: '200', description: 'fMP4 init segment', content: new OA\MediaType(mediaType: 'video/mp4', schema: new OA\Schema(type: 'string', format: 'binary'))),
+            new OA\Response(response: '403', description: 'Invalid or expired signature', content: new OA\JsonContent(
+                required: ['error'],
+                properties: [new OA\Property(property: 'error', type: 'string')],
+            )),
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '503', description: 'Init segment is not ready; empty response body', headers: [
+                new OA\Header(header: 'Retry-After', schema: new OA\Schema(type: 'integer', example: 2)),
+            ], content: new OA\MediaType(mediaType: 'video/mp4', schema: new OA\Schema(type: 'string', format: 'binary'))),
         ],
     )]
     #[Route('/init', name: 'init_segment', methods: ['GET'])]

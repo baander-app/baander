@@ -12,7 +12,18 @@ final class EndResponseProcessor implements ResponseProcessor
 {
     public function process(HttpFoundationResponse $httpFoundationResponse, SwooleResponse $swooleResponse): void
     {
-        if ($httpFoundationResponse instanceof BinaryFileResponse) {
+        if ($httpFoundationResponse instanceof SwooleBinaryFileResponse) {
+            $length = $httpFoundationResponse->getLength();
+            if ($length === 0) {
+                $swooleResponse->end();
+            } else {
+                $swooleResponse->sendfile(
+                    $httpFoundationResponse->getFile()->getRealPath(),
+                    $httpFoundationResponse->getOffset(),
+                    $length,
+                );
+            }
+        } elseif ($httpFoundationResponse instanceof BinaryFileResponse) {
             $swooleResponse->sendfile($httpFoundationResponse->getFile()->getRealPath());
         } else {
             $content = $httpFoundationResponse->getContent();

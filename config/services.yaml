@@ -537,10 +537,6 @@ services:
     App\Media\Application\Port\StreamPortInterface:
         alias: App\Media\Infrastructure\Service\StreamService
 
-    App\Media\Interface\Controller\StreamController:
-        arguments:
-            $mediaBasePath: '%kernel.project_dir%/storage/media'
-
     # --- Recommendation Domain Repository Aliases ---
     App\Recommendation\Domain\Repository\RecommendationRepositoryInterface:
         alias: App\Recommendation\Infrastructure\Doctrine\Repository\RecommendationRepository
