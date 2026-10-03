@@ -1,6 +1,6 @@
 # CLI Commands
 
-Baander ships a set of console commands for managing users, libraries, metadata, scheduler jobs, and more. All commands run inside the app container.
+Baander ships console commands for managing users, libraries, metadata and scheduler jobs. The console commands below run inside the app container. Worker deployment uses a separate host entrypoint.
 
 ```bash
 # Run any command
@@ -9,6 +9,97 @@ make exec cmd="php bin/console <command>"
 # Example
 make exec cmd="php bin/console app:user:create --help"
 ```
+
+## Worker deployment
+
+Run `bin/worker-deployment.php` from a trusted host checkout with Composer dependencies,
+PHP 8.5 with extensions `posix` and `pdo_pgsql`, and an absolute Docker executable connected
+to a local Unix socket. The application container receives no Docker authority.
+Provision the migrated database, Redis and a private Docker network first; use a
+locally available immutable image ID. The initial recipe has no mounts or devices.
+
+The manifest is a JSON object of at most 8192 bytes. Version 1 requires exactly
+these fields, with JSON integers for version and resource values:
+
+```json
+{
+  "version": 1,
+  "namespace": "worker.baander.app",
+  "bootId": "0123456789abcdef0123456789abcdef",
+  "daemonId": "replace-with-docker-info-ID",
+  "imageId": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "network": "baander-workers",
+  "dockerBinary": "/usr/bin/docker",
+  "dockerEndpoint": "unix:///var/run/docker.sock",
+  "memoryMiB": 1280,
+  "managementMiB": 128,
+  "consumerMiB": 320,
+  "relayMiB": 320,
+  "schedulerMiB": 320,
+  "scheduledConsoleMiB": 192,
+  "nanoCpus": 1000000000,
+  "pidsLimit": 64
+}
+```
+
+Replace the daemon/image examples with `docker info --format '{{.ID}}'` and the
+local image's `docker image inspect --format '{{.Id}}'` values on the same endpoint.
+Generate a fresh 32-character lowercase hexadecimal boot ID for each deployment
+attempt. Reservations must fit the memory ceiling: management requires at least
+128 MiB; consumer, relay and scheduler each require at least 320 MiB. Scheduled
+console execution requires at least 192 MiB or `0` to disable it. The worker argv,
+PHP management limit, identity and lock directory are fixed by the manifest parser;
+arbitrary commands, environment fields and secret paths are rejected.
+
+Keep credentials in a separate canonical absolute regular file owned by the
+invoking user, with mode `0600`, no symlink components and at most 8192 bytes:
+
+```json
+{
+  "controllerDatabaseUrl": "postgresql://worker:replace-password@db-control.baander.app/baander?serverVersion=18&charset=utf8",
+  "runtimeEnvironment": {
+    "APP_ENV": "prod",
+    "APP_DEBUG": "0",
+    "APP_SECRET": "replace-with-runtime-secret",
+    "DATABASE_URL": "postgresql://worker:replace-password@db-worker.baander.app/baander?serverVersion=18&charset=utf8",
+    "REDIS_URL": "redis://:replace-password@redis.baander.app:6379",
+    "MESSENGER_TRANSPORT_DSN": "redis://:replace-password@redis.baander.app:6379/messages"
+  }
+}
+```
+
+The two database addresses must reach the same database from the host and worker
+network respectively. The controller URL and credentials file stay on the host.
+Docker receives the admitted runtime values through a temporary private env-file;
+trusted daemon operators can inspect the resulting container environment.
+Optional runtime keys are `REDIS_PASSWORD` and `MAILER_DSN`; values cannot contain
+line breaks and their complete env-file is limited to 4 KiB.
+
+Apply an external deadline to every action. DBAL does not enforce a hard connection
+deadline through `connect_timeout`; that query option is rejected here.
+
+```bash
+php bin/worker-deployment.php --help
+timeout --kill-after=5s 60s php bin/worker-deployment.php create /etc/baander/worker-manifest.json /etc/baander/worker-credentials.json
+timeout --kill-after=5s 60s php bin/worker-deployment.php start /etc/baander/worker-manifest.json /etc/baander/worker-credentials.json
+timeout --kill-after=5s 60s php bin/worker-deployment.php status /etc/baander/worker-manifest.json /etc/baander/worker-credentials.json
+```
+
+`create` commits one creation intent before Docker work. If its reply is uncertain,
+use `reconcile-create` with the identical manifest and credentials; it verifies and
+registers the existing never-started container without creating another. `start`
+consumes a one-shot claim before issuing Docker start. An uncertain start requires
+explicit `recover`, never another start. Recovery retires that immutable boot,
+verifies removal and releases only its reservation. Keep the old manifest for
+recovery; a replacement needs a fresh boot ID. `status` reports committed
+observations and always returns `readiness: "not_checked"`; it does not certify
+application readiness. Timeout or interruption does not cancel an operation
+already submitted to Docker or authorize a retry.
+
+Actions return bounded JSON on stdout. Exit codes are `0` for a confirmed result,
+`1` for `operation_unconfirmed`, `2` for `invalid_configuration`, and `3` for a
+denied or unregistered operation. The external `timeout` command may return its
+own exit code without JSON. Error output contains no credentials or raw diagnostics.
 
 ## Auth & Users
 

@@ -24,6 +24,7 @@ bash scripts/test-messaging-container.sh
 bash scripts/test-worker-retirement-container.sh
 bash scripts/test-worker-recovery-container.sh
 bash scripts/test-worker-command-container.sh
+bash scripts/test-worker-operator-container.sh
 bash scripts/test-worker-containment-container.sh
 bash scripts/test-functional-container.sh tests/Functional/Controller/FavoritesControllerTest.php
 bash scripts/test-functional-container.sh tests/Integration/CoverExtractionPersistenceTest.php
@@ -38,6 +39,18 @@ test order within dependency constraints and treats unexpected output as risky.
 The unit runner sets a 256 MiB PHP memory limit so the combined unit and PHPStan-rule
 suite can compile its analysis container. This budget applies only to that isolated
 runner; it does not change the tracked PHPUnit configuration or deployment settings.
+The operator runner additionally requires host PHP with `posix` and `pdo_pgsql`
+(`BAANDER_TEST_PHP_BINARY` selects its executable), Python 3 and a local Unix Docker
+endpoint (`BAANDER_TEST_DOCKER_ENDPOINT`). Its outer 240-second timeout bounds
+native database waits; DBAL `connect_timeout` is not a hard connection deadline.
+It creates disposable PostgreSQL/Redis services and an isolated fixture image,
+then exercises `bin/worker-deployment.php` create, reconciliation, start, status
+and recovery with canonical private credentials. The controller reaches a
+loopback-published database port while the worker uses its private network address;
+both address the same database. It verifies real outbox delivery, scheduler work,
+lease/child identities and retirement of the immutable boot. The local drill passes;
+the fixture image does not certify the production build, and CI integration remains
+pending its host PHP and controller-network setup. Status does not certify readiness.
 The messaging runner waits for PostgreSQL TCP readiness (not its temporary
 initialization socket) and prints service logs on readiness timeout. It also
 explicitly selects `phpunit.xml.dist` and provisions

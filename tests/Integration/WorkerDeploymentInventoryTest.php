@@ -27,6 +27,20 @@ final class WorkerDeploymentInventoryTest extends TestCase
     /** @var list<Connection> */
     private array $extras = [];
 
+    public function testStartClaimObservationDoesNotConsumePermissionAndRequiresExactBinding(): void
+    {
+        $binding = $this->binding();
+        $inventory = new DoctrineDeploymentInventory($this->first);
+        self::assertFalse($inventory->hasStartClaim($binding));
+        self::assertTrue($inventory->register($binding));
+        self::assertFalse((new DoctrineDeploymentInventory($this->second))->hasStartClaim($binding));
+        self::assertTrue($inventory->claimStart($binding));
+        self::assertTrue((new DoctrineDeploymentInventory($this->second))->hasStartClaim($binding));
+        self::assertFalse($inventory->hasStartClaim(new DeploymentContainer($binding->namespace, $binding->bootId,
+            $binding->daemonId, str_repeat('f', 64))));
+        self::assertFalse($inventory->claimStart($binding), 'Observation never resets the consumed permission.');
+    }
+
     protected function setUp(): void
     {
         $url = getenv('OUTBOX_TEST_DATABASE_URL');
@@ -108,14 +122,12 @@ final class WorkerDeploymentInventoryTest extends TestCase
         $this->extras[] = $connection;
         $connection->executeStatement('SET search_path TO ' . $this->schema);
         $connection->throwAfterCommit = true;
-        $permission = null;
         try {
-            $permission = (new DoctrineDeploymentInventory($connection))->claimCreate($this->recipe());
+            (new DoctrineDeploymentInventory($connection))->claimCreate($this->recipe());
             self::fail('Uncertain commit acknowledgment must not grant another creation attempt.');
         } catch (\RuntimeException $error) {
             self::assertSame('Inventory commit acknowledgment is uncertain.', $error->getMessage());
         }
-        self::assertNull($permission);
         self::assertFalse($connection->isConnected());
         $observer = new DoctrineDeploymentInventory($this->second);
         self::assertTrue($observer->matchesCreate($this->recipe()));
@@ -167,14 +179,12 @@ final class WorkerDeploymentInventoryTest extends TestCase
         $this->extras[] = $connection;
         $connection->executeStatement('SET search_path TO ' . $this->schema);
         $connection->throwAfterCommit = true;
-        $permission = null;
         try {
-            $permission = (new DoctrineDeploymentInventory($connection))->claimStart($this->binding());
+            (new DoctrineDeploymentInventory($connection))->claimStart($this->binding());
             self::fail('Uncertain commit acknowledgment must not supply start permission.');
         } catch (\RuntimeException $error) {
             self::assertSame('Inventory commit acknowledgment is uncertain.', $error->getMessage());
         }
-        self::assertNull($permission);
         self::assertFalse($connection->isConnected());
         $claimedAt = $this->second->fetchOne('SELECT start_claimed_at FROM worker_deployment_containers');
         self::assertNotNull($claimedAt);

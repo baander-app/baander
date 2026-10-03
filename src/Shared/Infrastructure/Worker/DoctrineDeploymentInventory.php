@@ -80,6 +80,17 @@ final class DoctrineDeploymentInventory
         return $this->operation(fn (): ?DeploymentContainer => $this->select($namespace, $bootId));
     }
 
+    /** Observes the irreversible claim; it never grants permission to issue a start. */
+    public function hasStartClaim(DeploymentContainer $binding): bool
+    {
+        return $this->operation(fn (): bool => $this->connection->fetchOne(<<<'SQL'
+            SELECT 1 FROM worker_deployment_containers
+            WHERE namespace = :namespace AND boot_id = :boot AND daemon_id = :daemon
+                AND container_id = :container AND start_claimed_at IS NOT NULL
+            SQL, ['namespace' => $binding->namespace, 'boot' => $binding->bootId,
+                'daemon' => $binding->daemonId, 'container' => $binding->containerId]) !== false);
+    }
+
     private function select(string $namespace, string $bootId): ?DeploymentContainer
     {
         $row = $this->connection->fetchAssociative('SELECT daemon_id, container_id FROM worker_deployment_containers WHERE namespace = :namespace AND boot_id = :boot', ['namespace' => $namespace, 'boot' => $bootId]);

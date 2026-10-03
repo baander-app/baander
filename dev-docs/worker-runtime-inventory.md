@@ -184,7 +184,8 @@ the mixed Supervisor startup. The `worker` image target starts `app:worker`
 directly as PID 1 and requires explicit identity and memory reservations.
 Compose currently starts only the web role; background delivery requires a
 separate admitted worker. Do not add an automatically restarting Compose worker:
-the external creation/start/recovery controller still needs an operator entrypoint.
+the host-only `bin/worker-deployment.php` controller now handles creation, start,
+status and explicit recovery through immutable deployment records.
 Use an immutable image, no automatic
 restart, and a stop grace period longer than the 35-second worker drain deadline.
 The worker image disables the inherited web/dependency health check; readiness
@@ -218,8 +219,9 @@ forward migration preserves all earlier ownership and creation history.
 Real Docker/PostgreSQL drills cover lost removal replies and retirement before
 lease acquisition. Database tests cover acquisition/start races, an in-flight
 acquisition that commits before retirement, and lost intent/completion commit
-acknowledgments. This does not yet provide an operator entrypoint or readiness
-acceptance for an actual worker image launched through that entrypoint.
+acknowledgments. The host entrypoint now has a passing real-worker drill covering
+outbox delivery, scheduler execution and inventory-backed recovery. It uses an
+isolated fixture image and does not certify the production worker image or readiness.
 
 Production source and local Composer packages are copied before dependency
 installation. Dependency installation runs as the application user and does not
@@ -497,9 +499,10 @@ The caller must durably associate a fresh deployment boot with its container ID
 before starting it. Labels alone do not establish that lifecycle inventory or defend
 against a malicious Docker operator. Automatic recovery after a lost removal
 response, daemon replacement, and host-systemd containment remain unimplemented.
-The combined Docker/PostgreSQL recovery runner now checks real adapter removal
-and committed lease transitions together. Its deliberately controlled container
-fixture does not run `LeasedWorkerRuntime`; deployment startup wiring remains open.
+The combined Docker/PostgreSQL recovery runner checks real adapter removal and
+committed lease transitions together. Its controlled container fixture does not
+run `LeasedWorkerRuntime`; the separate operator drill now exercises the actual
+worker through the host entrypoint.
 
 `worker_deployment_containers` records a deployment namespace and boot against
 one Docker daemon ID and full container ID. The DBAL inventory permits exact retries
@@ -538,13 +541,31 @@ registering the full ID. It never starts or recreates a container.
 
 `DeploymentContainerRecipe` uses a local immutable image ID (`--pull=never`), an
 absolute executable and bounded argument vector, explicit CPU/memory/swap/PID
-ceilings, and a named isolated network. It does not yet support media mounts, device
-access or secret injection. The controller still needs application deployment
-configuration and command wiring. The combined acceptance fixture now leaves the
+ceilings, and a named isolated network. It does not yet support media mounts or device
+access. Runtime configuration is bound into the recipe fingerprint and passed
+through a temporary private env-file. The combined acceptance fixture leaves the
 predecessor unstarted and uses the startup adapter; an independent PostgreSQL
 connection verifies the committed claim before the real Docker start. It then
 exercises inventory-backed retirement. This validates external startup/recovery,
-not the full application runtime or deployment command wiring.
+not the full application runtime. `bin/worker-deployment.php` now supplies the host
+composition root without booting Symfony or loading host dotenv files. Its strict
+version-1 manifest fixes the worker argv and binds Docker resource ceilings to
+validated admission reservations. A separate canonical private credentials file
+provides the controller PostgreSQL URL and admitted production environment; host
+and worker database addresses must identify the same database. Host PHP requires
+`posix` and `pdo_pgsql`. Every action needs an external deadline because native
+database I/O has no hard DBAL connection bound. See the
+[operator workflow](../docs-book/part-1-operator-guide/commands/README.md#worker-deployment)
+for exact fields, credentials, actions and exit codes.
+
+`scripts/test-worker-operator-container.sh` passes real host-entrypoint create,
+reconcile-create, start, status and recovery against disposable PostgreSQL/Redis.
+It observes actual outbox delivery and scheduler execution, verifies the worker
+lease and child roles, retires the exact container and rejects reuse of its boot.
+The fixture image contains the checkout and generated test keys; this is not
+production-build certification. CI integration remains pending because its runner
+lacks the host PHP runtime and matching controller/database network setup. Status
+returns committed observations with `readiness: not_checked`, not a readiness grant.
 
 The first command facade is now wired. `app:serve` is the canonical name of the
 existing `ServerRunCommand`, retaining `swoole:server:run` as an alias and preserving
@@ -584,8 +605,9 @@ These checks establish lifecycle behavior, not end-to-end media or scheduler wor
 The worker command is not yet a replacement for every web-owned background role.
 Scheduler/media ownership, role-specific boot, queue families, autoscaling,
 full-identity health publication and deployment configuration cutover remain open.
-The external creation/start/recovery controller must still be wired into deployment
-operations. Its low-level lease acknowledgment does not itself verify cleanup, and
+The host creation/start/recovery entrypoint is implemented; deployment automation
+and production-image qualification remain open. Its low-level lease acknowledgment
+does not itself verify cleanup, and
 host-systemd and per-child containment remain unqualified.
 
 The scheduler poller is the next small lifetime to extract, but its execution
