@@ -573,6 +573,33 @@ Forgejo now has a blocking operator lifecycle step using this mode and
 Forgejo run. Status returns committed observations with `readiness: not_checked`,
 not a readiness grant.
 
+The production-image check is now `scripts/test-worker-production-container.sh`,
+run with `BAANDER_TEST_IMAGE` after building `Dockerfile --target worker`. Its
+300-second deadline excludes the separate build. It checks actual worker metadata,
+production Composer platform requirements and the absence of development
+dependencies, baked OAuth keys and agent artifacts. It then runs the operator
+lifecycle with `BAANDER_TEST_USE_IMAGE=1`, using the immutable worker image directly
+without fixture source, key, dependency or cache injection. Forgejo has blocking
+context-exclusion, production-worker build and production-lifecycle steps. A clean
+full worker build passes, and context exclusions reduce the transferred checkout
+from 6.86 GB to 188.30 MB. Native Swoole is pinned to 6.2.0 to match Composer's
+exact requirement, and the extension-configuration fallback cannot hide a failed
+PIE installation. The corrected production build, platform checks and direct-image
+lifecycle drill pass locally. This does not establish a passing Forgejo run.
+
+The production target now uses `php.ini-production` and `APP_DEBUG=0`; the image
+check rejects displayed runtime or startup errors. Development images retain
+their existing PHP configuration.
+
+This qualifies the tested worker startup, delivery, scheduler execution and
+retirement paths; it does not certify OAuth. `config/packages/auth.yaml` still
+sets `auth.encryption_key` to an empty string, and the configured OAuth key paths
+require external provisioning. The authorization-server factory rejects an empty
+encryption key in production; its non-production fallback generates a per-process
+key, which is unsuitable across workers.
+The strict worker recipe currently admits no key mounts, so authenticated web/OAuth
+deployment remains a separate configuration and acceptance task.
+
 The first command facade is now wired. `app:serve` is the canonical name of the
 existing `ServerRunCommand`, retaining `swoole:server:run` as an alias and preserving
 its options, signal handling and BootManager behavior. `app:worker` uses an

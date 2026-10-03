@@ -25,6 +25,7 @@ bash scripts/test-worker-retirement-container.sh
 bash scripts/test-worker-recovery-container.sh
 bash scripts/test-worker-command-container.sh
 bash scripts/test-worker-operator-container.sh
+bash scripts/test-docker-context.sh
 bash scripts/test-worker-containment-container.sh
 bash scripts/test-functional-container.sh tests/Functional/Controller/FavoritesControllerTest.php
 bash scripts/test-functional-container.sh tests/Integration/CoverExtractionPersistenceTest.php
@@ -70,6 +71,29 @@ blocking operator lifecycle step using container mode and
 `BAANDER_TEST_CHECKOUT_IN_IMAGE=1` to copy source and dependencies from the built
 image. Adding that gate does not establish a passing Forgejo run. Status does not
 certify readiness.
+
+To check the actual production worker target, build it separately and pass its
+local image reference to the production runner:
+
+```bash
+docker buildx build --target worker --load -t baander-worker:test .
+BAANDER_TEST_IMAGE=baander-worker:test bash scripts/test-worker-production-container.sh
+```
+
+The runner has a 300-second outer deadline; image build time is outside that bound.
+It verifies the worker user, entrypoint, disabled web health check and production
+environment and disabled PHP error display; checks that development dependencies,
+baked OAuth keys and agent artifacts are absent; and runs Composer's production platform checks. It then uses
+`BAANDER_TEST_USE_IMAGE=1` with container controller mode to run the lifecycle
+against that exact immutable image. This skips the fixture rebuild and injects no
+source, dependencies, keys or cache into the worker. Test preparation and Docker
+authority remain in separate containers. The scope is the worker lifecycle,
+outbox and scheduler, without OAuth certification. Forgejo now includes blocking
+context-exclusion, production-worker build and production-lifecycle steps. Their
+configuration does not establish a passing Forgejo run. The clean worker build,
+platform checks and direct-image lifecycle pass locally with native Swoole pinned
+to Composer's required 6.2.0. PIE installation failures fail the image build.
+
 The messaging runner waits for PostgreSQL TCP readiness (not its temporary
 initialization socket) and prints service logs on readiness timeout. It also
 explicitly selects `phpunit.xml.dist` and provisions

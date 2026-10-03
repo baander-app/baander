@@ -85,6 +85,9 @@ jobs:
                       echo "No BuildKit cache found, starting fresh"
                     fi
 
+            -   name: Docker build context contract
+                run: bash scripts/test-docker-context.sh
+
             -   name: Build CI image
                 run: |
                     docker buildx build \
@@ -94,6 +97,18 @@ jobs:
                       --cache-to=type=local,dest=/tmp/buildkit-cache,mode=max \
                       --cache-from=type=local,src=/tmp/buildkit-cache \
                       .
+
+            -   name: Build production worker image
+                run: |
+                    docker buildx build --target worker --load \
+                      -t "${CI_IMAGE}-worker" \
+                      --cache-from=type=local,src=/tmp/buildkit-cache .
+
+            -   name: Production worker lifecycle and dependencies
+                run: |
+                    BAANDER_TEST_IMAGE="${CI_IMAGE}-worker" \
+                    BAANDER_TEST_POSTGRES_IMAGE="${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest" \
+                      bash scripts/test-worker-production-container.sh
 
             -   name: Composer platform requirements
                 run: docker run --rm "$CI_IMAGE" composer check-platform-reqs
@@ -280,7 +295,7 @@ jobs:
                 run: |
                     docker rm -f "$CI_TEST_CONTAINER" "$CI_DATABASE" "$CI_REDIS" 2>/dev/null || true
                     docker network rm "$CI_NETWORK" 2>/dev/null || true
-                    docker image rm "$CI_IMAGE" 2>/dev/null || true
+                    docker image rm "$CI_IMAGE" "${CI_IMAGE}-worker" 2>/dev/null || true
 
     frontend-quality:
         runs-on: docker-cli

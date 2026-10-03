@@ -227,11 +227,12 @@ RUN set -xe && \
 RUN set -xe && \
     docker-php-ext-install -j "$(nproc)" sockets
 
+# Match the exact native API required by Composer and the Swoole bundle stubs.
 # Install Swoole from source with custom flags.
 # --mount=type=cache persists pie's download and build cache.
 RUN --mount=type=cache,target=/root/.cache/pie \
     set -xe && \
-    pie install swoole/swoole:dev-master \
+    pie install swoole/swoole:6.2.0 \
         --enable-swoole-thread \
         --enable-sockets \
         --enable-swoole-curl \
@@ -241,8 +242,8 @@ RUN --mount=type=cache,target=/root/.cache/pie \
         --enable-iouring \
         --enable-zstd && \
     # Ensure extension= directive exists — pie generates it but keep as safety net
-    grep -q 'extension=swoole' /usr/local/etc/php/conf.d/docker-php-ext-swoole.ini || \
-        echo 'extension=swoole.so' > /usr/local/etc/php/conf.d/docker-php-ext-swoole.ini
+    { grep -q 'extension=swoole' /usr/local/etc/php/conf.d/docker-php-ext-swoole.ini || \
+        echo 'extension=swoole.so' > /usr/local/etc/php/conf.d/docker-php-ext-swoole.ini; }
 
 # -----------------------------------------------------------------------------
 # Stage 2c: builder-tsduck
@@ -486,7 +487,7 @@ CMD ["/usr/local/bin/start-web.sh"]
 # -----------------------------------------------------------------------------
 FROM runtime AS production
 
-ENV APP_ENV=prod
+ENV APP_ENV=prod APP_DEBUG=0
 
 # Switch to root to install the Composer executable.
 USER root
@@ -498,8 +499,10 @@ COPY --from=builder /usr/bin/composer /usr/bin/composer
 # resolves local packages and generates the optimized application autoloader.
 COPY --chown=www-data:www-data . ${APP_HOME}/
 
+# Standalone production must not inherit development error-display settings.
 # Never ship a cache generated in the build context's environment.
-RUN rm -rf var/cache && \
+RUN cp /usr/local/etc/php/php.ini-production /usr/local/etc/php/php.ini && \
+    rm -rf var/cache && \
     mkdir -p var/cache var/log && \
     chown www-data:www-data var var/cache var/log
 

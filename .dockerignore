@@ -1,10 +1,24 @@
 .github
 .claude
 .git
+# Agent indexes, sessions, profiling captures and editor state are host-only.
+.agents
+.codex
+.gitnexus
+.pi
+.rpiv
+.reli
+**/.claude
+**/.idea
+.phpunit.cache
+.deptrac.cache
 config/secrets/
+docker/dev/*.key
 auth.json
 docs
 node_modules
+**/node_modules
+**/.yarn/install-state.gz
 vendor
 var/
 .env.local
@@ -13,3 +27,14 @@ var/
 storage/muzak
 storage/logs/*.{log,json}
 qodana.yaml
+
+# Keep native sources, local packages, patches, licenses and public web assets.
+ui/rn/android/build/
+ui/rn/android/app/build/
+ui/rn/android/app/.cxx/
+ui/rn/android/.gradle/
+ui/rn/android/.kotlin/
+ui/rn/ios/build/
+ui/rn/ios/DerivedData/
+ui/web/playwright-report/
+ui/web/test-results/

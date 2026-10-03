@@ -11,6 +11,13 @@ operator_in_container="${BAANDER_TEST_OPERATOR_IN_CONTAINER:-0}"
 [[ "$operator_in_container" = 0 || "$operator_in_container" = 1 ]] || {
     echo 'BAANDER_TEST_OPERATOR_IN_CONTAINER must be 0 or 1.' >&2; exit 1;
 }
+use_image="${BAANDER_TEST_USE_IMAGE:-0}"
+[[ "$use_image" = 0 || "$use_image" = 1 ]] || {
+    echo 'BAANDER_TEST_USE_IMAGE must be 0 or 1.' >&2; exit 1;
+}
+if [ "$use_image" = 1 ] && { [ "$operator_in_container" != 1 ] || [ "${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" != 1 ]; }; then
+    echo 'BAANDER_TEST_USE_IMAGE requires container operator mode and checkout in the image.' >&2; exit 1;
+fi
 php_binary="${BAANDER_TEST_PHP_BINARY:-php}"
 if [ "$operator_in_container" = 0 ]; then
     test -f vendor/autoload.php || { echo 'Host operator requires Composer dependencies.' >&2; exit 1; }
@@ -59,6 +66,11 @@ test "$(docker_local image inspect --format '{{.Id}}' "$fixture_base")" = "$base
 test "$(docker_local image inspect --format '{{json .Config.Volumes}}' "$base_id")" = null || {
     echo 'The local fixture base must not declare volumes.' >&2; exit 1;
 }
+image_id="$base_id"
+controller_base="$fixture_base"
+# Direct-image acceptance exercises the supplied artifact without copying source,
+# clearing its cache, generating keys, or changing its dependency installation.
+if [ "$use_image" = 0 ]; then
 mkdir "$work/checkout"
 if [ "${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" = 1 ]; then
     docker_local create --name "$run_id-source" --entrypoint /usr/local/bin/php "$base_id" -r 'exit(0);' >/dev/null
@@ -90,6 +102,8 @@ docker_local build --pull=false --build-arg "FIXTURE_BASE=$fixture_base" --tag "
     tail -40 "$work/build.log" >&2; exit 1;
 }
 image_id="$(docker_local image inspect --format '{{.Id}}' "$fixture_image")"
+controller_base="$fixture_image"
+fi
 if [ "$operator_in_container" = 1 ]; then
     # Docker's official CLI releases use static binaries. Check both that property
     # and execution in the application image before granting access to the socket.
@@ -113,7 +127,7 @@ RUN file /usr/local/bin/docker | grep -Eq 'statically linked|static-pie linked' 
     && /usr/local/bin/docker --version \
     && php -r 'foreach (["posix", "pdo_pgsql"] as $extension) { if (!extension_loaded($extension)) { exit(1); } }'
 DOCKERFILE
-    docker_local build --pull=false --build-arg "CONTROLLER_BASE=$fixture_image" --build-arg "DOCKER_CLI=$controller_cli" \
+    docker_local build --pull=false --build-arg "CONTROLLER_BASE=$controller_base" --build-arg "DOCKER_CLI=$controller_cli" \
         --tag "$controller_image" "$work/controller" > "$work/controller-build.log" 2>&1 || {
         tail -40 "$work/controller-build.log" >&2; exit 1;
     }
