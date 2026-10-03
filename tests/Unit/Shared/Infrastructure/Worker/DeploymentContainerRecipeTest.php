@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Infrastructure\Worker;
 
 use App\Shared\Infrastructure\Worker\DeploymentContainerRecipe;
+use App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment;
 use App\Shared\Infrastructure\Worker\RegisteredDeploymentStart;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -14,6 +15,35 @@ final class DeploymentContainerRecipeTest extends TestCase
 {
     private const string BOOT = '0123456789abcdef0123456789abcdef';
     private const string IMAGE = 'sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+
+    public function testRuntimeConfigurationParticipatesInIdentityWithoutEnteringArgv(): void
+    {
+        $variables = ['APP_ENV' => 'prod', 'APP_SECRET' => 'test-only-secret'];
+        $recipe = $this->recipe(['runtimeEnvironment' => new DeploymentRuntimeEnvironment($variables)]);
+        $reordered = $this->recipe(['runtimeEnvironment' => new DeploymentRuntimeEnvironment(array_reverse($variables, true))]);
+        self::assertSame($recipe->fingerprint(), $reordered->fingerprint());
+        self::assertNotSame($this->recipe()->fingerprint(), $recipe->fingerprint());
+        self::assertNotSame($recipe->fingerprint(), $this->recipe(['runtimeEnvironment' => new DeploymentRuntimeEnvironment([
+            ...$variables, 'APP_SECRET' => 'rotated-test-only-secret',
+        ])])->fingerprint());
+        $arguments = $recipe->createArguments('/tmp/baander-private/env');
+        self::assertContains('--env-file', $arguments);
+        self::assertContains('/tmp/baander-private/env', $arguments);
+        self::assertStringNotContainsString('test-only-secret', implode(' ', $arguments));
+    }
+
+    public function testPopulatedRuntimeConfigurationCannotSilentlyUseImageDefaults(): void
+    {
+        $recipe = $this->recipe(['runtimeEnvironment' => new DeploymentRuntimeEnvironment(['APP_ENV' => 'prod'])]);
+        $this->expectException(InvalidArgumentException::class);
+        $recipe->createArguments();
+    }
+
+    public function testRelativeEnvironmentFileIsRejected(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->recipe()->createArguments('relative.env');
+    }
 
     public function testCreateArgvPreservesCommandBytesAndExplicitIsolation(): void
     {

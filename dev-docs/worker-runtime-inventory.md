@@ -185,10 +185,28 @@ directly as PID 1 and requires explicit identity and memory reservations.
 Compose currently starts only the web role; background delivery requires a
 separate admitted worker. Do not add an automatically restarting Compose worker:
 the external creation/start/recovery controller still needs an operator entrypoint
-and validated runtime configuration injection. Use an immutable image, no automatic
+and complete retirement reconciliation. Use an immutable image, no automatic
 restart, and a stop grace period longer than the 35-second worker drain deadline.
 The worker image disables the inherited web/dependency health check; readiness
 requires the committed lease and child-role evidence.
+
+Creation recipes now bind explicit runtime configuration to the committed hash.
+The initial allowlist is `APP_ENV` (only `prod`), `APP_DEBUG` (only `0`),
+`APP_SECRET`, `DATABASE_URL`, `REDIS_URL`, `REDIS_PASSWORD`,
+`MESSENGER_TRANSPORT_DSN` and `MAILER_DSN`. Values are bounded printable UTF-8
+without line breaks; the complete environment file is limited to 4 KiB.
+Worker identity and control variables remain controller-owned. Docker receives
+a private temporary env-file, removed before inspection, rather than credential
+values in command arguments. Reconciliation checks each admitted value exactly
+once. Trusted Docker daemon operators can still inspect the container environment.
+This is configuration transport, not encrypted secret storage.
+
+Recovery still requires a matching acquired lease. Created-only containers and
+workers that fail before acquiring a lease need a separate retirement path.
+A lost successful removal reply or lost database acknowledgment also needs durable
+reconciliation; absence alone currently cannot release ownership. These remain
+operator-orchestration blockers, even though creation and runtime configuration
+have real Docker and PostgreSQL coverage.
 
 Production source and local Composer packages are copied before dependency
 installation. Dependency installation runs as the application user and does not

@@ -25,6 +25,7 @@ final readonly class DeploymentContainerRecipe
         public int $memoryBytes,
         public int $nanoCpus,
         public int $pidsLimit,
+        public DeploymentRuntimeEnvironment $runtimeEnvironment = new DeploymentRuntimeEnvironment(),
     ) {
         DeploymentLease::validateIdentity($namespace, $bootId);
         if (preg_match('/\A[A-Za-z0-9_.:-]{1,128}\z/D', $daemonId) !== 1
@@ -62,12 +63,17 @@ final readonly class DeploymentContainerRecipe
             'namespace' => $this->namespace, 'bootId' => $this->bootId, 'daemonId' => $this->daemonId,
             'imageId' => $this->imageId, 'command' => $this->command, 'network' => $this->network,
             'memoryBytes' => $this->memoryBytes, 'nanoCpus' => $this->nanoCpus, 'pidsLimit' => $this->pidsLimit,
+            'runtimeEnvironment' => $this->runtimeEnvironment->variables,
         ], JSON_THROW_ON_ERROR));
     }
 
     /** @return list<string> */
-    public function createArguments(): array
+    public function createArguments(?string $environmentFile = null): array
     {
+        if (($this->runtimeEnvironment->variables !== [] && $environmentFile === null)
+            || ($environmentFile !== null && (!str_starts_with($environmentFile, '/') || str_contains($environmentFile, "\0")))) {
+            throw new InvalidArgumentException('Runtime configuration requires an absolute private environment file.');
+        }
         $wholeCpus = intdiv($this->nanoCpus, 1_000_000_000);
         $fraction = rtrim(sprintf('%09d', $this->nanoCpus % 1_000_000_000), '0');
         $cpus = (string) $wholeCpus . ($fraction === '' ? '' : '.' . $fraction);
@@ -80,6 +86,7 @@ final readonly class DeploymentContainerRecipe
             '--label', 'app.baander.worker.namespace=' . $this->namespace,
             '--label', 'app.baander.worker.boot-id=' . $this->bootId, '--label', 'app.baander.worker.role=deployment',
             '--env', 'BAANDER_WORKER_NAMESPACE=' . $this->namespace, '--env', 'BAANDER_WORKER_BOOT_ID=' . $this->bootId,
+            ...($environmentFile === null ? [] : ['--env-file', $environmentFile]),
             '--entrypoint', $this->command[0], $this->imageId, ...array_slice($this->command, 1),
         ];
     }

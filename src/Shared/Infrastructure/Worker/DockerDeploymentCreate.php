@@ -29,7 +29,9 @@ FORMAT;
         if (!$this->inventory->claimCreate($recipe)) {
             throw new \RuntimeException('Deployment creation was already attempted; reconcile without recreating.');
         }
-        $id = trim($this->execute($recipe, $recipe->createArguments()));
+        $id = trim($recipe->runtimeEnvironment->variables === []
+            ? $this->execute($recipe, $recipe->createArguments())
+            : $recipe->runtimeEnvironment->withFile(fn (string $path): string => $this->execute($recipe, $recipe->createArguments($path))));
         if (preg_match('/\A[0-9a-f]{64}\z/D', $id) !== 1) {
             throw new \RuntimeException('Docker creation was not confirmed; reconcile the deterministic name.');
         }
@@ -72,10 +74,21 @@ FORMAT;
             || !is_array($state['env'] ?? null)) {
             throw new \RuntimeException('Created container does not match the deployment recipe.');
         }
-        foreach (['BAANDER_WORKER_NAMESPACE' => $recipe->namespace, 'BAANDER_WORKER_BOOT_ID' => $recipe->bootId] as $key => $value) {
-            $matches = array_values(array_filter($state['env'], static fn (mixed $item): bool => is_string($item) && str_starts_with($item, $key . '=')));
+        $expected = ['BAANDER_WORKER_NAMESPACE' => $recipe->namespace, 'BAANDER_WORKER_BOOT_ID' => $recipe->bootId,
+            ...$recipe->runtimeEnvironment->variables];
+        foreach ($state['env'] as $item) {
+            if (!is_string($item) || !str_contains($item, '=')) {
+                throw new \RuntimeException('Created container has invalid environment metadata.');
+            }
+            $key = explode('=', $item, 2)[0];
+            if (str_starts_with($key, 'BAANDER_WORKER_') && !array_key_exists($key, $expected)) {
+                throw new \RuntimeException('Created container has an unexpected worker control environment.');
+            }
+        }
+        foreach ($expected as $key => $value) {
+            $matches = array_values(array_filter($state['env'], static fn (string $item): bool => str_starts_with($item, $key . '=')));
             if ($matches !== [$key . '=' . $value]) {
-                throw new \RuntimeException('Created container has incorrect worker identity environment.');
+                throw new \RuntimeException('Created container environment does not match its committed recipe.');
             }
         }
         $binding = new DeploymentContainer($recipe->namespace, $recipe->bootId, $recipe->daemonId, $state['id']);
