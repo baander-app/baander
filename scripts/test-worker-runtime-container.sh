@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Historical Messenger transport recovery under Supervisor. Deployment startup
+# uses app:serve/app:worker; this fixture does not describe deployed supervision.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 run_id="baander-worker-$(date +%s)-$$"
@@ -39,11 +41,11 @@ tar -cf - "${archive_paths[@]}" |
             cd /var/www/html
             tar -xf -
             php tests/Fixtures/messaging-runtime.php prepare
-            # Exercise the exact consumer command and supervision policy without an HTTP server.
+            # Exercise historical transport recovery without a deployed supervisor or HTTP server.
             python3 - <<"PY"
 import configparser
 config = configparser.RawConfigParser()
-config.read("docker/general/supervisord.conf")
+config.read("tests/Fixtures/Worker/legacy-supervisord.conf")
 config.remove_section("program:swoole")
 with open("/tmp/worker-supervisord.conf", "w") as output:
     config.write(output)

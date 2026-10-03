@@ -134,7 +134,10 @@ jobs:
                     docker cp "$CI_TEST_CONTAINER:/var/www/html/coverage/." coverage/ || exit 1
                     exit "$test_status"
 
-            -   name: Supervised worker recovery
+            -   name: Container startup contract
+                run: bash scripts/test-container-startup.sh
+
+            -   name: Legacy transport redelivery recovery
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
                     BAANDER_TEST_POSTGRES_IMAGE="${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest" \

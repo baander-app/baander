@@ -390,6 +390,7 @@ DAMA-wrapped functional tests.
 ## Production Runtime Drills
 
 ```bash
+bash scripts/test-container-startup.sh
 timeout 180 bash scripts/test-worker-runtime-container.sh
 bash scripts/test-worker-command-container.sh
 bash scripts/test-outbox-runtime-container.sh
@@ -397,8 +398,12 @@ bash scripts/test-producer-runtime-container.sh
 ```
 
 These run the production kernel and actual repositories against disposable
-PostgreSQL and Redis on isolated networks, with cleanup on exit. The worker
-drill checks the real consumer and Supervisor recovery. The outbox drill checks
+PostgreSQL and Redis on isolated networks, with cleanup on exit. The startup
+contract uses isolated executable probes to check argument, PID and signal handling.
+The legacy worker-runtime drill checks transport redelivery using a historical
+Supervisor fixture; it does not represent deployment packaging. The worker-command
+drill exercises the current PID-1 supervisor and committed lease lifecycle.
+The outbox drill checks
 notification projections, receipts, channel handoffs, and replay after a lost
 acknowledgement. The producer drill rejects outbox writes, verifies rollback
 through a second connection, and retries through the same bus. It covers operator

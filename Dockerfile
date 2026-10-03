@@ -398,11 +398,8 @@ RUN set -xe && \
     groupmod -o -g ${HOST_GID} ${USERNAME} && \
     chown -R ${USERNAME}:${USERNAME} ${APP_HOME}
 
-# Copy cron file
-COPY ./docker/general/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-COPY --chmod=755 ./docker/general/start-supervisor.sh /usr/local/bin/start-supervisor.sh
-COPY --chown=root:crontab ./docker/general/cron /var/spool/cron/crontabs/root
-RUN chmod 0600 /var/spool/cron/crontabs/root
+# Web and worker roles run as foreground container processes.
+COPY --chmod=755 ./docker/general/start-web.sh /usr/local/bin/start-web.sh
 
 # Set working directory
 WORKDIR ${APP_HOME}
@@ -410,7 +407,7 @@ WORKDIR ${APP_HOME}
 # Switch to app user
 USER ${USERNAME}
 
-CMD ["/usr/local/bin/start-supervisor.sh"]
+CMD ["/usr/local/bin/start-web.sh"]
 
 # -----------------------------------------------------------------------------
 # Stage 5: dev
@@ -465,7 +462,7 @@ RUN set -xe && \
 
 # Set up bash aliases
 RUN echo 'alias sf="php /var/www/html/bin/console"' >> /home/www-data/.bashrc && \
-    echo 'alias sf-dev="php /var/www/html/bin/console swoole:server:run"' >> /home/www-data/.bashrc && \
+    echo 'alias sf-dev="php /var/www/html/bin/console app:serve"' >> /home/www-data/.bashrc && \
     echo '' >> /home/www-data/.bashrc && \
     echo '# ----- Xdebug quick toggle (entrypoint disables it at boot) -----' >> /home/www-data/.bashrc && \
     echo 'alias debug-on="sed -i \"s/^;zend_extension/zend_extension/\" /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini; sed -i \"s/^xdebug\\.mode.*/xdebug.mode = debug,develop/\" /usr/local/etc/php/conf.d/xdebug.ini; echo \"Xdebug ON — restart Swoole or start a new PHP process to activate\""' >> /home/www-data/.bashrc && \
@@ -479,7 +476,7 @@ RUN chown www-data:www-data /usr/local/etc/php/conf.d && \
 USER www-data
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["/usr/local/bin/start-supervisor.sh"]
+CMD ["/usr/local/bin/start-web.sh"]
 
 # -----------------------------------------------------------------------------
 # Stage 6: production
@@ -491,34 +488,43 @@ FROM runtime AS production
 
 ENV APP_ENV=prod
 
-# Switch to root for COPY and composer install
+# Switch to root to install the Composer executable.
 USER root
 
 # Copy Composer from builder (already installed there)
 COPY --from=builder /usr/bin/composer /usr/bin/composer
 
-# Copy Composer files and patches first for layer caching.
-# The patches directory is needed by cweagans/composer-patches during install.
-COPY composer.json composer.lock patches.lock.json ./
-COPY patches/ ./patches/
-
-# Install production dependencies only.
-# --mount=type=cache persists Composer's download and repository caches.
-RUN COMPOSER_MEMORY_LIMIT=-1 composer install --no-dev --optimize-autoloader --no-interaction --no-progress
-
-# Copy the full application source tree
+# Path repositories, patches and application classes must exist before Composer
+# resolves local packages and generates the optimized application autoloader.
 COPY --chown=www-data:www-data . ${APP_HOME}/
 
-# Clear the production cache
-RUN php bin/console cache:clear
+# Never ship a cache generated in the build context's environment.
+RUN rm -rf var/cache && \
+    mkdir -p var/cache var/log && \
+    chown www-data:www-data var var/cache var/log
 
-# Switch to app user
+# Dependency files and any later cache/assets generation belong to the app user.
 USER www-data
+
+# Auto-scripts boot Symfony for cache clearing and asset installation. Defer them
+# until runtime configuration is available instead of warming a build-time kernel.
+# A separate dump runs the Runtime plugin's autoload hook without post-install
+# auto-scripts, so bin/console still receives vendor/autoload_runtime.php.
+RUN COMPOSER_MEMORY_LIMIT=-1 composer install --no-dev --optimize-autoloader --no-interaction --no-progress --no-scripts && \
+    COMPOSER_MEMORY_LIMIT=-1 composer dump-autoload --no-dev --optimize --no-interaction
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD ["php", "bin/console", "app:health:check"]
 
-CMD ["/usr/local/bin/start-supervisor.sh"]
+CMD ["/usr/local/bin/start-web.sh"]
+
+# The trusted deployment controller supplies immutable identity, explicit budgets
+# and restart=no. No wrapper or init process may sit above the worker supervisor.
+FROM production AS worker
+HEALTHCHECK NONE
+STOPSIGNAL SIGTERM
+ENTRYPOINT ["/usr/local/bin/php", "/var/www/html/bin/console", "app:worker", "--no-interaction"]
+CMD []
 
 # -----------------------------------------------------------------------------
 # Stage 7: ci

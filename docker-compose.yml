@@ -66,7 +66,6 @@ services:
         volumes:
             - /home/martin/dev/baander-musik:/home/martin/dev/baander-musik:ro
             - ./:/var/www/html:cached
-            - ./docker/general/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf:ro
             - ./docker/dev/php.ini:/usr/local/etc/php/php.ini:ro
             - ./docker/dev/swoole.ini:/usr/local/etc/php/conf.d/docker-php-ext-swoole.ini:ro
             - /home/martin/Music:/home/martin/Music

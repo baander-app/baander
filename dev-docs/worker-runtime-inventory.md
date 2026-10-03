@@ -4,7 +4,7 @@ Verified against source on 2026-10-03 for stage 1 of the
 [web and worker runtime redesign](../docs/plans/2026-07-17-001-feat-messenger-enterprise-hardening-plan.md).
 `app:serve` now names the existing foreground web server, and `app:worker` runs a
 fixed consumer/outbox-relay/scheduler supervisor. Broader queue families, autoscaling,
-media ownership transfers and deployment packaging remain planned. This inventory
+media ownership transfers and external deployment orchestration remain planned. This inventory
 does not certify runtime resource defaults.
 
 Scheduler activation verification passes 3,510 unit tests and 132 combined
@@ -179,9 +179,25 @@ versioned Messenger codec and need an explicit compatibility contract when IPC m
 
 ## Deployment and migration traps
 
-[supervisord.conf](../docker/general/supervisord.conf) currently owns three daemons:
-`swoole:server:run`, one `messenger:consume async` and `app:outbox:consume`. Swoole
-configures four HTTP workers and two task workers; there is no current queue
+[start-web.sh](../docker/general/start-web.sh) starts only `app:serve`, replacing
+the mixed Supervisor startup. The `worker` image target starts `app:worker`
+directly as PID 1 and requires explicit identity and memory reservations.
+Compose currently starts only the web role; background delivery requires a
+separate admitted worker. Do not add an automatically restarting Compose worker:
+the external creation/start/recovery controller still needs an operator entrypoint
+and validated runtime configuration injection. Use an immutable image, no automatic
+restart, and a stop grace period longer than the 35-second worker drain deadline.
+The worker image disables the inherited web/dependency health check; readiness
+requires the committed lease and child-role evidence.
+
+Production source and local Composer packages are copied before dependency
+installation. Dependency installation runs as the application user and does not
+boot Symfony with build-time secrets. Run `php bin/console assets:install public`
+with runtime configuration before serving bundle assets. Symfony generates its
+cache on first boot. Local caches, logs and local dotenv overrides are excluded
+from the image context.
+
+Swoole configures four HTTP workers and two task workers; there is no current queue
 autoscaler. [swoole.yaml](../config/packages/swoole.yaml) disables both HTTP and
 task-worker recycling because of child-pool lifetime coupling. The configured
 six-child pool must be measured at runtime; comments describing older worker

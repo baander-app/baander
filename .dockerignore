@@ -6,6 +6,10 @@ auth.json
 docs
 node_modules
 vendor
+var/
+.env.local
+.env.*.local
+.env.local.php
 storage/muzak
 storage/logs/*.{log,json}
 qodana.yaml
