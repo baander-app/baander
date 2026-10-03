@@ -188,108 +188,100 @@ final class StreamSegmentController
     }
 
     /**
-     * Wait for a segment to become available, checking the in-memory
-     * SegmentAvailabilityInterface first (instant push signal from the encoder)
-     * and falling back to file-stat polling.
-     *
-     * The table check is the fast path: the encoder worker writes a row the
-     * instant it finishes a segment. If the table says ready, verify the file
-     * is actually complete (two consecutive stable-size reads, matching
-     * waitForFilePath's flush check) before serving — the HLS fMP4 muxer
-     * writes segment files incrementally, so non-zero size means writing has
-     * *started*, not finished. If the row is absent or the file isn't stable,
-     * the stat-loop handles it — file-existence + stability remains ground truth.
+     * Check the encoder's availability hint first, then poll the expected path.
+     * A nonempty, unchanged snapshot is a readiness heuristic: the continuous
+     * encoder can publish a hint while it is still writing the file.
      */
     private function waitForSegment(Uuid $jobId, string $tierKey, int $index, string $path, int $timeoutSeconds = 10): ?string
     {
         $ready = $this->segmentAvailability->isReady($jobId, $tierKey, $index);
-        if ($ready !== null && is_file($ready)) {
+        if ($ready !== null) {
             $stable = $this->isFileSizeStable($ready);
             if ($stable !== null) {
                 return $stable;
             }
         }
 
-        // Table miss, stale row, or file still being written — fall back to
-        // file-stat polling which performs the stability check in its loop.
         return $this->waitForFilePath($path, $timeoutSeconds);
     }
 
     /**
-     * Verify a file's size is stable across two reads (~0.25s apart), meaning
-     * the writer has finished and closed it. Returns the path if stable and
-     * non-empty, null otherwise (still being written or empty).
+     * Observe the same nonempty regular file across two fresh samples.
+     * An unchanged snapshot does not prove that the writer has closed the file.
      */
     private function isFileSizeStable(string $path): ?string
     {
-        $first = @filesize($path);
-        if ($first === false || $first <= 0) {
+        $first = $this->readFileSnapshot($path);
+        if ($first === null) {
             return null;
         }
 
         Async::sleep(0.25);
-        $second = @filesize($path);
-        if ($second === false || $second <= 0 || $second !== $first) {
-            return null;
-        }
-
-        return $path;
+        return $this->readFileSnapshot($path) === $first ? $path : null;
     }
 
     /**
-     * Wait up to $timeoutSeconds for a segment file to be written and flushed.
-     *
-     * Returns the path once the file exists with non-zero size, or null if the
-     * timeout expires. This replaces the old 202 + Retry-After behaviour so
-     * standard HLS players (hls.js, native Safari) can stream on-the-fly
-     * transcodes without custom retry logic.
+     * Poll until three consecutive fresh observations agree, or the deadline
+     * expires. Detect replacement as well as growth; a missing/empty file resets
+     * the observation window. Atomic producer publication is still required to
+     * turn this quiet-window heuristic into a completion guarantee.
      */
     private function waitForFilePath(string $path, int $timeoutSeconds = 10): ?string
     {
-        $elapsed = 0.0;
-        $interval = 0.25;
+        $deadline = hrtime(true) / 1_000_000_000 + $timeoutSeconds;
         $stableChecks = 0;
-        $lastSize = -1;
+        $last = null;
 
-        while ($elapsed < $timeoutSeconds) {
-            if (is_file($path)) {
-                $size = @filesize($path);
-                if ($size > 0 && $size === $lastSize) {
-                    $stableChecks++;
-                    // Two consecutive stable reads (≈0.5s apart) mean the writer
-                    // has likely finished and closed the file.
-                    if ($stableChecks >= 2) {
-                        return $path;
-                    }
-                } else {
-                    $stableChecks = 0;
+        while (hrtime(true) / 1_000_000_000 < $deadline) {
+            $snapshot = $this->readFileSnapshot($path);
+            if ($snapshot !== null && $snapshot === $last) {
+                if (++$stableChecks >= 2) {
+                    return $path;
                 }
-                $lastSize = $size;
             } else {
                 $stableChecks = 0;
-                $lastSize = -1;
             }
+            $last = $snapshot;
 
-            Async::sleep($interval);
-            $elapsed += $interval;
+            $remaining = $deadline - hrtime(true) / 1_000_000_000;
+            if ($remaining <= 0) {
+                break;
+            }
+            Async::sleep(min(0.25, $remaining));
         }
 
         return null;
     }
 
+    /** @return array{device: int, inode: int, size: int, modified: int, changed: int}|null */
+    private function readFileSnapshot(string $path): ?array
+    {
+        // FFmpeg runs outside this PHP process, so its writes do not invalidate
+        // PHP's stat cache. Clear it before every observation, including the first.
+        clearstatcache(true, $path);
+        $stat = @stat($path);
+        if ($stat === false || ($stat['mode'] & 0170000) !== 0100000 || $stat['size'] <= 0) {
+            return null;
+        }
+
+        return [
+            'device' => $stat['dev'],
+            'inode' => $stat['ino'],
+            'size' => $stat['size'],
+            'modified' => $stat['mtime'],
+            'changed' => $stat['ctime'],
+        ];
+    }
+
     /**
-     * Stream a file directly from disk using zero-copy I/O.
-     *
-     * Uses fopen/fpassthru to send file data without loading it into PHP memory.
-     * The OS kernel handles the file-to-socket data transfer.
-     *
-     * The file is stat'd before the response is built so Content-Length is
-     * emitted (lets players size buffers and seek within a segment). If the
-     * file vanishes between the stat and the streamed read (race), fopen
-     * returns false and the callback emits an empty 500 instead of crashing.
+     * Stream a file without loading its complete contents into PHP memory.
+     * Refresh metadata before constructing Content-Length. The file can still
+     * change before the callback opens it; the already-sent status cannot be
+     * changed if the file disappears at that point.
      */
     private function streamFile(string $path, string $contentType): Response
     {
+        clearstatcache(true, $path);
         if (!is_file($path)) {
             return new JsonResponse(['error' => 'Segment file not found'], Response::HTTP_NOT_FOUND);
         }

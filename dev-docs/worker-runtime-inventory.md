@@ -660,9 +660,18 @@ library access first. The specification and generated web client reflect removal
 Other callers of plain BinaryFileResponse still use the old Swoole emission branch
 and need separate audit; this change does not certify all binary responses.
 Contract checks also corrected the transcode init route description and webhook
-rotation response schema. The transcode file-stability helper still rereads file
-size without clearing PHP's stat cache; its three existing PHPStan findings and
-runtime stability behavior remain open.
+rotation response schema. Transcode readiness now clears PHP's stat cache before
+each observation and compares file identity, size and timestamps. Replacement,
+growth, deletion and empty/nonregular files reset or fail the stability check;
+polling uses a monotonic deadline. Final response construction also refreshes
+metadata before setting Content-Length.
+
+This remains a quiet-window heuristic. The continuous encoder's readiness table
+can mark a nonempty file while FFmpeg is still writing its final pathname. A paused
+writer or an in-place, same-size edit within timestamp precision can escape these
+observations, and the file can change after the last check. Authoritative readiness
+requires completed, immutable publication by that producer. The separate pool
+encoder already waits for completion and atomically publishes its output.
 
 Native media now requests refresh from its own window after an authenticated 401,
 shares that window's refresh queue with Axios, and retries once with a new proof.
