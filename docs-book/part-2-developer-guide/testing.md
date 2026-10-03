@@ -142,7 +142,7 @@ The second migration run checks that the recorded history produces no pending wo
 Scheduler occurrence persistence can be checked with:
 
 ```bash
-bash scripts/test-functional-container.sh tests/Integration/SchedulerOccurrenceStoreTest.php tests/Integration/SchedulerOccurrenceExecutionStoreTest.php tests/Integration/SchedulerOccurrenceGuardTest.php tests/Integration/WorkerDeploymentLeaseSchemaTest.php
+bash scripts/test-functional-container.sh tests/Integration/SchedulerOccurrenceStoreTest.php tests/Integration/SchedulerOccurrenceExecutionStoreTest.php tests/Integration/SchedulerOccurrenceGuardTest.php tests/Integration/SchedulerOccurrenceDispatchStoreTest.php tests/Integration/SchedulerOccurrenceRelayTest.php tests/Integration/WorkerDeploymentLeaseSchemaTest.php
 ```
 
 These checks cover immutable snapshots, independent-connection visibility,
@@ -159,8 +159,16 @@ during insertion with transaction rollback, and exact historical-owner receipts
 after expiry or replacement. The existing fresh-install execution migration
 requires the deployment tuple; this rewrites undeployed history and does not
 upgrade or reset an existing local database.
-This does not test automatic polling, fencing effects after lease expiry or native
-console/media execution. No occurrence relay is enabled yet.
+Dispatch tests exercise committed reservations, skipped locked rows, token replacement
+and idempotent acceptance receipts on PostgreSQL. Real Redis tests send through the
+explicit JSON serializer and reproduce acceptance followed by a lost acknowledgment;
+recovery republishes the same occurrence identity without granting a second attempt.
+A recorded acceptance stops repeated publication while consumers are stopped. Unit
+tests require the rest of a reserved batch to be attempted after a failed send or
+receipt. The configured Kernel resolves the relay and its explicit async sender.
+This does not test automatic polling, fencing effects after lease expiry, broker
+crash durability or native console/media execution. No occurrence relay loop is
+enabled yet.
 
 The functional runner also supplies the isolated PostgreSQL/Redis environment
 aliases used by integration tests that need the full migrated schema and kernel.

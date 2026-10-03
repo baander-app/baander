@@ -28,10 +28,14 @@ final class Version20261002230000 extends AbstractMigration
                 job_type TEXT NOT NULL CHECK (job_type IN ('messenger', 'console')),
                 command TEXT NOT NULL CHECK (octet_length(command) BETWEEN 1 AND 512),
                 parameters JSON NOT NULL CHECK (json_typeof(parameters) IN ('object', 'array') AND octet_length(parameters::text) <= 16384),
+                dispatch_after TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+                dispatch_token UUID DEFAULT NULL,
+                dispatched_at TIMESTAMPTZ DEFAULT NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
                 UNIQUE (job_id, scheduled_for)
             )
             SQL);
+        $this->addSql('CREATE INDEX scheduler_occurrences_pending_dispatch_idx ON scheduler_occurrences (dispatch_after, scheduled_for, id) WHERE dispatched_at IS NULL');
     }
 
     public function down(Schema $schema): void

@@ -580,8 +580,28 @@ the attempt consumed. In particular, an unknown console result may leave a child
 running. Inspection and explicit outcome reconciliation remain necessary; no
 automatic reset or retry is authorized by either receipt state.
 
-The poller and relay do not yet produce occurrence messages, and no queue route
-has been enabled for them. Missed-tick recovery and bounded console execution
+A bounded occurrence relay now reserves due unpublished intents in PostgreSQL
+before publishing their UUIDs through the explicit Redis sender. Reservations use
+`FOR UPDATE SKIP LOCKED`, a token and a retry deadline; independent claimers do not
+wait on already reserved rows. Only an exact-token receipt records transport
+acceptance. An accepted receipt stops further publication even while consumers are
+stopped. This is not an execution or success receipt.
+
+A crash before sending, an uncertain send, or a failed receipt leaves the delivery
+reservation recoverable after expiry. A stale token cannot acknowledge a replacement
+reservation. Unknown sends may enqueue the same occurrence more than once; the
+execution guard still admits only one attempt. The relay attempts every item in its
+bounded batch before reporting failures, so one failed handoff does not starve the
+rest. Batch size is limited to 100 and retry delay to 1–3,600 seconds. Database
+statement/lock timeouts do not bound transport I/O or an entire relay call.
+
+The existing fresh-install occurrence migration now includes delivery state and a
+partial pending index. Snapshot fields and execution attempts are retained. A
+successful sender return relies on the broker's durability configuration; this
+slice does not establish Redis crash durability or automatically recover failed
+execution messages. Delivery reservation expiry never resets execution admission.
+
+No poller, relay loop or queue route has been enabled for occurrence messages. Missed-tick recovery and bounded console execution
 independent of the web CPU pool remain open before cutover. Lease validation
 controls admission; it cannot stop effects already running after expiry.
 The guard prevents repeated wrapper invocation, not duplicate side effects from
@@ -589,8 +609,8 @@ retries of downstream messages or exactly-once external delivery. It also does n
 serialize different occurrences of the same job; shared resource admission and
 long-running execution ownership remain cutover prerequisites.
 
-The occurrence, execution guard and schema-introspection checks pass 52 tests with
-372 assertions on disposable PostgreSQL/Redis after all 18 migrations and a repeat
+The occurrence, execution guard, dispatch and schema-introspection checks pass 70
+tests with 632 assertions on disposable PostgreSQL/Redis after all 18 migrations and a repeat
 no-op migration run. They cover actual unique-key contention, independent
 visibility, failed and uncertain commits, immutable retry snapshots, future intent
 rejection, physical schema constraints and real Messenger redelivery after an

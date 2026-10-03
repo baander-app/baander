@@ -1032,6 +1032,22 @@ services:
     App\Scheduler\Application\Port\SchedulerOccurrenceExecutionStoreInterface:
         alias: App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceExecutionStore
 
+    # Delivery reservations commit before Redis sends. This does not enable a poller or relay loop.
+    App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceDispatchStore:
+        factory: ['App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceDispatchStore', 'fromDsn']
+        arguments:
+            $databaseUrl: '%env(resolve:DATABASE_URL)%'
+
+    App\Scheduler\Application\Port\SchedulerOccurrenceDispatchStoreInterface:
+        alias: App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceDispatchStore
+
+    App\Scheduler\Infrastructure\Messenger\MessengerSchedulerOccurrencePublisher:
+        arguments:
+            $sender: '@messenger.transport.async'
+
+    App\Scheduler\Application\Port\SchedulerOccurrencePublisherInterface:
+        alias: App\Scheduler\Infrastructure\Messenger\MessengerSchedulerOccurrencePublisher
+
     # --- Scheduler Registry ---
     App\Scheduler\Domain\Service\SchedulerRegistry:
         arguments:
@@ -1142,3 +1158,10 @@ services:
 
     App\Shared\Application\Port\WorkerSupervisorRunnerInterface:
         alias: App\Shared\Infrastructure\Worker\WorkerSupervisorRunner
+
+when@test:
+    services:
+        # Keep the real relay graph available for integration checks before its loop is enabled.
+        test.scheduler_occurrence_relay:
+            alias: App\Scheduler\Application\Service\SchedulerOccurrenceRelay
+            public: true
