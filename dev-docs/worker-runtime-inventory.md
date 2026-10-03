@@ -714,6 +714,27 @@ an unchanged execution snapshot and a registered command. Scheduled invocations
 still require active status. Both origins share permanent one-attempt admission and
 the same unresolved-job exclusion; origin cannot bypass an uncertain prior attempt.
 
+A dedicated manual recorder now accepts a job UUID and a stable request UUID.
+It returns an existing matching manual snapshot before reading the current schedule,
+so retries retain their original minute and arguments even after an edit or deletion.
+For a new request it locks the schedule row, rechecks request identity, captures the
+database UTC minute and commits the snapshot in one transaction. Separate request
+UUIDs remain separate requests. An ID already used for another job or for a scheduled
+occurrence is rejected. Missing schedules return no snapshot, and recording does
+not change schedule status, advance recovery or dispatch work.
+
+The caller must retain the same request UUID across uncertain responses. Successful
+recording means durable intent, not completed execution; the execution guard still
+checks whether the schedule exists and matches before invoking it. Authorization
+belongs at the eventual HTTP/CLI ingress. This recorder is container-wired but has
+no live producer calling it yet.
+
+The recorder and existing occurrence, materializer, recovery and guard checks pass
+119 integration tests with 1,130 assertions on disposable PostgreSQL/Redis. These
+include real concurrent processes, a retry blocked behind a deleting transaction,
+commit uncertainty and transaction-local isolation. All 3,506 unit tests and
+baseline-free PHPStan level 6 for this slice pass.
+
 This is the durable contract for a later cutover. HTTP/CLI manual entrypoints and the
 legacy web producer still use their existing path. No manual intents are written
 alongside legacy execution, and no new producer or route is enabled. Cutover still

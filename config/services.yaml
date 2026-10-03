@@ -1023,6 +1023,15 @@ services:
     App\Scheduler\Application\Port\ScheduledJobPortInterface:
         alias: App\Scheduler\Infrastructure\Service\ScheduledJobService
 
+    # Durable manual-request primitive; ingress changes together with the scheduler cutover.
+    App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder:
+        factory: ['App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder', 'fromDsn']
+        arguments:
+            $databaseUrl: '%env(resolve:DATABASE_URL)%'
+
+    App\Scheduler\Application\Port\SchedulerManualOccurrenceRecorderInterface:
+        alias: App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder
+
     # Callable recovery services; no producer loop or occurrence queue route is enabled yet.
     App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceMaterializer:
         factory: ['App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceMaterializer', 'fromDsn']
@@ -1194,6 +1203,9 @@ services:
 
 when@test:
     services:
+        test.scheduler_manual_recorder:
+            alias: App\Scheduler\Application\Port\SchedulerManualOccurrenceRecorderInterface
+            public: true
         # Resolve the real loop without enabling a producer alongside legacy execution.
         test.scheduler_worker_runner:
             alias: App\Scheduler\Infrastructure\Process\SchedulerWorkerRunner
