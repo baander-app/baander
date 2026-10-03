@@ -821,10 +821,20 @@ is mocked; this does not qualify backend cryptography or shared persistent login
 state across tabs. Same-account cross-tab refresh coordination, persistence races,
 and complete worker-restart acceptance remain open.
 
-Filesystem acceptance also remains open: the general
-`LocalFilesystem`/`ReadOnlyFilesystem` wrappers have separate symlink-boundary gaps
-beyond the media storage adapter's tests. These findings block a claim that
-authentication or storage remediation is complete.
+The general `LocalFilesystem` and `ReadOnlyFilesystem` wrappers now share canonical
+boundary checks. Existing ancestors of missing targets are resolved before I/O or
+parent-directory creation; external and dangling symlinks are rejected. Valid
+internal symlinks and configured root aliases remain usable, and path resolution
+clears PHP's realpath cache before checking changed links. All read-only operations
+validate the library boundary, including when the backing filesystem has a broader
+root. The factory now creates its local adapter at the requested library root.
+Absolute paths, parent traversal, and NUL bytes are rejected; port documentation
+now matches that relative-path contract. Real-filesystem tests cover these cases
+and verify rejected writes neither alter outside files nor create outside folders.
+
+These are pathname checks, not descriptor-relative atomic operations. Hostile
+concurrent filesystem renames can still race validation and I/O. Full storage
+acceptance and browser authentication recovery therefore remain open.
 
 Transcode directory deletion now rejects root/outside/traversal paths and symlink
 ancestors, and removes terminal or nested links without following their targets.

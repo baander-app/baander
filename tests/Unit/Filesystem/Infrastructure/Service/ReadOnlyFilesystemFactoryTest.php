@@ -6,7 +6,6 @@ namespace App\Tests\Unit\Filesystem\Infrastructure\Service;
 
 use App\Filesystem\Application\Port\ReadOnlyFilesystemPortInterface;
 use App\Shared\Domain\ValueObject\FilesystemType;
-use App\Filesystem\Infrastructure\Service\LocalFilesystem;
 use App\Filesystem\Infrastructure\Service\ReadOnlyFilesystem;
 use App\Filesystem\Infrastructure\Service\ReadOnlyFilesystemFactory;
 use PHPUnit\Framework\TestCase;
@@ -18,7 +17,7 @@ final class ReadOnlyFilesystemFactoryTest extends TestCase
         $base = $this->createTempDir();
 
         try {
-            $factory = new ReadOnlyFilesystemFactory(new LocalFilesystem($base));
+            $factory = new ReadOnlyFilesystemFactory();
 
             $filesystem = $factory->create(FilesystemType::Local, $base);
 
@@ -29,13 +28,12 @@ final class ReadOnlyFilesystemFactoryTest extends TestCase
         }
     }
 
-    public function testCreateLocalWiresInjectedFilesystemAndBasePath(): void
+    public function testCreateLocalResolvesRelativeToLibraryBase(): void
     {
         $base = $this->createTempDir();
 
         try {
-            $local = new LocalFilesystem($base);
-            $factory = new ReadOnlyFilesystemFactory($local);
+            $factory = new ReadOnlyFilesystemFactory();
 
             $filesystem = $factory->create(FilesystemType::Local, $base);
 
@@ -50,7 +48,7 @@ final class ReadOnlyFilesystemFactoryTest extends TestCase
         $base = $this->createTempDir();
 
         try {
-            $factory = new ReadOnlyFilesystemFactory(new LocalFilesystem($base));
+            $factory = new ReadOnlyFilesystemFactory();
 
             $first = $factory->create(FilesystemType::Local, $base);
             $second = $factory->create(FilesystemType::Local, $base);

@@ -9,8 +9,8 @@ interface ReadOnlyFilesystemPortInterface
     /**
      * Resolve a path to a full local filesystem path.
      *
-     * Absolute paths are returned as-is.
-     * Relative paths are resolved against the configured base path.
+     * Paths are relative to the configured base. Absolute paths, parent
+     * traversal, and symlink escapes are rejected.
      *
      * @throws \InvalidArgumentException if the resolved path escapes the base path
      */

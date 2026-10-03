@@ -23,11 +23,14 @@ final class LocalFilesystem implements LocalFilesystemPortInterface
 
         $normalized = $this->normalizeRelativePath($path);
 
-        return $this->basePath . '/' . $normalized;
+        return FilesystemPathBoundary::resolve($this->basePath, $this->basePath . '/' . $normalized);
     }
 
     private function normalizeRelativePath(string $path): string
     {
+        if (str_contains($path, "\0")) {
+            throw new \InvalidArgumentException('Null bytes are not allowed in filesystem paths.');
+        }
         $parts = explode('/', $path);
         $stack = [];
 

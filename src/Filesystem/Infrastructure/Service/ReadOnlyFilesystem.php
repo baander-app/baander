@@ -28,42 +28,27 @@ final readonly class ReadOnlyFilesystem implements ReadOnlyFilesystemPortInterfa
             throw new \InvalidArgumentException(sprintf('Library base path does not exist: %s', $this->basePath));
         }
 
-        $realPath = realpath($resolved);
-
-        if ($realPath === false) {
-            // Path doesn't exist yet — resolve without realpath and check prefix
-            $normalizedBase = rtrim($realBase, '/') . '/';
-            $normalizedResolved = rtrim($resolved, '/');
-
-            if (!str_starts_with($normalizedResolved, $normalizedBase) && $normalizedResolved !== $realBase) {
-                throw new \InvalidArgumentException(sprintf('Path escapes library base path: %s', $path));
-            }
-
-            return $resolved;
-        }
-
-        $normalizedBase = rtrim($realBase, '/') . '/';
-        $normalizedReal = rtrim($realPath, '/') . '/';
-
-        if (!str_starts_with($normalizedReal, $normalizedBase) && $realPath !== $realBase) {
-            throw new \InvalidArgumentException(sprintf('Path escapes library base path: %s', $path));
-        }
-
-        return $resolved;
+        return FilesystemPathBoundary::resolve($realBase, $resolved);
     }
 
     public function exists(string $path): bool
     {
+        $this->resolve($path);
+
         return $this->filesystem->exists($path);
     }
 
     public function size(string $path): int|false
     {
+        $this->resolve($path);
+
         return $this->filesystem->size($path);
     }
 
     public function read(string $path): string|false
     {
+        $this->resolve($path);
+
         return $this->filesystem->read($path);
     }
 
@@ -72,6 +57,8 @@ final readonly class ReadOnlyFilesystem implements ReadOnlyFilesystemPortInterfa
         if (!in_array($mode, self::ALLOWED_OPEN_MODES, true)) {
             throw new \InvalidArgumentException(sprintf('Read-only filesystem does not allow mode "%s". Allowed modes: %s', $mode, implode(', ', self::ALLOWED_OPEN_MODES)));
         }
+
+        $this->resolve($path);
 
         return $this->filesystem->open($path, $mode);
     }
