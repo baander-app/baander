@@ -522,12 +522,12 @@ operations. Its low-level lease acknowledgment does not itself verify cleanup, a
 host-systemd and per-child containment remain unqualified.
 
 The scheduler poller is the next small lifetime to extract, but its execution
-dependencies must be resolved first. Console jobs still dispatch into the CPU pool
-booted by the web server; starting the poller in an ordinary CLI child does not
-provide that pool. Its Redis lock-before-dispatch also has no durable occurrence
+dependencies must be resolved first. Legacy console jobs still dispatch into the
+CPU pool booted by the web server; starting the old poller in an ordinary CLI child
+does not provide that pool. The occurrence path now has a separate CLI executor. Its Redis lock-before-dispatch also has no durable occurrence
 intent, so a crash can lose a due minute. Establish a unique job/scheduled-instant
-occurrence with atomic dispatch intent under the current poller, then provide
-bounded console execution independent of HTTP boot before transferring ownership.
+occurrence with atomic dispatch intent under the current poller and qualify
+execution admission and deployment containment before transferring ownership.
 Keep the web boot/shutdown tags until those prerequisites pass concurrent-claim,
 restart-recovery and console-execution checks. A long-lived polling child also
 needs explicit Doctrine reset handling between ticks.
@@ -601,23 +601,50 @@ successful sender return relies on the broker's durability configuration; this
 slice does not establish Redis crash durability or automatically recover failed
 execution messages. Delivery reservation expiry never resets execution admission.
 
-No poller, relay loop or queue route has been enabled for occurrence messages. Missed-tick recovery and bounded console execution
-independent of the web CPU pool remain open before cutover. Lease validation
+Console occurrences now call `ScheduledConsoleExecutorInterface` after the existing
+snapshot and command-registry checks. The CLI adapter starts `bin/console` through
+a shell-free argument vector, with stdin closed, a 128 MiB PHP heap limit, a
+300-second monotonic deadline and a 10,000-byte combined stdout/stderr cap by
+default. Both pipes are drained in bounded chunks. Named boolean flags use the
+console convention: true emits the flag and false omits it. Arguments are scalar,
+validated before spawn and limited to 16 KiB in total. Positional values follow a
+`--` separator. Known nonzero exits are recorded as failures; successful output
+must be valid UTF-8.
+
+Timeout, output overflow, unexpected signals and unconfirmed completion raise
+`ScheduledConsoleCompletionUnknown`. The adapter attempts TERM, then KILL, and
+reaps a signalable direct child. The occurrence handler records a paused schedule
+and rethrows the uncertainty, leaving its consumed attempt without a return
+receipt. Failure to save the paused state retains the uncertainty classification.
+The Messenger subscriber stops this consumer before another queued job is handled;
+the supervisor's existing child-exit policy then drains the deployment. Legacy
+messages retain the web CPU-pool path and its existing pause behavior.
+
+A PHP heap limit does not bound native or total deployment memory. Direct-child
+reaping does not certify descendant containment. Kernel-stalled system calls and
+PHP resource teardown can exceed userspace deadlines. The executor rejects active
+Swoole coroutines and is intended for a supervised CLI child. Deployment containment
+and resource admission still need qualification before ownership cutover.
+
+No poller, relay loop or queue route has been enabled for occurrence messages.
+Missed-tick recovery remains open before cutover. Lease validation
 controls admission; it cannot stop effects already running after expiry.
 The guard prevents repeated wrapper invocation, not duplicate side effects from
 retries of downstream messages or exactly-once external delivery. It also does not
 serialize different occurrences of the same job; shared resource admission and
 long-running execution ownership remain cutover prerequisites.
 
-The occurrence, execution guard, dispatch and schema-introspection checks pass 70
-tests with 632 assertions on disposable PostgreSQL/Redis after all 18 migrations and a repeat
+The occurrence, dispatch, console-process, worker-stop and schema-introspection
+checks pass 89 tests with 758 assertions on disposable PostgreSQL/Redis after all 18 migrations and a repeat
 no-op migration run. They cover actual unique-key contention, independent
 visibility, failed and uncertain commits, immutable retry snapshots, future intent
 rejection, physical schema constraints and real Messenger redelivery after an
 effect. Lease admission checks cover stale and expired authority, contention,
 rollback when authority is lost during insertion, and historical-owner receipts.
 The configured Kernel resolves the guard and its dedicated store without granting
-authority to an unsupervised process.
+authority to an unsupervised process. Real CLI fixtures cover argument handling,
+pipe draining, ignored TERM, output overflow, signals and direct-child reaping.
+Actual Messenger worker tests stop before the next message on an uncertain result.
 Baseline-free PHPStan level 6 passes for the new production code, migration and
 tests.
 

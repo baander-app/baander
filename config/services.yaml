@@ -1023,6 +1023,13 @@ services:
     App\Scheduler\Application\Port\ScheduledJobPortInterface:
         alias: App\Scheduler\Infrastructure\Service\ScheduledJobService
 
+    App\Scheduler\Infrastructure\Process\BoundedScheduledConsoleExecutor:
+        arguments:
+            $projectDirectory: '%kernel.project_dir%'
+
+    App\Scheduler\Application\Port\ScheduledConsoleExecutorInterface:
+        alias: App\Scheduler\Infrastructure\Process\BoundedScheduledConsoleExecutor
+
     # Occurrence admission must commit independently before effects; never share the ORM transaction.
     App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceExecutionStore:
         factory: ['App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceExecutionStore', 'fromDsn']

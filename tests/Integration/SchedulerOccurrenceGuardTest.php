@@ -10,6 +10,7 @@ use App\Scheduler\Application\CommandHandler\ExecuteScheduledJobHandler;
 use App\Scheduler\Application\CommandHandler\ExecuteScheduledOccurrenceHandler;
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
 use App\Scheduler\Application\Port\ScheduledJobPortInterface;
+use App\Scheduler\Application\Port\ScheduledConsoleExecutorInterface;
 use App\Scheduler\Application\Port\SchedulerOccurrenceExecutionStoreInterface;
 use App\Scheduler\Domain\Model\SchedulableCommandInterface;
 use App\Scheduler\Domain\Model\ScheduledJob;
@@ -169,7 +170,7 @@ final class SchedulerOccurrenceGuardTest extends TestCase
         $pool->expects(self::never())->method('dispatch');
         $redis = $this->createMock(RedisClientFactory::class);
         $redis->expects(self::never())->method('borrow');
-        $executor = new ExecuteScheduledJobHandler($jobs, new SchedulerRegistry([], []), $bus, $pool, $redis, new NullLogger());
+        $executor = new ExecuteScheduledJobHandler($jobs, new SchedulerRegistry([], []), $bus, $pool, $redis, new NullLogger(), $this->createStub(ScheduledConsoleExecutorInterface::class));
         $guard = new ExecuteScheduledOccurrenceHandler(new DoctrineSchedulerOccurrenceExecutionStore($this->writer, $this->authority), $executor);
         $this->observer->executeStatement("UPDATE worker_deployment_leases SET expires_at = clock_timestamp() - INTERVAL '1 second' WHERE namespace = :namespace", ['namespace' => $this->authority->namespace]);
 
@@ -314,7 +315,7 @@ final class SchedulerOccurrenceGuardTest extends TestCase
         $pool = $this->createMock(CpuProcessPoolInterface::class);
         $pool->expects(self::never())->method('dispatch');
         $executor = new ExecuteScheduledJobHandler($jobs, new SchedulerRegistry([new GuardedSchedulerMessage('worker@baander.app', 1.0)], []),
-            $bus, $pool, $redis, new NullLogger());
+            $bus, $pool, $redis, new NullLogger(), $this->createStub(ScheduledConsoleExecutorInterface::class));
         return new ExecuteScheduledOccurrenceHandler(new DoctrineSchedulerOccurrenceExecutionStore($this->writer, $this->authority), $executor);
     }
 

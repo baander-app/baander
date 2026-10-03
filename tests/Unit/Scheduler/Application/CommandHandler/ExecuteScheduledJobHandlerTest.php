@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Scheduler\Application\CommandHandler;
 
 use App\Scheduler\Application\Command\ExecuteScheduledJobCommand;
+use App\Scheduler\Application\DTO\SchedulerOccurrence;
+use App\Scheduler\Application\Exception\ScheduledConsoleCompletionUnknown;
+use App\Scheduler\Application\Port\ScheduledConsoleExecutorInterface;
 use App\Scheduler\Application\CommandHandler\ExecuteScheduledJobHandler;
 use App\Scheduler\Application\Port\ScheduledJobPortInterface;
 use App\Scheduler\Domain\Model\SchedulableCommandInterface;
@@ -18,6 +21,8 @@ use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPoolInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\MockObject\Stub;
+use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Log\AbstractLogger;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Command\Command;
@@ -26,11 +31,12 @@ use Symfony\Component\Messenger\MessageBusInterface;
 
 final class ExecuteScheduledJobHandlerTest extends TestCase
 {
-    private ScheduledJobPortInterface $jobService;
-    private MessageBusInterface $messageBus;
-    private CpuProcessPoolInterface $cpuPool;
-    private RedisClientFactory $redis;
+    private ScheduledJobPortInterface&Stub $jobService;
+    private MessageBusInterface&Stub $messageBus;
+    private CpuProcessPoolInterface&Stub $cpuPool;
+    private RedisClientFactory&Stub $redis;
     private TestLogger $logger;
+    private ScheduledConsoleExecutorInterface&Stub $consoleExecutor;
 
     protected function setUp(): void
     {
@@ -39,6 +45,7 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
         $this->cpuPool = $this->createStub(CpuProcessPoolInterface::class);
         $this->redis = $this->createStub(RedisClientFactory::class);
         $this->logger = new TestLogger();
+        $this->consoleExecutor = $this->createStub(ScheduledConsoleExecutorInterface::class);
     }
 
     private function createHandler(?SchedulerRegistry $registry = null): ExecuteScheduledJobHandler
@@ -53,7 +60,103 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
             $this->cpuPool,
             $this->redis,
             $this->logger,
+            $this->consoleExecutor,
         );
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function occurrenceConsoleOutcomes(): iterable
+    {
+        foreach (['success', 'known failure', 'unknown', 'unknown with save failure'] as $outcome) {
+            yield $outcome => [$outcome];
+        }
+    }
+
+    #[DataProvider('occurrenceConsoleOutcomes')]
+    public function testOccurrenceConsoleUsesIndependentExecutorAndPreservesUncertainty(string $outcome): void
+    {
+        $console = new class extends Command implements SchedulableConsoleCommandInterface {
+            public function __construct() { parent::__construct('app:occurrence-console'); }
+            public static function schedulerParameters(): array { return []; }
+        };
+        $parameters = ['ttl-hours' => 1.0];
+        $job = ScheduledJob::create('Occurrence console', '* * * * *', JobType::Console, 'app:occurrence-console', parameters: $parameters);
+        $occurrence = new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-02T10:00:00Z'), JobType::Console, $job->getCommand(), $parameters);
+        $this->jobService = $this->createMock(ScheduledJobPortInterface::class);
+        $this->jobService->expects(self::once())->method('getById')->willReturn($job);
+        $persistenceError = new \RuntimeException('Storage failure');
+        $saves = 0;
+        $this->jobService->expects(self::exactly(2))->method('save')->willReturnCallback(function () use (&$saves, $outcome, $persistenceError): void {
+            if (++$saves === 2 && $outcome === 'unknown with save failure') {
+                throw $persistenceError;
+            }
+        });
+        $this->cpuPool = $this->createMock(CpuProcessPoolInterface::class);
+        $this->cpuPool->expects(self::never())->method('dispatch');
+        $this->cpuPool->expects(self::never())->method('readResult');
+        $this->redis = $this->createMock(RedisClientFactory::class);
+        $this->redis->expects(self::never())->method('borrow');
+        $this->messageBus = $this->createMock(MessageBusInterface::class);
+        $this->messageBus->expects(self::never())->method('dispatch');
+        $this->consoleExecutor = $this->createMock(ScheduledConsoleExecutorInterface::class);
+        $call = $this->consoleExecutor->expects(self::once())->method('execute')->with('app:occurrence-console', $parameters);
+        $unknown = new ScheduledConsoleCompletionUnknown('Console completion unknown: containment required.');
+        if ($outcome === 'success') {
+            $call->willReturn('completed');
+        } elseif ($outcome === 'known failure') {
+            $call->willThrowException(new \RuntimeException('Known console failure'));
+        } else {
+            $call->willThrowException($unknown);
+        }
+        $handler = $this->createHandler(new SchedulerRegistry([], [$console]));
+        if (str_starts_with($outcome, 'unknown')) {
+            try {
+                $handler->executeOccurrence($occurrence);
+                self::fail('Unknown completion must propagate.');
+            } catch (ScheduledConsoleCompletionUnknown $actual) {
+                if ($outcome === 'unknown') {
+                    self::assertSame($unknown, $actual);
+                } else {
+                    self::assertSame($persistenceError, $actual->getPrevious());
+                    self::assertStringContainsString('failed to persist paused schedule', $actual->getMessage());
+                }
+            }
+            self::assertSame(ScheduleStatus::Paused, $job->getStatus());
+            self::assertSame($unknown->getMessage(), $job->getLastError());
+        } else {
+            $handler->executeOccurrence($occurrence);
+            self::assertSame(ScheduleStatus::Active, $job->getStatus());
+            self::assertSame($outcome === 'success' ? 'completed' : null, $job->getLastResult());
+            self::assertSame($outcome === 'known failure' ? 'Known console failure' : null, $job->getLastError());
+        }
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function occurrenceConsoleRejections(): iterable
+    {
+        foreach (['snapshot changed', 'paused', 'not registered'] as $reason) {
+            yield $reason => [$reason];
+        }
+    }
+
+    #[DataProvider('occurrenceConsoleRejections')]
+    public function testOccurrenceConsoleAdmissionRejectsBeforeExecutor(string $reason): void
+    {
+        $job = ScheduledJob::create('Console gate', '* * * * *', JobType::Console, 'app:occurrence-console', parameters: ['value' => 1.0]);
+        if ($reason === 'paused') {
+            $job->pause();
+        }
+        $occurrence = new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-02T10:00:00Z'), JobType::Console, $job->getCommand(), ['value' => $reason === 'snapshot changed' ? 2.0 : 1.0]);
+        $this->jobService = $this->createMock(ScheduledJobPortInterface::class);
+        $this->jobService->expects(self::once())->method('getById')->willReturn($job);
+        $this->jobService->expects($reason === 'not registered' ? self::once() : self::never())->method('save');
+        $this->consoleExecutor = $this->createMock(ScheduledConsoleExecutorInterface::class);
+        $this->consoleExecutor->expects(self::never())->method('execute');
+        $this->cpuPool = $this->createMock(CpuProcessPoolInterface::class);
+        $this->cpuPool->expects(self::never())->method('dispatch');
+        $this->redis = $this->createMock(RedisClientFactory::class);
+        $this->redis->expects(self::never())->method('borrow');
+        $this->createHandler(new SchedulerRegistry([], []))->executeOccurrence($occurrence);
     }
 
     // --- Job not found ---
@@ -234,8 +337,8 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
 
     public function testOuterPoolErrorMarksFailureWithItsDiagnosticWithoutPausing(): void
     {
-        [$handler, $job, $command] = $this->prepareConsoleAttempt();
-        $this->cpuPool->expects($this->once())->method('readResult')->willReturn([
+        [$handler, $job, $command, $pool] = $this->prepareConsoleAttempt();
+        $pool->expects($this->once())->method('readResult')->willReturn([
             'status' => 'error', 'data' => 'Worker process could not load console handler',
         ]);
 
@@ -249,8 +352,8 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
 
     public function testUnsuccessfulConsoleResultMarksFailureWithoutPausing(): void
     {
-        [$handler, $job, $command] = $this->prepareConsoleAttempt();
-        $this->cpuPool->expects($this->once())->method('readResult')->willReturn([
+        [$handler, $job, $command, $pool] = $this->prepareConsoleAttempt();
+        $pool->expects($this->once())->method('readResult')->willReturn([
             'status' => 'ok',
             'data' => json_encode(['success' => false, 'error' => 'Console exited with code 9', 'exitCode' => 9], JSON_THROW_ON_ERROR),
         ]);
@@ -263,11 +366,12 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
         self::assertSame(1, $job->getRunCount());
     }
 
+    /** @param array{status: string, data: string} $row */
     #[DataProvider('malformedConsoleResults')]
     public function testConsumedMalformedConsoleResultFailsWithoutPausing(array $row): void
     {
-        [$handler, $job, $command] = $this->prepareConsoleAttempt();
-        $this->cpuPool->expects($this->once())->method('readResult')->willReturn($row);
+        [$handler, $job, $command, $pool] = $this->prepareConsoleAttempt();
+        $pool->expects($this->once())->method('readResult')->willReturn($row);
 
         $handler($command);
 
@@ -278,6 +382,7 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
         self::assertSame(1, $job->getRunCount());
     }
 
+    /** @return iterable<string, array{array{status: string, data: string}}> */
     public static function malformedConsoleResults(): iterable
     {
         yield 'numeric success' => [['status' => 'ok', 'data' => '{"success":1,"output":"not valid"}']];
@@ -295,16 +400,16 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
         ScheduleStatus $initialStatus,
         bool $resultReadFails,
     ): void {
-        [$handler, $job, $command] = $this->prepareConsoleAttempt();
+        [$handler, $job, $command, $pool] = $this->prepareConsoleAttempt();
         if ($initialStatus === ScheduleStatus::Paused) {
             $job->pause();
         } elseif ($initialStatus === ScheduleStatus::Disabled) {
             $job->disable();
         }
         if ($resultReadFails) {
-            $this->cpuPool->expects($this->once())->method('readResult')->willThrowException(new \RuntimeException('Result store unavailable'));
+            $pool->expects($this->once())->method('readResult')->willThrowException(new \RuntimeException('Result store unavailable'));
         } else {
-            $this->cpuPool->expects($this->atLeastOnce())->method('readResult')->willReturn(null);
+            $pool->expects($this->atLeastOnce())->method('readResult')->willReturn(null);
         }
 
         $handler($command);
@@ -318,6 +423,7 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
         self::assertSame(1, $job->getRunCount());
     }
 
+    /** @return iterable<string, array{ScheduleStatus, bool}> */
     public static function uncertainCompletionStates(): iterable
     {
         foreach (ScheduleStatus::cases() as $status) {
@@ -332,13 +438,13 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
         $logger->expects($this->never())->method('error');
         $logger->expects($this->once())->method('warning')->willThrowException(new \RuntimeException('Logger unavailable'));
         $savedStates = [];
-        [$handler, $job, $command] = $this->prepareConsoleAttempt(
+        [$handler, $job, $command, $pool] = $this->prepareConsoleAttempt(
             logger: $logger,
             onSave: static function (ScheduledJob $saved) use (&$savedStates): void {
                 $savedStates[] = ['status' => $saved->getStatus(), 'error' => $saved->getLastError()];
             },
         );
-        $this->cpuPool->expects($this->atLeastOnce())->method('readResult')->willReturn(null);
+        $pool->expects($this->atLeastOnce())->method('readResult')->willReturn(null);
         $this->redis->method('borrow')->willThrowException(new \RuntimeException('Redis unavailable'));
 
         $handler($command);
@@ -355,9 +461,9 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
 
     public function testRepeatedConsoleAttemptsUseDifferentResultKeysAndPreserveSuccessfulOutput(): void
     {
-        [$handler, $job, $command] = $this->prepareConsoleAttempt(attempts: 2);
+        [$handler, $job, $command, $pool] = $this->prepareConsoleAttempt(attempts: 2);
         $keys = [];
-        $this->cpuPool->expects($this->exactly(2))->method('readResult')->willReturnCallback(
+        $pool->expects($this->exactly(2))->method('readResult')->willReturnCallback(
             static function (string $key) use (&$keys): array {
                 $keys[] = $key;
                 return ['status' => 'ok', 'data' => '{"success":true,"output":"completed result"}'];
@@ -387,9 +493,11 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
             $this->redis,
             $this->logger,
             consoleResultTimeoutSeconds: $timeout,
+            consoleExecutor: $this->consoleExecutor,
         );
     }
 
+    /** @return iterable<string, array{float}> */
     public static function invalidConsoleTimeouts(): iterable
     {
         yield 'zero' => [0.0];
@@ -398,7 +506,7 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
         yield 'not a number' => [NAN];
     }
 
-    /** @return array{ExecuteScheduledJobHandler, ScheduledJob, ExecuteScheduledJobCommand} */
+    /** @return array{ExecuteScheduledJobHandler, ScheduledJob, ExecuteScheduledJobCommand, CpuProcessPoolInterface&MockObject} */
     private function prepareConsoleAttempt(int $attempts = 1, float $timeout = 0.001, ?LoggerInterface $logger = null, ?\Closure $onSave = null): array
     {
         $consoleCommand = new class extends Command implements SchedulableConsoleCommandInterface {
@@ -416,8 +524,8 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
             command: 'app:test-console-cmd',
         );
         $command = new ExecuteScheduledJobCommand($job->getId()->toString(), JobType::Console->value, 'app:test-console-cmd', []);
-        $this->cpuPool = $this->createMock(CpuProcessPoolInterface::class);
-        $this->cpuPool->method('getResultTable')->willReturn(null);
+        $pool = $this->createMock(CpuProcessPoolInterface::class);
+        $pool->method('getResultTable')->willReturn(null);
         $this->jobService = $this->createMock(ScheduledJobPortInterface::class);
         $this->jobService->method('getById')->willReturn($job);
         $this->redis = $this->createMock(RedisClientFactory::class);
@@ -425,18 +533,19 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
             $this->jobService,
             new SchedulerRegistry([], [$consoleCommand]),
             $this->messageBus,
-            $this->cpuPool,
+            $pool,
             $this->redis,
             $logger ?? $this->logger,
             consoleResultTimeoutSeconds: $timeout,
+            consoleExecutor: $this->consoleExecutor,
         );
-        $this->cpuPool->expects($this->exactly($attempts))->method('dispatch');
+        $pool->expects($this->exactly($attempts))->method('dispatch');
         $this->jobService->expects($this->exactly(2 * $attempts))->method('save')->willReturnCallback(
             $onSave ?? static function (ScheduledJob $saved): void {},
         );
         $this->redis->expects($this->exactly($attempts))->method('borrow');
 
-        return [$handler, $job, $command];
+        return [$handler, $job, $command, $pool];
     }
 
     // --- Console dispatch rejected when not in registry ---

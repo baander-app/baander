@@ -8,6 +8,8 @@ use App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand;
 use App\Scheduler\Application\CommandHandler\ExecuteScheduledJobHandler;
 use App\Scheduler\Application\CommandHandler\ExecuteScheduledOccurrenceHandler;
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
+use App\Scheduler\Application\Exception\ScheduledConsoleCompletionUnknown;
+use App\Scheduler\Application\Port\ScheduledConsoleExecutorInterface;
 use App\Scheduler\Application\Port\ScheduledJobPortInterface;
 use App\Scheduler\Application\Port\SchedulerOccurrenceExecutionStoreInterface;
 use App\Scheduler\Domain\Model\SchedulableCommandInterface;
@@ -46,7 +48,7 @@ final class ExecuteScheduledOccurrenceHandlerTest extends TestCase
         $pool->expects(self::never())->method('dispatch');
 
         return new ExecuteScheduledOccurrenceHandler($store, new ExecuteScheduledJobHandler(
-            $jobs, $registry ?? new SchedulerRegistry([new OccurrenceTestMessage()], []), $bus, $pool, $redis, new NullLogger(),
+            $jobs, $registry ?? new SchedulerRegistry([new OccurrenceTestMessage()], []), $bus, $pool, $redis, new NullLogger(), $this->createStub(ScheduledConsoleExecutorInterface::class),
         ));
     }
 
@@ -239,31 +241,45 @@ final class ExecuteScheduledOccurrenceHandlerTest extends TestCase
         $job = ScheduledJob::create('Console occurrence', '* * * * *', JobType::Console, 'app:occurrence-test', parameters: $parameters);
         $occurrence = $this->occurrence($job);
         $store = $this->createMock(SchedulerOccurrenceExecutionStoreInterface::class);
-        $store->method('begin')->willReturn($occurrence);
-        $store->expects(self::once())->method('markReturned')->willReturn(true);
+        $store->expects(self::exactly($timeout ? 2 : 1))->method('begin')->willReturnOnConsecutiveCalls($occurrence, null);
+        $store->expects($timeout ? self::never() : self::once())->method('markReturned')->willReturn(true);
         $jobs = $this->createMock(ScheduledJobPortInterface::class);
         $jobs->expects(self::once())->method('getById')->willReturn($job);
         $jobs->expects(self::exactly(2))->method('save');
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
         $pool = $this->createMock(CpuProcessPoolInterface::class);
-        $pool->expects(self::once())->method('dispatch')->willReturnCallback(function (string $payload, string $key) use ($parameters, $job): void {
-            $decoded = json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
-            self::assertSame($parameters, $decoded['parameters']);
-            self::assertStringContainsString('"negative_zero":-0.0', $payload);
-            self::assertStringStartsWith('scheduled_console:' . $job->getId()->toString() . ':', $key);
+        $pool->expects(self::never())->method('dispatch');
+        $pool->expects(self::never())->method('readResult');
+        $executor = $this->createMock(ScheduledConsoleExecutorInterface::class);
+        $unknown = new ScheduledConsoleCompletionUnknown('Console completion unknown: containment required.');
+        $executor->expects(self::once())->method('execute')->willReturnCallback(function (string $command, array $actual) use ($parameters, $timeout, $unknown): string {
+            self::assertSame('app:occurrence-test', $command);
+            self::assertSame($parameters, $actual);
+            self::assertSame(json_encode($parameters, JSON_PRESERVE_ZERO_FRACTION), json_encode($actual, JSON_PRESERVE_ZERO_FRACTION));
+            if ($timeout) {
+                throw $unknown;
+            }
+            return 'completed';
         });
-        $pool->expects(self::atLeastOnce())->method('readResult')->willReturn($timeout ? null : ['status' => 'ok', 'data' => '{"success":true,"output":"completed"}']);
         $redis = $this->createMock(RedisClientFactory::class);
         $redis->expects(self::never())->method('borrow');
         $handler = new ExecuteScheduledOccurrenceHandler($store, new ExecuteScheduledJobHandler(
-            $jobs, new SchedulerRegistry([], [$console]), $bus, $pool, $redis, new NullLogger(), consoleResultTimeoutSeconds: 0.001,
+            $jobs, new SchedulerRegistry([], [$console]), $bus, $pool, $redis, new NullLogger(), $executor, consoleResultTimeoutSeconds: 0.001,
         ));
-        $handler(new ExecuteScheduledOccurrenceCommand($occurrence->id));
+        $command = new ExecuteScheduledOccurrenceCommand($occurrence->id);
         if ($timeout) {
+            try {
+                $handler($command);
+                self::fail('Unknown console completion must propagate and prevent a return receipt.');
+            } catch (ScheduledConsoleCompletionUnknown $actual) {
+                self::assertSame($unknown, $actual);
+            }
+            $handler($command);
             self::assertSame(ScheduleStatus::Paused, $job->getStatus());
             self::assertStringContainsString('completion unknown', $job->getLastError());
         } else {
+            $handler($command);
             self::assertSame('completed', $job->getLastResult());
         }
     }

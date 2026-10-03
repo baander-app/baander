@@ -170,6 +170,23 @@ This does not test automatic polling, fencing effects after lease expiry, broker
 crash durability or native console/media execution. No occurrence relay loop is
 enabled yet.
 
+The occurrence console adapter and worker-stop policy can be checked with:
+
+```bash
+bash scripts/test-functional-container.sh tests/Integration/ScheduledConsoleExecutorTest.php tests/Integration/ScheduledConsoleWorkerStopTest.php tests/Integration/SchedulerOccurrenceGuardTest.php
+```
+
+Real CLI children verify literal argument handling, PHP heap settings, concurrent
+stdout/stderr draining, output limits, deadlines, ignored TERM followed by KILL,
+unexpected signals and exact direct-child reaping. The actual Messenger worker
+must stop before its next queued job after an uncertain result, including nested
+handler exceptions; ordinary known failures may continue. Kernel checks verify the
+executor port and stop subscriber registration. These fixtures do not certify
+business-command side effects, descendant containment, kernel-stalled processes or
+total deployment memory. The occurrence handler's unit tests also require the
+paused state and uncertainty to survive persistence failures without issuing a
+return receipt or granting a second execution.
+
 The functional runner also supplies the isolated PostgreSQL/Redis environment
 aliases used by integration tests that need the full migrated schema and kernel.
 `CoverExtractionPersistenceTest` disables DAMA rollback with its supported attribute

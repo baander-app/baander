@@ -7,6 +7,7 @@ namespace App\Scheduler\Application\CommandHandler;
 use App\Scheduler\Application\Command\ExecuteScheduledJobCommand;
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
 use App\Scheduler\Application\Port\ScheduledJobPortInterface;
+use App\Scheduler\Application\Port\ScheduledConsoleExecutorInterface;
 use App\Scheduler\Application\Exception\ScheduledConsoleCompletionUnknown;
 use App\Scheduler\Domain\Service\SchedulerRegistry;
 use App\Scheduler\Domain\ValueObject\JobType;
@@ -30,6 +31,7 @@ final class ExecuteScheduledJobHandler
         private readonly CpuProcessPoolInterface $cpuPool,
         private readonly RedisClientFactory $redis,
         private readonly LoggerInterface $logger,
+        private readonly ScheduledConsoleExecutorInterface $consoleExecutor,
         private readonly float $consoleResultTimeoutSeconds = 300.0,
     ) {
         if (!is_finite($consoleResultTimeoutSeconds) || $consoleResultTimeoutSeconds <= 0) {
@@ -99,10 +101,13 @@ final class ExecuteScheduledJobHandler
         $job->markRunning();
         $this->scheduledJobService->save($job);
 
+        $unknownCompletion = null;
         try {
             $result = match ($command->jobType) {
                 JobType::Messenger->value => $this->dispatchMessenger($command),
-                JobType::Console->value => $this->dispatchConsole($command),
+                JobType::Console->value => $legacyLock
+                    ? $this->dispatchConsole($command)
+                    : $this->consoleExecutor->execute($command->command, $command->parameters),
             };
 
             $job->markSuccess($result);
@@ -113,6 +118,9 @@ final class ExecuteScheduledJobHandler
             if ($job->getStatus() === ScheduleStatus::Active) {
                 $job->pause();
             }
+            if (!$legacyLock) {
+                $unknownCompletion = $e;
+            }
         } catch (Throwable $e) {
             $this->logger->error('Scheduled job failed', [
                 'jobId' => $command->jobId,
@@ -122,7 +130,20 @@ final class ExecuteScheduledJobHandler
             $job->markFailed($e->getMessage());
         }
 
-        $this->scheduledJobService->save($job);
+        try {
+            $this->scheduledJobService->save($job);
+        } catch (Throwable $persistenceError) {
+            if ($unknownCompletion !== null) {
+                throw new ScheduledConsoleCompletionUnknown(
+                    'Console completion unknown; failed to persist paused schedule. Deployment containment required.',
+                    previous: $persistenceError,
+                );
+            }
+            throw $persistenceError;
+        }
+        if ($unknownCompletion !== null) {
+            throw $unknownCompletion;
+        }
         if ($legacyLock) {
             $this->releaseLock($command->jobId);
         }
@@ -142,6 +163,7 @@ final class ExecuteScheduledJobHandler
         return 'dispatched';
     }
 
+    /** @throws ScheduledConsoleCompletionUnknown When the CPU child completion cannot be confirmed. */
     private function dispatchConsole(ExecuteScheduledJobCommand $command): string
     {
         $payload = json_encode([
