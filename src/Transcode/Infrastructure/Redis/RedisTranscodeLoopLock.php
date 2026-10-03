@@ -13,11 +13,26 @@ use Throwable;
  * Redis-backed distributed loop lock for transcode jobs.
  *
  * Uses SET NX EX for acquisition and a per-acquisition owner token for release
- * and renewal. A lock that is not released will expire via TTL, preventing a
- * crashed worker from permanently blocking a job.
+ * and renewal. Owner comparison and mutation execute atomically in Redis so a
+ * stale owner cannot overwrite or delete a successor's lease. A lock that is
+ * not released expires via TTL.
  */
 final class RedisTranscodeLoopLock implements TranscodeLoopLockInterface
 {
+    private const string RENEW_SCRIPT = <<<'LUA'
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+    return redis.call('EXPIRE', KEYS[1], ARGV[2])
+end
+return 0
+LUA;
+
+    private const string RELEASE_SCRIPT = <<<'LUA'
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+    return redis.call('DEL', KEYS[1])
+end
+return 0
+LUA;
+
     /** @var array<string, string> jobId -> owner token */
     private array $tokens = [];
 
@@ -59,12 +74,7 @@ final class RedisTranscodeLoopLock implements TranscodeLoopLockInterface
 
         try {
             return (bool) $this->redis->borrow(function (\Redis $redis) use ($key, $token, $ttlSeconds): bool {
-                $current = $redis->get($key);
-                if ($current !== $token) {
-                    return false;
-                }
-
-                return (bool) $redis->set($key, $token, ['XX', 'EX' => max(1, $ttlSeconds)]);
+                return $redis->eval(self::RENEW_SCRIPT, [$key, $token, max(1, $ttlSeconds)], 1) === 1;
             });
         } catch (Throwable) {
             return false;
@@ -83,10 +93,7 @@ final class RedisTranscodeLoopLock implements TranscodeLoopLockInterface
 
         try {
             $this->redis->borrow(function (\Redis $redis) use ($key, $token): void {
-                $current = $redis->get($key);
-                if ($current === $token) {
-                    $redis->del($key);
-                }
+                $redis->eval(self::RELEASE_SCRIPT, [$key, $token], 1);
             });
         } catch (Throwable) {
             // Key will expire via TTL; do not throw on shutdown/recovery paths.

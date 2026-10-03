@@ -700,6 +700,21 @@ late worker results. Init and media must belong to the same attempt. The existin
 job output-directory column can store the selected path, but switching it alone
 would still allow separate init/media requests to observe different attempts.
 
+Redis loop-lock renewal and release now compare the owner token and mutate the
+key in a single parameterized Lua script. Renewal changes only the matching key's
+expiry; it cannot recreate a missing key. Real Redis regressions force a successor
+to take ownership at the old read/write boundary and verify that stale renewal
+and release leave its token and expiry intact.
+
+This fixes the Redis command race, not the encoding loop's ownership contract.
+The session handler still falls through after failed lock acquisition when no live
+session appears, and the subscriber only logs renewal failure while encoding
+continues. Its general failure handler also saves stale job state. Those paths need
+explicit rejection and ownership-loss cleanup without job mutation. The current
+lock API stores one token per job in the service instance: a successful reacquisition
+replaces that token, so an older coroutine in the same instance can act on the new
+lease. Per-loop identity and conditional persistence remain required.
+
 Native media now requests refresh from its own window after an authenticated 401,
 shares that window's refresh queue with Axios, and retries once with a new proof.
 A second 401 or failed refresh ends recovery. Complete credential snapshots carry
