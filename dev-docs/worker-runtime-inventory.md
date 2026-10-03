@@ -665,6 +665,10 @@ each observation and compares file identity, size and timestamps. Replacement,
 growth, deletion and empty/nonregular files reset or fail the stability check;
 polling uses a monotonic deadline. Final response construction also refreshes
 metadata before setting Content-Length.
+Readiness-table hints can accelerate delivery only when their path exactly matches
+the segment path resolved for the request. A stale or unrelated path is ignored;
+delivery waits for the expected file instead. Regression tests use distinct file
+contents and verify the streamed bytes, including missing expected files.
 
 The continuous encoder now uses FFmpeg's `hls_flags temp_file`: new media fragments
 are closed under temporary names and atomically renamed to final `.m4s` names.
@@ -685,6 +689,16 @@ or same-size edit within timestamp precision can escape observation, and the fil
 can change after the last check. Init publication and encoding-attempt isolation
 remain open. The separate pool encoder already waits for completion and atomically
 publishes its output.
+
+The attempt-isolation audit found that changing producer directories alone would
+not close this gap: delivery recomputes video/tier paths, signed URLs identify only
+the job and segment, and availability/cache keys omit attempt identity. Retry keeps
+old segment state, and the seek loop ignores the restarted encoder's returned
+directory. The next change needs an immutable attempt identity in publication,
+manifest URLs, delivery and cache keys; a persisted ownership fence must reject
+late worker results. Init and media must belong to the same attempt. The existing
+job output-directory column can store the selected path, but switching it alone
+would still allow separate init/media requests to observe different attempts.
 
 Native media now requests refresh from its own window after an authenticated 401,
 shares that window's refresh queue with Axios, and retries once with a new proof.

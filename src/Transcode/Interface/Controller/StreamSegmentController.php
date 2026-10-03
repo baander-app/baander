@@ -188,15 +188,16 @@ final class StreamSegmentController
     }
 
     /**
-     * Check the encoder's availability hint first, then poll the expected path.
-     * A nonempty, unchanged snapshot is a readiness heuristic: the continuous
-     * encoder can publish a hint while it is still writing the file.
+     * Use the encoder's hint only for the path resolved for this request.
+     * A late readiness write must not redirect delivery to another file.
+     * A nonempty, unchanged snapshot remains a readiness heuristic, not proof
+     * of completed publication or encoding-attempt ownership.
      */
     private function waitForSegment(Uuid $jobId, string $tierKey, int $index, string $path, int $timeoutSeconds = 10): ?string
     {
         $ready = $this->segmentAvailability->isReady($jobId, $tierKey, $index);
-        if ($ready !== null) {
-            $stable = $this->isFileSizeStable($ready);
+        if ($ready === $path) {
+            $stable = $this->isFileSizeStable($path);
             if ($stable !== null) {
                 return $stable;
             }
