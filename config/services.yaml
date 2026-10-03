@@ -1023,6 +1023,23 @@ services:
     App\Scheduler\Application\Port\ScheduledJobPortInterface:
         alias: App\Scheduler\Infrastructure\Service\ScheduledJobService
 
+    # Callable recovery services; no producer loop or occurrence queue route is enabled yet.
+    App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceMaterializer:
+        factory: ['App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceMaterializer', 'fromDsn']
+        arguments:
+            $databaseUrl: '%env(resolve:DATABASE_URL)%'
+
+    App\Scheduler\Application\Port\SchedulerOccurrenceMaterializerInterface:
+        alias: App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceMaterializer
+
+    App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerRecoveryScheduleStore:
+        factory: ['App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerRecoveryScheduleStore', 'fromDsn']
+        arguments:
+            $databaseUrl: '%env(resolve:DATABASE_URL)%'
+
+    App\Scheduler\Application\Port\SchedulerRecoveryScheduleStoreInterface:
+        alias: App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerRecoveryScheduleStore
+
     App\Scheduler\Infrastructure\Process\BoundedScheduledConsoleExecutor:
         arguments:
             $projectDirectory: '%kernel.project_dir%'
@@ -1168,6 +1185,9 @@ services:
 
 when@test:
     services:
+        test.scheduler_recovery_poller:
+            alias: App\Scheduler\Application\Service\SchedulerRecoveryPoller
+            public: true
         # Keep the real relay graph available for integration checks before its loop is enabled.
         test.scheduler_occurrence_relay:
             alias: App\Scheduler\Application\Service\SchedulerOccurrenceRelay

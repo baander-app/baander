@@ -12,6 +12,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'scheduled_jobs')]
 #[ORM\Index(name: 'idx_scheduled_jobs_status', columns: ['status'])]
 #[ORM\Index(name: 'idx_scheduled_jobs_next_run_at', columns: ['next_run_at'])]
+#[ORM\Index(name: 'idx_scheduled_jobs_recovery_after', columns: ['recovery_after', 'id'], options: ['where' => "(status = 'active'::text)"])]
 class ScheduledJobEntity
 {
     #[ORM\Id]
@@ -26,6 +27,12 @@ class ScheduledJobEntity
     // Align reverse introspection with this project's timestamptz mapping while retaining native TZ DDL.
     #[ORM\Column(type: 'datetime_immutable', nullable: true, columnDefinition: 'TIMESTAMPTZ DEFAULT NULL')]
     private ?\DateTimeImmutable $evaluatedThrough = null;
+
+    // Generated from the database clock, then owned by durable recovery selection.
+    #[ORM\Column(type: 'datetime_immutable', insertable: false, updatable: false, generated: 'INSERT',
+        options: ['default' => 'clock_timestamp()'],
+        columnDefinition: 'TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp() CHECK (isfinite(recovery_after))')]
+    private \DateTimeImmutable $recoveryAfter;
 
     #[ORM\Column(type: 'text')]
     private string $name;
@@ -83,6 +90,11 @@ class ScheduledJobEntity
     public function getId(): Uuid
     {
         return $this->id;
+    }
+
+    public function getRecoveryAfter(): \DateTimeImmutable
+    {
+        return $this->recoveryAfter;
     }
 
     public function getEvaluatedThrough(): ?\DateTimeImmutable

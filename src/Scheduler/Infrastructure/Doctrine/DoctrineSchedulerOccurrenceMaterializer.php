@@ -12,6 +12,8 @@ use Cron\CronExpression;
 use DateTimeImmutable;
 use DateTimeZone;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Tools\DsnParser;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 /** Per-job recovery primitive, deliberately not wired into a poller or dispatch loop. */
@@ -26,6 +28,14 @@ final class DoctrineSchedulerOccurrenceMaterializer implements SchedulerOccurren
         if ($lockTimeoutMs < 1 || $statementTimeoutMs < $lockTimeoutMs || $statementTimeoutMs > 60000) {
             throw new \InvalidArgumentException('Scheduler recovery requires bounded positive lock/statement timeouts.');
         }
+    }
+
+    public static function fromDsn(string $databaseUrl): self
+    {
+        if ($databaseUrl === '' || str_contains($databaseUrl, "\0")) {
+            throw new \InvalidArgumentException('Scheduler recovery requires an explicit database URL.');
+        }
+        return new self(DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($databaseUrl)));
     }
 
     public function materialize(Uuid $jobId, int $minuteLimit = 60): int

@@ -96,6 +96,7 @@ final class Version620260619CreateMissingEntityTables extends AbstractMigration
         $this->addSql('CREATE TABLE IF NOT EXISTS scheduled_jobs (
             id UUID NOT NULL,
             revision UUID NOT NULL,
+            recovery_after TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp() CHECK (isfinite(recovery_after)),
             evaluated_through TIMESTAMPTZ DEFAULT NULL CHECK (evaluated_through IS NULL OR (isfinite(evaluated_through) AND evaluated_through = date_trunc(\'minute\', evaluated_through, \'UTC\'))),
             name TEXT NOT NULL,
             expression TEXT NOT NULL,
@@ -114,6 +115,7 @@ final class Version620260619CreateMissingEntityTables extends AbstractMigration
             last_error TEXT DEFAULT NULL,
             PRIMARY KEY (id)
         )');
+        $this->addSql("CREATE INDEX IF NOT EXISTS idx_scheduled_jobs_recovery_after ON scheduled_jobs (recovery_after, id) WHERE status = 'active'");
         $this->addSql('CREATE INDEX IF NOT EXISTS idx_scheduled_jobs_status ON scheduled_jobs (status)');
         $this->addSql('CREATE INDEX IF NOT EXISTS idx_scheduled_jobs_next_run_at ON scheduled_jobs (next_run_at)');
     }

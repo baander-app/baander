@@ -621,6 +621,51 @@ all runs use fresh and repeat migrations. The full unit suite remains green at
 Doctrine's mapping extension enabled. No production poller or new queue route was
 enabled by these checks.
 
+`SchedulerRecoveryPoller` now composes a durable candidate selector with the
+per-job materializer. Selection locks at most 100 eligible active schedules using
+`SKIP LOCKED`, ordered by `recovery_after` and UUID, and commits a future retry time
+before returning their IDs. A partial active-schedule index supports this ordering.
+Both a poisoned schedule and a large backlog take one bounded turn before other
+eligible schedules. Selection state survives process restarts; it is not an
+in-memory round-robin cursor. Current/future evaluated cursors are not selected.
+
+Every selected schedule is deferred, including one whose materialization fails or
+whose caller crashes before doing any work. Retry delays are 1–3,600 seconds. There
+is no early release or ownership token: the deadline only throttles selection,
+and the materializer still locks a fresh schedule and commits each window atomically.
+Expired selections may cause further safe recovery calls; they never grant execution
+permission. An uncertain selection commit returns no IDs, so the caller does no work
+until a later selection can establish a committed result. Schedule edits and results
+preserve the selector deadline, and selection leaves the schedule revision and
+recovery cursor unchanged.
+
+A pass defaults to ten jobs, sixty scanned minutes per job and a sixty-second retry
+delay. It rejects a requested product above 1,000 minutes before reserving anything,
+then attempts every selected job before reporting aggregate failures. The reported
+insertion count covers acknowledged commits; failures may have uncertain outcomes.
+These work limits do not bound connection, commit, PHP or network wall time. Invalid
+schedules remain visible errors without continually taking the first selection slot.
+Both adapters have dedicated connection factories and application-port aliases;
+the container resolves the callable pass without starting a producer loop.
+
+The legacy web poller still executes schedules outside the occurrence guard. Running
+a durable producer beside it would retain intents that could later duplicate that
+legacy work when the relay is enabled. Cutover therefore needs a deliberate boundary
+between the two paths, not shadow history that is later treated as executable.
+The new producer also needs its own supervised child reservation. Occurrence console
+execution adds a 128 MiB PHP child to the consumer's heap and process allowance;
+that nested child must be included in admission budgets and containment qualification.
+No command, timer or queue route was enabled by the recovery pass wiring.
+
+The combined scheduler checks pass 167 integration/functional tests with 1,525
+assertions after fresh and repeat migrations. Selection tests isolate their schedules
+in an owned schema built from production migrations; schema-drift checks use the
+actual configured Doctrine schema manager. They verify PostgreSQL's canonical
+partial-index predicate, native finite deadlines and database-clock defaults, as
+well as poison/backlog fairness, lock skipping, commit uncertainty and preservation
+of reserved deadlines across schedule saves. The unit suite passes 3,460 tests with
+12,499 assertions; baseline-free focused PHPStan also passes.
+
 Parameters use bounded native PostgreSQL `json`, deliberately preserving lexical
 numbers and argument order rather than normalizing them through `jsonb`. The
 application snapshot rejects non-JSON values and detaches nested references.
@@ -708,8 +753,8 @@ Swoole coroutines and is intended for a supervised CLI child. Deployment contain
 and resource admission still need qualification before ownership cutover.
 
 No poller, relay loop or queue route has been enabled for occurrence messages.
-The per-job missed-tick recovery primitive still needs a bounded, fair poller
-and deployment wiring before cutover. Lease validation controls admission; it
+The per-job materializer now has a bounded, durable fair recovery pass.
+A supervised loop, resource admission and deployment wiring remain before cutover. Lease validation controls admission; it
 cannot stop effects already running after expiry.
 The guard prevents repeated wrapper invocation, not duplicate side effects from
 retries of downstream messages or exactly-once external delivery. It also does not
