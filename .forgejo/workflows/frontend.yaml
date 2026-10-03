@@ -115,6 +115,14 @@ jobs:
                 working-directory: ui/web
                 run: yarn test:coverage
 
+            -   name: Install browser authentication test runtime
+                working-directory: ui/web
+                run: yarn exec playwright install --with-deps chromium
+
+            -   name: Native browser authentication transport
+                working-directory: ui/web
+                run: yarn test:browser-auth
+
             -   name: Extract coverage metrics
                 working-directory: ui/web
                 run: |

@@ -5,8 +5,8 @@ import { transformSync } from 'esbuild';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const code = transformSync(readFileSync('src/features/player/services/auth-stream-worker.ts', 'utf8'), { loader: 'ts' }).code;
-const origin = 'https://web.baander.test';
-const api = 'https://api.baander.test';
+const origin = 'https://web.baander.app';
+const api = 'https://api.baander.app';
 let handlers: Record<string, (event: unknown) => void>;
 let clients: Map<string, { id: string; url: string; postMessage: ReturnType<typeof vi.fn> }>;
 let fetchMock: ReturnType<typeof vi.fn>;
@@ -43,15 +43,15 @@ function configure(id: string, token: string) {
   return client;
 }
 
-function request(clientId: string, url = `${api}/api/images/cover`) {
+function request(clientId: string, url = `${api}/api/images/cover`, init?: RequestInit) {
   let response: Promise<Response> | undefined;
-  handlers.fetch({ clientId, request: new Request(url), respondWith: (value: Promise<Response>) => { response = value; } });
+  handlers.fetch({ clientId, request: new Request(url, init), respondWith: (value: Promise<Response>) => { response = value; } });
   return response;
 }
 
 it('does not intercept foreign origins even when their path matches', () => {
   configure('a', 'token-a');
-  expect(request('a', 'https://foreign.test/api/images/cover')).toBeUndefined();
+  expect(request('a', 'https://foreign.baander.app/api/images/cover')).toBeUndefined();
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
@@ -93,4 +93,28 @@ it('closes both ports when a tab fails to answer before the deadline', async () 
     expect(ports.every(port => port.close.mock.calls.length === 1)).toBe(true);
     expect(fetchMock.mock.calls[0][1]?.headers?.has('Authorization') ?? false).toBe(false);
   } finally { vi.useRealTimers(); }
+});
+
+it.each(['GET', 'HEAD'])('forwards authorized no-cors %s as CORS without cookies', async method => {
+  configure('a', 'token-a');
+  await request('a', `${api}/api/images/cover`, {
+    method, mode: 'no-cors', credentials: 'include', cache: 'force-cache',
+    headers: { Range: 'bytes=0-1023', Accept: 'image/*' },
+  });
+
+  expect(fetchMock).toHaveBeenCalledOnce();
+  const [input, init] = fetchMock.mock.calls[0];
+  expect(input.mode).toBe('no-cors');
+  // Node does not enforce the browser's no-cors header guard. Assert the final
+  // Request contract here; real-browser qualification verifies header delivery.
+  const forwarded = new Request(input, init);
+  expect(forwarded.mode).toBe('cors');
+  expect(forwarded.credentials).toBe('omit');
+  expect(forwarded.redirect).toBe('error');
+  expect(forwarded.method).toBe(method);
+  expect(forwarded.cache).toBe('force-cache');
+  expect(forwarded.headers.get('Range')).toBe('bytes=0-1023');
+  expect(forwarded.headers.get('Accept')).toBe('image/*');
+  expect(forwarded.headers.get('Authorization')).toBe('DPoP token-a');
+  expect(forwarded.headers.get('DPoP')).toBe('proof-a');
 });

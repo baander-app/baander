@@ -626,6 +626,29 @@ open. Issuance also now preserves client/user UUIDs and DPoP bindings, signs acc
 JWTs, and emits a complete DPoP JSON response without stale trailing stream bytes.
 Non-refresh grants are not covered by the new transaction boundary.
 
+The browser API client now fences requests, responses, nonce updates and refresh
+queues by the current DPoP key-pair identity. Delayed requests from a replaced
+session cannot replay under the next account's credentials, and completion of an
+old refresh cannot clear a new session's pending refresh. Vitest regressions cover
+those races and preserve retries after rotation within the same session. This is
+not yet a multi-tab or full browser authentication acceptance result.
+
+Native protected image/stream forwarding now explicitly uses CORS mode and omits
+cookies. Preserving a native image's original `no-cors` mode stripped Authorization
+and DPoP headers before network delivery. The isolated Chromium transport suite
+uses the actual compiled worker, separate loopback-routed baander.app origins,
+mock signing replies and a disposable HTTP server. It checks native image loading,
+credential delivery, cookie omission, Range/HEAD preservation, foreign-origin
+isolation and redirect rejection. The production build regenerates the checked-in
+worker asset. CI runs this browser suite separately from Vitest.
+
+These checks do not qualify backend proof verification or deployed CORS policy.
+The current API CORS method lists omit HEAD, which needs separate backend coverage
+for a web/API split across origins. Worker expiry recovery also remains open:
+`SW_AUTH_EXPIRED` has no bridge consumer, so native media cannot yet refresh and
+retry an expired token. Multi-tab persistence and worker-restart acceptance remain
+necessary.
+
 Filesystem acceptance also remains open: the general
 `LocalFilesystem`/`ReadOnlyFilesystem` wrappers have separate symlink-boundary gaps
 beyond the media storage adapter's tests. These findings block a claim that

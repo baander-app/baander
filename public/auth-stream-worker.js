@@ -92,7 +92,12 @@
       const headers = new Headers(event.request.headers);
       headers.set("Authorization", `DPoP ${auth.accessToken}`);
       headers.set("DPoP", proof);
-      const response = await fetch(event.request, { headers, redirect: "error" });
+      const response = await fetch(event.request, {
+        headers,
+        mode: "cors",
+        credentials: "omit",
+        redirect: "error"
+      });
       if (clientAuth.get(event.clientId) === auth) {
         const nonce = response.headers.get("dpop-nonce");
         if (nonce) auth.nonce = nonce;
