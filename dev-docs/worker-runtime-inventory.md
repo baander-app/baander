@@ -666,12 +666,25 @@ growth, deletion and empty/nonregular files reset or fail the stability check;
 polling uses a monotonic deadline. Final response construction also refreshes
 metadata before setting Content-Length.
 
-This remains a quiet-window heuristic. The continuous encoder's readiness table
-can mark a nonempty file while FFmpeg is still writing its final pathname. A paused
-writer or an in-place, same-size edit within timestamp precision can escape these
-observations, and the file can change after the last check. Authoritative readiness
-requires completed, immutable publication by that producer. The separate pool
-encoder already waits for completion and atomically publishes its output.
+The continuous encoder now uses FFmpeg's `hls_flags temp_file`: new media fragments
+are closed under temporary names and atomically renamed to final `.m4s` names.
+The scanner ignores temporary files and accepts only the configured rendition's
+video/audio identity, tier and representable segment index, using fresh file
+metadata. Completion counting uses the same eligibility rules. A nonzero or unavailable
+encoder exit status fails the job even if some fragments exist, and an init file
+without eligible media output cannot count as completion. Seek restarts use
+FFmpeg's supported `start_number` option. The real encoder regression captures
+filesystem publication events and decodes the resulting fragments, including a
+seeked encode; it does not rely on catching a brief temporary file by polling.
+
+This does not make all cached filenames authoritative for the current job.
+Continuous attempts still share video/tier output directories, and existing final
+files remain cache entries. FFmpeg writes `init.mp4` separately, outside this
+atomic-fragment policy. Its quiet-window check remains a heuristic: a paused writer
+or same-size edit within timestamp precision can escape observation, and the file
+can change after the last check. Init publication and encoding-attempt isolation
+remain open. The separate pool encoder already waits for completion and atomically
+publishes its output.
 
 Native media now requests refresh from its own window after an authenticated 401,
 shares that window's refresh queue with Axios, and retries once with a new proof.

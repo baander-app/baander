@@ -99,8 +99,9 @@ final class SegmentEncoder
      * One process produces all video segments for a tier — no per-segment
      * re-seek or encoder re-init.
      *
-     * Audio is NOT included (the HLS muxer produces one rendition per process).
-     * Audio continues through the existing per-segment pool path. See KTD-1.
+     * Selected video and audio are muxed into one rendition. Media fragments
+     * are written to temporary files and renamed after close; init.mp4 is
+     * separate and does not inherit this publication guarantee.
      *
      * @param string $sourcePath Path to the source video file
      * @param QualityTier $tier Target quality tier
@@ -194,9 +195,12 @@ final class SegmentEncoder
         $args[] = (string) $segmentDuration;
         $args[] = '-hls_playlist_type';
         $args[] = 'vod';
+        // Publish only closed media fragments at the final .m4s names.
+        $args[] = '-hls_flags';
+        $args[] = 'temp_file';
 
         if ($startSegment !== null && $startSegment > 0) {
-            $args[] = '-hls_start_number';
+            $args[] = '-start_number';
             $args[] = (string) $startSegment;
         }
 

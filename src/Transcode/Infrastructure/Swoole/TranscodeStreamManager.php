@@ -150,16 +150,19 @@ final class TranscodeStreamManager
             $this->scanForNewSegments($jobKey, $entry);
             $this->streams[$jobKey] = $entry;
 
-            // The process exited. If it produced nothing, this is a failure —
-            // not a normal completion. Surface the captured stderr so the
-            // caller (encoding loop) can fail the job with a real reason
-            // instead of hanging at in_progress forever.
-            $producedCount = $this->countProducedSegments($entry['output_dir']);
-            if (!$entry['init_marked'] && $producedCount === 0) {
-                throw FFmpegProcessFailedException::fromProcess(
+            // Only a confirmed zero exit can acknowledge completion. Existing
+            // cache fragments or an init hint cannot hide failure/unknown status.
+            $exitCode = $this->spawner->exitCode($entry['resource']);
+            $producedCount = $this->countProducedSegments($entry['output_dir'], $entry['tier_name']);
+            if ($exitCode !== 0) {
+                throw new FFmpegProcessFailedException(
+                    $exitCode === -1 ? 'FFmpeg exited without a confirmed exit status.' : sprintf('FFmpeg exited with code %d.', $exitCode),
                     $entry['stderr_buffer'],
-                    $this->spawner->exitCode($entry['resource']),
+                    $exitCode,
                 );
+            }
+            if ($producedCount === 0) {
+                throw FFmpegProcessFailedException::fromProcess($entry['stderr_buffer'], $exitCode);
             }
         }
 
@@ -272,7 +275,8 @@ final class TranscodeStreamManager
                 continue;
             }
             stream_set_blocking($pipe, false);
-            while ($chunk = fread($pipe, 65536)) {
+            while (true) {
+                $chunk = fread($pipe, 65536);
                 if ($chunk === '' || $chunk === false) {
                     break;
                 }
@@ -295,43 +299,21 @@ final class TranscodeStreamManager
         // Check for init segment
         if (!$entry['init_marked']) {
             $initPath = $dir . '/init.mp4';
-            if (is_file($initPath) && filesize($initPath) > 0) {
-                // Mark init segment at index -1 (convention: tier name with index -1)
-                // The HTTP controller checks the file path directly for init,
-                // so this is informational only. Segment availability is for media segments.
+            if ($this->isNonemptyRegularFile($initPath)) {
+                // This nonempty-file hint is informational only; it does not
+                // prove init completion. The controller checks init separately.
                 $entry['init_marked'] = true;
             }
         }
 
-        // Scan for new muxed segments (v{vIdx}_a{aIdx}_{tier}_{seg}.m4s).
-        // The identity prefix encodes provenance; the trailing _%d is the
-        // segment index the manifest/controller expects.
-        $pattern = $dir . '/*.m4s';
-        $files = glob($pattern) ?: [];
-
-        foreach ($files as $file) {
-            if (!is_file($file) || filesize($file) <= 0) {
-                continue;
-            }
-
-            $basename = basename($file, '.m4s');
-            // Match v{digits}_a{digits}_{tier}_{segDigits} — the segment index
-            // is the final underscore-delimited numeric group.
-            if (!preg_match('/_.*_(\d+)$/', $basename, $m)) {
-                continue;
-            }
-
-            $index = (int) $m[1];
-
+        // Only the current encoder's default source identity belongs to this
+        // tier. Existing final files remain cache entries, not job generations.
+        foreach ($this->findSegments($dir, $entry['tier_name']) as $index => $file) {
             if (isset($entry['marked'][$index])) {
                 continue;
             }
 
-            // Segment index from the HLS muxer starts at 0, but if we seeked
-            // with -hls_start_number N, the muxer starts at N. We need to
-            // mark the ABSOLUTE index that the manifest/controller expects.
-            // The HLS muxer with -hls_start_number produces seg_N, seg_N+1, etc.
-            // so the filename index IS the absolute index.
+            // The encoder's start_number makes the filename index absolute.
             $this->availability->markReady($jobId, $entry['tier_name'], $index, $file);
             $entry['marked'][$index] = true;
 
@@ -358,21 +340,40 @@ final class TranscodeStreamManager
     }
 
     /**
-     * Count non-empty segment files in the output directory.
-     *
-     * Used to detect a process that exited without producing any output —
-     * a failure that must be surfaced rather than treated as completion.
+     * Count eligible final files, including existing cache entries. This check
+     * rejects empty output directories; it is not a current-generation receipt.
      */
-    private function countProducedSegments(string $outputDir): int
+    private function countProducedSegments(string $outputDir, string $tierName): int
     {
-        $files = glob($outputDir . '/*.m4s') ?: [];
-        $count = 0;
-        foreach ($files as $file) {
-            if (is_file($file) && filesize($file) > 0) {
-                $count++;
-            }
-        }
+        return count($this->findSegments($outputDir, $tierName));
+    }
 
-        return $count;
+    /** @return array<int,string> Final filenames for the selected rendition, including existing cache entries. */
+    private function findSegments(string $outputDir, string $tierName): array
+    {
+        $segments = [];
+        $pattern = '/^v0_a0_' . preg_quote($tierName, '/') . '_(\d+)\.m4s$/D';
+        $maximum = (string) PHP_INT_MAX;
+        foreach (glob($outputDir . '/*.m4s') ?: [] as $file) {
+            if (!preg_match($pattern, basename($file), $matches)) {
+                continue;
+            }
+            $decimal = ltrim($matches[1], '0');
+            $decimal = $decimal === '' ? '0' : $decimal;
+            if (strlen($decimal) > strlen($maximum) ||
+                (strlen($decimal) === strlen($maximum) && strcmp($decimal, $maximum) > 0) ||
+                !$this->isNonemptyRegularFile($file)) {
+                continue;
+            }
+            $segments[(int) $decimal] = $file;
+        }
+        return $segments;
+    }
+
+    private function isNonemptyRegularFile(string $path): bool
+    {
+        clearstatcache(true, $path);
+        $stat = @stat($path);
+        return $stat !== false && ($stat['mode'] & 0170000) === 0100000 && $stat['size'] > 0;
     }
 }

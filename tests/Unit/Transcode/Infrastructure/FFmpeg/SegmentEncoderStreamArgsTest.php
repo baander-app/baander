@@ -9,6 +9,7 @@ use App\Transcode\Domain\ValueObject\HardwareAccelerator;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Process\Process;
 
 /**
  * Tests for SegmentEncoder::buildStreamArgs() — the FFmpeg argv builder for
@@ -54,6 +55,9 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         self::assertContains((string) (int) ceil(SegmentEncoder::getSegmentDuration()), $args);
         self::assertContains('-hls_playlist_type', $args);
         self::assertContains('vod', $args);
+        $flagsIndex = array_search('-hls_flags', $args, true);
+        self::assertNotFalse($flagsIndex);
+        self::assertSame('temp_file', $args[$flagsIndex + 1]);
         // Muxed: video + audio mapped together (no -an)
         self::assertNotContains('-an', $args);
         self::assertContains('-map', $args);
@@ -97,6 +101,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         $args = $this->encoder()->buildStreamArgs('/src.mkv', QualityTier::p720(), '', '/out');
 
         self::assertNotContains('-ss', $args);
+        self::assertNotContains('-start_number', $args);
         self::assertNotContains('-hls_start_number', $args);
     }
 
@@ -111,19 +116,20 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         self::assertNotFalse($ssIndex);
         self::assertSame($expectedStart, $args[$ssIndex + 1]);
 
-        $snIndex = array_search('-hls_start_number', $args, true);
+        $snIndex = array_search('-start_number', $args, true);
         self::assertNotFalse($snIndex);
         self::assertSame((string) $startSegment, $args[$snIndex + 1]);
     }
 
     public function testBuildStreamArgsReturnsArrayNotString(): void
     {
-        $args = $this->encoder()->buildStreamArgs('/src.mkv', QualityTier::p720(), '', '/out');
-
-        self::assertIsArray($args);
-        foreach ($args as $arg) {
-            self::assertIsString($arg);
-        }
+        $args = $this->encoder()->buildStreamArgs('/source dir/track;literal.mkv', QualityTier::p720(), '', '/out');
+        // Exercise argv delivery rather than reasserting the declared PHP type.
+        $process = new Process([PHP_BINARY, '-r',
+            'echo json_encode(array_slice($argv, 1), JSON_THROW_ON_ERROR);', '--', ...$args]);
+        $process->setTimeout(5);
+        $process->mustRun();
+        self::assertSame($args, json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR));
     }
 
     /**

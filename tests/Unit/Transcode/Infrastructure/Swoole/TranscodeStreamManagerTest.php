@@ -16,6 +16,7 @@ use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use App\Transcode\Infrastructure\Swoole\ProcessSpawnerInterface;
 use App\Transcode\Infrastructure\Swoole\TranscodeStreamManager;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Psr\Log\NullLogger;
 
 /**
@@ -290,6 +291,144 @@ final class TranscodeStreamManagerTest extends TestCase
 
         @unlink($segPath);
         @rmdir($outputDir);
+    }
+
+    public function testScannerIgnoresOtherIdentitiesAndInvalidIndexes(): void
+    {
+        $directory = $this->scannerDirectory();
+        try {
+            foreach (['v1_a0_720p_1', 'v0_a1_720p_2', 'v0_a0_1080p_3', 'junk_4', 'v0_a0_720p_5_extra', 'v0_a0_720p_' . str_repeat('9', 100)] as $name) {
+                file_put_contents($directory . '/' . $name . '.m4s', 'not-this-rendition');
+            }
+            mkdir($directory . '/v0_a0_720p_6.m4s');
+            $availability = $this->createMock(SegmentAvailabilityInterface::class);
+            $availability->expects(self::never())->method('markReady');
+            [$manager, $job] = $this->scannerManager($directory, $availability);
+            self::assertTrue($manager->pollOnce($job->getId()));
+        } finally { $this->removeScannerDirectory($directory); }
+    }
+
+    public function testTemporarySegmentIsInvisibleUntilPublishedRename(): void
+    {
+        $directory = $this->scannerDirectory();
+        try {
+            $temporary = $directory . '/v0_a0_720p_5.m4s.tmp';
+            $published = $directory . '/v0_a0_720p_5.m4s';
+            file_put_contents($temporary, 'finished-segment');
+            $observed = [];
+            $availability = $this->createStub(SegmentAvailabilityInterface::class);
+            $availability->method('markReady')->willReturnCallback(static function (Uuid $jobId, string $tier, int $index, string $path) use (&$observed): void {
+                $observed[] = [$tier, $index, $path];
+            });
+            [$manager, $job] = $this->scannerManager($directory, $availability);
+            $manager->pollOnce($job->getId());
+            self::assertSame([], $observed);
+            self::assertTrue(rename($temporary, $published));
+            $manager->pollOnce($job->getId());
+            $manager->pollOnce($job->getId());
+            self::assertSame([['720p', 5, $published]], $observed);
+        } finally { $this->removeScannerDirectory($directory); }
+    }
+
+    public function testPublicationReplacesCachedEmptyFileAndBecomesReady(): void
+    {
+        $directory = $this->scannerDirectory();
+        try {
+            $published = $directory . '/v0_a0_720p_0.m4s';
+            $temporary = $published . '.tmp';
+            file_put_contents($published, '');
+            file_put_contents($temporary, 'published');
+            self::assertSame(0, filesize($published));
+            $availability = $this->createMock(SegmentAvailabilityInterface::class);
+            $availability->expects(self::once())->method('markReady')->with(self::anything(), '720p', 0, $published);
+            [$manager, $job] = $this->scannerManager($directory, $availability);
+            $manager->pollOnce($job->getId());
+            // A separate producer does not invalidate this process's stat cache.
+            $process = proc_open([PHP_BINARY, '-r', 'exit(rename($argv[1], $argv[2]) ? 0 : 1);', $temporary, $published], [], $pipes);
+            self::assertIsResource($process);
+            self::assertSame(0, proc_close($process));
+            $manager->pollOnce($job->getId());
+        } finally { $this->removeScannerDirectory($directory); }
+    }
+
+    public function testUnrelatedFinalDoesNotMaskExitedProcessWithNoOutput(): void
+    {
+        $directory = $this->scannerDirectory();
+        try {
+            file_put_contents($directory . '/v0_a0_1080p_0.m4s', 'other-tier');
+            $availability = $this->createMock(SegmentAvailabilityInterface::class);
+            $availability->expects(self::never())->method('markReady');
+            [$manager, $job] = $this->scannerManager($directory, $availability);
+            $this->spawner->running = false;
+            $this->spawner->exitCode = 1;
+            $this->expectException(FFmpegProcessFailedException::class);
+            $manager->pollOnce($job->getId());
+        } finally { $this->removeScannerDirectory($directory); }
+    }
+
+    public function testSuccessfulExitWithOnlyInitDoesNotComplete(): void
+    {
+        $directory = $this->scannerDirectory();
+        try {
+            file_put_contents($directory . '/init.mp4', 'init');
+            [$manager, $job] = $this->scannerManager($directory, $this->createStub(SegmentAvailabilityInterface::class));
+            $this->spawner->running = false;
+            $this->spawner->exitCode = 0;
+            $this->expectException(FFmpegProcessFailedException::class);
+            $manager->pollOnce($job->getId());
+        } finally { $this->removeScannerDirectory($directory); }
+    }
+
+    #[DataProvider('failedExitCodes')]
+    public function testConfirmedFailedProcessThrowsEvenWithCompletedOutput(int $exitCode): void
+    {
+        $directory = $this->scannerDirectory();
+        try {
+            file_put_contents($directory . '/init.mp4', 'init');
+            file_put_contents($directory . '/v0_a0_720p_0.m4s', 'completed-fragment');
+            [$manager, $job] = $this->scannerManager($directory, $this->createStub(SegmentAvailabilityInterface::class));
+            $this->spawner->running = false;
+            $this->spawner->exitCode = $exitCode;
+            try {
+                $manager->pollOnce($job->getId());
+                self::fail('Completed fragments must not hide a confirmed encoder failure.');
+            } catch (FFmpegProcessFailedException $error) {
+                self::assertSame($exitCode, $error->getExitCode());
+            }
+        } finally { $this->removeScannerDirectory($directory); }
+    }
+
+    /** @return iterable<string,array{int}> */
+    public static function failedExitCodes(): iterable
+    {
+        yield 'confirmed nonzero exit' => [1];
+        yield 'unavailable exit code' => [-1];
+    }
+
+    private function scannerDirectory(): string
+    {
+        $directory = sys_get_temp_dir() . '/baander-scanner-' . bin2hex(random_bytes(8));
+        self::assertTrue(mkdir($directory, 0700));
+        return $directory;
+    }
+
+    /** @return array{TranscodeStreamManager,TranscodeJob} */
+    private function scannerManager(string $directory, SegmentAvailabilityInterface $availability): array
+    {
+        $storage = $this->createStub(TranscodeStoragePortInterface::class);
+        $storage->method('resolveJobDirectory')->willReturn($directory);
+        $manager = new TranscodeStreamManager($availability, $storage, $this->segmentEncoder, new NullLogger(), $this->spawner);
+        $job = $this->makeJob();
+        $manager->startStream($job, '/src.mkv', QualityTier::p720(), '');
+        return [$manager, $job];
+    }
+
+    private function removeScannerDirectory(string $directory): void
+    {
+        foreach (glob($directory . '/*') ?: [] as $path) {
+            is_dir($path) ? rmdir($path) : unlink($path);
+        }
+        rmdir($directory);
     }
 
     private function makeJob(): TranscodeJob
