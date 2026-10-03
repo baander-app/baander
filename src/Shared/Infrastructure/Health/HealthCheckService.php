@@ -81,7 +81,7 @@ final class HealthCheckService
         }
 
         $stats = swoole_get_vm_status();
-        if (!is_array($stats) || count($stats) === 0) {
+        if (count($stats) === 0) {
             return new HealthCheckResult(
                 component: 'swoole',
                 status: HealthStatus::Healthy,
@@ -183,7 +183,7 @@ final class HealthCheckService
         }
 
         $stats = swoole_get_vm_status();
-        if (!is_array($stats) || count($stats) === 0) {
+        if (count($stats) === 0) {
             return new HealthCheckResult(
                 component: 'swoole',
                 status: HealthStatus::NotAvailable,
@@ -250,7 +250,7 @@ final class HealthCheckService
 
         // Production-only
         if ($isProd) {
-            foreach (['REDIS_PASSWORD', 'OAUTH_ENCRYPTION_KEY'] as $var) {
+            foreach (['REDIS_PASSWORD'] as $var) {
                 $val = getenv($var);
                 if ($val === false || $val === '') {
                     $results[] = new HealthCheckResult(
@@ -461,7 +461,7 @@ final class HealthCheckService
                 details: [
                     'severity' => 'error',
                     'message' => 'OAUTH_ENCRYPTION_KEY (auth.encryption_key) is required in production for OAuth token encryption.',
-                    'suggestion' => 'Generate a key with: php -r \'echo Defuse\\Crypto\\Key::create()->saveToAsciiSafeString();\' and set the value in auth.yaml.',
+                    'suggestion' => 'Generate a key with: php -r \'require "vendor/autoload.php"; echo Defuse\\Crypto\\Key::createNewRandomKey()->saveToAsciiSafeString();\' and set OAUTH_ENCRYPTION_KEY in your environment provider.',
                 ],
             );
         }
@@ -476,7 +476,7 @@ final class HealthCheckService
                 details: [
                     'severity' => 'error',
                     'message' => 'OAUTH_ENCRYPTION_KEY is not a valid defuse/php-encryption ASCII-safe string.',
-                    'suggestion' => 'Regenerate the key and set the correct value in auth.yaml.',
+                    'suggestion' => 'Regenerate the key and set OAUTH_ENCRYPTION_KEY in your environment provider.',
                 ],
             );
         }
@@ -532,8 +532,8 @@ final class HealthCheckService
         ];
 
         foreach ($checks as $envVar => $service) {
-            $val = getenv($envVar);
-            if ($val === false || $val === '') {
+            $val = $this->apiKeys[$service] ?? '';
+            if ($val === '') {
                 continue; // R25: empty keys produce no result
             }
 

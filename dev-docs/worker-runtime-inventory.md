@@ -592,13 +592,17 @@ check rejects displayed runtime or startup errors. Development images retain
 their existing PHP configuration.
 
 This qualifies the tested worker startup, delivery, scheduler execution and
-retirement paths; it does not certify OAuth. `config/packages/auth.yaml` still
-sets `auth.encryption_key` to an empty string, and the configured OAuth key paths
-require external provisioning. The authorization-server factory rejects an empty
-encryption key in production; its non-production fallback generates a per-process
-key, which is unsuitable across workers.
+retirement paths; it does not certify the authenticated web workflow. OAuth key
+paths and encryption now resolve from the documented `OAUTH_*` environment variables.
+The authorization-server factory uses the kernel environment and rejects missing
+or malformed production encryption keys. Independent production-container tests
+verify encryption interoperability with a shared secret and externally provisioned
+RSA keys. Health diagnostics use the injected secret rather than requiring a second
+copy in `getenv()`. Non-production fallback keys remain unsuitable across workers.
 The strict worker recipe currently admits no key mounts, so authenticated web/OAuth
-deployment remains a separate configuration and acceptance task.
+deployment remains a separate configuration and acceptance task. Secret rotation
+also remains unfinished: `RotateSecretsCommand` writes new key files before token
+invalidation and incorrectly calls `rowCount()` on DBAL's integer return value.
 
 The first command facade is now wired. `app:serve` is the canonical name of the
 existing `ServerRunCommand`, retaining `swoole:server:run` as an alias and preserving

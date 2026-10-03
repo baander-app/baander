@@ -45,9 +45,17 @@ Redis is used for:
 |----------|---------|-------------|
 | `OAUTH_PRIVATE_KEY_PATH` | `%kernel.project_dir%/config/secrets/oauth/private.key` | Path to the RSA private key for signing JWT access tokens. Generate with `app:oauth:generate-keys`. |
 | `OAUTH_PUBLIC_KEY_PATH` | `%kernel.project_dir%/config/secrets/oauth/public.key` | Path to the RSA public key for verifying JWT access tokens. |
-| `OAUTH_ENCRYPTION_KEY` | — | Defuse/php-encryption key for encrypting authorization codes. **Required in production.** Leaving it empty generates a different key per Swoole worker, which silently breaks the authorization code flow in multi-worker setups (a code minted in one worker cannot be decrypted by another). Generate with `php -r "echo Defuse\Crypto\Key::create()->saveToAsciiSafeString();"`. |
+| `OAUTH_ENCRYPTION_KEY` | — | Defuse/php-encryption key for authorization codes and refresh tokens. **Required in production:** an empty or malformed key prevents authorization-server creation. Use the same stable secret for all web workers. Generate it from the project root with `php -r 'require "vendor/autoload.php"; echo Defuse\Crypto\Key::createNewRandomKey()->saveToAsciiSafeString(), PHP_EOL;'`. |
 | `AUTH_SPA_CLIENT_ID` | `baander_dev_spa_00001` | Public ID of the first-party SPA OAuth client. Seeded by `app:auth:setup-clients`. |
 | `AUTH_ELECTRON_CLIENT_ID` | `baander_dev_elc_00001` | Public ID of the first-party Electron OAuth client. Seeded by `app:auth:setup-clients`. |
+
+Provision the RSA key files outside the image and set the two key-path variables to
+readable paths inside the web container. The default paths resolve relative to the
+project directory. Keep the private key readable only by the application user;
+production images contain no OAuth keys. Supply `OAUTH_ENCRYPTION_KEY` through your
+environment or secret provider, and keep it stable across web-worker restarts.
+Development and test environments permit an empty encryption key with a deprecation
+warning and a temporary process-local key; this fallback does not work across workers.
 
 ### Token lifetimes
 

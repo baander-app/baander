@@ -52,14 +52,17 @@ parameters:
     # --- OAuth 2.0 Key Paths ---
 
     # Path to the private key used for signing JWT access tokens.
-    auth.private_key_path: '%kernel.project_dir%/config/secrets/oauth/private.key'
+    env(OAUTH_PRIVATE_KEY_PATH): '%kernel.project_dir%/config/secrets/oauth/private.key'
+    auth.private_key_path: '%env(resolve:OAUTH_PRIVATE_KEY_PATH)%'
 
     # Path to the public key used for verifying JWT access tokens.
-    auth.public_key_path: '%kernel.project_dir%/config/secrets/oauth/public.key'
+    env(OAUTH_PUBLIC_KEY_PATH): '%kernel.project_dir%/config/secrets/oauth/public.key'
+    auth.public_key_path: '%env(resolve:OAUTH_PUBLIC_KEY_PATH)%'
 
     # Encryption key for authorization codes (defuse/php-encryption ASCII-safe string).
-    # Leave empty to generate a random key per Swoole worker (not suitable for multi-worker setups).
-    auth.encryption_key: ''
+    # Required in production; share one stable secret across all web workers.
+    env(OAUTH_ENCRYPTION_KEY): ''
+    auth.encryption_key: '%env(OAUTH_ENCRYPTION_KEY)%'
 
     # --- Device Authorization (RFC 8628) ---
 

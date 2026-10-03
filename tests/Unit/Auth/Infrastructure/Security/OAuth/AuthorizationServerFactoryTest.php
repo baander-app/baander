@@ -29,21 +29,17 @@ final class AuthorizationServerFactoryTest extends TestCase
 
     public static function setUpBeforeClass(): void
     {
-        $realKeyPath = dirname(__DIR__, 5).'/config/secrets/oauth/private.key';
-
-        if (file_exists($realKeyPath) && filesize($realKeyPath) > 0) {
-            self::$privateKeyPath = $realKeyPath;
-        } else {
-            $tempDir = sys_get_temp_dir();
-            self::$privateKeyPath = $tempDir.'/test_oauth_private_'.uniqid().'.key';
-            $key = openssl_pkey_new([
-                'private_key_bits' => 2048,
-                'private_key_type' => OPENSSL_KEYTYPE_RSA,
-            ]);
-            openssl_pkey_export_to_file($key, self::$privateKeyPath);
-            chmod(self::$privateKeyPath, 0600);
-            self::$keyCreatedByUs = true;
+        $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+        $path = tempnam(sys_get_temp_dir(), 'baander-oauth-');
+        if ($key === false || $path === false) {
+            throw new RuntimeException('Cannot create disposable OAuth key fixture.');
         }
+        if (!openssl_pkey_export_to_file($key, $path) || !chmod($path, 0600)) {
+            unlink($path);
+            throw new RuntimeException('Cannot write disposable OAuth key fixture.');
+        }
+        self::$privateKeyPath = $path;
+        self::$keyCreatedByUs = true;
     }
 
     public static function tearDownAfterClass(): void
@@ -63,7 +59,7 @@ final class AuthorizationServerFactoryTest extends TestCase
         $this->deviceCodeRepository = $this->createStub(DeviceCodeRepositoryInterface::class);
     }
 
-    private function createFactory(string $encryptionKey = ''): AuthorizationServerFactory
+    private function createFactory(string $encryptionKey = '', string $environment = 'prod'): AuthorizationServerFactory
     {
         return new AuthorizationServerFactory(
             clientRepository: $this->clientRepository,
@@ -75,6 +71,7 @@ final class AuthorizationServerFactoryTest extends TestCase
             privateKeyPath: self::$privateKeyPath,
             encryptionKey: $encryptionKey,
             verificationUri: '/device/verify',
+            environment: $environment,
         );
     }
 
@@ -90,64 +87,47 @@ final class AuthorizationServerFactoryTest extends TestCase
 
     public function testCreateWithEmptyKeyInProdThrowsRuntimeException(): void
     {
-        $_SERVER['APP_ENV'] = 'prod';
-        try {
-            $factory = $this->createFactory('');
-
-            $this->expectException(RuntimeException::class);
-            $this->expectExceptionMessage('AUTH_ENCRYPTION_KEY must be configured in production');
-
-            $factory->create();
-        } finally {
-            unset($_SERVER['APP_ENV']);
-        }
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('OAUTH_ENCRYPTION_KEY must be configured in production');
+        $this->createFactory()->create();
     }
 
     public function testCreateWithEmptyKeyInDevDoesNotThrow(): void
     {
-        $_SERVER['APP_ENV'] = 'dev';
-        try {
-            $factory = $this->createFactory('');
-
-            // In dev, empty key should not throw (random key generated)
-            $server = $factory->create();
-
-            $this->assertInstanceOf(\League\OAuth2\Server\AuthorizationServer::class, $server);
-        } finally {
-            unset($_SERVER['APP_ENV']);
-        }
+        self::assertInstanceOf(\League\OAuth2\Server\AuthorizationServer::class,
+            $this->createFactory(environment: 'dev')->create());
     }
 
     public function testCreateWithEmptyKeyInTestDoesNotThrow(): void
     {
-        $_SERVER['APP_ENV'] = 'test';
-        try {
-            $factory = $this->createFactory('');
-
-            $server = $factory->create();
-
-            $this->assertInstanceOf(\League\OAuth2\Server\AuthorizationServer::class, $server);
-        } finally {
-            unset($_SERVER['APP_ENV']);
-        }
+        self::assertInstanceOf(\League\OAuth2\Server\AuthorizationServer::class,
+            $this->createFactory(environment: 'test')->create());
     }
 
     public function testCreateWithEmptyKeyInDevTriggersDeprecation(): void
     {
-        $_SERVER['APP_ENV'] = 'dev';
         set_error_handler(static function (int $errno, string $errstr): bool {
             self::assertSame(E_USER_DEPRECATED, $errno);
-            self::assertStringContainsString('No AUTH_ENCRYPTION_KEY is configured', $errstr);
-
+            self::assertStringContainsString('No OAUTH_ENCRYPTION_KEY is configured', $errstr);
             return true;
         });
-
         try {
-            $factory = $this->createFactory('');
-            $factory->create();
+            $this->createFactory(environment: 'dev')->create();
         } finally {
             restore_error_handler();
-            unset($_SERVER['APP_ENV']);
+        }
+    }
+
+    public function testMalformedKeyFailsWithoutExposingSecretOrParserException(): void
+    {
+        $secret = 'invalid-secret-baander.app';
+        try {
+            $this->createFactory($secret)->create();
+            self::fail('Malformed encryption key must fail.');
+        } catch (RuntimeException $error) {
+            self::assertSame('OAUTH_ENCRYPTION_KEY must be a valid Defuse ASCII-safe key.', $error->getMessage());
+            self::assertNull($error->getPrevious());
+            self::assertStringNotContainsString($secret, $error->getMessage());
         }
     }
 }

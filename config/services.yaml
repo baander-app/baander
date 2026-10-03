@@ -210,7 +210,7 @@ services:
     # --- Health Check ---
     App\Shared\Infrastructure\Health\HealthCheckService:
         arguments:
-            $appEnv: '%env(APP_ENV)%'
+            $appEnv: '%kernel.environment%'
             $appSecret: '%env(APP_SECRET)%'
             $appUrl: '%env(APP_URL)%'
             $oauthEncryptionKey: '%auth.encryption_key%'
@@ -332,6 +332,7 @@ services:
         arguments:
             $privateKeyPath: '%auth.private_key_path%'
             $encryptionKey: '%auth.encryption_key%'
+            $environment: '%kernel.environment%'
             $verificationUri: '%auth.device.verification_uri%'
             $accessTokenTtl: '%auth.access_token.ttl%'
             $refreshTokenTtl: '%auth.refresh_token.ttl%'
@@ -758,7 +759,7 @@ services:
 
     App\Shared\Infrastructure\EventListener\ConfigBootCheckListener:
         arguments:
-            $appEnv: '%env(APP_ENV)%'
+            $appEnv: '%kernel.environment%'
 
     # --- OpenAPI ---
     Nelmio\ApiDocBundle\OpenApiGenerator:

@@ -7,6 +7,7 @@ namespace App\Auth\Infrastructure\Security\OAuth;
 use App\Auth\Infrastructure\Adapter\OAuth\DpopTokenResponse;
 use DateInterval;
 use Defuse\Crypto\Key;
+use Defuse\Crypto\Exception\BadFormatException;
 use League\OAuth2\Server\AuthorizationServer;
 use League\OAuth2\Server\Grant\AuthCodeGrant;
 use League\OAuth2\Server\Grant\ClientCredentialsGrant;
@@ -40,12 +41,13 @@ final class AuthorizationServerFactory
         private readonly RefreshTokenRepositoryInterface $refreshTokenRepository,
         private readonly DeviceCodeRepositoryInterface $deviceCodeRepository,
         private readonly string $privateKeyPath,
-        private readonly string $encryptionKey,
+        #[\SensitiveParameter] private readonly string $encryptionKey,
         private readonly string $verificationUri,
         int $accessTokenTtl = 3600,
         int $refreshTokenTtl = 2592000,
         int $authCodeTtl = 600,
         int $deviceCodeTtl = 900,
+        private readonly string $environment = 'prod',
     ) {
         $this->accessTokenTTL = new DateInterval(sprintf('PT%dS', $accessTokenTtl));
         $this->refreshTokenTTL = new DateInterval(sprintf('PT%dS', $refreshTokenTtl));
@@ -56,21 +58,25 @@ final class AuthorizationServerFactory
     public function create(): AuthorizationServer
     {
         if ($this->encryptionKey === '') {
-            if (($_SERVER['APP_ENV'] ?? 'prod') === 'prod') {
-                throw new \RuntimeException('AUTH_ENCRYPTION_KEY must be configured in production. Generate one with: php -r "echo \Defuse\Crypto\Key::createNewRandomKey()->saveToAsciiSafeString();"');
+            if ($this->environment === 'prod') {
+                throw new \RuntimeException('OAUTH_ENCRYPTION_KEY must be configured in production. Generate one with: php -r "require \'vendor/autoload.php\'; echo \Defuse\Crypto\Key::createNewRandomKey()->saveToAsciiSafeString();"');
             }
 
             @trigger_error(
-                'No AUTH_ENCRYPTION_KEY is configured. A random key is generated per process. '
-                .'This is not suitable for multi-worker setups. Set auth.encryption_key in auth.yaml.',
+                'No OAUTH_ENCRYPTION_KEY is configured. A random key is generated per process. '
+                .'This is not suitable for multi-worker setups. Set OAUTH_ENCRYPTION_KEY in the environment.',
                 E_USER_DEPRECATED,
             );
         }
 
-        $encryptionKey = $this->encryptionKey !== ''
-            ? Key::loadFromAsciiSafeString($this->encryptionKey)
-            : Key::createNewRandomKey()
-            ;
+        try {
+            $encryptionKey = $this->encryptionKey !== ''
+                ? Key::loadFromAsciiSafeString($this->encryptionKey)
+                : Key::createNewRandomKey();
+        } catch (BadFormatException) {
+            // Parser exception traces can carry the secret argument.
+            throw new \RuntimeException('OAUTH_ENCRYPTION_KEY must be a valid Defuse ASCII-safe key.');
+        }
 
         $server = new AuthorizationServer(
             $this->clientRepository,
