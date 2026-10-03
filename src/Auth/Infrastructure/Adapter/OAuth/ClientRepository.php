@@ -51,6 +51,7 @@ final class ClientRepository implements ClientRepositoryInterface
             $domain->isDeviceClient(),
             $domain->isConfidential(),
             $domain->isFirstParty(),
+            id: $domain->getId(),
         );
 
         return $entity;

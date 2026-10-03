@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Auth\Infrastructure\Security\OAuth;
 
 use App\Auth\Infrastructure\Adapter\OAuth\DpopTokenResponse;
+use App\Shared\Application\Port\TransactionPortInterface;
+use Doctrine\ORM\EntityManagerInterface;
 use DateInterval;
 use Defuse\Crypto\Key;
 use Defuse\Crypto\Exception\BadFormatException;
@@ -12,7 +14,6 @@ use League\OAuth2\Server\AuthorizationServer;
 use League\OAuth2\Server\Grant\AuthCodeGrant;
 use League\OAuth2\Server\Grant\ClientCredentialsGrant;
 use League\OAuth2\Server\Grant\DeviceCodeGrant;
-use League\OAuth2\Server\Grant\RefreshTokenGrant;
 use League\OAuth2\Server\Repositories\AccessTokenRepositoryInterface;
 use League\OAuth2\Server\Repositories\AuthCodeRepositoryInterface;
 use League\OAuth2\Server\Repositories\ClientRepositoryInterface;
@@ -43,6 +44,8 @@ final class AuthorizationServerFactory
         private readonly string $privateKeyPath,
         #[\SensitiveParameter] private readonly string $encryptionKey,
         private readonly string $verificationUri,
+        private readonly TransactionPortInterface $transaction,
+        private readonly EntityManagerInterface $entityManager,
         int $accessTokenTtl = 3600,
         int $refreshTokenTtl = 2592000,
         int $authCodeTtl = 600,
@@ -78,13 +81,15 @@ final class AuthorizationServerFactory
             throw new \RuntimeException('OAUTH_ENCRYPTION_KEY must be a valid Defuse ASCII-safe key.');
         }
 
-        $server = new AuthorizationServer(
+        $server = new TransactionalAuthorizationServer(
             $this->clientRepository,
             $this->accessTokenRepository,
             $this->scopeRepository,
             $this->privateKeyPath,
             $encryptionKey,
             new DpopTokenResponse(),
+            $this->transaction,
+            $this->entityManager,
         );
 
         // Auth Code grant with PKCE
@@ -101,7 +106,7 @@ final class AuthorizationServerFactory
         $server->enableGrantType($clientCredentialsGrant, $this->accessTokenTTL);
 
         // Refresh Token grant (rotation enabled by default in league v9)
-        $refreshTokenGrant = new RefreshTokenGrant($this->refreshTokenRepository);
+        $refreshTokenGrant = new TransactionalRefreshTokenGrant($this->refreshTokenRepository, $this->entityManager);
         $refreshTokenGrant->setRefreshTokenTTL($this->refreshTokenTTL);
         $server->enableGrantType($refreshTokenGrant, $this->accessTokenTTL);
 

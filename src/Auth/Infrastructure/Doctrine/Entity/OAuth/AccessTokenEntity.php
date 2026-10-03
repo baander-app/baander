@@ -7,6 +7,10 @@ namespace App\Auth\Infrastructure\Doctrine\Entity\OAuth;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
+use Lcobucci\JWT\Configuration;
+use Lcobucci\JWT\Signer\Key\InMemory;
+use Lcobucci\JWT\Signer\Rsa\Sha256;
+use RuntimeException;
 use League\OAuth2\Server\Entities\AccessTokenEntityInterface;
 use League\OAuth2\Server\Entities\ClientEntityInterface;
 use League\OAuth2\Server\Entities\ScopeEntityInterface;
@@ -42,6 +46,7 @@ class AccessTokenEntity implements AccessTokenEntityInterface
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $name = null;
 
+    /** @var string[]|null */
     #[ORM\Column(type: 'json', nullable: true, options: ['jsonb' => true])]
     private ?array $scopes = null;
 
@@ -65,6 +70,10 @@ class AccessTokenEntity implements AccessTokenEntityInterface
 
     private ?CryptKeyInterface $privateKey = null;
 
+    // Transport configuration, deliberately not persisted with the token row.
+    private ?string $resourceServerUri = null;
+
+    /** @param string[]|null $scopes */
     public function __construct(
         string $tokenId,
         ClientEntity $client,
@@ -198,9 +207,39 @@ class AccessTokenEntity implements AccessTokenEntityInterface
         $this->privateKey = $privateKey;
     }
 
+    public function setResourceServerUri(string $resourceServerUri): void
+    {
+        if (trim($resourceServerUri) === '') {
+            throw new RuntimeException('A resource server audience is required to issue an access token.');
+        }
+        $this->resourceServerUri = $resourceServerUri;
+    }
+
     public function toString(): string
     {
-        return $this->tokenId;
+        if ($this->privateKey === null || $this->resourceServerUri === null || $this->expiresAt === null) {
+            throw new RuntimeException('Access token signing requires a key, audience and expiry.');
+        }
+        $configuration = Configuration::forAsymmetricSigner(
+            new Sha256(),
+            InMemory::plainText($this->privateKey->getKeyContents(), $this->privateKey->getPassPhrase() ?? ''),
+            InMemory::plainText('empty', 'empty'),
+        );
+        $now = new \DateTimeImmutable();
+        $builder = $configuration->builder()
+            ->permittedFor($this->resourceServerUri)
+            ->identifiedBy($this->tokenId)
+            ->issuedAt($now)
+            ->canOnlyBeUsedAfter($now)
+            ->expiresAt($this->expiresAt)
+            ->relatedTo($this->getUserIdentifier() ?? $this->client->getId()->toString())
+            ->withClaim('scopes', $this->scopes ?? [])
+            ->withClaim('client_id', $this->client->getId()->toString());
+        if ($this->dpopJkt !== null && $this->dpopJkt !== '') {
+            $builder = $builder->withClaim('cnf', ['jkt' => $this->dpopJkt]);
+        }
+
+        return $builder->getToken($configuration->signer(), $configuration->signingKey())->toString();
     }
 
     public function getName(): ?string
@@ -224,6 +263,7 @@ class AccessTokenEntity implements AccessTokenEntityInterface
         return $this->scopes;
     }
 
+    /** @param string[]|null $scopes */
     public function setScopes(?array $scopes): void
     {
         $this->scopes = $scopes;

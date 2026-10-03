@@ -22,6 +22,7 @@ final class AccessTokenState
     /** @var Scope[] */
     public array $scopes;
 
+    /** @param Scope[] $scopes */
     public function __construct(
         public readonly Uuid $id,
         public readonly TokenId $tokenId,
@@ -35,6 +36,7 @@ final class AccessTokenState
         public readonly DateTimeImmutable $createdAt,
         public DateTimeImmutable $updatedAt,
         public bool $revoked = false,
+        public readonly ?string $dpopJkt = null,
     ) {
         $this->scopes = $scopes;
     }

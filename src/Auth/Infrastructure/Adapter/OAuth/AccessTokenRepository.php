@@ -34,10 +34,11 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
         private readonly ClientRepositoryInterface $clientRepository,
         private readonly UserRepositoryInterface $userRepository,
         private readonly RequestStack $requestStack,
+        private readonly string $resourceServerUri,
     ) {
     }
 
-    public function getNewToken(ClientEntityInterface $clientEntity, array $scopes, $userIdentifier = null): AccessTokenEntity
+    public function getNewToken(ClientEntityInterface $clientEntity, array $scopes, ?string $userIdentifier = null): AccessTokenEntity
     {
         $client = $this->ensureClientEntity($clientEntity);
         $user = null;
@@ -45,28 +46,33 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
         if ($userIdentifier !== null) {
             $domainUser = $this->userRepository->findByUuid(Uuid::fromString($userIdentifier));
 
-            if ($domainUser !== null && $domainUser->isDisabled()) {
+            if ($domainUser === null) {
+                throw OAuthServerException::accessDenied('User account is unavailable.');
+            }
+            if ($domainUser->isDisabled()) {
                 throw OAuthServerException::accessDenied('User account is disabled.');
             }
 
-            if ($domainUser !== null) {
-                $user = new UserEntity(
-                    $domainUser->getPublicId(),
-                    $domainUser->getName(),
-                    $domainUser->getEmail(),
-                    $domainUser->getPassword(),
-                    $domainUser->getId(),
-                );
-            }
+            $user = new UserEntity(
+                $domainUser->getPublicId(),
+                $domainUser->getName(),
+                $domainUser->getEmail(),
+                $domainUser->getPassword(),
+                $domainUser->getTotpSecret() ?? '',
+                $domainUser->getId(),
+            );
         }
 
-        return new AccessTokenEntity(
+        $token = new AccessTokenEntity(
             bin2hex(random_bytes(40)),
             $client,
             $user,
             null,
             array_map(fn ($scope) => $scope->getIdentifier(), $scopes),
         );
+        $token->setResourceServerUri($this->resourceServerUri);
+
+        return $token;
     }
 
     public function persistNewAccessToken(AccessTokenEntityInterface $accessTokenEntity): void
@@ -98,12 +104,13 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
             createdAt: new \DateTimeImmutable(),
             updatedAt: new \DateTimeImmutable(),
             revoked: false,
+            dpopJkt: $entity->getDpopJkt(),
         ));
 
         $this->domainRepository->save($domain);
     }
 
-    public function revokeAccessToken($tokenId): void
+    public function revokeAccessToken(string $tokenId): void
     {
         $domain = $this->domainRepository->findByTokenId(TokenId::fromString($tokenId));
 
@@ -113,7 +120,7 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
         }
     }
 
-    public function isAccessTokenRevoked($tokenId): bool
+    public function isAccessTokenRevoked(string $tokenId): bool
     {
         $domain = $this->domainRepository->findByTokenId(TokenId::fromString($tokenId));
 

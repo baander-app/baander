@@ -72,8 +72,9 @@ class ClientEntity implements ClientEntityInterface
         bool $deviceClient = false,
         bool $confidential = false,
         bool $firstParty = false,
+        ?Uuid $id = null,
     ) {
-        $this->id = new Uuid();
+        $this->id = $id ?? new Uuid();
         $this->publicId = $publicId;
         $this->name = $name;
         $this->redirect = $redirect;

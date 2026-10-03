@@ -122,12 +122,14 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
             createdAt: $entity->getCreatedAt(),
             updatedAt: $entity->getUpdatedAt(),
             revoked: $entity->isRevoked(),
+            dpopJkt: $entity->getDpopJkt(),
         ));
     }
 
     private function syncToEntity(AccessToken $accessToken, AccessTokenEntity $entity): void
     {
         $entity->setName($accessToken->getName());
+        $entity->setDpopJkt($accessToken->getDpopJkt());
         $entity->setScopes($accessToken->getScopes() !== []
             ? $accessToken->getScopeIdentifiers()
             : null);

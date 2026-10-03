@@ -165,6 +165,11 @@ final class AccessToken
         return $this->state->updatedAt;
     }
 
+    public function getDpopJkt(): ?string
+    {
+        return $this->state->dpopJkt;
+    }
+
     public function getState(): AccessTokenState
     {
         return $this->state;

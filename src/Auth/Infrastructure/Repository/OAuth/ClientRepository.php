@@ -48,6 +48,7 @@ final class ClientRepository implements ClientRepositoryInterface
             $client->isDeviceClient(),
             $client->isConfidential(),
             $client->isFirstParty(),
+            id: $client->getId(),
         );
         $entity->setUserId($client->getUserId());
 

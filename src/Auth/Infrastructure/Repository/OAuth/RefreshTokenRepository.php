@@ -285,6 +285,7 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
             createdAt: $entity->getCreatedAt(),
             updatedAt: $entity->getUpdatedAt(),
             revoked: $entity->isRevoked(),
+            dpopJkt: $entity->getDpopJkt(),
         ));
     }
 

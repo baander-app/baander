@@ -609,11 +609,24 @@ through retries and configuration installation. Cache failures and uncertain
 commits require offline recovery; there is no automatic global fence or online
 atomic cutover. See the operator rotation runbook for installation and recovery.
 
-A subsequent source audit found that `/api/oauth/token` still executes League's
-standard refresh grant, bypassing the custom transactional refresh handlers. The
-active path needs PostgreSQL concurrency, rollback, and replay tests before refresh
-rotation is qualified. The custom handlers' SQLite/stub tests do not establish
-that endpoint's behavior. Filesystem acceptance also remains open: the general
+The active `/api/oauth/token` refresh path now uses a top-level transaction through
+response signing and serialization. It locks the original refresh/access rows,
+requires the original DPoP key binding, and conditionally consumes the refresh token
+before issuing its replacement. Replay retains League's reject-only policy; it does
+not revoke a winner's replacement family. Lock and statement timeouts bound database
+contention. Failure clears aborted ORM state and closes the captured connection.
+Transport delivery and uncertain commit acknowledgments remain outside that guarantee.
+
+PostgreSQL regressions exercise concurrent independent issuers, replacement persistence
+and signing failures, reusable replacements, missing/wrong DPoP bindings, persisted
+user identity, and client UUID round-trips. The returned JWT is validated through the
+resource-server factory. These tests supply the already-validated proof attribute;
+full firewall, cryptographic proof/replay, browser retry and logout acceptance remain
+open. Issuance also now preserves client/user UUIDs and DPoP bindings, signs access
+JWTs, and emits a complete DPoP JSON response without stale trailing stream bytes.
+Non-refresh grants are not covered by the new transaction boundary.
+
+Filesystem acceptance also remains open: the general
 `LocalFilesystem`/`ReadOnlyFilesystem` wrappers have separate symlink-boundary gaps
 beyond the media storage adapter's tests. These findings block a claim that
 authentication or storage remediation is complete.

@@ -5,6 +5,14 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Auth\Infrastructure\Security;
 
 use App\Auth\Infrastructure\Security\OAuth\AuthorizationServerFactory;
+use App\Auth\Infrastructure\Security\OAuth\TransactionalAuthorizationServer;
+use App\Shared\Application\Port\TransactionPortInterface;
+use Doctrine\DBAL\DriverManager;
+use Doctrine\ORM\EntityManagerInterface;
+use League\OAuth2\Server\Exception\OAuthServerException;
+use LogicException;
+use Nyholm\Psr7\Response;
+use Nyholm\Psr7\ServerRequest;
 use League\OAuth2\Server\Repositories\AccessTokenRepositoryInterface;
 use League\OAuth2\Server\Repositories\AuthCodeRepositoryInterface;
 use League\OAuth2\Server\Repositories\ClientRepositoryInterface;
@@ -59,7 +67,7 @@ final class AuthorizationServerFactoryTest extends TestCase
         $this->deviceCodeRepository = $this->createStub(DeviceCodeRepositoryInterface::class);
     }
 
-    private function createFactory(string $encryptionKey = '', string $environment = 'prod'): AuthorizationServerFactory
+    private function createFactory(string $encryptionKey = '', string $environment = 'prod', ?TransactionPortInterface $transaction = null, ?EntityManagerInterface $entityManager = null): AuthorizationServerFactory
     {
         return new AuthorizationServerFactory(
             clientRepository: $this->clientRepository,
@@ -71,6 +79,8 @@ final class AuthorizationServerFactoryTest extends TestCase
             privateKeyPath: self::$privateKeyPath,
             encryptionKey: $encryptionKey,
             verificationUri: '/device/verify',
+            transaction: $transaction ?? $this->createStub(TransactionPortInterface::class),
+            entityManager: $entityManager ?? $this->createStub(EntityManagerInterface::class),
             environment: $environment,
         );
     }
@@ -130,4 +140,47 @@ final class AuthorizationServerFactoryTest extends TestCase
             self::assertStringNotContainsString($secret, $error->getMessage());
         }
     }
+
+    public function testRefreshRejectsNestedTransactionWithoutChangingCallerState(): void
+    {
+        $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
+        $connection->beginTransaction();
+        $manager = $this->createStub(EntityManagerInterface::class);
+        $manager->method('getConnection')->willReturn($connection);
+        $transaction = $this->createMock(TransactionPortInterface::class);
+        $transaction->expects(self::never())->method('run');
+        $key = \Defuse\Crypto\Key::createNewRandomKey()->saveToAsciiSafeString();
+        $server = $this->createFactory($key, transaction: $transaction, entityManager: $manager)->create();
+        self::assertInstanceOf(TransactionalAuthorizationServer::class, $server);
+        try {
+            $server->respondToAccessTokenRequest(
+                (new ServerRequest('POST', 'https://baander.app/api/oauth/token'))->withParsedBody(['grant_type' => 'refresh_token']),
+                new Response(),
+            );
+            self::fail('A caller transaction must not contain refresh issuance.');
+        } catch (LogicException $error) {
+            self::assertSame('Refresh token issuance requires a top-level transaction.', $error->getMessage());
+            self::assertSame(1, $connection->getTransactionNestingLevel());
+            self::assertTrue($connection->isConnected());
+        } finally {
+            $connection->rollBack();
+            $connection->close();
+        }
+    }
+
+    public function testNonRefreshRequestDoesNotEnterRefreshTransaction(): void
+    {
+        $manager = $this->createMock(EntityManagerInterface::class);
+        $manager->expects(self::never())->method('getConnection');
+        $transaction = $this->createMock(TransactionPortInterface::class);
+        $transaction->expects(self::never())->method('run');
+        $key = \Defuse\Crypto\Key::createNewRandomKey()->saveToAsciiSafeString();
+        $server = $this->createFactory($key, transaction: $transaction, entityManager: $manager)->create();
+        $this->expectException(OAuthServerException::class);
+        $server->respondToAccessTokenRequest(
+            (new ServerRequest('POST', 'https://baander.app/api/oauth/token'))->withParsedBody(['grant_type' => 'unsupported']),
+            new Response(),
+        );
+    }
+
 }
