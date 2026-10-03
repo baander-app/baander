@@ -96,6 +96,7 @@ final class Version620260619CreateMissingEntityTables extends AbstractMigration
         $this->addSql('CREATE TABLE IF NOT EXISTS scheduled_jobs (
             id UUID NOT NULL,
             revision UUID NOT NULL,
+            evaluated_through TIMESTAMPTZ DEFAULT NULL CHECK (evaluated_through IS NULL OR (isfinite(evaluated_through) AND evaluated_through = date_trunc(\'minute\', evaluated_through, \'UTC\'))),
             name TEXT NOT NULL,
             expression TEXT NOT NULL,
             job_type TEXT NOT NULL,

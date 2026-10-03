@@ -28,32 +28,7 @@ final class DoctrineSchedulerOccurrenceStore implements SchedulerOccurrenceStore
 
     public function record(SchedulerOccurrence $occurrence): bool
     {
-        return $this->operation(function () use ($occurrence): bool {
-            $parameters = [
-                'id' => $occurrence->id->toString(), 'job' => $occurrence->jobId->toString(),
-                'scheduled' => $occurrence->scheduledFor->format('Y-m-d H:i:s.uP'),
-                'type' => $occurrence->jobType->value, 'command' => $occurrence->command,
-                'parameters' => $occurrence->parametersJson(),
-            ];
-            $inserted = $this->connection->executeStatement(<<<'SQL'
-                INSERT INTO scheduler_occurrences (id, job_id, scheduled_for, job_type, command, parameters)
-                VALUES (:id, :job, :scheduled, :type, :command, CAST(:parameters AS JSON))
-                ON CONFLICT DO NOTHING
-                SQL, $parameters);
-            if ($inserted === 1) {
-                return true;
-            }
-            if ($this->connection->fetchOne('SELECT 1 FROM scheduler_occurrences WHERE id = :id AND (job_id <> :job OR scheduled_for <> :scheduled)', ['id' => $parameters['id'], 'job' => $parameters['job'], 'scheduled' => $parameters['scheduled']]) !== false) {
-                throw new \LogicException('Scheduler occurrence identifier is already assigned to another slot.');
-            }
-            $existing = $this->select($occurrence->jobId, $occurrence->scheduledFor);
-            if ($existing === null || $existing->jobType !== $occurrence->jobType || $existing->command !== $occurrence->command
-                || $existing->parametersJson() !== $occurrence->parametersJson()) {
-                throw new \LogicException('Scheduler occurrence slot already has a different immutable snapshot.');
-            }
-            // A fresh candidate ID does not replace the originally admitted occurrence.
-            return false;
-        });
+        return $this->operation(fn (): bool => (new TransactionalSchedulerOccurrenceWriter($this->connection))->record($occurrence));
     }
 
     public function find(Uuid $jobId, DateTimeImmutable $dueMinute): ?SchedulerOccurrence

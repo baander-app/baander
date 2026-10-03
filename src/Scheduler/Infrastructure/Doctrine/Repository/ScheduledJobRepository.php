@@ -54,7 +54,13 @@ final class ScheduledJobRepository implements ScheduledJobRepositoryInterface
         } else {
             $parameters['expected_revision'] = $state->revision->toString();
             $sql = <<<'SQL'
-                UPDATE scheduled_jobs SET revision = :revision, name = :name, expression = :expression, job_type = :job_type,
+                UPDATE scheduled_jobs SET
+                    evaluated_through = CASE
+                        WHEN expression <> :expression OR job_type <> :job_type OR command <> :command
+                          OR parameters::text <> :parameters OR status <> :status THEN NULL
+                        ELSE evaluated_through
+                    END,
+                    revision = :revision, name = :name, expression = :expression, job_type = :job_type,
                     command = :command, status = :status, description = :description, parameters = CAST(:parameters AS JSON),
                     created_at = :created_at, updated_at = :updated_at, last_run_at = :last_run_at, next_run_at = :next_run_at,
                     last_result = :last_result, run_count = :run_count, last_failure_at = :last_failure_at, last_error = :last_error

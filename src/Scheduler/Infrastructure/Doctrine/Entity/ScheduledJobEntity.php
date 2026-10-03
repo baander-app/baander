@@ -22,6 +22,11 @@ class ScheduledJobEntity
     #[ORM\Column(type: 'uuid')]
     private Uuid $revision;
 
+    // Materializer-owned: NULL until the committed configuration is first observed.
+    // Align reverse introspection with this project's timestamptz mapping while retaining native TZ DDL.
+    #[ORM\Column(type: 'datetime_immutable', nullable: true, columnDefinition: 'TIMESTAMPTZ DEFAULT NULL')]
+    private ?\DateTimeImmutable $evaluatedThrough = null;
+
     #[ORM\Column(type: 'text')]
     private string $name;
 
@@ -78,6 +83,11 @@ class ScheduledJobEntity
     public function getId(): Uuid
     {
         return $this->id;
+    }
+
+    public function getEvaluatedThrough(): ?\DateTimeImmutable
+    {
+        return $this->evaluatedThrough;
     }
 
     public function getRevision(): Uuid

@@ -573,13 +573,53 @@ that the final stale result cannot overwrite the newer row. The unit suite passe
 3,449 tests with 12,455 assertions, including HTTP conflict mapping; focused PHPStan
 and web/shared TypeScript checks also pass.
 
-Recovery cursors still need their own transactional design. `updatedAt` changes
-when execution starts or finishes, and `nextRunAt` is recalculated from the current
-time; neither is an evaluated-minute watermark. Advance a durable UTC cursor in the
-same transaction as all intents for the evaluated range. Schedule edits and resumes
-need an explicit policy for unrecorded earlier minutes, rather than inferring
-historical settings. Revision conflicts preserve newer settings but do not stop
-already running effects or authorize retrying an execution.
+A per-job recovery primitive now records missed occurrences and advances
+`scheduled_jobs.evaluated_through` in the same PostgreSQL transaction. It locks the
+active schedule with `FOR UPDATE SKIP LOCKED`, captures the database UTC minute
+and examines `(evaluated_through, current minute]`, up to the requested limit.
+Calls default to 60 scanned minutes and accept 1–1,000; sparse cron expressions
+consume that budget even when no intent is due. A return value counts new committed
+intents, not scanned minutes. Missing, inactive or busy schedules return zero.
+Backward clock movement never rewinds the cursor. Remaining backlog is retained
+for subsequent calls rather than silently discarded.
+
+New schedules and changes to cron, command, type, exact parameters or status clear
+the cursor to NULL. The first locked observation of a valid committed active
+configuration initializes it to the current UTC minute and emits nothing; the next
+minute is its first eligible minute. This explicitly omits historical bootstrap
+work, including time between an edit's commit and its first observation. Sampling
+the clock inside the editing transaction would incorrectly backdate configurations
+held uncommitted for minutes. Name, description, execution-result and no-op saves
+preserve the cursor. Cursor advancement does not rotate the snapshot revision or
+invalidate an otherwise current execution result.
+
+The existing occurrence store and recovery adapter share a transaction-local
+immutable-insert primitive. An identical existing intent retains its original UUID
+and dispatch/execution state; a conflicting snapshot rolls back the entire window,
+including earlier inserts and cursor advancement. A retry after an uncertain commit
+uses the persisted cursor and unique job/minute keys. Invalid cron or unsupported
+parameters also leave the cursor unchanged. SQL projections bound configuration
+transfer before JSON decoding: expression 1,024 bytes, command 512 bytes and
+parameters 16 KiB, with the occurrence DTO's existing eight-array nesting bound.
+The database cursor constraint rejects non-finite and non-minute timestamps.
+
+Already-recorded occurrences retain the existing execution policy: current active
+status, command, type and exact parameters are checked before execution. This slice
+does not add generation cancellation for cron-only edits or pause/resume cycles.
+The recovery API neither publishes messages nor authorizes effects. Its dedicated
+connection rejects caller transactions. Statement/lock timeouts and scanned-minute
+limits do not certify a total wall-clock deadline for PHP cron evaluation, connection
+setup, network I/O or commit. Poison schedules must be isolated by the future
+caller rather than having their cursors silently advanced.
+
+Recovery passes 40 PostgreSQL cases with 417 assertions, including exceptions before
+and after an actual commit followed by a fresh-adapter retry. Independent observers
+verify both cursor and every intent, not merely an exception or return value. The
+108 existing scheduler integration/functional cases also pass with 943 assertions;
+all runs use fresh and repeat migrations. The full unit suite remains green at
+3,449 tests and 12,455 assertions, and baseline-free focused PHPStan passes with
+Doctrine's mapping extension enabled. No production poller or new queue route was
+enabled by these checks.
 
 Parameters use bounded native PostgreSQL `json`, deliberately preserving lexical
 numbers and argument order rather than normalizing them through `jsonb`. The
@@ -668,8 +708,9 @@ Swoole coroutines and is intended for a supervised CLI child. Deployment contain
 and resource admission still need qualification before ownership cutover.
 
 No poller, relay loop or queue route has been enabled for occurrence messages.
-Missed-tick recovery remains open before cutover. Lease validation
-controls admission; it cannot stop effects already running after expiry.
+The per-job missed-tick recovery primitive still needs a bounded, fair poller
+and deployment wiring before cutover. Lease validation controls admission; it
+cannot stop effects already running after expiry.
 The guard prevents repeated wrapper invocation, not duplicate side effects from
 retries of downstream messages or exactly-once external delivery. It also does not
 serialize different occurrences of the same job; shared resource admission and
