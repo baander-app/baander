@@ -47,8 +47,9 @@ Loudness streaming tests exercise state continuity and window decay; they do
 not establish R128 compliance. Independent vectors cover mono/stereo K-weighting
 at 44.1 and 48 kHz. Integrated gating tests cover energy thresholds, complete
 blocks, retained programme history, and explicit capacity exhaustion.
-Loudness range and true-peak reconstruction still require correction and
-independent vectors; see the
+Loudness range tests cover gated three-second windows, programme history,
+nearest-rank percentiles, and independent capacity exhaustion. True-peak
+reconstruction and programme-reset integration remain outstanding; see the
 [loudness module](loudness_r128/README.md) for the remaining limitations.
 This gate does not establish resampling or
 convolution quality, native AAC codec compliance, or audible playback quality.

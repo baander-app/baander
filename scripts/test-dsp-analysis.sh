@@ -35,7 +35,7 @@ for pass in 1 2; do
         -O3 -fno-math-errno -msimd128 -s STANDALONE_WASM=1 --no-entry \
         -s ENVIRONMENT=web -s STRICT=1 -s INITIAL_MEMORY=33554432 \
         -s ALLOW_MEMORY_GROWTH=0 \
-        -s 'EXPORTED_FUNCTIONS=["_malloc","_free","_init_loudness","_reset_loudness","_process_frames","_get_lufs_momentary","_get_lufs_shortterm","_get_lufs_integrated","_get_lra","_get_true_peak_dbfs","_gate_add","_gate_sum","_gate_count","_gate_used","_gate_exhausted","_gate_valid","_gate_node_bytes"]' \
+        -s 'EXPORTED_FUNCTIONS=["_malloc","_free","_init_loudness","_reset_loudness","_process_frames","_get_lufs_momentary","_get_lufs_shortterm","_get_lufs_integrated","_get_lra","_get_true_peak_dbfs","_gate_add","_gate_sum","_gate_count","_gate_used","_gate_exhausted","_gate_valid","_gate_node_bytes","_gate_inclusive_sum","_gate_inclusive_count","_gate_select","_lra_add","_lra_count","_lra_used","_lra_exhausted"]' \
         -lc++ -lc++abi -o "$output/loudness_gating_harness.wasm" >"$output/gating.build.log" 2>&1; then
         cat "$output/gating.build.log" >&2
         exit 1

@@ -57,7 +57,9 @@ declare interface LoudnessR128API {
   lufsI(): number;
 
   /**
-   * Loudness range (LRA) computed from recent history.
+   * Programme loudness range (LU) from gated three-second windows.
+   * Returns NaN if its independent history capacity is exhausted, until reset.
+   * File measurements need at least 1.5 seconds of trailing silence.
    */
   lra(): number;
 

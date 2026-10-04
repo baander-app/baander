@@ -17,6 +17,7 @@ export interface LoudnessR128API {
   lufsS(): number
   /** NaN if integrated history capacity is exhausted; reset starts a new programme. */
   lufsI(): number
+  /** NaN if LRA history capacity is exhausted; reset starts a new programme. */
   lra(): number
   truePkDbfs(): number
 }

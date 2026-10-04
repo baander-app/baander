@@ -67,11 +67,13 @@ for (const sampleRate of [44100, 48000]) {
       close(meter.api.get_lufs_momentary(), -120.691, 0.0001);
       close(meter.api.get_lufs_shortterm(), -120.691, 0.0001);
       const programmeLoudness = meter.api.get_lufs_integrated();
+      const programmeRange = meter.api.get_lra();
       assert.ok(Number.isFinite(programmeLoudness) && programmeLoudness > -70);
+      assert.ok(Number.isFinite(programmeRange) && programmeRange >= 0);
       // Silent passages must not evict the earlier audible programme.
       stream(meter, sampleRate * 302, 128);
       close(meter.api.get_lufs_integrated(), programmeLoudness, 0.00001);
-      close(meter.api.get_lra(), 0, 0.0001);
+      close(meter.api.get_lra(), programmeRange, 0.00001);
       meter.api.reset_loudness();
       assert.deepEqual(meter.readings(), [-70, -70, -70, 0]);
       assert.equal(meter.api.get_true_peak_dbfs(), -90);

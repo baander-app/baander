@@ -157,20 +157,63 @@ struct GateDistribution {
     }
     return result;
   }
+  // LRA uses inclusive gates; integrated loudness retains above()'s strict gate.
+  Aggregate at_least(double threshold) const {
+    Aggregate result;
+    uint32_t i = root;
+    while (i) {
+      const Node& n = nodes[i];
+      if (n.energy >= threshold) {
+        result.sum += n.energy * n.count + nodes[n.right].sum;
+        result.count += n.count + nodes[n.right].total_count;
+        i = n.left;
+      } else i = n.right;
+    }
+    return result;
+  }
+  // Zero-based order statistic including repeated energies, O(log distinct keys).
+  double select(uint64_t rank) const {
+    uint32_t i = root;
+    while (i) {
+      const Node& n = nodes[i];
+      const uint64_t left_count = nodes[n.left].total_count;
+      if (rank < left_count) i = n.left;
+      else if (rank - left_count < n.count) return n.energy;
+      else { rank -= left_count + n.count; i = n.right; }
+    }
+    return std::numeric_limits<double>::quiet_NaN();
+  }
+
 };
 static GateDistribution g_integrated;
 static size_t g_gate_remaining = 0;
 static size_t g_gate_hop = 0;
 static const double g_absolute_gate = std::pow(10.0, (-70.0 + 0.691) / 10.0);
 
-// Existing bounded history for the approximate LRA statistic.
+// Exact LRA distribution has its own independently exhausted/reset pool.
+static GateDistribution g_shortterm;
+static size_t g_shortterm_remaining = 0;
+static size_t g_shortterm_hop = 0;
 
-static std::vector<float> g_hist; // store block energies (e.g., 100 ms blocks)
-static std::vector<float> g_lufs_scratch;
-static std::vector<float> g_percentile_scratch;
-static size_t g_hist_max = 3000;  // ~5 minutes at 100 ms
-static int g_block_samples = 0;
-static int g_block_target = 0;
+// EBU Tech 3342 MATLAB: inclusive cascaded gates and rounded sample ranks.
+// Log conversion after rank selection is equivalent to sorting log levels.
+static float calculate_lra() {
+  if (g_shortterm.exhausted) return std::numeric_limits<float>::quiet_NaN();
+  const auto absolute = g_shortterm.at_least(g_absolute_gate);
+  if (!absolute.count) return 0.0f;
+  const double threshold = std::max(g_absolute_gate, absolute.sum / absolute.count * 0.01);
+  const auto gated = g_shortterm.at_least(threshold);
+  if (!gated.count) return 0.0f;
+  const uint64_t offset = g_shortterm.nodes[g_shortterm.root].total_count - gated.count;
+  // Exact rounded ranks without losing integer precision or overflowing at
+  // uint64 limits: round(N/10) and round(19*N/20), ties rounded upward.
+  const uint64_t n = gated.count - 1;
+  const uint64_t low_rank = n / 10 + (n % 10 + 5) / 10;
+  const uint64_t high_rank = (n / 20) * 19 + ((n % 20) * 19 + 10) / 20;
+  const double low = g_shortterm.select(offset + low_rank);
+  const double high = g_shortterm.select(offset + high_rank);
+  return (float)(10.0 * (std::log10(high) - std::log10(low)));
+}
 
 // Outputs
 static float g_lufs_m = -70.0f;
@@ -241,14 +284,9 @@ void init_loudness(int sample_rate, int truepeak_oversample) {
   g_m_win.init((size_t)std::max(1, (int)std::round(g_sr * 0.400f))); // 400 ms
   g_s_win.init((size_t)std::max(1, (int)std::round(g_sr * 3.000f))); // 3 s
 
-  g_hist.clear();
-  g_hist.reserve(g_hist_max);
-  g_lufs_scratch.clear();
-  g_lufs_scratch.reserve(g_hist_max);
-  g_percentile_scratch.clear();
-  g_percentile_scratch.reserve(g_hist_max);
-  g_block_samples = 0;
-  g_block_target = std::max(1, g_sr / 10); // Existing LRA cadence.
+  g_shortterm.init();
+  g_shortterm_remaining = g_s_win.size(); // First observation needs all 3 s.
+  g_shortterm_hop = std::max(1, g_sr / 10); // At least 10 Hz, independent of calls.
   g_integrated.init();
   g_gate_remaining = g_m_win.size(); // First gate needs a complete 400 ms.
   g_gate_hop = std::max<size_t>(1, (size_t)std::round(g_m_win.size() / 4.0));
@@ -292,13 +330,13 @@ static inline float truepeak_estimate(const float* in, int n, int ch) {
   return tp;
 }
 
-// Feed interleaved frames. K-weight, compute energy, update windows, gating hist, and true-peak estimate.
+// Feed interleaved frames. K-weight, compute energy, update windows, programme distributions, and true-peak estimate.
 void process_frames(const float* interleavedLR, int frames, int channels) {
   if (!interleavedLR || frames <= 0 || channels <= 0) return;
 
   float tp = truepeak_estimate(interleavedLR, frames, channels);
 
-  bool history_updated = false;
+  bool shortterm_updated = false;
   bool integrated_updated = false;
 
   // Per-sample processing
@@ -329,17 +367,14 @@ void process_frames(const float* interleavedLR, int frames, int channels) {
       g_gate_remaining = g_gate_hop;
     }
 
-    // Existing LRA history (100 ms cadence).
-    g_block_samples++;
-    if (g_block_samples >= g_block_target) {
-      // average energy of last 100 ms approx
-      float m = g_m_win.sum() / std::max<size_t>(1, g_m_win.filled);
-      // store as LUFS-like (log domain) proxy or keep energy and log later
-      // Keep capacity bounded without allocating on the render thread.
-      if (g_hist.size() == g_hist_max) g_hist.erase(g_hist.begin());
-      g_hist.push_back(m);
-      history_updated = true;
-      g_block_samples = 0;
+    // Tech 3342: complete 3 s windows, sampled at least 10 times per second.
+    if (--g_shortterm_remaining == 0) {
+      const double shortterm_energy = g_s_win.sum() / g_s_win.size();
+      if (std::isfinite(shortterm_energy) && shortterm_energy >= g_absolute_gate) {
+        g_shortterm.add(shortterm_energy);
+      }
+      shortterm_updated = true;
+      g_shortterm_remaining = g_shortterm_hop;
     }
   }
 
@@ -365,30 +400,7 @@ void process_frames(const float* interleavedLR, int frames, int channels) {
     }
   }
 
-  if (history_updated) {
-    auto& lufs = g_lufs_scratch;
-    lufs.resize(g_hist.size());
-    for (size_t i=0;i<g_hist.size();++i) {
-      lufs[i] = -0.691f + 10.0f * std::log10(std::max(g_hist[i], 1e-12f));
-    }
-
-    // LRA: interpercentile range over short-term history
-    if (lufs.size() >= 20) {
-      auto& tmp = g_percentile_scratch;
-      tmp.assign(lufs.begin(), lufs.end());
-      std::sort(tmp.begin(), tmp.end());
-      auto pct = [&](double p)->float{
-        double x = p * (tmp.size()-1);
-        size_t i0 = (size_t)std::floor(x);
-        size_t i1 = std::min(tmp.size()-1, i0+1);
-        float t = (float)(x - i0);
-        return tmp[i0]*(1-t) + tmp[i1]*t;
-      };
-      float p10 = pct(0.10), p95 = pct(0.95);
-      g_lra = p95 - p10;
-      if (g_lra < 0) g_lra = 0;
-    }
-  }
+  if (shortterm_updated) g_lra = calculate_lra();
 
   g_truepk = 20.0f * std::log10(std::max(tp, 1e-9f)); // dBFS
 }

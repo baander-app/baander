@@ -18,6 +18,16 @@ static bool validate_node(uint32_t i, double lower, double upper) {
 
 extern "C" {
 void gate_add(double energy) { g_integrated.add(energy); }
+double gate_inclusive_sum(double threshold) { return g_integrated.at_least(threshold).sum; }
+double gate_inclusive_count(double threshold) { return (double)g_integrated.at_least(threshold).count; }
+double gate_select(double rank) { return g_integrated.select((uint64_t)rank); }
+void lra_add(double energy) {
+  if (std::isfinite(energy) && energy >= g_absolute_gate) g_shortterm.add(energy);
+  g_lra = calculate_lra();
+}
+double lra_count() { return (double)g_shortterm.nodes[g_shortterm.root].total_count; }
+int lra_used() { return g_shortterm.used; }
+int lra_exhausted() { return g_shortterm.exhausted; }
 double gate_sum(double threshold) { return g_integrated.above(threshold).sum; }
 double gate_count(double threshold) { return (double)g_integrated.above(threshold).count; }
 int gate_used() { return g_integrated.used; }
