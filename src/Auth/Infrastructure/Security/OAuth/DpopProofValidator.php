@@ -243,12 +243,8 @@ final class DpopProofValidator
 
     private function buildHtu(Request $request): string
     {
-        $uri = $request->getSchemeAndHttpHost() . $request->getPathInfo();
-
-        // RFC 9449 §4.3: http and https on the same host are equivalent
-        $uri = preg_replace('#^https?://#i', 'https://', $uri);
-
-        return $uri;
+        // Bind to the actual URI, excluding query and fragment per RFC 9449 §4.3.
+        return $request->getSchemeAndHttpHost() . $request->getPathInfo();
     }
 
     /**
