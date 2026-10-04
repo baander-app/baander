@@ -42,7 +42,7 @@ export function AlertHistory() {
   const { data: alerts } = useQuery({
     queryKey: ['admin-alerts'],
     queryFn: () =>
-      notificationApi.list({ category: 'admin_operations', limit: 10 }),
+      notificationApi.list({ category: 'admin_operations', limit: 10 }).then((page) => page.data),
     refetchInterval: 30_000,
     retry: false,
   })

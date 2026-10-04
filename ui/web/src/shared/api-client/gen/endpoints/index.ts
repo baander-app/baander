@@ -1569,6 +1569,37 @@ export interface ImageResource {
   updatedAt: string;
 }
 
+/**
+ * Notification parameters
+ * @nullable
+ */
+export type NotificationResourceParameters = { [key: string]: unknown } | null;
+
+export interface NotificationResource {
+  /**
+     * Public notification identifier (Nanoid)
+     * @pattern ^[A-Za-z0-9_-]{21}$
+     */
+  publicId: string;
+  /** Notification category */
+  category: string;
+  /** Event type */
+  eventType: string;
+  /** Notification title */
+  title: string;
+  /** Notification body */
+  body: string;
+  /**
+     * Notification parameters
+     * @nullable
+     */
+  parameters: NotificationResourceParameters;
+  /** Whether the notification has been read */
+  isRead: boolean;
+  /** Creation timestamp */
+  createdAt: string;
+}
+
 export interface PlaylistResource {
   /** Playlist UUID */
   uuid: string;
@@ -3736,15 +3767,13 @@ export const GetNotificationIndexCategory = {
   admin_operations: 'admin_operations',
 } as const;
 
-export type GetNotificationIndex200DataItem = {
-  publicId?: string;
-  eventType?: string;
-  isRead?: boolean;
-  createdAt?: string;
-};
-
 export type GetNotificationIndex200 = {
-  data?: GetNotificationIndex200DataItem[];
+  data: NotificationResource[];
+  /**
+     * Cursor for the next page, or null when exhausted
+     * @nullable
+     */
+  nextCursor: string | null;
 };
 
 export type GetNotificationUnreadCount200 = {

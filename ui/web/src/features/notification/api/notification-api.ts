@@ -13,6 +13,7 @@ export interface NotificationItem {
 
 export interface NotificationListResponse {
   data: NotificationItem[]
+  nextCursor: string | null
 }
 
 export interface UnreadCountResponse {
@@ -20,11 +21,11 @@ export interface UnreadCountResponse {
 }
 
 export const notificationApi = {
-  list: (params?: { cursor?: string; limit?: number; category?: string; unread?: boolean }) =>
-    AXIOS_INSTANCE.get<NotificationListResponse>('/api/notifications/', { params }).then((r) => r.data.data),
+  list: (params?: { cursor?: string; limit?: number; category?: string; unread?: boolean }, signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<NotificationListResponse>('/api/notifications/', { params, signal }).then((r) => r.data),
 
-  unreadCount: () =>
-    AXIOS_INSTANCE.get<UnreadCountResponse>('/api/notifications/unread-count').then((r) => r.data.data.count),
+  unreadCount: (signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<UnreadCountResponse>('/api/notifications/unread-count', { signal }).then((r) => r.data.data.count),
 
   markRead: (publicId: string) =>
     AXIOS_INSTANCE.patch(`/api/notifications/${publicId}/read`),

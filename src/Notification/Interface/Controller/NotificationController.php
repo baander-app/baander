@@ -50,7 +50,13 @@ final class NotificationController
             new OA\Parameter(name: 'since', description: 'Exclusive creation timestamp with timezone (RFC 3339, up to six fractional digits)', in: 'query', schema: new OA\Schema(type: 'string', format: 'date-time')),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'List of notifications', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'publicId', type: 'string'), new OA\Property(property: 'eventType', type: 'string'), new OA\Property(property: 'isRead', type: 'boolean'), new OA\Property(property: 'createdAt', type: 'string', format: 'date-time')]))])),
+            new OA\Response(response: '200', description: 'List of notifications', content: new OA\JsonContent(
+                required: ['data', 'nextCursor'],
+                properties: [
+                    new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: NotificationResource::class))),
+                    new OA\Property(property: 'nextCursor', type: 'string', format: 'uuid', nullable: true, description: 'Cursor for the next page, or null when exhausted'),
+                ],
+            )),
             new OA\Response(response: '400', description: 'Invalid query parameters', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
@@ -73,11 +79,14 @@ final class NotificationController
             $userId,
             $category,
             $unreadOnly ?: null,
-            $limit,
+            $limit + 1,
             $cursor?->toString(),
             since: $since,
         );
 
+        $hasMore = count($notifications) > $limit;
+        $notifications = array_slice($notifications, 0, $limit);
+        $nextCursor = $hasMore ? $notifications[count($notifications) - 1]->getId()->toString() : null;
         $items = NotificationResource::collection($notifications);
 
         foreach ($items as $i => $item) {
@@ -95,7 +104,7 @@ final class NotificationController
             }
         }
 
-        return $this->successResponse($items);
+        return $this->json(['data' => $items, 'nextCursor' => $nextCursor]);
     }
 
     /**

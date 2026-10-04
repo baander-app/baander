@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import styled, { css } from 'styled-components'
 import { useNotificationStore } from '../stores/notification-store'
-import { notificationApi } from '../api/notification-api'
+import { useNotificationActions } from '../hooks/use-notification-actions'
 import type { NotificationItem as NotificationItemType } from '../api/notification-api'
 
 const categoryColorMap: Record<string, string> = {
@@ -90,16 +91,16 @@ const Time = styled.p`
 
 export function NotificationItem({ notification }: { notification: NotificationItemType }) {
   const navigate = useNavigate()
-  const markRead = useNotificationStore((s) => s.markRead)
+  const { markRead } = useNotificationActions()
   const barColor = categoryColorMap[notification.category] ?? 'var(--color-muted-foreground)'
 
   const handleClick = async () => {
     if (!notification.isRead) {
       try {
-        await notificationApi.markRead(notification.publicId)
-        markRead(notification.publicId)
+        await markRead.mutateAsync(notification.publicId)
       } catch {
-        // Optimistic update already applied
+        toast.error('Could not mark notification as read. Try again.')
+        return
       }
     }
 
@@ -113,7 +114,7 @@ export function NotificationItem({ notification }: { notification: NotificationI
   }
 
   return (
-    <ItemButton onClick={handleClick} $unread={!notification.isRead}>
+    <ItemButton onClick={handleClick} disabled={markRead.isPending} $unread={!notification.isRead}>
       <ColorBar $color={barColor} />
       <ContentArea>
         <Title>

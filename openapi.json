@@ -8957,27 +8957,22 @@
                         "content": {
                             "application/json": {
                                 "schema": {
+                                    "required": [
+                                        "data",
+                                        "nextCursor"
+                                    ],
                                     "properties": {
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "properties": {
-                                                    "publicId": {
-                                                        "type": "string"
-                                                    },
-                                                    "eventType": {
-                                                        "type": "string"
-                                                    },
-                                                    "isRead": {
-                                                        "type": "boolean"
-                                                    },
-                                                    "createdAt": {
-                                                        "type": "string",
-                                                        "format": "date-time"
-                                                    }
-                                                },
-                                                "type": "object"
+                                                "$ref": "#/components/schemas/NotificationResource"
                                             }
+                                        },
+                                        "nextCursor": {
+                                            "description": "Cursor for the next page, or null when exhausted",
+                                            "type": "string",
+                                            "format": "uuid",
+                                            "nullable": true
                                         }
                                     },
                                     "type": "object"
@@ -21573,6 +21568,56 @@
                     },
                     "updatedAt": {
                         "description": "Last update timestamp",
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "NotificationResource": {
+                "required": [
+                    "publicId",
+                    "category",
+                    "eventType",
+                    "title",
+                    "body",
+                    "parameters",
+                    "isRead",
+                    "createdAt"
+                ],
+                "properties": {
+                    "publicId": {
+                        "description": "Public notification identifier (Nanoid)",
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_-]{21}$"
+                    },
+                    "category": {
+                        "description": "Notification category",
+                        "type": "string"
+                    },
+                    "eventType": {
+                        "description": "Event type",
+                        "type": "string"
+                    },
+                    "title": {
+                        "description": "Notification title",
+                        "type": "string"
+                    },
+                    "body": {
+                        "description": "Notification body",
+                        "type": "string"
+                    },
+                    "parameters": {
+                        "description": "Notification parameters",
+                        "type": "object",
+                        "nullable": true
+                    },
+                    "isRead": {
+                        "description": "Whether the notification has been read",
+                        "type": "boolean"
+                    },
+                    "createdAt": {
+                        "description": "Creation timestamp",
                         "type": "string",
                         "format": "date-time"
                     }

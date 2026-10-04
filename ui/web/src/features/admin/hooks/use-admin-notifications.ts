@@ -1,11 +1,9 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { notificationApi } from '@/features/notification/api/notification-api'
-import { useNotificationStore } from '@/features/notification/stores/notification-store'
+import { useNotificationActions } from '@/features/notification/hooks/use-notification-actions'
 
 export function useAdminNotifications() {
-  const markReadInStore = useNotificationStore((s) => s.markRead)
-  const markAllReadInStore = useNotificationStore((s) => s.markAllRead)
-  const queryClient = useQueryClient()
+  const { markRead, markAllRead } = useNotificationActions()
 
   const query = useQuery({
     queryKey: ['admin-notifications'],
@@ -14,7 +12,7 @@ export function useAdminNotifications() {
         notificationApi.list({ category: 'admin_operations', limit: 20 }),
         notificationApi.unreadCount(),
       ])
-      return { items, count }
+      return { items: items.data, count }
     },
     staleTime: 30_000,
   })
@@ -24,22 +22,6 @@ export function useAdminNotifications() {
     (n) => n.category === 'admin_operations',
   )
   const adminUnreadCount = adminNotifications.filter((n) => !n.isRead).length
-
-  const markRead = useMutation({
-    mutationFn: (publicId: string) => notificationApi.markRead(publicId),
-    onSuccess: (_, publicId) => {
-      markReadInStore(publicId)
-      queryClient.invalidateQueries({ queryKey: ['admin-notifications'] })
-    },
-  })
-
-  const markAllRead = useMutation({
-    mutationFn: () => notificationApi.markAllRead(),
-    onSuccess: () => {
-      markAllReadInStore()
-      queryClient.invalidateQueries({ queryKey: ['admin-notifications'] })
-    },
-  })
 
   return {
     notifications: adminNotifications,

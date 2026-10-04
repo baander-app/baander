@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react'
 import styled from 'styled-components'
 import { useNotificationStore } from '../stores/notification-store'
-import { notificationApi } from '../api/notification-api'
+import { useNotifications } from '../hooks/use-notifications'
+import { useNotificationActions } from '../hooks/use-notification-actions'
+import { Button } from '@/shared/components/ui/button'
 import { NotificationItem } from './NotificationItem'
 
 const Popover = styled.div`
@@ -60,9 +62,8 @@ const EmptyState = styled.div`
 export function NotificationPopout() {
   const isPopoutOpen = useNotificationStore((s) => s.isPopoutOpen)
   const setPopoutOpen = useNotificationStore((s) => s.setPopoutOpen)
-  const markAllRead = useNotificationStore((s) => s.markAllRead)
-  const notifications = useNotificationStore((s) => s.notifications)
-  const unreadCount = useNotificationStore((s) => s.unreadCount)
+  const { notifications, unreadCount, isLoading, isError, hasNextPage, isFetchingNextPage, isFetchNextPageError, loadMore, refetch } = useNotifications()
+  const { markAllRead } = useNotificationActions()
   const ref = useRef<HTMLDivElement>(null)
 
   // Close on click outside
@@ -95,15 +96,6 @@ export function NotificationPopout() {
 
   if (!isPopoutOpen) return null
 
-  const handleMarkAllRead = async () => {
-    try {
-      await notificationApi.markAllRead()
-      markAllRead()
-    } catch {
-      // Optimistic update already applied
-    }
-  }
-
   return (
     <Popover ref={ref}>
       <Header>
@@ -111,14 +103,16 @@ export function NotificationPopout() {
           Notifications
         </HeaderLabel>
         {unreadCount > 0 && (
-          <MarkAllButton onClick={handleMarkAllRead}>
+          <MarkAllButton onClick={() => markAllRead.mutate()} disabled={markAllRead.isPending}>
             Mark all read
           </MarkAllButton>
         )}
       </Header>
 
       <ScrollArea>
-        {notifications.length === 0 ? (
+        {isLoading ? <EmptyState role="status">Loading notifications…</EmptyState> : isError && notifications.length === 0 ? (
+          <EmptyState role="alert">Could not load notifications. <Button variant="ghost" onClick={() => void refetch()}>Retry</Button></EmptyState>
+        ) : notifications.length === 0 ? (
           <EmptyState>
             No notifications
           </EmptyState>
@@ -126,6 +120,15 @@ export function NotificationPopout() {
           notifications.map((notification) => (
             <NotificationItem key={notification.publicId} notification={notification} />
           ))
+        )}
+        {markAllRead.isError && <EmptyState role="alert">Could not mark notifications as read. Try again.</EmptyState>}
+        {hasNextPage && (
+          <EmptyState>
+            {isFetchNextPageError && <p role="alert">Could not load more notifications.</p>}
+            <Button variant="ghost" disabled={isFetchingNextPage} onClick={loadMore}>
+              {isFetchingNextPage ? 'Loading…' : isFetchNextPageError ? 'Retry' : 'Load more'}
+            </Button>
+          </EmptyState>
         )}
       </ScrollArea>
     </Popover>
