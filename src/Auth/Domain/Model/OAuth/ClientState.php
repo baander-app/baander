@@ -19,6 +19,7 @@ final class ClientState
     /** @var string[] */
     public array $redirectUris;
 
+    /** @param array<array-key, string> $redirectUris */
     public function __construct(
         public readonly Uuid $id,
         public readonly PublicId $publicId,

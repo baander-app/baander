@@ -10,6 +10,7 @@ use App\Auth\Application\Port\TotpVerifierInterface;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Domain\Model\Email;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
@@ -18,9 +19,9 @@ use Symfony\Component\Cache\CacheItem;
 
 final class EnableTotpHandlerTest extends TestCase
 {
-    private UserRepositoryInterface $userRepository;
-    private TotpVerifierInterface $totpVerifier;
-    private CacheItemPoolInterface $cache;
+    private UserRepositoryInterface&Stub $userRepository;
+    private TotpVerifierInterface&Stub $totpVerifier;
+    private CacheItemPoolInterface&Stub $cache;
     private EnableTotpHandler $handler;
 
     protected function setUp(): void
@@ -44,7 +45,7 @@ final class EnableTotpHandlerTest extends TestCase
         $this->userRepository = $this->createMock(UserRepositoryInterface::class);
         $this->handler = $this->createEnableTotpHandlerFixture();
 
-        $user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
         $secret = 'JBSWY3DPEHPK3PXP';
 
         // Mock the cache to return the pending secret
@@ -75,7 +76,7 @@ final class EnableTotpHandlerTest extends TestCase
 
     public function testThrowsOnInvalidCode(): void
     {
-        $user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
         $secret = 'JBSWY3DPEHPK3PXP';
 
         $cacheItem = $this->createStub(CacheItemInterface::class);
@@ -97,7 +98,7 @@ final class EnableTotpHandlerTest extends TestCase
         $this->cache = $this->createMock(CacheItemPoolInterface::class);
         $this->handler = $this->createEnableTotpHandlerFixture();
 
-        $user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
 
         // Mock cache miss (no pending secret)
         $cacheItem = $this->createStub(CacheItemInterface::class);
@@ -117,7 +118,7 @@ final class EnableTotpHandlerTest extends TestCase
         $this->userRepository = $this->createMock(UserRepositoryInterface::class);
         $this->handler = $this->createEnableTotpHandlerFixture();
 
-        $user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
         $secret = 'JBSWY3DPEHPK3PXP';
 
         $cacheItem = $this->createStub(CacheItemInterface::class);
@@ -143,7 +144,7 @@ final class EnableTotpHandlerTest extends TestCase
         $this->cache = $this->createMock(CacheItemPoolInterface::class);
         $this->handler = $this->createEnableTotpHandlerFixture();
 
-        $user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
         $secret = 'JBSWY3DPEHPK3PXP';
         $key = 'totp_pending_secret_' . $user->getId()->toString();
 

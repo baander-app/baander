@@ -16,6 +16,7 @@ use DateTimeImmutable;
  */
 final class UserState
 {
+    /** @param array<array-key, string> $roles */
     public function __construct(
         public readonly Uuid $id,
         public readonly PublicId $publicId,

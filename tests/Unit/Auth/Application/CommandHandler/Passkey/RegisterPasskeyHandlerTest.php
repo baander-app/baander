@@ -12,15 +12,16 @@ use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use RuntimeException;
 
 final class RegisterPasskeyHandlerTest extends TestCase
 {
-    private UserRepositoryInterface $userRepository;
-    private PasskeyRepositoryInterface $passkeyRepository;
-    private EventDispatcherInterface $eventDispatcher;
+    private UserRepositoryInterface&Stub $userRepository;
+    private PasskeyRepositoryInterface&Stub $passkeyRepository;
+    private EventDispatcherInterface&Stub $eventDispatcher;
     private RegisterPasskeyHandler $handler;
 
     protected function setUp(): void
@@ -43,7 +44,7 @@ final class RegisterPasskeyHandlerTest extends TestCase
         $this->userRepository = $this->createMock(UserRepositoryInterface::class);
         $this->handler = $this->createRegisterPasskeyHandlerFixture();
 
-        $user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
         $userId = $user->getId();
         $this->userRepository->expects($this->once())->method('findByUuid')->with($userId)->willReturn($user);
         $this->passkeyRepository->method('ofCredentialId')->willReturn(null);
@@ -79,7 +80,7 @@ final class RegisterPasskeyHandlerTest extends TestCase
 
     public function testThrowsOnDuplicateCredentialId(): void
     {
-        $user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
         $this->userRepository->method('findByUuid')->willReturn($user);
         $passkey = Passkey::create(Uuid::v4(), 'Existing', 'cred-id', [], 0);
         $this->passkeyRepository->method('ofCredentialId')->willReturn($passkey);

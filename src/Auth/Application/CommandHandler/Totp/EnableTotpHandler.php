@@ -68,7 +68,6 @@ final class EnableTotpHandler
     private function getPendingSecret(string $userId): ?string
     {
         try {
-            /** @var CacheItem|null $item */
             $item = $this->cache->getItem($this->pendingSecretKey($userId));
             if (!$item->isHit()) {
                 return null;

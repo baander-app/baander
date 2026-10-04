@@ -16,16 +16,17 @@ use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 final class RevokeTokenHandlerTest extends TestCase
 {
-    private AccessTokenRepositoryInterface $accessTokenRepository;
-    private RefreshTokenRepositoryInterface $refreshTokenRepository;
-    private EntityManagerInterface $entityManager;
+    private AccessTokenRepositoryInterface&Stub $accessTokenRepository;
+    private RefreshTokenRepositoryInterface&Stub $refreshTokenRepository;
+    private EntityManagerInterface&Stub $entityManager;
     private Connection&MockObject $connection;
-    private EventDispatcherInterface $eventDispatcher;
+    private EventDispatcherInterface&Stub $eventDispatcher;
     private RevokeTokenHandler $handler;
 
     protected function setUp(): void

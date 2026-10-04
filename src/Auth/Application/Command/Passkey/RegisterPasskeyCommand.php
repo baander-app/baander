@@ -8,11 +8,12 @@ namespace App\Auth\Application\Command\Passkey;
  * @param string $userId              User UUID string
  * @param string $name                Human-readable name for this passkey
  * @param string $credentialId        Base64url-encoded credential ID
- * @param array  $credentialRecordData Serialized CredentialRecord fields for persistence
+ * @param array<array-key, mixed> $credentialRecordData Serialized CredentialRecord fields for persistence
  * @param int    $counter             Initial sign counter (from attestation response)
  */
 final readonly class RegisterPasskeyCommand
 {
+    /** @param array<array-key, mixed> $credentialRecordData */
     public function __construct(
         private string $userId,
         private string $name,
@@ -37,6 +38,7 @@ final readonly class RegisterPasskeyCommand
         return $this->credentialId;
     }
 
+    /** @return array<array-key, mixed> */
     public function getCredentialRecordData(): array
     {
         return $this->credentialRecordData;

@@ -30,20 +30,21 @@ use App\Auth\Domain\Service\TokenChainValidator;
 use App\Shared\Domain\Model\Email;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 final class IssueTokenHandlerTest extends TestCase
 {
-    private AccessTokenRepositoryInterface $accessTokenRepository;
-    private RefreshTokenRepositoryInterface $refreshTokenRepository;
-    private AuthCodeRepositoryInterface $authCodeRepository;
-    private DeviceCodeRepositoryInterface $deviceCodeRepository;
-    private ClientRepositoryInterface $clientRepository;
-    private UserRepositoryInterface $userRepository;
+    private AccessTokenRepositoryInterface&Stub $accessTokenRepository;
+    private RefreshTokenRepositoryInterface&Stub $refreshTokenRepository;
+    private AuthCodeRepositoryInterface&Stub $authCodeRepository;
+    private DeviceCodeRepositoryInterface&Stub $deviceCodeRepository;
+    private ClientRepositoryInterface&Stub $clientRepository;
+    private UserRepositoryInterface&Stub $userRepository;
     private ScopeAllowlist $scopeAllowlist;
-    private EntityManagerInterface $entityManager;
-    private TokenMetadataRepositoryInterface $tokenMetadataRepository;
+    private EntityManagerInterface&Stub $entityManager;
+    private TokenMetadataRepositoryInterface&Stub $tokenMetadataRepository;
     /** @var list<\App\Auth\Domain\Model\OAuth\TokenMetadata> */
     private array $savedMetadata = [];
     private IssueTokenHandler $handler;
@@ -104,7 +105,7 @@ final class IssueTokenHandlerTest extends TestCase
 
     public function testAuthorizationCodeWithStandardScopesSucceeds(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
         $authCode = AuthCode::create(
             $user,
@@ -133,7 +134,7 @@ final class IssueTokenHandlerTest extends TestCase
 
     public function testAuthorizationCodeDropsAdminScope(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
         $authCode = AuthCode::create($user, $client);
 
@@ -157,7 +158,7 @@ final class IssueTokenHandlerTest extends TestCase
 
     public function testAuthorizationCodeFiltersMixedValidAndInvalidScopes(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
         $authCode = AuthCode::create(
             $user,
@@ -260,7 +261,7 @@ final class IssueTokenHandlerTest extends TestCase
 
     public function testAuthorizationCodeWithRevokedCodeThrows(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
         $authCode = AuthCode::create($user, $client);
         $authCode->revoke();
@@ -283,7 +284,7 @@ final class IssueTokenHandlerTest extends TestCase
 
     public function testAuthorizationCodeWithExpiredCodeThrows(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
 
         // Create an expired auth code via reconstitute
@@ -403,7 +404,7 @@ final class IssueTokenHandlerTest extends TestCase
 
     public function testRefreshTokenWithExpiredTokenThrows(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
         $chainId = ChainId::generate();
 
@@ -447,7 +448,7 @@ final class IssueTokenHandlerTest extends TestCase
 
     public function testRefreshTokenWithRevokedTokenThrows(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
 
         $accessToken = \App\Auth\Domain\Model\OAuth\AccessToken::issue(
@@ -484,7 +485,7 @@ final class IssueTokenHandlerTest extends TestCase
 
     public function testRefreshTokenWithUsedTokenThrows(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
         $chainId = ChainId::generate();
 
@@ -584,7 +585,7 @@ final class IssueTokenHandlerTest extends TestCase
     {
         $client = $this->createConfidentialClient();
 
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $deviceCode = DeviceCode::create($client, 'ABCD-EFGH', 'http://localhost/verify');
         $deviceCode->deny();
 
@@ -607,7 +608,7 @@ final class IssueTokenHandlerTest extends TestCase
     public function testDeviceCodeWithConsumedCodeThrows(): void
     {
         $client = $this->createConfidentialClient();
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
 
         $deviceCode = DeviceCode::create($client, 'ABCD-EFGH', 'http://localhost/verify');
         $deviceCode->approve($user);
@@ -664,7 +665,7 @@ final class IssueTokenHandlerTest extends TestCase
     public function testDeviceCodeWithApprovedCodeReturnsTokenPair(): void
     {
         $client = $this->createConfidentialClient();
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
 
         $deviceCode = DeviceCode::create(
             $client,
@@ -735,7 +736,7 @@ final class IssueTokenHandlerTest extends TestCase
 
     public function testAuthorizationCodeWithDisallowedRedirectUriThrows(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
         $authCode = AuthCode::create($user, $client);
 
@@ -758,7 +759,7 @@ final class IssueTokenHandlerTest extends TestCase
 
     public function testAuthorizationCodeWithAllowedRedirectUriSucceeds(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
         $authCode = AuthCode::create(
             $user,
@@ -788,7 +789,7 @@ final class IssueTokenHandlerTest extends TestCase
 
     public function testAuthorizationCodePreservesTokenName(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
         $authCode = AuthCode::create(
             $user,
@@ -816,7 +817,7 @@ final class IssueTokenHandlerTest extends TestCase
 
     public function testAuthorizationCodeStoresTokenMetadata(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
         $authCode = AuthCode::create($user, $client);
 

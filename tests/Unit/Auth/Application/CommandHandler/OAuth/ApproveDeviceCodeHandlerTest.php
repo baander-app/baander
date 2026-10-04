@@ -15,16 +15,17 @@ use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use RuntimeException;
 
 final class ApproveDeviceCodeHandlerTest extends TestCase
 {
-    private DeviceCodeRepositoryInterface $deviceCodeRepo;
-    private UserRepositoryInterface $userRepo;
-    private EntityManagerInterface $entityManager;
-    private EventDispatcherInterface $eventDispatcher;
+    private DeviceCodeRepositoryInterface&Stub $deviceCodeRepo;
+    private UserRepositoryInterface&Stub $userRepo;
+    private EntityManagerInterface&Stub $entityManager;
+    private EventDispatcherInterface&Stub $eventDispatcher;
     private ApproveDeviceCodeHandler $handler;
 
     protected function setUp(): void
@@ -64,7 +65,7 @@ final class ApproveDeviceCodeHandlerTest extends TestCase
         $this->handler = $this->createApproveDeviceCodeHandlerFixture();
 
         $deviceCode = $this->createDeviceCode();
-        $user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
 
         $this->deviceCodeRepo->expects($this->once())->method('findByUserCode')->with('ABCD')->willReturn($deviceCode);
         $this->userRepo->method('findByUuid')->willReturn($user);
@@ -111,7 +112,7 @@ final class ApproveDeviceCodeHandlerTest extends TestCase
 
     public function testThrowsOnAlreadyApproved(): void
     {
-        $user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
         $deviceCode = $this->createDeviceCode();
         $deviceCode->approve($user);
         $this->deviceCodeRepo->method('findByUserCode')->willReturn($deviceCode);
@@ -137,7 +138,7 @@ final class ApproveDeviceCodeHandlerTest extends TestCase
     public function testReturnsVerificationUriWhenCompleteIsNull(): void
     {
         $deviceCode = DeviceCode::create(Client::create('Test', []), 'ABCD', '/verify');
-        $user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
 
         $this->deviceCodeRepo->method('findByUserCode')->willReturn($deviceCode);
         $this->userRepo->method('findByUuid')->willReturn($user);

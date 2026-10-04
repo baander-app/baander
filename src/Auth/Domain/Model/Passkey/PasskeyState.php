@@ -15,6 +15,7 @@ use DateTimeImmutable;
  */
 final class PasskeyState
 {
+    /** @param array<array-key, mixed> $data */
     public function __construct(
         public readonly Uuid $id,
         public string $name,

@@ -23,20 +23,21 @@ use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 final class RefreshTokenHandlerTest extends TestCase
 {
-    private AccessTokenRepositoryInterface $accessTokenRepository;
-    private RefreshTokenRepositoryInterface $refreshTokenRepository;
+    private AccessTokenRepositoryInterface&Stub $accessTokenRepository;
+    private RefreshTokenRepositoryInterface&Stub $refreshTokenRepository;
     /** @var list<AccessToken> */
     private array $savedAccessTokens = [];
     /** @var list<RefreshToken> */
     private array $savedRefreshTokens = [];
     private TokenChainValidator $chainValidator;
-    private EntityManagerInterface $entityManager;
-    private JwtGeneratorInterface $jwtGenerator;
+    private EntityManagerInterface&Stub $entityManager;
+    private JwtGeneratorInterface&Stub $jwtGenerator;
     private RefreshTokenHandler $handler;
 
     protected function setUp(): void
@@ -96,7 +97,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
     public function testValidRefreshTokenReturnsNewTokenPair(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
         $chainId = ChainId::generate();
 
@@ -138,7 +139,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
     public function testOldAccessTokenIsRevoked(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
         $chainId = ChainId::generate();
 
@@ -171,7 +172,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
     public function testOldRefreshTokenIsMarkedUsed(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
         $chainId = ChainId::generate();
 
@@ -219,7 +220,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
     public function testRevokedRefreshTokenThrows(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
         $chainId = ChainId::generate();
 
@@ -253,7 +254,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
     public function testExpiredRefreshTokenThrows(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
         $chainId = ChainId::generate();
 
@@ -295,7 +296,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
     public function testUsedRefreshTokenTriggersChainRevocation(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
         $chainId = ChainId::generate();
 
@@ -336,7 +337,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
     public function testTokenWithoutChainIdSkipsValidation(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
 
         // Create token pair without chainId (outside rotation model)
@@ -371,7 +372,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
     public function testMetadataIsStoredWhenFingerprintProvided(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
         $chainId = ChainId::generate();
 
@@ -412,7 +413,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
     public function testMetadataIsSkippedWhenNoFingerprint(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
         $chainId = ChainId::generate();
 
@@ -447,7 +448,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
     public function testNewTokenPairPreservesScopesAndName(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
         $chainId = ChainId::generate();
 
@@ -483,7 +484,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
     public function testTransactionRollbackOnFailure(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
         $chainId = ChainId::generate();
 

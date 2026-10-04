@@ -28,6 +28,7 @@ final readonly class AuthenticatePasskeyCommand
         return $this->challengeKey;
     }
 
+    /** @return array<string, mixed> */
     public function getResponse(): array
     {
         return $this->response;

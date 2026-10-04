@@ -21,6 +21,7 @@ final class DeviceCodeState
     /** @var Scope[] */
     public array $scopes;
 
+    /** @param array<array-key, Scope> $scopes */
     public function __construct(
         public readonly Uuid $id,
         public readonly TokenId $deviceCode,

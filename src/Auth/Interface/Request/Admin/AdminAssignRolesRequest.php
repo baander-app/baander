@@ -16,6 +16,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 )]
 final readonly class AdminAssignRolesRequest
 {
+    /** @param array<array-key, string> $roles */
     public function __construct(
         #[Assert\NotBlank(message: 'Roles are required.')]
         #[Assert\Choice(choices: ['ROLE_USER', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN'], multiple: true)]
