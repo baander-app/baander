@@ -1,4 +1,6 @@
-import type { ContextPanelMode } from '@/features/layout/stores/context-panel-store'
+import type { EqPresetName } from '@/features/equalizer/stores/eq-bands-store'
+import type { LufsTarget, ProcessingModule } from '@/features/equalizer/stores/eq-processing-store'
+import type { ContextPanelMode, ContextPanelTab } from '@/features/layout/stores/context-panel-store'
 
 /**
  * Settings action definitions.
@@ -19,7 +21,7 @@ export interface SettingsApplyEqPayload {
   bands?: number[]
   /** v2 bands with per-band gain + Q */
   bandsV2?: Array<{ gain: number; q: number }>
-  preset?: string
+  preset?: EqPresetName
   visualizerMode?: string
   compressionEnabled?: boolean
   compressorThreshold?: number
@@ -29,12 +31,13 @@ export interface SettingsApplyEqPayload {
   compressorRelease?: number
   masterGain?: number
   normalizationEnabled?: boolean
-  targetLufs?: number
+  targetLufs?: LufsTarget
   stereoEnabled?: boolean
   stereoWidth?: number
   stereoMode?: 'normal' | 'mid' | 'side'
   crossfeedEnabled?: boolean
   crossfeedPreset?: 'light' | 'normal' | 'heavy'
+  chainOrder?: ProcessingModule[]
   loudnessContourEnabled?: boolean
 }
 
@@ -46,4 +49,5 @@ export interface SettingsApplyPlayerPayload {
 
 export interface SettingsApplyLayoutPayload {
   contextPanelMode: ContextPanelMode
+  activeTab: ContextPanelTab
 }

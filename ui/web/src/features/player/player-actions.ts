@@ -28,6 +28,7 @@ export const SETTINGS_PLAYER_ACTIONS = {
 
 export interface SettingsApplyPlayerPayload {
   volume?: number
+  muted?: boolean
   shuffle?: boolean
   repeat?: RepeatMode
   crossfadeEnabled?: boolean

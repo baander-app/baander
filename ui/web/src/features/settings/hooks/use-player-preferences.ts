@@ -2,13 +2,17 @@ import { useCallback } from 'react'
 import { type PlayerState } from '@/features/player/stores/player-store'
 import { mediator } from '@/shared/lib/mediator/bus'
 import { SETTINGS_ACTIONS } from '@/features/settings/settings-actions'
+import type { SettingsApplyPlayerPayload } from '@/features/player/player-actions'
 import { usePreferenceSync } from './use-preference-sync'
 
 const VOLUME_SCALE = 100
+type PlayerPreferenceState = Pick<PlayerState,
+  'shuffle' | 'repeat' | 'volume' | 'muted' | 'crossfadeEnabled' | 'crossfadeDuration'
+>
 
 export function usePlayerPreferences(isActive?: () => boolean) {
 
-  const sync = usePreferenceSync<PlayerState>({
+  const sync = usePreferenceSync<PlayerPreferenceState>({
     isActive,
     baseUrl: '/api/user/player-preferences/',
     toPayload: (state) => ({
@@ -29,15 +33,16 @@ export function usePlayerPreferences(isActive?: () => boolean) {
       muted: payload.muted as boolean,
       crossfadeEnabled: payload.crossfadeEnabled as boolean,
       crossfadeDuration: payload.crossfadeDuration as number,
-    }) as unknown as PlayerState,
+    }),
     onRemoteUpdate: useCallback((data) => {
       mediator.dispatch(SETTINGS_ACTIONS.APPLY_PLAYER, {
         shuffle: data.shuffle,
         repeat: data.repeat,
         volume: data.volume,
+        muted: data.muted,
         crossfadeEnabled: data.crossfadeEnabled,
         crossfadeDuration: data.crossfadeDuration,
-      }, 'settings')
+      } satisfies SettingsApplyPlayerPayload, 'settings')
     }, []),
   })
 

@@ -6,6 +6,6 @@ import type { SettingsApplyLayoutPayload } from '@/features/settings/settings-ac
 export function registerContextPanelHandlers() {
   mediator.on(SETTINGS_ACTIONS.APPLY_LAYOUT, function contextPanelApplyLayoutHandler(payload: unknown) {
     const p = payload as SettingsApplyLayoutPayload
-    useContextPanelStore.setState({ mode: p.contextPanelMode })
+    useContextPanelStore.setState({ mode: p.contextPanelMode, activeTab: p.activeTab })
   })
 }

@@ -4,19 +4,22 @@ import { mediator } from '@/shared/lib/mediator/bus'
 import { SETTINGS_ACTIONS } from '@/features/settings/settings-actions'
 import { usePreferenceSync } from './use-preference-sync'
 
+type LayoutPreferences = Pick<ContextPanelState, 'mode' | 'activeTab'>
+
 export function useLayoutPreferences(isActive?: () => boolean) {
 
-  const sync = usePreferenceSync<ContextPanelState>({
+  const sync = usePreferenceSync<LayoutPreferences>({
     isActive,
     baseUrl: '/api/user/layout-preferences/',
     toPayload: (state) => ({
       mode: state.mode,
       activeTab: state.activeTab,
     }),
-    fromPayload: (payload) => payload as unknown as ContextPanelState,
+    fromPayload: (payload) => payload as LayoutPreferences,
     onRemoteUpdate: useCallback((data) => {
       mediator.dispatch(SETTINGS_ACTIONS.APPLY_LAYOUT, {
         contextPanelMode: data.mode,
+        activeTab: data.activeTab,
       }, 'settings')
     }, []),
   })

@@ -1,32 +1,19 @@
 import { useCallback } from 'react'
-import { useEqBandsStore, DEFAULT_Q } from '@/features/equalizer/stores/eq-bands-store'
-import { useEqProcessingStore } from '@/features/equalizer/stores/eq-processing-store'
+import { useEqBandsStore, DEFAULT_Q, type EqBandsState } from '@/features/equalizer/stores/eq-bands-store'
+import { useEqProcessingStore, type EqProcessingState } from '@/features/equalizer/stores/eq-processing-store'
 import { mediator } from '@/shared/lib/mediator/bus'
-import { SETTINGS_ACTIONS } from '@/features/settings/settings-actions'
+import { SETTINGS_ACTIONS, type SettingsApplyEqPayload } from '@/features/settings/settings-actions'
 import { usePreferenceSync } from './use-preference-sync'
 
-interface AudioPreferencePayload {
-  enabled: boolean
+type AudioPreferencePayload = Pick<EqBandsState, 'enabled' | 'preset' | 'visualizerMode'> & Pick<
+  EqProcessingState,
+  | 'compressionEnabled' | 'compressorThreshold' | 'compressorRatio' | 'compressorKnee'
+  | 'compressorAttack' | 'compressorRelease' | 'masterGain' | 'normalizationEnabled'
+  | 'targetLufs' | 'stereoEnabled' | 'stereoWidth' | 'stereoMode' | 'crossfeedEnabled'
+  | 'crossfeedPreset' | 'loudnessContourEnabled' | 'chainOrder'
+> & {
   bands: number[]
   bandsV2?: Array<{ gain: number; q: number }>
-  preset: string
-  compressionEnabled: boolean
-  compressorThreshold: number
-  compressorRatio: number
-  compressorKnee: number
-  compressorAttack: number
-  compressorRelease: number
-  masterGain: number
-  normalizationEnabled: boolean
-  targetLufs: number
-  visualizerMode: string
-  stereoEnabled: boolean
-  stereoWidth: number
-  stereoMode: string
-  crossfeedEnabled: boolean
-  crossfeedPreset: string
-  loudnessContourEnabled: boolean
-  chainOrder: string[]
 }
 
 function snapshotAudioPreferences(): AudioPreferencePayload {
@@ -71,6 +58,11 @@ export function useAudioPreferences(isActive?: () => boolean) {
         bandsV2: data.bandsV2 ?? data.bands?.map((gain: number) => ({ gain, q: DEFAULT_Q })),
         preset: data.preset,
         compressionEnabled: data.compressionEnabled,
+        compressorThreshold: data.compressorThreshold,
+        compressorRatio: data.compressorRatio,
+        compressorKnee: data.compressorKnee,
+        compressorAttack: data.compressorAttack,
+        compressorRelease: data.compressorRelease,
         masterGain: data.masterGain,
         normalizationEnabled: data.normalizationEnabled,
         targetLufs: data.targetLufs,
@@ -81,7 +73,8 @@ export function useAudioPreferences(isActive?: () => boolean) {
         crossfeedEnabled: data.crossfeedEnabled,
         crossfeedPreset: data.crossfeedPreset,
         loudnessContourEnabled: data.loudnessContourEnabled,
-      }, 'settings')
+        chainOrder: data.chainOrder,
+      } satisfies SettingsApplyEqPayload, 'settings')
     }, []),
   })
 

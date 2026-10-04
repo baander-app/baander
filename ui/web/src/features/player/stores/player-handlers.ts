@@ -1,5 +1,5 @@
 import { mediator } from '@/shared/lib/mediator/bus'
-import { usePlayerStore } from './player-store'
+import { usePlayerStore, type PlayerState } from './player-store'
 import { updateTime } from './player-time-tracker'
 import { PLAYER_ACTIONS, SETTINGS_PLAYER_ACTIONS } from '../player-actions'
 import type {
@@ -64,14 +64,15 @@ export function registerPlayerHandlers() {
 
   mediator.on(SETTINGS_PLAYER_ACTIONS.APPLY, function playerApplySettingsHandler(payload: unknown) {
     const p = payload as SettingsApplyPlayerPayload
-    const updates: Partial<{ volume: number; shuffle: boolean; repeat: string; crossfadeEnabled: boolean; crossfadeDuration: number }> = {}
+    const updates: Partial<PlayerState> = {}
     if (p.volume !== undefined) updates.volume = p.volume
+    if (p.muted !== undefined) updates.muted = p.muted
     if (p.shuffle !== undefined) updates.shuffle = p.shuffle
     if (p.repeat !== undefined) updates.repeat = p.repeat
     if (p.crossfadeEnabled !== undefined) updates.crossfadeEnabled = p.crossfadeEnabled
     if (p.crossfadeDuration !== undefined) updates.crossfadeDuration = p.crossfadeDuration
     if (Object.keys(updates).length > 0) {
-      usePlayerStore.setState(updates as any)
+      usePlayerStore.setState(updates)
     }
   })
 }

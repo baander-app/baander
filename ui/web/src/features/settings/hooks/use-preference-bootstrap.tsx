@@ -116,8 +116,12 @@ function PreferenceSyncSession({ userUuid }: { userUuid: string }) {
 
     const unsubProcessing = useEqProcessingStore.subscribe((state, prevState) => {
       const keys: (keyof typeof state)[] = [
-        'compressionEnabled', 'masterGain', 'normalizationEnabled',
-        'targetLufs',
+        'compressionEnabled', 'compressorThreshold', 'compressorRatio',
+        'compressorKnee', 'compressorAttack', 'compressorRelease',
+        'masterGain', 'normalizationEnabled', 'targetLufs',
+        'stereoEnabled', 'stereoWidth', 'stereoMode',
+        'crossfeedEnabled', 'crossfeedPreset', 'loudnessContourEnabled',
+        'chainOrder',
       ]
       if (keys.some((k) => state[k] !== prevState[k])) {
         audioPushRef.current()
@@ -125,7 +129,9 @@ function PreferenceSyncSession({ userUuid }: { userUuid: string }) {
     })
 
     const unsubPlayer = usePlayerStore.subscribe((state, prevState) => {
-      const keys: (keyof typeof state)[] = ['shuffle', 'repeat', 'volume', 'muted']
+      const keys: (keyof typeof state)[] = [
+        'shuffle', 'repeat', 'volume', 'muted', 'crossfadeEnabled', 'crossfadeDuration',
+      ]
       if (keys.some((k) => state[k] !== prevState[k])) {
         playerPushRef.current(state)
       }
