@@ -15,9 +15,9 @@ use App\Auth\Interface\Resource\AdminUserResource;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\Request\QueryParameters;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
-use Symfony\Component\HttpFoundation\Exception\BadRequestException;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -61,34 +61,25 @@ final class AdminUserController
                     ],
                 ),
             ),
-            new OA\Response(response: '400', description: 'Invalid pagination', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '400', description: 'Invalid query parameters', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('', name: 'list', methods: ['GET'])]
     public function list(Request $request): JsonResponse
     {
-        $role = $request->query->get('role');
-        $disabled = $request->query->has('disabled') ? filter_var($request->query->get('disabled'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) : null;
-        try {
-            $limit = $request->query->getInt('limit', 50);
-            $offset = $request->query->getInt('offset', 0);
-        } catch (BadRequestException) {
-            return $this->errorResponse('Limit and offset must be integers.');
-        }
+        $role = QueryParameters::optionalChoice($request->query, 'role', ['ROLE_USER', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN']);
+        $disabled = QueryParameters::optionalBoolean($request->query, 'disabled');
+        $pagination = QueryParameters::pagination($request->query);
 
-        if ($limit < 1 || $limit > 100 || $offset < 0) {
-            return $this->errorResponse('Limit must be between 1 and 100 and offset must be nonnegative.');
-        }
-
-        $users = $this->userService->findAll($role, $disabled, $limit, $offset);
+        $users = $this->userService->findAll($role, $disabled, $pagination->limit, $pagination->offset);
         $total = $this->userService->count($role, $disabled);
 
         return new JsonResponse([
             'data' => AdminUserResource::collection($users),
             'meta' => [
                 'total' => $total,
-                'limit' => $limit,
-                'offset' => $offset,
+                'limit' => $pagination->limit,
+                'offset' => $pagination->offset,
             ],
         ]);
     }

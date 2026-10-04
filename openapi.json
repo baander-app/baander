@@ -853,7 +853,7 @@
                         }
                     },
                     "400": {
-                        "description": "Invalid pagination",
+                        "description": "Invalid query parameters",
                         "content": {
                             "application/json": {
                                 "schema": {

@@ -8,9 +8,9 @@ use App\Auth\Domain\Repository\LoginBlockRepositoryInterface;
 use App\Auth\Interface\Resource\LoginBlockResource;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\Request\QueryParameters;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
-use Symfony\Component\HttpFoundation\Exception\BadRequestException;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -56,26 +56,17 @@ final class AdminLoginBlockController
     #[Route('', name: 'list', methods: ['GET'])]
     public function list(Request $request): JsonResponse
     {
-        try {
-            $limit = $request->query->getInt('limit', 50);
-            $offset = $request->query->getInt('offset', 0);
-        } catch (BadRequestException) {
-            return $this->errorResponse('Limit and offset must be integers.');
-        }
+        $pagination = QueryParameters::pagination($request->query);
 
-        if ($limit < 1 || $limit > 100 || $offset < 0) {
-            return $this->errorResponse('Limit must be between 1 and 100 and offset must be nonnegative.');
-        }
-
-        $blocks = $this->repository->findRecent($limit, $offset);
+        $blocks = $this->repository->findRecent($pagination->limit, $pagination->offset);
         $total = $this->repository->countRecent();
 
         return new JsonResponse([
             'data' => LoginBlockResource::collection($blocks),
             'meta' => [
                 'total' => $total,
-                'limit' => $limit,
-                'offset' => $offset,
+                'limit' => $pagination->limit,
+                'offset' => $pagination->offset,
             ],
         ]);
     }

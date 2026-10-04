@@ -11,6 +11,7 @@ use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class UserRepository implements UserRepositoryInterface
@@ -86,6 +87,7 @@ final class UserRepository implements UserRepositoryInterface
     {
         $sql = 'SELECT id FROM users WHERE 1=1';
         $params = [];
+        $types = ['limit' => ParameterType::INTEGER, 'offset' => ParameterType::INTEGER];
 
         if ($roleFilter !== null) {
             $sql .= ' AND roles @> :role';
@@ -95,6 +97,7 @@ final class UserRepository implements UserRepositoryInterface
         if ($disabledFilter !== null) {
             $sql .= ' AND disabled = :disabled';
             $params['disabled'] = $disabledFilter;
+            $types['disabled'] = ParameterType::BOOLEAN;
         }
 
         $sql .= ' ORDER BY created_at DESC LIMIT :limit OFFSET :offset';
@@ -103,6 +106,7 @@ final class UserRepository implements UserRepositoryInterface
         $stmt = $conn->executeQuery(
             $sql,
             [...$params, 'limit' => $limit, 'offset' => $offset],
+            $types,
         );
 
         $ids = array_map(static fn(array $row) => Uuid::fromString($row['id']), $stmt->fetchAllAssociative());
@@ -122,6 +126,7 @@ final class UserRepository implements UserRepositoryInterface
     {
         $sql = 'SELECT COUNT(*) FROM users WHERE 1=1';
         $params = [];
+        $types = [];
 
         if ($roleFilter !== null) {
             $sql .= ' AND roles @> :role';
@@ -131,11 +136,12 @@ final class UserRepository implements UserRepositoryInterface
         if ($disabledFilter !== null) {
             $sql .= ' AND disabled = :disabled';
             $params['disabled'] = $disabledFilter;
+            $types['disabled'] = ParameterType::BOOLEAN;
         }
 
         $conn = $this->entityManager->getConnection();
 
-        return (int) $conn->executeQuery($sql, $params)->fetchOne();
+        return (int) $conn->executeQuery($sql, $params, $types)->fetchOne();
     }
 
     private function toDomain(UserEntity $entity): User
