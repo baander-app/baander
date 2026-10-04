@@ -139,8 +139,8 @@ final class MetadataSyncController
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [
-                            new OA\Property(property: 'source', description: 'Match source identifier', type: 'string'),
-                            new OA\Property(property: 'sourceId', description: 'Source-specific ID', type: 'string'),
+                            new OA\Property(property: 'source', description: 'Match source identifier when supplied by the candidate', type: 'string', nullable: true),
+                            new OA\Property(property: 'sourceId', description: 'Source-specific ID when supplied by the candidate', type: 'string', nullable: true),
                             new OA\Property(property: 'confidence', description: 'Match confidence score', type: 'number', format: 'float'),
                             new OA\Property(property: 'data', properties: [
                                 new OA\Property(property: 'title', type: 'string', nullable: true),
@@ -181,18 +181,22 @@ final class MetadataSyncController
         $matches = $this->matchingStrategy->match($metadata, $payload->candidates);
 
         $matchData = array_map(
-            static fn (\App\Metadata\Domain\Model\MetadataMatch $m) => [
-                'source' => $m->getSource(),
-                'sourceId' => $m->getSourceId(),
-                'confidence' => $m->getConfidence(),
-                'data' => [
-                    'title' => $m->getData()->getTitle(),
-                    'artist' => $m->getData()->getArtist(),
-                    'album' => $m->getData()->getAlbum(),
-                    'year' => $m->getData()->getYear(),
-                    'mbid' => $m->getData()->getMbid(),
-                ],
-            ],
+            static function (\App\Metadata\Domain\Model\MetadataMatch $match): array {
+                $candidate = $match->getCandidate();
+
+                return [
+                    'source' => $candidate['source'] ?? null,
+                    'sourceId' => $candidate['sourceId'] ?? null,
+                    'confidence' => $match->getConfidence(),
+                    'data' => [
+                        'title' => $candidate['title'] ?? null,
+                        'artist' => $candidate['artist'] ?? null,
+                        'album' => $candidate['album'] ?? null,
+                        'year' => $candidate['year'] ?? null,
+                        'mbid' => $candidate['mbid'] ?? null,
+                    ],
+                ];
+            },
             $matches,
         );
 

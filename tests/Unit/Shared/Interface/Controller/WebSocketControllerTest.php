@@ -8,9 +8,12 @@ use App\Shared\Infrastructure\Swoole\ReconnectionTokenService;
 use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
 use App\Shared\Infrastructure\Swoole\WebSocketPusher;
 use App\Shared\Interface\Controller\WebSocketController;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Swoole\WebSocket\Server;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
@@ -280,6 +283,44 @@ final class WebSocketControllerTest extends TestCase
         ]));
 
         $this->assertLastPushMatches(1, 'error', ['message' => 'Invalid UUID format']);
+    }
+
+    /** @return iterable<string, array{string, string|null}> */
+    public static function failedPartyCommands(): iterable
+    {
+        yield 'join' => ['party.join', null];
+        yield 'leave' => ['party.leave', null];
+        yield 'play' => ['party.playback', 'play'];
+        yield 'pause' => ['party.playback', 'pause'];
+        yield 'seek' => ['party.playback', 'seek'];
+    }
+
+    #[DataProvider('failedPartyCommands')]
+    public function testPartyHandlerFailureSendsErrorAndKeepsConnectionUsable(string $type, ?string $action): void
+    {
+        $userId = '01900000-0000-7000-8000-000000000001';
+        $sessionId = '01900000-0000-7000-8000-000000000002';
+        $this->bus->method('dispatch')->willReturnCallback(
+            static function (object $command): never {
+                throw new HandlerFailedException(new Envelope($command), [
+                    'party.handler' => new \RuntimeException('Party action denied'),
+                ]);
+            },
+        );
+        $this->controller->onOpen(1, $userId);
+        $messageCount = count($this->pushedMessages);
+
+        $this->controller->onMessage(1, json_encode([
+            'type' => $type,
+            'sessionId' => $sessionId,
+            'action' => $action,
+            'position' => 12.5,
+        ], JSON_THROW_ON_ERROR));
+
+        $this->assertCount($messageCount + 1, $this->pushedMessages);
+        $this->assertLastPushMatches(1, 'error', ['message' => 'Party action denied']);
+        $this->controller->onMessage(1, '{"type":"ping"}');
+        $this->assertLastPushMatches(1, 'pong');
     }
 
     // --- Rate limiting ---

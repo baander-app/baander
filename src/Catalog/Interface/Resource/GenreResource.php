@@ -28,7 +28,7 @@ final class GenreResource extends AbstractResource
             'uuid' => $source->getId()->toString(),
             'name' => $source->getName(),
             'slug' => $source->getSlug(),
-            'parentId' => $source->getParent()?->getId()->toString(),
+            'parentId' => $source->getParent()?->toString(),
             'mbid' => $source->getMbid(),
         ];
     }

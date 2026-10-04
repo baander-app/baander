@@ -284,7 +284,7 @@ final class WebSocketController extends AbstractWebSocketController
         } catch (HandlerFailedException $e) {
             $this->pusher->pushToConnection($fd, [
                 'type'    => 'error',
-                'message' => $e->getNestedExceptions()[0]?->getMessage() ?? $e->getMessage(),
+                'message' => $e->getPrevious()?->getMessage() ?? $e->getMessage(),
             ]);
 
             return;
@@ -349,7 +349,7 @@ final class WebSocketController extends AbstractWebSocketController
         } catch (HandlerFailedException $e) {
             $this->pusher->pushToConnection($fd, [
                 'type'    => 'error',
-                'message' => $e->getNestedExceptions()[0]?->getMessage() ?? $e->getMessage(),
+                'message' => $e->getPrevious()?->getMessage() ?? $e->getMessage(),
             ]);
 
             return;
@@ -437,7 +437,7 @@ final class WebSocketController extends AbstractWebSocketController
         } catch (HandlerFailedException $e) {
             $this->pusher->pushToConnection($fd, [
                 'type'    => 'error',
-                'message' => $e->getNestedExceptions()[0]?->getMessage() ?? $e->getMessage(),
+                'message' => $e->getPrevious()?->getMessage() ?? $e->getMessage(),
             ]);
 
             return;

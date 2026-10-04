@@ -137,6 +137,27 @@ Final combined backend unit verification passes 4,386 tests with 18,452 assertio
 including 14 publication regressions and 11 EQ adapter tests. Deptrac verification
 confirms zero stale-exclusion errors after cleanup and 259 remaining violations.
 
+## Runtime defects found by static analysis
+
+- Genre resources now serialize their parent UUID directly. Root, child, and
+  reconstituted hierarchy regressions cover the existing response contract.
+- Metadata-match responses now map the actual candidate data instead of calling
+  nonexistent model getters. Tests use the real tag reader and matching strategy,
+  covering candidate identity, missing fields, ranking, and filtering. Optional
+  source identifiers are nullable in the specification and generated client.
+- Party WebSocket join, leave, play, pause, and seek failures now read Messenger's
+  original exception through its standard previous-exception chain. Regressions
+  reproduce the old fatal error and verify error delivery plus a usable connection.
+
+All three defects were reproduced before their fixes. Combined backend unit
+verification passes 4,397 tests with 18,509 assertions in the qualified PHP runtime.
+PHPStan now reports 1,693 diagnostics, down from 1,708, with no new diagnostics in
+the changed files. These are bounded runtime repairs; the remaining PHPStan and
+architecture findings still require remediation. The separate party-sync command
+construction mismatch remains a concrete runtime priority. Deptrac remains at 259
+violations with zero configuration errors. OpenAPI and client regeneration are
+limited to the two optional candidate identifiers; the web typecheck passes.
+
 ## Recent verified checkpoints
 
 | Commit | Result | Verification |

@@ -8821,12 +8821,14 @@
                                             "items": {
                                                 "properties": {
                                                     "source": {
-                                                        "description": "Match source identifier",
-                                                        "type": "string"
+                                                        "description": "Match source identifier when supplied by the candidate",
+                                                        "type": "string",
+                                                        "nullable": true
                                                     },
                                                     "sourceId": {
-                                                        "description": "Source-specific ID",
-                                                        "type": "string"
+                                                        "description": "Source-specific ID when supplied by the candidate",
+                                                        "type": "string",
+                                                        "nullable": true
                                                     },
                                                     "confidence": {
                                                         "description": "Match confidence score",

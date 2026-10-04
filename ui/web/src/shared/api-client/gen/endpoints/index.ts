@@ -3957,10 +3957,16 @@ export type PostMetadataMatch200DataItemData = {
 };
 
 export type PostMetadataMatch200DataItem = {
-  /** Match source identifier */
-  source?: string;
-  /** Source-specific ID */
-  sourceId?: string;
+  /**
+     * Match source identifier when supplied by the candidate
+     * @nullable
+     */
+  source?: string | null;
+  /**
+     * Source-specific ID when supplied by the candidate
+     * @nullable
+     */
+  sourceId?: string | null;
   /** Match confidence score */
   confidence?: number;
   data?: PostMetadataMatch200DataItemData;
