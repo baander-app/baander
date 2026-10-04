@@ -1,3 +1,6 @@
+import { withNoopGuard } from '@/shared/stores/with-noop-guard'
+import { createSelectiveJSONStorage } from '@/shared/stores/persistence'
+import { withStoreDebug } from '@/shared/stores/debug'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
@@ -14,17 +17,19 @@ export interface ViewModeState {
 }
 
 export const useViewModeStore = create<ViewModeState>()(
-  persist(
-    (set) => ({
+  withStoreDebug('catalog.view-mode', persist(
+    withNoopGuard((set) => ({
       viewMode: 'grid',
       columnSplitPx: null,
 
       setViewMode: (mode) => set({ viewMode: mode }),
       setColumnSplitPx: (px) => set({ columnSplitPx: px }),
-    }),
+    })),
     {
       name: 'baander-view-mode',
+      storage: createSelectiveJSONStorage(),
       version: 1,
+      partialize: (state) => ({ viewMode: state.viewMode, columnSplitPx: state.columnSplitPx }),
     },
-  ),
+  )),
 )

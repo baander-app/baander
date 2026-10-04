@@ -26,23 +26,26 @@ export function useRadioPlayback() {
     const sorted = [...station.streams].sort((a, b) => b.reliability - a.reliability)
     const bestStream = sorted[0]
 
+    // Local playback owns the current selection immediately. Session replies
+    // carry no playback transition and cannot revive an older station.
+    startStation(station, bestStream.url)
+
     try {
       await startRadioSession(station.id, bestStream.url)
     } catch {
       // API call failed — still play locally, sync later
     }
 
-    startStation(station, bestStream.url)
   }, [startStation, setAllStreamsFailed])
 
   const stop = useCallback(async () => {
+    stopRadio()
     try {
       await stopRadioSession()
     } catch {
       // API call failed — still stop locally
     }
 
-    stopRadio()
   }, [stopRadio])
 
   const handleStreamError = useCallback(() => {

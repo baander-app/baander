@@ -8,17 +8,12 @@ import { usePlayerStore } from '@/features/player/stores/player-store'
  */
 export function useRadioAudio() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const initialized = useRef(false)
 
   const setAudioElement = useRadioStore((s) => s.setAudioElement)
-  const setIsPlaying = useRadioStore((s) => s.setIsPlaying)
+  const observePlaying = useRadioStore((s) => s.observePlaying)
   const tryNextStream = useRadioStore((s) => s.tryNextStream)
-  const setAllStreamsFailed = useRadioStore((s) => s.setAllStreamsFailed)
 
   useEffect(() => {
-    if (initialized.current) return
-    initialized.current = true
-
     const audio = new Audio()
     audio.preload = 'none'
     audioRef.current = audio
@@ -33,25 +28,27 @@ export function useRadioAudio() {
     return () => {
       audio.pause()
       audio.src = ''
-      setAudioElement(null)
+      if (useRadioStore.getState().audioElement === audio) setAudioElement(null)
+      audioRef.current = null
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [setAudioElement])
 
   // Wire audio events to radio store
   useEffect(() => {
     const audio = audioRef.current
     if (!audio) return
 
-    const onPlay = () => setIsPlaying(true)
-    const onPause = () => setIsPlaying(false)
+    const onPlay = () => {
+      if (useRadioStore.getState().audioElement === audio && !audio.paused && !audio.ended) observePlaying(true)
+    }
+    const onPause = () => {
+      if (useRadioStore.getState().audioElement === audio && audio.paused) observePlaying(false)
+    }
 
     const onError = () => {
+      if (useRadioStore.getState().audioElement !== audio || !audio.error) return
       // Try next stream on error
-      const nextUrl = tryNextStream()
-      if (nextUrl === null) {
-        setAllStreamsFailed(true)
-      }
+      tryNextStream()
     }
 
     audio.addEventListener('play', onPlay)
@@ -63,7 +60,7 @@ export function useRadioAudio() {
       audio.removeEventListener('pause', onPause)
       audio.removeEventListener('error', onError)
     }
-  }, [setIsPlaying, tryNextStream, setAllStreamsFailed])
+  }, [observePlaying, tryNextStream])
 
   // Sync volume with player store
   useEffect(() => {

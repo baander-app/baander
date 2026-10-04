@@ -126,7 +126,8 @@ export function Sidebar() {
   const navigate = useNavigate()
   const { isLoading } = useSidebarConfig()
   const activeMedia = useMediaModeStore((s) => s.activeMedia)
-  const { setActiveTab, setMode } = useContextPanelStore()
+  const setActiveTab = useContextPanelStore((state) => state.setActiveTab)
+  const setMode = useContextPanelStore((state) => state.setMode)
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()

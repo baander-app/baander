@@ -1,3 +1,5 @@
+import { withNoopGuard } from '@/shared/stores/with-noop-guard'
+import { withStoreDebug } from '@/shared/stores/debug'
 import { create } from 'zustand'
 import type { PaletteColors } from '../types'
 
@@ -19,7 +21,7 @@ interface PaletteState {
   clearAll: () => void
 }
 
-export const usePaletteStore = create<PaletteState>()((set, get) => ({
+export const usePaletteStore = create<PaletteState>()(withStoreDebug('visualizer.palette', withNoopGuard((set, get) => ({
   palettes: {},
   extracting: new Set<string>(),
 
@@ -36,6 +38,7 @@ export const usePaletteStore = create<PaletteState>()((set, get) => ({
   },
 
   setPalette: (albumPublicId: string, palette: PaletteColors) => {
+    if (get().palettes[albumPublicId] === palette && !get().extracting.has(albumPublicId)) return
     const current = get().extracting
     const next = new Set(current)
     next.delete(albumPublicId)
@@ -46,8 +49,10 @@ export const usePaletteStore = create<PaletteState>()((set, get) => ({
   },
 
   removePalette: (albumPublicId: string) => {
+    if (!(albumPublicId in get().palettes) && !get().extracting.has(albumPublicId)) return
     set((s) => {
-      const { [albumPublicId]: _, ...rest } = s.palettes
+      const rest = { ...s.palettes }
+      delete rest[albumPublicId]
       const nextExtracting = new Set(s.extracting)
       nextExtracting.delete(albumPublicId)
       return { palettes: rest, extracting: nextExtracting }
@@ -55,6 +60,7 @@ export const usePaletteStore = create<PaletteState>()((set, get) => ({
   },
 
   clearAll: () => {
+    if (Object.keys(get().palettes).length === 0 && get().extracting.size === 0) return
     set({ palettes: {}, extracting: new Set<string>() })
   },
-}))
+}))))

@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useEqBandsStore } from '../stores/eq-bands-store'
-import { useEqProcessingStore } from '../stores/eq-processing-store'
+import { captureEqSettings, applyEqSettings } from '../stores/eq-settings'
 import { useEqProfilesStore, type EqProfile, type EqProfileIcon } from '../stores/eq-profiles-store'
-import { reapplyAllEqState } from '../stores/eq-reapply'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card'
@@ -47,58 +45,11 @@ async function apiActivateProfile(id: string) {
 }
 
 function captureCurrentPayload(): Record<string, unknown> {
-  const bandsState = useEqBandsStore.getState()
-  const processingState = useEqProcessingStore.getState()
-  return {
-    enabled: bandsState.enabled,
-    bands: bandsState.bands,
-    preset: bandsState.preset,
-    compressionEnabled: processingState.compressionEnabled,
-    compressorThreshold: processingState.compressorThreshold,
-    compressorRatio: processingState.compressorRatio,
-    compressorKnee: processingState.compressorKnee,
-    compressorAttack: processingState.compressorAttack,
-    compressorRelease: processingState.compressorRelease,
-    masterGain: processingState.masterGain,
-    normalizationEnabled: processingState.normalizationEnabled,
-    targetLufs: processingState.targetLufs,
-    stereoEnabled: processingState.stereoEnabled,
-    stereoWidth: processingState.stereoWidth,
-    stereoMode: processingState.stereoMode,
-    crossfeedEnabled: processingState.crossfeedEnabled,
-    crossfeedPreset: processingState.crossfeedPreset,
-    loudnessContourEnabled: processingState.loudnessContourEnabled,
-    chainOrder: processingState.chainOrder,
-  }
+  return { ...captureEqSettings() }
 }
 
 function applyProfilePayload(payload: Record<string, unknown>) {
-  const bandsState = useEqBandsStore.getState()
-
-  if (payload.bands && Array.isArray(payload.bands)) {
-    useEqBandsStore.setState({
-      bands: payload.bands as Array<{ gain: number; q: number }>,
-      enabled: payload.enabled as boolean ?? true,
-      preset: (payload.preset as string ?? 'FLAT') as typeof bandsState.preset,
-    })
-  }
-
-  const keys = [
-    'compressionEnabled', 'compressorThreshold', 'compressorRatio',
-    'compressorKnee', 'compressorAttack', 'compressorRelease',
-    'masterGain', 'normalizationEnabled', 'targetLufs',
-    'stereoEnabled', 'stereoWidth', 'stereoMode',
-    'crossfeedEnabled', 'crossfeedPreset', 'loudnessContourEnabled',
-  ] as const
-
-  const updates: Record<string, unknown> = {}
-  for (const key of keys) {
-    if (payload[key] !== undefined) updates[key] = payload[key]
-  }
-  if (payload.chainOrder) updates.chainOrder = payload.chainOrder
-
-  useEqProcessingStore.setState(updates)
-  reapplyAllEqState()
+  applyEqSettings(payload)
 }
 
 const HeaderRow = styled.div`
@@ -224,17 +175,21 @@ export function ProfileSelector() {
   // Load profiles on mount
   useEffect(() => {
     if (loaded) return
+    let cancelled = false
     apiListProfiles()
       .then((list) => {
+        if (cancelled) return
         setProfiles(list)
         // Auto-activate default
         const def = list.find((p) => p.isDefault)
         if (def) setActiveProfileId(def.id)
       })
       .catch((err) => {
+        if (cancelled) return
         logger.warn('Failed to load EQ profiles:', err)
         setLoaded(true)
       })
+    return () => { cancelled = true }
   }, [loaded, setProfiles, setActiveProfileId, setLoaded])
 
   const handleCreate = useCallback(async () => {

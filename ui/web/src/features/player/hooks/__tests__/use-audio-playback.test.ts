@@ -1,3 +1,4 @@
+import { updateTime } from '../../stores/player-time-tracker'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act, cleanup } from '@testing-library/react'
 import { reapplyAllEqState } from '@/features/equalizer/stores/eq-reapply'
@@ -114,12 +115,12 @@ function track(publicId: string): Track {
 }
 
 function resetStore(overrides: Partial<PlayerState> = {}) {
+  updateTime(0)
   usePlayerStore.setState({
     queue: [],
     currentIndex: -1,
     currentTrack: null,
     isPlaying: false,
-    currentTime: 0,
     duration: 0,
     shuffle: false,
     repeat: 'off',

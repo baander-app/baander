@@ -127,6 +127,10 @@ jobs:
                 working-directory: ui/web
                 run: yarn test:audio-graph
 
+            -   name: Store isolation and debugger browser workflow
+                working-directory: ui/web
+                run: yarn test:store-debug
+
             -   name: Extract coverage metrics
                 working-directory: ui/web
                 run: |

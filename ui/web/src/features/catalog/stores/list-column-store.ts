@@ -1,3 +1,6 @@
+import { withNoopGuard } from '@/shared/stores/with-noop-guard'
+import { createSelectiveJSONStorage } from '@/shared/stores/persistence'
+import { withStoreDebug } from '@/shared/stores/debug'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
@@ -47,8 +50,8 @@ export interface ListColumnState {
 }
 
 export const useListColumnStore = create<ListColumnState>()(
-  persist(
-    (set) => ({
+  withStoreDebug('catalog.list-column', persist(
+    withNoopGuard((set) => ({
       visibleColumns: DEFAULT_VISIBLE,
       columnOrder: DEFAULT_ORDER,
       columnWidths: { ...DEFAULT_WIDTHS },
@@ -63,15 +66,16 @@ export const useListColumnStore = create<ListColumnState>()(
           }
         }),
 
-      reorderColumns: (order) => set({ columnOrder: order }),
+      reorderColumns: (order) => set((state) => state.columnOrder.length === order.length && state.columnOrder.every((column, index) => column === order[index]) ? state : { columnOrder: [...order] }),
 
       setColumnWidth: (columnId, width) =>
-        set((state) => ({
+        set((state) => state.columnWidths[columnId] === width ? state : ({
           columnWidths: { ...state.columnWidths, [columnId]: width },
         })),
-    }),
+    })),
     {
       name: 'baander-list-columns',
+      storage: createSelectiveJSONStorage(),
       version: 2,
       partialize: (state) => ({
         visibleColumns: state.visibleColumns,
@@ -88,5 +92,5 @@ export const useListColumnStore = create<ListColumnState>()(
         return persisted
       },
     },
-  ),
+  )),
 )

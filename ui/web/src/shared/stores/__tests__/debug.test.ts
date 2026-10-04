@@ -1,0 +1,120 @@
+import { describe, expect, it, vi } from 'vitest'
+import { createStore, type StateCreator } from 'zustand/vanilla'
+import { persist } from 'zustand/middleware'
+import { createStoreDebugger, captureState } from '../debug'
+import { createSelectiveJSONStorage } from '../persistence'
+
+describe('store tracing', () => {
+  it('cannot be enabled by a saved preference in production builds', async () => {
+    localStorage.setItem('baander-store-debug', 'true')
+    vi.stubEnv('DEV', false)
+    vi.resetModules()
+    try {
+      const module = await import('../debug')
+      expect(module.storeDebugger.enabled).toBe(false)
+      const creator = () => ({ count: 0 })
+      expect(module.withStoreDebug('production', creator)).toBe(creator)
+    } finally {
+      localStorage.removeItem('baander-store-debug')
+      vi.unstubAllEnvs()
+      vi.resetModules()
+    }
+  })
+
+  it('returns the exact creator when disabled and never wraps actions or captures updates', () => {
+    const recorder = createStoreDebugger(false)
+    const action = vi.fn()
+    const creator: StateCreator<{ count: number; action: () => void }> = () => ({ count: 0, action })
+    expect(recorder.instrument('counter', creator)).toBe(creator)
+    const store = createStore(recorder.instrument('counter', creator))
+    expect(store.getState().action).toBe(action)
+    const listener = vi.fn()
+    recorder.subscribe(listener)
+    for (let i = 1; i <= 1000; i++) store.setState({ count: i })
+    expect(recorder.getSnapshot()).toEqual({ events: [], stores: {}, droppedEvents: 0 })
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('captures immutable before/after state, ordered nested calls and native setState', () => {
+    const recorder = createStoreDebugger(true)
+    const store = createStore(recorder.instrument<{ count: number; add: () => void; twice: () => void }>('counter', (set, get) => ({
+      count: 0,
+      add: () => set({ count: get().count + 1 }),
+      twice: () => { get().add(); get().add() },
+    })))
+    store.getState().twice()
+    const events = recorder.getSnapshot().events
+    const outer = events.find(event => event.action === 'twice' && event.kind === 'action')!
+    const nested = events.filter(event => event.action === 'add' && event.kind === 'action')
+    expect(nested).toHaveLength(2)
+    expect(nested.every(event => event.parentId === outer.id)).toBe(true)
+    const changes = events.filter(event => event.kind === 'update')
+    expect(changes.map(event => event.after?.value)).toEqual([{ count: 1 }, { count: 2 }])
+    expect(changes[0].parentId).toBe(nested[0].id)
+    expect(changes[0].stack).toContain('debug.test')
+    expect(Object.isFrozen(changes[0].after?.value)).toBe(true)
+    store.setState({ count: 3 })
+    expect(recorder.getSnapshot().events.at(-1)?.parentId).toBeNull()
+    expect(changes[0].after?.value).toEqual({ count: 1 })
+    expect(events.map(event => event.id)).toEqual([...events.map(event => event.id)].sort((a, b) => a - b))
+  })
+
+  it('preserves async promise identity and errors without guessing parentage after await', async () => {
+    const recorder = createStoreDebugger(true)
+    let finish!: () => void
+    const pending = new Promise<void>(resolve => { finish = resolve })
+    const store = createStore(recorder.instrument('async', () => ({ run: () => pending })))
+    expect(store.getState().run()).toBe(pending)
+    finish()
+    await pending
+    expect(recorder.getSnapshot().events.at(-1)?.kind).toBe('resolved')
+    const failure = new Error('private detail')
+    const failed = createStore(recorder.instrument('failed', () => ({ run: () => Promise.reject(failure) })))
+    await expect(failed.getState().run()).rejects.toBe(failure)
+    expect(recorder.getSnapshot().events.at(-1)?.kind).toBe('rejected')
+    expect(recorder.exportTrace()).not.toContain('private detail')
+  })
+
+  it('redacts authentication arguments/state and never invokes object accessors', () => {
+    const recorder = createStoreDebugger(true)
+    const store = createStore(recorder.instrument('auth', () => ({
+      accessToken: 'secret-token', user: { email: 'private@baander.app' }, isAuthenticated: false,
+      login: vi.fn<(email: string, password: string) => void>(),
+    })))
+    store.getState().login('private@baander.app', 'private-password')
+    expect(recorder.exportTrace()).not.toMatch(/secret-token|private@|private-password/)
+    const getter = vi.fn(() => 'secret')
+    const value = Object.defineProperty({}, 'unsafe', { enumerable: true, get: getter })
+    expect(captureState(value)).toEqual({ value: { unsafe: '[accessor]' }, complete: false })
+    const array = Object.defineProperty([], '0', { enumerable: true, get: getter })
+    expect(captureState(array)).toEqual({ value: ['[accessor or empty slot]'], complete: false })
+    expect(getter).not.toHaveBeenCalled()
+  })
+
+  it('bounds retained history and marks incomplete captures for future replay', () => {
+    const recorder = createStoreDebugger(true, 3)
+    const store = createStore(recorder.instrument('counter', () => ({ count: 0 })))
+    for (let count = 1; count <= 8; count++) store.setState({ count })
+    expect(recorder.getSnapshot().events).toHaveLength(3)
+    expect(recorder.getSnapshot().droppedEvents).toBe(5)
+    expect(captureState(Array.from({ length: 100 }, (_, index) => index)).complete).toBe(false)
+    expect(JSON.parse(recorder.exportTrace()).schemaVersion).toBe(1)
+    recorder.clear()
+    store.setState({ count: 9 })
+    expect(recorder.getSnapshot().events[0].id).toBe(9)
+  })
+
+  it('composes with persistence without duplicate update records or changed middleware APIs', () => {
+    const recorder = createStoreDebugger(true)
+    const storage = createSelectiveJSONStorage<{ count: number }>(() => ({ getItem: () => null, setItem: vi.fn(), removeItem: vi.fn() }))
+    const store = createStore(recorder.instrument('persisted', persist<{ count: number; increment: () => void }, [], [], { count: number }>(set => ({
+      count: 0, increment: () => set(state => ({ count: state.count + 1 })),
+    }), { name: 'counter', storage, partialize: state => ({ count: state.count }) })))
+    recorder.clear()
+    store.getState().increment()
+    expect(recorder.getSnapshot().events.map(event => event.kind)).toEqual(['action', 'update', 'resolved'])
+    store.setState({ count: 4 })
+    expect(recorder.getSnapshot().events.filter(event => event.kind === 'update')).toHaveLength(2)
+    expect(store.persist.hasHydrated()).toBe(true)
+  })
+})

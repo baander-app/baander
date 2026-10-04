@@ -213,7 +213,7 @@ export function LyricsAdminPage() {
   const { data: coverage, isLoading: coverageLoading } = useLyricsCoverage()
   const { data: syncStatus, isLoading: syncLoading } = useLyricsSyncStatus()
   const bulkFetch = useBulkFetchLyrics()
-  const roles = useAuthStore((s) => s.user?.roles ?? [])
+  const roles = useAuthStore((s) => s.user?.roles) ?? []
   const isSuperAdmin = roles.includes('ROLE_SUPER_ADMIN')
 
   if (coverageLoading || syncLoading) {

@@ -181,11 +181,13 @@ describe('useEqProcessingStore — enable toggles', () => {
     expect(mockProcessor.setCrossfeed).not.toHaveBeenCalled()
     expect(useEqProcessingStore.getState().crossfeedPreset).toBe('light')
 
-    // Enable, then changing the preset forwards the mapped amount.
+    // Enabling applies the stored amount; only changing the preset applies again.
     useEqProcessingStore.getState().setCrossfeedEnabled(true)
     mockProcessor.setCrossfeed.mockClear()
     useEqProcessingStore.getState().setCrossfeedPreset('light')
-    expect(mockProcessor.setCrossfeed).toHaveBeenCalledWith(CROSSFEED_PRESETS.light)
+    expect(mockProcessor.setCrossfeed).not.toHaveBeenCalled()
+    useEqProcessingStore.getState().setCrossfeedPreset('heavy')
+    expect(mockProcessor.setCrossfeed).toHaveBeenCalledWith(CROSSFEED_PRESETS.heavy)
   })
 
   it('setLoudnessContourEnabled flips the flag and forwards to the processor', () => {

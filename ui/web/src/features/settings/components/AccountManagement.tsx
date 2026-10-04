@@ -211,9 +211,7 @@ function ChangeEmailDialog({ open, onOpenChange }: { open: boolean; onOpenChange
     try {
       await AXIOS_INSTANCE.put('/api/auth/me/email', { email })
       // Update the local user state
-      useAuthStore.setState((s) => ({
-        user: s.user ? { ...s.user, email } : null,
-      }))
+      useAuthStore.getState().updateUser({ email })
       onOpenChange(false)
     } catch (err: unknown) {
       setError(parseApiError(err, 'Failed to change email.').message)

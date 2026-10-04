@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useEqBandsStore } from '../eq-bands-store'
 import { useEqProcessingStore } from '../eq-processing-store'
 import { reapplyAllEqState } from '../eq-reapply'
+import { applyEqSettings, captureEqSettings } from '../eq-settings'
 
 const audio = vi.hoisted(() => ({
   get: vi.fn(), post: vi.fn(),
@@ -85,6 +86,35 @@ describe('processor state reapplication', () => {
     expect(audio.processor.setCompressorParams).toHaveBeenCalledWith({ threshold: -32, ratio: 6, knee: 12, attack: 7, release: 180 })
     expect(audio.processor.rebuildChain).toHaveBeenCalledWith(payload.chainOrder)
     expect(result.current.versionRef.current).toBe(5)
+  })
+
+  it('restores a complete comparison snapshot to both stores and the processor', () => {
+    const snapshot = captureEqSettings()
+    snapshot.bands[0].gain = 5
+    snapshot.compressorThreshold = -32
+    snapshot.compressionEnabled = true
+    snapshot.normalizationEnabled = true
+    snapshot.targetLufs = -23
+    applyEqSettings({ ...snapshot })
+    expect(useEqBandsStore.getState().bands[0].gain).toBe(5)
+    expect(audio.processor.updateEQBands).toHaveBeenCalledWith(snapshot.bands)
+    expect(audio.processor.setNormalization).toHaveBeenCalledWith(true, -23)
+    expect(audio.processor.setCompressorParams).toHaveBeenCalledWith(expect.objectContaining({ threshold: -32 }))
+  })
+
+  it('skips notifications, processor calls and storage for equal detached settings', () => {
+    const snapshot = captureEqSettings()
+    const bandsNotify = vi.fn(), processingNotify = vi.fn()
+    const bandsUnsubscribe = useEqBandsStore.subscribe(bandsNotify), processingUnsubscribe = useEqProcessingStore.subscribe(processingNotify)
+    const write = vi.spyOn(Storage.prototype, 'setItem')
+    applyEqSettings({ ...snapshot })
+    expect(bandsNotify).not.toHaveBeenCalled()
+    expect(processingNotify).not.toHaveBeenCalled()
+    expect(audio.processor.updateEQBands).not.toHaveBeenCalled()
+    expect(audio.processor.setNormalization).not.toHaveBeenCalled()
+    expect(write).not.toHaveBeenCalled()
+    write.mockRestore()
+    bandsUnsubscribe(); processingUnsubscribe()
   })
 
 })

@@ -5,8 +5,12 @@ import { useDevPanelStore } from '@/shared/stores/dev-panel-store'
 import { ActionTimeline } from './ActionTimeline'
 import { HandlerMap } from './HandlerMap'
 import { StoreInspector } from './StoreInspector'
+import { StoreTimeline } from './StoreTimeline'
+import { storeDebugger, setStoreDebugEnabled } from '@/shared/stores/debug'
+import { Button } from '@/shared/components/ui/button'
+import { focusVisibleRing } from '@/shared/theme'
 
-type Tab = 'timeline' | 'handlers' | 'inspector'
+type Tab = 'timeline' | 'handlers' | 'inspector' | 'stores'
 
 const ToggleButton = styled.button`
   position: fixed;
@@ -19,7 +23,6 @@ const ToggleButton = styled.button`
   background-color: color-mix(in srgb, var(--color-muted) 80%, transparent);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   backdrop-filter: blur(4px);
   cursor: pointer;
 
@@ -33,14 +36,13 @@ const Panel = styled.div`
   bottom: 0;
   right: 0;
   z-index: 50;
-  width: 520px;
-  height: 400px;
+  width: min(900px, 100vw);
+  height: min(600px, 80vh);
   background-color: var(--color-background);
   border: 1px solid var(--color-border);
   border-bottom: none;
   border-right: none;
   border-top-left-radius: var(--radius-lg);
-  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
   display: flex;
   flex-direction: column;
 `
@@ -63,6 +65,9 @@ const TabButton = styled.button<{ $active: boolean }>`
   font-size: 0.75rem;
   border-radius: var(--radius-md);
   cursor: pointer;
+  border: 0;
+  background: transparent;
+  &:focus-visible { ${focusVisibleRing} }
 
   ${props => props.$active
     ? css`
@@ -92,6 +97,9 @@ const CloseButton = styled.button`
   color: var(--color-muted-foreground);
   font-size: 0.75rem;
   cursor: pointer;
+  border: 0;
+  background: transparent;
+  &:focus-visible { ${focusVisibleRing} }
 
   &:hover {
     color: var(--color-foreground);
@@ -100,7 +108,11 @@ const CloseButton = styled.button`
 
 const PanelContent = styled.div`
   flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
+  > button { align-self: flex-start; flex-shrink: 0; margin: 8px 16px; }
 `
 
 /**
@@ -117,24 +129,21 @@ export function MediatorDevPanel() {
 
   // Live updates via mediator subscription
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen || !visible) return
 
     const unsub = mediator.subscribe(() => {
       setLog(mediator.getActionLog())
       setHandlerMap(mediator.getHandlerMap())
     })
 
-    // Sync initial state
-    setLog(mediator.getActionLog())
-    setHandlerMap(mediator.getHandlerMap())
-
     return unsub
-  }, [isOpen])
+  }, [isOpen, visible])
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'timeline', label: 'Action Timeline' },
     { id: 'handlers', label: 'Handlers' },
     { id: 'inspector', label: 'Store Inspector' },
+    { id: 'stores', label: 'Store Timeline' },
   ]
 
   if (!visible) return null
@@ -142,7 +151,11 @@ export function MediatorDevPanel() {
   if (!isOpen) {
     return (
       <ToggleButton
-        onClick={() => setIsOpen(true)}
+        onClick={() => {
+          setLog(mediator.getActionLog())
+          setHandlerMap(mediator.getHandlerMap())
+          setIsOpen(true)
+        }}
         aria-label="Toggle debug panel"
       >
         🐛 Debug
@@ -159,6 +172,7 @@ export function MediatorDevPanel() {
             <TabButton
               key={tab.id}
               $active={activeTab === tab.id}
+              aria-pressed={activeTab === tab.id}
               onClick={() => setActiveTab(tab.id)}
             >
               {tab.label}
@@ -166,7 +180,7 @@ export function MediatorDevPanel() {
           ))}
         </TabGroup>
         <HeaderActions>
-          <ActionCount>{log.length} actions</ActionCount>
+          {(activeTab === 'timeline' || activeTab === 'handlers') && <ActionCount>{log.length} mediator actions</ActionCount>}
           <CloseButton
             onClick={() => setIsOpen(false)}
             aria-label="Close debug panel"
@@ -180,7 +194,18 @@ export function MediatorDevPanel() {
       <PanelContent>
         {activeTab === 'timeline' && <ActionTimeline log={log} />}
         {activeTab === 'handlers' && <HandlerMap handlerMap={handlerMap} />}
-        {activeTab === 'inspector' && <StoreInspector />}
+        {(activeTab === 'inspector' || activeTab === 'stores') && !storeDebugger.enabled && (
+          <div>
+            <p>Store recording is disabled. Enabling it reloads the app and adds tracing overhead.</p>
+            {import.meta.env.DEV ? <Button onClick={() => setStoreDebugEnabled(true)}>Enable store tracing and reload</Button>
+              : <p>Use a development build to enable recording.</p>}
+          </div>
+        )}
+        {storeDebugger.enabled && (activeTab === 'inspector' || activeTab === 'stores') && (
+          <Button size="sm" onClick={() => setStoreDebugEnabled(false)}>Disable store tracing and reload</Button>
+        )}
+        {activeTab === 'inspector' && storeDebugger.enabled && <StoreInspector />}
+        {activeTab === 'stores' && storeDebugger.enabled && <StoreTimeline />}
       </PanelContent>
     </Panel>
   )

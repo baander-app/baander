@@ -1,6 +1,7 @@
-import { useEffect, useCallback, useRef } from 'react'
+import { useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePlayerStore } from '@/features/player/stores/player-store'
+import { getCurrentTime } from '@/features/player/stores/player-time-tracker'
 import { useContextPanelStore } from '@/features/layout/stores/context-panel-store'
 import { useLyricsFullscreenStore } from '@/features/layout/stores/lyrics-fullscreen-store'
 import { toast } from 'sonner'
@@ -30,21 +31,20 @@ interface KeyboardShortcutsOptions {
 
 export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
   const navigate = useNavigate()
-  const registryRef = useRef<boolean>(false)
   const { onToggleHelp, onFocusSearch } = options
 
-  // Build and register shortcuts once on mount
-  if (!registryRef.current) {
+  // Keep external shortcut registration in the effect lifecycle.
+  useEffect(() => {
     clearRegistry()
 
     const definitions = createShortcutDefinitions({
       // Player store (using getState for stable references)
-      setIsPlaying: (p) => usePlayerStore.setState({ isPlaying: p }),
+      setIsPlaying: (p) => usePlayerStore.getState().setIsPlaying(p),
       isPlaying: () => usePlayerStore.getState().isPlaying,
       playNext: () => usePlayerStore.getState().playNext(),
       playPrevious: () => usePlayerStore.getState().playPrevious(),
       seekTo: (t) => usePlayerStore.getState().seekTo(t),
-      getCurrentTime: () => usePlayerStore.getState().currentTime,
+      getCurrentTime,
       setVolume: (v) => usePlayerStore.getState().setVolume(v),
       getVolume: () => usePlayerStore.getState().volume,
       toggleShuffle: () => usePlayerStore.getState().toggleShuffle(),
@@ -80,8 +80,8 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
       registerShortcut(entry)
     }
 
-    registryRef.current = true
-  }
+    return clearRegistry
+  }, [navigate, onToggleHelp, onFocusSearch])
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -108,7 +108,7 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
         }
       }
     },
-    [onToggleHelp, onFocusSearch],
+    [onToggleHelp],
   )
 
   useEffect(() => {

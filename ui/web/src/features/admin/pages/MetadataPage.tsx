@@ -162,7 +162,7 @@ export function MetadataPage() {
   const triggerSync = useTriggerMetadataSync()
   const triggerGenreSync = useTriggerGenreSync()
   const { data: genres } = useGenres()
-  const roles = useAuthStore((s) => s.user?.roles ?? [])
+  const roles = useAuthStore((s) => s.user?.roles) ?? []
   const isSuperAdmin = roles.includes('ROLE_SUPER_ADMIN')
 
   if (isLoading) {

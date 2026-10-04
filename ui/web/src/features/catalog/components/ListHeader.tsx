@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import styled, { css } from 'styled-components'
 import { useCallback, useMemo, useState } from 'react'
 import {
@@ -169,7 +170,7 @@ function DraggableColumn({
 }
 
 export function ListHeader({ sort, onSortChange }: ListHeaderProps) {
-  const { visibleColumns, columnOrder, columnWidths, toggleColumn, reorderColumns, setColumnWidth } = useListColumnStore()
+  const { visibleColumns, columnOrder, columnWidths, toggleColumn, reorderColumns, setColumnWidth } = useListColumnStore(useShallow((state) => ({ visibleColumns: state.visibleColumns, columnOrder: state.columnOrder, columnWidths: state.columnWidths, toggleColumn: state.toggleColumn, reorderColumns: state.reorderColumns, setColumnWidth: state.setColumnWidth })))
 
   const orderedVisible = useMemo(
     () =>

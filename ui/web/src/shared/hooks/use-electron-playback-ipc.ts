@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { usePlayerStore } from '@/features/player/stores/player-store'
+import { getCurrentTime } from '@/features/player/stores/player-time-tracker'
 
 declare global {
   interface Window {
@@ -26,7 +27,7 @@ export function useElectronPlaybackIpc() {
 
     const unsubToggle = electron.playback.onToggle(() => {
       const { isPlaying } = usePlayerStore.getState()
-      usePlayerStore.setState({ isPlaying: !isPlaying })
+      usePlayerStore.getState().setIsPlaying(!isPlaying)
     })
 
     const unsubNext = electron.playback.onNext(() => {
@@ -38,13 +39,11 @@ export function useElectronPlaybackIpc() {
     })
 
     const unsubSeekFwd = electron.playback.onSeekForward(() => {
-      const { currentTime } = usePlayerStore.getState()
-      usePlayerStore.getState().seekTo(currentTime + 10)
+      usePlayerStore.getState().seekTo(getCurrentTime() + 10)
     })
 
     const unsubSeekBack = electron.playback.onSeekBackward(() => {
-      const { currentTime } = usePlayerStore.getState()
-      usePlayerStore.getState().seekTo(Math.max(0, currentTime - 10))
+      usePlayerStore.getState().seekTo(Math.max(0, getCurrentTime() - 10))
     })
 
     return () => {

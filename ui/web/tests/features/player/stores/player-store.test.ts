@@ -1,3 +1,4 @@
+import { getCurrentTime, updateTime } from '@/features/player/stores/player-time-tracker'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { usePlayerStore, type Track } from '@/features/player/stores/player-store'
 
@@ -19,13 +20,13 @@ const mockTrack2: Track = {
 }
 
 beforeEach(() => {
+  updateTime(0)
   localStorage.clear()
   usePlayerStore.setState({
     queue: [],
     currentIndex: -1,
     currentTrack: null,
     isPlaying: false,
-    currentTime: 0,
     duration: 0,
     shuffle: false,
     repeat: 'off' as const,
@@ -120,11 +121,12 @@ describe('player-store', () => {
     })
 
     it('restarts current track if past 3 seconds', () => {
-      usePlayerStore.setState({ queue: [mockTrack, mockTrack2], currentIndex: 1, currentTrack: mockTrack2, currentTime: 5 })
+      updateTime(5)
+      usePlayerStore.setState({ queue: [mockTrack, mockTrack2], currentIndex: 1, currentTrack: mockTrack2 })
       usePlayerStore.getState().playPrevious()
       const state = usePlayerStore.getState()
       expect(state.currentIndex).toBe(1)
-      expect(state.currentTime).toBe(0)
+      expect(getCurrentTime()).toBe(0)
     })
 
     it('wraps to last track if at start of queue', () => {
@@ -149,14 +151,14 @@ describe('player-store', () => {
     it('resets all queue and playback state', () => {
       usePlayerStore.setState({
         queue: [mockTrack, mockTrack2], currentIndex: 1, currentTrack: mockTrack2,
-        isPlaying: true, currentTime: 50, duration: 180,
+        isPlaying: true, duration: 180,
       })
       usePlayerStore.getState().clearQueue()
       const state = usePlayerStore.getState()
       expect(state.queue).toHaveLength(0)
       expect(state.currentTrack).toBeNull()
       expect(state.isPlaying).toBe(false)
-      expect(state.currentTime).toBe(0)
+      expect(getCurrentTime()).toBe(0)
       expect(state.duration).toBe(0)
     })
   })

@@ -1,71 +1,15 @@
-import { useEqBandsStore, type BandConfig } from '../stores/eq-bands-store'
-import { useEqProcessingStore } from '../stores/eq-processing-store'
+import { captureEqSettings, applyEqSettings } from '../stores/eq-settings'
 import { useEqCompareStore, type EqSnapshot } from '../stores/eq-compare-store'
 import { Button } from '@/shared/components/ui/button'
 import styled from 'styled-components'
 
 function captureCurrentState(label: string): EqSnapshot {
-  const bandsState = useEqBandsStore.getState()
-  const processingState = useEqProcessingStore.getState()
-  return {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    label,
-    timestamp: Date.now(),
-    bands: [...bandsState.bands],
-    processing: {
-      compressionEnabled: processingState.compressionEnabled,
-      compressorThreshold: processingState.compressorThreshold,
-      compressorRatio: processingState.compressorRatio,
-      masterGain: processingState.masterGain,
-      stereoEnabled: processingState.stereoEnabled,
-      stereoWidth: processingState.stereoWidth,
-      crossfeedEnabled: processingState.crossfeedEnabled,
-      crossfeedPreset: processingState.crossfeedPreset,
-      loudnessContourEnabled: processingState.loudnessContourEnabled,
-      normalizationEnabled: processingState.normalizationEnabled,
-      targetLufs: processingState.targetLufs,
-    },
-  }
+  const { bands, ...processing } = captureEqSettings()
+  return { id: crypto.randomUUID(), label, timestamp: Date.now(), bands, processing }
 }
 
 function restoreSnapshot(snapshot: EqSnapshot) {
-  const bandsState = useEqBandsStore.getState()
-  const processingState = useEqProcessingStore.getState()
-
-  // Restore bands
-  if (snapshot.bands.length === bandsState.bands.length) {
-    bandsState.setPreset('FLAT' as never) // clear preset
-    useEqBandsStore.setState({
-      bands: [...snapshot.bands] as BandConfig[],
-    })
-  }
-
-  // Restore processing
-  const p = snapshot.processing as Record<string, unknown>
-  if (typeof p.compressorThreshold === 'number') {
-    processingState.setCompressorParams({
-      threshold: p.compressorThreshold as number,
-      ratio: p.compressorRatio as number,
-    })
-  }
-  if (typeof p.masterGain === 'number') {
-    processingState.setMasterGain(p.masterGain as number)
-  }
-  if (typeof p.stereoEnabled === 'boolean') {
-    processingState.setStereoEnabled(p.stereoEnabled as boolean)
-  }
-  if (typeof p.stereoWidth === 'number') {
-    processingState.setStereoWidth(p.stereoWidth as number)
-  }
-  if (typeof p.crossfeedEnabled === 'boolean') {
-    processingState.setCrossfeedEnabled(p.crossfeedEnabled as boolean)
-  }
-  if (typeof p.crossfeedPreset === 'string') {
-    processingState.setCrossfeedPreset(p.crossfeedPreset as 'light' | 'normal' | 'heavy')
-  }
-  if (typeof p.loudnessContourEnabled === 'boolean') {
-    processingState.setLoudnessContourEnabled(p.loudnessContourEnabled as boolean)
-  }
+  applyEqSettings({ ...snapshot.processing, bands: snapshot.bands })
 }
 
 const SlotColumn = styled.div`

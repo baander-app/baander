@@ -83,7 +83,7 @@ const FAKE_KEY_PAIR = {
 
 const VALID_USER = {
   uuid: 'user-1',
-  email: 'test@example.com',
+  email: 'test@baander.app',
   publicId: 'usr_abc123',
   name: null,
   roles: ['ROLE_USER'],
@@ -117,7 +117,7 @@ describe('useAuthStore', () => {
     // Defaults
     mockAxios.post.mockResolvedValue({ data: {} })
     mockGenerateDpopKeyPair.mockResolvedValue(FAKE_KEY_PAIR)
-    mockPostAuthLogout.mockResolvedValue({ data: {} } as any)
+    mockPostAuthLogout.mockResolvedValue({ data: {} } as Awaited<ReturnType<typeof postAuthLogout>>)
     mockLoadStoredAuth.mockResolvedValue(null)
   })
 
@@ -125,7 +125,7 @@ describe('useAuthStore', () => {
     it('sets tokens/user/isAuthenticated and persists auth + posts token to worker on valid response', async () => {
       mockAxios.post.mockResolvedValue(validLoginResponse())
 
-      await useAuthStore.getState().login('test@example.com', 'secret')
+      await useAuthStore.getState().login('test@baander.app', 'secret')
 
       const state = useAuthStore.getState()
       expect(state.accessToken).toBe('access-token-123')
@@ -162,7 +162,7 @@ describe('useAuthStore', () => {
       )
       mockGenerateDpopKeyPair.mockResolvedValue(FAKE_KEY_PAIR)
 
-      const firstCall = useAuthStore.getState().login('a@b.com', 'pw')
+      const firstCall = useAuthStore.getState().login('a@baander.app', 'pw')
 
       // Let the microtask queue drain so `isLoading` is set before the second call.
       await Promise.resolve()
@@ -171,7 +171,7 @@ describe('useAuthStore', () => {
       const beforeSecondCall = mockAxios.post.mock.calls.length
 
       // Second concurrent login attempt.
-      await expect(useAuthStore.getState().login('c@d.com', 'pw')).rejects.toThrow(
+      await expect(useAuthStore.getState().login('c@baander.app', 'pw')).rejects.toThrow(
         'Login already in progress',
       )
 
@@ -192,7 +192,7 @@ describe('useAuthStore', () => {
       mockGenerateDpopKeyPair.mockResolvedValue(FAKE_KEY_PAIR)
 
       await expect(
-        useAuthStore.getState().login('test@example.com', 'secret'),
+        useAuthStore.getState().login('test@baander.app', 'secret'),
       ).rejects.toThrow('Login response missing required token fields')
 
       // The finally block resets isLoading even on failure.
@@ -209,7 +209,7 @@ describe('useAuthStore', () => {
       mockGenerateDpopKeyPair.mockResolvedValue(FAKE_KEY_PAIR)
 
       await expect(
-        useAuthStore.getState().login('test@example.com', 'secret'),
+        useAuthStore.getState().login('test@baander.app', 'secret'),
       ).rejects.toThrow('network down')
 
       expect(useAuthStore.getState().isLoading).toBe(false)
@@ -238,7 +238,7 @@ describe('useAuthStore', () => {
 
       // clearAuth cleared both the DPoP key pair and IndexedDB.
       expect(mockClearDpopKeyPair).toHaveBeenCalledOnce()
-      expect(mockClearStoredAuth).toHaveBeenCalledOnce()
+      await vi.waitFor(() => expect(mockClearStoredAuth).toHaveBeenCalledOnce())
     })
 
     it('clears auth even when the logout network call rejects', async () => {
@@ -262,7 +262,7 @@ describe('useAuthStore', () => {
       expect(state.isLoading).toBe(false)
 
       expect(mockClearDpopKeyPair).toHaveBeenCalledOnce()
-      expect(mockClearStoredAuth).toHaveBeenCalledOnce()
+      await vi.waitFor(() => expect(mockClearStoredAuth).toHaveBeenCalledOnce())
     })
   })
 
@@ -272,7 +272,7 @@ describe('useAuthStore', () => {
       useAuthStore.getState().clearAuth()
       expect(mockPostTokenToWorker).toHaveBeenCalledWith(null)
     })
-    it('clears DPoP key pair, state, and IndexedDB', () => {
+    it('clears DPoP key pair, state, and IndexedDB', async () => {
       useAuthStore.setState({
         accessToken: 'tok',
         refreshToken: 'ref',
@@ -289,7 +289,7 @@ describe('useAuthStore', () => {
       expect(state.isAuthenticated).toBe(false)
 
       expect(mockClearDpopKeyPair).toHaveBeenCalledOnce()
-      expect(mockClearStoredAuth).toHaveBeenCalledOnce()
+      await vi.waitFor(() => expect(mockClearStoredAuth).toHaveBeenCalledOnce())
     })
   })
 
@@ -353,4 +353,105 @@ describe('useAuthStore', () => {
       expect(state.accessToken).toBeNull()
     })
   })
+})
+
+describe('auth request ownership', () => {
+  beforeEach(async () => {
+    useAuthStore.getState().clearAuth()
+    await vi.waitFor(() => expect(mockClearStoredAuth).toHaveBeenCalled())
+    vi.clearAllMocks()
+    mockLoadStoredAuth.mockResolvedValue(null)
+    mockGenerateDpopKeyPair.mockResolvedValue(FAKE_KEY_PAIR)
+    mockSaveStoredAuth.mockResolvedValue(undefined)
+  })
+
+  it('does not restore keys or tokens from hydration after clearAuth', async () => {
+    let resolve!: (value: Awaited<ReturnType<typeof loadStoredAuth>>) => void
+    mockLoadStoredAuth.mockReturnValueOnce(new Promise((yes) => { resolve = yes }))
+    const hydrate = useAuthStore.getState().initAuth()
+    await vi.waitFor(() => expect(mockLoadStoredAuth).toHaveBeenCalled())
+    useAuthStore.getState().clearAuth()
+    resolve({ cryptoKeyPair: { publicKey: FAKE_KEY_PAIR.publicKey, privateKey: FAKE_KEY_PAIR.privateKey },
+      publicJwk: FAKE_KEY_PAIR.jwk, jkt: FAKE_KEY_PAIR.jkt, accessToken: 'old', refreshToken: 'old-refresh', user: VALID_USER, nonce: null })
+    await hydrate
+    expect(useAuthStore.getState().isAuthenticated).toBe(false)
+    expect(mockSetDpopKeyPair).not.toHaveBeenCalled()
+    expect(mockPostTokenToWorker).not.toHaveBeenCalledWith('old')
+  })
+
+  it('does not restore a cleared session from an older login response', async () => {
+    let resolve!: (value: unknown) => void
+    mockAxios.post.mockReturnValueOnce(new Promise((yes) => { resolve = yes }))
+    const login = useAuthStore.getState().login('user@baander.app', 'secret')
+    await vi.waitFor(() => expect(mockAxios.post).toHaveBeenCalled())
+    useAuthStore.getState().clearAuth()
+    resolve(validLoginResponse())
+    await login
+    expect(useAuthStore.getState().accessToken).toBeNull()
+    expect(useAuthStore.getState().isLoading).toBe(false)
+    expect(mockSaveStoredAuth).not.toHaveBeenCalled()
+    expect(mockPostTokenToWorker).not.toHaveBeenCalledWith('access-token-123')
+  })
+
+  it('finishes an in-flight credential write before deleting the cleared session', async () => {
+    let release!: () => void
+    mockSaveStoredAuth.mockReturnValueOnce(new Promise((yes) => { release = yes }))
+    mockAxios.post.mockResolvedValue(validLoginResponse())
+    const login = useAuthStore.getState().login('user@baander.app', 'secret')
+    await vi.waitFor(() => expect(mockSaveStoredAuth).toHaveBeenCalledOnce())
+    useAuthStore.getState().clearAuth()
+    expect(mockClearStoredAuth).not.toHaveBeenCalled()
+    release()
+    await login
+    await vi.waitFor(() => expect(mockClearStoredAuth).toHaveBeenCalledOnce())
+    expect(mockClearStoredAuth.mock.invocationCallOrder[0]).toBeGreaterThan(mockSaveStoredAuth.mock.invocationCallOrder[0])
+    expect(useAuthStore.getState().accessToken).toBeNull()
+    expect(mockPostTokenToWorker).not.toHaveBeenCalledWith('access-token-123')
+  })
+
+  it('keeps repeated token and user updates notification-free', () => {
+    useAuthStore.setState({ accessToken: 'access', refreshToken: 'refresh', user: VALID_USER, isAuthenticated: true })
+    const notify = vi.fn(), unsubscribe = useAuthStore.subscribe(notify)
+    useAuthStore.getState().setTokens('access', 'refresh')
+    useAuthStore.getState().updateUser({ email: VALID_USER.email })
+    expect(notify).not.toHaveBeenCalled()
+    expect(mockPostTokenToWorker).not.toHaveBeenCalled()
+    unsubscribe()
+  })
+  it('cannot clear a newer login when an older logout finally returns', async () => {
+    let release!: (value: Awaited<ReturnType<typeof postAuthLogout>>) => void
+    mockPostAuthLogout.mockReturnValueOnce(new Promise((yes) => { release = yes }))
+    useAuthStore.setState({ accessToken: 'old', refreshToken: 'old-refresh', user: VALID_USER, isAuthenticated: true })
+    const logout = useAuthStore.getState().logout()
+    useAuthStore.getState().clearAuth()
+    mockAxios.post.mockResolvedValue(validLoginResponse())
+    await useAuthStore.getState().login('user@baander.app', 'secret')
+    release({ data: {} })
+    await logout
+    expect(useAuthStore.getState().accessToken).toBe('access-token-123')
+    expect(useAuthStore.getState().isAuthenticated).toBe(true)
+    expect(mockPostTokenToWorker.mock.calls.at(-1)).toEqual(['access-token-123'])
+  })
+
+  it('waits for queued credential deletion before hydration can read IndexedDB', async () => {
+    let releaseWrite!: () => void, releaseClear!: () => void
+    mockSaveStoredAuth.mockReturnValueOnce(new Promise((yes) => { releaseWrite = yes }))
+    mockClearStoredAuth.mockReturnValueOnce(new Promise((yes) => { releaseClear = yes }))
+    mockAxios.post.mockResolvedValue(validLoginResponse())
+    const login = useAuthStore.getState().login('user@baander.app', 'secret')
+    await vi.waitFor(() => expect(mockSaveStoredAuth).toHaveBeenCalledOnce())
+    useAuthStore.getState().clearAuth()
+    const hydrate = useAuthStore.getState().initAuth()
+    expect(mockLoadStoredAuth).not.toHaveBeenCalled()
+    releaseWrite()
+    await login
+    await vi.waitFor(() => expect(mockClearStoredAuth).toHaveBeenCalledOnce())
+    expect(mockLoadStoredAuth).not.toHaveBeenCalled()
+    releaseClear()
+    await hydrate
+    expect(mockLoadStoredAuth).toHaveBeenCalledOnce()
+    expect(useAuthStore.getState().isAuthenticated).toBe(false)
+    expect(mockPostTokenToWorker.mock.calls.at(-1)).toEqual([null])
+  })
+
 })

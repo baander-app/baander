@@ -150,7 +150,7 @@ export function MediaPage() {
   const { data: stats, isLoading, error } = useMediaStorageStats()
   const checkMissing = useCheckMissingImages()
   const pruneMissing = usePruneMissingImages()
-  const roles = useAuthStore((s) => s.user?.roles ?? [])
+  const roles = useAuthStore((s) => s.user?.roles) ?? []
   const isSuperAdmin = roles.includes('ROLE_SUPER_ADMIN')
   const [showMissing, setShowMissing] = useState(false)
   const [confirmPrune, setConfirmPrune] = useState(false)

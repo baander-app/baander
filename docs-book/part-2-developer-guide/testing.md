@@ -47,6 +47,32 @@ The gate rebuilds twice and checks reproducibility and shipped artifact parity.
 See [DSP qualification](../../packages/dsp/README.md) for covered contracts and
 the remaining loudness and codec qualification limits.
 
+## Web store isolation and debugging
+
+Run `yarn --cwd ui/web test:store-debug` for the disposable Chromium workflow at
+`https://debug.baander.app:5187`, mapped to loopback with a temporary certificate.
+It checks production selection/view-mode stores, render isolation, no-op updates,
+and enabling, inspecting, exporting, and disabling the store debugger. The frontend
+workflow runs this gate. Local prerequisites are Chromium and OpenSSL, as for the
+audio graph tests; port 5187 must be free.
+
+In a development build, enable the debug panel from Diagnostics, open Store Timeline
+or Store Inspector, and select **Enable store tracing and reload**. Recording is
+opt-in through `baander-store-debug` in local storage and is disabled in production
+builds. Disabling also reloads, removing tracing wrappers instead of keeping a
+conditional branch on every action. Enabling recording incurs snapshot/stack costs.
+
+The timeline links synchronous nested calls, shows changed fields and before/after
+state, and exports schema-version-1 JSON. Async completions link to their originating
+action; updates after an `await` retain their call stacks without inferred parentage.
+History is bounded and reports discarded events. Redacted/truncated/native values
+make captures incomplete; exports are diagnostic and do not yet support replay.
+
+Unit tests verify creator/action identity when tracing is disabled, no-op subscriber
+and persistence behavior, secret redaction, immutable snapshots, and event ordering.
+Player/session tests additionally cover clock isolation and sync under continuous
+playback. Performance assertions use counts rather than timing-sensitive thresholds.
+
 ## Test Suites
 
 | Suite | Directory | Scope |

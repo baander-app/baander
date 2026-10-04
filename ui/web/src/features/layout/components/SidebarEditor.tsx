@@ -1,9 +1,10 @@
+import { useShallow } from 'zustand/react/shallow'
 import styled from 'styled-components'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { useSidebarStore, type SidebarItemData } from '../stores/sidebar-store'
-import { useMediaModeStore } from '../stores/media-mode-store'
-import { type SidebarSection } from '../schemas/types'
+import { useMediaModeStore, type MediaType } from '../stores/media-mode-store'
+import { type MediaSidebarSchema, type SidebarSection } from '../schemas/types'
 import { getSidebarIcon, SIDEBAR_ICONS } from '../schemas/icons'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
@@ -277,9 +278,21 @@ const SheetFooter = styled.div`
 `
 
 export function SidebarEditor() {
-  const { isLoading, isEditorOpen, setEditorOpen, setSchema, schemas } = useSidebarStore()
-  const activeMedia = useMediaModeStore((s) => s.activeMedia)
-  const [editingSections, setEditingSections] = useState<SidebarSection[]>([])
+  const isEditorOpen = useSidebarStore((state) => state.isEditorOpen)
+  const activeMedia = useMediaModeStore((state) => state.activeMedia)
+  const schema = useSidebarStore((state) => state.schemas[activeMedia])
+  if (!isEditorOpen) return null
+  return <SidebarEditorForm key={activeMedia} activeMedia={activeMedia} initialSchema={schema} />
+}
+
+function SidebarEditorForm({ activeMedia, initialSchema }: { activeMedia: MediaType; initialSchema: MediaSidebarSchema }) {
+  const { isLoading, setEditorOpen, setSchema } = useSidebarStore(useShallow((state) => ({ isLoading: state.isLoading, setEditorOpen: state.setEditorOpen, setSchema: state.setSchema })))
+  const [editingSections, setEditingSections] = useState<SidebarSection[]>(() => initialSchema.sections.map((section) => ({ ...section, items: [...section.items] })))
+  const mounted = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
   const [isSaving, setIsSaving] = useState(false)
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
   const [showAddForm, setShowAddForm] = useState<string | null>(null) // section id
@@ -287,19 +300,6 @@ export function SidebarEditor() {
   const [newIcon, setNewIcon] = useState('home')
   const [newType, setNewType] = useState<string>('page_link')
   const [newRoute, setNewRoute] = useState('/')
-
-  // Initialize editing sections from the active schema when the editor opens or the
-  // active media changes. Previously this was a setState-during-render, which React
-  // warns about under StrictMode and triggers an immediate extra render.
-  useEffect(() => {
-    if (!isEditorOpen) return
-    const activeSchema = schemas[activeMedia]
-    if (activeSchema && activeSchema.sections.length > 0) {
-      setEditingSections(activeSchema.sections.map((s) => ({ ...s, items: [...s.items] })))
-    }
-  }, [isEditorOpen, activeMedia, schemas])
-
-  if (!isEditorOpen) return null
 
   const toggleCollapse = (sectionId: string) => {
     setCollapsedSections((prev) => {
@@ -385,12 +385,11 @@ export function SidebarEditor() {
       if (res.data?.mediaType) {
         setSchema(activeMedia, res.data)
       }
-      setEditorOpen(false)
-      setEditingSections([])
+      if (mounted.current) setEditorOpen(false)
     } catch {
       // Error handled silently — user can retry
     } finally {
-      setIsSaving(false)
+      if (mounted.current) setIsSaving(false)
     }
   }
 
@@ -401,11 +400,11 @@ export function SidebarEditor() {
       if (res.data?.mediaType) {
         setSchema(activeMedia, res.data)
       }
-      setEditingSections(res.data?.sections ?? [])
+      if (mounted.current) setEditingSections(res.data?.sections ?? [])
     } catch {
       // Error handled silently
     } finally {
-      setIsSaving(false)
+      if (mounted.current) setIsSaving(false)
     }
   }
 

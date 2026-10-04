@@ -1,3 +1,5 @@
+import { withNoopGuard } from '@/shared/stores/with-noop-guard'
+import { withStoreDebug } from '@/shared/stores/debug'
 import { create } from 'zustand'
 
 interface MergeState {
@@ -11,7 +13,7 @@ interface MergeState {
   closeMerge: () => void
 }
 
-export const useMergeStore = create<MergeState>((set) => ({
+export const useMergeStore = create<MergeState>()(withStoreDebug('catalog.merge', withNoopGuard((set) => ({
   isOpen: false,
   sourceId: null,
   targetId: null,
@@ -27,4 +29,4 @@ export const useMergeStore = create<MergeState>((set) => ({
     }),
   setTarget: (targetId, targetTitle) => set({ targetId, targetTitle }),
   closeMerge: () => set({ isOpen: false, sourceId: null, targetId: null, sourceTitle: null, targetTitle: null }),
-}))
+}))))

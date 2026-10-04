@@ -41,9 +41,13 @@ test('native gapless playback promotes preloaded elements A → B → A without 
 })
 
 test('native crossfade plays both elements before the outgoing ended event', async ({ page, origin }) => {
-  await start(page, origin, true)
-  await track(page, 'second')
-  const overlap = await snapshot(page)
+  await page.goto(origin)
+  await page.waitForFunction(() => document.documentElement.dataset.ready === 'true')
+  const overlap = await page.evaluate(() => {
+    const promotion = window.playbackFixture.observePromotion('second')
+    window.playbackFixture.start(true)
+    return promotion
+  })
   expectActive(overlap, 'second', 1)
   expect(overlap.elements[0].paused).toBe(false)
   expect(overlap.elements[0].ended).toBe(false)

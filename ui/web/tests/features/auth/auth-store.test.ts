@@ -30,7 +30,7 @@ describe('auth-store', () => {
     useAuthStore.setState({
       accessToken: 'token',
       refreshToken: 'refresh',
-      user: { uuid: '1', email: 'a@b.com', publicId: 'p1', name: null, roles: ['ROLE_USER'] },
+      user: { uuid: '1', email: 'a@baander.app', publicId: 'p1', name: null, roles: ['ROLE_USER'] },
       isAuthenticated: true,
     })
 
@@ -53,7 +53,7 @@ describe('auth-store', () => {
 
   it('login rejects when API is not available and not in mock mode', async () => {
     await expect(
-      useAuthStore.getState().login('user@example.com', 'password'),
+      useAuthStore.getState().login('user@baander.app', 'password'),
     ).rejects.toThrow()
 
     expect(useAuthStore.getState().isAuthenticated).toBe(false)

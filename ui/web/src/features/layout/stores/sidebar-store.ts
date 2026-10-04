@@ -1,3 +1,5 @@
+import { withNoopGuard } from '@/shared/stores/with-noop-guard'
+import { withStoreDebug } from '@/shared/stores/debug'
 import { create } from 'zustand'
 import type { MediaSidebarSchema } from '../schemas/types'
 import { ALL_SCHEMAS } from '../schemas'
@@ -29,7 +31,7 @@ interface SidebarState {
   getActiveSchema: () => MediaSidebarSchema
 }
 
-export const useSidebarStore = create<SidebarState>((set, get) => ({
+export const useSidebarStore = create<SidebarState>()(withStoreDebug('layout.sidebar', withNoopGuard((set, get) => ({
   items: [],
   isLoading: false,
   error: null,
@@ -40,9 +42,9 @@ export const useSidebarStore = create<SidebarState>((set, get) => ({
   setError: (error) => set({ error }),
   setEditorOpen: (isEditorOpen) => set({ isEditorOpen }),
   setSchema: (media, schema) =>
-    set((state) => ({ schemas: { ...state.schemas, [media]: schema } })),
+    set((state) => state.schemas[media] === schema ? state : { schemas: { ...state.schemas, [media]: schema } }),
   getActiveSchema: () => {
     const activeMedia = useMediaModeStore.getState().activeMedia
     return get().schemas[activeMedia]
   },
-}))
+}))))

@@ -1,3 +1,6 @@
+import { withNoopGuard } from '@/shared/stores/with-noop-guard'
+import { createSelectiveJSONStorage } from '@/shared/stores/persistence'
+import { withStoreDebug } from '@/shared/stores/debug'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
@@ -21,11 +24,12 @@ export interface ContextPanelState {
   setSelectedItem: (item: { type: SelectedItemType; publicId: string } | null) => void
   setOpen: (open: boolean) => void
   setWidth: (width: number) => void
+  restorePreferences: (preferences: Pick<ContextPanelState, 'mode' | 'activeTab'>) => void
 }
 
 export const useContextPanelStore = create<ContextPanelState>()(
-  persist(
-    (set) => ({
+  withStoreDebug('layout.context-panel', persist(
+    withNoopGuard((set) => ({
       mode: 'expanded',
       activeTab: 'queue',
       selectedItem: null,
@@ -38,17 +42,19 @@ export const useContextPanelStore = create<ContextPanelState>()(
           mode: s.mode === 'compact' ? 'expanded' : 'compact',
         })),
       setActiveTab: (tab) => set({ activeTab: tab, isOpen: true }),
-      setSelectedItem: (item) => set({ selectedItem: item, activeTab: 'details', isOpen: true }),
+      setSelectedItem: (item) => set((state) => state.selectedItem?.type === item?.type && state.selectedItem?.publicId === item?.publicId && state.activeTab === 'details' && state.isOpen ? state : { selectedItem: item, activeTab: 'details', isOpen: true }),
       setOpen: (open) => set({ isOpen: open }),
       setWidth: (width) => set({ width }),
-    }),
+      restorePreferences: ({ mode, activeTab }) => set({ mode, activeTab }),
+    })),
     {
       name: 'baander-context-panel',
+      storage: createSelectiveJSONStorage(),
       version: 1,
       partialize: (state) => ({
         mode: state.mode,
         width: state.width,
       }),
     },
-  ),
+  )),
 )

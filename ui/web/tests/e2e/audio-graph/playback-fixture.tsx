@@ -2,6 +2,7 @@ import React, { useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { useAudioPlayback } from '@/features/player/hooks/use-audio-playback'
 import { usePlayerStore } from '@/features/player/stores/player-store'
+import { getCurrentTime } from '@/features/player/stores/player-time-tracker'
 import { audioService } from '@/features/player/services/audio-service'
 
 export interface MediaSnapshot {
@@ -47,6 +48,22 @@ createRoot(document.getElementById('root')!).render(React.createElement(Fixture)
 
 const fixture = {
   renderFade,
+  observePromotion(id: string): Promise<MediaSnapshot> {
+    return new Promise((resolve, reject) => {
+      const deadline = setTimeout(() => {
+        unsubscribe()
+        reject(new Error(`No native promotion to ${id} within 12 seconds`))
+      }, 12_000)
+      const unsubscribe = usePlayerStore.subscribe((state, previous) => {
+        if (state.currentTrack?.publicId !== id || state.currentTrack === previous.currentTrack) return
+        unsubscribe()
+        clearTimeout(deadline)
+        // Adoption commits atomically, then synchronizes the processor in the
+        // same stack. Capture the real overlap before polling can miss its end.
+        queueMicrotask(() => resolve(fixture.snapshot()))
+      })
+    })
+  },
   start(crossfade: boolean) {
     const state = usePlayerStore.getState()
     state.setCrossfadeEnabled(crossfade)
@@ -59,7 +76,7 @@ const fixture = {
     return {
       track: state.currentTrack?.publicId, index: state.currentIndex, playing: state.isPlaying,
       processorPlaying: audioService.getProcessor()?.getSystemInfo().playing,
-      duration: state.duration, time: state.currentTime, active: elements.indexOf(state.audioElement!),
+      duration: state.duration, time: getCurrentTime(), active: elements.indexOf(state.audioElement!),
       source: audioService.getProcessor()?.getActiveSource(), outputGain: graph?.gainNode.gain.value, events: [...events],
       elements: elements.map((element, index) => ({ id: element.src ? new URL(element.src).searchParams.get('id') : null,
         paused: element.paused, ended: element.ended, time: element.currentTime, volume: element.volume, muted: element.muted,

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { ActionBus } from '../bus'
 import { usePlayerStore, type Track } from '@/features/player/stores/player-store'
+import { getCurrentTime, updateTime } from '@/features/player/stores/player-time-tracker'
 import { useRadioStore } from '@/features/radio/stores/radio-store'
 import { useEqBandsStore, DEFAULT_Q } from '@/features/equalizer/stores/eq-bands-store'
 import { useContextPanelStore } from '@/features/layout/stores/context-panel-store'
@@ -11,13 +12,13 @@ describe('Mediator integration', () => {
   beforeEach(() => {
     bus = new ActionBus({ maxLogSize: 100, warnOnNoHandlers: false })
 
+    updateTime(0)
     // Reset stores to initial state
     usePlayerStore.setState({
       queue: [],
       currentIndex: -1,
       currentTrack: null,
       isPlaying: false,
-      currentTime: 0,
       duration: 0,
       shuffle: false,
       repeat: 'off' as const,
@@ -72,7 +73,7 @@ describe('Mediator integration', () => {
         if (state.isPlaying) state.setIsPlaying(false)
       })
 
-      bus.dispatch('radio:started', { station: { name: 'Test FM', streams: [] } } as any, 'radio')
+      bus.dispatch('radio:started', { station: { name: 'Test FM', streams: [] } }, 'radio')
 
       expect(usePlayerStore.getState().isPlaying).toBe(false)
     })
@@ -126,11 +127,7 @@ describe('Mediator integration', () => {
 
       bus.on('player:state-restore', function playerStateRestoreHandler(payload: unknown) {
         const p = payload as { queue: Track[]; currentIndex: number; currentTime: number }
-        usePlayerStore.setState({
-          queue: p.queue,
-          currentIndex: p.currentIndex,
-          currentTime: p.currentTime,
-        })
+        usePlayerStore.getState().restoreQueue(p.queue, p.currentIndex, p.currentTime)
       })
 
       bus.dispatch('player:state-restore', {
@@ -142,7 +139,7 @@ describe('Mediator integration', () => {
       const state = usePlayerStore.getState()
       expect(state.queue).toEqual(tracks)
       expect(state.currentIndex).toBe(1)
-      expect(state.currentTime).toBe(45.5)
+      expect(getCurrentTime()).toBe(45.5)
     })
   })
 

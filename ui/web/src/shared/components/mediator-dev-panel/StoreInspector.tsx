@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import styled from 'styled-components'
-import { STORE_REGISTRY } from '@/shared/lib/mediator/store-registry'
+import { storeDebugger, captureState } from '@/shared/stores/debug'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/shared/components/ui/select'
 
 interface StoreInspectorProps {
@@ -11,7 +11,8 @@ interface StoreInspectorProps {
 const Container = styled.div`
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
 `
 
 const SelectBar = styled.div`
@@ -41,31 +42,16 @@ const EmptyState = styled.div`
 
 /**
  * Displays current state of any registered store as a JSON tree.
- * Auto-refreshes on selection change.
+ * Updates from recorded store changes without polling or importing feature stores.
  */
 export function StoreInspector({ stores: externalRegistry }: StoreInspectorProps) {
-  const registry = externalRegistry ?? STORE_REGISTRY
-  const storeNames = Object.keys(registry).sort()
   const [selected, setSelected] = useState('')
-  const [snapshot, setSnapshot] = useState<Record<string, unknown> | null>(null)
-
-  // Refresh snapshot when selection changes
-  useEffect(() => {
-    if (!selected || !registry[selected]) {
-      setSnapshot(null)
-      return
-    }
-
-    // Initial snapshot
-    setSnapshot(registry[selected]())
-
-    // Poll for changes while selected (stores don't emit events we can hook here)
-    const interval = setInterval(() => {
-      setSnapshot(registry[selected]())
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [selected, registry])
+  const debug = useSyncExternalStore(storeDebugger.subscribe, storeDebugger.getSnapshot, storeDebugger.getSnapshot)
+  const storeNames = Object.keys(externalRegistry ?? debug.stores).sort()
+  const capture = externalRegistry?.[selected]
+    ? captureState(externalRegistry[selected]())
+    : debug.stores[selected]
+  const snapshot = capture?.value
 
   return (
     <Container>
@@ -85,7 +71,7 @@ export function StoreInspector({ stores: externalRegistry }: StoreInspectorProps
       </SelectBar>
       <Content>
         {snapshot ? (
-          <JsonPre>{JSON.stringify(snapshot, null, 2)}</JsonPre>
+          <><JsonPre>{JSON.stringify(snapshot, null, 2)}</JsonPre>{!capture?.complete && <p>Some values are redacted or unavailable for replay.</p>}</>
         ) : (
           <EmptyState>Select a store to inspect its state.</EmptyState>
         )}

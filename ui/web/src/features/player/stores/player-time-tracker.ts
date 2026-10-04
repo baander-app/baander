@@ -2,7 +2,6 @@ import { useSyncExternalStore } from 'react'
 
 let currentTime = 0
 const listeners = new Set<() => void>()
-let bridge: ((time: number) => void) | null = null
 
 export function subscribe(listener: () => void): () => void {
   listeners.add(listener)
@@ -13,20 +12,13 @@ function getSnapshot(): number {
   return currentTime
 }
 
-/** Register a bridge callback (e.g. Zustand setState) for dual-write. */
-export function registerTimeBridge(fn: (time: number) => void): void {
-  bridge = fn
-}
-
-/**
- * Update the current playback time. Writes to both the external store
- * (for React consumers via useCurrentTime) and the registered bridge
- * (Zustand for non-React consumers like use-session sync).
- */
+/** The sole playback clock. Identical and invalid updates do not notify consumers. */
 export function updateTime(time: number): void {
-  currentTime = time
-  listeners.forEach((l) => l())
-  bridge?.(time)
+  if (!Number.isFinite(time)) return
+  const next = Math.max(0, time)
+  if (next === currentTime) return
+  currentTime = next
+  listeners.forEach(listener => listener())
 }
 
 /** Read current time outside React — no re-render. */

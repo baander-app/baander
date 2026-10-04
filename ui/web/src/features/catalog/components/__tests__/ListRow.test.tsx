@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { ReactNode } from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ListRow, type ListSongData } from '../ListRow'
 import { useSelectionStore } from '../../stores/selection-store'
@@ -7,7 +8,7 @@ import { usePlayerStore } from '@/features/player/stores/player-store'
 
 // Mock SongContextMenu to just render children
 vi.mock('../menus/SongContextMenu', () => ({
-  SongContextMenu: ({ children }: any) => children,
+  SongContextMenu: ({ children }: { children: ReactNode }) => children,
 }))
 
 const baseSong: ListSongData = {
@@ -43,7 +44,7 @@ describe('ListRow', () => {
     expect(screen.getByText('Test Artist')).toBeInTheDocument()
     expect(screen.getByText('Test Album')).toBeInTheDocument()
     expect(screen.getByText('2024')).toBeInTheDocument()
-    expect(screen.getByText('4:05')).toBeInTheDocument()
+    expect(screen.getByText('04:05')).toBeInTheDocument()
   })
 
   it('renders index number', () => {
@@ -88,7 +89,7 @@ describe('ListRow', () => {
     const song = { ...baseSong, duration: 0 }
     render(<ListRow song={song} allSongs={allSongs} style={defaultStyle} />)
 
-    expect(screen.getByText('0:00')).toBeInTheDocument()
+    expect(screen.getByText('00:00')).toBeInTheDocument()
   })
 
   it('shows dash for missing duration', () => {

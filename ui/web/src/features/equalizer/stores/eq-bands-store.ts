@@ -1,3 +1,6 @@
+import { withNoopGuard } from '@/shared/stores/with-noop-guard'
+import { createSelectiveJSONStorage } from '@/shared/stores/persistence'
+import { withStoreDebug } from '@/shared/stores/debug'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { audioService } from '@/features/player/services/audio-service'
@@ -54,6 +57,7 @@ export interface EqBandsState {
   visualizerMode: VisualizerMode
   showSystemPanel: boolean
 
+  applySettings: (settings: Partial<Pick<EqBandsState, 'enabled' | 'bands' | 'preset' | 'visualizerMode'>>) => void
   // Actions
   setEnabled: (enabled: boolean) => void
   setBandGain: (index: number, gain: number) => void
@@ -63,6 +67,10 @@ export interface EqBandsState {
   cyclePreset: () => void
   setVisualizerMode: (mode: VisualizerMode) => void
   toggleSystemPanel: () => void
+}
+
+function sameBands(left: BandConfig[], right: BandConfig[]): boolean {
+  return left.length === right.length && left.every((band, index) => band.gain === right[index].gain && band.q === right[index].q)
 }
 
 function applyBandsToProcessor(bands: BandConfig[]) {
@@ -79,15 +87,25 @@ export const reapplyBandsState = () => {
 }
 
 export const useEqBandsStore = create<EqBandsState>()(
-  persist(
-    (set, get) => ({
+  withStoreDebug('equalizer.eq-bands', persist(
+    withNoopGuard((set, get) => ({
       enabled: true,
       bands: flatBands(),
       preset: 'FLAT',
       visualizerMode: 'spectrum',
       showSystemPanel: false,
 
+      applySettings: (settings) => {
+        const state = get()
+        const next = { ...settings }
+        if (next.bands && sameBands(state.bands, next.bands)) next.bands = state.bands
+        if (Object.entries(next).every(([key, value]) => state[key as keyof EqBandsState] === value)) return
+        set(next)
+        if (next.bands !== undefined || next.enabled !== undefined) reapplyBandsState()
+      },
+
       setEnabled: (enabled) => {
+        if (get().enabled === enabled) return
         set({ enabled })
         if (!enabled) {
           applyBandsToProcessor(flatBands().map((b) => ({ ...b, gain: 0 })))
@@ -97,18 +115,24 @@ export const useEqBandsStore = create<EqBandsState>()(
       },
 
       setBandGain: (index, gain) => {
+        const current = get().bands[index]
+        if (!current || current.gain === gain) return
         const newBands = get().bands.map((b, i) => (i === index ? { ...b, gain } : b))
         set({ bands: newBands, preset: 'FLAT' })
         if (get().enabled) applyBandsToProcessor(newBands)
       },
 
       setBandQ: (index, q) => {
+        const current = get().bands[index]
+        if (!current || current.q === q) return
         const newBands = get().bands.map((b, i) => (i === index ? { ...b, q } : b))
         set({ bands: newBands, preset: 'FLAT' })
         if (get().enabled) applyBandsToProcessor(newBands)
       },
 
       setBand: (index, gain, q) => {
+        const current = get().bands[index]
+        if (!current || (current.gain === gain && current.q === q)) return
         const newBands = get().bands.map((b, i) => (i === index ? { gain, q } : b))
         set({ bands: newBands, preset: 'FLAT' })
         if (get().enabled) applyBandsToProcessor(newBands)
@@ -116,6 +140,7 @@ export const useEqBandsStore = create<EqBandsState>()(
 
       setPreset: (preset) => {
         const bands = presetToBands(preset)
+        if (get().preset === preset && sameBands(get().bands, bands)) return
         set({ bands, preset })
         if (get().enabled) applyBandsToProcessor(bands)
       },
@@ -132,15 +157,16 @@ export const useEqBandsStore = create<EqBandsState>()(
       },
 
       setVisualizerMode: (mode) => {
-        set({ visualizerMode: mode })
+        if (get().visualizerMode !== mode) set({ visualizerMode: mode })
       },
 
       toggleSystemPanel: () => {
         set((s) => ({ showSystemPanel: !s.showSystemPanel }))
       },
-    }),
+    })),
     {
       name: 'baander-eq-bands',
+      storage: createSelectiveJSONStorage(),
       version: 3,
       partialize: (state) => ({
         enabled: state.enabled,
@@ -172,5 +198,5 @@ export const useEqBandsStore = create<EqBandsState>()(
         return persisted
       },
     },
-  ),
+  )),
 )

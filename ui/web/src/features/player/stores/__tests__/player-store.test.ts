@@ -1,3 +1,4 @@
+import { getCurrentTime, updateTime } from '@/features/player/stores/player-time-tracker'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { audioService } from '../../services/audio-service'
 import { activityService } from '../../services/activity-service'
@@ -40,12 +41,12 @@ function makeAudioStub(): HTMLAudioElement {
 
 /** Replace the entire store state with a known starting point. */
 function resetStore() {
+  updateTime(0)
   usePlayerStore.setState({
     queue: [],
     currentIndex: -1,
     currentTrack: null,
     isPlaying: false,
-    currentTime: 0,
     duration: 0,
     shuffle: false,
     repeat: 'off',
@@ -92,7 +93,7 @@ describe('player-store', () => {
 
       expect(usePlayerStore.getState()).toMatchObject({
         audioElement: incoming, currentTrack: queue[1], currentIndex: 1,
-        isPlaying: true, currentTime: 1.5, duration: 120,
+        isPlaying: true, duration: 120,
       })
       expect(incoming.src).toBe('/api/stream/track?id=t1')
       expect(incoming.play).not.toHaveBeenCalled()
@@ -319,7 +320,7 @@ describe('player-store', () => {
         expect(activityService.recordPlay).toHaveBeenCalledTimes(count)
       }
       expect(audio.currentTime).toBe(0)
-      expect(usePlayerStore.getState().currentTime).toBe(0)
+      expect(getCurrentTime()).toBe(0)
       expect(sourceSetter).not.toHaveBeenCalled()
       expect(usePlayerStore.getState().queue).toBe(queue)
       expect(usePlayerStore.getState().currentTrack).toBe(queue[1])
@@ -595,7 +596,8 @@ describe('player-store', () => {
       seedQueue(1, 3)
       const audio = makeAudioStub()
       audio.currentTime = 5
-      usePlayerStore.setState({ currentTime: 5, audioElement: audio })
+      updateTime(5)
+      usePlayerStore.setState({ audioElement: audio })
       usePlayerStore.getState().playPrevious()
       const s = usePlayerStore.getState()
       // index unchanged, track unchanged
@@ -606,14 +608,14 @@ describe('player-store', () => {
 
     it('at exactly 3 seconds (boundary, not > 3) goes to previous track', () => {
       seedQueue(1, 3)
-      usePlayerStore.setState({ currentTime: 3 })
+      updateTime(3)
       usePlayerStore.getState().playPrevious()
       expect(usePlayerStore.getState().currentIndex).toBe(0)
     })
 
     it('goes to previous track when currentTime <= 3', () => {
       seedQueue(2, 3)
-      usePlayerStore.setState({ currentTime: 1 })
+      updateTime(1)
       usePlayerStore.getState().playPrevious()
       expect(usePlayerStore.getState().currentIndex).toBe(1)
       expect(usePlayerStore.getState().currentTrack?.publicId).toBe('t1')
@@ -621,7 +623,7 @@ describe('player-store', () => {
 
     it('wraps to last track when at index 0 and currentTime <= 3', () => {
       seedQueue(0, 3)
-      usePlayerStore.setState({ currentTime: 1 })
+      updateTime(1)
       usePlayerStore.getState().playPrevious()
       expect(usePlayerStore.getState().currentIndex).toBe(2)
       expect(usePlayerStore.getState().currentTrack?.publicId).toBe('t2')
@@ -635,14 +637,15 @@ describe('player-store', () => {
 
     it('restart rule does NOT depend on repeat mode (still restarts > 3s)', () => {
       seedQueue(1, 3)
-      usePlayerStore.setState({ currentTime: 10, repeat: 'all' })
+      updateTime(10)
+      usePlayerStore.setState({ repeat: 'all' })
       usePlayerStore.getState().playPrevious()
       expect(usePlayerStore.getState().currentIndex).toBe(1)
     })
 
     it('at index 0 with currentTime > 3 restarts instead of wrapping', () => {
       seedQueue(0, 3)
-      usePlayerStore.setState({ currentTime: 10 })
+      updateTime(10)
       usePlayerStore.getState().playPrevious()
       expect(usePlayerStore.getState().currentIndex).toBe(0)
     })
@@ -650,7 +653,8 @@ describe('player-store', () => {
     it('sets audio src + play when moving to a previous track', () => {
       const audio = makeAudioStub()
       seedQueue(2, 3)
-      usePlayerStore.setState({ currentTime: 0, audioElement: audio })
+      updateTime(0)
+      usePlayerStore.setState({ audioElement: audio })
       usePlayerStore.getState().playPrevious()
       expect(audio.src).toContain('id=t1')
       expect(audio.play).toHaveBeenCalledTimes(1)
@@ -943,7 +947,7 @@ describe('player-store', () => {
       usePlayerStore.setState({ audioElement: audio })
       usePlayerStore.getState().playTrack(track('first'), tracks('first', 'second'))
       if (operation === 'rewind') {
-        usePlayerStore.setState({ currentTime: 4 })
+        updateTime(4)
         usePlayerStore.getState().playPrevious()
       } else {
         expect(usePlayerStore.getState().adoptPreloadedNext(makeAudioStub(), 'first', 'unexpected')).toBe(false)

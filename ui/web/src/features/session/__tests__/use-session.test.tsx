@@ -12,12 +12,15 @@ vi.mock('@/shared/api-client/axios-instance', () => ({
   },
 }))
 
+vi.mock('@/features/player/stores/player-time-tracker', () => ({
+  getCurrentTime: () => 45, subscribe: () => () => {},
+}))
+
 vi.mock('@/features/player/stores/player-store', () => ({
   usePlayerStore: Object.assign(
     (selector: (s: unknown) => unknown) => selector({
       queue: [{ publicId: 'track-1' }, { publicId: 'track-2' }],
       currentIndex: 0,
-      currentTime: 45,
       isPlaying: true,
       audioElement: null,
     }),
@@ -25,8 +28,7 @@ vi.mock('@/features/player/stores/player-store', () => ({
       getState: vi.fn(() => ({
         queue: [{ publicId: 'track-1' }, { publicId: 'track-2' }],
         currentIndex: 0,
-        currentTime: 45,
-        isPlaying: true,
+          isPlaying: true,
         audioElement: null,
       })),
       setState: vi.fn(),
@@ -228,4 +230,27 @@ describe('useSession', () => {
 
     expect(result.current.showTransferPrompt).toBe(false)
   })
+  it('keeps a dismissed transfer hidden on refetch and prompts for a new session or device', async () => {
+    const session = { id: 'session-1', userId: 'user-1', activeDeviceId: 'other-device', queue: [],
+      currentTrackIndex: 0, position: 0, playbackState: 'stopped' as const,
+      createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', lastUsedAt: null }
+    mockAxios.get.mockResolvedValue({ data: { data: session } })
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { result, unmount } = renderHook(() => useSession(), {
+      wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+    })
+    await waitFor(() => expect(result.current.showTransferPrompt).toBe(true))
+    act(() => { result.current.dismissTransfer() })
+    act(() => { client.setQueryData(['session', 'current'], { ...session, position: 10, updatedAt: '2026-01-01T00:00:10Z' }) })
+    await waitFor(() => expect(result.current.pendingSession?.position).toBe(10))
+    expect(result.current.showTransferPrompt).toBe(false)
+    act(() => { client.setQueryData(['session', 'current'], { ...session, activeDeviceId: 'third-device' }) })
+    await waitFor(() => expect(result.current.showTransferPrompt).toBe(true))
+    act(() => { result.current.dismissTransfer() })
+    act(() => { client.setQueryData(['session', 'current'], { ...session, id: 'session-2', activeDeviceId: 'third-device' }) })
+    await waitFor(() => expect(result.current.showTransferPrompt).toBe(true))
+    unmount()
+    client.clear()
+  })
+
 })

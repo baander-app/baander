@@ -45,6 +45,20 @@ exclude DOM references and transient state. Authentication has its own IndexedDB
 and non-exportable DPoP key lifecycle: follow that implementation rather than
 moving credentials into a general localStorage store.
 
+Store entrypoints expose typed state and named transition actions. Compose the
+player's queue/playback/preferences slices in one store to retain atomic updates;
+small feature stores do not need artificial slices. Keep the playback clock in
+`player-time-tracker`, outside durable Zustand state. Use `withNoopGuard` inside
+`persist` and `createSelectiveJSONStorage` with an explicit durable projection.
+Guard external side effects before calling them, even when the state setter is
+idempotent. Consumers should call actions instead of bypassing invariants with
+`setState`. Test notification/render counts and storage writes for hot paths.
+
+Wrap store creators with outermost `withStoreDebug` for optional development
+tracing. Its disabled path returns the original creator unchanged. The developer
+panel enables recording on reload; never send credentials or raw native objects
+to a debugger. Recorded snapshots are diagnostic, not permission to replay effects.
+
 ## API access
 
 Use generated Orval hooks/functions in `@/shared/api-client/gen/endpoints` or the

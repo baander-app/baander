@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { getCurrentTime, subscribe as subscribeToTime } from '@/features/player/stores/player-time-tracker'
 import { usePlayerStore, type Track } from '@/features/player/stores/player-store'
 import { mediator } from '@/shared/lib/mediator/bus'
 import { PLAYER_ACTIONS } from '@/features/player/player-actions'
@@ -34,8 +35,7 @@ export function useSession() {
   const sessionSyncBus = useRef<SessionSyncBus | null>(null)
   const deviceRegistered = useRef(false)
 
-  const [showTransferPrompt, setShowTransferPrompt] = useState(false)
-  const [pendingSession, setPendingSession] = useState<SessionData | null>(null)
+  const [dismissedTransfer, setDismissedTransfer] = useState<{ sessionId: string; deviceId: string } | null>(null)
 
   const query = useQuery({
     queryKey: SESSION_KEY,
@@ -53,6 +53,10 @@ export function useSession() {
     },
     staleTime: 30_000,
   })
+
+  const pendingSession = query.data?.activeDeviceId && query.data.activeDeviceId !== deviceId ? query.data : null
+  const showTransferPrompt = pendingSession !== null && !(dismissedTransfer?.sessionId === pendingSession.id
+    && dismissedTransfer.deviceId === pendingSession.activeDeviceId)
 
   // Register this device once on mount
   useEffect(() => {
@@ -74,7 +78,8 @@ export function useSession() {
       if (query.data || sessionCreated) return
 
       setSessionCreated(true)
-      const { queue, currentIndex, currentTime } = usePlayerStore.getState()
+      const { queue, currentIndex } = usePlayerStore.getState()
+      const currentTime = getCurrentTime()
       const trackIds = queue.map(t => t.publicId)
       AXIOS_INSTANCE.post('/api/session/new', {
         queue: trackIds,
@@ -94,11 +99,7 @@ export function useSession() {
   useEffect(() => {
     const session = query.data
     if (!session) return
-    if (session.activeDeviceId && session.activeDeviceId !== deviceId) {
-      setPendingSession(session)
-      setShowTransferPrompt(true)
-      return
-    }
+    if (session.activeDeviceId && session.activeDeviceId !== deviceId) return
 
     // This device is active — hydrate server queue into player store if empty
     const localQueue = usePlayerStore.getState().queue
@@ -147,7 +148,7 @@ export function useSession() {
       wsEndpoint: '/api/ws',
       authToken: accessToken ?? undefined,
       deviceId,
-      getPosition: () => usePlayerStore.getState().currentTime,
+      getPosition: getCurrentTime,
       getQueue: () => usePlayerStore.getState().queue.map(t => t.publicId),
       getCurrentIndex: () => usePlayerStore.getState().currentIndex,
       getIsPlaying: () => usePlayerStore.getState().isPlaying,
@@ -196,16 +197,13 @@ export function useSession() {
         }
 
         const SYNC_TOLERANCE = 4.0 // seconds
-        const localPos = local.currentTime
+        const localPos = getCurrentTime()
         if (Math.abs(localPos - state.position) < SYNC_TOLERANCE) {
           // Same track, within tolerance — no action needed (gapless resume)
           return
         }
         // Significant drift — seek to server position (handles long disconnections)
-        const audio = usePlayerStore.getState().audioElement
-        if (audio) {
-          audio.currentTime = state.position
-        }
+        local.seekTo(state.position)
       },
       onReconnect: () => {
         bus.sendSync()
@@ -218,9 +216,11 @@ export function useSession() {
     sessionSyncBus.current = bus
     bus.connect(sessionId)
 
-    return () => { bus.disconnect() }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, deviceId])
+    return () => {
+      bus.disconnect()
+      if (sessionSyncBus.current === bus) sessionSyncBus.current = null
+    }
+  }, [sessionId, deviceId, queryClient])
 
   const claimMutation = useMutation({
     mutationFn: async (): Promise<SessionData> => {
@@ -232,8 +232,7 @@ export function useSession() {
     // STATE_RESTORE dispatch even if hydration fails.
     onSuccess: async (data) => {
       queryClient.setQueryData(SESSION_KEY, data)
-      setShowTransferPrompt(false)
-      setPendingSession(null)
+      setDismissedTransfer(null)
 
       if (data.queue.length > 0) {
         // Hydrate server queue (publicIds) into Track[] via batch lookup
@@ -279,7 +278,8 @@ export function useSession() {
   // "Bring local queue" option in claim flow
   const claimWithQueueMutation = useMutation({
     mutationFn: async (): Promise<SessionData> => {
-      const { queue, currentIndex, currentTime } = usePlayerStore.getState()
+      const { queue, currentIndex } = usePlayerStore.getState()
+      const currentTime = getCurrentTime()
       const trackIds = queue.map(t => t.publicId)
       const res = await AXIOS_INSTANCE.post('/api/session/claim', {
         deviceId,
@@ -291,14 +291,14 @@ export function useSession() {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(SESSION_KEY, data)
-      setShowTransferPrompt(false)
-      setPendingSession(null)
+      setDismissedTransfer(null)
     },
   })
 
   const newMutation = useMutation({
     mutationFn: async (): Promise<SessionData> => {
-      const { queue, currentIndex, currentTime } = usePlayerStore.getState()
+      const { queue, currentIndex } = usePlayerStore.getState()
+      const currentTime = getCurrentTime()
       const trackIds = queue.map((t) => t.publicId)
       const res = await AXIOS_INSTANCE.post('/api/session/new', {
         queue: trackIds,
@@ -309,14 +309,14 @@ export function useSession() {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(SESSION_KEY, data)
-      setShowTransferPrompt(false)
-      setPendingSession(null)
+      setDismissedTransfer(null)
     },
   })
 
   // Replace REST sync with WS-primary
   const syncToServer = useCallback(() => {
-    const { queue, currentIndex, currentTime, isPlaying } = usePlayerStore.getState()
+    const { queue, currentIndex, isPlaying } = usePlayerStore.getState()
+    const currentTime = getCurrentTime()
     const isActive = query.data?.activeDeviceId === deviceId
 
     if (!isActive) return // Client-side sync gate
@@ -335,29 +335,34 @@ export function useSession() {
         headers: { 'X-Device-Id': deviceId },
       }).catch((err) => { logger.warn('REST session sync failed:', err) })
     }
-  }, [deviceId, query.data])
+  }, [deviceId, query.data?.activeDeviceId])
 
-  // Subscribe to player store changes for debounced sync
+  // A pending deadline is never extended by playback ticks: continuous playback syncs too.
   useEffect(() => {
-    const unsub = usePlayerStore.subscribe((state, prevState) => {
-      if (
-        state.queue !== prevState.queue ||
-        state.currentIndex !== prevState.currentIndex ||
-        state.currentTime !== prevState.currentTime ||
-        state.isPlaying !== prevState.isPlaying
-      ) {
-        if (debounceRef.current) clearTimeout(debounceRef.current)
-        debounceRef.current = setTimeout(syncToServer, SYNC_DEBOUNCE_MS)
-      }
+    const scheduleSync = () => {
+      if (debounceRef.current !== null) return
+      debounceRef.current = setTimeout(() => {
+        debounceRef.current = null
+        syncToServer()
+      }, SYNC_DEBOUNCE_MS)
+    }
+    const unsubPlayer = usePlayerStore.subscribe((state, previous) => {
+      if (state.queue !== previous.queue || state.currentIndex !== previous.currentIndex
+        || state.isPlaying !== previous.isPlaying) scheduleSync()
     })
+    const unsubTime = subscribeToTime(scheduleSync)
     return () => {
-      unsub()
-      if (debounceRef.current) clearTimeout(debounceRef.current)
+      unsubPlayer()
+      unsubTime()
+      if (debounceRef.current !== null) clearTimeout(debounceRef.current)
+      debounceRef.current = null
     }
   }, [syncToServer])
 
   function dismissTransfer() {
-    setShowTransferPrompt(false)
+    if (pendingSession?.activeDeviceId) {
+      setDismissedTransfer({ sessionId: pendingSession.id, deviceId: pendingSession.activeDeviceId })
+    }
   }
 
   return {

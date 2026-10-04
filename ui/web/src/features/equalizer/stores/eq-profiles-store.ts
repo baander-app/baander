@@ -1,3 +1,5 @@
+import { withNoopGuard } from '@/shared/stores/with-noop-guard'
+import { withStoreDebug } from '@/shared/stores/debug'
 import { create } from 'zustand'
 
 export type EqProfileIcon = 'headphones' | 'speakers' | 'hifi-speaker' | 'wireless-speaker' | 'car' | 'tv' | 'monitor' | 'custom'
@@ -27,7 +29,7 @@ export interface EqProfilesState {
   setLoaded: (loaded: boolean) => void
 }
 
-export const useEqProfilesStore = create<EqProfilesState>()((set) => ({
+export const useEqProfilesStore = create<EqProfilesState>()(withStoreDebug('equalizer.eq-profiles', withNoopGuard((set) => ({
   profiles: [],
   activeProfileId: null,
   loaded: false,
@@ -37,20 +39,20 @@ export const useEqProfilesStore = create<EqProfilesState>()((set) => ({
   },
 
   addProfile: (profile) => {
-    set((s) => ({ profiles: [...s.profiles, profile] }))
+    set((s) => s.profiles.some((item) => item.id === profile.id) ? s : { profiles: [...s.profiles, profile] })
   },
 
   updateProfile: (id, updates) => {
-    set((s) => ({
+    set((s) => !s.profiles.some((profile) => profile.id === id && Object.entries(updates).some(([key, value]) => profile[key as keyof EqProfile] !== value)) ? s : ({
       profiles: s.profiles.map((p) => (p.id === id ? { ...p, ...updates } : p)),
     }))
   },
 
   removeProfile: (id) => {
-    set((s) => ({
+    set((s) => !s.profiles.some((profile) => profile.id === id) ? s : ({
       profiles: s.profiles.filter((p) => p.id !== id),
       activeProfileId: s.activeProfileId === id
-        ? s.profiles.find((p) => p.isDefault)?.id ?? null
+        ? s.profiles.find((p) => p.id !== id && p.isDefault)?.id ?? null
         : s.activeProfileId,
     }))
   },
@@ -62,4 +64,4 @@ export const useEqProfilesStore = create<EqProfilesState>()((set) => ({
   setLoaded: (loaded) => {
     set({ loaded })
   },
-}))
+}))))

@@ -1,3 +1,6 @@
+import { withNoopGuard } from '@/shared/stores/with-noop-guard'
+import { createSelectiveJSONStorage } from '@/shared/stores/persistence'
+import { withStoreDebug } from '@/shared/stores/debug'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
@@ -20,14 +23,16 @@ interface MediaModeState {
 }
 
 export const useMediaModeStore = create<MediaModeState>()(
-  persist(
-    (set) => ({
+  withStoreDebug('layout.media-mode', persist(
+    withNoopGuard((set) => ({
       activeMedia: 'music' as MediaType,
       setActiveMedia: (activeMedia: MediaType) => set({ activeMedia }),
-    }),
+    })),
     {
       name: 'baander-media-mode',
+      storage: createSelectiveJSONStorage(),
       version: 1,
+      partialize: (state) => ({ activeMedia: state.activeMedia }),
     },
-  ),
+  )),
 )
