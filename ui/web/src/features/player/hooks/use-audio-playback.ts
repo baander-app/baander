@@ -115,6 +115,7 @@ export function useAudioPlayback() {
         const adopted = usePlayerStore.getState().adoptPreloadedNext(next.audio, next.currentId, next.nextId)
         adopting = false
         if (!adopted) { invalidate(); return }
+        processor.resetProgramme()
         removeReadyListeners?.()
         candidate = undefined
         if (duration > 0) {
@@ -190,7 +191,7 @@ export function useAudioPlayback() {
         audioService.setPlayingState(true)
       }
       const onPause = () => {
-        if (!owned() || audio.ended) return
+        if (!owned() || audio.ended || !audio.paused) return
         usePlayerStore.getState().setIsPlaying(false)
         audioService.setPlayingState(false)
       }
@@ -208,6 +209,7 @@ export function useAudioPlayback() {
         if (!owned() || transitionPending) return
         const state = usePlayerStore.getState()
         if (state.repeat === 'one' && state.currentTrack) {
+          audioService.getProcessor()?.resetProgramme()
           audio.currentTime = 0
           void audio.play().catch((err) => { if (owned()) logger.warn('Repeat-one resume failed:', err) })
         } else if (candidate?.ready && valid(candidate)) {
@@ -218,7 +220,11 @@ export function useAudioPlayback() {
         }
       }
       const onSeeking = () => { if (owned()) invalidate() }
-      const onSourceChange = () => { if (owned()) invalidate() }
+      const onSourceChange = () => {
+        if (!owned()) return
+        invalidate()
+        if (audio.src) audioService.getProcessor()?.resetProgramme()
+      }
       const listeners = { seeking: onSeeking, loadstart: onSourceChange, play: onPlay, pause: onPause, timeupdate: onTimeUpdate, durationchange: onDurationChange, ended: onEnded }
       for (const [name, listener] of Object.entries(listeners)) audio.addEventListener(name, listener)
       return () => { for (const [name, listener] of Object.entries(listeners)) audio.removeEventListener(name, listener) }

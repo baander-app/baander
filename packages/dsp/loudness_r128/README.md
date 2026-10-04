@@ -55,6 +55,16 @@ qualification remain outstanding. In particular, 4× at 44.1 kHz is below the
 
 Momentary and short-term windows are 400 ms and 3 seconds. During startup,
 their averages use the samples received so far. Silence is represented by a
-finite floor. Call `reset_loudness` to begin a new measurement; worklet-level
-programme reset still needs integration before programme measurements can be
-considered qualified.
+finite floor. Call `reset_loudness` to begin a new measurement.
+
+The player starts a new output-mix programme on an active source load, accepted
+preloaded handoff, or repeat-one restart. Preload, pause/resume, and seeking do
+not reset history. Worklet resets clear both native meters and pending peak
+publication; generation-tagged reports prevent queued old readings from
+repopulating the main-thread loudness buffer. Reset requests also survive
+asynchronous worklet initialization.
+
+Crossfade overlap belongs to the new programme because the meters observe the
+summed output. These are playback-output measurements, not isolated per-track
+statistics or whole-file measurements. The player does not export a final
+programme result or explicitly flush a stopped stream's reconstruction tail.

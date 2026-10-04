@@ -113,6 +113,7 @@ export class AudioProcessor {
   private spectralFlux = 0
   private spectralFlatness = 0
   private lufsBuffer: number[] = []
+  private programmeGeneration = 0
   private readonly LUFS_WINDOW_SIZE = 400
   private readonly SMOOTHING_TIME = 0.1
 
@@ -585,14 +586,17 @@ export class AudioProcessor {
         this.audioWorkletNode = node
         node.port.onmessage = (event: MessageEvent) => {
           if (!this.ownsWorkletGeneration(generation) || this.audioWorkletNode !== node) return
-          const msg = event.data as { type: string; lufs?: number }
+          const msg = event.data as { type: string; lufs?: number; programmeGeneration?: number }
           if (msg.type === 'request-dsp-init') {
             void this.sendDSPToWorklet(node, generation)
-          } else if (msg.type === 'analysis') {
-            if (msg.lufs != null) this.lufsBuffer.push(msg.lufs)
+          } else if (msg.type === 'analysis' && msg.programmeGeneration === this.programmeGeneration) {
+            if (typeof msg.lufs === 'number' && Number.isFinite(msg.lufs)) this.lufsBuffer.push(msg.lufs)
             if (this.lufsBuffer.length > this.LUFS_WINDOW_SIZE) this.lufsBuffer.shift()
           }
         }
+      }
+      if (this.programmeGeneration > 0) {
+        this.audioWorkletNode.port.postMessage({ type: 'reset-programme', programmeGeneration: this.programmeGeneration })
       }
       this.analyzerNode.connect(this.audioWorkletNode)
       this.audioWorkletNode.connect(this.analysisSink)
@@ -638,6 +642,16 @@ export class AudioProcessor {
   }
 
   // --- Public API ---
+
+  /** Start a new output-mix measurement; crossfade overlap belongs to the new programme. */
+  public resetProgramme() {
+    if (this.destroyed) return
+    this.programmeGeneration++
+    this.lufsBuffer = []
+    this.audioWorkletNode?.port.postMessage({
+      type: 'reset-programme', programmeGeneration: this.programmeGeneration,
+    })
+  }
 
   public setPlayingState(isPlaying: boolean) {
     if (this.isPlaying === isPlaying) return

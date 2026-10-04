@@ -50,7 +50,8 @@ blocks, retained programme history, and explicit capacity exhaustion.
 Loudness range tests cover gated three-second windows, programme history,
 nearest-rank percentiles, and independent capacity exhaustion. True-peak tests
 cover EBU cases 15–19, intersample overshoot, and streaming filter history.
-Programme-reset integration remains outstanding; see the
+Player programme resets cover source loads, handoffs, and repeats, with
+queued-report isolation. Crossfades measure the output mix; see the
 [loudness module](loudness_r128/README.md) for the remaining limitations.
 This gate does not establish resampling or
 convolution quality, native AAC codec compliance, or audible playback quality.

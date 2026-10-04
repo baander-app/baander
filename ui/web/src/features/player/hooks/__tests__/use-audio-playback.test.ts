@@ -23,6 +23,7 @@ const processorMock = vi.hoisted(() => {
       setPlayingState: vi.fn(),
       resumeContextIfNeeded: vi.fn(() => Promise.resolve()),
       cancelCrossfade: vi.fn(),
+      resetProgramme: vi.fn(),
       destroy: vi.fn(),
     },
     __resetActive: () => { active = 'A' },
@@ -365,6 +366,78 @@ describe('useAudioPlayback', () => {
 
   // --- ended branching -----------------------------------------------------
 
+  describe('programme boundaries', () => {
+    it('ignores a queued pause from a replaced source while current playback is active', () => {
+      seedQueue(0, 2)
+      usePlayerStore.setState({ isPlaying: true })
+      renderHook(() => useAudioPlayback())
+      const [a] = capturedAudioElements
+      a.paused = false
+      act(() => { a.dispatchEvent(new Event('pause')) })
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+      expect(audioService.setPlayingState).not.toHaveBeenCalledWith(false)
+      a.paused = true
+      act(() => { a.dispatchEvent(new Event('pause')) })
+      expect(usePlayerStore.getState().isPlaying).toBe(false)
+      expect(audioService.setPlayingState).toHaveBeenCalledWith(false)
+    })
+
+    it('resets for active source loads including reloading the same track', () => {
+      seedQueue(0, 2)
+      renderHook(() => useAudioPlayback())
+      const [a, b] = capturedAudioElements
+      a.src = '/api/stream/track?id=t0'
+      act(() => {
+        a.dispatchEvent(new Event('loadstart'))
+        a.dispatchEvent(new Event('loadstart'))
+      })
+      expect(processorMock.instance.resetProgramme).toHaveBeenCalledTimes(2)
+
+      processorMock.instance.resetProgramme.mockClear()
+      act(() => {
+        timeUpdate(a, 95, 100)
+        b.dispatchEvent(new Event('loadstart'))
+        b.dispatchEvent(new Event('canplaythrough'))
+      })
+      expect(b.load).toHaveBeenCalledOnce()
+      expect(processorMock.instance.resetProgramme).not.toHaveBeenCalled()
+
+      act(() => {
+        a.src = ''
+        a.dispatchEvent(new Event('loadstart'))
+      })
+      expect(processorMock.instance.resetProgramme).not.toHaveBeenCalled()
+    })
+
+    it('preserves the programme on play, pause, seek and queue mutation', () => {
+      seedQueue(0, 2)
+      renderHook(() => useAudioPlayback())
+      const [a] = capturedAudioElements
+      act(() => {
+        a.dispatchEvent(new Event('play'))
+        a.dispatchEvent(new Event('pause'))
+        a.currentTime = 0
+        a.dispatchEvent(new Event('seeking'))
+        usePlayerStore.setState({ queue: [track('t0'), track('changed')] })
+      })
+      expect(processorMock.instance.resetProgramme).not.toHaveBeenCalled()
+    })
+
+    it('does not reset when incoming playback fails', async () => {
+      seedQueue(0, 2)
+      renderHook(() => useAudioPlayback())
+      const [a, b] = capturedAudioElements
+      vi.mocked(b.play).mockRejectedValueOnce(new Error('Playback unavailable'))
+      await act(async () => {
+        timeUpdate(a, 95, 100)
+        b.dispatchEvent(new Event('canplaythrough'))
+        a.dispatchEvent(new Event('ended'))
+      })
+      expect(processorMock.instance.resetProgramme).not.toHaveBeenCalled()
+      expect(processorMock.instance.instantSwap).not.toHaveBeenCalled()
+    })
+  })
+
   describe('ended event', () => {
     it('restarts the current track when repeat === "one"', () => {
       const q = seedQueue(0, 2)
@@ -379,6 +452,7 @@ describe('useAudioPlayback', () => {
 
       expect(a.currentTime).toBe(0)
       expect(a.play).toHaveBeenCalled()
+      expect(processorMock.instance.resetProgramme).toHaveBeenCalledOnce()
       // playNext must NOT be called: index unchanged.
       expect(usePlayerStore.getState().currentIndex).toBe(0)
       void result
@@ -404,6 +478,9 @@ describe('useAudioPlayback', () => {
 
       // crossfade off → instantSwap on the processor.
       expect(processorMock.instance.instantSwap).toHaveBeenCalledTimes(1)
+      expect(processorMock.instance.resetProgramme).toHaveBeenCalledOnce()
+      expect(processorMock.instance.resetProgramme.mock.invocationCallOrder[0])
+        .toBeLessThan(processorMock.instance.instantSwap.mock.invocationCallOrder[0])
       expect(processorMock.instance.crossfadeToInactive).not.toHaveBeenCalled()
       // Inactive (B) is now played; active (A) paused + rewound.
       expect(playSpy).toHaveBeenCalled()
@@ -441,6 +518,9 @@ describe('useAudioPlayback', () => {
       vi.useRealTimers()
 
       expect(processorMock.instance.crossfadeToInactive).toHaveBeenCalledWith(3.0)
+      expect(processorMock.instance.resetProgramme).toHaveBeenCalledOnce()
+      expect(processorMock.instance.resetProgramme.mock.invocationCallOrder[0])
+        .toBeLessThan(processorMock.instance.crossfadeToInactive.mock.invocationCallOrder[0])
       expect(processorMock.instance.instantSwap).not.toHaveBeenCalled()
       expect(usePlayerStore.getState().currentIndex).toBe(1)
     })
@@ -493,6 +573,12 @@ describe('useAudioPlayback', () => {
       })
       expect(usePlayerStore.getState().audioElement).toBe(b)
       expect(a.src).toContain('t0')
+      expect(processorMock.instance.resetProgramme).toHaveBeenCalledOnce()
+      act(() => {
+        a.dispatchEvent(new Event('loadstart'))
+        b.dispatchEvent(new Event('loadstart'))
+      })
+      expect(processorMock.instance.resetProgramme).toHaveBeenCalledTimes(2)
       act(() => {
         b.duration = 120
         b.dispatchEvent(new Event('durationchange'))
@@ -512,6 +598,7 @@ describe('useAudioPlayback', () => {
       expect(usePlayerStore.getState().audioElement).toBe(a)
       expect(usePlayerStore.getState().currentIndex).toBe(2)
       expect(a.src).toContain('t2')
+      expect(processorMock.instance.resetProgramme).toHaveBeenCalledTimes(3)
     })
 
     it('retains the prepared next track across the natural pause then ended event sequence', async () => {
@@ -544,8 +631,10 @@ describe('useAudioPlayback', () => {
       })
       expect(usePlayerStore.getState().audioElement).toBe(a)
       expect(processorMock.instance.instantSwap).not.toHaveBeenCalled()
+      expect(processorMock.instance.resetProgramme).not.toHaveBeenCalled()
       await act(async () => { resolvePlay() })
       expect(usePlayerStore.getState().audioElement).toBe(b)
+      expect(processorMock.instance.resetProgramme).toHaveBeenCalledOnce()
     })
 
     it.each([true, false])('cancels deferred fade after seeking backward (seeking event: %s)', async (dispatchSeeking) => {
@@ -568,6 +657,7 @@ describe('useAudioPlayback', () => {
       expect(usePlayerStore.getState().audioElement).toBe(a)
       expect(usePlayerStore.getState().currentIndex).toBe(0)
       expect(processorMock.instance.crossfadeToInactive).not.toHaveBeenCalled()
+      expect(processorMock.instance.resetProgramme).not.toHaveBeenCalled()
       expect(b.pause).toHaveBeenCalled()
     })
 
@@ -591,6 +681,7 @@ describe('useAudioPlayback', () => {
       await act(async () => { resolvePlay() })
       expect(usePlayerStore.getState().currentIndex).toBe(0)
       expect(processorMock.instance.instantSwap).not.toHaveBeenCalled()
+      expect(processorMock.instance.resetProgramme).not.toHaveBeenCalled()
       expect(b.pause).toHaveBeenCalled()
     })
 

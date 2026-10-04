@@ -15,14 +15,40 @@ class MagicSoupProcessor extends AudioWorkletProcessor {
     this.analysisFrameInterval = 16;
     this.isPlaying = false;
     this.intervalTruePeak = -Infinity;
+    this.programmeGeneration = 0;
     this.outputMessage = {
-      type: 'analysis', lufs: -60, leftChannel: 0, rightChannel: 0,
+      type: 'analysis', programmeGeneration: 0, lufs: -60, leftChannel: 0, rightChannel: 0,
       rms: 0, isPlaying: false, truePeak: -60, crestL: 0, crestR: 0,
     };
     this.port.onmessage = event => {
       if (event.data?.type === 'init-dsp') void this.initDSPFromMessage(event.data);
+      else if (event.data?.type === 'reset-programme') this.resetProgramme(event.data.programmeGeneration);
     };
     this.port.postMessage({ type: 'request-dsp-init' });
+  }
+
+  resetProgramme(generation) {
+    if (!Number.isSafeInteger(generation) || generation <= this.programmeGeneration) return;
+    this.programmeGeneration = generation;
+    for (const kind of ['loudness', 'dynamics']) {
+      if (this[`${kind}Ready`]) {
+        try { this[`${kind}API`].reset(); }
+        catch (error) { this.disableMeter(kind, error); }
+      }
+    }
+    // Pending initialization creates fresh meters; no previous programme has fed them.
+    this.intervalTruePeak = -Infinity;
+    this.frameCounter = 0;
+    this.isPlaying = false;
+    this.outputMessage.programmeGeneration = generation;
+    this.outputMessage.lufs = -60;
+    this.outputMessage.truePeak = -60;
+    this.outputMessage.leftChannel = 0;
+    this.outputMessage.rightChannel = 0;
+    this.outputMessage.rms = 0;
+    this.outputMessage.crestL = 0;
+    this.outputMessage.crestR = 0;
+    this.outputMessage.isPlaying = false;
   }
 
   initDSPFromMessage(data) {
@@ -51,19 +77,21 @@ class MagicSoupProcessor extends AudioWorkletProcessor {
     if (kind === 'loudness') {
       Object.assign(api, {
         init: pick('init_loudness', '_init_loudness'),
+        reset: pick('reset_loudness', '_reset_loudness'),
         lufsM: pick('get_lufs_momentary', '_get_lufs_momentary'),
         truePkDbfs: pick('get_true_peak_dbfs', '_get_true_peak_dbfs'),
       });
-      required.push('init', 'lufsM', 'truePkDbfs');
+      required.push('init', 'reset', 'lufsM', 'truePkDbfs');
     } else {
       Object.assign(api, {
         init: pick('init_meters', '_init_meters'),
+        reset: pick('reset_meters', '_reset_meters'),
         rmsL: pick('get_rms_left', '_get_rms_left'),
         rmsR: pick('get_rms_right', '_get_rms_right'),
         crestL: pick('get_crest_left', '_get_crest_left'),
         crestR: pick('get_crest_right', '_get_crest_right'),
       });
-      required.push('init', 'rmsL', 'rmsR', 'crestL', 'crestR');
+      required.push('init', 'reset', 'rmsL', 'rmsR', 'crestL', 'crestR');
     }
     if (!api.memory?.buffer || required.some(name => typeof api[name] !== 'function')) {
       throw new Error(`Missing required ${kind} exports`);

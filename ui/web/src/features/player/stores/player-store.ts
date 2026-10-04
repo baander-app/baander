@@ -6,6 +6,7 @@ import { updateTime, registerTimeBridge } from './player-time-tracker'
 import type { SongEntry } from '@/features/catalog/types'
 
 const logger = createLogger('PlayerStore')
+let playbackSelectionGeneration = 0
 
 export interface Track {
   publicId: string
@@ -151,6 +152,7 @@ export const usePlayerStore = create<PlayerState>()(
 
       // Queue actions
       playTrack: (track, queue) => {
+        const generation = ++playbackSelectionGeneration
         const state = get()
         const el = state.audioElement
 
@@ -181,13 +183,18 @@ export const usePlayerStore = create<PlayerState>()(
         set({ isPlaying: true })
         if (el) {
           el.src = buildStreamUrl(track.publicId)
+          const src = el.src
+          const ownsSelection = () => generation === playbackSelectionGeneration
+            && get().audioElement === el && el.src === src && get().currentTrack === track
           el.play().then(() => {
+            if (!ownsSelection()) return
             // Record activity only when playback actually starts
             activityService.recordPlay({
               songId: track.publicId,
               albumId: track.albumPublicId,
             })
           }).catch((err) => {
+            if (!ownsSelection()) return
             logger.warn('Autoplay blocked or failed:', err)
             set({ isPlaying: false })
           })
@@ -260,6 +267,7 @@ export const usePlayerStore = create<PlayerState>()(
         }
 
         const track = queue[nextIndex]
+        playbackSelectionGeneration++
         const el = audioElement
         if (el) {
           el.src = buildStreamUrl(track.publicId)
@@ -281,6 +289,7 @@ export const usePlayerStore = create<PlayerState>()(
         const track = nextIndex === null ? undefined : queue[nextIndex]
         if (nextIndex === null || !track || track.publicId !== expectedNextId) return false
 
+        playbackSelectionGeneration++
         element.volume = volume / 100
         element.muted = muted
         set({
@@ -315,6 +324,7 @@ export const usePlayerStore = create<PlayerState>()(
         }
 
         const track = queue[prevIndex]
+        playbackSelectionGeneration++
         const el = audioElement
         if (el) {
           el.src = buildStreamUrl(track.publicId)

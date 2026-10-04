@@ -624,6 +624,86 @@ describe('player-store', () => {
   // playTrack — queue replacement + audio wiring
   // =========================================================================
   describe('playTrack', () => {
+    it('ignores rejected playback from a replaced selection', async () => {
+      const audio = makeAudioStub()
+      let rejectFirst!: (reason: Error) => void
+      vi.mocked(audio.play).mockReturnValueOnce(new Promise<void>((_, reject) => { rejectFirst = reject }))
+      usePlayerStore.setState({ audioElement: audio })
+      usePlayerStore.getState().playTrack(track('first'))
+      usePlayerStore.getState().playTrack(track('third'))
+      rejectFirst(new Error('Playback interrupted by source replacement'))
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(usePlayerStore.getState().currentTrack?.publicId).toBe('third')
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+    })
+
+    it('ignores rejected playback from an earlier replay of the same track', async () => {
+      const audio = makeAudioStub()
+      const selected = track('first')
+      let rejectFirst!: (reason: Error) => void
+      vi.mocked(audio.play).mockReturnValueOnce(new Promise<void>((_, reject) => { rejectFirst = reject }))
+      usePlayerStore.setState({ audioElement: audio })
+      usePlayerStore.getState().playTrack(selected)
+      usePlayerStore.getState().playTrack(selected)
+      rejectFirst(new Error('Earlier replay interrupted'))
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+    })
+
+    it.each(['navigation', 'adoption'] as const)('ignores old playback after %s returns to the same selection', async (transition) => {
+      const audio = makeAudioStub()
+      const q = tracks('first', 'second')
+      let rejectFirst!: (reason: Error) => void
+      vi.mocked(audio.play).mockReturnValueOnce(new Promise<void>((_, reject) => { rejectFirst = reject }))
+      usePlayerStore.setState({ audioElement: audio })
+      usePlayerStore.getState().playTrack(q[0], q)
+      if (transition === 'navigation') {
+        usePlayerStore.getState().playNext()
+        usePlayerStore.getState().playPrevious()
+      } else {
+        const incoming = makeAudioStub()
+        usePlayerStore.setState({ repeat: 'all' })
+        expect(usePlayerStore.getState().adoptPreloadedNext(incoming, 'first', 'second')).toBe(true)
+        expect(usePlayerStore.getState().adoptPreloadedNext(audio, 'second', 'first')).toBe(true)
+      }
+      rejectFirst(new Error('Obsolete selection interrupted'))
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(usePlayerStore.getState().audioElement).toBe(audio)
+      expect(usePlayerStore.getState().currentTrack).toBe(q[0])
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+    })
+
+    it('stops playback when the current selection fails', async () => {
+      const audio = makeAudioStub()
+      vi.mocked(audio.play).mockRejectedValueOnce(new Error('Current playback failed'))
+      usePlayerStore.setState({ audioElement: audio })
+      usePlayerStore.getState().playTrack(track('first'))
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(usePlayerStore.getState().isPlaying).toBe(false)
+    })
+
+    it.each(['rewind', 'rejected adoption'] as const)('retains pending selection ownership after %s', async (operation) => {
+      const audio = makeAudioStub()
+      let rejectPlay!: (reason: Error) => void
+      vi.mocked(audio.play).mockReturnValueOnce(new Promise<void>((_, reject) => { rejectPlay = reject }))
+      usePlayerStore.setState({ audioElement: audio })
+      usePlayerStore.getState().playTrack(track('first'), tracks('first', 'second'))
+      if (operation === 'rewind') {
+        usePlayerStore.setState({ currentTime: 4 })
+        usePlayerStore.getState().playPrevious()
+      } else {
+        expect(usePlayerStore.getState().adoptPreloadedNext(makeAudioStub(), 'first', 'unexpected')).toBe(false)
+      }
+      rejectPlay(new Error('Current pending selection failed'))
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(usePlayerStore.getState().isPlaying).toBe(false)
+    })
+
     it('replaces queue and locates the track index when queue given', () => {
       const audio = makeAudioStub()
       usePlayerStore.setState({ audioElement: audio })

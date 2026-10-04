@@ -374,3 +374,52 @@ describe('AudioProcessor asynchronous analysis lifecycle', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 })
+
+
+describe('programme measurement ownership', () => {
+  it('clears readings and rejects queued reports from older programmes', async () => {
+    await connect()
+    await settle()
+    const meter = worklet('magic-soup-processor')
+    const readings = processor as unknown as { lufsBuffer: number[] }
+    meter.emit({ type: 'analysis', programmeGeneration: 0, lufs: -12 })
+    expect(readings.lufsBuffer).toEqual([-12])
+    processor.resetProgramme()
+    expect(readings.lufsBuffer).toEqual([])
+    expect(meter.port.postMessage).toHaveBeenCalledWith({ type: 'reset-programme', programmeGeneration: 1 })
+    meter.emit({ type: 'analysis', programmeGeneration: 0, lufs: -1 })
+    meter.emit({ type: 'analysis', lufs: -1 })
+    meter.emit({ type: 'analysis', programmeGeneration: 1, lufs: NaN })
+    expect(readings.lufsBuffer).toEqual([])
+    meter.emit({ type: 'analysis', programmeGeneration: 1, lufs: -24 })
+    expect(readings.lufsBuffer).toEqual([-24])
+    processor.resetProgramme()
+    meter.emit({ type: 'analysis', programmeGeneration: 1, lufs: -2 })
+    meter.emit({ type: 'analysis', programmeGeneration: 2, lufs: -30 })
+    expect(readings.lufsBuffer).toEqual([-30])
+  })
+
+  it('carries the latest boundary through delayed worklet creation and reconnection', async () => {
+    const module = deferred<void>()
+    graph.audioContext.audioWorklet.addModule.mockReturnValue(module.promise)
+    await connect()
+    processor.resetProgramme()
+    processor.resetProgramme()
+    module.resolve()
+    await settle()
+    expect(worklet('magic-soup-processor').port.postMessage).toHaveBeenCalledWith({ type: 'reset-programme', programmeGeneration: 2 })
+    processor.disconnect()
+    await connect()
+    await settle()
+    expect(worklet('magic-soup-processor').port.postMessage).toHaveBeenCalledWith({ type: 'reset-programme', programmeGeneration: 2 })
+  })
+
+  it('ignores reset calls after destruction', async () => {
+    await connect()
+    await settle()
+    const meter = worklet('magic-soup-processor')
+    processor.destroy()
+    processor.resetProgramme()
+    expect(meter.port.postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'reset-programme' }))
+  })
+})
