@@ -10,33 +10,33 @@ static int g_sr = 48000;
 static int g_tp_os = 1; // true-peak oversample factor (1/2/4)
 
 struct Biquad {
-  float b0=1, b1=0, b2=0, a1=0, a2=0;
-  float z1L=0, z2L=0, z1R=0, z2R=0;
+  double b0=1, b1=0, b2=0, a1=0, a2=0;
+  double z1L=0, z2L=0, z1R=0, z2R=0;
 
-  inline void set(float B0,float B1,float B2,float A1,float A2){
+  inline void set(double B0,double B1,double B2,double A1,double A2){
     b0=B0; b1=B1; b2=B2; a1=A1; a2=A2;
     z1L=z2L=z1R=z2R=0.0f;
   }
 
   inline void reset(){ z1L=z2L=z1R=z2R=0.0f; }
 
-  inline float processL(float x){
-    float y = b0*x + z1L;
+  inline double processL(double x){
+    double y = b0*x + z1L;
     z1L = b1*x + z2L - a1*y;
     z2L = b2*x - a2*y;
     return y;
   }
-  inline float processR(float x){
-    float y = b0*x + z1R;
+  inline double processR(double x){
+    double y = b0*x + z1R;
     z1R = b1*x + z2R - a1*y;
     z2R = b2*x - a2*y;
     return y;
   }
 };
 
-// K-weighting: 1st-order highpass (pre) + 2nd-order high-shelf approx (RLB)
-static Biquad g_pre; // highpass ~ 60 Hz
-static Biquad g_rlb; // high-shelf approx per ITU-R BS.1770-ish
+// ITU-R BS.1770-5 Annex 1: head-model shelf followed by RLB highpass.
+static Biquad g_pre;
+static Biquad g_rlb;
 
 // Energy ring buffers
 struct Ring {
@@ -80,37 +80,50 @@ static float g_truepk = -90.0f;
 static inline float db2(float db){ return std::pow(10.0f, db/10.0f); }
 static inline float lin2db(float v){ return (v > 1e-20f) ? 10.0f*std::log10(v) : -200.0f; }
 
-// Rough butterworth 1st-order HPF at 60 Hz (z-plane bilinear transform)
+// Reconstruct the bilinear design from the normative 48 kHz coefficients.
+// The cutoff is prewarped at each rate; the reference gains are preserved.
+// Double precision avoids cancellation around the RLB's low-frequency poles.
 static void design_pre(int sr) {
-  const float fc = 60.0f;
-  float k = std::tan((float)M_PI * fc / (float)sr);
-  float norm = 1.0f / (1.0f + k);
-  float b0 = 1.0f * norm;
-  float b1 = -1.0f * norm;
-  float a1 = (1.0f - k) * norm;
-  g_pre.set(b0, b1, 0.0f, -a1, 0.0f);
+  // Table 1: stage 1 shelving filter.
+  constexpr double b0 = 1.53512485958697;
+  constexpr double b1 = -2.69169618940638;
+  constexpr double b2 = 1.19839281085285;
+  constexpr double a1 = -1.69065929318241;
+  constexpr double a2 = 0.73248077421585;
+  if (sr == 48000) {
+    g_pre.set(b0, b1, b2, a1, a2);
+    return;
+  }
+  const double k48 = std::sqrt((1 + a1 + a2) / (1 - a1 + a2));
+  const double q = std::sqrt((1 + a1 + a2) * (1 - a1 + a2)) / (2 * (1 - a2));
+  const double k = std::tan(std::atan(k48) * 48000.0 / sr);
+  const double vh = (b0 - b1 + b2) / (1 - a1 + a2);
+  const double vb = (b0 - b2) / (1 - a2);
+  const double vl = (b0 + b1 + b2) / (1 + a1 + a2);
+  const double norm = 1 + k / q + k * k;
+  g_pre.set((vh + vb * k / q + vl * k * k) / norm,
+            2 * (vl * k * k - vh) / norm,
+            (vh - vb * k / q + vl * k * k) / norm,
+            2 * (k * k - 1) / norm,
+            (1 - k / q + k * k) / norm);
 }
 
-// Simple high-shelf approximation near 4 kHz
 static void design_rlb(int sr) {
-  // Using a gentle shelf approximation (not exact ITU)
-  const float fc = 1500.0f;
-  const float gain_db = 4.0f; // modest pre-emphasis
-  float A = std::pow(10.0f, gain_db / 40.0f);
-  float w0 = 2.0f*(float)M_PI*fc/(float)sr;
-  float alpha = std::sin(w0)/2.0f * std::sqrt((A + 1/A)*(1/0.707f - 1) + 2.0f);
-  float cosw0 = std::cos(w0);
-
-  float b0 =    A*( (A+1) + (A-1)*cosw0 + 2*std::sqrt(A)*alpha );
-  float b1 = -2*A*( (A-1) + (A+1)*cosw0 );
-  float b2 =    A*( (A+1) + (A-1)*cosw0 - 2*std::sqrt(A)*alpha );
-  float a0 =        (A+1) - (A-1)*cosw0 + 2*std::sqrt(A)*alpha;
-  float a1 =  2*( (A-1) - (A+1)*cosw0 );
-  float a2 =        (A+1) - (A-1)*cosw0 - 2*std::sqrt(A)*alpha;
-
-  // normalize
-  b0/=a0; b1/=a0; b2/=a0; a1/=a0; a2/=a0;
-  g_rlb.set(b0, b1, b2, a1, a2);
+  // Table 2: stage 2 RLB highpass, including its unnormalized numerator.
+  constexpr double a1 = -1.99004745483398;
+  constexpr double a2 = 0.99007225036621;
+  if (sr == 48000) {
+    g_rlb.set(1, -2, 1, a1, a2);
+    return;
+  }
+  const double k48 = std::sqrt((1 + a1 + a2) / (1 - a1 + a2));
+  const double q = std::sqrt((1 + a1 + a2) * (1 - a1 + a2)) / (2 * (1 - a2));
+  const double k = std::tan(std::atan(k48) * 48000.0 / sr);
+  const double norm = 1 + k / q + k * k;
+  const double gain = (1 + k48 / q + k48 * k48) / norm;
+  g_rlb.set(gain, -2 * gain, gain,
+            2 * (k * k - 1) / norm,
+            (1 - k / q + k * k) / norm);
 }
 
 void init_loudness(int sample_rate, int truepeak_oversample) {
@@ -184,16 +197,17 @@ void process_frames(const float* interleavedLR, int frames, int channels) {
   // Per-sample processing
   for (int i = 0; i < frames; ++i) {
     float l = interleavedLR[i*channels + 0];
-    float r = (channels > 1) ? interleavedLR[i*channels + 1] : l;
-
-    // K-weighting
-    float lp = g_pre.processL(l);
-    float rp = g_pre.processR(r);
-    float lk = g_rlb.processL(lp);
-    float rk = g_rlb.processR(rp);
-
-    // Energy (mean of channels)
-    float e = 0.5f * (lk*lk + rk*rk);
+    // Mono contributes once; stereo L/R each have unit channel weight.
+    double lk = g_rlb.processL(g_pre.processL(l));
+    double energy = lk * lk;
+    // Advance an absent right channel with silence so topology changes cannot
+    // resurrect frozen filter history; its decay does not count as mono energy.
+    double r = channels > 1 ? interleavedLR[i*channels + 1] : 0.0;
+    double rk = g_rlb.processR(g_pre.processR(r));
+    if (channels > 1) {
+      energy += rk * rk;
+    }
+    float e = (float)energy;
 
     g_m_win.push(e);
     g_s_win.push(e);

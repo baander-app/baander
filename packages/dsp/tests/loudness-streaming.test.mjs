@@ -43,21 +43,16 @@ function stream(meter, frames, chunkSize, generate) {
   }
 }
 
-// Recorded from the pre-optimization WASM with this signal and 128-frame feeds.
-const baseline = {
-  44100: [-23.123756408691406, -17.841062545776367, -18.817333221435547, 18.660449981689453],
-  48000: [-23.123327255249023, -17.840614318847656, -18.816884994506836, 18.660449981689453],
-};
-
+// Absolute weighting accuracy is checked independently in loudness-weighting.test.mjs.
+// This suite checks streaming state without freezing the old approximate algorithm.
 for (const sampleRate of [44100, 48000]) {
-  test(`streaming loudness preserves baseline and chunk boundaries at ${sampleRate} Hz`, async () => {
+  test(`streaming loudness preserves chunk boundaries at ${sampleRate} Hz`, async () => {
     const quantum = await fixture(sampleRate);
     const larger = await fixture(sampleRate);
     try {
       stream(quantum, sampleRate * 4, 128, signal(sampleRate));
       stream(larger, sampleRate * 4, 8192, signal(sampleRate));
       quantum.readings().forEach((value, i) => {
-        close(value, baseline[sampleRate][i]);
         close(value, larger.readings()[i], 0.00001);
       });
     } finally { quantum.dispose(); larger.dispose(); }
@@ -67,6 +62,7 @@ for (const sampleRate of [44100, 48000]) {
     const meter = await fixture(sampleRate);
     try {
       stream(meter, sampleRate * 4, 128, signal(sampleRate));
+      const beforeReset = meter.readings();
       stream(meter, sampleRate * 4, 128);
       close(meter.api.get_lufs_momentary(), -120.691, 0.0001);
       close(meter.api.get_lufs_shortterm(), -120.691, 0.0001);
@@ -78,7 +74,7 @@ for (const sampleRate of [44100, 48000]) {
       assert.deepEqual(meter.readings(), [-70, -70, -70, 0]);
       assert.equal(meter.api.get_true_peak_dbfs(), -90);
       stream(meter, sampleRate * 4, 128, signal(sampleRate));
-      meter.readings().forEach((value, i) => close(value, baseline[sampleRate][i]));
+      meter.readings().forEach((value, i) => close(value, beforeReset[i], 0.00001));
     } finally { meter.dispose(); }
   });
 }

@@ -39,7 +39,9 @@ buffering, spectral features, and the dynamics meter’s rolling RMS and
 sample-peak decay contract. Meter worklet tests cover continuous delivery,
 silence, channel handling, sample rates, and safe WASM buffer ownership.
 Loudness streaming tests exercise state continuity and window decay; they do
-not establish R128 compliance. K-weighting, integrated gating, loudness range,
-and true-peak reconstruction still require correction and independent vectors.
+not establish R128 compliance. Independent vectors cover mono/stereo K-weighting
+at 44.1 and 48 kHz. Integrated gating, loudness range, and true-peak
+reconstruction still require correction and independent vectors; see the
+[loudness module](loudness_r128/README.md) for the remaining limitations.
 This gate does not establish resampling or
 convolution quality, native AAC codec compliance, or audible playback quality.
