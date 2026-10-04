@@ -30,7 +30,7 @@ final class TokenMetadata
         private readonly ?string $clientFingerprint,
         private readonly ?string $sessionId,
         private ?string $ipAddress,
-        private array $ipHistoryParam,
+        array $ipHistoryParam,
         private int $ipChangeCount,
         private readonly ?string $countryCode,
         private readonly ?string $city,
