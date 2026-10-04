@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react'
 import styled from 'styled-components'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
+import { parseApiError } from '@/features/auth/lib/parse-api-error'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
 import { Card, CardContent } from '@/shared/components/ui/card'
@@ -215,8 +216,7 @@ function ChangeEmailDialog({ open, onOpenChange }: { open: boolean; onOpenChange
       }))
       onOpenChange(false)
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      setError(msg ?? 'Failed to change email.')
+      setError(parseApiError(err, 'Failed to change email.').message)
     } finally {
       setLoading(false)
     }
@@ -297,8 +297,7 @@ function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; onOpenCha
       setConfirmPassword('')
       onOpenChange(false)
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      setError(msg ?? 'Failed to change password.')
+      setError(parseApiError(err, 'Failed to change password.').message)
     } finally {
       setLoading(false)
     }

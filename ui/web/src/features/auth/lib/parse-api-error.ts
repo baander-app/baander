@@ -5,7 +5,7 @@ import { AxiosError } from 'axios';
  *
  * Handles two backend error envelope shapes:
  * - OAuth-style: { error: string, error_description: string }
- * - Project-style: { error: { code: string, message: string } }
+ * - Project-style: { error: { code: string | number, message: string } }
  *
  * Also checks for known error codes that signal special behavior (e.g. AUTH_TOTP_REQUIRED).
  */
@@ -16,29 +16,30 @@ interface OAuthStyleError {
 
 interface ProjectStyleError {
   error: {
-    code: string
+    code: string | number
     message: string
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 function isOAuthStyle(data: unknown): data is OAuthStyleError {
-  return typeof data === 'object' && data !== null && typeof (data as OAuthStyleError).error === 'string'
+  return isRecord(data) && typeof data.error === 'string' &&
+    (data.error_description === undefined || typeof data.error_description === 'string')
 }
 
 function isProjectStyle(data: unknown): data is ProjectStyleError {
-  return (
-    typeof data === 'object' &&
-    data !== null &&
-    typeof (data as ProjectStyleError).error === 'object' &&
-    (data as ProjectStyleError).error !== null &&
-    typeof (data as ProjectStyleError).error.code === 'string' &&
-    typeof (data as ProjectStyleError).error.message === 'string'
-  )
+  if (!isRecord(data) || !isRecord(data.error)) return false
+  const { code, message } = data.error
+  return (typeof code === 'string' || (typeof code === 'number' && Number.isInteger(code))) &&
+    typeof message === 'string'
 }
 
 export interface ParsedApiError {
   message: string
-  code: string | null
+  code: string | number | null
 }
 
 export function parseApiError(err: unknown, fallback: string): ParsedApiError {
