@@ -40,7 +40,7 @@ archive_paths=(vendor src tests config packages migrations bin docker/general te
 if [ "${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" = 1 ]; then
     archive_paths=(--files-from /dev/null)
 fi
-tar -cf - "${archive_paths[@]}" |
+tar --exclude='config/secrets/oauth' --exclude='config/secrets/*.decrypt.private.php' -cf - "${archive_paths[@]}" |
     docker run --rm --name "$run_id-app" --privileged --network "$run_id" -i --entrypoint sh \
         -e BAANDER_TEST_CHECKOUT_IN_IMAGE="${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" \
         -e APP_ENV=test -e APP_DEBUG=0 -e XDEBUG_MODE=off -e REDIS_PASSWORD=test-only \
@@ -58,6 +58,14 @@ tar -cf - "${archive_paths[@]}" |
                 cd /tmp/baander-functional
             fi
             tar -xf -
+            oauth_directory="$(mktemp -d /tmp/baander-functional-oauth.XXXXXXXX)"
+            export OAUTH_PRIVATE_KEY_PATH="$oauth_directory/private.key"
+            export OAUTH_PUBLIC_KEY_PATH="$oauth_directory/public.key"
+            (
+                umask 077
+                openssl genrsa -out "$OAUTH_PRIVATE_KEY_PATH" 2048 2>/dev/null
+                openssl rsa -in "$OAUTH_PRIVATE_KEY_PATH" -pubout -out "$OAUTH_PUBLIC_KEY_PATH" 2>/dev/null
+            )
             php -d memory_limit=512M bin/console cache:clear --env=test --no-debug
             php -d memory_limit=512M bin/console doctrine:migrations:migrate --no-interaction --env=test
             # A second run must recognize the completed migration history.
