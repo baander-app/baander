@@ -118,4 +118,13 @@ final class UuidTest extends TestCase
 
         Uuid::fromString('12345');
     }
+    public function testToDateTimeRejectsUuidWithoutTimestamp(): void
+    {
+        $uuid = Uuid::v4();
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('This UUID does not contain a timestamp.');
+
+        $uuid->toDateTime();
+    }
+
 }

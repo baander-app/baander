@@ -20,7 +20,7 @@ final readonly class PublicId implements Stringable, JsonSerializable
     {
         if ($id === null) {
             $client = new Client();
-            $this->id = $client->generateId(self::LENGTH, self::ALPHABET);
+            $this->id = $client->formattedId(self::ALPHABET, self::LENGTH);
 
             return;
         }

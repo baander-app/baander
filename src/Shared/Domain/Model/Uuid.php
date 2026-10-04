@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use JsonSerializable;
 use Stringable;
 use Symfony\Component\Uid\Uuid as SymfonyUuid;
+use Symfony\Component\Uid\TimeBasedUidInterface;
 
 final readonly class Uuid implements Stringable, JsonSerializable
 {
@@ -61,7 +62,12 @@ final readonly class Uuid implements Stringable, JsonSerializable
 
     public function toDateTime(): \DateTimeImmutable
     {
-        return SymfonyUuid::fromRfc4122($this->value)->getDateTime();
+        $uuid = SymfonyUuid::fromRfc4122($this->value);
+        if (!$uuid instanceof TimeBasedUidInterface) {
+            throw new \LogicException('This UUID does not contain a timestamp.');
+        }
+
+        return $uuid->getDateTime();
     }
 
     public function equals(self $other): bool

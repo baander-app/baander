@@ -126,6 +126,7 @@ final class WebSocketController extends AbstractWebSocketController
         };
     }
 
+    /** @return array<array-key, mixed>|null */
     private function deserialize(int $fd, string $data): ?array
     {
         try {
@@ -151,6 +152,7 @@ final class WebSocketController extends AbstractWebSocketController
         return $payload;
     }
 
+    /** @param array<array-key, mixed> $payload */
     private function handleAuthReconnect(int $fd, array $payload): void
     {
         if ($this->reconnectionTokens === null) {
@@ -210,6 +212,7 @@ final class WebSocketController extends AbstractWebSocketController
         return count($window) <= self::MAX_MESSAGES_PER_SECOND;
     }
 
+    /** @param array<array-key, mixed> $payload */
     private function handleRoomJoin(int $fd, string $userId, array $payload): void
     {
         $room = $payload['room'] ?? null;
@@ -231,6 +234,7 @@ final class WebSocketController extends AbstractWebSocketController
         ]);
     }
 
+    /** @param array<array-key, mixed> $payload */
     private function handleRoomLeave(int $fd, array $payload): void
     {
         $room = $payload['room'] ?? null;
@@ -252,6 +256,7 @@ final class WebSocketController extends AbstractWebSocketController
         ]);
     }
 
+    /** @param array<array-key, mixed> $payload */
     private function handlePartyJoin(int $fd, string $userId, array $payload): void
     {
         $sessionId = $payload['sessionId'] ?? null;
@@ -318,6 +323,7 @@ final class WebSocketController extends AbstractWebSocketController
         ]);
     }
 
+    /** @param array<array-key, mixed> $payload */
     private function handlePartyLeave(int $fd, string $userId, array $payload): void
     {
         $sessionId = $payload['sessionId'] ?? null;
@@ -376,6 +382,7 @@ final class WebSocketController extends AbstractWebSocketController
         ]);
     }
 
+    /** @param array<array-key, mixed> $payload */
     private function handlePartyPlayback(int $fd, string $userId, array $payload): void
     {
         $sessionId = $payload['sessionId'] ?? null;
@@ -456,6 +463,7 @@ final class WebSocketController extends AbstractWebSocketController
         // when the command handler dispatches domain events.
     }
 
+    /** @param array<array-key, mixed> $payload */
     private function handlePartySync(int $fd, string $userId, array $payload): void
     {
         $sessionId = $payload['sessionId'] ?? null;
@@ -533,6 +541,7 @@ final class WebSocketController extends AbstractWebSocketController
         ]);
     }
 
+    /** @param array<array-key, mixed> $payload */
     private function handleSessionJoin(int $fd, string $userId, array $payload): void
     {
         $deviceId = $payload['deviceId'] ?? null;
@@ -572,6 +581,7 @@ final class WebSocketController extends AbstractWebSocketController
         ]);
     }
 
+    /** @param array<array-key, mixed> $payload */
     private function handleSessionPlayback(int $fd, string $userId, array $payload): void
     {
         $deviceId = $payload['deviceId'] ?? null;
@@ -619,6 +629,7 @@ final class WebSocketController extends AbstractWebSocketController
         ]);
     }
 
+    /** @param array<array-key, mixed> $payload */
     private function handleSessionSync(int $fd, string $userId, array $payload): void
     {
         $deviceId = $payload['deviceId'] ?? null;
@@ -674,6 +685,7 @@ final class WebSocketController extends AbstractWebSocketController
         $this->logger?->debug('WebSocket closed', ['fd' => $fd, 'userId' => $userId]);
     }
 
+    /** @param array<array-key, mixed> $payload */
     private function handleTranscodePosition(int $fd, array $payload): void
     {
         $sessionId = $payload['sessionId'] ?? null;

@@ -5,16 +5,15 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Messenger\Stamp;
 
 use App\Transcode\Domain\Model\TranscodeSession;
-use Symfony\Component\Messenger\Stamp\StampInterface;
 
-final readonly class TranscodeSessionResultStamp implements StampInterface
+final readonly class TranscodeSessionResultStamp implements ResultStampInterface
 {
     public function __construct(
         private TranscodeSession $session,
     ) {
     }
 
-    public static function fromResult(mixed $result): ?self
+    public static function fromResult(mixed $result): ?static
     {
         return $result instanceof TranscodeSession ? new self($result) : null;
     }

@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Messenger\Stamp;
 
-use Symfony\Component\Messenger\Stamp\StampInterface;
-
-final readonly class CountrySubscriptionResultStamp implements StampInterface
+final readonly class CountrySubscriptionResultStamp implements ResultStampInterface
 {
+    /** @param array<array-key, mixed> $result */
     public function __construct(private array $result)
     {
     }
 
-    public static function fromResult(mixed $result): ?self
+    public static function fromResult(mixed $result): ?static
     {
         return is_array($result) && isset($result['countryCode']) ? new self($result) : null;
     }
 
+    /** @return array<array-key, mixed> */
     public function getResult(): array
     {
         return $this->result;

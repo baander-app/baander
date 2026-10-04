@@ -8,12 +8,12 @@ use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Middleware\MiddlewareInterface;
 use Symfony\Component\Messenger\Middleware\StackInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
-use Symfony\Component\Messenger\Stamp\StampInterface;
+use App\Shared\Infrastructure\Messenger\Stamp\ResultStampInterface;
 
 final readonly class ResultStampMiddleware implements MiddlewareInterface
 {
     /**
-     * @param class-string<StampInterface>[] $stampClasses
+     * @param list<class-string<ResultStampInterface>> $stampClasses
      */
     public function __construct(
         private array $stampClasses,
@@ -22,7 +22,7 @@ final readonly class ResultStampMiddleware implements MiddlewareInterface
 
     public function handle(Envelope $envelope, StackInterface $stack): Envelope
     {
-        $envelope = $stack->next()->handle($envelope);
+        $envelope = $stack->next()->handle($envelope, $stack);
 
         $handledStamp = $envelope->last(HandledStamp::class);
         if ($handledStamp === null) {

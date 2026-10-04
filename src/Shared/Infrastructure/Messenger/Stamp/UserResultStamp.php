@@ -5,16 +5,15 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Messenger\Stamp;
 
 use App\Auth\Domain\Model\User;
-use Symfony\Component\Messenger\Stamp\StampInterface;
 
-final readonly class UserResultStamp implements StampInterface
+final readonly class UserResultStamp implements ResultStampInterface
 {
     public function __construct(
         private User $user,
     ) {
     }
 
-    public static function fromResult(mixed $result): ?self
+    public static function fromResult(mixed $result): ?static
     {
         return $result instanceof User ? new self($result) : null;
     }

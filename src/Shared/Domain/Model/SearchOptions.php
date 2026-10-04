@@ -42,6 +42,7 @@ final readonly class SearchOptions
         );
     }
 
+    /** @param list<string> $fields */
     public function withFields(array $fields): self
     {
         return new self(
@@ -72,6 +73,7 @@ final readonly class SearchOptions
         );
     }
 
+    /** @param list<array{field: string, operator: string, value: mixed}> $filters */
     public function withFilters(array $filters): self
     {
         return new self(
@@ -132,6 +134,7 @@ final readonly class SearchOptions
         return $this->offset;
     }
 
+    /** @return list<string> */
     public function getFields(): array
     {
         return $this->fields;
@@ -142,6 +145,7 @@ final readonly class SearchOptions
         return $this->minScore;
     }
 
+    /** @return list<array{field: string, operator: string, value: mixed}> */
     public function getFilters(): array
     {
         return $this->filters;

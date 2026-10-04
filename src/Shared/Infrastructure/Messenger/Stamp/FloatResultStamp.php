@@ -4,16 +4,14 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Messenger\Stamp;
 
-use Symfony\Component\Messenger\Stamp\StampInterface;
-
-final readonly class FloatResultStamp implements StampInterface
+final readonly class FloatResultStamp implements ResultStampInterface
 {
     public function __construct(
         private float $result,
     ) {
     }
 
-    public static function fromResult(mixed $result): ?self
+    public static function fromResult(mixed $result): ?static
     {
         return is_float($result) ? new self($result) : null;
     }

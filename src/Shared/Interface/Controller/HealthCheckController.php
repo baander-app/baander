@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Controller;
 
 use App\Shared\Infrastructure\Health\HealthCheckService;
+use App\Shared\Infrastructure\Health\HealthCheckResult;
 use App\Shared\Infrastructure\Health\HealthStatus;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
