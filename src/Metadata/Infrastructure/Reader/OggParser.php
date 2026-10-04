@@ -18,8 +18,9 @@ final class OggParser
     private const int VORBIS_COMMENT = 3;
 
     private bool $isValid = false;
+    /** @var array{vendor: string, comments: array<string, list<string>>}|null */
     private ?array $vorbisCommentBlock = null;
-    /** @var list<array> */
+    /** @var list<array{type: int, mimeType: string, description: string, width: int, height: int, colorDepth: int, colorCount: int, imageData: string, imageSize: int}|array{}> */
     private array $pictures = [];
 
     public function __construct(
@@ -67,11 +68,13 @@ final class OggParser
         return $this->isValid;
     }
 
+    /** @return array{vendor: string, comments: array<string, list<string>>}|null */
     public function getVorbisCommentBlock(): ?array
     {
         return $this->vorbisCommentBlock;
     }
 
+    /** @return list<array{type: int, mimeType: string, description: string, width: int, height: int, colorDepth: int, colorCount: int, imageData: string, imageSize: int}|array{}> */
     public function getPictures(): array
     {
         return $this->pictures;
@@ -89,8 +92,6 @@ final class OggParser
      */
     private function parseOggPages($handle): void
     {
-        $foundVorbisComment = false;
-
         while (!feof($handle)) {
             $pageHeader = fread($handle, 27);
             if (strlen($pageHeader) < 27) {
@@ -132,23 +133,13 @@ final class OggParser
                     $headerSize = $isVorbis ? 7 : 8; // skip \x03vorbis or \x03OpusTags
                     $commentData = substr($pageData, $offset + $headerSize);
                     $this->parseVorbisCommentData($commentData);
-                    $foundVorbisComment = true;
                     $this->isValid = true;
                     break 2;
                 }
 
                 break;
             }
-
-            if ($foundVorbisComment) {
-                break;
-            }
         }
-    }
-
-    private function parseVorbisCommentBlock(string $data): void
-    {
-        $this->parseVorbisCommentData(substr($data, 7));
     }
 
     private function parseVorbisCommentData(string $data): void

@@ -26,7 +26,7 @@ final class SpotifyAdapter
     }
 
     /**
-     * @return array<int, array{id: string, name: string, popularity: int, genres: array, imageUrl: string|null}>
+     * @return array<int, array{id: string, name: string, popularity: int, genres: list<string>, imageUrl: string|null}>
      */
     public function searchArtist(string $query, int $limit = 20): array
     {
@@ -81,7 +81,7 @@ final class SpotifyAdapter
     }
 
     /**
-     * @return array{id: string, name: string, popularity: int, genres: array, imageUrl: string|null, followers: int}|null
+     * @return array{id: string, name: string, popularity: int, genres: list<string>, imageUrl: string|null, followers: int}|null
      */
     public function getArtist(string $spotifyId): ?array
     {
@@ -179,6 +179,10 @@ final class SpotifyAdapter
         return $this->accessToken;
     }
 
+    /**
+     * @param array<string, mixed> $params
+     * @return array<array-key, mixed>
+     */
     private function request(string $method, string $endpoint, array $params = []): array
     {
         $url = self::BASE_URL . $endpoint;

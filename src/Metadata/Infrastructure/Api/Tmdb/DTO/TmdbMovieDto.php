@@ -34,6 +34,9 @@ final readonly class TmdbMovieDto
     ) {
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public static function fromApiResponse(array $data): self
     {
         $collection = $data['belong_to_collection'] ?? $data['belongs_to_collection'] ?? null;

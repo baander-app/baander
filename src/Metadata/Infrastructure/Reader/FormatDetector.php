@@ -13,7 +13,6 @@ namespace App\Metadata\Infrastructure\Reader;
 final readonly class FormatDetector
 {
     private const string FLAC_SIGNATURE = "\x66\x4C\x61\x43";
-    private const string ID3V2_SIGNATURE = "\x49\x44\x33";
     private const string OGG_SIGNATURE = "\x4F\x67\x67\x53";
 
     /**

@@ -90,6 +90,6 @@ final class MetadataBrowseController
             return $this->notFound($this->trans('errors.release_group_not_found', domain: 'metadata'));
         }
 
-        return $this->successResponse($releaseGroup);
+        return $this->successResponse(get_object_vars($releaseGroup));
     }
 }

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Metadata\Infrastructure\Api\Tmdb\DTO;
 
-/** @param TmdbMovieDto[] $results */
 final readonly class TmdbSearchResultDto
 {
+    /**
+     * @param TmdbMovieDto[] $results
+     */
     public function __construct(
         public array $results,
         public int $totalResults,

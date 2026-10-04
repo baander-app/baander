@@ -30,10 +30,13 @@ final class FlacParser
 
     /** @var array<int, array{type: string, typeCode: int, isLast: bool, length: int, data: string}> */
     private array $metadataBlocks = [];
+    /** @var array{sampleRate: int, channels: int, bitsPerSample: int, totalSamples: int}|null */
     private ?array $streamInfo = null;
+    /** @var array{vendor: string, comments: array<string, list<string>>}|null */
     private ?array $vorbisCommentBlock = null;
-    /** @var list<array> */
+    /** @var list<array{type: int, mimeType: string, description: string, width: int, height: int, colorDepth: int, colorCount: int, imageData: string, imageSize: int}|array{}> */
     private array $pictureBlocks = [];
+    /** @var array{seekPoints: list<array{sampleNumber: int, byteOffset: int, frameSamples: int}>, pointCount: int}|null */
     private ?array $seektableBlock = null;
     private bool $isValid = false;
 
@@ -73,26 +76,31 @@ final class FlacParser
         return $this->isValid;
     }
 
+    /** @return array<int, array{type: string, typeCode: int, isLast: bool, length: int, data: string}> */
     public function getMetadataBlocks(): array
     {
         return $this->metadataBlocks;
     }
 
+    /** @return array{sampleRate: int, channels: int, bitsPerSample: int, totalSamples: int}|null */
     public function getStreamInfo(): ?array
     {
         return $this->streamInfo;
     }
 
+    /** @return array{vendor: string, comments: array<string, list<string>>}|null */
     public function getVorbisCommentBlock(): ?array
     {
         return $this->vorbisCommentBlock;
     }
 
+    /** @return list<array{type: int, mimeType: string, description: string, width: int, height: int, colorDepth: int, colorCount: int, imageData: string, imageSize: int}|array{}> */
     public function getPictureBlocks(): array
     {
         return $this->pictureBlocks;
     }
 
+    /** @return array{seekPoints: list<array{sampleNumber: int, byteOffset: int, frameSamples: int}>, pointCount: int}|null */
     public function getSeektableBlock(): ?array
     {
         return $this->seektableBlock;
@@ -194,6 +202,7 @@ final class FlacParser
 
     // ---- Private methods ----
 
+    /** @param resource $handle */
     private function validateSignature($handle): void
     {
         $signature = fread($handle, 4);

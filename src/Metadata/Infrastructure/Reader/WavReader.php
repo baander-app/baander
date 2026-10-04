@@ -207,6 +207,9 @@ final class WavReader
         return $info;
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     private function mapToMetadata(array $data): ExtractedMetadata
     {
         $metadata = new ExtractedMetadata();
@@ -273,6 +276,9 @@ final class WavReader
         return $metadata;
     }
 
+    /**
+     * @param resource $handle
+     */
     private function validateSignature($handle): void
     {
         $signature = fread($handle, 12);

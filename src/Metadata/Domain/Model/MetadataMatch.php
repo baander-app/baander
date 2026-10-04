@@ -6,6 +6,9 @@ namespace App\Metadata\Domain\Model;
 
 final class MetadataMatch
 {
+    /**
+     * @param array<string, mixed> $candidate
+     */
     public function __construct(
         public readonly array $candidate,
         public readonly float $confidence,
@@ -18,6 +21,9 @@ final class MetadataMatch
         }
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getCandidate(): array
     {
         return $this->candidate;

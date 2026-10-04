@@ -206,17 +206,6 @@ final readonly class MusicBrainzAdapter
     }
 
     /**
-     * Returns the CoverArtArchive URL for a release group.
-     *
-     * Not implemented here — cover art is handled by the separate
-     * CoverArtArchiveAdapter.
-     */
-    public function getCoverArtUrl(string $mbid): ?string
-    {
-        return null;
-    }
-
-    /**
      * Execute an HTTP GET request against the MusicBrainz API.
      *
      * Respects the MusicBrainz rate limit of 1 request per second by sleeping
@@ -276,7 +265,7 @@ final readonly class MusicBrainzAdapter
     /**
      * Extract tag names from the MusicBrainz tag array.
      *
-     * @param array<array{name: string, count?: int}> $tags
+     * @param array<array-key, array<string, mixed>> $tags
      * @return string[]
      */
     private function extractTags(array $tags): array
@@ -297,7 +286,7 @@ final readonly class MusicBrainzAdapter
      *
      * Each entry is either ["artist" => [...]] or ["joinphrase" => " & ", "artist" => [...]].
      *
-     * @param array<array{artist?: array{name: string}, joinphrase?: string, name?: string}> $artistCredit
+     * @param array<array-key, array<string, mixed>> $artistCredit
      */
     private function flattenArtistCredit(array $artistCredit): string
     {

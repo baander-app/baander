@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Metadata\Application\MessageHandler;
 
 use App\Catalog\Application\Port\AlbumPortInterface;
-use App\Catalog\Application\Port\SongPortInterface;
 use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncGenresMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
@@ -18,7 +17,6 @@ final class SyncGenresHandler
 {
     public function __construct(
         private readonly AlbumPortInterface $albumService,
-        private readonly SongPortInterface $songService,
         private readonly MessageBusInterface $bus,
         private readonly LoggerInterface $logger,
     ) {

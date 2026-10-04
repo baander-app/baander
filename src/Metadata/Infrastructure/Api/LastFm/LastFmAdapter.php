@@ -18,6 +18,9 @@ final readonly class LastFmAdapter
     ) {
     }
 
+    /**
+     * @return array<array-key, mixed>|null
+     */
     public function getArtistInfo(string $artist): ?array
     {
         $data = $this->request([
@@ -91,7 +94,7 @@ final readonly class LastFmAdapter
     }
 
     /**
-     * @return array<int, array{name: string, mbid: string|null, url: string|null, listeners: string|null, image: array}>
+     * @return array<int, array{name: string, mbid: string|null, url: string|null, listeners: string|null, image: array<array-key, mixed>}>
      */
     public function searchArtist(string $query, int $limit = 25): array
     {
@@ -118,6 +121,10 @@ final readonly class LastFmAdapter
         );
     }
 
+    /**
+     * @param array<string, mixed> $params
+     * @return array<array-key, mixed>
+     */
     private function request(array $params): array
     {
         $params['api_key'] = $this->apiKey;

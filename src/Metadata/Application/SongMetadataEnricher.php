@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Metadata\Application;
 
-use App\Catalog\Application\Port\ArtistPortInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Domain\Model\Song;
-use App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter;
 use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
 use Psr\Log\LoggerInterface;
 
@@ -16,9 +14,7 @@ final class SongMetadataEnricher
 {
     public function __construct(
         private readonly MusicBrainzAdapter $musicBrainz,
-        private readonly DiscogsAdapter $discogs,
         private readonly SongPortInterface $songService,
-        private readonly ArtistPortInterface $artistService,
         private readonly GenrePortInterface $genreService,
         private readonly LoggerInterface $logger,
     ) {
@@ -49,6 +45,9 @@ final class SongMetadataEnricher
         }
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     private function searchMusicBrainz(Song $song): ?array
     {
         $result = $this->musicBrainz->searchRecording(
@@ -58,12 +57,12 @@ final class SongMetadataEnricher
 
         if ($result->recordings !== []) {
             $best = $result->recordings[0];
-            $quality = min(1.0, ($best->score ?? 0) / 100);
+            $quality = min(1.0, $best->score / 100);
 
             return [
                 'source' => 'musicbrainz',
                 'quality' => $quality,
-                'mbid' => $best->id ?? null,
+                'mbid' => $best->id,
                 'title' => $best->title,
                 'tags' => $best->tags,
             ];
@@ -72,6 +71,9 @@ final class SongMetadataEnricher
         return null;
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     private function applyData(Song $song, array $data, bool $forceUpdate): EnrichmentResult
     {
         $quality = $data['quality'] ?? 0.0;

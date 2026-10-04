@@ -18,6 +18,7 @@ use Symfony\Component\Validator\Constraints\Count;
 )]
 final readonly class MatchMetadataRequest
 {
+    /** @param array<array-key, array<string, mixed>> $candidates */
     public function __construct(
         #[NotBlank(message: 'Path is required.')]
         public string $path = '',

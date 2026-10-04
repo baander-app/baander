@@ -70,6 +70,9 @@ final class AlbumMetadataEnricher
         }
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     private function searchGeneral(Album $album): ?array
     {
         // Try MusicBrainz first (has better structured data)
@@ -80,7 +83,7 @@ final class AlbumMetadataEnricher
 
         if ($mbResult->releaseGroups !== []) {
             $best = $mbResult->releaseGroups[0];
-            $quality = min(1.0, ($best->score ?? 0) / 100);
+            $quality = min(1.0, $best->score / 100);
 
             return [
                 'source' => 'musicbrainz',
@@ -100,7 +103,7 @@ final class AlbumMetadataEnricher
 
         if ($discogsResult->releases !== []) {
             $best = $discogsResult->releases[0];
-            $quality = min(1.0, ($best->score ?? 0) / 100);
+            $quality = min(1.0, $best->score / 100);
 
             return [
                 'source' => 'discogs',
@@ -117,6 +120,9 @@ final class AlbumMetadataEnricher
         return null;
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     private function applyData(Album $album, array $data, string $source, bool $forceUpdate): EnrichmentResult
     {
         $quality = $data['quality'] ?? 0.0;
@@ -274,7 +280,7 @@ final class AlbumMetadataEnricher
         $suffixParts = array_map('trim', explode(',', $suffixContents));
 
         $extracted = [];
-        if (isset($suffixParts[0]) && $suffixParts[0] !== '') {
+        if ($suffixParts[0] !== '') {
             $extracted['label'] = $suffixParts[0];
         }
         if (isset($suffixParts[1]) && $suffixParts[1] !== '') {

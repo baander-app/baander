@@ -63,7 +63,7 @@ final class MetadataSearchController
             default => $this->musicBrainz->searchArtist($query, $limit),
         };
 
-        return $this->successResponse($results);
+        return $this->successResponse(is_array($results) ? $results : get_object_vars($results));
     }
 
     #[OA\Get(
@@ -102,7 +102,7 @@ final class MetadataSearchController
             default => $this->musicBrainz->searchReleaseGroup($query, $artist ?? null, $limit),
         };
 
-        return $this->successResponse($results);
+        return $this->successResponse(get_object_vars($results));
     }
 
     #[OA\Get(
@@ -141,6 +141,6 @@ final class MetadataSearchController
             default => $this->musicBrainz->searchRecording($query, $artist ?? null, $limit),
         };
 
-        return $this->successResponse($results);
+        return $this->successResponse(get_object_vars($results));
     }
 }

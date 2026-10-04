@@ -45,6 +45,9 @@ final class ArtistMetadataEnricher
         }
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     private function searchGeneral(Artist $artist): ?array
     {
         // Try MusicBrainz
@@ -52,7 +55,7 @@ final class ArtistMetadataEnricher
 
         if ($mbResult->artists !== []) {
             $best = $mbResult->artists[0];
-            $quality = min(1.0, ($best->score ?? 0) / 100);
+            $quality = min(1.0, $best->score / 100);
 
             return [
                 'source' => 'musicbrainz',
@@ -73,7 +76,7 @@ final class ArtistMetadataEnricher
 
         if ($discogsResult->artists !== []) {
             $best = $discogsResult->artists[0];
-            $quality = min(1.0, ($best->score ?? 0) / 100);
+            $quality = min(1.0, $best->score / 100);
 
             return [
                 'source' => 'discogs',
@@ -87,6 +90,9 @@ final class ArtistMetadataEnricher
         return null;
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     private function applyData(Artist $artist, array $data, string $source, bool $forceUpdate): EnrichmentResult
     {
         $quality = $data['quality'] ?? 0.0;

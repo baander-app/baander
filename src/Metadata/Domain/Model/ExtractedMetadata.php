@@ -277,6 +277,9 @@ final class ExtractedMetadata
     }
 
     // Static factory method
+    /**
+     * @param array<string, mixed> $data
+     */
     public static function fromArray(array $data): self
     {
         $metadata = new self();

@@ -19,7 +19,6 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 final class TmdbAdapter
 {
     private const BASE_URL = 'https://api.themoviedb.org/3';
-    private const CONNECTION_TIMEOUT = 10;
     private const REQUEST_TIMEOUT = 30;
 
     public function __construct(
@@ -80,6 +79,7 @@ final class TmdbAdapter
 
     /**
      * @return array<string, mixed>
+     * @param array<string, mixed> $params
      */
     private function request(string $endpoint, array $params = []): array
     {
@@ -105,10 +105,11 @@ final class TmdbAdapter
             return [];
         }
 
-        $statusCode = $this->extractStatusCode($http_response_header ?? []);
+        $headers = http_get_last_response_headers() ?? [];
+        $statusCode = $this->extractStatusCode($headers);
 
         if ($statusCode === 429) {
-            $retryAfter = $this->extractHeader($http_response_header ?? [], 'Retry-After');
+            $retryAfter = $this->extractHeader($headers, 'Retry-After');
             $sleepSeconds = $retryAfter !== null ? (float) $retryAfter : 1.0;
             $this->logger->info('TMDB rate limit hit, retrying', ['retryAfter' => $sleepSeconds]);
 
@@ -135,6 +136,9 @@ final class TmdbAdapter
         }
     }
 
+    /**
+     * @param list<string> $headers
+     */
     private function extractStatusCode(array $headers): int
     {
         foreach ($headers as $header) {
@@ -146,6 +150,9 @@ final class TmdbAdapter
         return 0;
     }
 
+    /**
+     * @param list<string> $headers
+     */
     private function extractHeader(array $headers, string $name): ?string
     {
         foreach ($headers as $header) {

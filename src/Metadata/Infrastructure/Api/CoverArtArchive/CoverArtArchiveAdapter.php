@@ -19,6 +19,9 @@ final readonly class CoverArtArchiveAdapter
     {
     }
 
+    /**
+     * @return array<array-key, mixed>
+     */
     public function getReleaseCovers(string $releaseGroupId): array
     {
         $endpoint = '/release-group/' . $releaseGroupId;
@@ -32,6 +35,9 @@ final readonly class CoverArtArchiveAdapter
         return $this->mapCoversData($data);
     }
 
+    /**
+     * @return array<array-key, mixed>
+     */
     public function getReleaseCover(string $releaseId): array
     {
         $endpoint = '/release/' . $releaseId;
@@ -73,6 +79,9 @@ final readonly class CoverArtArchiveAdapter
         return null;
     }
 
+    /**
+     * @return array<array-key, mixed>
+     */
     private function request(string $endpoint): array
     {
         $url = self::BASE_URL . $endpoint;
@@ -114,6 +123,10 @@ final readonly class CoverArtArchiveAdapter
         return $data;
     }
 
+    /**
+     * @param array<array-key, mixed> $data
+     * @return array<array-key, mixed>
+     */
     private function mapCoversData(array $data): array
     {
         if (empty($data)) {
@@ -142,6 +155,10 @@ final readonly class CoverArtArchiveAdapter
         return $mapped;
     }
 
+    /**
+     * @param array<array-key, mixed> $data
+     * @return array<array-key, mixed>|null
+     */
     private function findFirstCoverByType(array $data, string $type): ?array
     {
         foreach ($data as $image) {

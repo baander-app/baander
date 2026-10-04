@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Metadata\Infrastructure\Api\Tmdb\DTO;
 
-/** @param array{id: int, title: string, poster_path?: string}[] $parts */
 final readonly class TmdbCollectionDto
 {
+    /**
+     * @param array<array-key, array{id: int, title: string, poster_path?: string|null}> $parts
+     */
     public function __construct(
         public int $id,
         public string $name,
@@ -17,6 +19,9 @@ final readonly class TmdbCollectionDto
     ) {
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public static function fromApiResponse(array $data): self
     {
         return new self(

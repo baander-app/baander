@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Catalog\Application\Port\AlbumPortInterface;
-use App\Catalog\Application\Port\ArtistPortInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Metadata\Application\AlbumMetadataEnricher;
@@ -72,6 +71,7 @@ final class MessengerJsonDeliveryTest extends TestCase
     private int $completed = 0;
     private int $attempted = 0;
 
+    /** @return iterable<string, array{bool|null}> */
     public static function unavailableModes(): iterable
     {
         yield 'queue full' => [false];
@@ -155,18 +155,21 @@ final class MessengerJsonDeliveryTest extends TestCase
         $failed = $this->transport([ExecuteScheduledJobCommand::class]);
         $parameters = ['integer' => 1, 'integralFloat' => 1.0, 'negativeZero' => -0.0, 'largeFloat' => 1.0e18, 'nested' => [1.0, -0.0, false, null, 'worker@baander.app']];
         $command = new ExecuteScheduledJobCommand(Uuid::v7()->toString(), 'console', 'app:baander-numeric-check', $parameters);
-        $attempts = [];
+        $deliveries = new class {
+            /** @var list<array<string, mixed>> */
+            public array $attempts = [];
+        };
         $bus = new MessageBus([
             new SendMessageMiddleware(new SendersLocator([ExecuteScheduledJobCommand::class => ['async']], new ServiceLocator(['async' => static fn () => $async]))),
             new HandleMessageMiddleware(new HandlersLocator([ExecuteScheduledJobCommand::class => [new HandlerDescriptor(
-                static function (ExecuteScheduledJobCommand $delivered) use (&$attempts): never {
-                    $attempts[] = $delivered->parameters;
+                static function (ExecuteScheduledJobCommand $delivered) use ($deliveries): never {
+                    $deliveries->attempts[] = $delivered->parameters;
                     throw new \RuntimeException('Fixture scheduled numeric delivery failure.');
                 }, ['from_transport' => 'async'],
             )]])),
         ]);
         $bus->dispatch($command);
-        self::assertSame([], $attempts, 'The real send middleware must enqueue without handling inline.');
+        self::assertSame([], $deliveries->attempts, 'The real send middleware must enqueue without handling inline.');
         self::assertSame(1, $async->getMessageCount());
         $events = new EventDispatcher();
         $retries = [];
@@ -187,8 +190,8 @@ final class MessengerJsonDeliveryTest extends TestCase
             }
         });
         (new Worker(['async' => $async], $bus, $events))->run(['sleep' => 1000]);
-        self::assertCount(2, $attempts);
-        foreach ($attempts as $attempt) {
+        self::assertCount(2, $deliveries->attempts);
+        foreach ($this->readDeliveryAttempts($deliveries) as $attempt) {
             self::assertSame($parameters, $attempt, 'PHP scalar types must survive every actual Redis delivery.');
             self::assertSame(json_encode($parameters, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION), json_encode($attempt, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION), 'Signed zero must also survive each serialization hop.');
         }
@@ -240,7 +243,7 @@ final class MessengerJsonDeliveryTest extends TestCase
                 ->willReturnCallback(static function () use (&$effects): null { ++$effects; return null; });
             // Missing aggregate is intentional: real handler lookup proves selection,
             // while this transport test never performs external metadata requests.
-            $enricher = new SongMetadataEnricher($musicBrainz, $discogs, $songs, $this->createStub(ArtistPortInterface::class), $genres, $logger);
+            $enricher = new SongMetadataEnricher($musicBrainz, $songs, $genres, $logger);
             $handler = new SyncSongHandler($songs, $enricher, $logger);
         } elseif ($messageType === SyncAlbumMessage::class) {
             $message = new SyncAlbumMessage($id, true);
@@ -338,4 +341,14 @@ final class MessengerJsonDeliveryTest extends TestCase
             $connection->close();
         }
     }
+
+    /**
+     * @param object{attempts: list<array<string, mixed>>} $deliveries
+     * @return list<array<string, mixed>>
+     */
+    private function readDeliveryAttempts(object $deliveries): array
+    {
+        return $deliveries->attempts;
+    }
+
 }

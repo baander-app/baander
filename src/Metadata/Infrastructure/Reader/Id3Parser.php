@@ -295,7 +295,7 @@ final class Id3Parser
         fseek($handle, -3, SEEK_END);
         $track = ord(fread($handle, 1));
 
-        if ($track !== 0 && $track <= 255) {
+        if ($track !== 0) {
             $this->tags['TRACKNUMBER'][] = (string) $track;
         }
 

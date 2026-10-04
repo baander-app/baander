@@ -46,6 +46,10 @@ final readonly class TasteDiveAdapter
         );
     }
 
+    /**
+     * @param array<string, mixed> $params
+     * @return array<array-key, mixed>
+     */
     private function request(array $params): array
     {
         $params['k'] = $this->apiKey;
