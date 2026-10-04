@@ -6,7 +6,7 @@ import { loadWasm } from './wasm-fixture.mjs'
 
 async function fixture(rate = 48000, fault) {
   const modules = await Promise.all(['loudness_r128', 'dynamics_meter'].map(loadWasm))
-  const messages = [], calls = [[], []], allocations = [[], []], freed = [[], []], initRates = []
+  const messages = [], calls = [[], []], allocations = [[], []], freed = [[], []], initRates = [], oversampling = []
   let count = 0, Processor
   const wrapped = modules.map((exp, index) => {
     const result = { ...exp, _initialize() {},
@@ -17,6 +17,7 @@ async function fixture(rate = 48000, fault) {
       },
       [index === 0 ? 'init_loudness' : 'init_meters'](...args) {
         initRates.push(index === 0 ? args[0] : args[2])
+        if (index === 0) oversampling.push(args[1])
         return exp[index === 0 ? 'init_loudness' : 'init_meters'](...args)
       },
     }
@@ -42,7 +43,7 @@ async function fixture(rate = 48000, fault) {
   const initialize = () => processor.initDSPFromMessage({ loudnessWasm: new Uint8Array([0]), dynamicsWasm: new Uint8Array([1]) })
   await initialize()
   await new Promise(resolve => setImmediate(resolve))
-  return { processor, messages, calls, modules, allocations, freed, initRates, initialize, count: () => count }
+  return { processor, messages, calls, modules, allocations, freed, initRates, oversampling, initialize, count: () => count }
 }
 
 function feed(f, left, right = left) {
@@ -64,6 +65,7 @@ for (const rate of [44100, 48000]) test(`meter processes every frame and silence
     if (block === 31) assert.equal(f.processor.isPlaying, true, 'right-only input must be detected')
   }
   assert.deepEqual(f.initRates, [rate, rate])
+  assert.deepEqual(f.oversampling, [4])
   for (let index = 0; index < 2; index++) {
     assert.deepEqual(f.calls[index].flat(), expected)
     assert.ok(f.calls[index].every(block => block.length <= 256))
@@ -75,7 +77,7 @@ for (const rate of [44100, 48000]) test(`meter processes every frame and silence
   assert.equal(reports.at(-1).isPlaying, false)
   assert.ok(reports.at(-1).rms < 0.001, 'silent frames must release the RMS envelope')
   const reference = await Promise.all(['loudness_r128', 'dynamics_meter'].map(loadWasm))
-  reference[0].init_loudness(rate, 2)
+  reference[0].init_loudness(rate, 4)
   reference[1].init_meters(10, 100, rate)
   for (const exp of reference) {
     const ptr = exp.malloc(1024)
@@ -118,8 +120,11 @@ test('processing errors release failed meter and leave pass-through and other me
 test('publication retains true peak from earlier blocks in the interval', async () => {
   const f = await fixture()
   feed(f, new Float32Array(128).fill(0.75))
-  const peak = f.modules[0].get_true_peak_dbfs()
-  for (let block = 1; block < 16; block++) feed(f, new Float32Array(128))
+  let peak = f.modules[0].get_true_peak_dbfs()
+  for (let block = 1; block < 16; block++) {
+    feed(f, new Float32Array(128))
+    peak = Math.max(peak, f.modules[0].get_true_peak_dbfs())
+  }
   assert.equal(f.messages.find(m => m.type === 'analysis').truePeak, peak)
 })
 
@@ -141,4 +146,21 @@ test('cleanup traps cannot interrupt pass-through or the healthy meter', async (
   assert.equal(f.processor.loudnessReady, false)
   assert.equal(f.freed[0].length, 1)
   assert.equal(f.calls[1].length, 16)
+})
+
+// Tech 3341 case 16: fs/4 at 45 degrees, with 10 ms fades.
+test('player publishes reconstructed intersample peaks', async () => {
+  const f = await fixture()
+  let samplePeak = 0
+  for (let block = 0; block < 16; block++) {
+    const input = Float32Array.from({ length: 128 }, (_, i) => {
+      const n = block * 128 + i
+      return 0.5 * Math.sin(Math.PI * n / 2 + Math.PI / 4) * Math.min(1, n / 480, (2047 - n) / 480)
+    })
+    for (const value of input) samplePeak = Math.max(samplePeak, Math.abs(value))
+    feed(f, input)
+  }
+  const peak = f.messages.find(m => m.type === 'analysis').truePeak
+  assert.ok(peak >= -6.4 && peak <= -5.8, `EBU case 16: ${peak}`)
+  assert.ok(peak > 20 * Math.log10(samplePeak) + 2)
 })

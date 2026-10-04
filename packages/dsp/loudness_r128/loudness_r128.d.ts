@@ -21,7 +21,7 @@ declare interface LoudnessR128API {
   /**
    * Initialize loudness state.
    * @param sampleRate Audio sample rate in Hz.
-   * @param truePeakOversample Oversampling factor for true-peak estimation (1, 2, or 4).
+   * @param truePeakOversample 1 = sample peak, 2 = reduced-resolution FIR, 4 = all reconstruction phases.
    */
   init(sampleRate: number, truePeakOversample: TruePeakOversample | 1 | 2 | 4): void;
 
@@ -64,7 +64,9 @@ declare interface LoudnessR128API {
   lra(): number;
 
   /**
-   * True-peak in dBFS estimated with the configured oversample factor.
+   * Peak in dBFS for the latest process call, using the configured mode.
+   * For programme peak, collect the maximum across calls, including 11 zero
+   * frames at stream end to drain the reconstruction tail. Reset clears history.
    */
   truePkDbfs(): number;
 }

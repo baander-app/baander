@@ -36,11 +36,22 @@ serializing it. Other meters continue. No accepted programme history is
 silently discarded to recover space. Both pools fit the fixed 32 MiB WASM
 memory at the verified 44.1, 48, 96, and 192 kHz sample rates.
 
-This is not an EBU Mode compliance claim. Remaining defects include:
+True-peak reconstruction uses the four-phase, 12-tap-per-phase FIR from
+BS.1770-5 Annex 2. The player uses 4× mode; 2× evaluates alternate phases
+with lower resolution, and 1× measures sample peaks. Fixed channel histories
+persist across calls and clear on reset. Processing performs no allocation.
 
-- The peak estimator uses linear interpolation and cannot measure intersample
-  overshoot. Its oversampling argument does not make it a compliant true-peak
-  meter.
+The peak getter reports the maximum for the latest call, including raw samples.
+Collect the maximum across calls for a programme measurement. The filter delay
+is 5.875 input frames; feed 11 zero frames at the end of a finite stream and
+include their peaks. Do not pad individual blocks. A removed channel's pending
+filter tail is included while its history advances with silence.
+
+Actual-WASM tests cover EBU Tech 3341 cases 15–19 at 44.1 and 48 kHz,
+independent intersample signals, chunk boundaries, channel history, and reset.
+This is not an EBU Mode compliance claim: cases 20–23 and complete programme
+qualification remain outstanding. In particular, 4× at 44.1 kHz is below the
+192 kHz reconstruction rate described by Annex 2.
 
 Momentary and short-term windows are 400 ms and 3 seconds. During startup,
 their averages use the samples received so far. Silence is represented by a

@@ -10,6 +10,27 @@ extern "C" {
 static int g_sr = 48000;
 static int g_tp_os = 1; // true-peak oversample factor (1/2/4)
 
+// BS.1770-5 Annex 2, pp. 18–19: the four-phase, 12-tap-per-phase
+// interpolation FIR. Rows are successive input delays, columns output phases.
+// Floating-point arithmetic needs neither the optional 12.04 dB attenuation
+// nor its compensating gain. Do not normalize these published coefficients.
+static constexpr double g_tp_coefficients[12][4] = {
+  { 0.0017089843750, -0.0291748046875, -0.0189208984375, -0.0083007812500 },
+  { 0.0109863281250,  0.0292968750000,  0.0330810546875,  0.0148925781250 },
+  {-0.0196533203125, -0.0517578125000, -0.0582275390625, -0.0266113281250 },
+  { 0.0332031250000,  0.0891113281250,  0.1015625000000,  0.0476074218750 },
+  {-0.0594482421875, -0.1665039062500, -0.2003173828125, -0.1022949218750 },
+  { 0.1373291015625,  0.4650878906250,  0.7797851562500,  0.9721679687500 },
+  { 0.9721679687500,  0.7797851562500,  0.4650878906250,  0.1373291015625 },
+  {-0.1022949218750, -0.2003173828125, -0.1665039062500, -0.0594482421875 },
+  { 0.0476074218750,  0.1015625000000,  0.0891113281250,  0.0332031250000 },
+  {-0.0266113281250, -0.0582275390625, -0.0517578125000, -0.0196533203125 },
+  { 0.0148925781250,  0.0330810546875,  0.0292968750000,  0.0109863281250 },
+  {-0.0083007812500, -0.0189208984375, -0.0291748046875,  0.0017089843750 },
+};
+static double g_tp_history[2][12] = {};
+static int g_tp_write = 0;
+
 struct Biquad {
   double b0=1, b1=0, b2=0, a1=0, a2=0;
   double z1L=0, z2L=0, z1R=0, z2R=0;
@@ -275,6 +296,8 @@ static void design_rlb(int sr) {
 void init_loudness(int sample_rate, int truepeak_oversample) {
   g_sr = (sample_rate > 0) ? sample_rate : 48000;
   g_tp_os = (truepeak_oversample==4) ? 4 : (truepeak_oversample==2 ? 2 : 1);
+  for (auto& history : g_tp_history) std::fill(history, history + 12, 0.0);
+  g_tp_write = 0;
 
   design_pre(g_sr);
   design_rlb(g_sr);
@@ -300,34 +323,36 @@ void reset_loudness() {
   init_loudness(g_sr, g_tp_os);
 }
 
-// Very simple 4x oversample true-peak with linear interpolation
+// Streaming reconstruction, including raw samples to preserve endpoint peaks.
+// The 48-coefficient prototype delays output by 5.875 input frames; its final
+// nonzero output is emitted within 11 subsequent silent frames. Callers ending
+// a finite programme must feed that silence and include those calls' maxima.
+// Never pad individual processing blocks: history belongs to the audio stream.
+// 1x is sample peak. 2x uses alternate phases and is a lower-resolution estimate;
+// 4x evaluates the complete Annex 2 reconstruction filter.
 static inline float truepeak_estimate(const float* in, int n, int ch) {
-  float tp = 0.0f;
-  if (g_tp_os <= 1) {
-    for (int i = 0; i < n*ch; i+=ch) {
-      float a = std::max(std::abs(in[i]), (ch>1? std::abs(in[i+1]) : 0.0f));
-      tp = std::max(tp, a);
-    }
-    return tp;
-  }
-  int C = ch;
-  for (int c = 0; c < std::min(2,C); ++c) {
-    // Linear interpolation cannot exceed endpoints; include the final sample,
-    // including singleton buffers. This remains an approximate peak estimator.
-    tp = std::max(tp, std::abs(in[(n-1)*C + c]));
-    for (int i = 0; i < n-1; ++i) {
-      float s0 = in[i*C + c];
-      float s1 = in[(i+1)*C + c];
-      // upsample linearly
-      int OS = g_tp_os;
-      for (int k = 0; k < OS; ++k) {
-        float t = (float)k / (float)OS;
-        float y = s0 + (s1 - s0) * t;
-        tp = std::max(tp, std::abs(y));
+  double tp = 0.0;
+  for (int i = 0; i < n; ++i) {
+    for (int c = 0; c < 2; ++c) {
+      const double sample = c < ch ? in[i * ch + c] : 0.0;
+      tp = std::max(tp, std::abs(sample));
+      g_tp_history[c][g_tp_write] = sample;
+      if (g_tp_os > 1) {
+        const int phase_step = g_tp_os == 4 ? 1 : 2;
+        for (int phase = 0; phase < 4; phase += phase_step) {
+          double reconstructed = 0.0;
+          int read = g_tp_write;
+          for (int tap = 0; tap < 12; ++tap) {
+            reconstructed += g_tp_history[c][read] * g_tp_coefficients[tap][phase];
+            if (--read < 0) read = 11;
+          }
+          tp = std::max(tp, std::abs(reconstructed));
+        }
       }
     }
+    if (++g_tp_write == 12) g_tp_write = 0;
   }
-  return tp;
+  return (float)tp;
 }
 
 // Feed interleaved frames. K-weight, compute energy, update windows, programme distributions, and true-peak estimate.

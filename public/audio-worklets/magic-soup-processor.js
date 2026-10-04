@@ -68,7 +68,7 @@ class MagicSoupProcessor extends AudioWorkletProcessor {
     if (!api.memory?.buffer || required.some(name => typeof api[name] !== 'function')) {
       throw new Error(`Missing required ${kind} exports`);
     }
-    if (kind === 'loudness') api.init(sampleRate, 2);
+    if (kind === 'loudness') api.init(sampleRate, 4);
     else api.init(10, 100, sampleRate);
     const bytes = this.bufferFrames * 2 * Float32Array.BYTES_PER_ELEMENT;
     const ptr = api.malloc(bytes);

@@ -156,7 +156,7 @@ export class AudioProcessor {
       this.loudnessAPI = loudness
       this.dynamicsAPI = dynamics
       this.spectralAPI = spectral
-      this.loudnessAPI.init(this.audioContext.sampleRate, 2)
+      this.loudnessAPI.init(this.audioContext.sampleRate, 4)
       this.dynamicsAPI.init(10, 100, this.audioContext.sampleRate)
       this.spectralAPI.init(this.FFT_SIZE, this.audioContext.sampleRate)
 

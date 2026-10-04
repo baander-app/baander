@@ -89,6 +89,8 @@ for (const oversample of [1, 2, 4]) {
     try {
       meter.feed(1, (_, channel) => channel ? -0.75 : 0.25);
       close(meter.api.get_true_peak_dbfs(), 20 * Math.log10(0.75), 0.00001);
+      // The endpoint cases are independent measurements; discard the first FIR tail.
+      meter.api.reset_loudness();
       meter.feed(128, (frame, channel) => frame === 127 && channel === 1 ? -0.5 : 0);
       close(meter.api.get_true_peak_dbfs(), 20 * Math.log10(0.5), 0.00001);
     } finally { meter.dispose(); }
