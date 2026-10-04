@@ -1,6 +1,13 @@
 import type { StateCreator, StoreMutatorIdentifier } from 'zustand'
 
 export const STORE_DEBUG_SETTING = 'baander-store-debug'
+const MAX_CAPTURE_KEY_LENGTH = 512
+const MAX_CAPTURE_STACK_LENGTH = 4096
+function captureStack(): string | undefined {
+  const stack = new Error().stack
+  return stack && stack.length > MAX_CAPTURE_STACK_LENGTH
+    ? `${stack.slice(0, MAX_CAPTURE_STACK_LENGTH - 12)}…[truncated]` : stack
+}
 function enabledAtStartup(): boolean {
   if (!import.meta.env?.DEV) return false
   try { return localStorage.getItem(STORE_DEBUG_SETTING) === 'true' } catch { return false }
@@ -36,7 +43,7 @@ function freezeCapture<T>(value: T): T {
   return value
 }
 
-/** Detached, bounded diagnostic data. Never inspect getters, credentials, or native objects. */
+/** Limit retained diagnostic data; arbitrary object enumeration itself is not bounded. */
 export function captureState(value: unknown, sensitive = false): StateCapture {
   let complete = true
   let budget = 600
@@ -64,9 +71,12 @@ export function captureState(value: unknown, sensitive = false): StateCapture {
     const prototype = Object.getPrototypeOf(input)
     if (prototype !== Object.prototype && prototype !== null) { complete = false; return '[native or class instance]' }
     const output: Record<string, DebugValue> = Object.create(null)
-    const descriptors = Object.entries(Object.getOwnPropertyDescriptors(input))
-    if (descriptors.length > 60) complete = false
-    for (const [key, descriptor] of descriptors.slice(0, 60)) {
+    const keys = Object.getOwnPropertyNames(input)
+    if (keys.length > 60) complete = false
+    for (const key of keys.slice(0, 60)) {
+      if (key.length > MAX_CAPTURE_KEY_LENGTH) { complete = false; continue }
+      const descriptor = Object.getOwnPropertyDescriptor(input, key)
+      if (!descriptor) { complete = false; continue }
       if (!('value' in descriptor)) { complete = false; output[key] = '[accessor]'; continue }
       if (typeof descriptor.value === 'function') continue
       if (/token|password|secret|credential|authorization|cookie|dpop|privatekey/i.test(key)
@@ -117,35 +127,58 @@ export function createStoreDebugger(enabled: boolean, limit = 200) {
           const beforeRecord = (beforeState ?? {}) as Record<string, unknown>
           const afterRecord = (afterState ?? {}) as Record<string, unknown>
           const changedKeys = [...new Set([...Object.keys(beforeRecord), ...Object.keys(afterRecord)])]
-            .filter(key => !Object.is(beforeRecord[key], afterRecord[key]))
+            .filter(key => key.length <= MAX_CAPTURE_KEY_LENGTH && !Object.is(beforeRecord[key], afterRecord[key]))
+            .slice(0, 60)
           snapshot = Object.freeze({ ...snapshot, stores: Object.freeze({ ...snapshot.stores, [name]: after }) })
           append({ schemaVersion: 1, id: nextId++, parentId, store: name, kind: 'update', action: 'setState',
-            timestamp: Date.now(), stack: new Error().stack, before, after, changedKeys })
+            timestamp: Date.now(), stack: captureStack(), before, after, changedKeys })
         }
         return result
       }) as typeof set
       const state = creator(wrapSet(set), get, api)
       api.setState = wrapSet(api.setState as typeof set) as typeof api.setState
-      const wrapped = { ...state }
-      for (const [key, value] of Object.entries(state as Record<string, unknown>)) {
-        if (typeof value !== 'function') continue
-        Object.assign(wrapped, { [key]: function (this: unknown, ...args: unknown[]) {
-          const id = nextId++
-          const previous = parentId
-          append({ schemaVersion: 1, id, parentId: previous, store: name, kind: 'action', action: key,
-            timestamp: Date.now(), stack: new Error().stack,
-            args: sensitive ? { value: '[redacted]', complete: false } : captureState(args) })
-          parentId = id
-          const settled = (kind: 'resolved' | 'rejected') => append({ schemaVersion: 1, id: nextId++, parentId: id,
-            store: name, kind, action: key, timestamp: Date.now() })
-          try {
-            const result = Reflect.apply(value, this, args)
-            if (result instanceof Promise) result.then(() => settled('resolved'), () => settled('rejected'))
-            else settled('resolved')
-            return result
-          } catch (error) { settled('rejected'); throw error }
-          finally { parentId = previous }
-        } })
+      const actions = new Map<string, { original: unknown; wrapped: (this: unknown, ...args: unknown[]) => unknown }>()
+      const wrapActions = (source: T): T => {
+        const wrapped = { ...source }
+        for (const [key, value] of Object.entries(source as Record<string, unknown>)) {
+          if (typeof value !== 'function') continue
+          const label = key.length > MAX_CAPTURE_KEY_LENGTH ? `${key.slice(0, MAX_CAPTURE_KEY_LENGTH - 12)}…[truncated]` : key
+          let action = actions.get(key)
+          if (!action || action.original !== value) {
+            action = { original: value, wrapped: function (this: unknown, ...args: unknown[]) {
+              const id = nextId++
+              const previous = parentId
+              append({ schemaVersion: 1, id, parentId: previous, store: name, kind: 'action', action: label,
+                timestamp: Date.now(), stack: captureStack(),
+                args: sensitive ? { value: '[redacted]', complete: false } : captureState(args) })
+              parentId = id
+              const settled = (kind: 'resolved' | 'rejected') => append({ schemaVersion: 1, id: nextId++, parentId: id,
+                store: name, kind, action: label, timestamp: Date.now() })
+              try {
+                const result = Reflect.apply(value, this, args)
+                if (result instanceof Promise) result.then(() => settled('resolved'), () => settled('rejected'))
+                else settled('resolved')
+                return result
+              } catch (error) { settled('rejected'); throw error }
+              finally { parentId = previous }
+            } }
+            actions.set(key, action)
+          }
+          Object.assign(wrapped, { [key]: action.wrapped })
+        }
+        return wrapped
+      }
+      const wrapped = wrapActions(state)
+      // Persist exposes its original creator result through getInitialState.
+      // Keep those defaults and stable snapshot identity, with traced actions.
+      const getInitialState = api.getInitialState
+      let tracedInitial: T | undefined
+      api.getInitialState = () => {
+        if (tracedInitial === undefined) {
+          const initial = getInitialState()
+          tracedInitial = initial === wrapped ? wrapped : wrapActions(initial)
+        }
+        return tracedInitial
       }
       snapshot = Object.freeze({ ...snapshot, stores: Object.freeze({ ...snapshot.stores, [name]: capture(wrapped) }) })
       return wrapped

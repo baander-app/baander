@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { StrictMode, createElement, type ReactNode } from 'react'
 import { renderHook, waitFor, act } from '@testing-library/react'
 
 // Mock AXIOS_INSTANCE before importing the hook
@@ -16,7 +17,7 @@ describe('useImageBlob', () => {
     mockGet.mockReset()
 
     // Mock URL.createObjectURL / revokeObjectURL
-    globalThis.URL.createObjectURL = vi.fn(() => 'blob:http://localhost/test-blob')
+    globalThis.URL.createObjectURL = vi.fn(() => 'blob:https://baander.app/test-blob')
     globalThis.URL.revokeObjectURL = vi.fn()
   })
 
@@ -49,11 +50,24 @@ describe('useImageBlob', () => {
       expect(result.current.isLoading).toBe(false)
     })
 
-    expect(result.current.src).toBe('blob:http://localhost/test-blob')
+    expect(result.current.src).toBe('blob:https://baander.app/test-blob')
     expect(mockGet).toHaveBeenCalledWith('/api/image/123', {
       responseType: 'blob',
       signal: expect.any(AbortSignal),
     })
+  })
+
+  it('retains the loaded cover without another fetch or allocation on unchanged renders', async () => {
+    mockGet.mockResolvedValue({ data: new Blob(['image']) })
+    const { result, rerender } = renderHook(() => useImageBlob('/api/image/123'))
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    const src = result.current.src
+    rerender()
+    rerender()
+    expect(result.current.src).toBe(src)
+    expect(mockGet).toHaveBeenCalledOnce()
+    expect(URL.createObjectURL).toHaveBeenCalledOnce()
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled()
   })
 
   it('revokes object URL on unmount', async () => {
@@ -63,12 +77,12 @@ describe('useImageBlob', () => {
     const { result, unmount } = renderHook(() => useImageBlob('/api/image/123'))
 
     await waitFor(() => {
-      expect(result.current.src).toBe('blob:http://localhost/test-blob')
+      expect(result.current.src).toBe('blob:https://baander.app/test-blob')
     })
 
     unmount()
 
-    expect(globalThis.URL.revokeObjectURL).toHaveBeenCalledWith('blob:http://localhost/test-blob')
+    expect(globalThis.URL.revokeObjectURL).toHaveBeenCalledWith('blob:https://baander.app/test-blob')
   })
 
   it('handles fetch error gracefully', async () => {
@@ -83,34 +97,80 @@ describe('useImageBlob', () => {
     expect(result.current.src).toBeNull()
   })
 
-  it('cancels fetch if imageUrl changes while fetching', async () => {
-    let resolveFirst: (value: unknown) => void
-    const firstPromise = new Promise((resolve) => { resolveFirst = resolve })
-    mockGet.mockImplementationOnce(() => firstPromise)
-    mockGet.mockResolvedValue({ data: new Blob(['second'], { type: 'image/jpeg' }) })
+  function deferredImage() {
+    let resolve!: (value: { data: Blob }) => void
+    let reject!: (reason: Error) => void
+    const promise = new Promise<{ data: Blob }>((yes, no) => { resolve = yes; reject = no })
+    return { promise, resolve, reject }
+  }
 
-    const { result, rerender } = renderHook(
-      ({ url }: { url: string }) => useImageBlob(url),
-      { initialProps: { url: '/api/image/1' } }
-    )
-
-    // Change URL while first is pending
+  it('ignores a canceled response while the replacement is still loading', async () => {
+    const first = deferredImage()
+    const second = deferredImage()
+    mockGet.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    const { result, rerender } = renderHook(({ url }) => useImageBlob(url), {
+      initialProps: { url: '/api/image/1' },
+    })
+    const signal = mockGet.mock.calls[0][1].signal as AbortSignal
     rerender({ url: '/api/image/2' })
+    expect(signal.aborted).toBe(true)
+    await act(async () => { first.resolve({ data: new Blob(['stale']) }) })
+    expect(result.current).toEqual({ src: null, isLoading: true })
+    expect(URL.createObjectURL).not.toHaveBeenCalled()
+    await act(async () => { second.resolve({ data: new Blob(['current']) }) })
+    expect(result.current.isLoading).toBe(false)
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1)
+  })
 
-    // Resolve the first (stale) request
-    await act(async () => {
-      resolveFirst!({ data: new Blob(['stale'], { type: 'image/jpeg' }) })
+  it('hides and revokes the previous cover immediately when its URL changes', async () => {
+    mockGet.mockResolvedValueOnce({ data: new Blob(['first']) })
+    const second = deferredImage()
+    mockGet.mockReturnValueOnce(second.promise)
+    const { result, rerender } = renderHook(({ url }) => useImageBlob(url), {
+      initialProps: { url: '/api/image/1' },
     })
+    await waitFor(() => expect(result.current.src).not.toBeNull())
+    rerender({ url: '/api/image/2' })
+    expect(result.current).toEqual({ src: null, isLoading: true })
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:https://baander.app/test-blob')
+    await act(async () => { second.reject(new Error('Missing cover')) })
+    expect(result.current).toEqual({ src: null, isLoading: false })
+  })
 
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false)
-    })
+  it('does not resurrect a revoked cover when returning to the same URL', async () => {
+    mockGet.mockResolvedValueOnce({ data: new Blob(['first']) })
+    const pending = deferredImage()
+    mockGet.mockReturnValue(pending.promise)
+    const initialProps: { url: string | null } = { url: '/api/image/1' }
+    const { result, rerender } = renderHook(({ url }) => useImageBlob(url), { initialProps })
+    await waitFor(() => expect(result.current.src).not.toBeNull())
+    rerender({ url: null })
+    expect(result.current).toEqual({ src: null, isLoading: false })
+    rerender({ url: '/api/image/1' })
+    expect(result.current).toEqual({ src: null, isLoading: true })
+  })
 
-    // The second request should be the one that sets the src
-    expect(mockGet).toHaveBeenCalledTimes(2)
-    expect(mockGet).toHaveBeenCalledWith('/api/image/2', {
-      responseType: 'blob',
-      signal: expect.any(AbortSignal),
+  it('does not allocate a blob URL after unmount even if cancellation is ignored', async () => {
+    const pending = deferredImage()
+    mockGet.mockReturnValue(pending.promise)
+    const { unmount } = renderHook(() => useImageBlob('/api/image/1'))
+    unmount()
+    await act(async () => { pending.resolve({ data: new Blob(['late']) }) })
+    expect(URL.createObjectURL).not.toHaveBeenCalled()
+  })
+
+  it('keeps only the live StrictMode request and releases its blob exactly once', async () => {
+    const discarded = deferredImage()
+    const live = deferredImage()
+    mockGet.mockReturnValueOnce(discarded.promise).mockReturnValueOnce(live.promise)
+    const { result, unmount } = renderHook(() => useImageBlob('/api/image/1'), {
+      wrapper: ({ children }: { children: ReactNode }) => createElement(StrictMode, null, children),
     })
+    await act(async () => { live.resolve({ data: new Blob(['live']) }) })
+    await act(async () => { discarded.resolve({ data: new Blob(['discarded']) }) })
+    expect(result.current.isLoading).toBe(false)
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1)
+    unmount()
+    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1)
   })
 })

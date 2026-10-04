@@ -6,16 +6,14 @@ import { CATALOG_ACTIONS } from '@/features/catalog/catalog-actions'
 export function registerRadioHandlers() {
   // Radio reacts to player starting — stop itself
   mediator.on(PLAYER_ACTIONS.PLAY, function radioStopForPlayerHandler() {
-    const state = useRadioStore.getState()
-    if (state.isPlaying) {
-      state.stopRadio()
-    }
+    // Observed pause/error can retain radio fallback intent. Music always
+    // cancels that intent, including when no native playback is active.
+    useRadioStore.getState().stopRadio()
   })
 
   mediator.on(CATALOG_ACTIONS.PLAY_TRACK, function radioStopForCatalogHandler() {
-    const state = useRadioStore.getState()
-    if (state.isPlaying) {
-      state.stopRadio()
-    }
+    // Observed pause/error can retain radio fallback intent. Music always
+    // cancels that intent, including when no native playback is active.
+    useRadioStore.getState().stopRadio()
   })
 }

@@ -10,10 +10,13 @@ export function withNoopGuard<T extends object, Mps extends [StoreMutatorIdentif
       const patch = typeof args[0] === 'function' ? args[0](state) : args[0]
       if (Object.is(patch, state)) return
       if (state && patch && typeof patch === 'object') {
-        const current = state as Record<string, unknown>
-        const proposed = patch as Record<string, unknown>
-        const keys = Object.keys(proposed)
-        const sameKeys = !args[1] || keys.length === Object.keys(current).length
+        const current = state as Record<PropertyKey, unknown>
+        const proposed = patch as Record<PropertyKey, unknown>
+        // Zustand merges enumerable string and symbol properties.
+        const enumerableKeys = (value: object) => Reflect.ownKeys(value)
+          .filter(key => Object.prototype.propertyIsEnumerable.call(value, key))
+        const keys = enumerableKeys(proposed)
+        const sameKeys = !args[1] || keys.length === enumerableKeys(current).length
         if (sameKeys && keys.every(key => Object.hasOwn(current, key) && Object.is(current[key], proposed[key]))) return
       }
       return Reflect.apply(original, undefined, [patch, ...args.slice(1)])

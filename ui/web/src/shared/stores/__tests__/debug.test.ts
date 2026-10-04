@@ -117,4 +117,69 @@ describe('store tracing', () => {
     expect(recorder.getSnapshot().events.filter(event => event.kind === 'update')).toHaveLength(2)
     expect(store.persist.hasHydrated()).toBe(true)
   })
+  it('keeps reset defaults and stable initial snapshot identity while tracing actions after persisted resets', () => {
+    const recorder = createStoreDebugger(true)
+    const storage = createSelectiveJSONStorage<{ count: number }>(() => ({
+      getItem: () => JSON.stringify({ state: { count: 7 }, version: 0 }), setItem: vi.fn(), removeItem: vi.fn(),
+    }))
+    const store = createStore(recorder.instrument('reset', persist<{ count: number; increment: () => void }, [], [], { count: number }>(set => ({
+      count: 0, increment: () => set(state => ({ count: state.count + 1 })),
+    }), { name: 'reset', storage, partialize: state => ({ count: state.count }) })))
+    expect(store.getState().count).toBe(7)
+    const initial = store.getInitialState()
+    expect(initial.count).toBe(0)
+    expect(store.getInitialState()).toBe(initial)
+    for (let reset = 0; reset < 2; reset++) {
+      store.setState(initial, true)
+      recorder.clear()
+      store.getState().increment()
+      const events = recorder.getSnapshot().events
+      expect(events.map(event => event.kind)).toEqual(['action', 'update', 'resolved'])
+      expect(events[1].parentId).toBe(events[0].id)
+      expect(events[2].parentId).toBe(events[0].id)
+      expect(store.getState().count).toBe(1)
+    }
+  })
+
+  it('omits oversized object keys from captures and exports and marks the capture incomplete', () => {
+    const hugeKey = 'x'.repeat(1_000_000)
+    const state = { readable: 3, [hugeKey]: 1 }
+    expect(captureState(state)).toEqual({ value: { readable: 3 }, complete: false })
+    const recorder = createStoreDebugger(true)
+    const store = createStore(recorder.instrument('large', () => state))
+    store.setState({ readable: 4, [hugeKey]: 2 })
+    const exported = recorder.exportTrace()
+    expect(exported).not.toContain(hugeKey)
+    expect(exported.length).toBeLessThan(10_000)
+    expect(JSON.parse(exported).stores.large.complete).toBe(false)
+  })
+
+  it('bounds changed-key lists for many-field updates and marks exported snapshots incomplete', () => {
+    const initial = Object.fromEntries(Array.from({ length: 1000 }, (_, index) => [`field${index}`, 0]))
+    const changed = Object.fromEntries(Object.keys(initial).map(key => [key, 1]))
+    const recorder = createStoreDebugger(true)
+    const store = createStore(recorder.instrument('many', () => initial))
+    store.setState(changed)
+    const exported = JSON.parse(recorder.exportTrace())
+    expect(exported.events[0].changedKeys).toHaveLength(60)
+    expect(exported.events[0].changedKeys).toEqual(Object.keys(initial).slice(0, 60))
+    expect(exported.events[0].before.complete).toBe(false)
+    expect(exported.events[0].after.complete).toBe(false)
+  })
+
+  it('traces oversized method names with bounded, explicitly truncated labels', () => {
+    const key = 'method'.repeat(200_000)
+    const recorder = createStoreDebugger(true)
+    const method = vi.fn(() => 3)
+    const store = createStore(recorder.instrument('method', () => ({ [key]: method })))
+    expect(store.getState()[key]()).toBe(3)
+    expect(method).toHaveBeenCalledOnce()
+    const events = recorder.getSnapshot().events
+    expect(events.map(event => event.kind)).toEqual(['action', 'resolved'])
+    expect(events.every(event => event.action.length <= 512 && event.action.endsWith('…[truncated]'))).toBe(true)
+    expect(events.every(event => !event.stack || event.stack.length <= 4096)).toBe(true)
+    expect(recorder.exportTrace().includes(key)).toBe(false)
+    expect(recorder.exportTrace().length).toBeLessThan(10_000)
+  })
+
 })

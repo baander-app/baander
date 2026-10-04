@@ -1,14 +1,11 @@
 import styled from 'styled-components'
-import { useEffect, useState, useCallback } from 'react'
+import { useCallback } from 'react'
 import { Play } from 'lucide-react'
-import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { useImageBlob } from '@/shared/hooks/use-image-blob'
 import { useContextPanelStore } from '@/features/layout/stores/context-panel-store'
 import { AlbumContextMenu } from './menus/AlbumContextMenu'
 import { usePlayAlbum } from '../hooks/use-play-album'
-import { createLogger } from '@/shared/lib/logger'
 import { focusVisibleRing } from '@/shared/theme'
-
-const logger = createLogger('AlbumGridItem')
 
 const CardButton = styled.button`
   position: relative;
@@ -106,25 +103,9 @@ interface AlbumGridItemProps {
 }
 
 export function AlbumGridItem({ publicId, title, artistName, imageUrl }: AlbumGridItemProps) {
-  const [src, setSrc] = useState<string | null>(null)
+  const { src } = useImageBlob(imageUrl)
   const setSelectedItem = useContextPanelStore((s) => s.setSelectedItem)
   const { playAlbum } = usePlayAlbum()
-
-  useEffect(() => {
-    if (!imageUrl) {
-      setSrc(null)
-      return
-    }
-    let revoked = false
-    AXIOS_INSTANCE.get(imageUrl, { responseType: 'blob' })
-      .then((res) => { if (!revoked) setSrc(URL.createObjectURL(res.data)) })
-      .catch((err) => { if (!revoked) { logger.warn('Image load failed:', err); setSrc(null) } })
-    return () => { revoked = true }
-  }, [imageUrl])
-
-  useEffect(() => {
-    return () => { if (src) URL.revokeObjectURL(src) }
-  }, [src])
 
   const handleClick = useCallback(() => {
     setSelectedItem({ type: 'album', publicId })

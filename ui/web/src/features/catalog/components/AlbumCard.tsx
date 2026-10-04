@@ -1,12 +1,8 @@
 import styled from 'styled-components'
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { useImageBlob } from '@/shared/hooks/use-image-blob'
 import { AlbumContextMenu } from './menus/AlbumContextMenu'
-import { createLogger } from '@/shared/lib/logger'
 import { interactiveTransition } from '@/shared/theme'
-
-const logger = createLogger('AlbumCard')
 
 const CardLink = styled(Link)`
   display: block;
@@ -60,38 +56,7 @@ interface AlbumCardProps {
 }
 
 export function AlbumCard({ publicId, title, artistName, imageUrl }: AlbumCardProps) {
-  const [src, setSrc] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!imageUrl) {
-      setSrc(null)
-      return
-    }
-
-    let revoked = false
-
-    AXIOS_INSTANCE.get(imageUrl, { responseType: 'blob' })
-      .then((res) => {
-        if (!revoked) {
-          const url = URL.createObjectURL(res.data)
-          setSrc(url)
-        }
-      })
-      .catch((err) => {
-        if (!revoked) { logger.warn('Image load failed:', err); setSrc(null) }
-      })
-
-    return () => {
-      revoked = true
-    }
-  }, [imageUrl])
-
-  // Revoke blob URL when component unmounts or src changes
-  useEffect(() => {
-    return () => {
-      if (src) URL.revokeObjectURL(src)
-    }
-  }, [src])
+  const { src } = useImageBlob(imageUrl)
 
   return (
     <AlbumContextMenu album={{ publicId, title, artistName }}>

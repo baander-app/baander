@@ -65,6 +65,30 @@ and count-based performance gates, not full application deployment certification
 Duration formatting also supports hours and zero-pads each field (`00:09`,
 `01:05`, `01:00:00`), with boundary and rounding coverage.
 
+## Follow-up: correctness review and remaining web gates
+
+The full web lint audit on 2026-10-04 reported 134 errors and 14 warnings before
+this follow-up, across the application, tests, and embedded player package.
+Changed-file lint passing does not satisfy this release gate. Resolve the errors
+at their source; do not broaden exclusions or suppressions to obtain a green run.
+After centralizing the image lifecycle, the rerun reports 130 errors and 14 warnings.
+
+- [x] Verify canceled image requests cannot publish stale covers or allocate leaked
+  blob URLs; share one loader across album cards and retain unchanged-render budgets.
+- [x] Verify starting music cancels radio fallback intent even while native radio is
+  paused, and late radio failures cannot take playback ownership back.
+- [x] Verify shared store helpers preserve symbol-key updates and action tracing
+  after reset, and oversized property names cannot bypass trace export bounds.
+- [x] Rerun combined tests, typechecks, changed-file lint, and debugger browser flow.
+- [ ] Bring full-project web lint to zero errors before the application release.
+
+Verification: 1,602 web tests across 138 files, 46 native audio browser tests,
+11 browser authentication tests, the HTTPS debugger browser flow, TypeScript,
+changed-file ESLint, and the production build pass. New regressions
+failed before their fixes. Disabled debugger instrumentation remains unchanged;
+retained exports are bounded, but arbitrary JavaScript object enumeration is not
+a bounded-time operation.
+
 ## Recent verified checkpoints
 
 | Commit | Result | Verification |
