@@ -13,7 +13,6 @@ use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 final class WebhookDeliveryService
@@ -27,7 +26,6 @@ final class WebhookDeliveryService
         private readonly HttpClientInterface $httpClient,
         private readonly HmacSigner $hmacSigner,
         private readonly LoggerInterface $logger,
-        private readonly JsonEncoder $jsonEncoder,
         private readonly WebhookDestinationPolicy $destinations = new WebhookDestinationPolicy(),
         private readonly ?WebhookSecretPortInterface $secrets = null,
     ) {
@@ -119,13 +117,13 @@ final class WebhookDeliveryService
             throw new \RuntimeException('Webhook destination could not be safely resolved.');
         }
 
-        $payload = $this->jsonEncoder->encode([
+        $payload = json_encode([
             'title' => $title,
             'body' => $body,
             'category' => $category->value,
             'notification_id' => $notificationId,
             'timestamp' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
-        ], 'json');
+        ], JSON_THROW_ON_ERROR);
 
         // Pin the validated IP so the client connects only to an address already
         // checked, closing the DNS-rebinding window between validation and the

@@ -18,7 +18,6 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Mailer\Exception\TransportException;
 use Symfony\Component\Mailer\MailerInterface;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Twig\Environment;
 
@@ -81,7 +80,6 @@ final class ChannelFailurePropagationTest extends TestCase
             $httpClient,
             new HmacSigner(),
             new NullLogger(),
-            new JsonEncoder(),
         );
         $handler = new SendWebhookHandler($delivery, new NullLogger());
 

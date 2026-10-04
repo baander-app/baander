@@ -20,7 +20,6 @@ use Symfony\Component\HttpClient\Exception\TransportException;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 
@@ -138,7 +137,7 @@ final class WebhookResponseLifecycleTest extends TestCase
         $entityManager->expects(self::once())->method('flush');
         $policy = new WebhookDestinationPolicy(dnsResolver: static fn (string $host): array => ['1.1.1.1']);
 
-        return new WebhookDeliveryService($entityManager, $client, new HmacSigner(), new NullLogger(), new JsonEncoder(), $policy);
+        return new WebhookDeliveryService($entityManager, $client, new HmacSigner(), new NullLogger(), $policy);
     }
 
     private function deliver(WebhookDeliveryService $service): void

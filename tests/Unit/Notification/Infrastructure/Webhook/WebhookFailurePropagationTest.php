@@ -20,7 +20,6 @@ use Symfony\Component\HttpClient\Exception\TransportException;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class WebhookFailurePropagationTest extends TestCase
 {
@@ -178,7 +177,7 @@ final class WebhookFailurePropagationTest extends TestCase
         $em ??= $this->createStub(EntityManagerInterface::class);
         $em->method('getRepository')->willReturn($repository);
         $policy ??= new WebhookDestinationPolicy(dnsResolver: static fn (string $host): array => $host === 'blocked.baander.app' ? ['127.0.0.1'] : ['1.1.1.1']);
-        return new WebhookDeliveryService($em, $client, new HmacSigner(), new NullLogger(), new JsonEncoder(), $policy, $secrets);
+        return new WebhookDeliveryService($em, $client, new HmacSigner(), new NullLogger(), $policy, $secrets);
     }
 
     private function deliver(WebhookDeliveryService $service, string $notificationId = 'notification-1'): void

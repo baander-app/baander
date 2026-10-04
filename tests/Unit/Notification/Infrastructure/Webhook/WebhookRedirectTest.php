@@ -17,7 +17,6 @@ use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class WebhookRedirectTest extends TestCase
 {
@@ -40,7 +39,7 @@ final class WebhookRedirectTest extends TestCase
             self::assertSame(['lan.baander.app' => '192.168.1.2'], $options['resolve']);
             return new MockResponse('', ['http_code' => 302, 'response_headers' => ['Location: http://169.254.169.254/']]);
         });
-        $service = new WebhookDeliveryService($em, $client, new HmacSigner(), new NullLogger(), new JsonEncoder(), new WebhookDestinationPolicy(['192.168.1.2'], dnsResolver: static fn (string $host): array => ['192.168.1.2']));
+        $service = new WebhookDeliveryService($em, $client, new HmacSigner(), new NullLogger(), new WebhookDestinationPolicy(['192.168.1.2'], dnsResolver: static fn (string $host): array => ['192.168.1.2']));
         $failure = null;
         try {
             $service->deliverAll('title', 'body', NotificationCategory::Security, 'event-id', Uuid::generate());

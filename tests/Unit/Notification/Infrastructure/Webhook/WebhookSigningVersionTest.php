@@ -18,7 +18,6 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class WebhookSigningVersionTest extends TestCase
 {
@@ -54,7 +53,7 @@ final class WebhookSigningVersionTest extends TestCase
             self::assertSame('X-Webhook-Signature: ' . $expected, $headers['x-webhook-signature'][0]);
             return new MockResponse('', ['http_code' => 200]);
         });
-        $service = new WebhookDeliveryService($em, $client, new HmacSigner(), new NullLogger(), new JsonEncoder(), new WebhookDestinationPolicy(), $codec);
+        $service = new WebhookDeliveryService($em, $client, new HmacSigner(), new NullLogger(), new WebhookDestinationPolicy(), $codec);
         $service->deliverAll('title', 'body', NotificationCategory::Security, 'event-id', Uuid::generate());
         self::assertSame(1, $client->getRequestsCount());
     }

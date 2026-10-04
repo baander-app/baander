@@ -16,7 +16,6 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 final class WebhookDeliveryServiceTest extends TestCase
@@ -50,7 +49,6 @@ final class WebhookDeliveryServiceTest extends TestCase
             $this->httpClient,
             $this->hmacSigner,
             $this->logger,
-            new JsonEncoder(),
             new WebhookDestinationPolicy(dnsResolver: static fn (string $host): array => $host === 'baander.app' ? ['93.184.216.34'] : []),
         );
         return $fixture;
