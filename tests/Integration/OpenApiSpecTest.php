@@ -11,6 +11,7 @@ use Nelmio\ApiDocBundle\Render\RenderOpenApi;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\Routing\RouterInterface;
 
 final class OpenApiSpecTest extends KernelTestCase
 {
@@ -27,6 +28,58 @@ final class OpenApiSpecTest extends KernelTestCase
         $spec = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
 
         return $spec;
+    }
+
+    public function test_every_api_route_operation_is_documented(): void
+    {
+        $spec = $this->getSpec();
+        $router = self::getContainer()->get('router.default');
+        self::assertInstanceOf(RouterInterface::class, $router);
+        $operations = [];
+
+        foreach ($router->getRouteCollection() as $name => $route) {
+            $path = $route->getPath();
+            // The documentation endpoint itself is provided by Nelmio.
+            if (!str_starts_with($path, '/api/') || $name === 'app.swagger') {
+                continue;
+            }
+            self::assertNotEmpty($route->getMethods(), $name . ' must declare HTTP methods.');
+            foreach ($route->getMethods() as $method) {
+                if (in_array($method, ['HEAD', 'OPTIONS'], true)) {
+                    continue;
+                }
+                $operation = strtolower($method);
+                self::assertArrayHasKey($path, $spec['paths'], $name . ' is missing from OpenAPI.');
+                self::assertArrayHasKey($operation, $spec['paths'][$path], $name . ' is missing its method.');
+                $operations[$path][$operation] = true;
+            }
+        }
+
+        foreach ($spec['paths'] as $path => $item) {
+            foreach (['get', 'post', 'put', 'patch', 'delete'] as $method) {
+                if (isset($item[$method])) {
+                    self::assertTrue(isset($operations[$path][$method]), $method . ' ' . $path . ' has no route.');
+                }
+            }
+        }
+    }
+
+    public function test_configuration_object_defaults_match_their_schema_type(): void
+    {
+        self::bootKernel();
+        $renderer = self::getContainer()->get(RenderOpenApi::class);
+        self::assertInstanceOf(RenderOpenApi::class, $renderer);
+        $spec = json_decode($renderer->render('json', 'default'), false, 512, JSON_THROW_ON_ERROR);
+
+        foreach ([
+            'CreateRadioSourceRequest' => 'syncConfig',
+            'CreateScheduledJobRequest' => 'parameters',
+            'UpdateScheduledJobRequest' => 'parameters',
+        ] as $name => $field) {
+            $property = $spec->components->schemas->{$name}->properties->{$field};
+            self::assertSame('object', $property->type);
+            self::assertEquals(new \stdClass(), $property->default, $name . ' must default to a JSON object.');
+        }
     }
 
     public function test_layout_save_schema_documents_supported_panel_values(): void

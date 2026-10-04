@@ -234,6 +234,31 @@ remain isolated. Catalog's playlist-impact helper now accepts only song UUIDs.
 Lyrics Application is still missing from Deptrac's collectors, an enforcement gap
 to address during the separate architecture remediation.
 
+## Production authentication and contract drift gates
+
+DPoP validation now preserves the actual HTTP/HTTPS scheme. Signed unit tests and
+an isolated production-firewall test reproduced HTTPS proofs being accepted for
+HTTP requests before the fix. The corrected OAuth security suite passes 85 tests
+with 426 assertions; the production firewall passes seven cases with 100 assertions
+using real RS256 access tokens, ES256 proofs, PostgreSQL records, and Redis replay
+storage. This does not yet qualify the complete signed-delivery or browser matrix.
+
+OpenAPI export now offers a non-writing `--check` gate and reports write failures
+instead of returning success. The current 228 paths match runtime routing; tests
+check both missing operations and documented operations without routes. Configuration
+map defaults are JSON objects, and the three changed request schemas and generated
+web client are regenerated together. Backend publication requires the specification
+check; frontend publication requires regenerated-client parity. Failure-injection
+workflow tests verify both checks prevent publication from proceeding. Export/workflow
+tests pass 26 cases with 161 assertions; schema tests pass 20 cases with 169 assertions,
+and the route-coverage test adds 1,164 assertions. Web typechecking and both drift
+checks pass. The full configured PHPStan scan remains clean.
+
+The full disposable functional run reached 987 tests and 7,688 assertions, but eight
+mock notices prevented a clean result. Those fixtures now use stubs and pass their
+eight focused cases. The full strict rerun is in progress; do not count the earlier
+notice-bearing run as a completed gate.
+
 ## Recent verified checkpoints
 
 | Commit | Result | Verification |

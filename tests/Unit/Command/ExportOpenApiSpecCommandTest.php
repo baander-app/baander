@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Command;
 
 use App\Command\ExportOpenApiSpecCommand;
 use Nelmio\ApiDocBundle\Render\RenderOpenApi;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
@@ -13,7 +14,7 @@ use Symfony\Component\Console\Tester\CommandTester;
 
 final class ExportOpenApiSpecCommandTest extends TestCase
 {
-    private RenderOpenApi $renderOpenApi;
+    private RenderOpenApi&Stub $renderOpenApi;
 
     protected function setUp(): void
     {
@@ -105,6 +106,64 @@ final class ExportOpenApiSpecCommandTest extends TestCase
 
         $this->assertSame(Command::FAILURE, $exitCode);
         $this->assertStringContainsString('Failed to generate OpenAPI specification', $tester->getDisplay());
+    }
+
+    public function testCheckAcceptsTheExactGeneratedSpecWithoutWriting(): void
+    {
+        $path = $this->tempPath('.json');
+        $content = '{"openapi":"3.0.0"}';
+        file_put_contents($path, $content);
+        $this->renderOpenApi->method('render')->willReturn($content);
+
+        try {
+            $tester = new CommandTester(new ExportOpenApiSpecCommand($this->renderOpenApi));
+            $this->assertSame(Command::SUCCESS, $tester->execute(['--output' => $path, '--check' => true]));
+            $this->assertSame($content, file_get_contents($path));
+        } finally {
+            unlink($path);
+        }
+    }
+
+    public function testCheckRejectsDriftWithoutReplacingTheCheckedInSpec(): void
+    {
+        $path = $this->tempPath('.json');
+        $old = '{"openapi":"3.0.0","paths":{}}';
+        file_put_contents($path, $old);
+        $this->renderOpenApi->method('render')->willReturn('{"openapi":"3.0.0","paths":{"/api/songs":{}}}');
+
+        try {
+            $tester = new CommandTester(new ExportOpenApiSpecCommand($this->renderOpenApi));
+            $this->assertSame(Command::FAILURE, $tester->execute(['--output' => $path, '--check' => true]));
+            $this->assertSame($old, file_get_contents($path));
+            $this->assertStringContainsString('out of date', $tester->getDisplay());
+        } finally {
+            unlink($path);
+        }
+    }
+
+    public function testCheckRejectsMissingSpecWithoutCreatingIt(): void
+    {
+        $path = $this->tempPath('.json');
+        $this->renderOpenApi->method('render')->willReturn('{"openapi":"3.0.0"}');
+        $tester = new CommandTester(new ExportOpenApiSpecCommand($this->renderOpenApi));
+
+        $this->assertSame(Command::FAILURE, $tester->execute(['--output' => $path, '--check' => true]));
+        $this->assertFileDoesNotExist($path);
+    }
+
+    public function testExportReportsWriteFailure(): void
+    {
+        $path = $this->tempPath('-directory');
+        mkdir($path);
+        $this->renderOpenApi->method('render')->willReturn('{"openapi":"3.0.0"}');
+
+        try {
+            $tester = new CommandTester(new ExportOpenApiSpecCommand($this->renderOpenApi));
+            $this->assertSame(Command::FAILURE, $tester->execute(['--output' => $path]));
+            $this->assertDirectoryExists($path);
+        } finally {
+            rmdir($path);
+        }
     }
 
     private function tempPath(string $suffix): string

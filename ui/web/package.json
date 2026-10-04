@@ -15,6 +15,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "generate": "orval",
+    "generate:check": "yarn generate && git ls-files --error-unmatch src/shared/api-client/gen/endpoints/index.ts && git diff --exit-code -- src/shared/api-client/gen",
     "test:perf": "vitest run --config vitest.perf.config.ts",
     "test:browser-auth": "playwright test -c tests/e2e/browser-auth/playwright.config.ts",
     "test:audio-graph": "playwright test -c tests/e2e/audio-graph/playwright.config.ts",

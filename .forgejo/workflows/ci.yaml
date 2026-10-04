@@ -120,6 +120,11 @@ jobs:
                       "$CI_IMAGE" \
                       php ./vendor/bin/phpstan analyse --memory-limit=1G --no-progress
 
+            -   name: OpenAPI drift
+                run: |
+                    docker run --rm "$CI_IMAGE" \
+                      php bin/console app:export-openapi-spec --env=test --no-debug --check
+
             -   name: Deptrac
                 run: |
                     docker run --rm "$CI_IMAGE" vendor/bin/deptrac analyse --no-cache --no-progress
@@ -326,6 +331,7 @@ jobs:
                 working-directory: ui/web
                 run: |
                     yarn install --immutable
+                    yarn generate:check
                     yarn lint
                     yarn test
                     yarn build

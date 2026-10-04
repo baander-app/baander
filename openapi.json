@@ -19895,21 +19895,11 @@
                         "type": "string"
                     },
                     "syncConfig": {
-                        "oneOf": [
-                            {
-                                "type": "array",
-                                "items": {
-                                    "nullable": true
-                                }
-                            },
-                            {
-                                "type": "object",
-                                "additionalProperties": {
-                                    "nullable": true
-                                }
-                            }
-                        ],
-                        "default": []
+                        "type": "object",
+                        "default": {},
+                        "additionalProperties": {
+                            "nullable": true
+                        }
                     },
                     "syncSchedule": {
                         "type": "string",
@@ -19961,21 +19951,11 @@
                         "default": null
                     },
                     "parameters": {
-                        "oneOf": [
-                            {
-                                "type": "array",
-                                "items": {
-                                    "nullable": true
-                                }
-                            },
-                            {
-                                "type": "object",
-                                "additionalProperties": {
-                                    "nullable": true
-                                }
-                            }
-                        ],
-                        "default": []
+                        "type": "object",
+                        "default": {},
+                        "additionalProperties": {
+                            "nullable": true
+                        }
                     }
                 },
                 "type": "object"
@@ -20011,21 +19991,11 @@
                         "default": null
                     },
                     "parameters": {
-                        "oneOf": [
-                            {
-                                "type": "array",
-                                "items": {
-                                    "nullable": true
-                                }
-                            },
-                            {
-                                "type": "object",
-                                "additionalProperties": {
-                                    "nullable": true
-                                }
-                            }
-                        ],
-                        "default": []
+                        "type": "object",
+                        "default": {},
+                        "additionalProperties": {
+                            "nullable": true
+                        }
                     }
                 },
                 "type": "object"

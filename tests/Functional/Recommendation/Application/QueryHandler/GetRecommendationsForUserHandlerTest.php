@@ -22,7 +22,7 @@ use App\Recommendation\Domain\Repository\RecommendationRepositoryInterface;
 use App\Tests\Functional\TestCase;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 
@@ -32,7 +32,7 @@ final class GetRecommendationsForUserHandlerTest extends TestCase
     private AlbumRepositoryInterface $albumRepository;
     private ArtistRepositoryInterface $artistRepository;
     private SongRepositoryInterface $songRepository;
-    private ImagePortInterface&MockObject $imagePort;
+    private ImagePortInterface&Stub $imagePort;
     private RequestStack $requestStack;
     private GetRecommendationsForUserHandler $handler;
 
@@ -46,9 +46,9 @@ final class GetRecommendationsForUserHandlerTest extends TestCase
         $this->artistRepository = $container->get(ArtistRepositoryInterface::class);
         $this->songRepository = $container->get(SongRepositoryInterface::class);
 
-        $this->imagePort = $this->createMock(ImagePortInterface::class);
+        $this->imagePort = $this->createStub(ImagePortInterface::class);
         $this->requestStack = new RequestStack();
-        $request = Request::create('https://example.com/api/recommendations');
+        $request = Request::create('https://baander.app/api/recommendations');
         $this->requestStack->push($request);
 
         $this->handler = new GetRecommendationsForUserHandler(
@@ -171,7 +171,7 @@ final class GetRecommendationsForUserHandlerTest extends TestCase
         $this->assertCount(1, $result);
         $this->assertSame('Test Album', $result[0]['targetTitle']);
         $this->assertSame('Test Artist', $result[0]['targetArtistName']);
-        $this->assertSame('https://example.com/api/images/' . $coverPublicId->toString() . '/file', $result[0]['coverImageUrl']);
+        $this->assertSame('https://baander.app/api/images/' . $coverPublicId->toString() . '/file', $result[0]['coverImageUrl']);
     }
 
     public function testEnrichesArtistRecommendationsWithNameAndCoverUrl(): void
@@ -255,7 +255,7 @@ final class GetRecommendationsForUserHandlerTest extends TestCase
         $this->assertCount(1, $result);
         $this->assertSame('Test Artist', $result[0]['targetTitle']);
         $this->assertNull($result[0]['targetArtistName']);
-        $this->assertSame('https://example.com/api/images/' . $coverPublicId->toString() . '/file', $result[0]['coverImageUrl']);
+        $this->assertSame('https://baander.app/api/images/' . $coverPublicId->toString() . '/file', $result[0]['coverImageUrl']);
     }
 
     public function testHandlesMissingAlbumWithNullFields(): void
@@ -591,11 +591,11 @@ final class GetRecommendationsForUserHandlerTest extends TestCase
 
         $this->assertSame('Mixed Album', $albumResult['targetTitle']);
         $this->assertSame('Mixed Artist', $albumResult['targetArtistName']);
-        $this->assertSame('https://example.com/api/images/' . $coverPublicId->toString() . '/file', $albumResult['coverImageUrl']);
+        $this->assertSame('https://baander.app/api/images/' . $coverPublicId->toString() . '/file', $albumResult['coverImageUrl']);
 
         $this->assertSame('Mixed Artist', $artistResult['targetTitle']);
         $this->assertNull($artistResult['targetArtistName']);
-        $this->assertSame('https://example.com/api/images/' . $coverPublicId->toString() . '/file', $artistResult['coverImageUrl']);
+        $this->assertSame('https://baander.app/api/images/' . $coverPublicId->toString() . '/file', $artistResult['coverImageUrl']);
     }
 
     public function testEnrichesSourceNameForAlbumAndArtistSources(): void

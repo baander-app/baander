@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Scheduler\Interface\Request;
 
 use App\Scheduler\Interface\Validator\CronExpression;
+use OpenApi\Attributes as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 final readonly class UpdateScheduledJobRequest
@@ -28,6 +29,7 @@ final readonly class UpdateScheduledJobRequest
 
         public ?string $description = null,
 
+        #[OA\Property(default: new \stdClass())]
         public array $parameters = [],
     ) {
     }

@@ -11,6 +11,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\Filesystem\Filesystem;
 
 #[AsCommand(
     name: 'app:export-openapi-spec',
@@ -28,7 +29,8 @@ final class ExportOpenApiSpecCommand extends Command
     {
         $this
             ->addOption('output', 'o', InputOption::VALUE_REQUIRED, 'Output file path', 'openapi.json')
-            ->addOption('format', 'f', InputOption::VALUE_REQUIRED, 'Output format (json or yaml)', 'json');
+            ->addOption('format', 'f', InputOption::VALUE_REQUIRED, 'Output format (json or yaml)', 'json')
+            ->addOption('check', null, InputOption::VALUE_NONE, 'Fail if the existing specification differs; do not write files');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -52,7 +54,29 @@ final class ExportOpenApiSpecCommand extends Command
             return Command::FAILURE;
         }
 
-        file_put_contents($outputPath, $content);
+        if ($input->getOption('check')) {
+            if (!is_file($outputPath) || !is_readable($outputPath)) {
+                $io->error('The OpenAPI specification is missing or unreadable.');
+
+                return Command::FAILURE;
+            }
+            if (file_get_contents($outputPath) !== $content) {
+                $io->error('The OpenAPI specification is out of date. Regenerate it and the API clients.');
+
+                return Command::FAILURE;
+            }
+            $io->success('The OpenAPI specification matches the current application.');
+
+            return Command::SUCCESS;
+        }
+
+        try {
+            (new Filesystem())->dumpFile($outputPath, $content);
+        } catch (\Throwable $e) {
+            $io->error('Failed to write OpenAPI specification: ' . $e->getMessage());
+
+            return Command::FAILURE;
+        }
 
         $io->success(sprintf('OpenAPI spec exported to %s (%s)', $outputPath, $format));
 

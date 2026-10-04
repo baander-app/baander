@@ -613,7 +613,7 @@ export interface StartRadioRequest {
   streamUrl: string;
 }
 
-export type CreateRadioSourceRequestSyncConfig = (unknown | null)[] | {[key: string]: unknown | null};
+export type CreateRadioSourceRequestSyncConfig = {[key: string]: unknown | null};
 
 export interface CreateRadioSourceRequest {
   name: string;
@@ -636,7 +636,7 @@ export const CreateScheduledJobRequestJobType = {
   console: 'console',
 } as const;
 
-export type CreateScheduledJobRequestParameters = (unknown | null)[] | {[key: string]: unknown | null};
+export type CreateScheduledJobRequestParameters = {[key: string]: unknown | null};
 
 export interface CreateScheduledJobRequest {
   /** @maxLength 255 */
@@ -657,7 +657,7 @@ export const UpdateScheduledJobRequestJobType = {
   console: 'console',
 } as const;
 
-export type UpdateScheduledJobRequestParameters = (unknown | null)[] | {[key: string]: unknown | null};
+export type UpdateScheduledJobRequestParameters = {[key: string]: unknown | null};
 
 export interface UpdateScheduledJobRequest {
   /** @maxLength 255 */
