@@ -1,0 +1,39 @@
+{
+  "api": {
+    "address": "0.0.0.0",
+    "port": 9502,
+    "certificate": "/run/secrets/registry/api.crt",
+    "key": "/run/secrets/registry/api.key",
+    "maximumSessions": 64,
+    "deadlineMs": 2000,
+    "shutdownGraceMs": 5000,
+    "requestsPerSecond": 200,
+    "burst": 200
+  },
+  "database": {
+    "endpoints": [
+      {
+        "url": "https://de.rqlite.registry.baander.app:4001"
+      },
+      {
+        "url": "https://ca.rqlite.registry.baander.app:4001"
+      },
+      {
+        "url": "https://sg.rqlite.registry.baander.app:4001"
+      },
+      {
+        "url": "https://au.rqlite.registry.baander.app:4001"
+      },
+      {
+        "url": "https://fi.rqlite.registry.baander.app:4001"
+      }
+    ],
+    "ca": "/run/secrets/registry/database-ca.crt",
+    "certificate": "/run/secrets/registry/database-client.crt",
+    "key": "/run/secrets/registry/database-client.key",
+    "username": "registry",
+    "passwordFile": "/run/secrets/registry/database-password",
+    "connections": 8,
+    "deadlineMs": 2000
+  }
+}

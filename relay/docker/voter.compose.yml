@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: Apache-2.0
+services:
+  voter:
+    image: baander/registry-rqlite:10.5.1
+    platform: linux/amd64
+    build:
+      context: ../
+      dockerfile: docker/rqlite.Dockerfile
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: 0.75
+    mem_limit: 352m
+    stop_grace_period: 15s
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+    ports:
+      - "${RQLITE_PRIVATE_BIND_IP:?Provide private interface IP}:4001:4001"
+      - "${RQLITE_PRIVATE_BIND_IP:?Provide private interface IP}:4002:4002"
+    environment:
+      RQLITE_NODE_ID: "${RQLITE_NODE_ID:?Provide stable voter ID}"
+      RQLITE_PRIVATE_BIND_IP: "${RQLITE_PRIVATE_BIND_IP:?Provide private interface IP}"
+      RQLITE_HTTP_ADVERTISE: "${RQLITE_HTTP_ADVERTISE:?Provide private HTTP advertised address}"
+      RQLITE_RAFT_ADVERTISE: "${RQLITE_RAFT_ADVERTISE:?Provide private Raft advertised address}"
+      RQLITE_START_MODE: "${RQLITE_START_MODE:-restart}"
+      RQLITE_JOIN_ADDRESSES: "${RQLITE_JOIN_ADDRESSES:-}"
+      RQLITE_EXPECTED_VOTERS: "5"
+    volumes:
+      - voter_data:/var/lib/rqlite
+      - "${RQLITE_SECRETS_DIRECTORY:?Provide voter TLS/auth directory}:/run/secrets/rqlite:ro"
+volumes:
+  voter_data:
+    name: "${RQLITE_VOLUME_NAME:?Provide unique persistent voter volume name}"

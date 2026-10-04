@@ -89,13 +89,14 @@ struct Server {
             if (!schema_bootstrapped)
                 throw Failure(503, "Registry schema is not ready.");
             try {
-                auto result = co_await database.request(
-                    {"/db/query?level=linearizable&associative",
-                     Json::array(
-                         {"SELECT version, checksum FROM schema_migrations ORDER BY version",
-                          "SELECT public_id, credential_digest, url, name, version, created_ms, "
-                          "updated_ms, last_seen_ms, revision FROM registries WHERE 0"})},
-                    database_deadline);
+                DatabaseRequest readiness_request{
+                    "/db/query?level=linearizable&associative",
+                    Json::array(
+                        {"SELECT version, checksum FROM schema_migrations ORDER BY version",
+                         "SELECT public_id, credential_digest, url, name, version, created_ms, "
+                         "updated_ms, last_seen_ms, revision FROM registries WHERE 0"})};
+                auto result =
+                    co_await database.request(std::move(readiness_request), database_deadline);
                 validate_database_result(result.status, result.body, 2);
                 const auto &schema = result.body["results"][0];
                 if (!schema.contains("types") || !schema.contains("rows") ||

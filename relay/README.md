@@ -1,11 +1,8 @@
 # Baander registry
 
-The replacement is a C++20 registry core backed exclusively by rqlite's HTTP API.
-The PHP service remains in this directory until the replacement server and its
-integration checks are coherent. Do not deploy the existing PHP service: its
-repository initialization drops registrations, credentials are stored in plaintext,
-and separate credentials can claim the same public identity. Existing SQLite data
-is left untouched by this implementation; it is never opened or migrated.
+The registry is a C++20 service backed exclusively by rqlite's HTTP API. Its
+container deployment path replaces the obsolete PHP service. Existing SQLite
+data and legacy volumes are left untouched; they are never opened or migrated.
 
 The local implementation includes validation, parameterized rqlite requests, a
 bounded asynchronous mTLS connection pool, and a TLS HTTP server. Regional
@@ -209,3 +206,128 @@ Third-party license notices are retained in `third_party/`.
 
 Authoritative contracts: [rqlite HTTP API](https://rqlite.io/docs/api/api/) and
 [read consistency](https://rqlite.io/docs/api/read-consistency/).
+
+## Container packaging and private inventory
+
+The mandatory container gate builds unique image tags and runs the disposable
+qualification, then removes its image tags:
+
+```sh
+bash scripts/test-registry-container.sh
+```
+
+The image build context is allowlisted: local data, keys, operator configuration
+and PHP files are excluded. The API image builds C++20 Release code with static
+OpenSSL 3.5.3 and the CMake dependency checksums above. The voter image verifies
+the rqlite 10.5.1 Linux amd64 archive. Both use the immutable official Debian base
+`sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251`.
+The verified amd64 child is
+`sha256:f3034a6ec3c1205360777c4aae76234998866ad18806ae62b63a3f84ccad782b`.
+Only Linux amd64 is qualified here. Debian security packages are installed from
+its package repository; these builds do not claim byte-for-byte reproducibility
+of the operating-system package set. Dependency updates require new verified pins
+and qualification. First-party code is Apache-2.0; runtime images retain dependency
+license notices. The operating-system package licenses remain separate obligations.
+
+```sh
+docker build --platform linux/amd64 -f relay/docker/Dockerfile \
+  -t baander/registry:0.1.0 relay
+docker build --platform linux/amd64 -f relay/docker/rqlite.Dockerfile \
+  -t baander/registry-rqlite:10.5.1 relay
+PYTHONDONTWRITEBYTECODE=1 python3 relay/tests/run_container_contract.py \
+  --api-image baander/registry:0.1.0 --rqlite-image baander/registry-rqlite:10.5.1
+```
+
+The container check creates a unique network and uniquely named disposable voter
+volumes, generates fixture credentials and certificates, and removes only those
+resources. Fixtures are copied into named volumes; HTTPS probes run inside the
+test network. It needs no host bind mounts, published API ports or shared
+runner/daemon filesystem, and is qualified against an isolated remote TLS Docker
+daemon. It checks startup guard failures, five-voter formation, authenticated
+TLS registration/lookup, rolling restart with retained revisions, nonroot runtime,
+read-only containers, clean API SIGTERM and absence of fixture secrets in logs.
+`--guards-only` runs startup rejection checks without forming the cluster.
+
+`docker/registry.example.json` is a complete mounted API configuration;
+`docker/inventory.example.env` describes one host's inventory. These are examples,
+not deployment credentials. Copy and review them outside this checkout. Region
+names and domains are configurable; the current inventory is `de`, `ca`, `sg`,
+`au`, `fi`. Keep exactly five voter identities independent of how many hosts are
+currently reachable. Additional API-only hosts do not become voters.
+
+The base Compose file runs only the API. The five voter hosts explicitly include
+`voter.compose.yml`. Database HTTP and Raft published ports require an RFC1918
+host interface address, with no broad/default binding. Use private DNS and a
+VPN/private network with firewall rules allowing only API hosts and voter peers.
+The rqlite administration API is never proxied by the public registry. TLS is
+required even on the private network. Docker bridge NAT and published-port rules
+must be included in the operator's firewall review.
+
+```sh
+# Validate API-only configuration; it needs no voter variables or data volume.
+docker compose --env-file /etc/baander-registry/inventory.env \
+  -f relay/docker/docker-compose.yml config --quiet
+# Validate one of the five voter hosts, then build the two images locally.
+docker compose --env-file /etc/baander-registry/inventory.env \
+  -f relay/docker/docker-compose.yml -f relay/docker/voter.compose.yml config --quiet
+docker compose --env-file /etc/baander-registry/inventory.env \
+  -f relay/docker/docker-compose.yml -f relay/docker/voter.compose.yml build
+```
+
+The API mounts `api.crt`, `api.key`, `api-ca.crt` (health check trust),
+`database-ca.crt`, `database-client.crt`, `database-client.key` and
+`database-password` under `/run/secrets/registry`. It binds `0.0.0.0` inside its
+container and publishes only port 9502. The health check verifies the API's
+configured certificate hostname and CA; it never disables verification. Monitor
+`/ready` separately for authoritative database readiness; `/health` is liveness.
+
+Each voter mounts `ca.crt`, `node.crt`, `node.key` and `auth.json` under
+`/run/secrets/rqlite`. Voter certificates need their private HTTP hostname and
+`raft.registry.baander.app` in their DNS SANs, with both server and client TLS
+usage. Raft verifies that shared cluster hostname and the trusted peer CA;
+HTTP clients verify the individual endpoint hostname. Issuance of peer certificates
+therefore grants cluster trust and must remain restricted. The `registry` auth
+account needs `query` and `execute`; `registry-cluster` needs the `join` permission
+for joining and bootstrap notifications. Keep administrative accounts separate.
+The API password file and
+rqlite auth file must agree. Credentials are supplied through mounted files,
+not command-line passwords. Private files must be readable by UID/GID 10001,
+for example owned by that UID with mode 0600; never make operator keys world-readable.
+Do not mount the CA signing key into either runtime.
+
+Voter startup modes are explicit:
+
+- `bootstrap`: a reviewed first creation, requiring an empty directory, an explicit
+  peer inventory and exactly five expected voters. All five initial hosts use this
+  mode together. It never reduces the count to match currently online hosts.
+- `join-new`: an explicitly provisioned empty replacement/new voter joining an
+  existing cluster, with no bootstrap option. Review membership removal and node
+  identity separately; do not grow the agreed five-voter set accidentally.
+- `restart`: the default, requiring existing native `raft.db` and the matching
+  recorded voter identity. Empty or wrong-identity directories fail closed. This
+  mode neither joins automatically nor starts a competing cluster after quorum loss.
+
+Restart additionally passes rqlite's `-raft-non-voter` startup flag **without** any
+join or discovery option. In pinned 10.5.1, `createCluster` rejects a missing peer
+configuration on this path; existing persisted membership remains unchanged.
+This blocks a partially initialized `raft.db` from accidentally bootstrapping one
+voter after an interrupted five-voter creation. The container check reproduces
+that failure and verifies all five persisted members remain voters after restart.
+Do not combine this restart guard with join/discovery or CDC; dependency upgrades
+must reverify these native semantics against the
+[pinned rqlite startup implementation](https://github.com/rqlite/rqlite/blob/v10.5.1/cmd/rqlited/main.go).
+
+After successful initial creation/join, set the inventory to `restart` and recreate
+that container with its same persistent volume. Leaving `bootstrap`/`join-new`
+configured on a populated volume intentionally fails. Any `raft/peers.json` recovery
+file is rejected; quorum-loss recovery requires a separate reviewed offline procedure.
+No startup path deletes state or silently repairs/reinitializes a volume. Inspect
+membership after provisioning and upgrade one voter at a time while quorum remains.
+
+API and voter limits total one CPU and 448 MiB per host (96 MiB API, 352 MiB voter).
+These are containment limits, not measured acceptance evidence: whole-host RSS/CPU,
+regional latency, physical failure, backups, restore, and soak gates remain pending.
+The old `relay_data` volume and local SQLite files are deliberately unreferenced;
+they are not opened, converted or reset. Never use `docker compose down -v` on an
+operator inventory, and never reuse that legacy volume as native rqlite storage.
+External deployment access and an actual S3 destination are not available yet.

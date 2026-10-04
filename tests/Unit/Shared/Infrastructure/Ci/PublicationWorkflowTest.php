@@ -30,7 +30,7 @@ final class PublicationWorkflowTest extends TestCase
     {
         $jobs = $this->workflow('ci.yaml')['jobs'];
         $publisher = $jobs['build-and-push'];
-        self::assertSame(['quality-gate', 'frontend-quality', 'dsp-quality', 'registry-quality'], $publisher['needs']);
+        self::assertSame(['quality-gate', 'frontend-quality', 'dsp-quality', 'registry-quality', 'registry-container-quality'], $publisher['needs']);
         self::assertSame(['release', 'sanitize'], $jobs['registry-quality']['strategy']['matrix']['mode']);
         self::assertArrayNotHasKey('continue-on-error', $publisher);
         self::assertArrayNotHasKey('if', $publisher);
@@ -196,6 +196,7 @@ SH;
             'embedded unit' => ['frontend-quality', 'Embedded player checks', 'corepack yarn test'],
             'DSP' => ['dsp-quality', 'Build and qualify analysis modules', 'bash scripts/test-dsp-analysis.sh'],
             'registry' => ['registry-quality', 'Build and qualify registry', 'bash scripts/test-registry.sh'],
+            'registry container' => ['registry-container-quality', 'Build and qualify registry containers', 'bash scripts/test-registry-container.sh'],
         ];
     }
 

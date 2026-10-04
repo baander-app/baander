@@ -1,25 +1,29 @@
+# SPDX-License-Identifier: Apache-2.0
+# API-only deployment. The five voter hosts also include voter.compose.yml.
 services:
-    relay:
-        image: baander/cloud-relay:latest
-        container_name: baander-relay
-        build:
-            context: ../
-            dockerfile: docker/Dockerfile
-        restart: unless-stopped
-        ports:
-            - "9502:9502"
-        environment:
-            APP_ENV: prod
-            APP_DEBUG: "0"
-        volumes:
-            - relay_data:/app/data
-        healthcheck:
-            test: ["CMD", "curl", "-f", "http://localhost:9502/health"]
-            interval: 30s
-            timeout: 5s
-            retries: 3
-            start_period: 10s
-
-volumes:
-    relay_data:
-        driver: local
+  registry:
+    image: baander/registry:0.1.0
+    platform: linux/amd64
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: 0.25
+    mem_limit: 96m
+    stop_grace_period: 7s
+    ports:
+      - "${REGISTRY_PUBLIC_BIND_IP:?Configure public bind IP}:9502:9502"
+    volumes:
+      - "${REGISTRY_CONFIG_FILE:?Provide API JSON config}:/etc/baander-registry/config.json:ro"
+      - "${REGISTRY_SECRETS_DIRECTORY:?Provide API TLS/auth directory}:/run/secrets/registry:ro"
+    environment:
+      REGISTRY_HEALTH_HOSTNAME: "${REGISTRY_HEALTH_HOSTNAME:?Provide API certificate hostname}"
+    healthcheck:
+      test: [CMD-SHELL, 'curl --silent --fail --max-time 2 --cacert /run/secrets/registry/api-ca.crt --resolve "$${REGISTRY_HEALTH_HOSTNAME}:9502:127.0.0.1" "https://$${REGISTRY_HEALTH_HOSTNAME}:9502/health" >/dev/null']
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s

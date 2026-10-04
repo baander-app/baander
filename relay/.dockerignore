@@ -1,0 +1,14 @@
+# Allowlist: local SQLite, credentials, logs and PHP never enter build context.
+**
+!CMakeLists.txt
+!LICENSE.md
+!cpp/
+!cpp/**
+!include/
+!include/**
+!third_party/
+!third_party/**
+!docker/
+!docker/Dockerfile
+!docker/rqlite.Dockerfile
+!docker/rqlite-entrypoint.sh

@@ -397,9 +397,29 @@ jobs:
             -   name: Build and qualify registry
                 run: bash scripts/test-registry.sh ${{ matrix.mode }}
 
+    registry-container-quality:
+        runs-on: docker-cli
+        timeout-minutes: 30
+        container:
+            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+        steps:
+            -   name: Checkout
+                run: |
+                    git init -q
+                    git remote add origin ${{ forgejo.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
+                    git checkout -q --detach "${{ forgejo.sha }}"
+                    test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+            -   name: Install container test tools
+                run: |
+                    apt-get update
+                    apt-get install -y --no-install-recommends python3 openssl
+            -   name: Build and qualify registry containers
+                run: bash scripts/test-registry-container.sh
+
     build-and-push:
         runs-on: docker-cli
-        needs: [ quality-gate, frontend-quality, dsp-quality, registry-quality ]
+        needs: [ quality-gate, frontend-quality, dsp-quality, registry-quality, registry-container-quality ]
         container:
             image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
         steps:

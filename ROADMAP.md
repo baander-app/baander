@@ -479,6 +479,16 @@ the user explicitly announces the first production release.
 
 ## C++ registry
 
+Production container qualification now builds pinned C++/rqlite images and checks
+five TLS voters, nonroot read-only API operation, acknowledged registration across
+rolling restarts, explicit replacement joining, and graceful shutdown. Startup
+rejects empty restarts, wrong identities, reduced bootstrap counts and manual peer
+recovery files. A regression reproduced incomplete bootstrap forming a competing
+single-voter cluster; the pinned native restart guard now rejects that state and
+preserves all five persisted voters on normal restart. The required container CI
+job passes through `scripts/test-registry-container.sh`. Container limits are
+containment settings, not evidence that the whole-host resource gates pass.
+
 The C++ core and bounded TLS HTTP server are implemented and committed. Local
 qualification passes 16 sanitizer unit tests, real authenticated TLS rqlite API
 checks, same-pool reconnect/deadline checks, concurrent ownership claims, readiness
@@ -487,13 +497,14 @@ credentials are never returned or logged. Real three- and five-voter authenticat
 TLS clusters now pass 2–1/3–2 partitions, minority rejection, majority commits,
 leader recovery within 30 seconds, abrupt one/two-voter failures and rejoin without
 losing acknowledged metadata or revisions. These local tests do not qualify
-regional latency, constrained capacity, soak or backup restoration. The PHP
-implementation remains until the replacement's deployment path is complete.
+regional latency, constrained capacity, soak or backup restoration. The C++
+container deployment path now replaces the obsolete PHP registry source/config;
+local SQLite files and existing volumes remain untouched.
 Clean release and ASan/LeakSanitizer/UBSan builds now pass through
 `scripts/test-registry.sh`, which verifies downloaded rqlite/OpenSSL checksums and
 isolates OpenSSL dependency discovery. Both CI matrix variants are required before
-publication. Eighteen workflow tests verify event-commit checkouts and failure
-propagation, including each registry variant. ThreadSanitizer, static analysis,
+publication. Nineteen workflow tests verify event-commit checkouts and failure
+propagation, including both registry variants and the container qualification job. ThreadSanitizer, static analysis,
 automated license checks and performance/soak gates remain outstanding.
 
 The cluster tests exposed rqlite's HTTP-200 leadership-loss response and an API
