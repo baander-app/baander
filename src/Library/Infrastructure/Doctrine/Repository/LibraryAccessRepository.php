@@ -42,8 +42,24 @@ final class LibraryAccessRepository implements LibraryAccessPortInterface
             return; // Idempotent
         }
 
-        $this->entityManager->remove($existing);
-        $this->entityManager->flush();
+        // Hydrated composite association identifiers are flattened to strings by
+        // Doctrine. Bind the original UUID values instead of deleting via the UoW.
+        $this->entityManager->wrapInTransaction(
+            static function (EntityManagerInterface $em) use ($existing, $userId, $libraryId): void {
+                $em->createQueryBuilder()
+                    ->delete(UserLibraryAccessEntity::class, 'access')
+                    ->where('access.user = :userId')
+                    ->andWhere('access.library = :libraryId')
+                    ->setParameter('userId', $userId, 'uuid')
+                    ->setParameter('libraryId', $libraryId, 'uuid')
+                    ->getQuery()
+                    ->execute();
+
+                // This immutable association has no removal callbacks or cascades.
+                // Remove its stale identity so the same membership can be regranted.
+                $em->detach($existing);
+            },
+        );
     }
 
     public function getUserLibraryIds(Uuid $userId): array

@@ -7,6 +7,7 @@ namespace App\Tests\Functional\Controller;
 use App\Auth\Domain\Model\User;
 use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
+use App\Library\Infrastructure\Doctrine\Entity\UserLibraryAccessEntity;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
 use Doctrine\ORM\EntityManagerInterface;
@@ -101,5 +102,45 @@ final class LibraryAccessTest extends TestCase
         $libraryId = $this->createLibrary();
 
         $this->assertFalse($this->libraryAccess->hasAccess($userId, $libraryId));
+    }
+
+    public function testRevokeHydratedMembershipAllowsRegrantInTheSamePersistenceContext(): void
+    {
+        $userId = $this->createTestUser()->getId();
+        $libraryId = $this->createLibrary();
+        $this->libraryAccess->grant($userId, $libraryId);
+        $this->libraryEm->clear();
+        $membership = $this->libraryEm->getRepository(UserLibraryAccessEntity::class)
+            ->findOneBy(['user' => $userId, 'library' => $libraryId]);
+        $this->assertNotNull($membership);
+        $this->assertTrue($this->libraryEm->contains($membership));
+
+        $this->libraryAccess->revoke($userId, $libraryId);
+
+        $this->assertFalse($this->libraryAccess->hasAccess($userId, $libraryId));
+        $this->assertSame([], $this->libraryAccess->getUserLibraryIds($userId));
+        $this->assertFalse($this->libraryEm->contains($membership));
+        $this->libraryAccess->revoke($userId, $libraryId);
+        $this->libraryAccess->grant($userId, $libraryId);
+        $this->assertTrue($this->libraryAccess->hasAccess($userId, $libraryId));
+        $this->assertSame([$libraryId->toString()], $this->libraryAccess->getUserLibraryIds($userId));
+    }
+
+    public function testRevokeHydratedMembershipPreservesOtherUsersAndLibraries(): void
+    {
+        $userId = $this->createTestUser()->getId();
+        $otherUserId = $this->createTestUser()->getId();
+        $libraryId = $this->createLibrary();
+        $otherLibraryId = $this->createLibrary();
+        $this->libraryAccess->grant($userId, $libraryId);
+        $this->libraryAccess->grant($userId, $otherLibraryId);
+        $this->libraryAccess->grant($otherUserId, $libraryId);
+        $this->libraryEm->clear();
+
+        $this->libraryAccess->revoke($userId, $libraryId);
+
+        $this->assertFalse($this->libraryAccess->hasAccess($userId, $libraryId));
+        $this->assertSame([$otherLibraryId->toString()], $this->libraryAccess->getUserLibraryIds($userId));
+        $this->assertTrue($this->libraryAccess->hasAccess($otherUserId, $libraryId));
     }
 }
