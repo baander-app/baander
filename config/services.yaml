@@ -961,6 +961,8 @@ services:
         alias: App\Party\Infrastructure\Doctrine\Repository\PartyMemberRepository
 
     # --- Party Application Port Aliases ---
+    App\Party\Application\Port\PlaybackSynchronizationPortInterface:
+        alias: App\Party\Infrastructure\PlaybackSynchronizer
     App\Party\Application\Port\PartySessionPortInterface:
         alias: App\Party\Infrastructure\PartySessionService
     App\Party\Application\Port\PartyMemberPortInterface:

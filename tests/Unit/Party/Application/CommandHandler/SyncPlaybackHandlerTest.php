@@ -8,6 +8,7 @@ use App\Party\Application\Command\SyncPlaybackCommand;
 use App\Party\Application\CommandHandler\SyncPlaybackHandler;
 use App\Party\Application\Port\PartyMemberPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
+use App\Party\Application\Port\PlaybackSynchronizationPortInterface;
 use App\Party\Infrastructure\PlaybackSynchronizer;
 use App\Party\Domain\Model\PartyMember;
 use App\Shared\Domain\Model\Uuid;
@@ -59,4 +60,22 @@ final class SyncPlaybackHandlerTest extends TestCase
         $this->expectExceptionMessage('Party membership required.');
         ($this->handler)(new SyncPlaybackCommand($sessionId, $userId, 75.0, 0.3));
     }
+
+    public function testHandlerAcceptsTheSynchronizationPortAndPreservesItsArguments(): void
+    {
+        $this->sessionPort->expects($this->never())->method('syncPlayback');
+        $this->memberPort->expects($this->never())->method('findByUserAndSession');
+        $sessionId = new Uuid();
+        $userId = new Uuid();
+        $synchronizer = $this->createMock(PlaybackSynchronizationPortInterface::class);
+        $synchronizer->expects($this->once())->method('synchronize')
+            ->with($sessionId, $userId, 45.5, 0.25)
+            ->willReturn(46.0);
+        $handler = new SyncPlaybackHandler($synchronizer);
+
+        $position = $handler(new SyncPlaybackCommand($sessionId, $userId, 45.5, 0.25));
+
+        self::assertSame(46.0, $position);
+    }
+
 }

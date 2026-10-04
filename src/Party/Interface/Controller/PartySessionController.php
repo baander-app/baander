@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Party\Interface\Controller;
 
-use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Party\Application\Command\CreatePartySessionCommand;
@@ -73,7 +73,7 @@ final class PartySessionController
         ],
     )]
     #[Route('/', name: 'create', methods: ['POST'])]
-    public function create(#[MapRequestPayload] CreatePartySessionRequest $payload, #[CurrentUser] SecurityUser $user): JsonResponse
+    public function create(#[MapRequestPayload] CreatePartySessionRequest $payload, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
         $session = $this->unwrapResult($this->commandBus->dispatch(new CreatePartySessionCommand(
             hostUserId: Uuid::fromString($user->getId()),
@@ -138,7 +138,7 @@ final class PartySessionController
         ],
     )]
     #[Route('/{uuid}/join', name: 'join', methods: ['POST'])]
-    public function join(string $uuid, #[CurrentUser] SecurityUser $user): JsonResponse
+    public function join(string $uuid, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
         $member = $this->unwrapResult($this->commandBus->dispatch(new JoinPartySessionCommand(
             userId: Uuid::fromString($user->getId()),
@@ -159,7 +159,7 @@ final class PartySessionController
         ],
     )]
     #[Route('/{uuid}/leave', name: 'leave', methods: ['POST'])]
-    public function leave(string $uuid, #[CurrentUser] SecurityUser $user): JsonResponse
+    public function leave(string $uuid, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
         $this->commandBus->dispatch(new LeavePartySessionCommand(
             userId: Uuid::fromString($user->getId()),
@@ -180,7 +180,7 @@ final class PartySessionController
         ],
     )]
     #[Route('/{uuid}/sync', name: 'sync', methods: ['POST'])]
-    public function sync(string $uuid, #[MapRequestPayload] SyncPlaybackRequest $payload, #[CurrentUser] SecurityUser $user): JsonResponse
+    public function sync(string $uuid, #[MapRequestPayload] SyncPlaybackRequest $payload, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
         $position = $this->unwrapResult($this->commandBus->dispatch(new SyncPlaybackCommand(
             sessionId: Uuid::fromString($uuid),
@@ -203,7 +203,7 @@ final class PartySessionController
         ],
     )]
     #[Route('/{uuid}', name: 'end', methods: ['DELETE'])]
-    public function end(string $uuid, #[CurrentUser] SecurityUser $user): JsonResponse
+    public function end(string $uuid, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
         $this->commandBus->dispatch(new EndPartySessionCommand(
             sessionId: Uuid::fromString($uuid),

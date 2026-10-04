@@ -556,6 +556,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Library Interface':
+      - 'Auth Identity Contract'
       - 'Library Application'
       - 'Shared Domain'
       - 'Shared Application'

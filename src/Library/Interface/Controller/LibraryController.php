@@ -20,7 +20,7 @@ use App\Library\Interface\Request\UpdateLibraryRequest;
 use App\Library\Interface\Resource\LibraryResource;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
-use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -107,6 +107,16 @@ final class LibraryController
     #[Route('', name: 'store', methods: ['POST'])]
     public function store(#[MapRequestPayload] CreateLibraryRequest $payload): JsonResponse
     {
+        $user = $this->security?->getUser();
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
+            return $this->unauthorized($this->trans('errors.unauthorized.default', domain: 'messages'));
+        }
+
+        $userId = $this->parseUuid($user->getId());
+        if ($userId === null) {
+            return $this->unauthorized($this->trans('errors.unauthorized.default', domain: 'messages'));
+        }
+
         try {
             $libraryType = LibraryType::from($payload->type);
         } catch (\ValueError) {
@@ -148,13 +158,8 @@ final class LibraryController
 
         $this->libraryService->save($library);
 
-        $user = $this->security?->getUser();
-        if (!$user instanceof SecurityUser) {
-            return $this->unauthorized($this->trans('errors.unauthorized.default', domain: 'messages'));
-        }
-
         $this->libraryAccess?->grant(
-            Uuid::fromString($user->getId()),
+            $userId,
             $library->getId(),
         );
 
@@ -460,7 +465,7 @@ final class LibraryController
     public function scanAll(): JsonResponse
     {
         $user = $this->security?->getUser();
-        if (!$user instanceof SecurityUser || !in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface || !in_array('ROLE_ADMIN', $user->getRoles(), true)) {
             return $this->forbidden();
         }
 
@@ -494,7 +499,7 @@ final class LibraryController
     {
         $user = $this->security?->getUser();
 
-        if (!$user instanceof SecurityUser) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return $this->forbidden();
         }
 

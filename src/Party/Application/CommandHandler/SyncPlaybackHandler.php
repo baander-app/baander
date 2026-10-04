@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\Party\Application\CommandHandler;
 
 use App\Party\Application\Command\SyncPlaybackCommand;
-use App\Party\Infrastructure\PlaybackSynchronizer;
+use App\Party\Application\Port\PlaybackSynchronizationPortInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 final class SyncPlaybackHandler
 {
     public function __construct(
-        private readonly PlaybackSynchronizer $synchronizer,
+        private readonly PlaybackSynchronizationPortInterface $synchronizer,
     ) {
     }
 

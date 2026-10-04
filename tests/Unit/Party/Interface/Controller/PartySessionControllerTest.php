@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Party\Interface\Controller;
 
-use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Party\Application\Command\CreatePartySessionCommand;
 use App\Party\Application\Command\JoinPartySessionCommand;
 use App\Party\Application\Port\PartyMemberPortInterface;
@@ -20,13 +20,14 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\ControllerMetadata\ArgumentMetadataFactory;
+use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage;
+use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
+use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Security\Http\Controller\UserValueResolver;
 
-/**
- * Validation test: command-bus dispatch() returns an Envelope, not the handler
- * result. Controllers must unwrap the HandledStamp before passing the result to
- * resource mappers. The current PartySessionController passes the Envelope
- * directly, so these tests fail.
- */
 final class PartySessionControllerTest extends TestCase
 {
     private MessageBusInterface&MockObject $commandBus;
@@ -49,7 +50,7 @@ final class PartySessionControllerTest extends TestCase
 
     public function testCreateUnwrapsEnvelopeBeforeMappingResource(): void
     {
-        $user = new SecurityUser(Uuid::v7()->toString(), 'host@example.com', 'hash');
+        $user = $this->principal();
         $session = SyncedPartySession::create(
             hostUserId: Uuid::fromString($user->getId()),
             videoId: Uuid::v7(),
@@ -79,7 +80,7 @@ final class PartySessionControllerTest extends TestCase
 
     public function testJoinUnwrapsEnvelopeBeforeMappingResource(): void
     {
-        $user = new SecurityUser(Uuid::v7()->toString(), 'member@example.com', 'hash');
+        $user = $this->principal();
         $sessionId = Uuid::v7();
         $member = PartyMember::create(
             userId: Uuid::fromString($user->getId()),
@@ -99,4 +100,46 @@ final class PartySessionControllerTest extends TestCase
         $this->assertSame($member->getId()->toString(), $data['data']['uuid']);
         $this->assertSame($user->getId(), $data['data']['userId']);
     }
+
+    public function testEveryPartyMutationResolvesThePublicIdentityContract(): void
+    {
+        $this->commandBus->expects($this->never())->method('dispatch');
+        $user = $this->principal();
+        $storage = new TokenStorage();
+        $storage->setToken(new UsernamePasswordToken($user, 'api', $user->getRoles()));
+        $resolver = new UserValueResolver($storage);
+        $metadata = new ArgumentMetadataFactory();
+
+        foreach (['create', 'join', 'leave', 'sync', 'end'] as $method) {
+            $arguments = $metadata->createArgumentMetadata([$this->controller, $method]);
+            $userArgument = array_values(array_filter($arguments, static fn ($argument): bool => $argument->getName() === 'user'))[0];
+
+            self::assertSame(AuthenticatedUserIdentityInterface::class, $userArgument->getType());
+            self::assertSame([$user], $resolver->resolve(Request::create('/api/party/sessions'), $userArgument));
+        }
+    }
+
+    public function testPartyMutationStillRequiresAnAuthenticatedPrincipal(): void
+    {
+        $this->commandBus->expects($this->never())->method('dispatch');
+        $arguments = (new ArgumentMetadataFactory())->createArgumentMetadata([$this->controller, 'join']);
+        $userArgument = array_values(array_filter($arguments, static fn ($argument): bool => $argument->getName() === 'user'))[0];
+        $this->expectException(AccessDeniedException::class);
+
+        (new UserValueResolver(new TokenStorage()))->resolve(Request::create('/api/party/sessions'), $userArgument);
+    }
+
+    private function principal(): AuthenticatedUserIdentityInterface&UserInterface
+    {
+        $user = $this->createStubForIntersectionOfInterfaces([AuthenticatedUserIdentityInterface::class, UserInterface::class]);
+        $user->method('getId')->willReturn((new Uuid())->toString());
+        $user->method('getRoles')->willReturn(['ROLE_USER']);
+        $user->method('getUserIdentifier')->willReturn('member@baander.app');
+
+        self::assertInstanceOf(UserInterface::class, $user);
+        self::assertInstanceOf(AuthenticatedUserIdentityInterface::class, $user);
+
+        return $user;
+    }
+
 }

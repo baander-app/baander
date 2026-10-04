@@ -8,7 +8,7 @@ use App\Activity\Application\Port\ActivityPortInterface;
 use App\Activity\Domain\Model\MediaActivity;
 use App\Activity\Infrastructure\ActivityEnrichmentService;
 use App\Activity\Interface\Controller\ActivityController;
-use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
@@ -21,15 +21,12 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
+use Symfony\Component\Security\Core\User\UserInterface;
+use App\Activity\Application\Command\ToggleLoveCommand;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
-/**
- * Security-focused tests for ActivityController.
- *
- * The love() endpoint currently toggles the love state of any activity
- * without verifying that the caller owns the activity. These tests assert
- * the expected secure behaviour and fail against the current production code.
- */
 final class ActivityControllerSecurityTest extends TestCase
 {
     private Security&Stub $security;
@@ -88,7 +85,7 @@ final class ActivityControllerSecurityTest extends TestCase
 
         $this->activityService->method('findByPublicId')->willReturn($activity);
 
-        $intruder = new SecurityUser($intruderId->toString(), 'intruder@example.com', 'hashed', ['ROLE_USER']);
+        $intruder = $this->principal($intruderId);
         $this->security->method('getUser')->willReturn($intruder);
 
         // The toggle command should never be dispatched for an activity the
@@ -99,4 +96,43 @@ final class ActivityControllerSecurityTest extends TestCase
 
         $this->assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode());
     }
+
+    public function testLoveAcceptsThePublicOwnerIdentityAndDispatchesItsActivity(): void
+    {
+        $ownerId = new Uuid();
+        $activity = MediaActivity::create(userId: $ownerId, activityType: 'play');
+        $this->security->method('getUser')->willReturn($this->principal($ownerId));
+        $this->activityService->method('findByPublicId')->willReturn($activity);
+        $this->commandBus->expects($this->once())->method('dispatch')
+            ->with($this->callback(static fn (ToggleLoveCommand $command): bool => $command->getActivityId()->equals($activity->getId())))
+            ->willReturnCallback(static fn (object $command): Envelope => new Envelope($command, [new HandledStamp($activity, 'handler')]));
+
+        $response = $this->controller->love($activity->getPublicId()->toString());
+
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    public function testLoveRejectsPrincipalsWithoutTheApplicationIdentity(): void
+    {
+        $activity = MediaActivity::create(userId: new Uuid(), activityType: 'play');
+        $this->security->method('getUser')->willReturn($this->createStub(UserInterface::class));
+        $this->activityService->method('findByPublicId')->willReturn($activity);
+        $this->commandBus->expects($this->never())->method('dispatch');
+
+        $response = $this->controller->love($activity->getPublicId()->toString());
+
+        self::assertSame(403, $response->getStatusCode());
+    }
+
+    private function principal(Uuid $id): AuthenticatedUserIdentityInterface&UserInterface
+    {
+        $user = $this->createStubForIntersectionOfInterfaces([AuthenticatedUserIdentityInterface::class, UserInterface::class]);
+        $user->method('getId')->willReturn($id->toString());
+
+        self::assertInstanceOf(UserInterface::class, $user);
+        self::assertInstanceOf(AuthenticatedUserIdentityInterface::class, $user);
+
+        return $user;
+    }
+
 }

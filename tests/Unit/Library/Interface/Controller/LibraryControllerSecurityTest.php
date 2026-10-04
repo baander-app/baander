@@ -119,8 +119,8 @@ final class LibraryControllerSecurityTest extends TestCase
         $this->libraryService = $this->createMock(LibraryPortInterface::class);
         $this->controller = $this->createLibraryControllerFixture();
 
-        $this->libraryService->method('findBySlug')->willReturn(null);
-        $this->libraryService->expects($this->once())->method('save');
+        $this->libraryService->expects($this->never())->method('findBySlug');
+        $this->libraryService->expects($this->never())->method('save');
 
         $libraryAccess = $this->createMock(LibraryAccessPortInterface::class);
         $libraryAccess->expects($this->never())->method('grant');

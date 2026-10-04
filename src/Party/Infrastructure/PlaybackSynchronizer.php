@@ -6,10 +6,11 @@ namespace App\Party\Infrastructure;
 
 use App\Party\Application\Port\PartyMemberPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
+use App\Party\Application\Port\PlaybackSynchronizationPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
-final class PlaybackSynchronizer
+final class PlaybackSynchronizer implements PlaybackSynchronizationPortInterface
 {
     private const MAX_JITTER = 2.0;
     private const EMA_ALPHA = 0.3;

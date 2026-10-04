@@ -6,7 +6,7 @@ namespace App\Activity\Interface\Controller;
 
 use App\Activity\Application\Command\RecordPlayCommand;
 use App\Activity\Application\Command\ToggleLoveCommand;
-use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Activity\Application\Port\ActivityPortInterface;
 use App\Activity\Domain\Model\MediaActivity;
 use App\Activity\Infrastructure\ActivityEnrichmentService;
@@ -73,7 +73,7 @@ final class ActivityController
     public function history(Request $request): JsonResponse
     {
         $user = $this->security->getUser();
-        if (!$user instanceof SecurityUser) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return $this->unauthorized();
         }
 
@@ -122,7 +122,7 @@ final class ActivityController
     public function play(#[MapRequestPayload] PlayActivityRequest $payload): JsonResponse
     {
         $user = $this->security->getUser();
-        if (!$user instanceof SecurityUser) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return $this->unauthorized();
         }
 
@@ -237,7 +237,7 @@ final class ActivityController
             return $this->notFound($this->trans('errors.not_found', domain: 'activity'));
         }
 
-        if (!$user instanceof SecurityUser || !$activity->getUserId()->equals(Uuid::fromString($user->getId()))) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface || !$activity->getUserId()->equals(Uuid::fromString($user->getId()))) {
             return $this->forbidden();
         }
 
@@ -269,7 +269,7 @@ final class ActivityController
     public function loved(): JsonResponse
     {
         $user = $this->security->getUser();
-        if (!$user instanceof SecurityUser) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return $this->unauthorized();
         }
 

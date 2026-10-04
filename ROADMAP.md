@@ -258,6 +258,21 @@ The full disposable functional suite passes 987 tests with 7,688 assertions afte
 replacing eight passive mocks with stubs. Fresh migrations and a second no-op
 migration run pass; PHPUnit notices and skipped tests fail the runner.
 
+## Application boundary remediation
+
+Party playback synchronization now uses an application port. Activity, Library,
+and Party session controllers consume the authenticated-identity contract rather
+than a concrete security adapter. Owner/admin/member regressions and container
+wiring pass. Review also found Library creation saving a record before rejecting an
+unsupported principal; identity and UUID validation now precede every lookup/save.
+Four regressions reproduced that unauthorized side effect before the fix.
+
+Deptrac is down to 240 active violations from 257, with no added violations or stale
+baseline entries. The initial combined Party/Activity/Library suite passes 295 tests
+with 917 assertions; the final Library suite passes 138 tests with 301 assertions.
+Scoped PHPStan remains clean. Existing architecture debt and uncovered contexts are
+still release work; no suppressions or baseline entries were added.
+
 ## First-party license alignment
 
 The root license, first-party package manifests, and current project/package
