@@ -18,9 +18,11 @@ final readonly class AdminUpdateUserRequest
 {
     public function __construct(
         #[Assert\Email]
+        #[Assert\NotBlank(allowNull: true, normalizer: 'trim')]
         public ?string $email = null,
 
         #[Assert\Length(min: 1, max: 255)]
+        #[Assert\NotBlank(allowNull: true, normalizer: 'trim')]
         public ?string $name = null,
     ) {
     }

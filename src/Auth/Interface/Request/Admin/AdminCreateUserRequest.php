@@ -19,6 +19,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 )]
 final readonly class AdminCreateUserRequest
 {
+    /** @param array<array-key, string> $roles */
     public function __construct(
         #[Assert\NotBlank(message: 'Email is required.')]
         #[Assert\Email]
@@ -28,7 +29,7 @@ final readonly class AdminCreateUserRequest
         #[Assert\Length(min: 8, max: 255)]
         public string $password = '',
 
-        #[Assert\NotBlank(message: 'Name is required.')]
+        #[Assert\NotBlank(message: 'Name is required.', normalizer: 'trim')]
         #[Assert\Length(min: 1, max: 255)]
         public string $name = '',
 
