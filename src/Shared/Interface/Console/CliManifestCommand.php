@@ -46,6 +46,7 @@ final class CliManifestCommand extends Command
         return Command::SUCCESS;
     }
 
+    /** @return array{commands: list<array<string, mixed>>} */
     private function introspectConsole(): array
     {
         $application = $this->getApplication();
@@ -104,6 +105,7 @@ final class CliManifestCommand extends Command
         return ['commands' => $commands];
     }
 
+    /** @return array{config: string, level: int|null, memoryLimit: string, paths: list<string>} */
     private function introspectPhpstan(): array
     {
         $config = [
@@ -139,6 +141,7 @@ final class CliManifestCommand extends Command
         return $config;
     }
 
+    /** @return array{config: string, layers: list<string>} */
     private function introspectDeptrac(): array
     {
         $config = [
@@ -161,6 +164,7 @@ final class CliManifestCommand extends Command
         return $config;
     }
 
+    /** @return array{scripts: mixed, autoload: mixed} */
     private function introspectComposer(): array
     {
         $config = [
@@ -184,6 +188,7 @@ final class CliManifestCommand extends Command
         return $config;
     }
 
+    /** @return array{config: string, coverage: bool} */
     private function introspectPhpunit(): array
     {
         return [
@@ -192,6 +197,7 @@ final class CliManifestCommand extends Command
         ];
     }
 
+    /** @return array{processes: string, config: string} */
     private function introspectParatest(): array
     {
         return [

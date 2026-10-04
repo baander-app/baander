@@ -133,6 +133,7 @@ final class WebSocketConnectionRegistry
         return $fds;
     }
 
+    /** @return array{user_id: string, worker_id: int, connected_at: int}|null */
     public function getConnection(int $fd): ?array
     {
         $row = $this->connections->get((string) $fd);

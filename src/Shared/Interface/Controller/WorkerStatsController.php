@@ -74,6 +74,7 @@ final class WorkerStatsController
 
     /**
      * Get stats directly from the Swoole Server object via SwooleBundle's HttpServer.
+     * @return array<string, mixed>
      */
     private function getServerStats(): array
     {

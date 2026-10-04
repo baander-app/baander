@@ -32,6 +32,7 @@ final class ManagedRedisConnection
      * Delegates method calls to the underlying Redis connection.
      *
      * @throws LogicException if called after release()
+     * @param array<array-key, mixed> $args
      */
     public function __call(string $method, array $args): mixed
     {

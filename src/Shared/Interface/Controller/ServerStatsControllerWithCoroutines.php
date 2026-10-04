@@ -73,7 +73,7 @@ final class ServerStatsControllerWithCoroutines
 
         $swoole = null;
         $server = swoole_get_vm_status();
-        if (is_array($server) && count($server) > 0) {
+        if (count($server) > 0) {
             $swoole = $server;
         }
 
@@ -89,7 +89,7 @@ final class ServerStatsControllerWithCoroutines
 
         $redis = null;
         try {
-            $redis = $this->redisClientFactory->borrow(function (Redis $r) use ($mb): ?array {
+            $redis = $this->redisClientFactory->borrow(function (Redis $r) use ($mb): array {
                 return [
                     'connected'         => true,
                     'ping'              => $r->ping() === 'PONG',
@@ -145,6 +145,7 @@ final class ServerStatsControllerWithCoroutines
         ]);
     }
 
+    /** @param array<string, mixed> $data */
     private function successResponse(array $data): JsonResponse
     {
         return new JsonResponse(['data' => $data], 200);

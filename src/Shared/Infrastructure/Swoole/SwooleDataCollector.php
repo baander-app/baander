@@ -61,37 +61,41 @@ final class SwooleDataCollector extends DataCollector
         return $status['worker_id'] ?? -1;
     }
 
+    /** @return array<string, mixed> */
     public function getVmStatus(): array
     {
         if (!function_exists('swoole_get_vm_status')) {
             return [];
         }
 
-        $status = swoole_get_vm_status();
-
-        return is_array($status) ? $status : [];
+        return swoole_get_vm_status();
     }
 
+    /** @return array<int, array{active: int, free: int, limit: int}> */
     public function getPoolStats(): array
     {
         return $this->data['pool_stats'] ?? [];
     }
 
+    /** @return array<string, mixed> */
     public function getServerSettings(): array
     {
         return $this->data['server_settings'] ?? [];
     }
 
+    /** @return array<int, array{type: string, workerId: int, timestamp: float}> */
     public function getWorkerEvents(): array
     {
         return $this->data['worker_events'] ?? [];
     }
 
+    /** @return array{available?: bool, boot_pending?: bool, running?: bool, worker_count?: int, result_table_size?: int} */
     public function getCpuPool(): array
     {
         return $this->data['cpu_pool'] ?? [];
     }
 
+    /** @return array<string, mixed> */
     private function resolveServerSettings(): array
     {
         if ($this->serverConfiguration === null) {
@@ -101,6 +105,7 @@ final class SwooleDataCollector extends DataCollector
         return $this->serverConfiguration->getSettings();
     }
 
+    /** @return array{available: bool, boot_pending?: bool, running?: bool, worker_count?: int, result_table_size?: int} */
     private function resolveCpuPoolStats(): array
     {
         if ($this->cpuProcessPoolLocator === null) {

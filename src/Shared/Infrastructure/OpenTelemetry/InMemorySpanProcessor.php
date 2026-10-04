@@ -47,7 +47,7 @@ final class InMemorySpanProcessor implements SpanProcessorInterface
             'kind'           => (string)$span->getKind(),
             'start_time_us'  => (int)($spanData->getStartEpochNanos() / 1000),
             'duration_us'    => (int)(($spanData->getEndEpochNanos() - $spanData->getStartEpochNanos()) / 1000),
-            'attributes'     => iterator_to_array($attributes->getIterator()),
+            'attributes'     => $attributes->toArray(),
             'status_code'    => $spanData->getStatus()->getCode(),
             'status_message' => $spanData->getStatus()->getDescription(),
             'file_path'      => $attributes->get('code.filepath') ?? $attributes->get('file.path'),

@@ -9,7 +9,7 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class WebSocketPusher
 {
-    private ?\Swoole\Server $server = null;
+    private ?\Swoole\WebSocket\Server $server = null;
 
     public function __construct(
         private readonly WebSocketConnectionRegistry $registry,
@@ -19,12 +19,17 @@ final class WebSocketPusher
 
     public function setServer(\Swoole\Server $server): void
     {
+        if (!$server instanceof \Swoole\WebSocket\Server) {
+            throw new \InvalidArgumentException('WebSocket push requires a WebSocket server.');
+        }
+
         $this->server = $server;
     }
 
     /**
      * Push a message to all connections belonging to a user.
      *
+     * @param array<array-key, mixed> $payload
      * @return int Number of connections the message was sent to
      */
     public function push(string $userId, array $payload): int
@@ -44,6 +49,8 @@ final class WebSocketPusher
 
     /**
      * Push a message to a specific connection by FD.
+     *
+     * @param array<array-key, mixed>|string $payload
      */
     public function pushToConnection(int $fd, array|string $payload): bool
     {
@@ -55,6 +62,7 @@ final class WebSocketPusher
     /**
      * Broadcast a message to all members of a room.
      *
+     * @param array<array-key, mixed> $payload
      * @return int Number of connections the message was sent to
      */
     public function broadcast(string $room, array $payload): int

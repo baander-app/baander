@@ -49,6 +49,7 @@ final class SpanBridge
 
     /**
      * Add a span to the ring buffer.
+     * @param array<string, mixed> $spanData
      */
     public function addSpan(array $spanData): void
     {

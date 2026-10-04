@@ -14,10 +14,10 @@ use App\Shared\Domain\Model\Cursor;
  *
  * @internal
  *
- * @param array<mixed> $items
  */
 final readonly class CursorResult
 {
+    /** @param array<array-key, mixed> $items */
     public function __construct(
         public readonly array $items,
         public readonly ?Cursor $nextCursor,

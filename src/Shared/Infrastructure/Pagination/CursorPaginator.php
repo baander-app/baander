@@ -50,6 +50,7 @@ final class CursorPaginator
         return $this->paginateForward($qb, $sortColumn, $idColumn, $cursor, $cursorValues, $limit, $valueExtractor, $total);
     }
 
+    /** @param array<string, mixed> $cursorValues */
     private function paginateForward(
         QueryBuilder $qb,
         string $sortColumn,
@@ -125,6 +126,7 @@ final class CursorPaginator
         );
     }
 
+    /** @param array<string, mixed> $cursorValues */
     private function paginateBackward(
         QueryBuilder $qb,
         string $sortColumn,

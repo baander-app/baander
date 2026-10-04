@@ -167,4 +167,14 @@ final class WebSocketPusherTest extends TestCase
         $sent = $this->pusher->broadcast('party:abc', ['type' => 'test']);
         $this->assertSame(2, $sent);
     }
+
+    public function testPlainServerIsRejectedBeforeAnyPushAttempt(): void
+    {
+        $this->server->expects($this->never())->method('push');
+        $server = $this->createStub(\Swoole\Server::class);
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('WebSocket push requires a WebSocket server.');
+
+        $this->pusher->setServer($server);
+    }
 }

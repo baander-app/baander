@@ -86,7 +86,7 @@ final class CoroutineStatsProvider
      */
     private function getActiveCids(): array
     {
-        if (!class_exists(\Swoole\Coroutine::class) || !method_exists(\Swoole\Coroutine::class, 'listCoroutines')) {
+        if (!class_exists(\Swoole\Coroutine::class)) {
             return [];
         }
 

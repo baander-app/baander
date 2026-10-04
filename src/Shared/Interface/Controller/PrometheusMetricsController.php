@@ -63,7 +63,7 @@ final class PrometheusMetricsController
 
         $stats = swoole_get_vm_status();
 
-        return is_array($stats) ? $stats : [];
+        return $stats;
     }
 
     /**
