@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Lyrics\Infrastructure\Api;
 use App\Lyrics\Application\DTO\LrclibResult;
 use App\Lyrics\Application\DTO\LrclibSearchResult;
 use App\Lyrics\Infrastructure\Api\LrclibClient;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -14,7 +15,7 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
 
 final class LrclibClientTest extends TestCase
 {
-    private HttpClientInterface $httpClient;
+    private HttpClientInterface&Stub $httpClient;
     private LoggerInterface $logger;
     private LrclibClient $client;
 

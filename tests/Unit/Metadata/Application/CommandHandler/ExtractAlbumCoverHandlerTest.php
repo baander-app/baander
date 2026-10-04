@@ -18,19 +18,21 @@ use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 
 final class ExtractAlbumCoverHandlerTest extends TestCase
 {
-    private MetadataContentReaderPortInterface $metadataReader;
-    private SongPortInterface $songService;
-    private AlbumPortInterface $albumService;
-    private ImagePortInterface $imagePort;
-    private StoragePortInterface $storage;
-    private EntityManagerInterface $entityManager;
-    private LoggerInterface $logger;
+    private MetadataContentReaderPortInterface&Stub $metadataReader;
+    private SongPortInterface&Stub $songService;
+    private AlbumPortInterface&Stub $albumService;
+    private ImagePortInterface&Stub $imagePort;
+    private StoragePortInterface&Stub $storage;
+    private EntityManagerInterface&Stub $entityManager;
+    private LoggerInterface&Stub $logger;
     private ExtractAlbumCoverHandler $handler;
 
     protected function setUp(): void
@@ -168,6 +170,8 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
         $this->metadataReader->expects($this->once())->method('readMetadata')->with($tmpFile)->willReturn(
             (function() use ($coverArt) { $m = new ExtractedMetadata(); $m->setPictures([$coverArt]); return $m; })(),
         );
+        self::assertInstanceOf(MockObject::class, $this->storage);
+        self::assertInstanceOf(MockObject::class, $this->logger);
         $this->storage->expects($this->never())->method('storeFromBytes');
         $this->logger->expects($this->once())->method('debug')->with(
             'Cover art has no image data, skipping',
@@ -204,6 +208,8 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
         $this->metadataReader->expects($this->once())->method('readMetadata')->with($tmpFile)->willReturn(
             (function() use ($coverArt) { $m = new ExtractedMetadata(); $m->setPictures([$coverArt]); return $m; })(),
         );
+        self::assertInstanceOf(MockObject::class, $this->storage);
+        self::assertInstanceOf(MockObject::class, $this->logger);
         $this->storage->expects($this->never())->method('storeFromBytes');
         $this->logger->expects($this->once())->method('warning')->with(
             'Cover art has unsupported MIME type, skipping',
@@ -241,6 +247,8 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
         $this->metadataReader->expects($this->once())->method('readMetadata')->with($tmpFile)->willReturn(
             (function() use ($coverArt) { $m = new ExtractedMetadata(); $m->setPictures([$coverArt]); return $m; })(),
         );
+        self::assertInstanceOf(MockObject::class, $this->storage);
+        self::assertInstanceOf(MockObject::class, $this->logger);
         $this->storage->expects($this->never())->method('storeFromBytes');
         $this->logger->expects($this->once())->method('warning')->with(
             'Cover art exceeds maximum size, skipping',
@@ -254,6 +262,7 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
     public function testExtractsCoverAndPersistsImage(): void
     {
         [$album, $path] = $this->prepareCoverExtraction(mockImage: true);
+        self::assertInstanceOf(MockObject::class, $this->imagePort);
         $this->entityManager->expects($this->once())->method('beginTransaction');
         $this->entityManager->expects($this->once())->method('commit');
         $this->entityManager->expects($this->never())->method('rollback');
@@ -292,6 +301,7 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
     {
         // A failed storage write must reach Messenger for retry.
         [$album, $path] = $this->prepareCoverExtraction(store: false, mockImage: true);
+        self::assertInstanceOf(MockObject::class, $this->imagePort);
         $failure = new RuntimeException('Write failed');
         $this->storage->method('storeFromBytes')->willThrowException($failure);
         $this->entityManager->expects($this->never())->method('beginTransaction');
@@ -348,6 +358,7 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
     public function testTransactionBeginFailureCleansUpStoredFileAndReachesMessenger(): void
     {
         [$album, $path] = $this->prepareCoverExtraction(mockImage: true);
+        self::assertInstanceOf(MockObject::class, $this->imagePort);
         $failure = new RuntimeException('Cannot begin transaction');
         $this->entityManager->method('beginTransaction')->willThrowException($failure);
         $this->entityManager->expects($this->never())->method('rollback');
@@ -478,7 +489,12 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
         }
     }
 
-    /** @return array{Album, string} */
+    /**
+     * @return array{Album, string}
+     * @phpstan-assert AlbumPortInterface&MockObject $this->albumService
+     * @phpstan-assert EntityManagerInterface&MockObject $this->entityManager
+     * @phpstan-assert StoragePortInterface&MockObject $this->storage
+     */
     private function prepareCoverExtraction(bool $read = true, bool $store = true, bool $mockImage = false): array
     {
         $this->albumService = $this->createMock(AlbumPortInterface::class);

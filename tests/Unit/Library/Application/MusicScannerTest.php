@@ -14,13 +14,14 @@ use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Library\Infrastructure\Scanner\MediaFile;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 final class MusicScannerTest extends TestCase
 {
-    private DirectoryScannerPortInterface $directoryScanner;
-    private LibraryFileIndexRepositoryInterface $fileIndexRepository;
+    private DirectoryScannerPortInterface&Stub $directoryScanner;
+    private LibraryFileIndexRepositoryInterface&Stub $fileIndexRepository;
     private LoggerInterface $logger;
     private string $tmpDir;
 
