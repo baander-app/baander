@@ -123,6 +123,10 @@ jobs:
                 working-directory: ui/web
                 run: yarn test:browser-auth
 
+            -   name: Native browser audio graph
+                working-directory: ui/web
+                run: yarn test:audio-graph
+
             -   name: Extract coverage metrics
                 working-directory: ui/web
                 run: |

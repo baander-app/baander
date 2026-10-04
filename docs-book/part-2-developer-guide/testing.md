@@ -5,6 +5,22 @@ Disposable container runners exercise the application's PHP runtime without usin
 the development database or Redis instance. The Makefile commands remain available
 for a configured development test environment.
 
+## Web audio graph
+
+Run `yarn --cwd ui/web test:audio-graph` after installing Chromium with
+`yarn --cwd ui/web exec playwright install chromium`. The runner also requires
+OpenSSL for its temporary HTTPS certificate. It serves a disposable fixture at
+`audio.baander.app`, explicitly mapped to loopback; it does not contact the public
+application.
+
+These browser tests render the real `AudioProcessor` nodes with
+`OfflineAudioContext` and compare stereo, processing order, and normalization
+against reference signals. They replace external WASM analysis and workers;
+they do not certify those modules, codecs, media-element transport, or audible
+clicks during live graph changes. Rebuild timing and worklet graph attachment
+also have unit regressions in `audio-processor-rebuild.test.ts`. The browser
+suite runs as a blocking step in the frontend workflow.
+
 ## Test Suites
 
 | Suite | Directory | Scope |

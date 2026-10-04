@@ -34,7 +34,10 @@ export function reapplyAllEqState() {
   processor.setMasterGain(processingState.masterGain)
 
   // Stereo width
-  processor.setStereoWidth(getEffectiveStereoWidth(processingState))
+  processor.setStereoWidth(
+    getEffectiveStereoWidth(processingState),
+    processingState.stereoEnabled ? processingState.stereoMode : 'normal',
+  )
 
   // Crossfeed
   processor.setCrossfeed(

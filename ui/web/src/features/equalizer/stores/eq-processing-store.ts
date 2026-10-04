@@ -152,14 +152,17 @@ export const useEqProcessingStore = create<EqProcessingState>()(
 
       setStereoEnabled: (enabled) => {
         set({ stereoEnabled: enabled })
-        audioService.getProcessor()?.setStereoWidth(getEffectiveStereoWidth(useEqProcessingStore.getState()))
+        const state = useEqProcessingStore.getState()
+        audioService.getProcessor()?.setStereoWidth(
+          getEffectiveStereoWidth(state), state.stereoEnabled ? state.stereoMode : 'normal',
+        )
       },
 
       setStereoWidth: (width) => {
         set({ stereoWidth: width })
         const state = useEqProcessingStore.getState()
         if (state.stereoEnabled) {
-          audioService.getProcessor()?.setStereoWidth(getEffectiveStereoWidth(state))
+          audioService.getProcessor()?.setStereoWidth(getEffectiveStereoWidth(state), state.stereoMode)
         }
       },
 
@@ -167,7 +170,7 @@ export const useEqProcessingStore = create<EqProcessingState>()(
         set({ stereoMode: mode })
         const state = useEqProcessingStore.getState()
         if (state.stereoEnabled) {
-          audioService.getProcessor()?.setStereoWidth(getEffectiveStereoWidth(state))
+          audioService.getProcessor()?.setStereoWidth(getEffectiveStereoWidth(state), state.stereoMode)
         }
       },
 

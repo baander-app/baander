@@ -28,14 +28,14 @@ describe('stereo controls', () => {
     expect(processor.setStereoWidth).not.toHaveBeenCalled()
 
     actions.setStereoEnabled(true)
-    expect(processor.setStereoWidth).toHaveBeenLastCalledWith(effectiveWidth)
+    expect(processor.setStereoWidth).toHaveBeenLastCalledWith(effectiveWidth, mode)
 
     actions.setStereoEnabled(false)
-    expect(processor.setStereoWidth).toHaveBeenLastCalledWith(1)
+    expect(processor.setStereoWidth).toHaveBeenLastCalledWith(1, 'normal')
     expect(useEqProcessingStore.getState()).toMatchObject({ stereoMode: mode, stereoWidth: 1.4 })
 
     actions.setStereoEnabled(true)
-    expect(processor.setStereoWidth).toHaveBeenLastCalledWith(effectiveWidth)
+    expect(processor.setStereoWidth).toHaveBeenLastCalledWith(effectiveWidth, mode)
     expect(processor.setStereoWidth).toHaveBeenCalledTimes(3)
   })
 
@@ -48,11 +48,11 @@ describe('stereo controls', () => {
     actions.setStereoMode(mode)
     actions.setStereoWidth(1.7)
 
-    expect(processor.setStereoWidth).toHaveBeenLastCalledWith(effectiveWidth)
+    expect(processor.setStereoWidth).toHaveBeenLastCalledWith(effectiveWidth, mode)
     expect(useEqProcessingStore.getState()).toMatchObject({ stereoMode: mode, stereoWidth: 1.7 })
 
     actions.setStereoMode('normal')
-    expect(processor.setStereoWidth).toHaveBeenLastCalledWith(1.7)
+    expect(processor.setStereoWidth).toHaveBeenLastCalledWith(1.7, 'normal')
   })
 
   it('updates modes and widths while disabled and applies the latest selection on enable', () => {
@@ -65,16 +65,29 @@ describe('stereo controls', () => {
     expect(getProcessor).not.toHaveBeenCalled()
 
     actions.setStereoEnabled(true)
-    expect(processor.setStereoWidth).toHaveBeenLastCalledWith(2)
+    expect(processor.setStereoWidth).toHaveBeenLastCalledWith(2, 'side')
     actions.setStereoMode('normal')
-    expect(processor.setStereoWidth).toHaveBeenLastCalledWith(1.8)
+    expect(processor.setStereoWidth).toHaveBeenLastCalledWith(1.8, 'normal')
   })
 
   it('applies normal width changes immediately when enabled', () => {
     const actions = useEqProcessingStore.getState()
     actions.setStereoEnabled(true)
     actions.setStereoWidth(0.6)
-    expect(processor.setStereoWidth).toHaveBeenLastCalledWith(0.6)
+    expect(processor.setStereoWidth).toHaveBeenLastCalledWith(0.6, 'normal')
+  })
+
+  it('distinguishes maximum normal width from side-only mode', () => {
+    const actions = useEqProcessingStore.getState()
+    actions.setStereoWidth(2)
+    actions.setStereoEnabled(true)
+    expect(processor.setStereoWidth).toHaveBeenLastCalledWith(2, 'normal')
+
+    actions.setStereoMode('side')
+    expect(processor.setStereoWidth).toHaveBeenLastCalledWith(2, 'side')
+
+    actions.setStereoMode('normal')
+    expect(processor.setStereoWidth).toHaveBeenLastCalledWith(2, 'normal')
   })
 
   it('stores all stereo settings when no processor exists', () => {

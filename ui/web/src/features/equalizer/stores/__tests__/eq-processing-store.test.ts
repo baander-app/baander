@@ -148,7 +148,7 @@ describe('useEqProcessingStore — enable toggles', () => {
     useEqProcessingStore.getState().setStereoEnabled(true)
     expect(useEqProcessingStore.getState().stereoEnabled).toBe(true)
     // Enabling pushes the stored width (1.5), not the default.
-    expect(mockProcessor.setStereoWidth).toHaveBeenCalledWith(1.5)
+    expect(mockProcessor.setStereoWidth).toHaveBeenCalledWith(1.5, 'normal')
   })
 
   it('setStereoEnabled resets width to 1 when disabling', () => {
@@ -158,7 +158,7 @@ describe('useEqProcessingStore — enable toggles', () => {
 
     useEqProcessingStore.getState().setStereoEnabled(false)
     expect(useEqProcessingStore.getState().stereoEnabled).toBe(false)
-    expect(mockProcessor.setStereoWidth).toHaveBeenCalledWith(1)
+    expect(mockProcessor.setStereoWidth).toHaveBeenCalledWith(1, 'normal')
   })
 
   it('setCrossfeedEnabled maps the preset to an amount via CROSSFEED_PRESETS', () => {
@@ -220,10 +220,10 @@ describe('useEqProcessingStore — enable toggles', () => {
 
     useEqProcessingStore.getState().setStereoMode('mid')
     expect(useEqProcessingStore.getState().stereoMode).toBe('mid')
-    expect(mockProcessor.setStereoWidth).toHaveBeenLastCalledWith(0)
+    expect(mockProcessor.setStereoWidth).toHaveBeenLastCalledWith(0, 'mid')
 
     useEqProcessingStore.getState().setStereoMode('side')
-    expect(mockProcessor.setStereoWidth).toHaveBeenLastCalledWith(2)
+    expect(mockProcessor.setStereoWidth).toHaveBeenLastCalledWith(2, 'side')
   })
 
   it('setStereoMode does not reach the processor when stereo is disabled', () => {

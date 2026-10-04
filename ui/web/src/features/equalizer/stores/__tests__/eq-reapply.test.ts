@@ -37,11 +37,12 @@ describe('processor state reapplication', () => {
     { stereoEnabled: true, stereoMode: 'mid' as const, expected: 0 },
     { stereoEnabled: true, stereoMode: 'side' as const, expected: 2 },
     { stereoEnabled: true, stereoMode: 'normal' as const, expected: 1.4 },
+    { stereoEnabled: true, stereoMode: 'normal' as const, expected: 2, stereoWidth: 2 },
     { stereoEnabled: false, stereoMode: 'side' as const, expected: 1 },
-  ])('restores $stereoMode with stereo enabled=$stereoEnabled', ({ expected, ...state }) => {
-    useEqProcessingStore.setState({ ...state, stereoWidth: 1.4 })
+  ])('restores $stereoMode with stereo enabled=$stereoEnabled', ({ expected, stereoWidth = 1.4, ...state }) => {
+    useEqProcessingStore.setState({ ...state, stereoWidth })
     reapplyAllEqState()
-    expect(audio.processor.setStereoWidth).toHaveBeenCalledWith(expected)
+    expect(audio.processor.setStereoWidth).toHaveBeenCalledWith(expected, state.stereoEnabled ? state.stereoMode : 'normal')
   })
 
   it('rebuilds the saved processing order after applying compressor state', () => {
@@ -73,7 +74,7 @@ describe('processor state reapplication', () => {
       expect(success).toBe(true)
     })
     expect(audio.processor.updateEQBands).toHaveBeenCalledWith(payload.bands)
-    expect(audio.processor.setStereoWidth).toHaveBeenCalledWith(2)
+    expect(audio.processor.setStereoWidth).toHaveBeenCalledWith(2, 'side')
     expect(audio.processor.setCompressorParams).toHaveBeenCalledWith({ threshold: -32, ratio: 6, knee: 12, attack: 7, release: 180 })
     expect(audio.processor.rebuildChain).toHaveBeenCalledWith(payload.chainOrder)
     expect(result.current.versionRef.current).toBe(5)

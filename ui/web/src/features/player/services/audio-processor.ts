@@ -1,6 +1,7 @@
 import { getDynamics, getLoudness, getSpectralFeatures, getWasmUrl, getAudioWorkletUrl } from './wasm-loader'
 import type { LoudnessR128API, DynamicsMeterAPI, SpectralFeaturesApi } from './wasm-types'
 import { createLogger } from '@/shared/lib/logger'
+import { StereoMatrix } from './stereo-matrix'
 
 const logger = createLogger('AudioProcessor')
 
@@ -58,19 +59,18 @@ export class AudioProcessor {
   private dummyElement: HTMLAudioElement | null = null
   private analyzerNode!: AnalyserNode
   private gainNode!: GainNode
+  private rebuildGain!: GainNode
+  private analysisSink!: GainNode
+  private rebuildTimer: ReturnType<typeof setTimeout> | null = null
+  private destroyed = false
+  private chainEntry: AudioNode | null = null
   private masterGainNode!: GainNode
   private compressorNode!: DynamicsCompressorNode
   private filters: BiquadFilterNode[] = []
 
-  // Stereo + Crossfeed nodes
-  private channelSplitter!: ChannelSplitterNode
-  private channelMerger!: ChannelMergerNode
-  private leftGain!: GainNode
-  private rightGain!: GainNode
-  private midGain!: GainNode
-  private sideGain!: GainNode
-  private crossfeedLeft!: GainNode
-  private crossfeedRight!: GainNode
+  // Independent stages can occupy different positions in the processing chain.
+  private stereoStage!: StereoMatrix
+  private crossfeedStage!: StereoMatrix
 
   // Loudness contour
   private loudnessGain!: GainNode
@@ -253,6 +253,12 @@ export class AudioProcessor {
     this.analyzerNode.smoothingTimeConstant = 0.8
 
     this.gainNode = this.audioContext.createGain()
+    this.rebuildGain = this.audioContext.createGain()
+    this.analysisSink = this.audioContext.createGain()
+    this.analysisSink.gain.value = 0
+    this.analysisSink.connect(this.audioContext.destination)
+    this.gainNode.connect(this.rebuildGain)
+    this.rebuildGain.connect(this.audioContext.destination)
     this.masterGainNode = this.audioContext.createGain()
     this.compressorNode = this.audioContext.createDynamicsCompressor()
 
@@ -262,19 +268,8 @@ export class AudioProcessor {
     this.compressorNode.attack.value = 0.003
     this.compressorNode.release.value = 0.25
 
-    // Stereo width nodes
-    this.channelSplitter = this.audioContext.createChannelSplitter(2)
-    this.channelMerger = this.audioContext.createChannelMerger(2)
-    this.leftGain = this.audioContext.createGain()
-    this.rightGain = this.audioContext.createGain()
-    this.midGain = this.audioContext.createGain()
-    this.sideGain = this.audioContext.createGain()
-
-    // Crossfeed nodes (default: passthrough, 0 crossfeed)
-    this.crossfeedLeft = this.audioContext.createGain()
-    this.crossfeedRight = this.audioContext.createGain()
-    this.crossfeedLeft.gain.value = 0
-    this.crossfeedRight.gain.value = 0
+    this.stereoStage = new StereoMatrix(this.audioContext)
+    this.crossfeedStage = new StereoMatrix(this.audioContext)
 
     // Loudness contour gain
     this.loudnessGain = this.audioContext.createGain()
@@ -311,112 +306,81 @@ export class AudioProcessor {
 
   private setupAudioGraph() {
     // Default chain order
-    this.currentChainOrder = ['eq', 'compressor', 'masterGain']
+    this.currentChainOrder = ['eq', 'compressor', 'stereo', 'crossfeed', 'loudness', 'masterGain']
     this.rebuildChainInternal()
   }
 
-  private getChainNode(module: string): AudioNode {
+  private getChainNode(module: string): { input: AudioNode; output: AudioNode } {
     switch (module) {
       case 'eq':
-        // Return last filter in the chain — the filters chain is always sequential
-        return this.filters[this.filters.length - 1]
+        return { input: this.filters[0], output: this.filters[this.filters.length - 1] }
       case 'compressor':
-        return this.compressorNode
+        return { input: this.compressorNode, output: this.compressorNode }
       case 'stereo':
-        return this.channelMerger
+        return this.stereoStage
       case 'crossfeed':
-        return this.channelMerger // Crossfeed is part of the stereo path
+        return this.crossfeedStage
       case 'loudness':
-        return this.loudnessGain
+        return { input: this.loudnessGain, output: this.loudnessGain }
       case 'masterGain':
-        return this.masterGainNode
+        return { input: this.masterGainNode, output: this.masterGainNode }
       default:
-        return this.masterGainNode
+        throw new Error(`Unknown audio processing module: ${module}`)
     }
   }
 
-  /**
-   * Reconnect the processing chain in a new order.
-   * Uses fade-out / fade-in to avoid clicks.
-   * chainOrder lists modules from first (after source) to last (before destination).
-   */
+  /** Reconnect stages in order, fading through a gain independent of output settings. */
   rebuildChain(chainOrder: string[]) {
-    if (this.passiveMode) return
-    this.currentChainOrder = chainOrder
+    if (this.passiveMode || this.destroyed) return
+    // Validate before altering the live graph. Duplicate stages would create feedback.
+    if (new Set(chainOrder).size !== chainOrder.length) {
+      throw new Error('Duplicate audio processing module')
+    }
+    for (const module of chainOrder) this.getChainNode(module)
+    this.currentChainOrder = [...chainOrder]
     this.fadeAndRebuild()
   }
 
-  private async fadeAndRebuild() {
+  private fadeAndRebuild() {
+    if (this.rebuildTimer !== null) clearTimeout(this.rebuildTimer)
+    const gain = this.rebuildGain.gain
     const t = this.audioContext.currentTime
-    const fadeTime = 0.01 // 10ms
-
-    // Fade out
-    this.gainNode.gain.setTargetAtTime(0, t, fadeTime)
-
-    // Wait for fade out
-    await new Promise((resolve) => setTimeout(resolve, 30))
-
-    this.rebuildChainInternal()
-
-    // Fade in
-    this.gainNode.gain.setTargetAtTime(1, t + fadeTime, fadeTime)
+    gain.cancelScheduledValues(t)
+    gain.setTargetAtTime(0, t, 0.01)
+    this.rebuildTimer = setTimeout(() => {
+      this.rebuildTimer = null
+      if (this.destroyed || this.audioContext.state === 'closed') return
+      this.rebuildChainInternal()
+      const now = this.audioContext.currentTime
+      gain.cancelScheduledValues(now)
+      gain.setTargetAtTime(1, now, 0.01)
+    }, 30)
   }
 
   private rebuildChainInternal() {
-    // Disconnect everything after the filters
-    for (const filter of this.filters) {
-      filter.disconnect()
-    }
+    // Only detach the old chain entry: metering branches on the analyzer stay connected.
+    if (this.chainEntry) this.analyzerNode.disconnect(this.chainEntry)
+    for (const filter of this.filters) filter.disconnect()
     this.compressorNode.disconnect()
     this.masterGainNode.disconnect()
-    this.channelSplitter.disconnect()
-    this.channelMerger.disconnect()
+    this.stereoStage.output.disconnect()
+    this.crossfeedStage.output.disconnect()
     this.loudnessGain.disconnect()
 
-    // Re-wire the EQ filter chain
+    for (let i = 1; i < this.filters.length; i++) {
+      this.filters[i - 1].connect(this.filters[i])
+    }
+
     let currentNode: AudioNode = this.analyzerNode
-    for (const filter of this.filters) {
-      currentNode.connect(filter)
-      currentNode = filter
-    }
-
-    // Determine if stereo processing is in the chain
-    const hasStereo = this.currentChainOrder.includes('stereo') || this.currentChainOrder.includes('crossfeed')
-    let stereoWired = false
-
-    // Wire modules in order
+    this.chainEntry = null
     for (const module of this.currentChainOrder) {
-      if (module === 'eq') continue // Already wired above
-
-      if ((module === 'stereo' || module === 'crossfeed') && hasStereo) {
-        if (stereoWired) continue // Already wired — skip duplicate
-        stereoWired = true
-
-        // Stereo: split → left/right + crossfeed → merge
-        currentNode.connect(this.channelSplitter)
-        // Left path
-        this.channelSplitter.connect(this.leftGain, 0)
-        this.channelSplitter.connect(this.crossfeedRight, 1) // R→L crossfeed
-        this.leftGain.connect(this.channelMerger, 0, 0)
-        this.crossfeedRight.connect(this.channelMerger, 0, 0)
-        // Right path
-        this.channelSplitter.connect(this.rightGain, 1)
-        this.channelSplitter.connect(this.crossfeedLeft, 0) // L→R crossfeed
-        this.rightGain.connect(this.channelMerger, 0, 1)
-        this.crossfeedLeft.connect(this.channelMerger, 0, 1)
-
-        currentNode = this.channelMerger
-        continue
-      }
-
-      const nextNode = this.getChainNode(module)
-      currentNode.connect(nextNode)
-      currentNode = nextNode
+      const stage = this.getChainNode(module)
+      this.chainEntry ??= stage.input
+      currentNode.connect(stage.input)
+      currentNode = stage.output
     }
-
-    // Final connection to output
+    this.chainEntry ??= this.gainNode
     currentNode.connect(this.gainNode)
-    this.gainNode.connect(this.audioContext.destination)
   }
 
   // --- Worker ---
@@ -583,15 +547,9 @@ export class AudioProcessor {
         }
       }
 
-      if (this.sourceNodeA || this.sourceNodeB) {
-        try {
-          this.compressorNode.disconnect()
-        } catch {
-          // ignore
-        }
-        this.compressorNode.connect(this.audioWorkletNode)
-        this.audioWorkletNode.connect(this.masterGainNode)
-      }
+      // Metering observes the input and cannot rewrite the selected processing order.
+      this.analyzerNode.connect(this.audioWorkletNode)
+      this.audioWorkletNode.connect(this.analysisSink)
     } catch {
       this.setupFallbackAnalysis()
     }
@@ -615,6 +573,7 @@ export class AudioProcessor {
   private teardownWorklet() {
     if (this.audioWorkletNode) {
       try {
+        this.analyzerNode.disconnect(this.audioWorkletNode)
         this.audioWorkletNode.disconnect()
       } catch {
         // ignore
@@ -624,6 +583,7 @@ export class AudioProcessor {
 
     if (this.wasmSpectrumNode) {
       try {
+        this.analyzerNode.disconnect(this.wasmSpectrumNode)
         this.wasmSpectrumNode.disconnect()
       } catch {
         // ignore
@@ -631,13 +591,6 @@ export class AudioProcessor {
       this.wasmSpectrumNode = null
       this.wasmSpectrumReady = false
     }
-
-    try {
-      this.compressorNode.disconnect()
-    } catch {
-      // ignore
-    }
-    this.compressorNode.connect(this.masterGainNode)
   }
 
   // --- Public API ---
@@ -804,6 +757,11 @@ export class AudioProcessor {
   }
 
   destroy() {
+    this.destroyed = true
+    if (this.rebuildTimer !== null) {
+      clearTimeout(this.rebuildTimer)
+      this.rebuildTimer = null
+    }
     if (this.analysisInterval) {
       clearInterval(this.analysisInterval)
       this.analysisInterval = null
@@ -868,22 +826,19 @@ export class AudioProcessor {
     if (params.release !== undefined) this.compressorNode.release.setTargetAtTime(params.release / 1000, t, this.SMOOTHING_TIME)
   }
 
-  setStereoWidth(width: number) {
+  setStereoWidth(width: number, mode: 'normal' | 'mid' | 'side' = 'normal') {
     if (this.passiveMode) return
-    // width: 0 = mono, 1 = normal, >1 = expanded
-    // mid = (L+R)/2, side = (L-R)/2
-    // output L = mid + side * width, R = mid - side * width
-    const mid = Math.max(0, 1 - Math.abs(width - 1))
-    const side = width
-    this.midGain.gain.setTargetAtTime(mid, this.audioContext.currentTime, this.SMOOTHING_TIME)
-    this.sideGain.gain.setTargetAtTime(side, this.audioContext.currentTime, this.SMOOTHING_TIME)
+    // M=(L+R)/2, S=(L-R)/2. Width preserves M; isolation selects M or S.
+    const mid = mode === 'side' ? 0 : 1
+    const side = mode === 'mid' ? 0 : mode === 'side' ? 1 : width
+    this.stereoStage.setCoefficients(
+      (mid + side) / 2, (mid - side) / 2, this.audioContext.currentTime, this.SMOOTHING_TIME,
+    )
   }
 
   setCrossfeed(amount: number) {
     if (this.passiveMode) return
-    // amount: 0 = no crossfeed, 0.3 = light, 0.5 = normal, 0.7 = heavy
-    this.crossfeedLeft.gain.setTargetAtTime(amount, this.audioContext.currentTime, this.SMOOTHING_TIME)
-    this.crossfeedRight.gain.setTargetAtTime(amount, this.audioContext.currentTime, this.SMOOTHING_TIME)
+    this.crossfeedStage.setCoefficients(1, amount, this.audioContext.currentTime, this.SMOOTHING_TIME)
   }
 
   setLoudnessContour(enabled: boolean, volume?: number) {

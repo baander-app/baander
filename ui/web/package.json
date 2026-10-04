@@ -17,6 +17,7 @@
     "generate": "orval",
     "test:perf": "vitest run --config vitest.perf.config.ts",
     "test:browser-auth": "playwright test -c tests/e2e/browser-auth/playwright.config.ts",
+    "test:audio-graph": "playwright test -c tests/e2e/audio-graph/playwright.config.ts",
     "e2e": "playwright test --headed -c tests/e2e/playwright.config.ts",
     "e2e:headless": "playwright test -c tests/e2e/playwright.config.ts",
     "e2e:ui": "playwright test --ui -c tests/e2e/playwright.config.ts",
