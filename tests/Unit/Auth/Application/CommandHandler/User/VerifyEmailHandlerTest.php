@@ -9,11 +9,9 @@ use App\Auth\Application\CommandHandler\User\VerifyEmailHandler;
 use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
 use App\Auth\Domain\Exception\EmailVerificationException;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
-use App\Auth\Infrastructure\Doctrine\Entity\EmailVerificationTokenEntity;
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Auth\Application\DTO\EmailVerificationTokenDTO;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
-use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
@@ -56,19 +54,19 @@ final class VerifyEmailHandlerTest extends TestCase
         $this->handler = $this->createVerifyEmailHandlerFixture();
 
         $tokenString = 'valid-token';
-        $userEntity = new UserEntity(new PublicId(), 'Alice', 'alice@baander.app', 'hashed-pw', '');
-        $tokenEntity = new EmailVerificationTokenEntity(
-            $userEntity,
+        $tokenEntity = new EmailVerificationTokenDTO(
+            Uuid::generate(),
+            Uuid::generate(),
             $tokenString,
             new \DateTimeImmutable('+1 hour'),
         );
 
         $this->tokenRepository->method('findByToken')->willReturn($tokenEntity);
-        $this->userRepository->method('findByUuid')->willReturn(
+        $this->userRepository->expects($this->once())->method('findByUuid')->with($tokenEntity->userId)->willReturn(
             \App\Auth\Domain\Model\User::register(new Email('alice@baander.app'), 'hashed-pw', 'Alice'),
         );
         $this->userRepository->expects($this->once())->method('save');
-        $this->tokenRepository->expects($this->once())->method('delete')->with($tokenEntity);
+        $this->tokenRepository->expects($this->once())->method('delete')->with($tokenEntity->id);
         $this->eventDispatcher->expects($this->once())->method('dispatch')->with(
             $this->isInstanceOf(\App\Auth\Domain\Event\EmailVerified::class),
         );
@@ -96,9 +94,9 @@ final class VerifyEmailHandlerTest extends TestCase
 
     public function testExpiredTokenThrows(): void
     {
-        $userEntity = new UserEntity(new PublicId(), 'Alice', 'alice@baander.app', 'hashed-pw', '');
-        $tokenEntity = new EmailVerificationTokenEntity(
-            $userEntity,
+        $tokenEntity = new EmailVerificationTokenDTO(
+            Uuid::generate(),
+            Uuid::generate(),
             'expired-token',
             new \DateTimeImmutable('-1 hour'),
         );
@@ -112,13 +110,13 @@ final class VerifyEmailHandlerTest extends TestCase
 
     public function testUsedTokenThrows(): void
     {
-        $userEntity = new UserEntity(new PublicId(), 'Alice', 'alice@baander.app', 'hashed-pw', '');
-        $tokenEntity = new EmailVerificationTokenEntity(
-            $userEntity,
+        $tokenEntity = new EmailVerificationTokenDTO(
+            Uuid::generate(),
+            Uuid::generate(),
             'used-token',
             new \DateTimeImmutable('+1 hour'),
+            usedAt: new \DateTimeImmutable(),
         );
-        $tokenEntity->markUsed();
 
         $this->tokenRepository->method('findByToken')->willReturn($tokenEntity);
 
@@ -159,8 +157,9 @@ final class VerifyEmailHandlerTest extends TestCase
                 throw $failure;
             },
         );
-        $token = new EmailVerificationTokenEntity(
-            new UserEntity(new PublicId(), 'Alice', 'alice@baander.app', 'hashed-pw', ''),
+        $token = new EmailVerificationTokenDTO(
+            Uuid::generate(),
+            Uuid::generate(),
             'valid-token',
             new \DateTimeImmutable('+1 hour'),
         );

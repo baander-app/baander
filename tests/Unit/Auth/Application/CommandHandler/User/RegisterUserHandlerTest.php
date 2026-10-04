@@ -9,11 +9,9 @@ use App\Auth\Application\CommandHandler\User\RegisterUserHandler;
 use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
 use App\Auth\Application\Port\PasswordHasherInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
-use App\Auth\Infrastructure\Doctrine\Entity\EmailVerificationTokenEntity;
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Auth\Application\DTO\EmailVerificationTokenDTO;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
-use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
@@ -50,8 +48,9 @@ final class RegisterUserHandlerTest extends TestCase
     {
         $double = $expectCalls ? $this->createMock(EmailVerificationTokenRepositoryInterface::class) : $this->createStub(EmailVerificationTokenRepositoryInterface::class);
         $double->method('createForUser')->willReturnCallback(
-            fn ($userId, $token, $expiresAt) => new EmailVerificationTokenEntity(
-                new UserEntity(new PublicId(), 'Test', 'test@baander.app', 'pw', ''),
+            fn ($userId, $token, $expiresAt) => new EmailVerificationTokenDTO(
+                Uuid::generate(),
+                $userId,
                 $token,
                 $expiresAt,
             ),
@@ -116,7 +115,7 @@ final class RegisterUserHandlerTest extends TestCase
                 $this->isInstanceOf(Uuid::class),
                 $this->matchesRegularExpression('/^[0-9A-Z]{26}$/'),
                 $this->isInstanceOf(\DateTimeImmutable::class),
-            );
+            )->willReturnCallback(static fn (Uuid $userId, string $token, \DateTimeImmutable $expiresAt): EmailVerificationTokenDTO => new EmailVerificationTokenDTO(Uuid::generate(), $userId, $token, $expiresAt));
 
         ($this->handler)(new RegisterUserCommand($email, 'Alice', 'password123'));
     }
@@ -164,10 +163,11 @@ final class RegisterUserHandlerTest extends TestCase
         );
         $this->emailVerificationTokenRepository = $this->createMock(EmailVerificationTokenRepositoryInterface::class);
         $this->emailVerificationTokenRepository->expects($this->once())->method('createForUser')->willReturnCallback(
-            function ($userId, string $token, \DateTimeImmutable $expiresAt) use (&$active): EmailVerificationTokenEntity {
+            function ($userId, string $token, \DateTimeImmutable $expiresAt) use (&$active): EmailVerificationTokenDTO {
                 $this->assertTrue($active);
-                return new EmailVerificationTokenEntity(
-                    new UserEntity(new PublicId(), 'Alice', 'alice@baander.app', 'hashed-pw', ''),
+                return new EmailVerificationTokenDTO(
+                    Uuid::generate(),
+                    $userId,
                     $token,
                     $expiresAt,
                 );

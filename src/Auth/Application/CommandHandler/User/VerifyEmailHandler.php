@@ -40,21 +40,21 @@ final class VerifyEmailHandler
         }
 
         return $this->transaction->run(function () use ($token): bool {
-            $entity = $this->emailVerificationTokenRepository->findByToken($token);
+            $verification = $this->emailVerificationTokenRepository->findByToken($token);
 
-            if ($entity === null) {
+            if ($verification === null) {
                 throw EmailVerificationException::invalid();
             }
 
-            if ($entity->isExpired()) {
+            if ($verification->expiresAt < new \DateTimeImmutable()) {
                 throw EmailVerificationException::expired();
             }
 
-            if ($entity->getUsedAt() !== null) {
+            if ($verification->usedAt !== null) {
                 throw EmailVerificationException::alreadyUsed();
             }
 
-            $user = $this->userRepository->findByUuid($entity->getUser()->getId());
+            $user = $this->userRepository->findByUuid($verification->userId);
 
             if ($user === null) {
                 throw EmailVerificationException::invalid();
@@ -68,7 +68,7 @@ final class VerifyEmailHandler
                 email: Email::fromString($user->getEmail()),
             ));
 
-            $this->emailVerificationTokenRepository->delete($entity);
+            $this->emailVerificationTokenRepository->delete($verification->id);
 
             return true;
         });

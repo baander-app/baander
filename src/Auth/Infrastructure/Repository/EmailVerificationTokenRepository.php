@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Infrastructure\Repository;
 
 use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
+use App\Auth\Application\DTO\EmailVerificationTokenDTO;
 use App\Auth\Infrastructure\Doctrine\Entity\EmailVerificationTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Uuid;
@@ -17,7 +18,7 @@ final class EmailVerificationTokenRepository implements EmailVerificationTokenRe
     ) {
     }
 
-    public function createForUser(Uuid $userId, string $token, \DateTimeImmutable $expiresAt): EmailVerificationTokenEntity
+    public function createForUser(Uuid $userId, string $token, \DateTimeImmutable $expiresAt): EmailVerificationTokenDTO
     {
         $user = $this->entityManager->find(UserEntity::class, $userId);
 
@@ -29,19 +30,36 @@ final class EmailVerificationTokenRepository implements EmailVerificationTokenRe
         $this->entityManager->persist($entity);
         $this->entityManager->flush();
 
-        return $entity;
+        return $this->toDTO($entity);
     }
 
-    public function findByToken(string $token): ?EmailVerificationTokenEntity
+    public function findByToken(string $token): ?EmailVerificationTokenDTO
     {
-        return $this->entityManager
+        $entity = $this->entityManager
             ->getRepository(EmailVerificationTokenEntity::class)
             ->findOneBy(['token' => $token]);
+
+        return $entity === null ? null : $this->toDTO($entity);
     }
 
-    public function delete(EmailVerificationTokenEntity $token): void
+    public function delete(Uuid $tokenId): void
     {
+        $token = $this->entityManager->find(EmailVerificationTokenEntity::class, $tokenId);
+        if ($token === null) {
+            return;
+        }
         $this->entityManager->remove($token);
         $this->entityManager->flush();
+    }
+
+    private function toDTO(EmailVerificationTokenEntity $entity): EmailVerificationTokenDTO
+    {
+        return new EmailVerificationTokenDTO(
+            id: $entity->getId(),
+            userId: $entity->getUser()->getId(),
+            token: $entity->getToken(),
+            expiresAt: $entity->getExpiresAt(),
+            usedAt: $entity->getUsedAt(),
+        );
     }
 }
