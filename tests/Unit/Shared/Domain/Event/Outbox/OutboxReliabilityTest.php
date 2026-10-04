@@ -191,7 +191,7 @@ final class OutboxReliabilityTest extends TestCase
 
         // The test event class exists and extends AbstractDomainEvent, but is
         // intentionally NOT registered as a service definition.
-        $this->assertTrue(is_subclass_of(OutboxSubscriberPassTestEvent::class, AbstractDomainEvent::class));
+        $this->assertFalse($container->hasDefinition(OutboxSubscriberPassTestEvent::class));
 
         (new OutboxSubscriberPass())->process($container);
 

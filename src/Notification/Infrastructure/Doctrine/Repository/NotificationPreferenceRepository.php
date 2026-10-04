@@ -20,6 +20,7 @@ final class NotificationPreferenceRepository implements NotificationPreferenceRe
     ) {
     }
 
+    /** @return \Doctrine\ORM\EntityRepository<NotificationPreferenceEntity> */
     private function getEntityRepository(): \Doctrine\ORM\EntityRepository
     {
         return $this->entityManager->getRepository(NotificationPreferenceEntity::class);

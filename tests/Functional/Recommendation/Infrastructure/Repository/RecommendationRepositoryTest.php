@@ -27,13 +27,17 @@ final class RecommendationRepositoryTest extends TestCase
     private function createAndPersistUser(): User
     {
         $user = User::register(
-            new Email('rec-test-' . bin2hex(random_bytes(4)) . '@example.com'),
+            new Email('rec-test-' . bin2hex(random_bytes(4)) . '@baander.app'),
             password_hash('password', PASSWORD_BCRYPT),
             'Recommendation Test User',
         );
         $this->userRepository->save($user);
 
-        return $this->userRepository->findByUuid($user->getId());
+        $persisted = $this->userRepository->findByUuid($user->getId());
+        $this->assertSame($user->getId()->toString(), $persisted->getId()->toString());
+        $this->assertSame($user->getEmail(), $persisted->getEmail());
+
+        return $persisted;
     }
 
     // --- Happy path: save and findByUuid ---
@@ -67,7 +71,6 @@ final class RecommendationRepositoryTest extends TestCase
     public function testSavePreservesUserAssociation(): void
     {
         $user = $this->createAndPersistUser();
-        $this->assertNotNull($user);
 
         $recommendation = Recommendation::create(
             sourceType: 'song',
@@ -247,7 +250,6 @@ final class RecommendationRepositoryTest extends TestCase
     public function testFindForUserReturnsOnlyUserRecommendationsAndRespectsLimit(): void
     {
         $user = $this->createAndPersistUser();
-        $this->assertNotNull($user);
 
         for ($i = 0; $i < 5; $i++) {
             $rec = Recommendation::create(
@@ -279,7 +281,6 @@ final class RecommendationRepositoryTest extends TestCase
     public function testFindForUserClampsOversizedLimit(): void
     {
         $user = $this->createAndPersistUser();
-        $this->assertNotNull($user);
 
         for ($i = 0; $i < 5; $i++) {
             $rec = Recommendation::create(
@@ -344,8 +345,8 @@ final class RecommendationRepositoryTest extends TestCase
         // Never saved, so entity does not exist
         $this->recommendationRepository->delete($recommendation);
 
-        // No exception thrown — silent no-op
-        $this->assertTrue(true);
+        // The unsaved recommendation remains absent after the no-op delete.
+        $this->assertNull($this->recommendationRepository->findByUuid($recommendation->getId()));
     }
 
     // --- Integration: deleteBySource ---

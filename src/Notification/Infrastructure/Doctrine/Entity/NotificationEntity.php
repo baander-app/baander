@@ -43,9 +43,11 @@ class NotificationEntity
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
     private bool $isRead = false;
 
+    /** @var array<string, mixed>|null */
     #[ORM\Column(type: 'json', nullable: true, options: ['jsonb' => true])]
     private ?array $referenceData = null;
 
+    /** @var array<string, mixed>|null */
     #[ORM\Column(type: 'json', nullable: true, options: ['jsonb' => true])]
     private ?array $parameters = null;
 
@@ -138,21 +140,25 @@ class NotificationEntity
         $this->isRead = $isRead;
     }
 
+    /** @return array<string, mixed>|null */
     public function getReferenceData(): ?array
     {
         return $this->referenceData;
     }
 
+    /** @param array<string, mixed>|null $referenceData */
     public function setReferenceData(?array $referenceData): void
     {
         $this->referenceData = $referenceData;
     }
 
+    /** @return array<string, mixed>|null */
     public function getParameters(): ?array
     {
         return $this->parameters;
     }
 
+    /** @param array<string, mixed>|null $parameters */
     public function setParameters(?array $parameters): void
     {
         $this->parameters = $parameters;

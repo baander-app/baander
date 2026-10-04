@@ -22,6 +22,7 @@ final readonly class PairingCompleted extends AbstractDomainEvent
         parent::__construct($occurredAt);
     }
 
+    /** @param array<string, mixed> $payload */
     public static function fromPayload(array $payload): static
     {
         return new self(
@@ -33,6 +34,7 @@ final readonly class PairingCompleted extends AbstractDomainEvent
         );
     }
 
+    /** @return array{pairing_id: string, pairing_public_id: string, server_id: string, method: string, occurred_at: string} */
     public function toPayload(): array
     {
         return [

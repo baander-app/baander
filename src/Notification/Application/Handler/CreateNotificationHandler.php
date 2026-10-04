@@ -131,6 +131,7 @@ final class CreateNotificationHandler
     }
 
     /**
+     * @param array<string, mixed> $payload
      * @return list<string>
      */
     private function resolveRecipients(string $eventName, array $payload): array
@@ -148,6 +149,10 @@ final class CreateNotificationHandler
         return [];
     }
 
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>|null
+     */
     private function extractReferenceData(string $eventName, array $payload): ?array
     {
         if ($eventName === 'library.scan_completed' && isset($payload['library_id'])) {

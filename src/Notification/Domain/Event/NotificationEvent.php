@@ -8,6 +8,7 @@ use App\Shared\Domain\Event\AbstractDomainEvent;
 
 final readonly class NotificationEvent extends AbstractDomainEvent
 {
+    /** @param array<string, mixed> $payload */
     public function __construct(
         private readonly string $eventClass,
         private readonly string $eventName,
@@ -27,6 +28,7 @@ final readonly class NotificationEvent extends AbstractDomainEvent
         return $this->eventName;
     }
 
+    /** @return array<string, mixed> */
     public function getPayload(): array
     {
         return $this->payload;

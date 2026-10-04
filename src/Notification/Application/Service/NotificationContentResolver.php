@@ -11,8 +11,12 @@ final class NotificationContentResolver
     /**
      * Resolves translation keys and parameters from event data.
      *
-     * @param array $payload The event's toPayload() output
-     * @return array{titleKey: string, bodyKey: string, parameters: array{title: array, body: array}}
+     * @param array<string, mixed> $payload The event's toPayload() output
+     * @return array{
+     *     titleKey: string,
+     *     bodyKey: string,
+     *     parameters: array{title: array<string, mixed>, body: array<string, mixed>},
+     * }
      */
     public function resolve(NotificationCategory $category, string $eventName, array $payload): array
     {

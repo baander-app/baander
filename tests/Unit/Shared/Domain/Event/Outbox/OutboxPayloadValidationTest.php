@@ -29,6 +29,7 @@ final class OutboxPayloadValidationTest extends TestCase
         $this->assertInvalidRowHandled(PayloadEventWithoutFactory::class, '{}', 'payload.valid', 4);
     }
 
+    /** @return iterable<string, array{string, string, string}> */
     public static function invalidRows(): iterable
     {
         yield 'unknown class' => ['App\\MissingOutboxEvent', '{}', 'payload.valid'];
@@ -36,7 +37,7 @@ final class OutboxPayloadValidationTest extends TestCase
         yield 'non-event class' => [PayloadNonEventFactory::class, '{}', 'payload.valid'];
         yield 'abstract class' => [PayloadAbstractFactory::class, '{}', 'payload.valid'];
         yield 'instance factory' => [PayloadInstanceFactory::class, '{}', 'payload.valid'];
-        yield 'private factory' => [PayloadPrivateFactory::class, '{}', 'payload.valid'];
+        yield 'private factory' => [PayloadPrivateFactory::create()::class, '{}', 'payload.valid'];
         yield 'wrong event class' => [PayloadWrongEventFactory::class, '{}', 'payload.valid'];
         yield 'non-event result' => [PayloadNonEventResult::class, '{}', 'payload.valid'];
         yield 'event name mismatch' => [PayloadValidEvent::class, '{}', 'payload.other'];
@@ -111,6 +112,7 @@ readonly class PayloadEventWithoutFactory extends AbstractDomainEvent
 
 final readonly class PayloadValidEvent extends PayloadEventWithoutFactory
 {
+    /** @param array<string, mixed> $payload */
     public static function fromPayload(array $payload): self
     {
         return new self();
@@ -119,6 +121,7 @@ final readonly class PayloadValidEvent extends PayloadEventWithoutFactory
 
 final class PayloadNonEventFactory
 {
+    /** @param array<string, mixed> $payload */
     public static function fromPayload(array $payload): PayloadValidEvent
     {
         return new PayloadValidEvent();
@@ -127,6 +130,7 @@ final class PayloadNonEventFactory
 
 abstract readonly class PayloadAbstractFactory extends PayloadEventWithoutFactory
 {
+    /** @param array<string, mixed> $payload */
     public static function fromPayload(array $payload): PayloadValidEvent
     {
         return new PayloadValidEvent();
@@ -135,6 +139,7 @@ abstract readonly class PayloadAbstractFactory extends PayloadEventWithoutFactor
 
 final readonly class PayloadInstanceFactory extends PayloadEventWithoutFactory
 {
+    /** @param array<string, mixed> $payload */
     public function fromPayload(array $payload): self
     {
         return $this;
@@ -143,6 +148,12 @@ final readonly class PayloadInstanceFactory extends PayloadEventWithoutFactory
 
 final readonly class PayloadPrivateFactory extends PayloadEventWithoutFactory
 {
+    public static function create(): self
+    {
+        return self::fromPayload([]);
+    }
+
+    /** @param array<string, mixed> $payload */
     private static function fromPayload(array $payload): self
     {
         return new self();
@@ -151,6 +162,7 @@ final readonly class PayloadPrivateFactory extends PayloadEventWithoutFactory
 
 final readonly class PayloadWrongEventFactory extends PayloadEventWithoutFactory
 {
+    /** @param array<string, mixed> $payload */
     public static function fromPayload(array $payload): PayloadValidEvent
     {
         return new PayloadValidEvent();
@@ -159,6 +171,7 @@ final readonly class PayloadWrongEventFactory extends PayloadEventWithoutFactory
 
 final readonly class PayloadNonEventResult extends PayloadEventWithoutFactory
 {
+    /** @param array<string, mixed> $payload */
     public static function fromPayload(array $payload): \stdClass
     {
         return new \stdClass();

@@ -29,6 +29,7 @@ final class OutboxSubscriberFailureTest extends TestCase
                 return 'outbox.serialization_failure';
             }
 
+            /** @return array<string, mixed> */
             public function toPayload(): array
             {
                 throw $this->error;
@@ -89,18 +90,22 @@ final class OutboxSubscriberFailureTest extends TestCase
         (new OutboxSubscriber(new OutboxRepository($connection), new NullLogger()))($event);
     }
 
-    private function serializableEvent(): AbstractDomainEvent
+    private function serializableEvent(): OutboxPersistableTestEvent
     {
-        return new readonly class extends AbstractDomainEvent {
-            public function eventName(): string
-            {
-                return 'outbox.persistable';
-            }
+        return new OutboxPersistableTestEvent();
+    }
+}
 
-            public function toPayload(): array
-            {
-                return ['value' => 'persist me'];
-            }
-        };
+final readonly class OutboxPersistableTestEvent extends AbstractDomainEvent
+{
+    public function eventName(): string
+    {
+        return 'outbox.persistable';
+    }
+
+    /** @return array{value: string} */
+    public function toPayload(): array
+    {
+        return ['value' => 'persist me'];
     }
 }

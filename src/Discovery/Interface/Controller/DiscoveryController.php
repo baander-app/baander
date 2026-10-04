@@ -19,7 +19,6 @@ use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
-use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -37,7 +36,6 @@ final class DiscoveryController
     public function __construct(
         private readonly MessageBusInterface $commandBus,
         private readonly ServerInstancePortInterface $serverPort,
-        private readonly Security $security,
     ) {
     }
 

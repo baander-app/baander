@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Favorites\Interface\Controller;
 
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Favorites\Application\Command\AddFavoriteCommand;
 use App\Favorites\Application\Command\RemoveFavoriteCommand;
 use App\Favorites\Application\Port\FavoritesPortInterface;
@@ -61,7 +62,7 @@ final class FavoritesController
     public function index(Request $request): JsonResponse
     {
         $user = $this->security->getUser();
-        if ($user === null) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return $this->unauthorized();
         }
 
@@ -109,7 +110,7 @@ final class FavoritesController
     public function add(#[MapRequestPayload] AddFavoriteRequest $payload): JsonResponse
     {
         $user = $this->security->getUser();
-        if ($user === null) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return $this->unauthorized();
         }
 
@@ -137,7 +138,7 @@ final class FavoritesController
     public function remove(string $publicId): JsonResponse
     {
         $user = $this->security->getUser();
-        if ($user === null) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return $this->unauthorized();
         }
 

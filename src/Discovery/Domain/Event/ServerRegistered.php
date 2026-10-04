@@ -21,6 +21,7 @@ final readonly class ServerRegistered extends AbstractDomainEvent
         parent::__construct($occurredAt);
     }
 
+    /** @param array<string, mixed> $payload */
     public static function fromPayload(array $payload): static
     {
         return new self(
@@ -32,6 +33,7 @@ final readonly class ServerRegistered extends AbstractDomainEvent
         );
     }
 
+    /** @return array{server_id: string, server_public_id: string, server_url: string, name: string, occurred_at: string} */
     public function toPayload(): array
     {
         return [

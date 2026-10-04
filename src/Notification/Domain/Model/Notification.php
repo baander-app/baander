@@ -13,6 +13,10 @@ final class Notification
 {
     private bool $isRead;
 
+    /**
+     * @param array<string, mixed>|null $referenceData
+     * @param array<string, mixed>|null $parameters
+     */
     private function __construct(
         private readonly Uuid $id,
         private readonly PublicId $publicId,
@@ -31,6 +35,9 @@ final class Notification
 
     /**
      * Create a new notification.
+     *
+     * @param array<string, mixed>|null $referenceData
+     * @param array<string, mixed>|null $parameters
      */
     public static function create(
         Uuid $userId,
@@ -60,6 +67,9 @@ final class Notification
      * Reconstitute a Notification from persistence.
      *
      * This is intended for use by the repository layer only.
+     *
+     * @param array<string, mixed>|null $referenceData
+     * @param array<string, mixed>|null $parameters
      */
     public static function reconstitute(
         Uuid $id,
@@ -143,11 +153,13 @@ final class Notification
         return $this->createdAt;
     }
 
+    /** @return array<string, mixed>|null */
     public function getReferenceData(): ?array
     {
         return $this->referenceData;
     }
 
+    /** @return array<string, mixed>|null */
     public function getParameters(): ?array
     {
         return $this->parameters;

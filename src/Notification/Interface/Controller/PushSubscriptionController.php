@@ -181,6 +181,7 @@ final class PushSubscriptionController
     }
 
     /**
+     * @param array<string, mixed> $data
      * @return array<string, string>
      */
     private function validateSubscription(array $data): array

@@ -19,6 +19,7 @@ class WebhookEntity
     #[ORM\Column(type: 'text')]
     private string $url;
 
+    /** @var list<string>|null */
     #[ORM\Column(type: 'json', nullable: true, options: ['jsonb' => true])]
     private ?array $categoryFilter = null;
 
@@ -77,11 +78,13 @@ class WebhookEntity
         $this->url = $url;
     }
 
+    /** @return list<string>|null */
     public function getCategoryFilter(): ?array
     {
         return $this->categoryFilter;
     }
 
+    /** @param list<string>|null $categoryFilter */
     public function setCategoryFilter(?array $categoryFilter): void
     {
         $this->categoryFilter = $categoryFilter;
