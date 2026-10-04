@@ -12,7 +12,7 @@ use OpenApi\Attributes as OA;
     schema: 'VideoResource',
     properties: [
         new OA\Property(property: 'uuid', type: 'string', format: 'uuid', description: 'Video UUID'),
-        new OA\Property(property: 'publicId', type: 'string', format: 'uuid', description: 'Public-facing UUID'),
+        new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: 'Public identifier'),
         new OA\Property(property: 'path', type: 'string', description: 'File path'),
         new OA\Property(property: 'duration', type: 'number', nullable: true, description: 'Duration in seconds'),
         new OA\Property(property: 'height', type: 'integer', nullable: true, description: 'Video height in pixels'),

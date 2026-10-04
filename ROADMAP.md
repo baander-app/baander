@@ -105,6 +105,18 @@ contract; web typechecking passes. CI image Composer installation now enforces t
 Swoole requirement and generates test keys with mode 0600. Optimized installation
 still reports 52 PSR-4 class/path warnings, a separate autoload cleanup task.
 
+Catalog album, artist, song, movie and video public-ID schemas now describe the
+actual 21-character NanoID instead of UUID. Regression checks reject the former
+schemas, and the specification/client are regenerated together. Other contexts'
+public-ID schemas and mixed UUID/public-ID relationship fields still need audit.
+
+A PostgreSQL query-plan probe with 5,000 denied image/album/artist rows found
+43–46 ms image authorization queries dominated by JIT compilation; the same
+disposable session with JIT disabled took 0.095–0.110 ms for allowed images and
+0.463 ms for denial. The reverse artist-cover predicate scanned 5,001 artists.
+Query-shape/index remediation and representative benchmarks remain a bounded
+performance follow-up; no global JIT setting or schema change was made.
+
 ## Delivery horizons
 
 The destination is a reliable private self-hosted backend/web application, a small

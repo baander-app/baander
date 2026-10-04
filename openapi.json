@@ -20761,9 +20761,11 @@
                         "format": "uuid"
                     },
                     "publicId": {
-                        "description": "Public-facing UUID",
+                        "description": "Public identifier",
                         "type": "string",
-                        "format": "uuid"
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "albumId": {
                         "description": "Album UUID",
@@ -20848,9 +20850,11 @@
                         "format": "uuid"
                     },
                     "publicId": {
-                        "description": "Public-facing UUID",
+                        "description": "Public identifier",
                         "type": "string",
-                        "format": "uuid"
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "title": {
                         "description": "Album title",
@@ -20935,9 +20939,11 @@
                         "format": "uuid"
                     },
                     "publicId": {
-                        "description": "Public-facing UUID",
+                        "description": "Public identifier",
                         "type": "string",
-                        "format": "uuid"
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "name": {
                         "description": "Artist name",
@@ -21023,9 +21029,11 @@
                         "format": "uuid"
                     },
                     "publicId": {
-                        "description": "Public-facing UUID",
+                        "description": "Public identifier",
                         "type": "string",
-                        "format": "uuid"
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "title": {
                         "description": "Movie title",

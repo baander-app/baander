@@ -12,7 +12,7 @@ use OpenApi\Attributes as OA;
     schema: 'SongResource',
     properties: [
         new OA\Property(property: 'uuid', type: 'string', format: 'uuid', description: 'Song UUID'),
-        new OA\Property(property: 'publicId', type: 'string', format: 'uuid', description: 'Public-facing UUID'),
+        new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: 'Public identifier'),
         new OA\Property(property: 'albumId', type: 'string', format: 'uuid', description: 'Album UUID'),
         new OA\Property(property: 'title', type: 'string', description: 'Song title'),
         new OA\Property(property: 'artistName', type: 'string', nullable: true, description: 'Primary artist name'),

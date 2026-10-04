@@ -1057,7 +1057,12 @@ export interface PaginatedResponse {
 export interface SongResource {
   /** Song UUID */
   uuid: string;
-  /** Public-facing UUID */
+  /**
+     * Public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId: string;
   /** Album UUID */
   albumId: string;
@@ -1114,7 +1119,12 @@ export interface SongResource {
 export interface AlbumResource {
   /** Album UUID */
   uuid: string;
-  /** Public-facing UUID */
+  /**
+     * Public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId: string;
   /** Album title */
   title: string;
@@ -1160,7 +1170,12 @@ export interface DuplicateGroupResource {
 export interface ArtistResource {
   /** Artist UUID */
   uuid: string;
-  /** Public-facing UUID */
+  /**
+     * Public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId: string;
   /** Artist name */
   name: string;
@@ -1220,7 +1235,12 @@ export type MovieResourceVideosItem = { [key: string]: unknown };
 export interface MovieResource {
   /** Movie UUID */
   uuid: string;
-  /** Public-facing UUID */
+  /**
+     * Public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId: string;
   /** Movie title */
   title: string;

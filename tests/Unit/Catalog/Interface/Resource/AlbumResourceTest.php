@@ -158,10 +158,10 @@ final class AlbumResourceTest extends TestCase
             ),
         );
 
-        $result = AlbumResource::fromWithCover($this->album, $image, 'https://example.com');
+        $result = AlbumResource::fromWithCover($this->album, $image, 'https://baander.app');
 
         $this->assertNotNull($result['coverImage']);
-        $this->assertSame('https://example.com/api/images/' . $image->getPublicId()->toString() . '/file', $result['coverImage']['url']);
+        $this->assertSame('https://baander.app/api/images/' . $image->getPublicId()->toString() . '/file', $result['coverImage']['url']);
         $this->assertSame('L6Pj0^i_.AyE_3t7t7R**0o#DgR4', $result['coverImage']['blurhash']);
     }
 
@@ -189,9 +189,9 @@ final class AlbumResourceTest extends TestCase
             ),
         );
 
-        $result = AlbumResource::fromWithCover($this->album, $image, 'https://baander.example.com');
+        $result = AlbumResource::fromWithCover($this->album, $image, 'https://media.baander.app');
 
-        $this->assertSame('https://baander.example.com/api/images/' . $publicId->toString() . '/file', $result['coverImage']['url']);
+        $this->assertSame('https://media.baander.app/api/images/' . $publicId->toString() . '/file', $result['coverImage']['url']);
         $this->assertNull($result['coverImage']['blurhash']);
     }
 

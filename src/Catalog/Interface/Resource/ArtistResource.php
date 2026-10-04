@@ -13,7 +13,7 @@ use OpenApi\Attributes as OA;
     schema: 'ArtistResource',
     properties: [
         new OA\Property(property: 'uuid', type: 'string', format: 'uuid', description: 'Artist UUID'),
-        new OA\Property(property: 'publicId', type: 'string', format: 'uuid', description: 'Public-facing UUID'),
+        new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: 'Public identifier'),
         new OA\Property(property: 'name', type: 'string', description: 'Artist name'),
         new OA\Property(property: 'country', type: 'string', nullable: true, description: 'Country code'),
         new OA\Property(property: 'type', type: 'string', nullable: true, description: 'Artist type'),

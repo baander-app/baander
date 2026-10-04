@@ -12,7 +12,7 @@ use OpenApi\Attributes as OA;
     schema: 'MovieResource',
     properties: [
         new OA\Property(property: 'uuid', type: 'string', format: 'uuid', description: 'Movie UUID'),
-        new OA\Property(property: 'publicId', type: 'string', format: 'uuid', description: 'Public-facing UUID'),
+        new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: 'Public identifier'),
         new OA\Property(property: 'title', type: 'string', description: 'Movie title'),
         new OA\Property(property: 'year', type: 'integer', nullable: true, description: 'Release year'),
         new OA\Property(property: 'summary', type: 'string', nullable: true, description: 'Plot summary'),
