@@ -6,6 +6,7 @@ namespace App\Shared\Infrastructure\Messenger;
 
 use ArrayObject;
 use Symfony\Component\PropertyAccess\PropertyAccessorInterface;
+use Symfony\Component\Serializer\Exception\NotNormalizableValueException;
 use Symfony\Component\Serializer\Normalizer\DenormalizerInterface;
 use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
 use Symfony\Component\Serializer\Normalizer\ObjectNormalizer;
@@ -55,7 +56,10 @@ final class AllowedClassNormalizer implements NormalizerInterface, DenormalizerI
     public function denormalize(mixed $data, string $type, ?string $format = null, array $context = []): mixed
     {
         if (!$this->isClassAllowed($type)) {
-            return null;
+            throw new NotNormalizableValueException(sprintf(
+                'Class "%s" is not allowed for denormalization.',
+                $type,
+            ));
         }
 
         return $this->inner->denormalize($data, $type, $format, $context);
