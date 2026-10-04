@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Doctrine\Platform;
 
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\Schema\AbstractSchemaManager;
+use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\DBAL\Schema\SchemaManagerFactory;
 
 /**
@@ -16,11 +16,13 @@ use Doctrine\DBAL\Schema\SchemaManagerFactory;
  */
 class BaanderSchemaManagerFactory implements SchemaManagerFactory
 {
-    public function createSchemaManager(Connection $connection): AbstractSchemaManager
+    public function createSchemaManager(Connection $connection): BaanderPostgreSQLSchemaManager
     {
-        return new BaanderPostgreSQLSchemaManager(
-            $connection,
-            $connection->getDatabasePlatform(),
-        );
+        $platform = $connection->getDatabasePlatform();
+        if (!$platform instanceof PostgreSQLPlatform) {
+            throw new \LogicException('Baander schema management requires PostgreSQL.');
+        }
+
+        return new BaanderPostgreSQLSchemaManager($connection, $platform);
     }
 }

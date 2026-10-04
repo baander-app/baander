@@ -8,6 +8,7 @@ use Doctrine\Bundle\DoctrineBundle\Attribute\AsMiddleware;
 use Doctrine\DBAL\Driver;
 use Doctrine\DBAL\Driver\Middleware as MiddlewareInterface;
 use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
+use Doctrine\DBAL\Platforms\AbstractPlatform;
 use Doctrine\DBAL\ServerVersionProvider;
 
 /**
@@ -35,7 +36,7 @@ class BaanderDriverMiddleware implements MiddlewareInterface
                 return $this->inner->connect($params);
             }
 
-            public function getDatabasePlatform(ServerVersionProvider $versionProvider): PostgreSQLPlatform
+            public function getDatabasePlatform(ServerVersionProvider $versionProvider): AbstractPlatform
             {
                 $platform = $this->inner->getDatabasePlatform($versionProvider);
 

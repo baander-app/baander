@@ -15,6 +15,9 @@ use Redis;
  * Delegates all Redis method calls via __call(). The caller must call
  * release() when done. If release() is not called, the destructor will
  * return the connection to the pool with a warning log.
+ *
+ * @method mixed get(string $key)
+ * @method Redis|bool setex(string $key, int $expire, mixed $value)
  */
 final class ManagedRedisConnection
 {

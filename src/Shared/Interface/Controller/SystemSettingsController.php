@@ -8,7 +8,6 @@ use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Auth\Infrastructure\Security\Voter\AdminVoter;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
-use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -24,7 +23,6 @@ final class SystemSettingsController
 
     public function __construct(
         private readonly SystemSettingsPortInterface $settings,
-        private readonly Security $security,
     ) {
     }
 

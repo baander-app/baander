@@ -55,6 +55,7 @@ class JobMonitorEntity
     #[ORM\Column(type: 'integer', nullable: true)]
     private ?int $progress = null;
 
+    /** @var array<string, mixed>|null */
     #[ORM\Column(type: 'json', nullable: true, options: ['jsonb' => true])]
     private ?array $exception = null;
 
@@ -85,7 +86,7 @@ class JobMonitorEntity
     ) {
         $this->id = $id ?? new Uuid();
         $this->jobId = $jobId;
-        $this->jobUuid = $jobUuid;
+        $this->jobUuid = $jobUuid !== null ? Uuid::fromString($jobUuid) : null;
         $this->name = $name;
         $this->queue = $queue;
         $this->queuedAt = new \DateTimeImmutable();
@@ -100,7 +101,7 @@ class JobMonitorEntity
 
     public function getJobUuid(): ?string
     {
-        return $this->jobUuid;
+        return $this->jobUuid?->toString();
     }
 
     public function getJobId(): string
@@ -211,11 +212,13 @@ class JobMonitorEntity
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /** @return array<string, mixed>|null */
     public function getException(): ?array
     {
         return $this->exception;
     }
 
+    /** @param array<string, mixed>|null $exception */
     public function setException(?array $exception): void
     {
         $this->exception = $exception;

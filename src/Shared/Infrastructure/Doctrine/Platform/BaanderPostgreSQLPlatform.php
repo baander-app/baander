@@ -39,11 +39,6 @@ class BaanderPostgreSQLPlatform extends PostgreSQLPlatform
             return parent::getCreateIndexSQL($index, $table);
         }
 
-        $columns = $index->getColumns();
-        if (count($columns) === 0) {
-            return parent::getCreateIndexSQL($index, $table);
-        }
-
         $flags = $index->getFlags();
         $usingMethod = $this->extractUsingMethod($flags);
 

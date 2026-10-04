@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Infrastructure\Doctrine\Entity;
 
 use App\Shared\Domain\Model\JobStatus;
+use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Doctrine\Entity\JobMonitorEntity;
+use App\Shared\Infrastructure\Doctrine\Type\UuidType;
+use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use PHPUnit\Framework\TestCase;
 
 final class JobMonitorEntityTest extends TestCase
@@ -155,4 +158,34 @@ final class JobMonitorEntityTest extends TestCase
         $this->assertSame(0, $entity->getAttempt());
         $this->assertFalse($entity->isRetried());
     }
+    public function testConstructorConvertsJobUuidToTheMappedValueType(): void
+    {
+        $uuid = Uuid::generate()->toString();
+
+        $entity = new JobMonitorEntity('job-uuid', jobUuid: $uuid);
+
+        $mappedValue = (new \ReflectionProperty(JobMonitorEntity::class, 'jobUuid'))->getValue($entity);
+        self::assertInstanceOf(Uuid::class, $mappedValue);
+        self::assertSame($uuid, $entity->getJobUuid());
+        self::assertSame($uuid, (new UuidType())->convertToDatabaseValue($mappedValue, new PostgreSQLPlatform()));
+    }
+
+    public function testGetterSerializesTheUuidReturnedByTheDoctrineType(): void
+    {
+        $uuid = Uuid::generate()->toString();
+        $mappedValue = (new UuidType())->convertToPHPValue($uuid, new PostgreSQLPlatform());
+        $entity = new JobMonitorEntity('job-hydrated');
+        (new \ReflectionProperty(JobMonitorEntity::class, 'jobUuid'))->setValue($entity, $mappedValue);
+
+        self::assertSame($uuid, $entity->getJobUuid());
+    }
+
+    public function testConstructorRejectsAnInvalidJobUuid(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('"invalid-uuid" is not a valid UUID.');
+
+        new JobMonitorEntity('job-invalid', jobUuid: 'invalid-uuid');
+    }
+
 }

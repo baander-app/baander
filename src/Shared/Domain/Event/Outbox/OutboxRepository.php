@@ -14,6 +14,7 @@ final class OutboxRepository
     ) {
     }
 
+    /** @param array<array-key, mixed> $payload */
     public function append(string $eventClass, string $eventName, array $payload): void
     {
         $this->connection->insert('domain_event_outbox', [
