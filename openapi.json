@@ -13414,21 +13414,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "required": [
-                                    "deviceId"
-                                ],
-                                "properties": {
-                                    "deviceId": {
-                                        "description": "Persistent device identifier from localStorage",
-                                        "type": "string",
-                                        "format": "uuid"
-                                    },
-                                    "name": {
-                                        "type": "string",
-                                        "example": "Living Room Speaker"
-                                    }
-                                },
-                                "type": "object"
+                                "$ref": "#/components/schemas/RegisterDeviceRequest"
                             }
                         }
                     }
@@ -13451,6 +13437,16 @@
                                         }
                                     },
                                     "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Malformed request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -19931,6 +19927,26 @@
                             }
                         ],
                         "default": []
+                    }
+                },
+                "type": "object"
+            },
+            "RegisterDeviceRequest": {
+                "required": [
+                    "deviceId"
+                ],
+                "properties": {
+                    "deviceId": {
+                        "description": "Persistent device identifier from localStorage",
+                        "type": "string",
+                        "format": "uuid",
+                        "default": ""
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Living Room Speaker",
+                        "default": "Device",
+                        "maxLength": 255
                     }
                 },
                 "type": "object"

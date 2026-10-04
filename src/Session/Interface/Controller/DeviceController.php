@@ -15,8 +15,6 @@ use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -37,13 +35,7 @@ final class DeviceController
         summary: 'Register or touch a device (upsert)',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(
-                required: ['deviceId'],
-                properties: [
-                    new OA\Property(property: 'deviceId', type: 'string', format: 'uuid', description: 'Persistent device identifier from localStorage'),
-                    new OA\Property(property: 'name', type: 'string', example: 'Living Room Speaker'),
-                ],
-            ),
+            content: new OA\JsonContent(ref: new Model(type: RegisterDeviceRequest::class)),
         ),
         responses: [
             new OA\Response(
@@ -59,34 +51,22 @@ final class DeviceController
                     ],
                 ),
             ),
+            new OA\Response(response: '400', description: 'Malformed request body', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
     #[Route('', name: 'register', methods: ['POST'])]
-    public function register(Request $request): JsonResponse
+    public function register(#[MapRequestPayload] RegisterDeviceRequest $request): JsonResponse
     {
         $user = $this->getCurrentSecurityUser();
         if ($user === null) {
             return $this->unauthorized();
         }
 
-        $body = json_decode($request->getContent(), true, 512, JSON_THROW_ON_ERROR);
-        $deviceIdString = $body['deviceId'] ?? null;
-        $name = $body['name'] ?? 'Device';
-
-        if ($deviceIdString === null || $deviceIdString === '') {
-            return $this->errorResponse('deviceId is required.', Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        try {
-            $deviceId = Uuid::fromString($deviceIdString);
-        } catch (\InvalidArgumentException) {
-            return $this->errorResponse('Invalid deviceId.', Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
+        $deviceId = Uuid::fromString($request->deviceId);
         $userId = Uuid::fromString($user->getId());
-        $this->sessionPort->registerDevice($userId, $deviceId, $name);
+        $this->sessionPort->registerDevice($userId, $deviceId, $request->name);
 
         return $this->successResponse(['message' => 'Device registered.']);
     }

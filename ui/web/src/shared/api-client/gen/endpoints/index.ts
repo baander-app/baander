@@ -670,6 +670,13 @@ export interface UpdateScheduledJobRequest {
   parameters?: UpdateScheduledJobRequestParameters;
 }
 
+export interface RegisterDeviceRequest {
+  /** Persistent device identifier from localStorage */
+  deviceId: string;
+  /** @maxLength 255 */
+  name?: string;
+}
+
 export interface RenameDeviceRequest {
   /** @maxLength 255 */
   name: string;
@@ -4520,12 +4527,6 @@ export type GetDeviceList200DataItem = {
 
 export type GetDeviceList200 = {
   data?: GetDeviceList200DataItem[];
-};
-
-export type PostDeviceRegisterBody = {
-  /** Persistent device identifier from localStorage */
-  deviceId: string;
-  name?: string;
 };
 
 export type PostDeviceRegister200Data = {
@@ -28035,6 +28036,11 @@ export type postDeviceRegisterResponse200 = {
   status: 200
 }
 
+export type postDeviceRegisterResponse400 = {
+  data: ApiError
+  status: 400
+}
+
 export type postDeviceRegisterResponse401 = {
   data: ApiError
   status: 401
@@ -28048,7 +28054,7 @@ export type postDeviceRegisterResponse422 = {
 export type postDeviceRegisterResponseSuccess = (postDeviceRegisterResponse200) & {
   headers: Headers;
 };
-export type postDeviceRegisterResponseError = (postDeviceRegisterResponse401 | postDeviceRegisterResponse422) & {
+export type postDeviceRegisterResponseError = (postDeviceRegisterResponse400 | postDeviceRegisterResponse401 | postDeviceRegisterResponse422) & {
   headers: Headers;
 };
 
@@ -28065,14 +28071,14 @@ export const getPostDeviceRegisterUrl = () => {
 /**
  * @summary Register or touch a device (upsert)
  */
-export const postDeviceRegister = async (postDeviceRegisterBody: PostDeviceRegisterBody, options?: RequestInit): Promise<postDeviceRegisterResponse> => {
+export const postDeviceRegister = async (registerDeviceRequest: RegisterDeviceRequest, options?: RequestInit): Promise<postDeviceRegisterResponse> => {
 
   return customInstance<postDeviceRegisterResponse>(getPostDeviceRegisterUrl(),
   {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(postDeviceRegisterBody)
+    body: JSON.stringify(registerDeviceRequest)
   }
 );}
 
@@ -28080,8 +28086,8 @@ export const postDeviceRegister = async (postDeviceRegisterBody: PostDeviceRegis
 
 
 export const getPostDeviceRegisterMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDeviceRegister>>, TError,{data: BodyType<PostDeviceRegisterBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postDeviceRegister>>, TError,{data: BodyType<PostDeviceRegisterBody>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDeviceRegister>>, TError,{data: BodyType<RegisterDeviceRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postDeviceRegister>>, TError,{data: BodyType<RegisterDeviceRequest>}, TContext> => {
 
 const mutationKey = ['postDeviceRegister'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -28093,7 +28099,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postDeviceRegister>>, {data: BodyType<PostDeviceRegisterBody>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postDeviceRegister>>, {data: BodyType<RegisterDeviceRequest>}> = (props) => {
           const {data} = props ?? {};
 
           return  postDeviceRegister(data,requestOptions)
@@ -28107,18 +28113,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PostDeviceRegisterMutationResult = NonNullable<Awaited<ReturnType<typeof postDeviceRegister>>>
-    export type PostDeviceRegisterMutationBody = BodyType<PostDeviceRegisterBody>
+    export type PostDeviceRegisterMutationBody = BodyType<RegisterDeviceRequest>
     export type PostDeviceRegisterMutationError = ErrorType<ApiError | ValidationError>
 
     /**
  * @summary Register or touch a device (upsert)
  */
 export const usePostDeviceRegister = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDeviceRegister>>, TError,{data: BodyType<PostDeviceRegisterBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDeviceRegister>>, TError,{data: BodyType<RegisterDeviceRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postDeviceRegister>>,
         TError,
-        {data: BodyType<PostDeviceRegisterBody>},
+        {data: BodyType<RegisterDeviceRequest>},
         TContext
       > => {
       return useMutation(getPostDeviceRegisterMutationOptions(options), queryClient);
