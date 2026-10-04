@@ -76,7 +76,7 @@ const LoadMoreRow = styled.div`
 `
 
 export function ActivityView() {
-  const { groups, isLoading, error, loadMore, hasMore, refetch } = useActivityViewModel()
+  const { groups, isLoading, error, loadMore, hasMore, refetch, isFetchingMore, isFetchMoreError } = useActivityViewModel()
 
   if (isLoading) {
     return (
@@ -103,10 +103,10 @@ export function ActivityView() {
     )
   }
 
-  if (error) {
+  if (error && !groups.length) {
     return (
       <CenterMessage>
-        <ErrorText>Failed to load activity history</ErrorText>
+        <ErrorText role="alert">Failed to load activity history</ErrorText>
         <Button variant="ghost" size="sm" onClick={() => refetch()}>
           Retry
         </Button>
@@ -128,10 +128,19 @@ export function ActivityView() {
         <ActivityGroup key={group.label} label={group.label} items={group.items} />
       ))}
 
-      {hasMore && (
+      {Boolean(error) && (
+        <CenterMessage>
+          <ErrorText role="alert">{isFetchMoreError ? 'Failed to load more activity' : 'Failed to refresh activity history'}</ErrorText>
+          <Button variant="ghost" size="sm" disabled={isFetchingMore} onClick={isFetchMoreError ? loadMore : () => refetch()}>
+            Retry
+          </Button>
+        </CenterMessage>
+      )}
+
+      {hasMore && !error && (
         <LoadMoreRow>
-          <Button variant="ghost" size="sm" onClick={loadMore}>
-            Load more
+          <Button variant="ghost" size="sm" disabled={isFetchingMore} onClick={loadMore}>
+            {isFetchingMore ? 'Loading…' : 'Load more'}
           </Button>
         </LoadMoreRow>
       )}

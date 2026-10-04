@@ -1,17 +1,14 @@
-import { useMemo, useState, useEffect, useRef } from 'react'
+import { useMemo } from 'react'
+import { useInfiniteQuery } from '@tanstack/react-query'
 import {
-  useGetActivityHistory,
-  type GetActivityHistoryParams,
+  getActivityHistory,
+  getGetActivityHistoryQueryKey,
 } from '@/shared/api-client/gen/endpoints'
 import type { ActivityEntry } from '../types/activity'
 import { getTimePeriodLabel, PERIOD_ORDER, type TimePeriod } from '@/shared/utils/format-relative-time'
 
 function asString(val: unknown): string {
   return typeof val === 'string' ? val : ''
-}
-
-function asNumber(val: unknown): number | undefined {
-  return typeof val === 'number' ? val : undefined
 }
 
 export interface ActivityGroup {
@@ -26,6 +23,8 @@ interface UseActivityViewModelOptions {
 interface UseActivityViewModelReturn {
   groups: ActivityGroup[]
   isLoading: boolean
+  isFetchingMore: boolean
+  isFetchMoreError: boolean
   error: unknown
   loadMore: () => void
   hasMore: boolean
@@ -35,68 +34,44 @@ interface UseActivityViewModelReturn {
 export function useActivityViewModel({
   limit = 50,
 }: UseActivityViewModelOptions = {}): UseActivityViewModelReturn {
-  const [offset, setOffset] = useState(0)
-  const [accumulated, setAccumulated] = useState<ActivityEntry[]>([])
-  const mountedRef = useRef(true)
+  const {
+    data, isLoading, error, refetch, fetchNextPage, hasNextPage,
+    isFetchingNextPage, isFetchNextPageError,
+  } = useInfiniteQuery({
+    queryKey: [...getGetActivityHistoryQueryKey({ limit }), 'infinite'],
+    initialPageParam: 0,
+    queryFn: ({ pageParam, signal }) => getActivityHistory({ limit, offset: pageParam }, { signal }),
+    getNextPageParam: (lastPage, _pages, lastOffset) =>
+      (lastPage.data?.length ?? 0) >= limit ? lastOffset + limit : undefined,
+  })
 
-  // Reset accumulated entries on mount
-  useEffect(() => {
-    mountedRef.current = true
-    setAccumulated([])
-    return () => {
-      mountedRef.current = false
+  const entries = useMemo(() => {
+    const byUuid = new Map<string, ActivityEntry>()
+    for (const page of data?.pages ?? []) {
+      for (const entry of page.data ?? []) {
+        byUuid.set(entry.uuid, {
+          uuid: entry.uuid,
+          publicId: entry.publicId,
+          userId: entry.userId,
+          activityType: entry.activityType,
+          songId: entry.songId ?? null,
+          albumId: entry.albumId ?? null,
+          artistId: entry.artistId ?? null,
+          movieId: entry.movieId ?? null,
+          playCount: entry.playCount,
+          love: entry.love,
+          lastPlayedAt: entry.lastPlayedAt ?? null,
+          lastPlatform: entry.lastPlatform ?? null,
+          lastPlayer: entry.lastPlayer ?? null,
+          createdAt: entry.createdAt,
+          songTitle: 'songTitle' in entry ? asString(entry.songTitle) || null : null,
+          artistName: 'artistName' in entry ? asString(entry.artistName) || null : null,
+          albumName: 'albumName' in entry ? asString(entry.albumName) || null : null,
+        })
+      }
     }
-  }, [])
-
-  const params: GetActivityHistoryParams = useMemo(
-    () => ({ limit, offset }),
-    [limit, offset],
-  )
-
-  const { data, isLoading, error, refetch } = useGetActivityHistory(params)
-
-  // Parse raw entries from API response
-  const rawEntries: ActivityEntry[] = useMemo(() => {
-    const response = data as Record<string, unknown> | undefined
-    const raw = Array.isArray(response?.data) ? (response?.data as unknown[]) : []
-    return raw.map((item) => {
-      const entry = item as Record<string, unknown>
-      return {
-        uuid: asString(entry.uuid),
-        publicId: asString(entry.publicId),
-        userId: asString(entry.userId),
-        activityType: asString(entry.activityType),
-        songId: asString(entry.songId) || null,
-        albumId: asString(entry.albumId) || null,
-        artistId: asString(entry.artistId) || null,
-        movieId: asString(entry.movieId) || null,
-        playCount: asNumber(entry.playCount) ?? 0,
-        love: entry.love === true,
-        lastPlayedAt: asString(entry.lastPlayedAt) || null,
-        lastPlatform: asString(entry.lastPlatform) || null,
-        lastPlayer: asString(entry.lastPlayer) || null,
-        createdAt: asString(entry.createdAt),
-        songTitle: asString(entry.songTitle) || null,
-        artistName: asString(entry.artistName) || null,
-        albumName: asString(entry.albumName) || null,
-      } satisfies ActivityEntry
-    })
+    return [...byUuid.values()]
   }, [data])
-
-  // Accumulate entries when new data arrives
-  useEffect(() => {
-    if (rawEntries.length > 0) {
-      setAccumulated((prev) => {
-        if (prev.length === 0) return rawEntries
-        // Avoid duplicates: only append entries whose uuid isn't already present
-        const existingIds = new Set(prev.map((e) => e.uuid))
-        const newItems = rawEntries.filter((e) => !existingIds.has(e.uuid))
-        return [...prev, ...newItems]
-      })
-    }
-  }, [rawEntries])
-
-  const entries = accumulated
 
   const groups: ActivityGroup[] = useMemo(() => {
     const map = new Map<TimePeriod, ActivityEntry[]>()
@@ -114,19 +89,18 @@ export function useActivityViewModel({
       .map((label) => ({ label, items: map.get(label)! }))
   }, [entries])
 
-  const totalReceived = entries.length
-  const hasMore = totalReceived >= limit
-
   const loadMore = () => {
-    setOffset((prev) => prev + limit)
+    if (hasNextPage) void fetchNextPage({ cancelRefetch: false })
   }
 
   return {
     groups,
     isLoading,
+    isFetchingMore: isFetchingNextPage,
+    isFetchMoreError: isFetchNextPageError,
     error,
     loadMore,
-    hasMore,
+    hasMore: hasNextPage,
     refetch,
   }
 }
