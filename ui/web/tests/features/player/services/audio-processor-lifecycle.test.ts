@@ -93,17 +93,7 @@ class MockWorklet extends MockNode {
   emit(data: unknown) { this.port.onmessage?.({ data } as MessageEvent) }
 }
 
-class MockWorker {
-  static instances: MockWorker[] = []
-  static failInitialPost = false
-  onmessage: MessageCallback | null = null
-  onerror: (() => void) | null = null
-  postMessage = vi.fn(() => {
-    if (MockWorker.failInitialPost) throw new Error('Worker initialization failed')
-  })
-  terminate = vi.fn()
-  constructor() { MockWorker.instances.push(this) }
-}
+const workerConstructor = vi.fn(function () { throw new Error('Unexpected background analysis worker') })
 
 type ProcessorInspection = {
   audioContext: MockContext
@@ -123,11 +113,9 @@ beforeEach(() => {
   dsp.getSpectralFeatures.mockResolvedValue({ init: dsp.initSpectral })
   vi.useFakeTimers()
   MockWorklet.instances = []
-  MockWorker.instances = []
-  MockWorker.failInitialPost = false
   vi.stubGlobal('AudioContext', MockContext)
   vi.stubGlobal('AudioWorkletNode', MockWorklet)
-  vi.stubGlobal('Worker', MockWorker)
+  vi.stubGlobal('Worker', workerConstructor)
   fetchMock = vi.fn().mockResolvedValue({ ok: true, arrayBuffer: async () => new ArrayBuffer(0) })
   vi.stubGlobal('fetch', fetchMock)
   processor = new AudioProcessor()
@@ -204,6 +192,7 @@ describe('AudioProcessor asynchronous analysis lifecycle', () => {
   })
 
   it('rejects malformed worklet buffers before copying data or computing features', async () => {
+    processor.setPlayingState(true)
     await connect()
     await settle()
     const inspection = processor as unknown as {
@@ -382,62 +371,69 @@ describe('AudioProcessor asynchronous analysis lifecycle', () => {
     expect(graph.wasmSpectrumReady).toBe(false)
   })
 
-  it('does not restart fallback analysis from a queued worker error after destroy', async () => {
+  it('does not construct an unused worker or fetch its ignored WASM payload', async () => {
+    await settle()
+    expect(workerConstructor).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('clears stale measurements and never fabricates passive levels or starts polling', async () => {
     await connect()
     await settle()
-    const worker = MockWorker.instances[0]
-    const queuedError = worker.onerror!
-    processor.destroy()
-
-    queuedError()
-
-    expect(worker.terminate).toHaveBeenCalledTimes(1)
-    expect(vi.getTimerCount()).toBe(0)
-  })
-
-  it('terminates a constructed worker when its initial postMessage fails', () => {
-    processor.destroy()
-    MockWorker.failInitialPost = true
-    processor = new AudioProcessor()
-    const worker = MockWorker.instances.at(-1)!
-
-    expect(worker.terminate).toHaveBeenCalledTimes(1)
-    expect(worker.onmessage).toBeNull()
-    expect(worker.onerror).toBeNull()
-    expect(processor.getSystemInfo().workerReady).toBe(false)
-
-    processor.destroy()
-    expect(worker.terminate).toHaveBeenCalledTimes(1)
-    expect(vi.getTimerCount()).toBe(0)
-  })
-
-  it.each(['pause', 'disconnect', 'destroy'] as const)('ignores a queued worker result after %s', async (stop) => {
-    // Exercise the browser fallback without shared memory, where results own the data copies.
-    processor.destroy()
-    vi.stubGlobal('SharedArrayBuffer', undefined)
-    processor = new AudioProcessor()
-    await connect()
     processor.setPlayingState(true)
-    const worker = MockWorker.instances.at(-1)!
-    const queuedResult = worker.onmessage!
+    const state = processor as unknown as { frequencyData: Uint8Array; timeDomainData: Uint8Array }
+    state.frequencyData.fill(200)
+    state.timeDomainData.fill(220)
+    Object.assign(processor, { peakFrequency: 1000, spectralCentroid: 2000, spectralRolloff: 4000,
+      spectralFlux: 1, spectralFlatness: 0.5, lufsBuffer: [-12] })
+    await processor.initializePassiveMode()
+    expect(vi.getTimerCount()).toBe(0)
+    for (let i = 0; i < 3; i++) {
+      vi.advanceTimersByTime(1000)
+      const data = processor.getAnalysisData()
+      expect(data.frequencyData.every(value => value === 0)).toBe(true)
+      expect(data.timeDomainData.every(value => value === 128)).toBe(true)
+      expect(data).toMatchObject({ leftChannel: 0, rightChannel: 0, rms: 0, lufs: -60,
+        peakFrequency: 0, spectralCentroid: 0, spectralRolloff: 0, spectralFlux: 0, spectralFlatness: 0 })
+    }
+    processor.setPlayingState(false)
+    processor.setPlayingState(true)
+    expect(vi.getTimerCount()).toBe(0)
+    expect(workerConstructor).not.toHaveBeenCalled()
+    expect(processor.getSystemInfo()).toMatchObject({ connected: true, passive: true })
+  })
 
-    if (stop === 'pause') processor.setPlayingState(false)
-    else processor[stop]()
-    const stoppedData = processor.getAnalysisData()
-    const frequencyBefore = stoppedData.frequencyData[0]
-    const timeBefore = stoppedData.timeDomainData[0]
-    queuedResult({ data: {
-      type: 'analysis-result',
-      frequencyData: new Uint8Array([200]),
-      timeDomainData: new Uint8Array([220]),
-      peakFrequency: 1000,
-    } } as MessageEvent)
-
-    const result = processor.getAnalysisData()
-    expect(result.frequencyData[0]).toBe(frequencyBefore)
-    expect(result.timeDomainData[0]).toBe(timeBefore)
+  it('keeps the active analyser fallback polling when worklets are unavailable', async () => {
+    graph.audioContext.audioWorklet.addModule.mockRejectedValue(new Error('Worklet unavailable'))
+    await connect()
+    await settle()
+    processor.setPlayingState(true)
+    expect(vi.getTimerCount()).toBe(1)
+    vi.advanceTimersByTime(80)
+    expect(graph.analyzerNode.getByteFrequencyData).toHaveBeenCalled()
+    expect(graph.analyzerNode.getByteTimeDomainData).toHaveBeenCalled()
+    processor.disconnect()
     expect(vi.getTimerCount()).toBe(0)
   })
+
+  it.each(['pause', 'disconnect', 'destroy', 'passive'] as const)('ignores a queued spectrum after %s', async (stop) => {
+    await connect()
+    await settle()
+    processor.setPlayingState(true)
+    const spectrum = worklet('wasm-spectrum')
+    const queuedResult = spectrum.port.onmessage!
+    if (stop === 'pause') processor.setPlayingState(false)
+    else if (stop === 'passive') await processor.initializePassiveMode()
+    else processor[stop]()
+    queuedResult({ data: { type: 'spectrum', frequencyData: new Uint8Array(1024).fill(200),
+      timeDomainData: new Uint8Array(2048).fill(220) } } as MessageEvent)
+    const result = processor.getAnalysisData()
+    expect(result.frequencyData.every(value => value === 0)).toBe(true)
+    expect(result.timeDomainData.every(value => value === 128)).toBe(true)
+    expect(result.rms).toBe(0)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
 })
 
 

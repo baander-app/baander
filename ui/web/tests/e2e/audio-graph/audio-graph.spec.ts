@@ -109,6 +109,29 @@ test('native spectrum readiness connects analysis and closes both worklet ports'
   expect(result.fallbackActive).toBe(false)
 })
 
+test('passive mode stops native fallback analysis and keeps measurements neutral while playing', async ({ passiveAnalysis }) => {
+  const result = await passiveAnalysis()
+  expect(result.activeFallback).toBe(true)
+  expect(result.activeSignal).toBe(true)
+  expect(result.passive).toBe(true)
+  expect(result.playing).toBe(true)
+  expect(result.elapsed).toBeGreaterThan(0.2)
+  expect(result.passiveFallback).toEqual([false, false, false])
+  expect(result.readings).toEqual(Array(3).fill({
+    frequencySilent: true,
+    timeDomainSilent: true,
+    leftChannel: 0,
+    rightChannel: 0,
+    lufs: -60,
+    peakFrequency: 0,
+    spectralCentroid: 0,
+    spectralRolloff: 0,
+    spectralFlux: 0,
+    spectralFlatness: 0,
+    rms: 0,
+  }))
+})
+
 for (const stop of ['disconnect', 'destroy'] as const) {
   test(`native addModule completion cannot recreate analysis after ${stop}`, async ({ lifecycle }) => {
     const result = await lifecycle(stop)

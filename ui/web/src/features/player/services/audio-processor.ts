@@ -40,7 +40,6 @@ export interface AudioSystemInfo {
   playing: boolean
   dspReady: boolean
   wasmSpectrumReady: boolean
-  workerReady: boolean
   workletActive: boolean
   fftSize: number
   filterCount: number
@@ -65,7 +64,6 @@ export class AudioProcessor {
   private destroyed = false
   private workletGeneration = 0
   private workletAbort = new AbortController()
-  private readonly workerAbort = new AbortController()
   private chainEntry: AudioNode | null = null
   private masterGainNode!: GainNode
   private compressorNode!: DynamicsCompressorNode
@@ -89,16 +87,9 @@ export class AudioProcessor {
   // AudioWorklet for volume/level analysis (LUFS + meters)
   private audioWorkletNode: AudioWorkletNode | null = null
 
-  // Web Worker for background spectral analysis
-  private analysisWorker: Worker | null = null
-  private workerReady = false
-  private lastWorkerAnalysisTime = 0
-
   // Data buffers
   private readonly FFT_SIZE = 2048
   private readonly TIME_SIZE = 2048
-  private sharedFrequencyBuffer: SharedArrayBuffer | null = null
-  private sharedTimeDomainBuffer: SharedArrayBuffer | null = null
   private frequencyData!: Uint8Array
   private timeDomainData!: Uint8Array
   private tempFrequencyData!: Uint8Array
@@ -128,13 +119,13 @@ export class AudioProcessor {
   constructor() {
     try {
       this.audioContext = new AudioContext()
-      this.initializeSharedBuffers()
+      this.frequencyData = new Uint8Array(this.FFT_SIZE / 2)
+      this.timeDomainData = new Uint8Array(this.TIME_SIZE).fill(128)
       this.initializeNodes()
       this.setupAudioGraph()
       this.tempFrequencyData = new Uint8Array(this.FFT_SIZE / 2)
       this.tempTimeDomainData = new Uint8Array(this.FFT_SIZE)
       this.initializeDSP()
-      this.initializeWorker()
     } catch (error) {
       console.error('[AudioProcessor] Constructor failed:', error)
       throw error
@@ -194,7 +185,7 @@ export class AudioProcessor {
         } else if (msg.type === 'error') {
           console.error('[AudioProcessor] WASM spectrum error:', msg)
           this.wasmSpectrumReady = false
-        } else if (msg.type === 'spectrum'
+        } else if (msg.type === 'spectrum' && this.isConnected && this.isPlaying
           && msg.frequencyData instanceof Uint8Array && msg.frequencyData.length === this.FFT_SIZE / 2
           && msg.timeDomainData instanceof Uint8Array && msg.timeDomainData.length === this.FFT_SIZE) {
           const freqLen = Math.min(this.frequencyData.length, msg.frequencyData.length)
@@ -247,26 +238,6 @@ export class AudioProcessor {
     } finally {
       if (magPtr) this.spectralAPI.free(magPtr)
     }
-  }
-
-  private initializeSharedBuffers() {
-    try {
-      if (typeof SharedArrayBuffer !== 'undefined') {
-        this.sharedFrequencyBuffer = new SharedArrayBuffer(this.FFT_SIZE / 2)
-        this.sharedTimeDomainBuffer = new SharedArrayBuffer(this.TIME_SIZE)
-        this.frequencyData = new Uint8Array(this.sharedFrequencyBuffer)
-        this.timeDomainData = new Uint8Array(this.sharedTimeDomainBuffer)
-        this.frequencyData.fill(20)
-        this.timeDomainData.fill(128)
-        return
-      }
-    } catch {
-      // fall through
-    }
-    this.frequencyData = new Uint8Array(this.FFT_SIZE / 2)
-    this.timeDomainData = new Uint8Array(this.TIME_SIZE)
-    this.frequencyData.fill(20)
-    this.timeDomainData.fill(128)
   }
 
   private initializeNodes() {
@@ -405,123 +376,29 @@ export class AudioProcessor {
     currentNode.connect(this.gainNode)
   }
 
-  // --- Worker ---
-
-  private initializeWorker() {
-    try {
-      const worker = new Worker(getAudioWorkletUrl('audio-analysis-worker.js'))
-      this.analysisWorker = worker
-
-      this.analysisWorker.onmessage = (e: MessageEvent) => {
-        if (this.destroyed || this.analysisWorker !== worker || !this.isConnected || !this.isPlaying) return
-        const data = e.data as { type: string; frequencyData?: Uint8Array; timeDomainData?: Uint8Array; peakFrequency?: number; spectralCentroid?: number; spectralRolloff?: number; spectralFlux?: number; spectralFlatness?: number }
-        if (data.type === 'analysis-result') {
-          if (!this.sharedFrequencyBuffer) {
-            if (data.frequencyData && data.frequencyData.length > 0) {
-              const len = Math.min(this.frequencyData.length, data.frequencyData.length)
-              for (let i = 0; i < len; i++) this.frequencyData[i] = data.frequencyData[i]
-            }
-            if (data.timeDomainData && data.timeDomainData.length > 0) {
-              const len = Math.min(this.timeDomainData.length, data.timeDomainData.length)
-              for (let i = 0; i < len; i++) this.timeDomainData[i] = data.timeDomainData[i]
-            }
-          }
-          this.peakFrequency = data.peakFrequency || 0
-          this.spectralCentroid = data.spectralCentroid || 0
-          this.spectralRolloff = data.spectralRolloff || 0
-          this.spectralFlux = data.spectralFlux || 0
-          this.spectralFlatness = data.spectralFlatness || 0
-        }
-      }
-
-      this.analysisWorker.onerror = () => {
-        if (this.destroyed || this.analysisWorker !== worker) return
-        worker.onmessage = null
-        worker.onerror = null
-        worker.terminate()
-        this.workerAbort.abort()
-        this.workerReady = false
-        this.analysisWorker = null
-        this.setupFallbackAnalysis()
-      }
-
-      if (this.sharedFrequencyBuffer && this.sharedTimeDomainBuffer) {
-        this.analysisWorker.postMessage({
-          type: 'init-shared-buffers',
-          frequencyBuffer: this.sharedFrequencyBuffer,
-          timeDomainBuffer: this.sharedTimeDomainBuffer,
-        })
-      } else {
-        this.analysisWorker.postMessage({
-          type: 'init',
-          length: { freq: this.FFT_SIZE / 2, time: this.TIME_SIZE },
-        })
-      }
-
-      // Send spectral WASM to worker
-      this.sendSpectralWasmToWorker()
-      this.workerReady = true
-    } catch {
-      if (this.analysisWorker) {
-        this.analysisWorker.onmessage = null
-        this.analysisWorker.onerror = null
-        this.analysisWorker.terminate()
-      }
-      this.workerAbort.abort()
-      this.workerReady = false
-      this.analysisWorker = null
-      this.setupFallbackAnalysis()
-    }
-  }
-
-  private async sendSpectralWasmToWorker() {
-    const worker = this.analysisWorker
-    try {
-      const response = await fetch(getWasmUrl('spectral_features.wasm'), { signal: this.workerAbort.signal })
-      if (!response.ok) throw new Error(`Spectral WASM request failed: ${response.status}`)
-      const spectralWasm = await response.arrayBuffer()
-      if (!this.destroyed && this.analysisWorker === worker) {
-        worker?.postMessage({ type: 'init-spectral-wasm', spectralWasm })
-      }
-    } catch (error) {
-      if (this.destroyed || this.analysisWorker !== worker) return
-      console.warn('[AudioProcessor] Failed to send spectral WASM to worker:', error)
-    }
-  }
-
   // --- Analysis ---
 
+  private clearAnalysis() {
+    this.frequencyData.fill(0)
+    this.timeDomainData.fill(128)
+    this.peakFrequency = 0
+    this.spectralCentroid = 0
+    this.spectralRolloff = 0
+    this.spectralFlux = 0
+    this.spectralFlatness = 0
+    this.lufsBuffer = []
+  }
+
   private setupFallbackAnalysis() {
-    if (this.destroyed || !this.isConnected || !this.isPlaying) return
+    if (this.destroyed || this.passiveMode || !this.isConnected || !this.isPlaying) return
     if (this.analysisInterval) clearInterval(this.analysisInterval)
     this.analysisInterval = window.setInterval(() => this.performUnifiedAnalysis(), this.ANALYSIS_INTERVAL)
   }
 
   private performUnifiedAnalysis() {
+    if (this.destroyed || this.passiveMode || !this.isConnected) return
     if (!this.isPlaying) {
-      this.frequencyData.fill(20)
-      this.timeDomainData.fill(128)
-      this.peakFrequency = 0
-      this.spectralCentroid = 0
-      this.spectralRolloff = 0
-      this.spectralFlux = 0
-      this.spectralFlatness = 0
-      return
-    }
-
-    const now = performance.now()
-
-    if (this.passiveMode) {
-      if (this.workerReady && this.analysisWorker && now - this.lastWorkerAnalysisTime > 100) {
-        this.lastWorkerAnalysisTime = now
-        this.analysisWorker.postMessage({
-          type: 'analyze',
-          isPassiveMode: true,
-          sampleRate: this.audioContext.sampleRate,
-          useSharedBuffer: !!this.sharedFrequencyBuffer,
-          isPlaying: this.isPlaying,
-        })
-      }
+      this.clearAnalysis()
       return
     }
 
@@ -647,22 +524,13 @@ export class AudioProcessor {
     if (this.isPlaying === isPlaying) return
     this.isPlaying = isPlaying
 
-    this.analysisWorker?.postMessage({ type: 'set-playing-state', isPlaying })
-
     if (!isPlaying) {
       if (this.analysisInterval) {
         clearInterval(this.analysisInterval)
         this.analysisInterval = null
       }
-      this.frequencyData.fill(20)
-      this.timeDomainData.fill(128)
-      this.peakFrequency = 0
-      this.spectralCentroid = 0
-      this.spectralRolloff = 0
-      this.spectralFlux = 0
-      this.spectralFlatness = 0
-      this.lufsBuffer = []
-    } else if (this.isConnected && !this.analysisInterval) {
+      this.clearAnalysis()
+    } else if (this.isConnected && !this.passiveMode && !this.analysisInterval) {
       this.setupFallbackAnalysis()
     }
   }
@@ -755,7 +623,7 @@ export class AudioProcessor {
       clearInterval(this.analysisInterval)
       this.analysisInterval = null
     }
-    if (this.isPlaying) this.setupFallbackAnalysis()
+    this.clearAnalysis()
   }
 
   disconnect() {
@@ -772,6 +640,7 @@ export class AudioProcessor {
     this.isConnected = false
     this.passiveMode = false
     this.isPlaying = false
+    this.clearAnalysis()
   }
 
   // --- Crossfade / swap methods ---
@@ -822,11 +691,6 @@ export class AudioProcessor {
     this.destroyed = true
     this.spectralAPI = null
     this.dspReady = false
-    this.workerAbort.abort()
-    if (this.analysisWorker) {
-      this.analysisWorker.onmessage = null
-      this.analysisWorker.onerror = null
-    }
     if (this.rebuildTimer !== null) {
       clearTimeout(this.rebuildTimer)
       this.rebuildTimer = null
@@ -835,9 +699,6 @@ export class AudioProcessor {
       clearInterval(this.analysisInterval)
       this.analysisInterval = null
     }
-    this.analysisWorker?.terminate()
-    this.analysisWorker = null
-    this.workerReady = false
     this.disconnect()
     if (this.audioContext.state !== 'closed') {
       this.audioContext.close()
@@ -932,7 +793,7 @@ export class AudioProcessor {
   }
 
   getAnalysisData(): AnalysisData {
-    if (!this.isPlaying) {
+    if (this.destroyed || this.passiveMode || !this.isConnected || !this.isPlaying) {
       return {
         frequencyData: this.frequencyData,
         timeDomainData: this.timeDomainData,
@@ -945,25 +806,6 @@ export class AudioProcessor {
         spectralFlux: 0,
         spectralFlatness: 0,
         rms: 0,
-      }
-    }
-
-    if (this.passiveMode) {
-      const now = performance.now()
-      const leftLevel = Math.abs(Math.sin(now / 200)) * 60 + 20
-      const rightLevel = Math.abs(Math.cos(now / 200)) * 60 + 20
-      return {
-        frequencyData: this.frequencyData,
-        timeDomainData: this.timeDomainData,
-        leftChannel: leftLevel,
-        rightChannel: rightLevel,
-        lufs: this.lufsBuffer.length > 0 ? this.lufsBuffer.reduce((a, b) => a + b, 0) / this.lufsBuffer.length : -20,
-        peakFrequency: this.peakFrequency,
-        spectralCentroid: this.spectralCentroid,
-        spectralRolloff: this.spectralRolloff,
-        spectralFlux: this.spectralFlux,
-        spectralFlatness: this.spectralFlatness,
-        rms: 0.1,
       }
     }
 
@@ -1035,7 +877,6 @@ export class AudioProcessor {
       playing: this.isPlaying,
       dspReady: this.dspReady,
       wasmSpectrumReady: this.wasmSpectrumReady,
-      workerReady: this.workerReady,
       workletActive: this.audioWorkletNode !== null,
       fftSize: this.FFT_SIZE,
       filterCount: this.filters.length,

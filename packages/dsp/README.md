@@ -63,3 +63,9 @@ isolation, concurrent compilation, failed-load retries, and cache reset races.
 Clearing the compilation cache never resets live measurements. The main-thread
 processor owns only spectral analysis; loudness and dynamics run in its worklet.
 The standalone JavaScript demo loaders are separate from this web loading path.
+
+
+Playback without a captured audio source exposes neutral buffers and unavailable
+measurements. It does not run a background analysis worker or fabricate channel
+levels. Active analysis uses the spectrum worklet with the native analyser as
+fallback; both feed the processor's owned spectral module.

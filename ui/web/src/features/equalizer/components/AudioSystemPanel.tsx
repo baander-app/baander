@@ -188,6 +188,11 @@ export function AudioSystemPanel({ className }: { className?: string }) {
       if (!processor) return
 
       const system = processor.getSystemInfo()
+      if (system.passive) {
+        setLive({ system, analysis: null })
+        return
+      }
+
       const data = processor.getAnalysisData()
       const analysis: LiveState['analysis'] = {
         spectralCentroid: data.spectralCentroid,
@@ -259,7 +264,6 @@ export function AudioSystemPanel({ className }: { className?: string }) {
               <StatusDotComponent on={sys.connected} label="Audio Source" />
               <StatusDotComponent on={sys.dspReady} label="WASM DSP" />
               <StatusDotComponent on={sys.wasmSpectrumReady} label="WASM Spectrum" />
-              <StatusDotComponent on={sys.workerReady} label="Analysis Worker" />
               <StatusDotComponent on={sys.workletActive} label="LUFS Worklet" />
               <StatusDotComponent on={sys.filterCount === 10} label={`EQ Filters (${sys.filterCount}/10)`} />
               <StatusDotComponent on={sys.compressorActive} label="Compressor" />
@@ -270,29 +274,30 @@ export function AudioSystemPanel({ className }: { className?: string }) {
           <SectionGap>
             <MetricGroup>
               <ColHeader>Spectral</ColHeader>
+              {sys.passive && <NoProcessorText>Analysis unavailable in passive mode</NoProcessorText>}
               <MetricList>
                 <KvRowComponent label="Centroid" value={centroidKHz} mono />
                 <KvRowComponent label="Rolloff" value={rolloffKHz} mono />
                 <div>
                   <MetricWithBar>
                     <KvLabel>Flux</KvLabel>
-                    <KvValue $mono>{flux.toFixed(2)}</KvValue>
+                    <KvValue $mono>{live.analysis ? flux.toFixed(2) : '—'}</KvValue>
                   </MetricWithBar>
-                  <MiniBarComponent value={flux} max={50} color="rgba(var(--color-primary-rgb, 0 0 0), 0.6)" />
+                  {live.analysis && <MiniBarComponent value={flux} max={50} color="rgba(var(--color-primary-rgb, 0 0 0), 0.6)" />}
                 </div>
                 <div>
                   <MetricWithBar>
                     <KvLabel>Flatness</KvLabel>
-                    <KvValue $mono>{flatness.toFixed(3)}</KvValue>
+                    <KvValue $mono>{live.analysis ? flatness.toFixed(3) : '—'}</KvValue>
                   </MetricWithBar>
-                  <MiniBarComponent value={flatness} max={1} color="rgba(var(--color-primary-rgb, 0 0 0), 0.4)" />
+                  {live.analysis && <MiniBarComponent value={flatness} max={1} color="rgba(var(--color-primary-rgb, 0 0 0), 0.4)" />}
                 </div>
                 <div>
                   <MetricWithBar>
                     <KvLabel>RMS</KvLabel>
-                    <KvValue $mono>{(rms * 100).toFixed(1)}%</KvValue>
+                    <KvValue $mono>{live.analysis ? `${(rms * 100).toFixed(1)}%` : '—'}</KvValue>
                   </MetricWithBar>
-                  <MiniBarComponent value={rms} max={0.5} color="rgba(var(--color-primary-rgb, 0 0 0), 0.5)" />
+                  {live.analysis && <MiniBarComponent value={rms} max={0.5} color="rgba(var(--color-primary-rgb, 0 0 0), 0.5)" />}
                 </div>
               </MetricList>
             </MetricGroup>

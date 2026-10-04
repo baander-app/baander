@@ -6,10 +6,10 @@ import { tmpdir } from 'node:os'
 import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { RenderOptions, LifecycleCase, LifecycleResult } from './browser-fixture'
+import type { RenderOptions, LifecycleCase, LifecycleResult, PassiveAnalysisResult } from './browser-fixture'
 
 export interface Signal { left: number[]; right: number[]; leftGain: number; rightGain: number }
-export const test = base.extend<{ render: (options: RenderOptions) => Promise<Signal>; lifecycle: (scenario: LifecycleCase) => Promise<LifecycleResult> }, { origin: string }>({
+export const test = base.extend<{ render: (options: RenderOptions) => Promise<Signal>; lifecycle: (scenario: LifecycleCase) => Promise<LifecycleResult>; passiveAnalysis: () => Promise<PassiveAnalysisResult> }, { origin: string }>({
   origin: [async ({ browserName }, provide) => {
     if (browserName !== 'chromium') throw new Error('The audio regression harness requires Chromium')
     const temporary = mkdtempSync(resolve(tmpdir(), 'baander-audio-graph-'))
@@ -84,6 +84,13 @@ export const test = base.extend<{ render: (options: RenderOptions) => Promise<Si
   context: async ({ browser }, provide) => {
     const context = await browser.newContext({ ignoreHTTPSErrors: true })
     try { await provide(context) } finally { await context.close() }
+  },
+  passiveAnalysis: async ({ page, origin }, provide) => {
+    await page.goto(origin)
+    await page.waitForFunction(() => 'audioGraphFixture' in window)
+    await provide(() => page.evaluate(() => (window as unknown as {
+      audioGraphFixture: { passiveAnalysis(): Promise<PassiveAnalysisResult> }
+    }).audioGraphFixture.passiveAnalysis()))
   },
   lifecycle: async ({ page, origin }, provide) => {
     await page.goto(origin)

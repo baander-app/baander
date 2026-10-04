@@ -186,4 +186,75 @@ async function lifecycle(scenario: LifecycleCase): Promise<LifecycleResult> {
   }
 }
 
-Object.assign(window, { audioGraphFixture: { render, lifecycle } })
+export interface PassiveAnalysisResult {
+  activeFallback: boolean
+  activeSignal: boolean
+  passiveFallback: boolean[]
+  passive: boolean
+  playing: boolean
+  elapsed: number
+  readings: {
+    frequencySilent: boolean
+    timeDomainSilent: boolean
+    leftChannel: number
+    rightChannel: number
+    lufs: number
+    peakFrequency: number
+    spectralCentroid: number
+    spectralRolloff: number
+    spectralFlux: number
+    spectralFlatness: number
+    rms: number
+  }[]
+}
+
+async function passiveAnalysis(): Promise<PassiveAnalysisResult> {
+  // Native nodes and clocks exercise fallback scheduling. The harness replaces
+  // external WASM APIs; rejecting worklet loading selects the real fallback.
+  const processor = new AudioProcessor()
+  const graph = processor as unknown as {
+    audioContext: AudioContext
+    sourceGainA: GainNode
+    analysisInterval: number | null
+  }
+  const context = graph.audioContext
+  const oscillator = context.createOscillator()
+  const gain = context.createGain()
+  gain.gain.value = 0.2
+  oscillator.connect(gain).connect(graph.sourceGainA)
+  context.audioWorklet.addModule = async () => { throw new Error('Fixture selects analyser fallback') }
+  try {
+    await context.resume()
+    await processor.connectDualAudioElements(new Audio(), new Audio())
+    oscillator.start()
+    processor.setPlayingState(true)
+    await new Promise(resolve => setTimeout(resolve, 200))
+    const activeFallback = graph.analysisInterval !== null
+    const activeSignal = processor.getAnalysisData().frequencyData.some(value => value > 0)
+    await processor.initializePassiveMode()
+    const started = context.currentTime
+    const readings: PassiveAnalysisResult['readings'] = []
+    const passiveFallback: boolean[] = []
+    for (let sample = 0; sample < 3; sample++) {
+      if (sample > 0) await new Promise(resolve => setTimeout(resolve, 150))
+      const { frequencyData, timeDomainData, ...metrics } = processor.getAnalysisData()
+      readings.push({
+        frequencySilent: frequencyData.every(value => value === 0),
+        timeDomainSilent: timeDomainData.every(value => value === 128),
+        ...metrics,
+      })
+      passiveFallback.push(graph.analysisInterval !== null)
+    }
+    const { passive, playing } = processor.getSystemInfo()
+    return { activeFallback, activeSignal, passiveFallback, passive, playing,
+      elapsed: context.currentTime - started, readings }
+  } finally {
+    oscillator.stop()
+    oscillator.disconnect()
+    gain.disconnect()
+    processor.destroy()
+    if (context.state !== 'closed') await context.close()
+  }
+}
+
+Object.assign(window, { audioGraphFixture: { render, lifecycle, passiveAnalysis } })

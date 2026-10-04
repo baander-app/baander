@@ -43,7 +43,6 @@ const mockProcessor = {
     playing: false,
     dspReady: true,
     wasmSpectrumReady: true,
-    workerReady: true,
     workletActive: false,
     fftSize: 2048,
     filterCount: 10,

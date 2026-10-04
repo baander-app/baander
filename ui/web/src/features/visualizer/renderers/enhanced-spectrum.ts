@@ -25,13 +25,13 @@ export class EnhancedSpectrumRenderer implements VisualizerRenderer {
     const alpha = smoothingAlpha
     const decay = 0.92
 
-    // Detect low-energy state (paused or silent): getAnalysisData() fills with 20 when paused
+    // Detect low-energy state (paused or silent): getAnalysisData() exposes zeros when paused
     let totalEnergy = 0
     for (let i = 0; i < barCount; i++) {
       const dataIndex = Math.floor((i / barCount) * data.frequencyData.length)
       totalEnergy += data.frequencyData[dataIndex]! ?? 0
     }
-    const isLowEnergy = totalEnergy / barCount < 25 // floor is 20, active audio is >>25
+    const isLowEnergy = totalEnergy / barCount < 25 // Treat near-silent input as decay rather than new bar energy
 
     if (!isLowEnergy) {
       for (let i = 0; i < barCount; i++) {

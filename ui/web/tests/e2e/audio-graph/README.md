@@ -7,7 +7,7 @@ yarn exec playwright test -c tests/e2e/audio-graph/playwright.config.ts
 ```
 
 The fixture bundles the actual `AudioProcessor`, substitutes its external WASM
-loader and analysis worker, and creates its nodes in Chromium's native
+loader, and creates its nodes in Chromium's native
 `OfflineAudioContext`. A generated buffer enters the source gain and analyser
 without depending on media decoding. Tests inspect the final 200 ms of a
 one-second render so parameter smoothing settles naturally. They preserve all
@@ -34,7 +34,7 @@ It checks promotion through A → B → A, preload reuse via native `loadstart`
 events, overlap before `ended`, active media controls, and manual interruption.
 These checks establish element reuse and overlap; they do not measure a
 sample-accurate gap between decoded tracks. External activity recording, EQ
-state reapplication, and WASM/analysis workers are fixture substitutes.
+state reapplication, and WASM analysis modules are fixture substitutes.
 
 Additional native offline renders start a crossfade at context time two seconds
 and inspect both channels before, during, and after the ramp, including
@@ -49,3 +49,9 @@ AUDIO_GRAPH_SOURCE_REF=HEAD yarn exec playwright test \
 ```
 
 The archived files never replace or modify the working checkout.
+
+
+Passive-mode coverage checks that unavailable audio capture produces neutral
+buffers and no polling, rather than simulated measurements. This exercises the
+real processor in Chromium; analysis modules remain fixture substitutes except
+in the separate production WASM loader test.

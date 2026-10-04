@@ -48,7 +48,7 @@ describe('wasm-loader', () => {
     expect(getWasmUrl('loudness_r128.wasm')).toBe('/dsp/loudness_r128.wasm')
     expect(getWasmUrl('dynamics_meter.wasm')).toBe('/dsp/dynamics_meter.wasm')
     expect(getWasmUrl('fft2048.wasm')).toBe('/dsp/fft2048.wasm')
-    expect(getAudioWorkletUrl('audio-analysis-worker.js')).toBe('/audio-worklets/audio-analysis-worker.js')
+    expect(getAudioWorkletUrl('wasm-spectrum.js')).toBe('/audio-worklets/wasm-spectrum.js')
     expect(getAudioWorkletUrl('magic-soup-processor.js')).toBe('/audio-worklets/magic-soup-processor.js')
   })
 

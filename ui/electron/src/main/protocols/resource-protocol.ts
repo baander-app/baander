@@ -152,7 +152,7 @@ export function getWasmUrl(relativePath: string): string {
 
 /**
  * Get the URL for an audio worklet file
- * @param filename - The worklet filename (e.g., 'audio-analysis-worker.js')
+ * @param filename - The worklet filename (e.g., 'wasm-spectrum.js')
  * @returns Full URL using the custom protocol
  */
 export function getAudioWorkletUrl(filename: string): string {
