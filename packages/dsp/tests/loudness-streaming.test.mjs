@@ -66,9 +66,11 @@ for (const sampleRate of [44100, 48000]) {
       stream(meter, sampleRate * 4, 128);
       close(meter.api.get_lufs_momentary(), -120.691, 0.0001);
       close(meter.api.get_lufs_shortterm(), -120.691, 0.0001);
-      // More than 3000 history blocks must evict the earlier audible material.
+      const programmeLoudness = meter.api.get_lufs_integrated();
+      assert.ok(Number.isFinite(programmeLoudness) && programmeLoudness > -70);
+      // Silent passages must not evict the earlier audible programme.
       stream(meter, sampleRate * 302, 128);
-      assert.equal(meter.api.get_lufs_integrated(), -70);
+      close(meter.api.get_lufs_integrated(), programmeLoudness, 0.00001);
       close(meter.api.get_lra(), 0, 0.0001);
       meter.api.reset_loudness();
       assert.deepEqual(meter.readings(), [-70, -70, -70, 0]);

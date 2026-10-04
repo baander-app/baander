@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <algorithm>
 #include <vector>
+#include <limits>
 
 extern "C" {
 
@@ -61,7 +62,109 @@ struct Ring {
 static Ring g_m_win; // 400 ms momentary
 static Ring g_s_win; // 3 s short-term
 
-// Integrated storage for gating (coarse)
+// Exact programme gating distribution. Storage is allocated only at init.
+// Distinct block energies share no quantized bins: threshold comparisons stay
+// exact even when many blocks lie close to the relative gate.
+#ifndef LOUDNESS_GATING_CAPACITY
+#define LOUDNESS_GATING_CAPACITY 262144
+#endif
+struct GateDistribution {
+  struct Node {
+    double energy = 0, sum = 0;
+    uint64_t count = 0, total_count = 0;
+    uint32_t left = 0, right = 0;
+    int height = 1;
+  };
+  struct Aggregate { double sum = 0; uint64_t count = 0; };
+  std::vector<Node> nodes;
+  uint32_t root = 0, used = 0;
+  bool exhausted = false;
+
+  void init() {
+    nodes.resize(LOUDNESS_GATING_CAPACITY + 1);
+    root = used = 0;
+    exhausted = false;
+    nodes[0] = Node{};
+    nodes[0].height = 0;
+  }
+  int height(uint32_t i) const { return nodes[i].height; }
+  void update(uint32_t i) {
+    Node& n = nodes[i];
+    n.height = 1 + std::max(height(n.left), height(n.right));
+    n.sum = n.energy * n.count + nodes[n.left].sum + nodes[n.right].sum;
+    n.total_count = n.count + nodes[n.left].total_count + nodes[n.right].total_count;
+  }
+  uint32_t rotate_left(uint32_t i) {
+    uint32_t j = nodes[i].right;
+    nodes[i].right = nodes[j].left;
+    nodes[j].left = i;
+    update(i); update(j);
+    return j;
+  }
+  uint32_t rotate_right(uint32_t i) {
+    uint32_t j = nodes[i].left;
+    nodes[i].left = nodes[j].right;
+    nodes[j].right = i;
+    update(i); update(j);
+    return j;
+  }
+  uint32_t insert(uint32_t i, double energy) {
+    if (!i) {
+      if (used == LOUDNESS_GATING_CAPACITY) {
+        exhausted = true;
+        return 0;
+      }
+      i = ++used;
+      nodes[i] = Node{};
+      nodes[i].energy = nodes[i].sum = energy;
+      nodes[i].count = nodes[i].total_count = 1;
+      return i;
+    }
+    Node& n = nodes[i];
+    if (energy < n.energy) n.left = insert(n.left, energy);
+    else if (energy > n.energy) n.right = insert(n.right, energy);
+    else ++n.count;
+    update(i);
+    int balance = height(n.left) - height(n.right);
+    if (balance > 1) {
+      if (energy > nodes[n.left].energy) n.left = rotate_left(n.left);
+      return rotate_right(i);
+    }
+    if (balance < -1) {
+      if (energy < nodes[n.right].energy) n.right = rotate_right(n.right);
+      return rotate_left(i);
+    }
+    return i;
+  }
+  void add(double energy) {
+    if (exhausted) return;
+    if (nodes[root].total_count == std::numeric_limits<uint64_t>::max()) {
+      exhausted = true;
+      return;
+    }
+    root = insert(root, energy);
+  }
+  Aggregate above(double threshold) const {
+    Aggregate result;
+    uint32_t i = root;
+    while (i) {
+      const Node& n = nodes[i];
+      if (n.energy > threshold) {
+        result.sum += n.energy * n.count + nodes[n.right].sum;
+        result.count += n.count + nodes[n.right].total_count;
+        i = n.left;
+      } else i = n.right;
+    }
+    return result;
+  }
+};
+static GateDistribution g_integrated;
+static size_t g_gate_remaining = 0;
+static size_t g_gate_hop = 0;
+static const double g_absolute_gate = std::pow(10.0, (-70.0 + 0.691) / 10.0);
+
+// Existing bounded history for the approximate LRA statistic.
+
 static std::vector<float> g_hist; // store block energies (e.g., 100 ms blocks)
 static std::vector<float> g_lufs_scratch;
 static std::vector<float> g_percentile_scratch;
@@ -145,7 +248,10 @@ void init_loudness(int sample_rate, int truepeak_oversample) {
   g_percentile_scratch.clear();
   g_percentile_scratch.reserve(g_hist_max);
   g_block_samples = 0;
-  g_block_target = std::max(1, g_sr / 10); // 100 ms blocks
+  g_block_target = std::max(1, g_sr / 10); // Existing LRA cadence.
+  g_integrated.init();
+  g_gate_remaining = g_m_win.size(); // First gate needs a complete 400 ms.
+  g_gate_hop = std::max<size_t>(1, (size_t)std::round(g_m_win.size() / 4.0));
 
   g_lufs_m = g_lufs_s = g_lufs_i = -70.0f;
   g_lra = 0.0f;
@@ -193,6 +299,7 @@ void process_frames(const float* interleavedLR, int frames, int channels) {
   float tp = truepeak_estimate(interleavedLR, frames, channels);
 
   bool history_updated = false;
+  bool integrated_updated = false;
 
   // Per-sample processing
   for (int i = 0; i < frames; ++i) {
@@ -212,7 +319,17 @@ void process_frames(const float* interleavedLR, int frames, int channels) {
     g_m_win.push(e);
     g_s_win.push(e);
 
-    // Integrated block storage (100ms)
+    // BS.1770-5 Annex 1: complete 400 ms windows, overlapping by 75%.
+    if (--g_gate_remaining == 0) {
+      double block_energy = g_m_win.sum() / g_m_win.size();
+      if (std::isfinite(block_energy) && block_energy > g_absolute_gate) {
+        g_integrated.add(block_energy);
+      }
+      integrated_updated = true;
+      g_gate_remaining = g_gate_hop;
+    }
+
+    // Existing LRA history (100 ms cadence).
     g_block_samples++;
     if (g_block_samples >= g_block_target) {
       // average energy of last 100 ms approx
@@ -232,31 +349,28 @@ void process_frames(const float* interleavedLR, int frames, int channels) {
   g_lufs_m = -0.691f + 10.0f * std::log10(std::max(Em, 1e-12f));
   g_lufs_s = -0.691f + 10.0f * std::log10(std::max(Es, 1e-12f));
 
-  // Integrated with simple absolute and relative gating
+  if (integrated_updated) {
+    if (g_integrated.exhausted) {
+      // Never silently truncate a programme when the fixed pool fills.
+      g_lufs_i = std::numeric_limits<float>::quiet_NaN();
+    } else {
+      const auto absolute = g_integrated.above(g_absolute_gate);
+      if (absolute.count) {
+        const double relative_gate = absolute.sum / absolute.count * 0.1;
+        const auto gated = g_integrated.above(std::max(g_absolute_gate, relative_gate));
+        g_lufs_i = gated.count
+          ? (float)(-0.691 + 10.0 * std::log10(gated.sum / gated.count))
+          : -70.0f;
+      } else g_lufs_i = -70.0f;
+    }
+  }
+
   if (history_updated) {
-    // Convert energies to LUFS-like per block
     auto& lufs = g_lufs_scratch;
     lufs.resize(g_hist.size());
     for (size_t i=0;i<g_hist.size();++i) {
       lufs[i] = -0.691f + 10.0f * std::log10(std::max(g_hist[i], 1e-12f));
     }
-    // Absolute gate -70 LUFS
-    double absolute_sum = 0;
-    size_t absolute_count = 0;
-    for (float v : lufs) if (v > -70.0f) { absolute_sum += v; ++absolute_count; }
-
-    float mean = -70.0f;
-    if (absolute_count > 0) {
-      mean = (float)(absolute_sum / absolute_count);
-      // Relative gate: discard blocks more than 10 LU below current mean
-      double relative_sum = 0;
-      size_t relative_count = 0;
-      for (float v : lufs) if (v > -70.0f && v > mean - 10.0f) {
-        relative_sum += v; ++relative_count;
-      }
-      if (relative_count > 0) mean = (float)(relative_sum / relative_count);
-    }
-    g_lufs_i = mean;
 
     // LRA: interpercentile range over short-term history
     if (lufs.size() >= 20) {

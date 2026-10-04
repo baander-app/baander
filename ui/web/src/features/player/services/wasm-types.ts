@@ -15,6 +15,7 @@ export interface LoudnessR128API {
   process(inputPtr: number, frames: number, channels: number): void
   lufsM(): number
   lufsS(): number
+  /** NaN if integrated history capacity is exhausted; reset starts a new programme. */
   lufsI(): number
   lra(): number
   truePkDbfs(): number

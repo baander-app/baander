@@ -2,7 +2,7 @@ EMCC ?= emcc
 SRC  := loudness_r128.cpp
 WASM := loudness_r128.wasm
 
-CFLAGS := -O3 -ffast-math -fno-math-errno -msimd128
+CFLAGS := -O3 -fno-math-errno -msimd128
 LDFLAGS := \
   -s STANDALONE_WASM=1 \
   --no-entry \

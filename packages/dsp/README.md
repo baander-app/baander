@@ -9,6 +9,11 @@ worklet and dynamics loader match their source-package copies. It leaves tracked
 and fails on a missing compiler, different compiler version, failed vector,
 or stale artifact.
 
+The gate also builds an unshipped small-capacity gating harness. Its tests check
+exact threshold queries, tree balancing, and explicit exhaustion/reset behavior.
+The production pool remains fixed at 262144 distinct energies; the harness
+does not change the deployed ABI or memory limit.
+
 After an intentional source change, regenerate the affected artifacts before
 running the gate:
 
@@ -40,8 +45,10 @@ sample-peak decay contract. Meter worklet tests cover continuous delivery,
 silence, channel handling, sample rates, and safe WASM buffer ownership.
 Loudness streaming tests exercise state continuity and window decay; they do
 not establish R128 compliance. Independent vectors cover mono/stereo K-weighting
-at 44.1 and 48 kHz. Integrated gating, loudness range, and true-peak
-reconstruction still require correction and independent vectors; see the
+at 44.1 and 48 kHz. Integrated gating tests cover energy thresholds, complete
+blocks, retained programme history, and explicit capacity exhaustion.
+Loudness range and true-peak reconstruction still require correction and
+independent vectors; see the
 [loudness module](loudness_r128/README.md) for the remaining limitations.
 This gate does not establish resampling or
 convolution quality, native AAC codec compliance, or audible playback quality.

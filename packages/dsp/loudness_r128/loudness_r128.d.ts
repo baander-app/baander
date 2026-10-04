@@ -32,7 +32,7 @@ declare interface LoudnessR128API {
 
   /**
    * Feed interleaved frames to the analyzer.
-   * Buffer must be Float32 interleaved LR (if channels === 1, R is mirrored from L).
+   * Buffer must be Float32 interleaved mono or LR; mono contributes one channel.
    * @param inputPtr Byte offset (pointer) into WASM memory where samples start.
    * @param frames Number of frames in the provided block.
    * @param channels Number of channels (1 = mono, 2 = stereo).
@@ -50,7 +50,9 @@ declare interface LoudnessR128API {
   lufsS(): number;
 
   /**
-   * Integrated loudness (LUFS) with gating.
+   * Integrated loudness (LUFS) over complete gated programme blocks.
+   * Returns -70 before any accepted block, or NaN if exact history capacity is
+   * exhausted (until reset). Check Number.isFinite before display/serialization.
    */
   lufsI(): number;
 

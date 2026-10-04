@@ -14,10 +14,20 @@ The streaming suite separately checks block-size independence, silence,
 reset, and bounded history. Run `bash scripts/test-dsp-analysis.sh` from
 the repository root with Emscripten 6.0.3.
 
+Integrated loudness uses complete 400 ms blocks with 75% overlap. Both gates
+operate on energy: first the −70 LUFS absolute gate, then a threshold 10 LU
+below the absolute-gated mean. Earlier accepted blocks remain part of the
+programme until reset, including across long silent passages.
+
+The integrated accumulator has preallocated space for 262144 distinct accepted
+block energies. Identical energies share a count. In the worst case, capacity
+lasts approximately 7.3 hours at ten blocks per second. On exhaustion,
+`get_lufs_integrated()` / `lufsI()` returns `NaN` until reset; callers must check
+`Number.isFinite` before displaying or serializing it. Other meters continue.
+No accepted programme history is silently discarded to recover space.
+
 This is not an EBU Mode compliance claim. Remaining defects include:
 
-- Integrated loudness averages logarithmic levels, includes incomplete startup
-  blocks, and discards history after approximately five minutes.
 - Loudness range uses momentary history instead of gated short-term history.
 - The peak estimator uses linear interpolation and cannot measure intersample
   overshoot. Its oversampling argument does not make it a compliant true-peak
