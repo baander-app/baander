@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+$argv = $_SERVER['argv'] ?? [];
+
 // Copied into a disposable project as bin/console; no application kernel or external services.
 $arguments = array_slice($argv, 2);
 $pidFile = null;
@@ -38,7 +40,7 @@ switch ($argv[1] ?? '') {
             pcntl_async_signals(true);
             pcntl_signal(SIGTERM, SIG_IGN);
         }
-        while (true) {
+        for (;;) {
             usleep(10_000);
         }
     case 'app:fixture-output-overflow':
@@ -46,7 +48,7 @@ switch ($argv[1] ?? '') {
             pcntl_async_signals(true);
             pcntl_signal(SIGTERM, SIG_IGN);
         }
-        while (true) {
+        for (;;) {
             fwrite(STDOUT, str_repeat('X', 4096));
         }
     case 'app:fixture-invalid-utf8':

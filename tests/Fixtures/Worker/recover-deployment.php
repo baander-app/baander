@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+$argv = $_SERVER['argv'] ?? [];
+
 // Disposable host-side controller acceptance; the contained worker fixture does
 // not run LeasedWorkerRuntime or consult this database's lease.
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
@@ -57,8 +59,10 @@ try {
     if ($state !== ['status' => 'created', 'pid' => 0]) {
         throw new RuntimeException('Predecessor had process activity before registered startup.');
     }
-    $startCalls = 0;
-    $starter = new RegisteredDeploymentStart($inventory, static function (array $arguments) use ($command, $observer, $binding, &$startCalls): string {
+    $starts = new class {
+        public int $calls = 0;
+    };
+    $starter = new RegisteredDeploymentStart($inventory, static function (array $arguments) use ($command, $observer, $binding, $starts): string {
         if ($arguments === ['container', 'start', $binding->containerId]) {
             // Independent connection visibility proves registration and one-shot
             // admission committed BEFORE Docker starts the first worker process.
@@ -67,13 +71,14 @@ try {
             if ((int) $committed !== 1) {
                 throw new RuntimeException('Start attempted before committed inventory and claim.');
             }
-            ++$startCalls;
+            ++$starts->calls;
         }
         return $command->execute($arguments);
     });
-    if (!$starter->start($binding) || $startCalls !== 1) {
+    if (!$starter->start($binding)) {
         throw new RuntimeException('Registered initial startup was not admitted once.');
     }
+    assertSingleRecoveryStart($starts);
     $readyDeadline = hrtime(true) / 1e9 + 5;
     do {
         try {
@@ -88,13 +93,14 @@ try {
     } while (true);
     $firstPid = trim($command->execute(['container', 'inspect', '--format', '{{.State.Pid}}', $binding->containerId]));
     try {
-        if ($starter->start($binding)) {
+        if (startRecoveryDeployment($starter, $binding)) {
             throw new LogicException('A repeated controller start was admitted.');
         }
     } catch (RuntimeException) {
         // Created-state validation rejects repeating a start on a running container.
     }
-    if ($startCalls !== 1 || trim($command->execute(['container', 'inspect', '--format', '{{.State.Pid}}', $binding->containerId])) !== $firstPid) {
+    assertSingleRecoveryStart($starts);
+    if (trim($command->execute(['container', 'inspect', '--format', '{{.State.Pid}}', $binding->containerId])) !== $firstPid) {
         throw new RuntimeException('Repeated startup issued another start or changed the predecessor PID.');
     }
     echo "PASS: committed inventory and one-shot claim precede initial process activity; repeated start refused\n";
@@ -107,9 +113,7 @@ try {
     }
     // Test-only deterministic expiry using the database clock, not a wall-clock sleep.
     $connection->executeStatement("UPDATE worker_deployment_leases SET expires_at = clock_timestamp() - interval '1 second' WHERE namespace = :namespace", ['namespace' => $namespace]);
-    if ($leases->acquire($namespace, $replacementBoot, 60) !== null) {
-        throw new RuntimeException('Expired ownership incorrectly admitted a replacement.');
-    }
+    assertRecoveryAcquisitionDenied($leases, $namespace, $replacementBoot);
     if ($controller->recover($namespace, $replacementBoot, $argv[3])) {
         throw new RuntimeException('Wrong database boot unexpectedly authorized retirement.');
     }
@@ -125,15 +129,15 @@ try {
         }
     }
     $reserved = $leases->findForContainment($namespace);
-    if ($reserved === null || $reserved->bootId !== $boot || $reserved->epoch !== 1
-        || $leases->acquire($namespace, $replacementBoot, 60) !== null) {
+    assertRecoveryAcquisitionDenied($leases, $namespace, $replacementBoot);
+    if ($reserved === null || $reserved->bootId !== $boot || $reserved->epoch !== 1) {
         throw new RuntimeException('Rejected retirement changed committed ownership.');
     }
     echo "PASS: expiry and mismatched boots preserve live predecessor and committed reservation\n";
     if (!$registeredRecovery->recover($namespace, $boot)) {
         throw new RuntimeException('Successful immutable-ID removal did not release committed ownership.');
     }
-    $replacement = $leases->acquire($namespace, $replacementBoot, 60);
+    $replacement = acquireRecoveryLease($leases, $namespace, $replacementBoot);
     if ($replacement === null || $replacement->epoch !== 2 || $leases->renew($initial, 60)
         || $leases->acknowledgeContainment($initial)) {
         throw new RuntimeException('Recovery did not advance epoch or reject old tokens.');
@@ -155,7 +159,7 @@ try {
         throw new LogicException('Absent predecessor supplied a retirement receipt.');
     } catch (RuntimeException) {
     }
-    $reserved = $leases->findForContainment($namespace);
+    $reserved = readRecoveryLease($leases, $namespace);
     if ($reserved === null || $reserved->bootId !== $replacementBoot || $reserved->epoch !== 2
         || $leases->acquire($namespace, str_repeat('c', 32), 60) !== null) {
         throw new RuntimeException('Absent-container failure released active replacement ownership.');
@@ -167,4 +171,34 @@ try {
     $connection->executeStatement('DROP SCHEMA ' . $schema . ' CASCADE');
     $observer->close();
     $connection->close();
+}
+
+function startRecoveryDeployment(RegisteredDeploymentStart $starter, DeploymentContainer $binding): bool
+{
+    return $starter->start($binding);
+}
+
+function acquireRecoveryLease(DoctrineDeploymentLease $leases, string $namespace, string $bootId): ?\App\Shared\Infrastructure\Worker\DeploymentLease
+{
+    return $leases->acquire($namespace, $bootId, 60);
+}
+
+function readRecoveryLease(DoctrineDeploymentLease $leases, string $namespace): ?\App\Shared\Infrastructure\Worker\DeploymentLease
+{
+    return $leases->findForContainment($namespace);
+}
+
+/** @param object{calls: int} $starts */
+function assertSingleRecoveryStart(object $starts): void
+{
+    if ($starts->calls !== 1) {
+        throw new RuntimeException('Registered startup must be admitted exactly once.');
+    }
+}
+
+function assertRecoveryAcquisitionDenied(DoctrineDeploymentLease $leases, string $namespace, string $bootId): void
+{
+    if ($leases->acquire($namespace, $bootId, 60) !== null) {
+        throw new RuntimeException('Committed ownership incorrectly admitted a replacement.');
+    }
 }

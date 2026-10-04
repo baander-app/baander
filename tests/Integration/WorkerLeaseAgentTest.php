@@ -203,7 +203,10 @@ PHP;
         return ['action' => $action, 'sequence' => $sequence, 'namespace' => 'baander.app:workers', 'bootId' => str_repeat('a', 32), 'epoch' => $epoch, 'ttlSeconds' => 60];
     }
 
-    /** @param array<string, mixed> $request @param array<string, string>|null $environment */
+    /**
+     * @param array<string, mixed> $request
+     * @param array<string, string>|null $environment
+     */
     private function start(array $request, float $timeout = 2, ?string $directory = null, ?array $environment = null): LeaseAgentProcess
     {
         $agent = LeaseAgentProcess::start($request, $directory ?? dirname(__DIR__, 2), hrtime(true) / 1e9, $timeout, $environment ?? $this->environment);
@@ -238,7 +241,7 @@ PHP;
 
     protected function tearDown(): void
     {
-        $this->agents = [];
+        array_splice($this->agents, 0);
         gc_collect_cycles();
         foreach ($this->fixtures as $directory) {
             foreach (glob($directory . '/bin/*') ?: [] as $file) {

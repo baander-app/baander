@@ -77,7 +77,7 @@ final class WorkerDeploymentLeaseTest extends TestCase
         // Deterministically expire the fixture using the database clock, without sleeping.
         $this->second->executeStatement("UPDATE worker_deployment_leases SET expires_at = clock_timestamp() - interval '1 second'");
         self::assertFalse($first->renew($old, 60));
-        self::assertNull($second->acquire('deployment', str_repeat('b', 32), 60));
+        $this->assertAcquisitionDenied($second, 'deployment', str_repeat('b', 32));
         self::assertEquals($old, $second->findForContainment('deployment'));
         self::assertTrue($second->acknowledgeContainment($old), 'Fixture controller assumes predecessor cleanup was verified externally.');
         self::assertFalse($second->acknowledgeContainment($old));
@@ -242,6 +242,12 @@ PHP;
             $connection?->close();
         }
     }
+
+    private function assertAcquisitionDenied(DoctrineDeploymentLease $leases, string $namespace, string $bootId): void
+    {
+        self::assertNull($leases->acquire($namespace, $bootId, 60));
+    }
+
 }
 
 /** Only the acknowledgment is fault-injected: the actual PostgreSQL transaction commits first. */
@@ -257,4 +263,5 @@ final class CommitThenThrowLeaseConnection extends Connection
             throw new \RuntimeException('Injected uncertain commit acknowledgment.');
         }
     }
+
 }

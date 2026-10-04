@@ -45,6 +45,7 @@ final class NotificationRetryDeliveryTest extends TestCase
     /** @var list<Connection> */
     private array $connections = [];
 
+    /** @return iterable<string, array{bool}> */
     public static function deliveryOutcomes(): iterable
     {
         yield 'transport remains unavailable' => [false];
@@ -137,7 +138,7 @@ final class NotificationRetryDeliveryTest extends TestCase
         self::assertSame($command->notificationPublicId, $envelope->getMessage()->notificationPublicId);
         self::assertSame('async', $envelope->last(SentToFailureTransportStamp::class)?->getOriginalReceiverName());
         self::assertSame(TransportException::class, $envelope->last(ErrorDetailsStamp::class)?->getExceptionClass());
-        self::assertSame('SMTP unavailable', $envelope->last(ErrorDetailsStamp::class)?->getExceptionMessage());
+        self::assertSame('SMTP unavailable', $envelope->last(ErrorDetailsStamp::class)->getExceptionMessage());
         $failed->ack($envelope);
         self::assertSame(0, $failed->getMessageCount());
     }

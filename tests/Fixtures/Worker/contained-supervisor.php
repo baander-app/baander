@@ -18,7 +18,7 @@ if ($role === 'grandchild') {
     file_put_contents('/tmp/baander-descendant-ready', (string) getmypid());
     echo "descendant_ready\n";
     $sequence = 0;
-    while (true) {
+    for (;;) {
         file_put_contents('/tmp/baander-descendant-heartbeat', (string) ++$sequence);
         usleep(10_000);
     }
@@ -29,7 +29,7 @@ if ($role === 'child') {
     if (!is_resource($descendant)) {
         exit(2);
     }
-    while (true) {
+    for (;;) {
         usleep(10_000);
     }
 }
@@ -43,7 +43,7 @@ pcntl_signal(SIGINT, static function () use (&$stop): void { $stop = true; });
 $definition = new WorkerDefinition('containment', [PHP_BINARY, __FILE__, 'child'], dirname(__DIR__, 3), 32 * 1024 * 1024, 0.2);
 $supervisor = new WorkerSupervisor([$definition], 1, 64 * 1024 * 1024, 16 * 1024 * 1024,
     static fn (WorkerDefinition $worker, WorkerLaunchIdentity $identity): WorkerChildProcess => WorkerChildProcess::start($worker->argv, $worker->directory, STDOUT, STDERR, $worker->environment), 'containment-fixture');
-while (true) {
+for (;;) {
     $now = hrtime(true) / 1e9;
     if ($stop) {
         $supervisor->requestDrain($now);

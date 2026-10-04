@@ -69,6 +69,7 @@ final class RegisteredDeploymentStartTest extends TestCase
         self::assertSame(1, $this->startCalls);
     }
 
+    /** @param array<string, mixed> $state */
     #[DataProvider('unsafePrecreatedStates')]
     public function testUnsafeContainerNeverStartsOrClaims(array $state, bool $wrongDaemon): void
     {
@@ -153,6 +154,7 @@ final class RegisteredDeploymentStartTest extends TestCase
         self::assertSame(1, $this->startCalls, 'A lost start acknowledgment cannot cause a duplicate start.');
     }
 
+    /** @return iterable<string, array{bool}> */
     public static function uncertainStartResponses(): iterable
     {
         yield 'transport exception' => [true];

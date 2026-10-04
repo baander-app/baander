@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+$argv = $_SERVER['argv'] ?? [];
+
 // External controller test harness; never copied into an application entrypoint.
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
 

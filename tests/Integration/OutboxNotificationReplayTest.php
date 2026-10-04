@@ -101,9 +101,11 @@ final class OutboxNotificationReplayTest extends TestCase
     public function testFailureRollsBackPartialEffectsAndReceiptThenRetryRecovers(): void
     {
         $listeners = $this->notificationListeners($this->first);
-        $fail = true;
-        $listeners->addListener(UserRegistered::class, static function () use (&$fail): void {
-            if ($fail) {
+        $consumer = new class {
+            public bool $fail = true;
+        };
+        $listeners->addListener(UserRegistered::class, static function () use ($consumer): void {
+            if ($consumer->fail) {
                 throw new RuntimeException('Later consumer failed');
             }
         }, -100);
@@ -116,7 +118,7 @@ final class OutboxNotificationReplayTest extends TestCase
         }
         self::assertFalse($this->first->isTransactionActive());
         $this->assertCounts($this->second, 0, 0, 0);
-        $fail = false;
+        $consumer->fail = false;
         $replayer->dispatch($this->event(), 1);
         $this->assertCounts($this->second, 2, 3, 1);
     }
@@ -264,6 +266,7 @@ final class OutboxNotificationReplayTest extends TestCase
         $manager->method('getConnection')->willReturn($connection);
         $manager->method('isOpen')->willReturn(true);
         if ($expectsRollback) {
+            self::assertInstanceOf(\PHPUnit\Framework\MockObject\MockObject::class, $manager);
             $manager->expects($this->once())->method('clear');
         }
         $registry = $this->createStub(ManagerRegistry::class);

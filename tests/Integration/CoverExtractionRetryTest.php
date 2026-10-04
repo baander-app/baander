@@ -53,6 +53,7 @@ final class CoverExtractionRetryTest extends TestCase
     /** @var list<string> */
     private array $sourcePaths = [];
 
+    /** @return iterable<string, array{bool}> */
     public static function deliveryOutcomes(): iterable
     {
         yield 'transport remains unavailable' => [false];
@@ -165,7 +166,7 @@ final class CoverExtractionRetryTest extends TestCase
         self::assertSame($command->getAlbumId()->toString(), $envelope->getMessage()->getAlbumId()->toString());
         self::assertSame('async', $envelope->last(SentToFailureTransportStamp::class)?->getOriginalReceiverName());
         self::assertSame(\RuntimeException::class, $envelope->last(ErrorDetailsStamp::class)?->getExceptionClass());
-        self::assertSame('Cover storage unavailable', $envelope->last(ErrorDetailsStamp::class)?->getExceptionMessage());
+        self::assertSame('Cover storage unavailable', $envelope->last(ErrorDetailsStamp::class)->getExceptionMessage());
         $failed->ack($envelope);
         self::assertSame(0, $failed->getMessageCount());
     }

@@ -180,7 +180,7 @@ final class EncoderProfilePayloadIntegrationTest extends TestCase
     //
 
     /**
-     * @return list<array{EncoderProfile}>
+     * @return array<string, array{EncoderProfile}>
      */
     public static function acceleratorProvider(): array
     {

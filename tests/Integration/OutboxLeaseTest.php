@@ -60,12 +60,12 @@ final class OutboxLeaseTest extends TestCase
         $first = new OutboxRepository($this->first);
         $second = new OutboxRepository($this->second);
         $first->append('Event', 'test', []);
-        $claim = $first->fetchPending(1)[0];
+        $claim = $this->claimPending($first);
         self::assertFalse($this->first->isTransactionActive());
         self::assertSame([], $second->fetchPending(1));
 
         $this->first->executeStatement("UPDATE domain_event_outbox SET lease_until = NOW() - INTERVAL '1 second'");
-        $replacement = $second->fetchPending(1)[0];
+        $replacement = $this->claimPending($second);
         self::assertSame($claim['id'], $replacement['id']);
         self::assertNotSame($claim['lease_token'], $replacement['lease_token']);
         self::assertFalse($first->markRelayed((int) $claim['id'], $claim['lease_token']));
@@ -95,8 +95,8 @@ final class OutboxLeaseTest extends TestCase
         $first->append('Event', 'second', []);
         $this->first->beginTransaction();
         try {
-            $a = $first->fetchPending(1)[0];
-            $b = $second->fetchPending(1)[0];
+            $a = $this->claimPending($first);
+            $b = $this->claimPending($second);
             self::assertNotSame($a['id'], $b['id']);
             $this->first->commit();
         } catch (\Throwable $error) {
@@ -152,4 +152,15 @@ final class OutboxLeaseTest extends TestCase
         self::assertSame(1, (int) $this->second->fetchOne('SELECT COUNT(*) FROM domain_event_outbox WHERE relayed_at IS NOT NULL'));
         self::assertSame(0, $handler(new RelayOutboxCommand()));
     }
+
+    /** @return array<string, mixed> */
+    private function claimPending(OutboxRepository $repository): array
+    {
+        $claims = $repository->fetchPending(1);
+        self::assertCount(1, $claims);
+        self::assertArrayHasKey(0, $claims);
+
+        return $claims[0];
+    }
+
 }

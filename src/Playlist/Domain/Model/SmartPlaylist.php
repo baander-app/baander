@@ -33,7 +33,7 @@ final class SmartPlaylist
      * Operators that require a value: equals, not_equals, contains, greater_than, less_than.
      * Operators that do not require a value: is_empty, is_not_empty.
      *
-     * @param array<int, array<string, mixed>> $json
+     * @param array<int, mixed> $json
      *
      * @return array<int, array{field: string, operator: string, value?: mixed}>
      */
