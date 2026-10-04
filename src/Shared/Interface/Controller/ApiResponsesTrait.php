@@ -14,6 +14,7 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
 
 trait ApiResponsesTrait
 {
+    /** @param array<string, string|list<string>|null> $headers */
     protected function json(mixed $data, int $status = Response::HTTP_OK, array $headers = []): JsonResponse
     {
         return new JsonResponse($data, $status, $headers);
@@ -24,11 +25,13 @@ trait ApiResponsesTrait
         return new JsonResponse(null, Response::HTTP_NO_CONTENT);
     }
 
+    /** @param array<string, string|list<string>|null> $headers */
     protected function created(mixed $data = null, array $headers = []): JsonResponse
     {
         return new JsonResponse($data, Response::HTTP_CREATED, $headers);
     }
 
+    /** @param array<array-key, mixed> $data */
     protected function successResponse(array $data, int $status = Response::HTTP_OK): JsonResponse
     {
         return new JsonResponse(['data' => $data], $status);
@@ -44,6 +47,7 @@ trait ApiResponsesTrait
         return new JsonResponse($paginated->toArray());
     }
 
+    /** @param array<string, mixed> $details */
     protected function errorResponse(string $message, int $status = Response::HTTP_BAD_REQUEST, array $details = []): JsonResponse
     {
         $error = new ApiError($message, $status, $details);

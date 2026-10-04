@@ -9,7 +9,6 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Serializer\Normalizer\ArrayDenormalizer;
 use Symfony\Component\Serializer\Normalizer\BackedEnumNormalizer;
 use Symfony\Component\Serializer\Serializer;
-use Symfony\Component\Serializer\SerializerAwareInterface;
 
 final class JobMessageSerializerFactory
 {
@@ -39,9 +38,7 @@ final class JobMessageSerializerFactory
         // on normalizers implementing SerializerAwareInterface. However, since
         // AllowedClassNormalizer creates ObjectNormalizer internally, we need
         // to explicitly propagate the serializer to the inner normalizer.
-        if ($normalizer instanceof SerializerAwareInterface) {
-            $normalizer->setSerializer($serializer);
-        }
+        $normalizer->setSerializer($serializer);
 
         return $serializer;
     }

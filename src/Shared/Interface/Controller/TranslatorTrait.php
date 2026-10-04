@@ -17,6 +17,7 @@ trait TranslatorTrait
         $this->translator = $translator;
     }
 
+    /** @param array<string, mixed> $parameters */
     protected function trans(
         string $id,
         array $parameters = [],

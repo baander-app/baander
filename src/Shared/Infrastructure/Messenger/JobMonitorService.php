@@ -86,6 +86,7 @@ final class JobMonitorService
         ]);
     }
 
+    /** @return list<JobMonitorEntity> */
     public function getRecent(int $limit = 50): array
     {
         return $this->entityManager
@@ -93,6 +94,7 @@ final class JobMonitorService
             ->findBy([], ['createdAt' => 'DESC'], $limit);
     }
 
+    /** @return list<JobMonitorEntity> */
     public function getRunning(): array
     {
         return $this->entityManager
@@ -109,6 +111,7 @@ final class JobMonitorService
         ]);
     }
 
+    /** @return array<string, int> */
     public function countByStatus(): array
     {
         $qb = $this->entityManager
@@ -234,6 +237,7 @@ final class JobMonitorService
         );
     }
 
+    /** @return array<string, int> */
     public function countByStatusAndDateRange(\DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
         $qb = $this->entityManager
@@ -297,9 +301,9 @@ final class JobMonitorService
         }
 
         // Success rate: finished / (finished + failed + cancelled)
-        $finished = $statusCounts[JobStatus::Finished->value] ?? 0;
-        $failed = $statusCounts[JobStatus::Failed->value] ?? 0;
-        $cancelled = $statusCounts[JobStatus::Cancelled->value] ?? 0;
+        $finished = $statusCounts[JobStatus::Finished->value];
+        $failed = $statusCounts[JobStatus::Failed->value];
+        $cancelled = $statusCounts[JobStatus::Cancelled->value];
         $completed = $finished + $failed + $cancelled;
         $successRate = $completed > 0 ? $finished / $completed : 0.0;
 
@@ -541,6 +545,7 @@ final class JobMonitorService
         ]);
     }
 
+    /** @param array<string, mixed> $entry */
     public function appendAuditLog(string $jobId, array $entry): void
     {
         $monitor = $this->findByJobIdOrFail($jobId);
@@ -583,6 +588,8 @@ final class JobMonitorService
      *
      * Avoids loading the entity and flushing the UnitOfWork, which removes
      * flush churn and lost-update races when many status updates arrive.
+     *
+     * @param array<string, mixed> $data
      */
     private function updateJob(string $jobId, array $data): void
     {
