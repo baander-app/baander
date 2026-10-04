@@ -11,6 +11,11 @@ parameters:
     - tests/
 
   excludePaths:
+    analyse:
+      - migrations/
+
+  # Doctrine discovers migration classes outside Composer PSR-4 autoloading.
+  scanDirectories:
     - migrations/
 
   bootstrapFiles:

@@ -200,6 +200,27 @@ also passes for the Swoole decorator and transport tests. Production container
 warmup passes without wiring errors; external Redis availability was not tested in
 the no-network container. Deptrac remains at 259 violations.
 
+## PHPStan remediation in progress
+
+The sustained cleanup is reducing the 1,683-diagnostic baseline without adding
+suppressions or expanding the baseline. The latest complete snapshot reports 677
+diagnostics at the existing 512 MB analysis limit. An earlier full run exhausted
+that limit; the subsequent run completed after correcting contracts and migration
+discovery. This is progress, not a clean quality gate.
+
+Committed fixes cover secure public/token ID generation, UUID timestamp semantics,
+OAuth identity reconstruction, Messenger result propagation, OpenTelemetry span
+attributes, locale/WebSocket service contracts, and truthful test doubles. Doctrine
+migration declarations are now available for symbol discovery while retaining the
+existing analysis paths. Recommendation controllers reject principals without an
+application identity. Regression checks cover each changed runtime behavior.
+
+The current combined Shared and Recommendation unit snapshot passes 1,232 tests
+with 5,629 assertions. Auth batches pass their focused suites, including 804 Auth
+unit tests after the runtime fixes. Recent fixture changes also pass disposable
+functional tests. Full combined validation and elimination of the remaining
+PHPStan diagnostics are still in progress; Deptrac remediation remains separate.
+
 ## Recent verified checkpoints
 
 | Commit | Result | Verification |
