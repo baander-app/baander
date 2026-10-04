@@ -13,6 +13,8 @@ int main(int argc, char **argv) {
         boost::asio::io_context context(1);
         registry::DatabaseConfig database;
         database.endpoints = {{config.at("url"), "127.0.0.1"}};
+        for (const auto &url : config.value("additionalUrls", registry::Json::array()))
+            database.endpoints.push_back({url, "127.0.0.1"});
         database.ca_file = config.at("ca");
         database.client_certificate = config.at("certificate");
         database.client_key = config.at("key");
@@ -22,15 +24,39 @@ int main(int argc, char **argv) {
         database.connections = 1;
         registry::DatabasePool pool(context, database);
         const auto count = std::stoi(argv[2]);
+        const auto rotation = config.value("rotateOnError", false);
         for (int i = 0; i < (count < 0 ? 1 : count); ++i) {
             boost::asio::co_spawn(
                 context,
-                [&pool, &context, count]() -> boost::asio::awaitable<void> {
+                [&pool, &context, count, rotation]() -> boost::asio::awaitable<void> {
                     for (int attempt = 0; attempt < (count < 0 ? -count : 1); ++attempt) {
                         try {
-                            const auto response =
-                                co_await pool.request({"/db/query?level=linearizable&associative",
-                                                       registry::Json::array({"SELECT 1"})});
+                            registry::DatabaseRequest request{
+                                "/db/query?level=linearizable&associative",
+                                registry::Json::array({"SELECT 1"})};
+                            registry::Registration registration;
+                            if (rotation) {
+                                registration = registry::validate_registration(
+                                    {{"publicId", "rotation-fixture"},
+                                     {"url", "https://rotation.baander.app"},
+                                     {"name", "Rotation fixture"},
+                                     {"version", "1.0.0"},
+                                     {"apiKey", std::string(64, 'a')}});
+                                request = attempt == 0
+                                              ? registry::register_request(registration, 2000)
+                                              : registry::lookup_request(registration.public_id);
+                            }
+                            const auto response = co_await pool.request(std::move(request));
+                            if (rotation) {
+                                [[maybe_unused]] const auto decoded =
+                                    attempt == 0 ? registry::register_result(
+                                                       registration, response.status, response.body)
+                                                 : registry::lookup_result(response.status,
+                                                                           response.body, 3000);
+                            } else {
+                                registry::validate_database_result(response.status, response.body,
+                                                                   1);
+                            }
                             std::cout << response.status << '\n';
                         } catch (const registry::Failure &failure) {
                             std::cout << failure.status << '\n';

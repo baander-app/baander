@@ -78,7 +78,8 @@ struct Server {
                    std::chrono::system_clock::now().time_since_epoch())
             .count();
     }
-    asio::awaitable<Json> route(const http::request<http::string_body> &request) {
+    asio::awaitable<Json> route(const http::request<http::string_body> &request,
+                                std::chrono::steady_clock::time_point database_deadline) {
         const std::string target(request.target());
         if (request.method() == http::verb::get && target == "/health")
             co_return Json{{"data", {{"alive", true}}}};
@@ -93,7 +94,8 @@ struct Server {
                      Json::array(
                          {"SELECT version, checksum FROM schema_migrations ORDER BY version",
                           "SELECT public_id, credential_digest, url, name, version, created_ms, "
-                          "updated_ms, last_seen_ms, revision FROM registries WHERE 0"})});
+                          "updated_ms, last_seen_ms, revision FROM registries WHERE 0"})},
+                    database_deadline);
                 validate_database_result(result.status, result.body, 2);
                 const auto &schema = result.body["results"][0];
                 if (!schema.contains("types") || !schema.contains("rows") ||
@@ -122,12 +124,14 @@ struct Server {
         if (request.method() == http::verb::post && target == "/api/servers/register") {
             const auto registration =
                 validate_registration(parse_json_body(request.body(), 8192, 8));
-            auto result = co_await database.request(register_request(registration, now_ms()));
+            auto result = co_await database.request(register_request(registration, now_ms()),
+                                                    database_deadline);
             co_return register_result(registration, result.status, result.body);
         }
         const std::string prefix = "/api/servers/";
         if (request.method() == http::verb::get && target.starts_with(prefix)) {
-            auto result = co_await database.request(lookup_request(target.substr(prefix.size())));
+            auto result = co_await database.request(lookup_request(target.substr(prefix.size())),
+                                                    database_deadline);
             co_return lookup_result(result.status, result.body, now_ms());
         }
         throw Failure(404, "Route not found.");
@@ -158,6 +162,7 @@ struct Server::Session : std::enable_shared_from_this<Session> {
     Server &server;
     beast::ssl_stream<beast::tcp_stream> stream;
     asio::steady_timer deadline_timer;
+    std::chrono::steady_clock::time_point deadline_time;
     asio::cancellation_signal cancellation;
     bool active_request = false;
     Session(Server &server, tcp::socket socket)
@@ -168,7 +173,8 @@ struct Server::Session : std::enable_shared_from_this<Session> {
         beast::get_lowest_layer(stream).socket().close(ignored);
     }
     void arm_deadline() {
-        deadline_timer.expires_after(server.deadline);
+        deadline_time = std::chrono::steady_clock::now() + server.deadline;
+        deadline_timer.expires_at(deadline_time);
         deadline_timer.async_wait(
             [weak = weak_from_this()](const boost::system::error_code &error) {
                 if (!error) {
@@ -181,7 +187,7 @@ struct Server::Session : std::enable_shared_from_this<Session> {
     }
     asio::awaitable<void> run() {
         try {
-            beast::get_lowest_layer(stream).expires_after(server.deadline);
+            beast::get_lowest_layer(stream).expires_at(deadline_time);
             co_await stream.async_handshake(ssl::stream_base::server, asio::use_awaitable);
             beast::flat_buffer buffer;
             http::request_parser<http::string_body> parser;
@@ -200,7 +206,11 @@ struct Server::Session : std::enable_shared_from_this<Session> {
                     if (server.stopping)
                         throw Failure(503, "Registry is shutting down.");
                     active_request = true;
-                    body = co_await server.route(parser.release());
+                    // Preserve a small bounded write budget for a known database failure.
+                    // Slow TLS/headers retain the full-session transport cutoff.
+                    const auto reserve =
+                        std::min(std::chrono::milliseconds(100), server.deadline / 4);
+                    body = co_await server.route(parser.release(), deadline_time - reserve);
                 } catch (const Failure &failure) {
                     status = failure.status;
                     body = {{"error", failure.what()}};
@@ -218,7 +228,7 @@ struct Server::Session : std::enable_shared_from_this<Session> {
             response.body() = body.dump();
             response.prepare_payload();
             // The session timer also bounds the complete handshake/read/database/write lifecycle.
-            beast::get_lowest_layer(stream).expires_after(server.deadline);
+            beast::get_lowest_layer(stream).expires_at(deadline_time);
             co_await http::async_write(stream, response, asio::use_awaitable);
         } catch (const std::exception &) {
             // Transport disconnect/deadline errors never include credentials or request bodies in

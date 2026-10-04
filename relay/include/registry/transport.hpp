@@ -6,6 +6,7 @@
 #include <boost/asio/io_context.hpp>
 #include <chrono>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -30,13 +31,18 @@ struct DatabaseResponse {
     Json body;
 };
 Json parse_json_body(const std::string &body, std::size_t maximum_bytes, unsigned maximum_depth);
+// Confined to one io_context event-loop thread; construction/destruction and all calls
+// must be serialized. The pool must outlive every request coroutine. A future multi-thread
+// runner must add a strand or synchronized state rather than running these slots concurrently.
 class DatabasePool {
   public:
     DatabasePool(boost::asio::io_context &context, DatabaseConfig config);
     ~DatabasePool();
     DatabasePool(const DatabasePool &) = delete;
     DatabasePool &operator=(const DatabasePool &) = delete;
-    boost::asio::awaitable<DatabaseResponse> request(DatabaseRequest request);
+    boost::asio::awaitable<DatabaseResponse>
+    request(DatabaseRequest request,
+            std::optional<std::chrono::steady_clock::time_point> request_deadline = std::nullopt);
     void stop();
 
   private:

@@ -50,9 +50,12 @@ cmake -S relay -B "$work/build" -G Ninja \
 cmake --build "$work/build" --parallel 2
 ctest --test-dir "$work/build" --output-on-failure --no-tests=error
 export PYTHONDONTWRITEBYTECODE=1
+python3 relay/tests/test_cluster_cleanup.py
 python3 relay/tests/run_rqlite_contract.py \
     --rqlited "$work/rqlite/rqlited" --fixture "$work/build/registry_contract_fixture"
 python3 relay/tests/run_transport_contract.py --fixture "$work/build/registry_transport_fixture"
 python3 relay/tests/run_http_contract.py \
+    --rqlited "$work/rqlite/rqlited" --server "$work/build/baander-registry"
+python3 relay/tests/run_cluster_contract.py --nodes 3 \
     --rqlited "$work/rqlite/rqlited" --server "$work/build/baander-registry"
 echo "Registry $mode qualification passed."

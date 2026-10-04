@@ -377,7 +377,7 @@ def main():
             assert request("GET", "/ready")[0] == 200
             assert request("GET", "/api/servers/server-one")[0] == 200
 
-            def launch_graceful(grace, identifier, deadline=1000):
+            def launch_graceful(grace, identifier, deadline=1000, database_deadline=500):
                 nonlocal graceful
                 selected_port = port()
                 selected_config = dict(
@@ -389,6 +389,13 @@ def main():
                         deadlineMs=deadline,
                     ),
                 )
+                selected_config["database"] = dict(config["database"])
+                if deadline is None:
+                    selected_config["api"].pop("deadlineMs")
+                if database_deadline is None:
+                    selected_config["database"].pop("deadlineMs")
+                else:
+                    selected_config["database"]["deadlineMs"] = database_deadline
                 path = directory / (identifier + ".json")
                 path.write_text(json.dumps(selected_config))
                 graceful = subprocess.Popen(
@@ -405,6 +412,27 @@ def main():
                         raise AssertionError("Drain instance never became ready.")
                     time.sleep(0.05)
 
+            default_port = launch_graceful(
+                3000, "default-budget", deadline=None, database_deadline=None
+            )
+            gate["delay"] = 2.5
+            gate["seen"].clear()
+            try:
+                result = request(
+                    "POST",
+                    "/api/servers/register",
+                    json.dumps(dict(registration, publicId="default-timeout-uncertain")),
+                    default_port,
+                )
+            except (OSError, http.client.HTTPException) as error:
+                assert gate["seen"].is_set(), "Complete request never reached the delayed database."
+                raise AssertionError(
+                    "Complete valid request under default deadlines disconnected instead of503."
+                ) from error
+            assert result[0] == 503 and result[2].get("Retry-After") == "1"
+            gate["delay"] = 0
+            graceful.terminate()
+            assert graceful.wait(timeout=3) == 0
             gate["delay"] = 0.25
             gate["waitFor"] = 2
             gate["arrivals"] = 0
@@ -432,16 +460,13 @@ def main():
             gate["delay"] = 0.3
             gate["seen"].clear()
             start = time.monotonic()
-            try:
-                result = request(
-                    "POST",
-                    "/api/servers/register",
-                    json.dumps(dict(registration, publicId="expired-unacknowledged")),
-                    deadline_port,
-                )
-                raise AssertionError(f"Expired API request incorrectly returned {result[0]}.")
-            except (OSError, http.client.HTTPException):
-                pass
+            result = request(
+                "POST",
+                "/api/servers/register",
+                json.dumps(dict(registration, publicId="expired-unacknowledged")),
+                deadline_port,
+            )
+            assert result[0] == 503 and result[2].get("Retry-After") == "1"
             assert gate["seen"].is_set(), "Deadline test never reached pending database work."
             assert time.monotonic() - start < 0.8
             gate["delay"] = 0

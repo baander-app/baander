@@ -441,8 +441,11 @@ The C++ core and bounded TLS HTTP server are implemented and committed. Local
 qualification passes 16 sanitizer unit tests, real authenticated TLS rqlite API
 checks, same-pool reconnect/deadline checks, concurrent ownership claims, readiness
 schema recovery, and bounded graceful shutdown during a commit. Registration
-credentials are never returned or logged. These results do not qualify multi-voter
-partitions, capacity, soak, backup restoration or regional deployment. The PHP
+credentials are never returned or logged. Real three- and five-voter authenticated
+TLS clusters now pass 2–1/3–2 partitions, minority rejection, majority commits,
+leader recovery within 30 seconds, abrupt one/two-voter failures and rejoin without
+losing acknowledged metadata or revisions. These local tests do not qualify
+regional latency, constrained capacity, soak or backup restoration. The PHP
 implementation remains until the replacement's deployment path is complete.
 Clean release and ASan/LeakSanitizer/UBSan builds now pass through
 `scripts/test-registry.sh`, which verifies downloaded rqlite/OpenSSL checksums and
@@ -450,6 +453,14 @@ isolates OpenSSL dependency discovery. Both CI matrix variants are required befo
 publication. Eighteen workflow tests verify event-commit checkouts and failure
 propagation, including each registry variant. ThreadSanitizer, static analysis,
 automated license checks and performance/soak gates remain outstanding.
+
+The cluster tests exposed rqlite's HTTP-200 leadership-loss response and an API
+deadline that could expire before a database failure became a 503 response.
+The pool now evicts failed connections for the next independent request without
+replaying uncertain writes. Database work shares the remaining API deadline with
+a bounded response reserve. Failure-injection tests verify test-harness process and
+listener cleanup even when readiness or teardown fails. The blocking CI recipe now
+also runs the three-voter partition/failover gate.
 
 - [ ] Complete/verify C++20 registry with Beast/Asio, OpenSSL, nlohmann/json,
   pinned dependencies, CMake/Ninja, GoogleTest, and bounded async rqlite pools.

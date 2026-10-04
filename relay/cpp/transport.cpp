@@ -207,6 +207,9 @@ struct DatabasePool::Impl {
             co_await http::async_read(*slot.stream, buffer, parser, asio::use_awaitable);
             auto response = parser.release();
             auto body = parse_json_body(response.body(), 65536, 8);
+            // rqlite can return HTTP200 while the quorum/statement failed. Evict this
+            // connection for the NEXT request; never replay the uncertain current write.
+            validate_database_result(response.result_int(), body, request.statements.size());
             if (!response.keep_alive() || response.result_int() != 200)
                 slot.close();
             co_return DatabaseResponse{response.result_int(), std::move(body)};
@@ -224,7 +227,9 @@ void DatabasePool::stop() {
     for (auto &slot : impl_->slots)
         slot->close();
 }
-asio::awaitable<DatabaseResponse> DatabasePool::request(DatabaseRequest request) {
+asio::awaitable<DatabaseResponse>
+DatabasePool::request(DatabaseRequest request,
+                      std::optional<std::chrono::steady_clock::time_point> request_deadline) {
     if (impl_->stopping)
         throw Failure(503, "Registry is shutting down.");
     auto found = std::find_if(impl_->slots.begin(), impl_->slots.end(),
@@ -237,7 +242,12 @@ asio::awaitable<DatabaseResponse> DatabasePool::request(DatabaseRequest request)
         Impl::Slot &slot;
         ~Release() { slot.busy = false; }
     } release{slot};
-    const auto deadline = std::chrono::steady_clock::now() + impl_->config.deadline;
+    const auto now = std::chrono::steady_clock::now();
+    const auto configured_deadline = now + impl_->config.deadline;
+    const auto deadline =
+        request_deadline ? std::min(configured_deadline, *request_deadline) : configured_deadline;
+    if (deadline <= now)
+        throw Failure(503, "Database request budget exhausted.");
     asio::steady_timer timer(impl_->context, deadline);
     auto result = co_await (impl_->exchange(slot, request, deadline) ||
                             timer.async_wait(asio::use_awaitable));

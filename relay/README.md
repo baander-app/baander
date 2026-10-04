@@ -48,6 +48,19 @@ metadata; revision, update and heartbeat milliseconds make the new lifecycle exp
 
 ## Local checks
 
+The CI entrypoint builds pinned dependencies in a disposable directory:
+
+```sh
+bash scripts/test-registry.sh release
+bash scripts/test-registry.sh sanitize
+```
+
+It compiles OpenSSL 3.5.3 into an isolated prefix and checks its source archive
+against the official release SHA-256
+`c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf`.
+The sanitizer mode instruments first-party targets with ASan/LSan and UBSan;
+it does not establish complete third-party instrumentation or TSan acceptance.
+The manual commands below also work with an appropriately pinned environment.
 Dependencies are fetched from versioned archives and verified with SHA-256 in
 CMake. OpenSSL 3.5.3 must be supplied by the build environment; CMake verifies its
 exact reported version. Build outputs belong outside the checkout.
@@ -84,9 +97,35 @@ PYTHONDONTWRITEBYTECODE=1 python3 relay/tests/run_http_contract.py \
 ```
 
 These checks establish local behavior and TLS interoperability. They do not
-qualify three/five-voter partitions, whole-host capacity, regional latency,
-failover/backup recovery, fuzzing or the 24-hour soak. Those remain release gates
+qualify whole-host capacity, regional latency, physical failure or backup recovery,
+fuzzing or the 24-hour soak. Those remain release gates
 in the root roadmap; regional inventory and real S3 access are not available yet.
+
+The cluster harness starts three or five native voters with HTTPS authentication
+and Raft mTLS. A loopback TLS forwarder verifies each peer certificate, retains
+its identity when forwarding, and partitions the Raft links without pausing
+processes or changing host networking. Three-voter runs close cross-group links;
+five-voter runs stall established cross-group links and reject new ones. Healing
+closes stalled links before unblocking, so buffered RPCs are not replayed.
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 relay/tests/run_cluster_contract.py \
+  --nodes 3 --rqlited /path/to/verified/rqlited \
+  --server /tmp/baander-registry-build/baander-registry
+PYTHONDONTWRITEBYTECODE=1 python3 relay/tests/run_cluster_contract.py \
+  --nodes 5 --rqlited /path/to/verified/rqlited \
+  --server /tmp/baander-registry-build/baander-registry
+```
+
+The tests check minority 503 responses, majority progress, leader recovery within
+30 seconds, retained acknowledged metadata/revisions, rejoin, abrupt voter crashes
+(one of three or two of five), and durable catch-up after process restart.
+Uncertain writes are submitted once and are not retried. The actual lease-loss
+response can be either HTTP 200 with an error or HTTP 503; a deterministic TLS
+pool test replays the observed 200 error to verify next-request rotation without
+relying on that timing window. These are local emulations with TLS termination at
+the fixture forwarders, rather than certification of regional network behavior,
+physical disk/power loss or capacity.
 
 ## Server configuration
 
@@ -133,7 +172,12 @@ session has a deadline covering TLS, request reads, database work and response
 writes. The per-instance token bucket has constant state, without a growing
 client-IP map. The rqlite pool has 1–16 fixed slots and no waiting queue;
 saturation fails with 503. DNS, connection, TLS and response reads share a database
-deadline (50–10000 ms). Shutdown stops accepting and closes idle sessions. Admitted requests drain until
+deadline (50–10000 ms). API calls cap that deadline at their remaining budget,
+reserving up to 100 ms (at most one quarter of the API deadline) to write a known
+failure as 503 with `Retry-After`. Incomplete/slow TLS or headers and disconnected
+clients remain transport cutoffs. An HTTP 200 database response containing a
+statement/top-level error evicts the connection for the next request; the failed
+write is never replayed. Shutdown stops accepting and closes idle sessions. Admitted requests drain until
 `shutdownGraceMs` (default 5000, configurable 50–10000 ms); remaining sockets and
 rqlite work are then cancelled. The event loop drains before destroying their owners.
 
@@ -160,7 +204,7 @@ Third-party license notices are retained in `third_party/`.
 | Boost (Asio, Beast, URL and headers) | 1.88.0 | `46d9d2c06637b219270877c9e16155cbd015b6dc84349af064c088e9b5b12f7b` | Boost Software License 1.0 |
 | nlohmann/json | 3.12.0 | `42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa` | MIT |
 | GoogleTest (tests only) | 1.17.0 | `65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27c` | BSD-3-Clause |
-| OpenSSL (environment library) | 3.5.3 | Environment must pin its package/artifact | Apache-2.0 |
+| OpenSSL (environment library; isolated CI source build) | 3.5.3 | `c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf` | Apache-2.0 |
 | rqlite (external database/test binary) | 10.5.1 | Linux amd64 release: `f0ebf593b573595022947add67cd22e6cbb02c1d2a1ed8c7da45c94093a49b0d` | MIT |
 
 Authoritative contracts: [rqlite HTTP API](https://rqlite.io/docs/api/api/) and

@@ -100,6 +100,7 @@ def main():
         client_key, client_certificate = certificate(directory, "client")
         (directory / "password").write_text("disposable-test-secret\n")
         observations = []
+        arrivals = []
         behavior = {
             "status": 200,
             "delay": 0,
@@ -115,6 +116,8 @@ def main():
 
             def do_POST(self):
                 self.rfile.read(int(self.headers["Content-Length"]))
+                selected = getattr(self.server, "behavior", behavior)
+                arrivals.append((self.server.server_port, self.path))
                 observations.append(
                     (
                         self.path,
@@ -122,16 +125,16 @@ def main():
                         bool(self.connection.getpeercert()),
                     )
                 )
-                delay = behavior["delay"]
-                if behavior["delayOnce"]:
-                    behavior["delay"] = 0
-                    behavior["delayOnce"] = False
+                delay = selected["delay"]
+                if selected["delayOnce"]:
+                    selected["delay"] = 0
+                    selected["delayOnce"] = False
                 time.sleep(delay)
                 try:
-                    self.send_response(behavior["status"])
-                    self.send_header("Content-Length", str(len(behavior["body"])))
+                    self.send_response(selected["status"])
+                    self.send_header("Content-Length", str(len(selected["body"])))
                     self.end_headers()
-                    self.wfile.write(behavior["body"])
+                    self.wfile.write(selected["body"])
                 except (OSError, ssl.SSLError):
                     pass  # Expected cancellation closes the disposable client socket.
 
@@ -160,7 +163,7 @@ def main():
         }
         config_path = directory / "config.json"
 
-        def run(expected, count=1):
+        def run(expected, count=1, ordered=False):
             config_path.write_text(json.dumps(config))
             completed = subprocess.run(
                 [args.fixture, str(config_path), str(count)],
@@ -169,7 +172,8 @@ def main():
                 text=True,
                 timeout=5,
             )
-            assert sorted(completed.stdout.splitlines()) == sorted(expected), (
+            actual = completed.stdout.splitlines()
+            assert actual == expected if ordered else sorted(actual) == sorted(expected), (
                 completed.stdout + completed.stderr
             )
 
@@ -193,6 +197,61 @@ def main():
             assert (
                 len(names) == before + 1
             ), "Sequential requests did not reuse their TLS connection."
+            healthy = DisposableServer(("127.0.0.1", 0), Handler)
+            healthy.daemon_threads = True
+            healthy.behavior = {
+                "status": 200,
+                "delay": 0,
+                "delayOnce": False,
+                "body": json.dumps(
+                    {
+                        "results": [
+                            {
+                                "types": {
+                                    "public_id": "text",
+                                    "url": "text",
+                                    "name": "text",
+                                    "version": "text",
+                                    "updated_ms": "integer",
+                                    "last_seen_ms": "integer",
+                                    "revision": "integer",
+                                },
+                                "rows": [
+                                    {
+                                        "public_id": "rotation-fixture",
+                                        "url": "https://rotation.baander.app",
+                                        "name": "Rotation fixture",
+                                        "version": "1.0.0",
+                                        "updated_ms": 2000,
+                                        "last_seen_ms": 2000,
+                                        "revision": 1,
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                ).encode(),
+            }
+            healthy.socket = tls.wrap_socket(healthy.socket, server_side=True)
+            healthy_thread = threading.Thread(target=healthy.serve_forever, daemon=True)
+            healthy_thread.start()
+            try:
+                config["additionalUrls"] = [f"https://rqlite.baander.app:{healthy.server_port}"]
+                config["rotateOnError"] = True
+                # Real observed rqlite10.5.1 lease-loss response, deterministically replayed.
+                behavior["body"] = b'{"results":[],"error":"leadership lost while committing log"}'
+                before = len(arrivals)
+                run(["503", "200"], -2, ordered=True)
+                assert arrivals[before:] == [
+                    (server.server_port, "/db/request?transaction&level=linearizable&associative"),
+                    (healthy.server_port, "/db/query?level=linearizable&associative"),
+                ], "Uncertain write was replayed or next lookup did not rotate."
+            finally:
+                healthy.shutdown()
+                healthy.server_close()
+                healthy_thread.join(timeout=2)
+                config.pop("additionalUrls")
+                config.pop("rotateOnError")
             behavior["status"] = 301
             run(["503"])  # Never follow redirects or downgrade consistency.
             behavior["status"] = 200
@@ -204,7 +263,7 @@ def main():
             run(["503"])
             assert len(observations) == before, "Wrong TLS hostname reached authenticated HTTP."
             print(
-                "PASS: 8 native TLS scenarios (authentication, SNI, saturation/deadline, same-pool reconnect/keepalive, redirect, malformed response, hostname verification)."
+                "PASS: native TLS authentication/SNI, saturation/deadline, same-pool reconnect/keepalive, observed-error rotation without replay, redirect, malformed response, hostname verification."
             )
         finally:
             server.shutdown()
