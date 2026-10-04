@@ -82,7 +82,13 @@ final class AdminLoginBlockController
     #[IsGranted('ROLE_SUPER_ADMIN')]
     public function delete(string $id): JsonResponse
     {
-        $this->repository->deleteByUuid(Uuid::fromString($id));
+        try {
+            $uuid = Uuid::fromString($id);
+        } catch (\InvalidArgumentException) {
+            return $this->notFound('Block not found.');
+        }
+
+        $this->repository->deleteByUuid($uuid);
 
         return $this->noContent();
     }
