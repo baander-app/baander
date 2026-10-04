@@ -45,7 +45,7 @@ final class AudioPreferencesControllerTest extends TestCase
 
         $user = new SecurityUser(
             id: '01911111-1111-7111-8111-111111111111',
-            email: 'user@example.com',
+            email: 'user@baander.app',
             password: 'hashed-pw',
         );
         $this->security->method('getUser')->willReturn($user);
@@ -59,8 +59,7 @@ final class AudioPreferencesControllerTest extends TestCase
         $request = $this->createJsonRequest('GET', '');
 
         $payload = ['enabled' => true, 'preset' => 'flat'];
-        $this->port->method('getForUser')->willReturn($payload);
-        $this->port->method('getVersion')->willReturn(3);
+        $this->port->method('getSnapshotForUser')->willReturn(['payload' => $payload, 'version' => 3]);
 
         $response = $this->controller->index($request);
 
@@ -76,7 +75,7 @@ final class AudioPreferencesControllerTest extends TestCase
     {
         $request = $this->createJsonRequest('GET', '');
 
-        $this->port->method('getForUser')->willReturn(null);
+        $this->port->method('getSnapshotForUser')->willReturn(null);
 
         $response = $this->controller->index($request);
 
@@ -120,7 +119,7 @@ final class AudioPreferencesControllerTest extends TestCase
         $this->jsonEncoder->method('decode')->willReturn($inputData);
         $this->validator->method('validate')->willReturn(new ConstraintViolationList());
 
-        $this->port->method('saveForUser')->willThrowException(new \RuntimeException('Version mismatch'));
+        $this->port->method('saveForUser')->willThrowException(new \App\UserPreference\Application\Exception\PreferenceVersionConflict(5));
         $this->port->method('getVersion')->willReturn(5);
 
         $response = $this->controller->update($request);
@@ -167,9 +166,9 @@ final class AudioPreferencesControllerTest extends TestCase
         $this->port->expects($this->once())
             ->method('rollbackTo')
             ->with($this->isInstanceOf(Uuid::class), 2)
-            ->willReturn(['enabled' => false, 'preset' => 'rock']);
+            ->willReturn(['payload' => ['enabled' => false, 'preset' => 'rock'], 'version' => 4]);
 
-        $this->port->method('getVersion')->willReturn(4);
+        $this->port->expects($this->never())->method('getVersion');
 
         $response = $this->controller->rollback($request);
 

@@ -25,7 +25,14 @@ final class PlayerPreferencesDoctrineRepository implements PlayerPreferencesRepo
             ->getRepository(PlayerPreferencesEntity::class)
             ->findOneBy(['user' => $userId]);
 
-        return $entity !== null ? $this->toDomain($entity) : null;
+        if ($entity === null) {
+            return null;
+        }
+
+        // Versioned writes use DBAL; refresh any entity already in the identity map.
+        $this->entityManager->refresh($entity);
+
+        return $this->toDomain($entity);
     }
 
     public function save(PlayerPreferences $model): void

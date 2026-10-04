@@ -5689,7 +5689,10 @@ export type PutPlayerPreferencesUpdateBodyPayload = {
 
 export type PutPlayerPreferencesUpdateBody = {
   payload: PutPlayerPreferencesUpdateBodyPayload;
-  /** @minimum 1 */
+  /**
+     * Expected current version; 0 creates preferences.
+     * @minimum 0
+     */
   version: number;
 };
 

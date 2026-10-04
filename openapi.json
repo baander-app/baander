@@ -17170,6 +17170,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "Concurrent version conflict",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Invalid input",
                         "content": {
@@ -17829,6 +17839,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "Concurrent version conflict",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Invalid input",
                         "content": {
@@ -17984,8 +18004,9 @@
                                         "type": "object"
                                     },
                                     "version": {
+                                        "description": "Expected current version; 0 creates preferences.",
                                         "type": "integer",
-                                        "minimum": 1
+                                        "minimum": 0
                                     }
                                 },
                                 "type": "object"
@@ -18198,6 +18219,16 @@
                     },
                     "401": {
                         "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Concurrent version conflict",
                         "content": {
                             "application/json": {
                                 "schema": {

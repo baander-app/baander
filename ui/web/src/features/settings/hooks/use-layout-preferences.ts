@@ -4,9 +4,10 @@ import { mediator } from '@/shared/lib/mediator/bus'
 import { SETTINGS_ACTIONS } from '@/features/settings/settings-actions'
 import { usePreferenceSync } from './use-preference-sync'
 
-export function useLayoutPreferences() {
+export function useLayoutPreferences(isActive?: () => boolean) {
 
   const sync = usePreferenceSync<ContextPanelState>({
+    isActive,
     baseUrl: '/api/user/layout-preferences/',
     toPayload: (state) => ({
       mode: state.mode,

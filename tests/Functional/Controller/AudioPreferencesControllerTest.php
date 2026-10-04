@@ -16,11 +16,7 @@ use App\Tests\Functional\TestCase;
  *   GET    /api/user/audio-preferences/history    version history
  *   POST   /api/user/audio-preferences/rollback   restore a previous version
  *
- * Notable behaviour pinned here: the adapter performs no server-side optimistic
- * locking — saveForUser() simply increments the client-supplied version, so a
- * 409 conflict can never occur (the controller's catch is dead code). Versioning
- * is therefore client-driven, which testSaveDoesNotEnforceOptimisticLocking
- * documents explicitly.
+ * Saves require the current persisted version and reject stale writes without adding history.
  */
 final class AudioPreferencesControllerTest extends TestCase
 {
@@ -57,7 +53,7 @@ final class AudioPreferencesControllerTest extends TestCase
             'data',
         );
 
-        $this->assertSame($payload, $data['data']['payload']);
+        $this->assertEquals($payload, $data['data']['payload']);
         $this->assertSame(1, $data['data']['version']);
     }
 
@@ -86,7 +82,7 @@ final class AudioPreferencesControllerTest extends TestCase
             'data',
         );
 
-        $this->assertSame($payload, $data['data']['payload']);
+        $this->assertEquals($payload, $data['data']['payload']);
         $this->assertSame(1, $data['data']['version']);
     }
 
@@ -102,17 +98,41 @@ final class AudioPreferencesControllerTest extends TestCase
         $this->assertSame(['preset' => 'BASS'], $second['data']['payload']);
     }
 
-    public function testSaveDoesNotEnforceOptimisticLocking(): void
+    public function testSaveRejectsStaleVersionWithoutChangingPayloadOrHistory(): void
     {
-        // The adapter never compares the supplied version against the stored one,
-        // so a stale version does not produce a 409 — it is silently accepted.
-        // This test pins that (lack of) behaviour so a future fix is intentional.
         $user = $this->createTestUser();
 
         $this->savePreferences($user, ['preset' => 'FLAT'], 0);   // -> version 1
         $stale = $this->savePreferences($user, ['preset' => 'BASS'], 0); // stale version 0
 
-        $this->assertSame(200, $stale->getStatusCode(), 'A stale version must not be rejected (no optimistic locking).');
+        $conflict = $this->assertJsonResponse($stale, 409);
+        $this->assertSame(1, $conflict['error']['details']['currentVersion']);
+        $saved = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/user/audio-preferences/', $user), 200, 'data');
+        $this->assertSame(['preset' => 'FLAT'], $saved['data']['payload']);
+        $this->assertSame(1, $saved['data']['version']);
+        $history = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/user/audio-preferences/history', $user), 200, 'data');
+        $this->assertCount(1, $history['data']['history']);
+        $retry = $this->assertJsonResponse($this->savePreferences($user, ['preset' => 'FLAT'], 1), 200, 'data');
+        $this->assertSame(2, $retry['data']['version']);
+    }
+
+    public function testSaveRejectsNonzeroVersionWhenAbsent(): void
+    {
+        $user = $this->createTestUser();
+        $conflict = $this->assertJsonResponse($this->savePreferences($user, ['preset' => 'FLAT'], 3), 409);
+        $this->assertSame(0, $conflict['error']['details']['currentVersion']);
+        $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/user/audio-preferences/', $user), 404);
+    }
+
+    public function testSaveRejectsStalePositiveAndFutureVersions(): void
+    {
+        $user = $this->createTestUser();
+        $this->assertJsonResponse($this->savePreferences($user, ['preset' => 'FLAT'], 0), 200);
+        $this->assertJsonResponse($this->savePreferences($user, ['preset' => 'FLAT'], 1), 200);
+        foreach ([1, 9] as $expectedVersion) {
+            $conflict = $this->assertJsonResponse($this->savePreferences($user, ['preset' => 'FLAT'], $expectedVersion), 409);
+            $this->assertSame(2, $conflict['error']['details']['currentVersion']);
+        }
     }
 
     public function testSaveWithNegativeVersionFailsValidation(): void
@@ -181,7 +201,8 @@ final class AudioPreferencesControllerTest extends TestCase
             'data',
         );
 
-        $this->assertSame($firstPayload, $data['data']['payload'], 'Rollback must restore the version-1 payload.');
+        $this->assertEquals($firstPayload, $data['data']['payload'], 'Rollback must restore the version-1 payload.');
+        $this->assertSame(3, $data['data']['version']);
     }
 
     public function testRollbackWithVersionBelowOneFailsValidation(): void

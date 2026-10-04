@@ -6,6 +6,7 @@ namespace App\UserPreference\Interface\Controller;
 
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Shared\Domain\Model\Uuid;
+use App\UserPreference\Application\Exception\PreferenceVersionConflict;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\UserPreference\Application\Port\LayoutPreferencesPortInterface;
 use App\UserPreference\Interface\Request\RollbackRequest;
@@ -58,18 +59,13 @@ final class LayoutPreferencesController
     {
         $userId = $this->getUserId();
 
-        $payload = $this->layoutPreferencesPort->getForUser($userId);
+        $snapshot = $this->layoutPreferencesPort->getSnapshotForUser($userId);
 
-        if ($payload === null) {
+        if ($snapshot === null) {
             return $this->notFound('No layout preferences found.');
         }
 
-        $version = $this->layoutPreferencesPort->getVersion($userId);
-
-        return $this->successResponse([
-            'payload' => $payload,
-            'version' => $version,
-        ]);
+        return $this->successResponse($snapshot);
     }
 
     #[OA\Put(
@@ -120,10 +116,8 @@ final class LayoutPreferencesController
 
         try {
             $newVersion = $this->layoutPreferencesPort->saveForUser($userId, $dto->payload, $dto->version);
-        } catch (\RuntimeException $e) {
-            $currentVersion = $this->layoutPreferencesPort->getVersion($userId);
-
-            return $this->errorResponse('Conflict', 409, ['currentVersion' => $currentVersion]);
+        } catch (PreferenceVersionConflict $e) {
+            return $this->errorResponse('Conflict', 409, ['currentVersion' => $e->currentVersion]);
         }
 
         return $this->successResponse([
@@ -181,6 +175,7 @@ final class LayoutPreferencesController
                 new OA\Property(property: 'version', type: 'integer'),
             ])),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '409', description: 'Concurrent version conflict', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Invalid input', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
@@ -198,13 +193,12 @@ final class LayoutPreferencesController
             return $this->validationErrorResponse($errors);
         }
 
-        $payload = $this->layoutPreferencesPort->rollbackTo($userId, $dto->version);
-        $version = $this->layoutPreferencesPort->getVersion($userId);
-
-        return $this->successResponse([
-            'payload' => $payload,
-            'version' => $version,
-        ]);
+        try {
+            $snapshot = $this->layoutPreferencesPort->rollbackTo($userId, $dto->version);
+        } catch (PreferenceVersionConflict $e) {
+            return $this->errorResponse('Conflict', 409, ['currentVersion' => $e->currentVersion]);
+        }
+        return $this->successResponse($snapshot);
     }
 
     private function getUserId(): Uuid

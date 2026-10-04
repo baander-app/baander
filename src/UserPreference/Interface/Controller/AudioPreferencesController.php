@@ -6,6 +6,7 @@ namespace App\UserPreference\Interface\Controller;
 
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Shared\Domain\Model\Uuid;
+use App\UserPreference\Application\Exception\PreferenceVersionConflict;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\UserPreference\Application\Port\AudioPreferencesPortInterface;
 use App\UserPreference\Interface\Request\RollbackRequest;
@@ -55,18 +56,13 @@ final class AudioPreferencesController
     {
         $userId = $this->getUserId();
 
-        $payload = $this->audioPreferencesPort->getForUser($userId);
+        $snapshot = $this->audioPreferencesPort->getSnapshotForUser($userId);
 
-        if ($payload === null) {
+        if ($snapshot === null) {
             return $this->notFound('No audio preferences found.');
         }
 
-        $version = $this->audioPreferencesPort->getVersion($userId);
-
-        return $this->successResponse([
-            'payload' => $payload,
-            'version' => $version,
-        ]);
+        return $this->successResponse($snapshot);
     }
 
     #[OA\Put(
@@ -114,10 +110,8 @@ final class AudioPreferencesController
 
         try {
             $newVersion = $this->audioPreferencesPort->saveForUser($userId, $dto->payload, $dto->version);
-        } catch (\RuntimeException $e) {
-            $currentVersion = $this->audioPreferencesPort->getVersion($userId);
-
-            return $this->errorResponse('Conflict', 409, ['currentVersion' => $currentVersion]);
+        } catch (PreferenceVersionConflict $e) {
+            return $this->errorResponse('Conflict', 409, ['currentVersion' => $e->currentVersion]);
         }
 
         return $this->successResponse([
@@ -172,6 +166,7 @@ final class AudioPreferencesController
                 new OA\Property(property: 'version', type: 'integer'),
             ])),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '409', description: 'Concurrent version conflict', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Invalid input', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
@@ -189,13 +184,12 @@ final class AudioPreferencesController
             return $this->validationErrorResponse($errors);
         }
 
-        $payload = $this->audioPreferencesPort->rollbackTo($userId, $dto->version);
-        $version = $this->audioPreferencesPort->getVersion($userId);
-
-        return $this->successResponse([
-            'payload' => $payload,
-            'version' => $version,
-        ]);
+        try {
+            $snapshot = $this->audioPreferencesPort->rollbackTo($userId, $dto->version);
+        } catch (PreferenceVersionConflict $e) {
+            return $this->errorResponse('Conflict', 409, ['currentVersion' => $e->currentVersion]);
+        }
+        return $this->successResponse($snapshot);
     }
 
     private function getUserId(): Uuid

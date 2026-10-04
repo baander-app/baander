@@ -29,37 +29,40 @@ interface AudioPreferencePayload {
   chainOrder: string[]
 }
 
-export function useAudioPreferences() {
+function snapshotAudioPreferences(): AudioPreferencePayload {
+  const bandsState = useEqBandsStore.getState()
+  const processingState = useEqProcessingStore.getState()
+  return {
+    enabled: bandsState.enabled,
+    bands: bandsState.bands.map((b) => b.gain),
+    bandsV2: bandsState.bands.map((band) => ({ ...band })),
+    preset: bandsState.preset,
+    compressionEnabled: processingState.compressionEnabled,
+    compressorThreshold: processingState.compressorThreshold,
+    compressorRatio: processingState.compressorRatio,
+    compressorKnee: processingState.compressorKnee,
+    compressorAttack: processingState.compressorAttack,
+    compressorRelease: processingState.compressorRelease,
+    masterGain: processingState.masterGain,
+    normalizationEnabled: processingState.normalizationEnabled,
+    targetLufs: processingState.targetLufs,
+    visualizerMode: bandsState.visualizerMode,
+    stereoEnabled: processingState.stereoEnabled,
+    stereoWidth: processingState.stereoWidth,
+    stereoMode: processingState.stereoMode,
+    crossfeedEnabled: processingState.crossfeedEnabled,
+    crossfeedPreset: processingState.crossfeedPreset,
+    loudnessContourEnabled: processingState.loudnessContourEnabled,
+    chainOrder: [...processingState.chainOrder],
+  }
+}
+
+export function useAudioPreferences(isActive?: () => boolean) {
 
   const sync = usePreferenceSync<AudioPreferencePayload>({
+    isActive,
     baseUrl: '/api/user/audio-preferences/',
-    toPayload: () => {
-      const bandsState = useEqBandsStore.getState()
-      const processingState = useEqProcessingStore.getState()
-      return {
-        enabled: bandsState.enabled,
-        bands: bandsState.bands.map((b) => b.gain),
-        bandsV2: bandsState.bands,
-        preset: bandsState.preset,
-        compressionEnabled: processingState.compressionEnabled,
-        compressorThreshold: processingState.compressorThreshold,
-        compressorRatio: processingState.compressorRatio,
-        compressorKnee: processingState.compressorKnee,
-        compressorAttack: processingState.compressorAttack,
-        compressorRelease: processingState.compressorRelease,
-        masterGain: processingState.masterGain,
-        normalizationEnabled: processingState.normalizationEnabled,
-        targetLufs: processingState.targetLufs,
-        visualizerMode: bandsState.visualizerMode,
-        stereoEnabled: processingState.stereoEnabled,
-        stereoWidth: processingState.stereoWidth,
-        stereoMode: processingState.stereoMode,
-        crossfeedEnabled: processingState.crossfeedEnabled,
-        crossfeedPreset: processingState.crossfeedPreset,
-        loudnessContourEnabled: processingState.loudnessContourEnabled,
-        chainOrder: processingState.chainOrder,
-      }
-    },
+    toPayload: (state) => ({ ...state }),
     fromPayload: (payload) => payload as unknown as AudioPreferencePayload,
     onRemoteUpdate: useCallback((data) => {
       mediator.dispatch(SETTINGS_ACTIONS.APPLY_EQ, {
@@ -82,5 +85,10 @@ export function useAudioPreferences() {
     }, []),
   })
 
-  return sync
+  return {
+    ...sync,
+    pushToServer: () => sync.pushToServer(snapshotAudioPreferences()),
+    resolveConflict: (resolution: 'mine' | 'theirs') =>
+      sync.resolveConflict(resolution, snapshotAudioPreferences()),
+  }
 }

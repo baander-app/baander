@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useEqBandsStore } from '@/features/equalizer/stores/eq-bands-store'
 import { useEqProcessingStore } from '@/features/equalizer/stores/eq-processing-store'
 import { usePlayerStore } from '@/features/player/stores/player-store'
@@ -13,27 +13,41 @@ import { useAccentColor, VALID_COLORS } from './use-accent-color'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 
 export function PreferenceSyncProvider({ children }: { children: React.ReactNode }) {
-  const audioSync = useAudioPreferences()
-  const playerSync = usePlayerPreferences()
-  const layoutSync = useLayoutPreferences()
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  const userUuid = useAuthStore((state) => state.user?.uuid)
+  const { applyOnMount: applyThemeMood } = useThemeMood()
+  const { applyOnMount: applyAccentColor } = useAccentColor()
 
-  const themeMood = useThemeMood()
-  const accentColor = useAccentColor()
+  useEffect(() => {
+    applyThemeMood()
+    applyAccentColor()
+  }, [applyThemeMood, applyAccentColor])
 
-  const [activeConflict, setActiveConflict] = useState<{
-    sync: ReturnType<typeof useAudioPreferences>
-    store: 'audio' | 'player' | 'layout'
-  } | null>(null)
+  return (
+    <>
+      {children}
+      {isAuthenticated && userUuid
+        ? <PreferenceSyncSession key={userUuid} userUuid={userUuid} />
+        : null}
+    </>
+  )
+}
 
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
-  const initialized = useRef(false)
+function PreferenceSyncSession({ userUuid }: { userUuid: string }) {
+  const isActive = useCallback(() => {
+    const auth = useAuthStore.getState()
+    return auth.isAuthenticated && auth.user?.uuid === userUuid
+  }, [userUuid])
+  const audioSync = useAudioPreferences(isActive)
+  const playerSync = usePlayerPreferences(isActive)
+  const layoutSync = useLayoutPreferences(isActive)
 
   // The sync objects returned by the preference hooks are fresh each render, and the
   // callbacks inside them are not referentially stable (their useCallback deps include
   // inline toPayload/fromPayload). Mirror the latest push/fetch callbacks into refs so the
-  // subscribe + fetch effects below can depend only on `isAuthenticated` and run once per
+  // subscribe + fetch effects below can depend only on `isActive` and run once per
   // auth transition instead of tearing down and recreating four store subscriptions (and
-  // re-running the fetch guard) on every render.
+  // repeating server fetches) on every render.
   const audioPushRef = useRef(audioSync.pushToServer)
   const playerPushRef = useRef(playerSync.pushToServer)
   const layoutPushRef = useRef(layoutSync.pushToServer)
@@ -54,60 +68,49 @@ export function PreferenceSyncProvider({ children }: { children: React.ReactNode
     layoutFetchRef.current = layoutSync.fetchFromServer
   }, [audioSync, playerSync, layoutSync])
 
-  // Apply theme immediately on mount (before auth check)
+  // Each authenticated account owns a fresh sync session. Cleanup also permits
+  // StrictMode effect replay to restart requests instead of skipping initialization.
   useEffect(() => {
-    themeMood.applyOnMount()
-    accentColor.applyOnMount()
-  }, [themeMood.applyOnMount, accentColor.applyOnMount])
+    if (!isActive()) return
+    const controller = new AbortController()
+    const canApply = () => !controller.signal.aborted && isActive()
 
-  // Fetch all preferences from server once authenticated
-  useEffect(() => {
-    if (!isAuthenticated) return
-    if (initialized.current) return
-    initialized.current = true
+    void audioFetchRef.current()
+    void playerFetchRef.current()
+    void layoutFetchRef.current()
 
-    audioFetchRef.current()
-    playerFetchRef.current()
-    layoutFetchRef.current()
-
-    // Fetch theme mood and accent color from server
-    ;(async () => {
+    void (async () => {
       try {
-        const moodRes = await AXIOS_INSTANCE.get('/api/user/theme-mood/')
+        const moodRes = await AXIOS_INSTANCE.get('/api/user/theme-mood/', { signal: controller.signal })
         const serverMood = moodRes.data?.mood ?? moodRes.data?.data?.mood
-        if (serverMood && (VALID_MOODS as readonly string[]).includes(serverMood)) {
+        if (canApply() && serverMood && (VALID_MOODS as readonly string[]).includes(serverMood)) {
           localStorage.setItem('baander-theme-mood', serverMood)
           document.documentElement.setAttribute('data-theme', serverMood)
         }
       } catch { /* first-time user, use local/OS default */ }
 
+      if (!canApply()) return
       try {
-        const colorRes = await AXIOS_INSTANCE.get('/api/user/accent-color/')
+        const colorRes = await AXIOS_INSTANCE.get('/api/user/accent-color/', { signal: controller.signal })
         const serverColor = colorRes.data?.color ?? colorRes.data?.data?.color
-        if (serverColor && (VALID_COLORS as readonly string[]).includes(serverColor)) {
+        if (canApply() && serverColor && (VALID_COLORS as readonly string[]).includes(serverColor)) {
           localStorage.setItem('baander-accent-color', serverColor)
           document.documentElement.setAttribute('data-accent', serverColor)
         }
       } catch { /* first-time user, use local default */ }
     })()
-  }, [isAuthenticated])
 
-  // Reset initialization when user logs out
-  useEffect(() => {
-    if (!isAuthenticated) {
-      initialized.current = false
-    }
-  }, [isAuthenticated])
+    return () => controller.abort()
+  }, [isActive])
 
   // Subscribe to store changes and push to server
   useEffect(() => {
-    if (!isAuthenticated) return
+    if (!isActive()) return
 
     const unsubBands = useEqBandsStore.subscribe((state, prevState) => {
       const keys: (keyof typeof state)[] = ['enabled', 'bands', 'preset', 'visualizerMode']
       if (keys.some((k) => state[k] !== prevState[k])) {
-        // toPayload reads from stores directly; arg triggers the debounce+push
-        audioPushRef.current({} as any)
+        audioPushRef.current()
       }
     })
 
@@ -117,7 +120,7 @@ export function PreferenceSyncProvider({ children }: { children: React.ReactNode
         'targetLufs',
       ]
       if (keys.some((k) => state[k] !== prevState[k])) {
-        audioPushRef.current({} as any)
+        audioPushRef.current()
       }
     })
 
@@ -140,65 +143,37 @@ export function PreferenceSyncProvider({ children }: { children: React.ReactNode
       unsubPlayer()
       unsubLayout()
     }
-  }, [isAuthenticated])
+  }, [isActive])
 
-  // Detect conflicts from any sync
-  useEffect(() => {
-    if (audioSync.conflict.type === 'conflict') {
-      setActiveConflict({ sync: audioSync as any, store: 'audio' })
-    } else if (playerSync.conflict.type === 'conflict') {
-      setActiveConflict({ sync: playerSync as any, store: 'player' })
-    } else if (layoutSync.conflict.type === 'conflict') {
-      setActiveConflict({ sync: layoutSync as any, store: 'layout' })
-    }
-  }, [audioSync.conflict, playerSync.conflict, layoutSync.conflict])
+  // Render the highest-priority current conflict and use its current resolver.
+  const activeConflict = audioSync.conflict.type === 'conflict'
+    ? {
+        serverVersion: audioSync.conflict.serverVersion,
+        resolve: (resolution: 'mine' | 'theirs') => audioSync.resolveConflict(resolution),
+      }
+    : playerSync.conflict.type === 'conflict'
+      ? {
+          serverVersion: playerSync.conflict.serverVersion,
+          resolve: (resolution: 'mine' | 'theirs') =>
+            playerSync.resolveConflict(resolution, usePlayerStore.getState()),
+        }
+      : layoutSync.conflict.type === 'conflict'
+        ? {
+            serverVersion: layoutSync.conflict.serverVersion,
+            resolve: (resolution: 'mine' | 'theirs') =>
+              layoutSync.resolveConflict(resolution, useContextPanelStore.getState()),
+          }
+        : null
 
   function handleConflictResolve(resolution: 'mine' | 'theirs') {
-    if (!activeConflict) return
-
-    const localState = (() => {
-      switch (activeConflict.store) {
-        case 'audio':
-          // The sync's toPayload reads from stores directly, so pass a minimal payload
-          return {
-            enabled: true,
-            bands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            preset: 'FLAT',
-            compressionEnabled: false,
-            compressorThreshold: -20,
-            compressorRatio: 4,
-            compressorKnee: 4,
-            compressorAttack: 0.003,
-            compressorRelease: 0.1,
-            masterGain: 0,
-            normalizationEnabled: false,
-            targetLufs: -16,
-            visualizerMode: 'spectrum',
-            stereoEnabled: false,
-            stereoWidth: 100,
-            stereoMode: 'normal',
-            crossfeedEnabled: false,
-            crossfeedPreset: 'normal',
-            loudnessContourEnabled: false,
-            chainOrder: [],
-          } as const
-        case 'player':
-          return usePlayerStore.getState()
-        case 'layout':
-          return useContextPanelStore.getState()
-      }
-    })()
-
-    activeConflict.sync.resolveConflict(resolution, localState as any)
-    setActiveConflict(null)
+    void activeConflict?.resolve(resolution)
   }
 
   return (
     <>
-      {children}
       <PreferenceConflictDialog
         open={activeConflict != null}
-        serverVersion={activeConflict?.sync.conflict.serverVersion ?? null}
+        serverVersion={activeConflict?.serverVersion ?? null}
         onResolve={handleConflictResolve}
       />
     </>

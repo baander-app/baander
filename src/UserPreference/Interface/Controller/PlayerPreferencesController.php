@@ -6,6 +6,7 @@ namespace App\UserPreference\Interface\Controller;
 
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Shared\Domain\Model\Uuid;
+use App\UserPreference\Application\Exception\PreferenceVersionConflict;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\UserPreference\Application\Port\PlayerPreferencesPortInterface;
 use App\UserPreference\Interface\Request\RollbackRequest;
@@ -65,18 +66,13 @@ final class PlayerPreferencesController
     {
         $userId = $this->getUserId();
 
-        $payload = $this->playerPreferencesPort->getForUser($userId);
+        $snapshot = $this->playerPreferencesPort->getSnapshotForUser($userId);
 
-        if ($payload === null) {
+        if ($snapshot === null) {
             return $this->notFound('No player preferences found.');
         }
 
-        $version = $this->playerPreferencesPort->getVersion($userId);
-
-        return $this->successResponse([
-            'payload' => $payload,
-            'version' => $version,
-        ]);
+        return $this->successResponse($snapshot);
     }
 
     #[OA\Put(
@@ -100,7 +96,7 @@ final class PlayerPreferencesController
                             new OA\Property(property: 'replayGainMode', type: 'string', enum: ['track', 'album']),
                             new OA\Property(property: 'replayGainPreAmp', type: 'number', minimum: -15, maximum: 15),
                         ]),
-                        new OA\Property(property: 'version', type: 'integer', minimum: 1),
+                        new OA\Property(property: 'version', type: 'integer', minimum: 0, description: 'Expected current version; 0 creates preferences.'),
                     ],
                 ),
             ),
@@ -144,10 +140,8 @@ final class PlayerPreferencesController
 
         try {
             $newVersion = $this->playerPreferencesPort->saveForUser($userId, $dto->payload, $dto->version);
-        } catch (\RuntimeException $e) {
-            $currentVersion = $this->playerPreferencesPort->getVersion($userId);
-
-            return $this->errorResponse('Conflict', 409, ['currentVersion' => $currentVersion]);
+        } catch (PreferenceVersionConflict $e) {
+            return $this->errorResponse('Conflict', 409, ['currentVersion' => $e->currentVersion]);
         }
 
         return $this->successResponse([
@@ -212,6 +206,7 @@ final class PlayerPreferencesController
                 new OA\Property(property: 'version', type: 'integer'),
             ])),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '409', description: 'Concurrent version conflict', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Invalid input', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
@@ -229,13 +224,12 @@ final class PlayerPreferencesController
             return $this->validationErrorResponse($errors);
         }
 
-        $payload = $this->playerPreferencesPort->rollbackTo($userId, $dto->version);
-        $version = $this->playerPreferencesPort->getVersion($userId);
-
-        return $this->successResponse([
-            'payload' => $payload,
-            'version' => $version,
-        ]);
+        try {
+            $snapshot = $this->playerPreferencesPort->rollbackTo($userId, $dto->version);
+        } catch (PreferenceVersionConflict $e) {
+            return $this->errorResponse('Conflict', 409, ['currentVersion' => $e->currentVersion]);
+        }
+        return $this->successResponse($snapshot);
     }
 
     private function getUserId(): Uuid

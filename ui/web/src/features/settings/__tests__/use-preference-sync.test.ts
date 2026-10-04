@@ -95,12 +95,12 @@ describe('usePreferenceSync', () => {
     expect(mockAxios.put).toHaveBeenCalledWith('/api/user/player-preferences', {
       payload: { volume: 0.75, muted: false },
       version: 0,
-    })
+    }, { signal: expect.any(AbortSignal) })
   })
 
   it('detects 409 conflict', async () => {
     mockAxios.put.mockRejectedValueOnce({
-      response: { status: 409, data: { data: { currentVersion: 5 } } },
+      response: { status: 409, data: { error: { details: { currentVersion: 5 } } } },
     })
 
     const { result } = createHook()
@@ -140,7 +140,7 @@ describe('usePreferenceSync', () => {
       await result.current.resolveConflict('theirs')
     })
 
-    expect(mockAxios.get).toHaveBeenCalledWith('/api/user/player-preferences')
+    expect(mockAxios.get).toHaveBeenCalledWith('/api/user/player-preferences', { signal: expect.any(AbortSignal) })
   })
 
   it('fetches history from server', async () => {
@@ -148,8 +148,8 @@ describe('usePreferenceSync', () => {
       data: {
         data: {
           history: [
-            { version: 1, createdAt: '2026-01-01T00:00:00Z' },
-            { version: 2, createdAt: '2026-01-02T00:00:00Z' },
+            { version: 1, created_at: '2026-01-01T00:00:00Z' },
+            { version: 2, created_at: '2026-01-02T00:00:00Z' },
           ],
         },
       },
@@ -165,7 +165,7 @@ describe('usePreferenceSync', () => {
       { version: 1, createdAt: '2026-01-01T00:00:00Z' },
       { version: 2, createdAt: '2026-01-02T00:00:00Z' },
     ])
-    expect(mockAxios.get).toHaveBeenCalledWith('/api/user/player-preferences/history')
+    expect(mockAxios.get).toHaveBeenCalledWith('/api/user/player-preferences/history', { signal: expect.any(AbortSignal) })
   })
 
   it('rolls back to a previous version', async () => {
@@ -187,7 +187,7 @@ describe('usePreferenceSync', () => {
     expect(success!).toBe(true)
     expect(mockAxios.post).toHaveBeenCalledWith('/api/user/player-preferences/rollback', {
       version: 1,
-    })
+    }, { signal: expect.any(AbortSignal) })
     expect(onRemoteUpdate).toHaveBeenCalledWith({ volume: 50, muted: false }, 1)
   })
 })

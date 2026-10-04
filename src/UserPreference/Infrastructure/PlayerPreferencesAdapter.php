@@ -6,7 +6,7 @@ namespace App\UserPreference\Infrastructure;
 
 use App\Shared\Domain\Model\Uuid;
 use App\UserPreference\Application\Port\PlayerPreferencesPortInterface;
-use App\UserPreference\Domain\Model\PlayerPreferences;
+use App\UserPreference\Application\Port\PreferenceWriterPortInterface;
 use App\UserPreference\Domain\Model\PreferenceHistory;
 use App\UserPreference\Domain\Repository\PlayerPreferencesRepositoryInterface;
 use App\UserPreference\Domain\Repository\PreferenceHistoryRepositoryInterface;
@@ -18,9 +18,18 @@ final class PlayerPreferencesAdapter implements PlayerPreferencesPortInterface
     public function __construct(
         private readonly PlayerPreferencesRepositoryInterface $repository,
         private readonly PreferenceHistoryRepositoryInterface $historyRepository,
+        private readonly PreferenceWriterPortInterface $writer,
     ) {
     }
 
+    public function getSnapshotForUser(Uuid $userId): ?array
+    {
+        $model = $this->repository->findByUserId($userId);
+
+        return $model === null ? null : ['payload' => $model->getPayload(), 'version' => $model->getVersion()];
+    }
+
+    /** @return array<string, mixed>|null */
     public function getForUser(Uuid $userId): ?array
     {
         $model = $this->repository->findByUserId($userId);
@@ -28,22 +37,10 @@ final class PlayerPreferencesAdapter implements PlayerPreferencesPortInterface
         return $model?->getPayload();
     }
 
+    /** @param array<string, mixed> $payload */
     public function saveForUser(Uuid $userId, array $payload, int $version): int
     {
-        $model = $this->repository->findByUserId($userId);
-
-        if ($model !== null) {
-            $newVersion = $version + 1;
-            $model->updatePayload($payload, $newVersion);
-        } else {
-            $newVersion = 1;
-            $model = PlayerPreferences::create($userId, $payload, $newVersion);
-        }
-
-        $this->repository->save($model);
-        $this->createHistorySnapshot($userId, $newVersion, $payload);
-
-        return $newVersion;
+        return $this->writer->saveForUser(self::PREFERENCE_TYPE, $userId, $payload, $version);
     }
 
     public function getVersion(Uuid $userId): ?int
@@ -53,6 +50,7 @@ final class PlayerPreferencesAdapter implements PlayerPreferencesPortInterface
         return $model?->getVersion();
     }
 
+    /** @return list<array{version: int, payload: array<string, mixed>, created_at: string}> */
     public function getHistory(Uuid $userId, int $limit = 20): array
     {
         $entries = $this->historyRepository->findByUserAndType($userId, self::PREFERENCE_TYPE, $limit);
@@ -67,6 +65,7 @@ final class PlayerPreferencesAdapter implements PlayerPreferencesPortInterface
         );
     }
 
+    /** @return array{payload: array<string, mixed>, version: int} */
     public function rollbackTo(Uuid $userId, int $version): array
     {
         $historyEntry = $this->historyRepository->findByUserAndTypeAndVersion(
@@ -82,20 +81,8 @@ final class PlayerPreferencesAdapter implements PlayerPreferencesPortInterface
         }
 
         $payload = $historyEntry->getPayload();
-        $this->saveForUser($userId, $payload, $version);
+        $newVersion = $this->saveForUser($userId, $payload, $this->getVersion($userId) ?? 0);
 
-        return $payload;
-    }
-
-    private function createHistorySnapshot(Uuid $userId, int $version, array $payload): void
-    {
-        $historyEntry = PreferenceHistory::create(
-            $userId,
-            self::PREFERENCE_TYPE,
-            $version,
-            $payload,
-        );
-
-        $this->historyRepository->save($historyEntry);
+        return ['payload' => $payload, 'version' => $newVersion];
     }
 }

@@ -6,9 +6,10 @@ import { usePreferenceSync } from './use-preference-sync'
 
 const VOLUME_SCALE = 100
 
-export function usePlayerPreferences() {
+export function usePlayerPreferences(isActive?: () => boolean) {
 
   const sync = usePreferenceSync<PlayerState>({
+    isActive,
     baseUrl: '/api/user/player-preferences/',
     toPayload: (state) => ({
       shuffle: state.shuffle,

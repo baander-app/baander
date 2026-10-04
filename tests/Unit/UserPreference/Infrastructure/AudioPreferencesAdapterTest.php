@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\UserPreference\Infrastructure;
 
 use App\Shared\Domain\Model\Uuid;
+use App\UserPreference\Application\Port\PreferenceWriterPortInterface;
+use App\UserPreference\Application\Exception\PreferenceVersionConflict;
 use App\UserPreference\Domain\Model\AudioPreferences;
 use App\UserPreference\Domain\Model\AudioPreferencesState;
 use App\UserPreference\Domain\Model\PreferenceHistory;
@@ -22,7 +24,7 @@ final class AudioPreferencesAdapterTest extends TestCase
         $userId = Uuid::generate();
         $historyStub = $this->createStub(PreferenceHistoryRepositoryInterface::class);
         $repository = $this->createMock(AudioPreferencesRepositoryInterface::class);
-        $adapter = new AudioPreferencesAdapter($repository, $historyStub);
+        $adapter = new AudioPreferencesAdapter($repository, $historyStub, $this->createStub(PreferenceWriterPortInterface::class));
 
         $repository
             ->expects($this->once())
@@ -41,7 +43,7 @@ final class AudioPreferencesAdapterTest extends TestCase
         $payload = ['volume' => 75, 'eq_preset' => 'bass_boost'];
         $historyStub = $this->createStub(PreferenceHistoryRepositoryInterface::class);
         $repository = $this->createMock(AudioPreferencesRepositoryInterface::class);
-        $adapter = new AudioPreferencesAdapter($repository, $historyStub);
+        $adapter = new AudioPreferencesAdapter($repository, $historyStub, $this->createStub(PreferenceWriterPortInterface::class));
 
         $model = AudioPreferences::reconstitute(new AudioPreferencesState(
             id: Uuid::generate(),
@@ -63,86 +65,47 @@ final class AudioPreferencesAdapterTest extends TestCase
         $this->assertSame($payload, $result);
     }
 
-    public function testSaveForUserCreatesNewModelWhenNoneExists(): void
+    public function testSnapshotReturnsPayloadAndVersionFromOneRepositoryRead(): void
     {
         $userId = Uuid::generate();
-        $payload = ['volume' => 50];
+        $payload = ['volume' => 75];
         $repository = $this->createMock(AudioPreferencesRepositoryInterface::class);
-        $historyRepository = $this->createMock(PreferenceHistoryRepositoryInterface::class);
-        $adapter = new AudioPreferencesAdapter($repository, $historyRepository);
+        $repository->expects($this->once())->method('findByUserId')->with($userId)
+            ->willReturn(AudioPreferences::create($userId, $payload, 7));
+        $adapter = new AudioPreferencesAdapter(
+            $repository,
+            $this->createStub(PreferenceHistoryRepositoryInterface::class),
+            $this->createStub(PreferenceWriterPortInterface::class),
+        );
 
-        $repository
-            ->expects($this->once())
-            ->method('findByUserId')
-            ->with($userId)
-            ->willReturn(null);
-
-        $repository
-            ->expects($this->once())
-            ->method('save')
-            ->with($this->callback(function (AudioPreferences $model) use ($userId, $payload): bool {
-                return $model->getUserId()->equals($userId)
-                    && $model->getPayload() === $payload
-                    && $model->getVersion() === 1;
-            }));
-
-        $historyRepository
-            ->expects($this->once())
-            ->method('save')
-            ->with($this->callback(function (PreferenceHistory $entry) use ($userId, $payload): bool {
-                return $entry->getUserId()->equals($userId)
-                    && $entry->getPreferenceType() === 'audio'
-                    && $entry->getVersion() === 1
-                    && $entry->getPayload() === $payload;
-            }));
-
-        $newVersion = $adapter->saveForUser($userId, $payload, 0);
-
-        $this->assertSame(1, $newVersion);
+        self::assertSame(['payload' => $payload, 'version' => 7], $adapter->getSnapshotForUser($userId));
     }
 
-    public function testSaveForUserIncrementsVersionOnUpdate(): void
+    public function testSaveForUserDelegatesExpectedVersionToAtomicWriter(): void
     {
         $userId = Uuid::generate();
-        $existingPayload = ['volume' => 50];
-        $newPayload = ['volume' => 80];
+        $payload = ['volume' => 80];
         $repository = $this->createMock(AudioPreferencesRepositoryInterface::class);
-        $historyRepository = $this->createMock(PreferenceHistoryRepositoryInterface::class);
-        $adapter = new AudioPreferencesAdapter($repository, $historyRepository);
+        $history = $this->createMock(PreferenceHistoryRepositoryInterface::class);
+        $writer = $this->createMock(PreferenceWriterPortInterface::class);
+        $repository->expects($this->never())->method('save');
+        $history->expects($this->never())->method('save');
+        $writer->expects($this->once())->method('saveForUser')->with('audio', $userId, $payload, 2)->willReturn(3);
 
-        $model = AudioPreferences::reconstitute(new AudioPreferencesState(
-            id: Uuid::generate(),
-            userId: $userId,
-            payload: $existingPayload,
-            version: 2,
-            createdAt: new DateTimeImmutable(),
-            updatedAt: new DateTimeImmutable(),
-        ));
+        self::assertSame(3, (new AudioPreferencesAdapter($repository, $history, $writer))->saveForUser($userId, $payload, 2));
+    }
 
-        $repository
-            ->expects($this->once())
-            ->method('findByUserId')
-            ->with($userId)
-            ->willReturn($model);
-
-        $repository
-            ->expects($this->once())
-            ->method('save')
-            ->with($this->callback(function (AudioPreferences $model) use ($newPayload): bool {
-                return $model->getPayload() === $newPayload
-                    && $model->getVersion() === 3;
-            }));
-
-        $historyRepository
-            ->expects($this->once())
-            ->method('save')
-            ->with($this->callback(function (PreferenceHistory $entry): bool {
-                return $entry->getVersion() === 3;
-            }));
-
-        $newVersion = $adapter->saveForUser($userId, $newPayload, 2);
-
-        $this->assertSame(3, $newVersion);
+    public function testSaveForUserPropagatesVersionConflict(): void
+    {
+        $writer = $this->createStub(PreferenceWriterPortInterface::class);
+        $writer->method('saveForUser')->willThrowException(new PreferenceVersionConflict(5));
+        $adapter = new AudioPreferencesAdapter(
+            $this->createStub(AudioPreferencesRepositoryInterface::class),
+            $this->createStub(PreferenceHistoryRepositoryInterface::class),
+            $writer,
+        );
+        $this->expectException(PreferenceVersionConflict::class);
+        $adapter->saveForUser(Uuid::generate(), [], 1);
     }
 
     public function testGetVersionReturnsNullWhenNoPreferences(): void
@@ -150,7 +113,7 @@ final class AudioPreferencesAdapterTest extends TestCase
         $userId = Uuid::generate();
         $historyStub = $this->createStub(PreferenceHistoryRepositoryInterface::class);
         $repository = $this->createMock(AudioPreferencesRepositoryInterface::class);
-        $adapter = new AudioPreferencesAdapter($repository, $historyStub);
+        $adapter = new AudioPreferencesAdapter($repository, $historyStub, $this->createStub(PreferenceWriterPortInterface::class));
 
         $repository
             ->expects($this->once())
@@ -168,7 +131,7 @@ final class AudioPreferencesAdapterTest extends TestCase
         $userId = Uuid::generate();
         $historyStub = $this->createStub(PreferenceHistoryRepositoryInterface::class);
         $repository = $this->createMock(AudioPreferencesRepositoryInterface::class);
-        $adapter = new AudioPreferencesAdapter($repository, $historyStub);
+        $adapter = new AudioPreferencesAdapter($repository, $historyStub, $this->createStub(PreferenceWriterPortInterface::class));
 
         $model = AudioPreferences::reconstitute(new AudioPreferencesState(
             id: Uuid::generate(),
@@ -195,7 +158,7 @@ final class AudioPreferencesAdapterTest extends TestCase
         $userId = Uuid::generate();
         $repositoryStub = $this->createStub(AudioPreferencesRepositoryInterface::class);
         $historyRepository = $this->createMock(PreferenceHistoryRepositoryInterface::class);
-        $adapter = new AudioPreferencesAdapter($repositoryStub, $historyRepository);
+        $adapter = new AudioPreferencesAdapter($repositoryStub, $historyRepository, $this->createStub(PreferenceWriterPortInterface::class));
 
         $entry1 = PreferenceHistory::reconstitute(new PreferenceHistoryState(
             id: Uuid::generate(),
@@ -236,7 +199,8 @@ final class AudioPreferencesAdapterTest extends TestCase
         $oldPayload = ['volume' => 30];
         $repository = $this->createMock(AudioPreferencesRepositoryInterface::class);
         $historyRepository = $this->createMock(PreferenceHistoryRepositoryInterface::class);
-        $adapter = new AudioPreferencesAdapter($repository, $historyRepository);
+        $writer = $this->createMock(PreferenceWriterPortInterface::class);
+        $adapter = new AudioPreferencesAdapter($repository, $historyRepository, $writer);
 
         $historyEntry = PreferenceHistory::reconstitute(new PreferenceHistoryState(
             id: Uuid::generate(),
@@ -259,17 +223,11 @@ final class AudioPreferencesAdapterTest extends TestCase
             ->with($userId)
             ->willReturn(null);
 
-        $repository
-            ->expects($this->once())
-            ->method('save');
-
-        $historyRepository
-            ->expects($this->once())
-            ->method('save');
+        $writer->expects($this->once())->method('saveForUser')->with('audio', $userId, $oldPayload, 0)->willReturn(1);
 
         $result = $adapter->rollbackTo($userId, 1);
 
-        $this->assertSame($oldPayload, $result);
+        $this->assertSame(['payload' => $oldPayload, 'version' => 1], $result);
     }
 
     public function testRollbackToThrowsWhenVersionNotFound(): void
@@ -277,7 +235,7 @@ final class AudioPreferencesAdapterTest extends TestCase
         $userId = Uuid::generate();
         $repositoryStub = $this->createStub(AudioPreferencesRepositoryInterface::class);
         $historyRepository = $this->createMock(PreferenceHistoryRepositoryInterface::class);
-        $adapter = new AudioPreferencesAdapter($repositoryStub, $historyRepository);
+        $adapter = new AudioPreferencesAdapter($repositoryStub, $historyRepository, $this->createStub(PreferenceWriterPortInterface::class));
 
         $historyRepository
             ->expects($this->once())

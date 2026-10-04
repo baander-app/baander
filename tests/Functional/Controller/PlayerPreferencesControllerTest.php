@@ -16,7 +16,7 @@ use App\Tests\Functional\TestCase;
  *   GET    /api/user/player-preferences/history   version history
  *   POST   /api/user/player-preferences/rollback  restore a previous version
  *
- * Same versioned shape as AudioPreferences/LayoutPreferences.
+ * Saves require the current persisted version and reject stale writes without adding history.
  */
 final class PlayerPreferencesControllerTest extends TestCase
 {
@@ -53,7 +53,7 @@ final class PlayerPreferencesControllerTest extends TestCase
             'data',
         );
 
-        $this->assertSame($payload, $data['data']['payload']);
+        $this->assertEquals($payload, $data['data']['payload']);
         $this->assertSame(1, $data['data']['version']);
     }
 
@@ -78,7 +78,7 @@ final class PlayerPreferencesControllerTest extends TestCase
 
         $data = $this->assertJsonResponse($this->savePreferences($user, $payload, 0), 200, 'data');
 
-        $this->assertSame($payload, $data['data']['payload']);
+        $this->assertEquals($payload, $data['data']['payload']);
         $this->assertSame(1, $data['data']['version']);
     }
 
@@ -93,14 +93,41 @@ final class PlayerPreferencesControllerTest extends TestCase
         $this->assertSame(2, $second['data']['version']);
     }
 
-    public function testSaveDoesNotEnforceOptimisticLocking(): void
+    public function testSaveRejectsStaleVersionWithoutChangingPayloadOrHistory(): void
     {
         $user = $this->createTestUser();
 
         $this->savePreferences($user, $this->validPayload(0.5), 0);
         $stale = $this->savePreferences($user, $this->validPayload(0.8), 0);
 
-        $this->assertSame(200, $stale->getStatusCode(), 'A stale version must not be rejected (no optimistic locking).');
+        $conflict = $this->assertJsonResponse($stale, 409);
+        $this->assertSame(1, $conflict['error']['details']['currentVersion']);
+        $saved = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/user/player-preferences/', $user), 200, 'data');
+        $this->assertEquals($this->validPayload(0.5), $saved['data']['payload']);
+        $this->assertSame(1, $saved['data']['version']);
+        $history = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/user/player-preferences/history', $user), 200, 'data');
+        $this->assertCount(1, $history['data']['history']);
+        $retry = $this->assertJsonResponse($this->savePreferences($user, $this->validPayload(0.5), 1), 200, 'data');
+        $this->assertSame(2, $retry['data']['version']);
+    }
+
+    public function testSaveRejectsNonzeroVersionWhenAbsent(): void
+    {
+        $user = $this->createTestUser();
+        $conflict = $this->assertJsonResponse($this->savePreferences($user, $this->validPayload(0.5), 3), 409);
+        $this->assertSame(0, $conflict['error']['details']['currentVersion']);
+        $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/user/player-preferences/', $user), 404);
+    }
+
+    public function testSaveRejectsStalePositiveAndFutureVersions(): void
+    {
+        $user = $this->createTestUser();
+        $this->assertJsonResponse($this->savePreferences($user, $this->validPayload(0.5), 0), 200);
+        $this->assertJsonResponse($this->savePreferences($user, $this->validPayload(0.5), 1), 200);
+        foreach ([1, 9] as $expectedVersion) {
+            $conflict = $this->assertJsonResponse($this->savePreferences($user, $this->validPayload(0.5), $expectedVersion), 409);
+            $this->assertSame(2, $conflict['error']['details']['currentVersion']);
+        }
     }
 
     public function testSaveWithNegativeVersionFailsValidation(): void
@@ -165,7 +192,8 @@ final class PlayerPreferencesControllerTest extends TestCase
             'data',
         );
 
-        $this->assertSame($firstPayload, $data['data']['payload'], 'Rollback must restore the version-1 payload.');
+        $this->assertEquals($firstPayload, $data['data']['payload'], 'Rollback must restore the version-1 payload.');
+        $this->assertSame(3, $data['data']['version']);
     }
 
     public function testRollbackWithVersionBelowOneFailsValidation(): void
