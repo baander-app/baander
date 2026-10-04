@@ -55,3 +55,11 @@ queued-report isolation. Crossfades measure the output mix; see the
 [loudness module](loudness_r128/README.md) for the remaining limitations.
 This gate does not establish resampling or
 convolution quality, native AAC codec compliance, or audible playback quality.
+
+
+The web loader shares compiled WASM modules, while each getter call creates an
+independent instance and memory. Its tests use shipped binaries to check state
+isolation, concurrent compilation, failed-load retries, and cache reset races.
+Clearing the compilation cache never resets live measurements. The main-thread
+processor owns only spectral analysis; loudness and dynamics run in its worklet.
+The standalone JavaScript demo loaders are separate from this web loading path.

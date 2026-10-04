@@ -1,5 +1,5 @@
-import { getDynamics, getLoudness, getSpectralFeatures, getWasmUrl, getAudioWorkletUrl } from './wasm-loader'
-import type { LoudnessR128API, DynamicsMeterAPI, SpectralFeaturesApi } from './wasm-types'
+import { getSpectralFeatures, getWasmUrl, getAudioWorkletUrl } from './wasm-loader'
+import type { SpectralFeaturesApi } from './wasm-types'
 import { createLogger } from '@/shared/lib/logger'
 import { StereoMatrix } from './stereo-matrix'
 
@@ -83,8 +83,6 @@ export class AudioProcessor {
   private wasmSpectrumReady = false
 
   // WASM DSP modules (main-thread)
-  private loudnessAPI: LoudnessR128API | null = null
-  private dynamicsAPI: DynamicsMeterAPI | null = null
   private spectralAPI: SpectralFeaturesApi | null = null
   private dspReady = false
 
@@ -147,18 +145,10 @@ export class AudioProcessor {
 
   private async initializeDSP() {
     try {
-      const [loudness, dynamics, spectral] = await Promise.all([
-        getLoudness(),
-        getDynamics(),
-        getSpectralFeatures(),
-      ])
+      const spectral = await getSpectralFeatures()
 
       if (this.destroyed) return
-      this.loudnessAPI = loudness
-      this.dynamicsAPI = dynamics
       this.spectralAPI = spectral
-      this.loudnessAPI.init(this.audioContext.sampleRate, 4)
-      this.dynamicsAPI.init(10, 100, this.audioContext.sampleRate)
       this.spectralAPI.init(this.FFT_SIZE, this.audioContext.sampleRate)
 
       this.dspReady = true
@@ -830,6 +820,8 @@ export class AudioProcessor {
   destroy() {
     if (this.destroyed) return
     this.destroyed = true
+    this.spectralAPI = null
+    this.dspReady = false
     this.workerAbort.abort()
     if (this.analysisWorker) {
       this.analysisWorker.onmessage = null

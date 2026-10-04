@@ -1,8 +1,8 @@
 /**
  * WASM type definitions for DSP modules.
- * Source: packages/dsp/ on master branch.
+ * Source: packages/dsp/.
  *
- * These modules are loaded from /dsp/*.js (JS glue) and /dsp/*.wasm (binaries),
+ * The web loader creates owned instances from compiled /dsp/*.wasm binaries,
  * served as static assets by Symfony (production) or Vite (development).
  */
 
@@ -10,6 +10,8 @@
 
 export interface LoudnessR128API {
   memory: WebAssembly.Memory
+  malloc(bytes: number): number
+  free(ptr: number): void
   init(sampleRate: number, truePeakOversample: number): void
   reset(): void
   process(inputPtr: number, frames: number, channels: number): void
@@ -20,10 +22,6 @@ export interface LoudnessR128API {
   /** NaN if LRA history capacity is exhausted; reset starts a new programme. */
   lra(): number
   truePkDbfs(): number
-}
-
-export interface LoudnessModule {
-  loadLoudness(url?: string): Promise<LoudnessR128API>
 }
 
 // --- Dynamics Meter ---
@@ -43,10 +41,6 @@ export interface DynamicsMeterAPI {
   crestR(): number
 }
 
-export interface DynamicsModule {
-  loadDynamics(url?: string): Promise<DynamicsMeterAPI>
-}
-
 // --- Spectral Features ---
 
 export interface SpectralFeaturesApi {
@@ -61,8 +55,4 @@ export interface SpectralFeaturesApi {
   getFlatness(): number
   getPeakIndex(): number
   getBandEnergies(outPtr: number, bands: number): void
-}
-
-export interface SpectralFeaturesModule {
-  loadSpectralFeatures(url?: string): Promise<SpectralFeaturesApi>
 }

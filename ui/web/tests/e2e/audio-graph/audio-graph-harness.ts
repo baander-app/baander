@@ -31,8 +31,18 @@ export const test = base.extend<{ render: (options: RenderOptions) => Promise<Si
           ` }))
         } }],
       })
+      const wasmLoaderBundle = await build({ bundle: true, write: false, platform: 'browser', format: 'esm',
+        entryPoints: [resolve(sourceRoot, 'features/player/services/wasm-loader.ts')],
+      })
+      const dspDirectory = fileURLToPath(new URL('../../../../../public/dsp/', import.meta.url))
       server = createServer({ key: readFileSync(key), cert: readFileSync(cert) }, (request, response) => {
-        if (request.url === '/fixture.js') {
+        if (request.url === '/wasm-loader.js') {
+          response.setHeader('Content-Type', 'application/javascript')
+          response.end(wasmLoaderBundle.outputFiles[0].text)
+        } else if (/^\/dsp\/(loudness_r128|dynamics_meter|spectral_features)\.wasm$/.test(request.url ?? '')) {
+          response.setHeader('Content-Type', 'application/wasm')
+          response.end(readFileSync(resolve(dspDirectory, request.url!.slice('/dsp/'.length))))
+        } else if (request.url === '/fixture.js') {
           response.setHeader('Content-Type', 'application/javascript')
           response.end('window.Worker=class { postMessage(){} terminate(){} };\n' + bundle.outputFiles[0].text)
         } else if (request.url === '/magic-soup-processor.js' || request.url === '/wasm-spectrum.js') {

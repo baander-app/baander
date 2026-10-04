@@ -1,10 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AudioProcessor } from '@/features/player/services/audio-processor'
 
+const dsp = vi.hoisted(() => ({
+  getLoudness: vi.fn(),
+  getDynamics: vi.fn(),
+  getSpectralFeatures: vi.fn(),
+  initSpectral: vi.fn(),
+}))
+
 vi.mock('@/features/player/services/wasm-loader', () => ({
-  getLoudness: async () => ({ init: vi.fn() }),
-  getDynamics: async () => ({ init: vi.fn() }),
-  getSpectralFeatures: async () => ({ init: vi.fn() }),
+  getLoudness: dsp.getLoudness,
+  getDynamics: dsp.getDynamics,
+  getSpectralFeatures: dsp.getSpectralFeatures,
   getWasmUrl: (file: string) => `/dsp/${file}`,
   getAudioWorkletUrl: (file: string) => `/audio-worklets/${file}`,
 }))
@@ -112,6 +119,8 @@ let elementB: HTMLAudioElement
 let fetchMock: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
+  vi.clearAllMocks()
+  dsp.getSpectralFeatures.mockResolvedValue({ init: dsp.initSpectral })
   vi.useFakeTimers()
   MockWorklet.instances = []
   MockWorker.instances = []
@@ -137,6 +146,62 @@ const connect = () => processor.connectDualAudioElements(elementA, elementB)
 const worklet = (name: string) => MockWorklet.instances.filter((node) => node.name === name).at(-1)!
 
 describe('AudioProcessor asynchronous analysis lifecycle', () => {
+
+  it('initializes spectral analysis without allocating unused main-thread meters', async () => {
+    await settle()
+    expect(dsp.getSpectralFeatures).toHaveBeenCalledOnce()
+    expect(dsp.initSpectral).toHaveBeenCalledExactlyOnceWith(2048, 48000)
+    expect(dsp.getLoudness).not.toHaveBeenCalled()
+    expect(dsp.getDynamics).not.toHaveBeenCalled()
+    await connect()
+    await settle()
+    worklet('magic-soup-processor').emit({ type: 'request-dsp-init' })
+    await settle()
+    expect(worklet('magic-soup-processor').port.postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'init-dsp' }))
+  })
+
+  it('does not initialize spectral state when loading finishes after destruction', async () => {
+    processor.destroy()
+    await settle()
+    const load = deferred<{ init: ReturnType<typeof vi.fn> }>()
+    dsp.getSpectralFeatures.mockReturnValueOnce(load.promise)
+    processor = new AudioProcessor()
+    processor.destroy()
+    const init = vi.fn()
+    load.resolve({ init })
+    await settle()
+    expect(init).not.toHaveBeenCalled()
+  })
+
+  it('releases its owned spectral instance on destruction', async () => {
+    await settle()
+    const inspection = processor as unknown as { spectralAPI: unknown; dspReady: boolean }
+    expect(inspection.spectralAPI).not.toBeNull()
+    expect(inspection.dspReady).toBe(true)
+    processor.destroy()
+    expect(inspection.spectralAPI).toBeNull()
+    expect(inspection.dspReady).toBe(false)
+    processor.destroy()
+    expect(inspection.spectralAPI).toBeNull()
+  })
+
+  it('continues worklet metering when main-thread spectral loading fails', async () => {
+    processor.destroy()
+    await settle()
+    dsp.getSpectralFeatures.mockRejectedValueOnce(new Error('spectral load failed'))
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      processor = new AudioProcessor()
+      await connect()
+      await settle()
+      expect(warning).toHaveBeenCalledWith('[AudioProcessor] Failed to initialize DSP modules:', expect.any(Error))
+      worklet('magic-soup-processor').emit({ type: 'request-dsp-init' })
+      await settle()
+      expect(worklet('magic-soup-processor').port.postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'init-dsp' }))
+    } finally {
+      warning.mockRestore()
+    }
+  })
 
   it('rejects malformed worklet buffers before copying data or computing features', async () => {
     await connect()

@@ -16,8 +16,9 @@ application.
 These browser tests render the real `AudioProcessor` nodes with
 `OfflineAudioContext` and compare stereo, processing order, and normalization
 against reference signals. They replace external WASM analysis and workers;
-they do not certify those modules, production codecs, or audible clicks during
-live graph changes. Native media tests use locally generated WAV files and the
+they do not certify production codecs or audible clicks during live graph
+changes. A separate loader check serves the production TypeScript loader and
+shipped WASM to Chromium, checking instance memory and analysis-state isolation. Native media tests use locally generated WAV files and the
 real playback hook, store, service, and processor to exercise repeated preloaded
 handoffs, crossfade overlap, promoted-element controls, and interrupted fades.
 These verify element ownership and timing, not sample-accurate gaplessness or
