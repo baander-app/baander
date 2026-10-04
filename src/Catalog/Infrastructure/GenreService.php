@@ -6,9 +6,11 @@ namespace App\Catalog\Infrastructure;
 
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Domain\Model\Genre;
+use App\Catalog\Domain\ReadModel\GenreReadView;
 use App\Catalog\Domain\Repository\GenreRepositoryInterface;
 use App\Catalog\Infrastructure\Doctrine\Repository\GenreMovieRepository;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 final class GenreService implements GenrePortInterface
 {
@@ -16,6 +18,39 @@ final class GenreService implements GenrePortInterface
         private readonly GenreRepositoryInterface $genreRepository,
         private readonly GenreMovieRepository $genreMovieRepository,
     ) {
+    }
+
+    public function findVisibleByUuid(Uuid $uuid, LibraryReadScope $scope): ?GenreReadView
+    {
+        return $this->genreRepository->findVisibleByUuid($uuid, $scope);
+    }
+
+    public function findVisibleBySlug(string $slug, LibraryReadScope $scope): ?GenreReadView
+    {
+        return $this->genreRepository->findVisibleBySlug($slug, $scope);
+    }
+
+    /** @return GenreReadView[] */
+    public function findVisibleChildren(Uuid $parentId, LibraryReadScope $scope): array
+    {
+        return $this->genreRepository->findVisibleChildren($parentId, $scope);
+    }
+
+    /** @return GenreReadView[] */
+    public function findVisibleRootGenres(LibraryReadScope $scope): array
+    {
+        return $this->genreRepository->findVisibleRootGenres($scope);
+    }
+
+    /** @return GenreReadView[] */
+    public function findAllVisible(LibraryReadScope $scope): array
+    {
+        return $this->genreRepository->findAllVisible($scope);
+    }
+
+    public function countVisible(LibraryReadScope $scope): int
+    {
+        return $this->genreRepository->countVisible($scope);
     }
 
     public function findByUuid(Uuid $uuid): ?Genre

@@ -10,6 +10,10 @@ use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\GenreEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\GenreSongEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\GenreAlbumEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\GenreMovieEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistAlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistSongEntity;
@@ -26,6 +30,8 @@ use App\Tests\Fixtures\Auth\OAuthAccessTokenJwt;
 use App\Tests\Fixtures\Auth\CatalogOAuthKernel;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Catalog\Application\Port\AlbumPortInterface;
+use App\Catalog\Application\Port\GenrePortInterface;
+use App\Catalog\Domain\ReadModel\GenreReadView;
 use App\Catalog\Application\Port\ArtistPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
@@ -50,6 +56,8 @@ final class CatalogReadFirewallTest extends TestCase
     private UserRepositoryInterface $users;
     /** @var array<string, array{artist: ArtistEntity, album: AlbumEntity, song: SongEntity, movie: MovieEntity, library: LibraryEntity}> */
     private array $catalog = [];
+    /** @var array<string, GenreEntity> */
+    private array $genres = [];
     private ArtistEntity $sharedArtist;
     private ArtistEntity $unlinkedArtist;
     private SignedDpopProof $proof;
@@ -129,6 +137,7 @@ final class CatalogReadFirewallTest extends TestCase
         foreach ($this->catalog as $entities) {
             $this->manager->persist(new ArtistSongEntity($this->sharedArtist, $entities['song'], 'featured'));
         }
+        $this->seedGenres();
         $this->manager->flush();
     }
 
@@ -254,7 +263,7 @@ final class CatalogReadFirewallTest extends TestCase
 
     public function testAnonymousCatalogReadsRequireAuthentication(): void
     {
-        foreach (['artists', 'albums', 'songs', 'movies'] as $kind) {
+        foreach (['artists', 'albums', 'songs', 'movies', 'genres'] as $kind) {
             self::assertSame(401, $this->request('/api/' . $kind . '/')->getStatusCode());
         }
     }
@@ -311,6 +320,10 @@ final class CatalogReadFirewallTest extends TestCase
         self::assertSame(200, $response->getStatusCode());
         $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
         self::assertSame([], $body['data']);
+        $response = $this->request('/api/genres/?flat=true');
+        self::assertSame(200, $response->getStatusCode());
+        $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame([], $body['data']);
         foreach (['artist', 'album', 'song', 'movie'] as $kind) {
             $response = $this->request('/api/' . $kind . 's/' . $this->catalog['allowed'][$kind]->getPublicId());
             self::assertSame(404, $response->getStatusCode(), (string) $response->getContent());
@@ -326,10 +339,12 @@ final class CatalogReadFirewallTest extends TestCase
     {
         $container = $this->kernel->getContainer();
         $albums = $container->get('catalog.acceptance.albums');
+        $genres = $container->get('catalog.acceptance.genres');
         $artists = $container->get('catalog.acceptance.artists');
         $movies = $container->get('catalog.acceptance.movies');
         $songs = $container->get('catalog.acceptance.songs');
         self::assertInstanceOf(AlbumPortInterface::class, $albums);
+        self::assertInstanceOf(GenrePortInterface::class, $genres);
         self::assertInstanceOf(ArtistPortInterface::class, $artists);
         self::assertInstanceOf(MoviePortInterface::class, $movies);
         self::assertInstanceOf(SongPortInterface::class, $songs);
@@ -338,6 +353,13 @@ final class CatalogReadFirewallTest extends TestCase
         $scope = LibraryReadScope::restricted([$allowed['library']->getId()]);
         $none = LibraryReadScope::none();
 
+        self::assertSame(3, $genres->countVisible($scope));
+        self::assertSame(0, $genres->countVisible($none));
+        self::assertNull($genres->findVisibleByUuid($this->genres['allowed-root']->getId(), $none));
+        self::assertSame([], $genres->findVisibleChildren($this->genres['denied-parent']->getId(), $scope));
+        $projected = $genres->findVisibleByUuid($this->genres['allowed-movie']->getId(), $scope);
+        self::assertInstanceOf(GenreReadView::class, $projected);
+        self::assertNull($projected->getParent());
         self::assertSame(1, $albums->countVisible($scope));
         self::assertSame(2, $artists->countVisible($scope));
         self::assertSame(1, $movies->countVisible($scope));
@@ -360,6 +382,91 @@ final class CatalogReadFirewallTest extends TestCase
         self::assertArrayNotHasKey($denied['album']->getId()->toString(), $titles);
         self::assertSame([], $songs->getVisibleArtistNamesForSongs([$allowed['song']->getId()], $none));
         self::assertSame([], $songs->getVisibleAlbumTitlesByIds([$allowed['album']->getId()], $none));
+    }
+
+    #[DataProvider('libraryActors')]
+    public function testGenreListsAndChildrenRespectDirectLibraryAssociations(string $actor): void
+    {
+        $this->authenticate($actor);
+        $visible = match ($actor) {
+            'admin' => array_keys($this->genres),
+            'member' => ['allowed-root', 'allowed-song', 'allowed-movie'],
+            default => [],
+        };
+        $roots = match ($actor) {
+            'admin' => ['allowed-root', 'denied-parent', 'orphan'],
+            'member' => ['allowed-root', 'allowed-movie'],
+            default => [],
+        };
+        foreach ([false, true] as $flat) {
+            $response = $this->request('/api/genres/?' . http_build_query(['flat' => $flat ? 'true' : 'false']));
+            self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+            $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+            $expected = array_map(fn (string $key): string => $this->genres[$key]->getId()->toString(), $flat ? $visible : $roots);
+            $ids = array_column($body['data'], 'uuid');
+            sort($expected);
+            sort($ids);
+            self::assertSame($expected, $ids);
+            if ($actor === 'member') {
+                $promoted = array_filter($body['data'], fn (array $genre): bool => $genre['uuid'] === $this->genres['allowed-movie']->getId()->toString());
+                self::assertCount(1, $promoted);
+                self::assertNull(array_values($promoted)[0]['parentId']);
+            }
+        }
+        foreach ($this->genres as $key => $genre) {
+            $response = $this->request('/api/genres/' . $genre->getSlug());
+            $allowed = in_array($key, $visible, true);
+            self::assertSame($allowed ? 200 : 404, $response->getStatusCode(), (string) $response->getContent());
+            if ($allowed && $key === 'allowed-root') {
+                $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+                $children = array_column($body['data']['children'], 'uuid');
+                $expectedChildren = [$this->genres['allowed-song']->getId()->toString()];
+                if ($actor === 'admin') {
+                    $expectedChildren[] = $this->genres['denied-child']->getId()->toString();
+                }
+                sort($children);
+                sort($expectedChildren);
+                self::assertSame($expectedChildren, $children);
+            }
+        }
+    }
+
+    public function testGenreHiddenParentProjectionPreservesStoredHierarchy(): void
+    {
+        $this->authenticate('member');
+        $child = $this->genres['allowed-movie'];
+        $response = $this->request('/api/genres/' . $child->getSlug());
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+        $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertNull($body['data']['parentId']);
+        $this->manager->flush();
+        $this->manager->clear();
+        $stored = $this->manager->find(GenreEntity::class, $child->getId());
+        self::assertInstanceOf(GenreEntity::class, $stored);
+        self::assertSame($this->genres['denied-parent']->getId()->toString(), $stored->getParent()?->getId()->toString());
+    }
+
+    private function seedGenres(): void
+    {
+        $suffix = bin2hex(random_bytes(8));
+        $root = new GenreEntity('Permitted root', 'allowed-root-' . $suffix);
+        $deniedParent = new GenreEntity('Private parent', 'denied-parent-' . $suffix);
+        $this->genres = [
+            'allowed-root' => $root,
+            'allowed-song' => new GenreEntity('Permitted song genre', 'allowed-song-' . $suffix, $root),
+            'allowed-movie' => new GenreEntity('Permitted movie genre', 'allowed-movie-' . $suffix, $deniedParent),
+            'denied-child' => new GenreEntity('Private child', 'denied-child-' . $suffix, $root),
+            'denied-parent' => $deniedParent,
+            'orphan' => new GenreEntity('Unlinked genre', 'orphan-' . $suffix),
+        ];
+        foreach ($this->genres as $genre) {
+            $this->persistFixture($genre, $genre->getId());
+        }
+        $this->manager->persist(new GenreAlbumEntity($root, $this->catalog['allowed']['album']));
+        $this->manager->persist(new GenreSongEntity($this->genres['allowed-song'], $this->catalog['allowed']['song']));
+        $this->manager->persist(new GenreMovieEntity($this->genres['allowed-movie'], $this->catalog['allowed']['movie']));
+        $this->manager->persist(new GenreAlbumEntity($this->genres['denied-child'], $this->catalog['denied']['album']));
+        $this->manager->persist(new GenreMovieEntity($deniedParent, $this->catalog['denied']['movie']));
     }
 
     private function persistFixture(object $entity, Uuid $id): void

@@ -6,6 +6,7 @@ namespace App\Catalog\Infrastructure\Doctrine\Repository;
 
 use App\Catalog\Domain\Model\Genre;
 use App\Catalog\Domain\Model\GenreState;
+use App\Catalog\Domain\ReadModel\GenreReadView;
 use App\Catalog\Domain\Repository\GenreRepositoryInterface;
 use App\Catalog\Infrastructure\Doctrine\Entity\GenreAlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\GenreEntity;
@@ -14,9 +15,12 @@ use App\Catalog\Infrastructure\Doctrine\Entity\GenreSongEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
+use App\Catalog\Infrastructure\Doctrine\Query\CatalogReadScopeQuery;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\QueryBuilder;
 
 /**
  * Pure domain repository for genres.
@@ -26,6 +30,133 @@ final class GenreRepository implements GenreRepositoryInterface
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
     ) {
+    }
+
+    public function findVisibleByUuid(Uuid $uuid, LibraryReadScope $scope): ?GenreReadView
+    {
+        $entities = $this->visibleQuery($scope)
+            ->andWhere('g.id = :id')
+            ->setParameter('id', $uuid)
+            ->getQuery()
+            ->getResult();
+
+        return $this->toVisibleReadViews($entities, $scope)[0] ?? null;
+    }
+
+    public function findVisibleBySlug(string $slug, LibraryReadScope $scope): ?GenreReadView
+    {
+        $entities = $this->visibleQuery($scope)
+            ->andWhere('g.slug = :slug')
+            ->setParameter('slug', $slug)
+            ->getQuery()
+            ->getResult();
+
+        return $this->toVisibleReadViews($entities, $scope)[0] ?? null;
+    }
+
+    public function findVisibleChildren(Uuid $parentId, LibraryReadScope $scope): array
+    {
+        if ($this->findVisibleByUuid($parentId, $scope) === null) {
+            return [];
+        }
+
+        $entities = $this->visibleQuery($scope)
+            ->andWhere('g.parent = :parentId')
+            ->setParameter('parentId', $parentId)
+            ->orderBy('g.name', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $this->toVisibleReadViews($entities, $scope);
+    }
+
+    public function findVisibleRootGenres(LibraryReadScope $scope): array
+    {
+        $qb = $this->visibleQuery($scope);
+        if ($scope->isUnrestricted()) {
+            $qb->andWhere('g.parent IS NULL');
+        } else {
+            $visibleParents = $this->visibleQuery($scope, 'visible_parent')
+                ->select('visible_parent.id')
+                ->andWhere('visible_parent.id = g.parent');
+            $qb->andWhere('g.parent IS NULL OR NOT EXISTS (' . $visibleParents->getDQL() . ')');
+        }
+        $entities = $qb->orderBy('g.name', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $this->toVisibleReadViews($entities, $scope);
+    }
+
+    public function findAllVisible(LibraryReadScope $scope): array
+    {
+        $entities = $this->visibleQuery($scope)
+            ->orderBy('g.name', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $this->toVisibleReadViews($entities, $scope);
+    }
+
+    public function countVisible(LibraryReadScope $scope): int
+    {
+        return (int) $this->visibleQuery($scope)
+            ->select('COUNT(g.id)')
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    private function visibleQuery(LibraryReadScope $scope, string $alias = 'g'): QueryBuilder
+    {
+        $qb = $this->entityManager
+            ->getRepository(GenreEntity::class)
+            ->createQueryBuilder($alias);
+        CatalogReadScopeQuery::apply($qb, $scope, 'genre', $alias);
+
+        return $qb;
+    }
+
+    /**
+     * @param GenreEntity[] $entities
+     * @return GenreReadView[]
+     */
+    private function toVisibleReadViews(array $entities, LibraryReadScope $scope): array
+    {
+        $visibleParentIds = [];
+        if (!$scope->isUnrestricted()) {
+            $parentIds = [];
+            foreach ($entities as $entity) {
+                $parentId = $entity->getParent()?->getId();
+                if ($parentId !== null) {
+                    $parentIds[$parentId->toString()] = $parentId;
+                }
+            }
+            if ($parentIds !== []) {
+                $visibleParents = $this->visibleQuery($scope)
+                    ->andWhere('g.id IN (:parentIds)')
+                    ->setParameter('parentIds', array_values($parentIds))
+                    ->getQuery()
+                    ->getResult();
+                foreach ($visibleParents as $parent) {
+                    $visibleParentIds[$parent->getId()->toString()] = true;
+                }
+            }
+        }
+
+        return array_map(static function (GenreEntity $entity) use ($scope, $visibleParentIds): GenreReadView {
+            $parentId = $entity->getParent()?->getId();
+            if ($parentId !== null && !$scope->isUnrestricted() && !isset($visibleParentIds[$parentId->toString()])) {
+                $parentId = null;
+            }
+
+            return new GenreReadView(
+                $entity->getId(),
+                $entity->getName(),
+                $entity->getSlug(),
+                $parentId,
+                $entity->getMbid(),
+            );
+        }, $entities);
     }
 
     public function save(Genre $genre): void

@@ -5,6 +5,13 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Controller;
 
 use App\Auth\Domain\Model\User;
+use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\GenreAlbumEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\GenreEntity;
+use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
+use App\Library\Infrastructure\Doctrine\Entity\UserLibraryAccessEntity;
+use App\Shared\Domain\Model\PublicId;
 use App\Tests\Functional\TestCase;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -12,9 +19,9 @@ use Symfony\Component\HttpFoundation\Response;
  * Functional tests for genre management (Catalog bounded context).
  *
  * Covers GenreController:
- *   GET    /api/genres/         index (public, root-only or flat)
+ *   GET    /api/genres/         index (accessible library genres, root-only or flat)
  *   POST   /api/genres/         store (ROLE_ADMIN only)
- *   GET    /api/genres/{slug}   show (public)
+ *   GET    /api/genres/{slug}   show (accessible library genres)
  *   PATCH  /api/genres/{slug}   update (ROLE_ADMIN only)
  *   DELETE /api/genres/{slug}   destroy (ROLE_ADMIN only)
  */
@@ -50,6 +57,7 @@ final class GenreControllerTest extends TestCase
         $user = $this->createTestUser();
         $this->createGenre($admin, 'Rock', 'rock');
         $this->createGenre($admin, 'Jazz', 'jazz');
+        $this->grantGenreLibraryAccess($user, ['rock', 'jazz']);
 
         $rootData = $this->assertJsonResponse(
             $this->authenticatedRequest('GET', '/api/genres/', $user),
@@ -64,6 +72,8 @@ final class GenreControllerTest extends TestCase
         );
 
         $this->assertGreaterThanOrEqual(count($rootData['data']), count($flatData['data']));
+        $this->assertSame(['jazz', 'rock'], array_column($rootData['data'], 'slug'));
+        $this->assertSame(['jazz', 'rock'], array_column($flatData['data'], 'slug'));
     }
 
     // ---------------------------------------------------------------
@@ -124,7 +134,16 @@ final class GenreControllerTest extends TestCase
     {
         $admin = $this->createAdminUser();
         $user = $this->createTestUser();
-        $this->createGenre($admin, 'Rock', 'rock');
+        $root = $this->assertJsonResponse($this->createGenre($admin, 'Rock', 'rock'), 201);
+        $this->assertJsonResponse(
+            $this->authenticatedRequest('POST', '/api/genres/', $admin, [
+                'name' => 'Hard Rock',
+                'slug' => 'hard-rock',
+                'parentId' => $root['uuid'],
+            ]),
+            201,
+        );
+        $this->grantGenreLibraryAccess($user, ['rock', 'hard-rock']);
 
         $data = $this->assertJsonResponse(
             $this->authenticatedRequest('GET', '/api/genres/rock', $user),
@@ -135,6 +154,21 @@ final class GenreControllerTest extends TestCase
         $this->assertSame('Rock', $data['data']['name']);
         $this->assertSame('rock', $data['data']['slug']);
         $this->assertArrayHasKey('children', $data['data']);
+        $this->assertCount(1, $data['data']['children']);
+        $this->assertSame('hard-rock', $data['data']['children'][0]['slug']);
+        $this->assertSame($root['uuid'], $data['data']['children'][0]['parentId']);
+    }
+
+    public function testShowDeniesGenreWithoutAccessibleMedia(): void
+    {
+        $admin = $this->createAdminUser();
+        $user = $this->createTestUser();
+        $this->createGenre($admin, 'Orphan', 'orphan');
+
+        $this->assertJsonResponse(
+            $this->authenticatedRequest('GET', '/api/genres/orphan', $user),
+            404,
+        );
     }
 
     public function testShowReturns404ForUnknownSlug(): void
@@ -216,7 +250,7 @@ final class GenreControllerTest extends TestCase
 
         // Gone.
         $this->assertJsonResponse(
-            $this->anonymousRequest('GET', '/api/genres/rock'),
+            $this->authenticatedRequest('GET', '/api/genres/rock', $admin),
             404,
         );
     }
@@ -240,5 +274,27 @@ final class GenreControllerTest extends TestCase
             'name' => $name,
             'slug' => $slug,
         ]);
+    }
+
+    /** @param list<string> $slugs */
+    private function grantGenreLibraryAccess(User $user, array $slugs): void
+    {
+        $entity = $this->entityManager->find(UserEntity::class, $user->getId());
+        self::assertInstanceOf(UserEntity::class, $entity);
+
+        $suffix = bin2hex(random_bytes(8));
+        $library = new LibraryEntity('Genre fixture', 'genre-' . $suffix, '/tmp/genre-' . $suffix, 'music', 'local');
+        $album = new AlbumEntity(new PublicId(), $library, 'Genre fixture album', 'album');
+        $this->entityManager->persist($library);
+        $this->entityManager->persist($album);
+        $this->entityManager->persist(new UserLibraryAccessEntity($entity, $library, new \DateTimeImmutable()));
+
+        foreach ($slugs as $slug) {
+            $genre = $this->entityManager->getRepository(GenreEntity::class)->findOneBy(['slug' => $slug]);
+            self::assertInstanceOf(GenreEntity::class, $genre);
+            $this->entityManager->persist(new GenreAlbumEntity($genre, $album));
+        }
+
+        $this->entityManager->flush();
     }
 }

@@ -53,8 +53,35 @@ unused framework serializer factory and its obsolete allowlist implementation.
 The active codec/transport units pass 123 tests (644 assertions); real Redis delivery,
 retry, outbox replay, and container wiring pass 23 tests (369 assertions). Golden
 wire fixtures, strict payload fields, numeric types, and size limits remain covered.
-Scoped PHPStan and container lint pass. The earlier combined backend gate passed
-4,560 tests (19,165 assertions); rerun it after the ongoing library-scope changes.
+Scoped PHPStan and container lint pass.
+
+Library and album/artist/song/movie reads now use an explicit library scope through
+application ports and repositories, including search, counts, cursors and related
+metadata. Both native PGroonga queries and Doctrine queries apply access predicates
+before pagination. Multiple artist roles no longer duplicate album counts/pages.
+The combined production OAuth, catalog, library, artist mutation and signed-delivery
+matrix passes 91 tests (876 assertions). Scoped PostgreSQL search tests pass eight
+cases (77 assertions). Direct image delivery remains an access gap:
+image metadata/file/blurhash endpoints still lack resource ownership
+checks, so scoped album cover redirects alone do not complete media authorization.
+
+Genre reads now cover accessible song, album and movie associations through an
+immutable read projection. Inaccessible parent identifiers are omitted and their
+visible children become scoped roots; stored hierarchy data remains unchanged.
+The combined firewall and existing genre-controller gate passes 111 tests (991
+assertions), with four PostgreSQL hierarchy tests (44 assertions). Existing success
+fixtures now create real grants and media associations; explicit denied/orphan
+cases remain covered. Playlist reads also require a separate ownership audit:
+the current show endpoint does not enforce the owner/admin policy of its voter.
+
+Malformed DPoP verification keys now return an authentication rejection instead
+of an uncaught server error. Deterministic leading-zero EC key fixtures exercise
+valid 32-byte JWK coordinates through the production firewall. Cache initialization
+also fails explicitly when its directory or exclusive lock cannot be established.
+The combined unit/static-rule gate passes 4,558 tests (19,176 assertions), and the
+full configured PHPStan scan reports zero errors. Deptrac reports 298 active
+violations, 676 skipped occurrences and zero configuration errors; no baseline
+expansion was used. The full functional suite is being requalified separately.
 
 ## Delivery horizons
 
@@ -387,6 +414,20 @@ design over compatibility layers. The temporary AGENTS.md policy remains until
 the user explicitly announces the first production release.
 
 ## C++ registry
+
+The C++ core and bounded TLS HTTP server are implemented and committed. Local
+qualification passes 16 sanitizer unit tests, real authenticated TLS rqlite API
+checks, same-pool reconnect/deadline checks, concurrent ownership claims, readiness
+schema recovery, and bounded graceful shutdown during a commit. Registration
+credentials are never returned or logged. These results do not qualify multi-voter
+partitions, capacity, soak, backup restoration or regional deployment. The PHP
+implementation remains until the replacement's deployment path is complete.
+Clean release and ASan/LeakSanitizer/UBSan builds now pass through
+`scripts/test-registry.sh`, which verifies downloaded rqlite/OpenSSL checksums and
+isolates OpenSSL dependency discovery. Both CI matrix variants are required before
+publication. Eighteen workflow tests verify event-commit checkouts and failure
+propagation, including each registry variant. ThreadSanitizer, static analysis,
+automated license checks and performance/soak gates remain outstanding.
 
 - [ ] Complete/verify C++20 registry with Beast/Asio, OpenSSL, nlohmann/json,
   pinned dependencies, CMake/Ninja, GoogleTest, and bounded async rqlite pools.

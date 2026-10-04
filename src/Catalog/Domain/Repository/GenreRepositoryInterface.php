@@ -5,10 +5,27 @@ declare(strict_types=1);
 namespace App\Catalog\Domain\Repository;
 
 use App\Catalog\Domain\Model\Genre;
+use App\Catalog\Domain\ReadModel\GenreReadView;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 interface GenreRepositoryInterface
 {
+    public function findVisibleByUuid(Uuid $uuid, LibraryReadScope $scope): ?GenreReadView;
+
+    public function findVisibleBySlug(string $slug, LibraryReadScope $scope): ?GenreReadView;
+
+    /** @return GenreReadView[] */
+    public function findVisibleChildren(Uuid $parentId, LibraryReadScope $scope): array;
+
+    /** @return GenreReadView[] */
+    public function findVisibleRootGenres(LibraryReadScope $scope): array;
+
+    /** @return GenreReadView[] */
+    public function findAllVisible(LibraryReadScope $scope): array;
+
+    public function countVisible(LibraryReadScope $scope): int;
+
     public function save(Genre $genre): void;
 
     public function persist(Genre $genre): void;

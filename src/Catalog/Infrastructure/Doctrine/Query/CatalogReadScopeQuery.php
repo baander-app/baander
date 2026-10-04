@@ -23,6 +23,9 @@ final class CatalogReadScopeQuery
         $album = 'App\\Catalog\\Infrastructure\\Doctrine\\Entity\\AlbumEntity';
         $artistAlbum = 'App\\Catalog\\Infrastructure\\Doctrine\\Entity\\ArtistAlbumEntity';
         $artistSong = 'App\\Catalog\\Infrastructure\\Doctrine\\Entity\\ArtistSongEntity';
+        $genreSong = 'App\\Catalog\\Infrastructure\\Doctrine\\Entity\\GenreSongEntity';
+        $genreAlbum = 'App\\Catalog\\Infrastructure\\Doctrine\\Entity\\GenreAlbumEntity';
+        $genreMovie = 'App\\Catalog\\Infrastructure\\Doctrine\\Entity\\GenreMovieEntity';
         $predicate = match ($kind) {
             'album', 'movie' => "IDENTITY($alias.library) IN (:visible_libraries)",
             'song' => <<<DQL
@@ -46,6 +49,28 @@ final class CatalogReadScopeQuery
                     JOIN visible_s.album visible_sa
                     WHERE visible_as.artist = $alias.id
                         AND IDENTITY(visible_sa.library) IN (:visible_libraries)
+                )
+                DQL,
+            'genre' => <<<DQL
+                EXISTS (
+                    SELECT {$alias}_visible_gs.id
+                    FROM $genreSong {$alias}_visible_gs
+                    JOIN {$alias}_visible_gs.song {$alias}_visible_gs_song
+                    JOIN {$alias}_visible_gs_song.album {$alias}_visible_gs_album
+                    WHERE {$alias}_visible_gs.genre = $alias.id
+                        AND IDENTITY({$alias}_visible_gs_album.library) IN (:visible_libraries)
+                ) OR EXISTS (
+                    SELECT {$alias}_visible_ga.id
+                    FROM $genreAlbum {$alias}_visible_ga
+                    JOIN {$alias}_visible_ga.album {$alias}_visible_ga_album
+                    WHERE {$alias}_visible_ga.genre = $alias.id
+                        AND IDENTITY({$alias}_visible_ga_album.library) IN (:visible_libraries)
+                ) OR EXISTS (
+                    SELECT {$alias}_visible_gm.id
+                    FROM $genreMovie {$alias}_visible_gm
+                    JOIN {$alias}_visible_gm.movie {$alias}_visible_gm_movie
+                    WHERE {$alias}_visible_gm.genre = $alias.id
+                        AND IDENTITY({$alias}_visible_gm_movie.library) IN (:visible_libraries)
                 )
                 DQL,
             default => throw new \InvalidArgumentException('Unsupported catalog scope kind.'),

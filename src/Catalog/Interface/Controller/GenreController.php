@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Interface\Controller;
 
 use App\Catalog\Application\Port\GenrePortInterface;
+use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Catalog\Domain\Model\Genre;
 use App\Catalog\Interface\Request\CreateGenreRequest;
 use App\Catalog\Interface\Request\GenreAlbumRequest;
@@ -31,6 +32,7 @@ final class GenreController
 
     public function __construct(
         private readonly GenrePortInterface $genreService,
+        private readonly LibraryReadScopeProviderInterface $libraryReadScopeProvider,
     ) {
     }
 
@@ -55,10 +57,11 @@ final class GenreController
     #[Route('/', name: 'index', methods: ['GET'])]
     public function index(Request $request): JsonResponse
     {
+        $scope = $this->libraryReadScopeProvider->current();
         if ($request->query->getBoolean('flat')) {
-            $genres = $this->genreService->findAll();
+            $genres = $this->genreService->findAllVisible($scope);
         } else {
-            $genres = $this->genreService->findRootGenres();
+            $genres = $this->genreService->findVisibleRootGenres($scope);
         }
 
         return $this->successResponse(GenreResource::collection($genres));
@@ -139,13 +142,14 @@ final class GenreController
     #[Route('/{slug}', name: 'show', methods: ['GET'])]
     public function show(string $slug): JsonResponse
     {
-        $genre = $this->genreService->findBySlug($slug);
+        $scope = $this->libraryReadScopeProvider->current();
+        $genre = $this->genreService->findVisibleBySlug($slug, $scope);
 
         if ($genre === null) {
             return $this->notFound();
         }
 
-        $children = $this->genreService->findChildren($genre->getId());
+        $children = $this->genreService->findVisibleChildren($genre->getId(), $scope);
 
         return $this->successResponse(array_merge(
             GenreResource::from($genre),

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Interface\Resource;
 
 use App\Catalog\Domain\Model\Genre;
+use App\Catalog\Domain\ReadModel\GenreReadView;
 use App\Shared\Interface\Resource\AbstractResource;
 use OpenApi\Attributes as OA;
 
@@ -22,7 +23,7 @@ final class GenreResource extends AbstractResource
 {
     public static function from(mixed $source): array
     {
-        assert($source instanceof Genre);
+        assert($source instanceof Genre || $source instanceof GenreReadView);
 
         return [
             'uuid' => $source->getId()->toString(),
