@@ -12,33 +12,26 @@ namespace App\Media\Infrastructure\Converter;
 final class BlurHash
 {
     /**
-     * Encode an image to a BlurHash string.
-     *
-     * @param resource|\GdImage $image GD image resource
-     * @param int<1, 9> $componentsX Number of DCT components on X axis (1-9)
-     * @param int<1, 9> $componentsY Number of DCT components on Y axis (1-9)
+     * Encode an image to a BlurHash string using 1–9 components per axis.
      */
     public static function encode(\GdImage $image, int $componentsX = 4, int $componentsY = 3): string
     {
-        $componentsX = max(1, min(9, $componentsX));
-        $componentsY = max(1, min(9, $componentsY));
-
         $width = imagesx($image);
         $height = imagesy($image);
-
-        if ($width === 0 || $height === 0) {
-            throw new \InvalidArgumentException('Image must have non-zero dimensions.');
-        }
 
         $pixels = [];
         for ($y = 0; $y < $height; $y++) {
             $row = [];
             for ($x = 0; $x < $width; $x++) {
                 $index = imagecolorat($image, $x, $y);
+                if ($index === false) {
+                    throw new \RuntimeException('Failed to read image pixel.');
+                }
+                $color = imagecolorsforindex($image, $index);
                 $row[] = [
-                    'r' => (($index >> 16) & 0xFF) / 255.0,
-                    'g' => (($index >> 8) & 0xFF) / 255.0,
-                    'b' => ($index & 0xFF) / 255.0,
+                    'r' => $color['red'] / 255.0,
+                    'g' => $color['green'] / 255.0,
+                    'b' => $color['blue'] / 255.0,
                 ];
             }
             $pixels[] = $row;
@@ -48,12 +41,34 @@ final class BlurHash
     }
 
     /**
-     * Encode from raw pixel data.
+     * Encode from normalized sRGB pixel data (channels between zero and one).
      *
      * @param array<int, array<int, array{r: float, g: float, b: float}>> $pixels
      */
     public static function encodePixels(array $pixels, int $width, int $height, int $componentsX, int $componentsY): string
     {
+        if ($width < 1 || $height < 1) {
+            throw new \InvalidArgumentException('Image dimensions must be positive.');
+        }
+        if ($componentsX < 1 || $componentsX > 9 || $componentsY < 1 || $componentsY > 9) {
+            throw new \InvalidArgumentException('BlurHash must have between 1 and 9 components per axis.');
+        }
+        if (!array_is_list($pixels) || count($pixels) !== $height) {
+            throw new \InvalidArgumentException('Pixel rows must match image height.');
+        }
+        foreach ($pixels as $row) {
+            if (!array_is_list($row) || count($row) !== $width) {
+                throw new \InvalidArgumentException('Pixel columns must match image width.');
+            }
+            foreach ($row as $pixel) {
+                foreach (['r', 'g', 'b'] as $channel) {
+                    if (!is_finite($pixel[$channel]) || $pixel[$channel] < 0 || $pixel[$channel] > 1) {
+                        throw new \InvalidArgumentException('Pixel channels must be finite normalized sRGB values.');
+                    }
+                }
+            }
+        }
+
         $factors = [];
 
         for ($y = 0; $y < $componentsY; $y++) {
@@ -70,6 +85,8 @@ final class BlurHash
 
         $quantizedMaximumValue = self::encodeMaxAcComponent($ac);
 
+        $maximumValue = ($quantizedMaximumValue + 1) / 166.0;
+
         $dcValue = self::encodeDc($dc['r'], $dc['g'], $dc['b']);
 
         $result = self::base83Encode($sizeFlag, 1);
@@ -79,7 +96,7 @@ final class BlurHash
         $result .= self::base83Encode($dcValue, 4);
 
         foreach ($ac as $factor) {
-            $result .= self::encodeAc($factor['r'], $factor['g'], $factor['b'], $quantizedMaximumValue);
+            $result .= self::encodeAc($factor['r'], $factor['g'], $factor['b'], $maximumValue);
         }
 
         return $result;
@@ -92,6 +109,9 @@ final class BlurHash
      */
     public static function decode(string $blurHash, int $width, int $height, float $punch = 1.0): array
     {
+        if ($width < 1 || $height < 1 || !is_finite($punch) || $punch < 0) {
+            throw new \InvalidArgumentException('Dimensions must be positive and punch must be finite and non-negative.');
+        }
         if (strlen($blurHash) < 6) {
             throw new \InvalidArgumentException('BlurHash string is too short.');
         }
@@ -104,15 +124,15 @@ final class BlurHash
         $componentsX = ($sizeFlag % 9) + 1;
         $componentsY = intdiv($sizeFlag, 9) + 1;
 
-        if ($componentsX * $componentsY + 3 !== strlen($blurHash) * 5 / 8) {
-            // Approximate length check — some valid hashes may not match exactly
+        if ($componentsY > 9 || strlen($blurHash) !== 4 + 2 * $componentsX * $componentsY) {
+            throw new \InvalidArgumentException('BlurHash length does not match its components.');
         }
 
         $dc = self::decodeDc(self::base83Decode($blurHash, 2, 4));
 
         $ac = [];
         for ($i = 0; $i < $componentsX * $componentsY - 1; $i++) {
-            $ac[] = self::decodeAc(self::base83Decode($blurHash, 4 + i * 2, 2), $maximumValue);
+            $ac[] = self::decodeAc(self::base83Decode($blurHash, 6 + $i * 2, 2), $maximumValue * $punch);
         }
 
         $pixels = [];
@@ -141,9 +161,9 @@ final class BlurHash
                 }
 
                 $row[] = [
-                    'r' => (int) max(0, min(255, (int) round($r * $punch + 0.5))),
-                    'g' => (int) max(0, min(255, (int) round($g * $punch + 0.5))),
-                    'b' => (int) max(0, min(255, (int) round($b * $punch + 0.5))),
+                    'r' => self::linearToSrgb($r),
+                    'g' => self::linearToSrgb($g),
+                    'b' => self::linearToSrgb($b),
                 ];
             }
             $pixels[] = $row;
@@ -180,33 +200,7 @@ final class BlurHash
 
     // --- Internal ---
 
-    private const array BASE83_CHARS = [
-        0 => '0', 1 => '1', 2 => '2', 3 => '3', 4 => '4', 5 => '5', 6 => '6', 7 => '7',
-        8 => '8', 9 => '9', 10 => 'A', 11 => 'B', 12 => 'C', 13 => 'D', 14 => 'E', 15 => 'F',
-        16 => 'G', 17 => 'H', 18 => 'I', 19 => 'J', 20 => 'K', 21 => 'L', 22 => 'M', 23 => 'N',
-        24 => 'O', 25 => 'P', 26 => 'Q', 27 => 'R', 28 => 'S', 29 => 'T', 30 => 'U', 31 => 'V',
-        32 => 'W', 33 => 'X', 34 => 'Y', 35 => 'Z', 36 => 'a', 37 => 'b', 38 => 'c', 39 => 'd',
-        40 => 'e', 41 => 'f', 42 => 'g', 43 => 'h', 44 => 'i', 45 => 'j', 46 => 'k', 47 => 'l',
-        48 => 'm', 49 => 'n', 50 => 'o', 51 => 'p', 52 => 'q', 53 => 'r', 54 => 's', 55 => 't',
-        56 => 'u', 57 => 'v', 58 => 'w', 59 => 'x', 60 => 'y', 61 => 'z', 62 => '#', 63 => '$',
-        64 => '%', 65 => '&', 66 => '(', 67 => ')', 68 => '*', 69 => '+', 70 => ',', 71 => '-',
-        72 => '.', 73 => ':', 74 => ';', 75 => '=', 76 => '?', 77 => '@', 78 => '[', 79 => ']',
-        80 => '^', 81 => '_', 82 => '{', 83 => '|', 84 => '}', 85 => '~',
-    ];
-
-    private const array CHAR_TO_VALUE = [
-        '0' => 0, '1' => 1, '2' => 2, '3' => 3, '4' => 4, '5' => 5, '6' => 6, '7' => 7,
-        '8' => 8, '9' => 9, 'A' => 10, 'B' => 11, 'C' => 12, 'D' => 13, 'E' => 14, 'F' => 15,
-        'G' => 16, 'H' => 17, 'I' => 18, 'J' => 19, 'K' => 20, 'L' => 21, 'M' => 22, 'N' => 23,
-        'O' => 24, 'P' => 25, 'Q' => 26, 'R' => 27, 'S' => 28, 'T' => 29, 'U' => 30, 'V' => 31,
-        'W' => 32, 'X' => 33, 'Y' => 34, 'Z' => 35, 'a' => 36, 'b' => 37, 'c' => 38, 'd' => 39,
-        'e' => 40, 'f' => 41, 'g' => 42, 'h' => 43, 'i' => 44, 'j' => 45, 'k' => 46, 'l' => 47,
-        'm' => 48, 'n' => 49, 'o' => 50, 'p' => 51, 'q' => 52, 'r' => 53, 's' => 54, 't' => 55,
-        'u' => 56, 'v' => 57, 'w' => 58, 'x' => 59, 'y' => 60, 'z' => 61, '#' => 62, '$' => 63,
-        '%' => 64, '&' => 65, '(' => 66, ')' => 67, '*' => 68, '+' => 69, ',' => 70, '-' => 71,
-        '.' => 72, ':' => 73, ';' => 74, '=' => 75, '?' => 76, '@' => 77, '[' => 78, ']' => 79,
-        '^' => 80, '_' => 81, '{' => 82, '|' => 83, '}' => 84, '~' => 85,
-    ];
+    private const string BASE83_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~';
 
     private static function base83Encode(int $value, int $length): string
     {
@@ -224,7 +218,10 @@ final class BlurHash
         $value = 0;
         for ($i = 0; $i < $length; $i++) {
             $char = $hash[$offset + $i];
-            $digit = self::CHAR_TO_VALUE[$char] ?? 0;
+            $digit = strpos(self::BASE83_CHARS, $char);
+            if ($digit === false) {
+                throw new \InvalidArgumentException('BlurHash contains an invalid base83 character.');
+            }
             $value = $value * 83 + $digit;
         }
 
@@ -233,22 +230,24 @@ final class BlurHash
 
     private static function encodeDc(float $r, float $g, float $b): int
     {
-        $roundedR = (int) round($r * 255);
-        $roundedG = (int) round($g * 255);
-        $roundedB = (int) round($b * 255);
+        $roundedR = self::linearToSrgb($r);
+        $roundedG = self::linearToSrgb($g);
+        $roundedB = self::linearToSrgb($b);
 
         return ($roundedR << 16) | ($roundedG << 8) | $roundedB;
     }
 
+    /** @return array{r: float, g: float, b: float} */
     private static function decodeDc(int $value): array
     {
         return [
-            'r' => (($value >> 16) & 0xFF) / 255.0,
-            'g' => (($value >> 8) & 0xFF) / 255.0,
-            'b' => ($value & 0xFF) / 255.0,
+            'r' => self::srgbToLinear((($value >> 16) & 0xFF) / 255.0),
+            'g' => self::srgbToLinear((($value >> 8) & 0xFF) / 255.0),
+            'b' => self::srgbToLinear(($value & 0xFF) / 255.0),
         ];
     }
 
+    /** @param list<array{r: float, g: float, b: float}> $ac */
     private static function encodeMaxAcComponent(array $ac): int
     {
         $max = 0.0;
@@ -262,15 +261,11 @@ final class BlurHash
         return $quantizedMax;
     }
 
-    private static function encodeAc(float $r, float $g, float $b, int $maxAc): string
+    private static function encodeAc(float $r, float $g, float $b, float $maxAc): string
     {
-        if ($maxAc === 0) {
-            return self::base83Encode(0, 2);
-        }
-
-        $qr = (int) round((float) (self::signPow($r / $maxAc, 0.5) * 9 + 9));
-        $qg = (int) round((float) (self::signPow($g / $maxAc, 0.5) * 9 + 9));
-        $qb = (int) round((float) (self::signPow($b / $maxAc, 0.5) * 9 + 9));
+        $qr = (int) floor(self::signPow($r / $maxAc, 0.5) * 9 + 9.5);
+        $qg = (int) floor(self::signPow($g / $maxAc, 0.5) * 9 + 9.5);
+        $qb = (int) floor(self::signPow($b / $maxAc, 0.5) * 9 + 9.5);
 
         $qr = max(0, min(18, $qr));
         $qg = max(0, min(18, $qg));
@@ -279,6 +274,7 @@ final class BlurHash
         return self::base83Encode($qr * 19 * 19 + $qg * 19 + $qb, 2);
     }
 
+    /** @return array{r: float, g: float, b: float} */
     private static function decodeAc(int $value, float $maxAc): array
     {
         $qr = intdiv($value, 19 * 19);
@@ -292,6 +288,19 @@ final class BlurHash
         ];
     }
 
+    private static function srgbToLinear(float $value): float
+    {
+        return $value <= 0.04045 ? $value / 12.92 : pow(($value + 0.055) / 1.055, 2.4);
+    }
+
+    private static function linearToSrgb(float $value): int
+    {
+        $value = max(0.0, min(1.0, $value));
+        $srgb = $value <= 0.0031308 ? $value * 12.92 : 1.055 * pow($value, 1 / 2.4) - 0.055;
+
+        return (int) floor($srgb * 255 + 0.5);
+    }
+
     private static function signPow(float $value, float $exp): float
     {
         if ($value < 0) {
@@ -303,6 +312,7 @@ final class BlurHash
 
     /**
      * @param array<int, array<int, array{r: float, g: float, b: float}>> $pixels
+     * @return array{r: float, g: float, b: float}
      */
     private static function multiplyBasisFunction(array $pixels, int $width, int $height, int $basisX, int $basisY): array
     {
@@ -319,9 +329,9 @@ final class BlurHash
                     * cos((M_PI * $basisY * $y) / $height);
 
                 $pixel = $pixels[$y][$x];
-                $r += $pixel['r'] * $basis;
-                $g += $pixel['g'] * $basis;
-                $b += $pixel['b'] * $basis;
+                $r += self::srgbToLinear($pixel['r']) * $basis;
+                $g += self::srgbToLinear($pixel['g']) * $basis;
+                $b += self::srgbToLinear($pixel['b']) * $basis;
             }
         }
 
