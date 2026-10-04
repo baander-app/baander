@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Controller;
 
 use App\Shared\Domain\Model\JobStatus;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Infrastructure\Doctrine\Entity\JobMonitorEntity;
 use App\Shared\Infrastructure\Messenger\JobIdStamp;
 use App\Shared\Infrastructure\Messenger\JobMessageSerializer;
@@ -20,7 +21,9 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
-use Symfony\Component\Messenger\Stamp\TransportNameStamp;
+use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
+use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -332,7 +335,7 @@ final class JobMonitorController
         ],
     )]
     #[Route('/jobs/{jobId}/retry', name: 'jobs_retry', methods: ['POST'])]
-    public function retry(Request $request, string $jobId): JsonResponse
+    public function retry(string $jobId, #[CurrentUser] UserInterface $user): JsonResponse
     {
         try {
             $job = $this->jobMonitorService->findByJobIdOrFail($jobId);
@@ -357,22 +360,17 @@ final class JobMonitorController
             return $this->errorResponse('Failed to deserialize the stored message payload.', 422);
         }
 
-        $envelope = new Envelope($message);
+        $newJobId = new PublicId();
+        $envelope = new Envelope($message, [new JobIdStamp($newJobId)]);
         if ($job->getQueue() !== null) {
-            $envelope = $envelope->with(new TransportNameStamp($job->getQueue()));
+            $envelope = $envelope->with(new TransportNamesStamp([$job->getQueue()]));
         }
 
-        $dispatched = $this->messageBus->dispatch($envelope);
-
-        /** @var JobIdStamp|null $stamp */
-        $stamp = $dispatched->last(JobIdStamp::class);
-        $newJobId = $stamp?->jobId->toString() ?? '';
-
-        $userId = $request->getUser()?->getUserIdentifier() ?? 'anonymous';
-        $this->jobMonitorService->markRetriedWithAudit($jobId, $newJobId, $userId);
+        $this->messageBus->dispatch($envelope);
+        $this->jobMonitorService->markRetriedWithAudit($jobId, $newJobId->toString(), $user->getUserIdentifier());
 
         return $this->successResponse([
-            'newJobId' => $newJobId,
+            'newJobId' => $newJobId->toString(),
         ]);
     }
 

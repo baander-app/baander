@@ -178,6 +178,28 @@ suite. PHPStan reports 1,690 diagnostics, down from 1,693, with no new diagnosti
 in the changed files. Deptrac remains at 259 violations and zero configuration
 errors; both release gates remain blocked.
 
+## Worker monitoring and manual retry repair
+
+Worker job monitoring now uses the receiving worker event's queue name. Manual
+retry uses Messenger's transport-selection stamp, assigns a fresh job ID before
+sending, and records the authenticated administrator in its audit entry. The
+response, queued message, and audit record share that new ID. Both Symfony workers
+and the Swoole task-monitor decorator preserve it through success or failure. Dispatch failure
+leaves the original job unmarked so it can be retried later.
+
+Tests exercise real Messenger sender routing and worker events with the independent
+JSON message codec. This repairs runtime behavior without claiming atomic retry
+claims: concurrent administrative retries and send-success/audit-failure recovery
+still need an explicit durable transaction/delivery design.
+
+Verification: 4,424 backend unit tests with 18,758 assertions pass in the qualified
+PHP runtime. The final explicit stamp-check cleanup also passes all five Swoole
+transport tests. PHPStan reports 1,683 diagnostics, down from 1,690; the initial
+changed production and regression files have no diagnostics. Final scoped analysis
+also passes for the Swoole decorator and transport tests. Production container
+warmup passes without wiring errors; external Redis availability was not tested in
+the no-network container. Deptrac remains at 259 violations.
+
 ## Recent verified checkpoints
 
 | Commit | Result | Verification |

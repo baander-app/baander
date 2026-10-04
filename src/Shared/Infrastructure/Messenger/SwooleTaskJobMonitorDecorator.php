@@ -17,7 +17,7 @@ use Symfony\Component\Messenger\Transport\Serialization\SerializerInterface;
  *
  * Creates a job_monitor entry before bus->dispatch() runs, then marks
  * it finished or failed when the handler completes. Does not depend on
- * any bus middleware — the job ID is generated here.
+ * any bus middleware. A supplied job ID is retained; otherwise one is generated here.
  */
 final readonly class SwooleTaskJobMonitorDecorator implements TaskHandler
 {
@@ -52,7 +52,8 @@ final readonly class SwooleTaskJobMonitorDecorator implements TaskHandler
 
         $message = $data->getMessage();
         $name = (new \ReflectionClass($message))->getShortName();
-        $jobId = new PublicId();
+        $jobIdStamp = $data->last(JobIdStamp::class);
+        $jobId = $jobIdStamp !== null ? $jobIdStamp->jobId : new PublicId();
         $jobIdStr = $jobId->toString();
 
         // Create + mark started

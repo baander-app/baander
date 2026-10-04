@@ -8,7 +8,6 @@ use App\Shared\Domain\Model\PublicId;
 use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
 use Symfony\Component\Messenger\Event\WorkerMessageHandledEvent;
 use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
-use Symfony\Component\Messenger\Stamp\TransportNameStamp;
 
 final class WorkerJobMonitorSubscriber
 {
@@ -33,8 +32,7 @@ final class WorkerJobMonitorSubscriber
         $message = $envelope->getMessage();
         $name = (new \ReflectionClass($message))->getShortName();
 
-        $transportStamp = $envelope->last(TransportNameStamp::class);
-        $queue = $transportStamp?->getTransportName();
+        $queue = $event->getReceiverName();
 
         $this->jobMonitorService->create(
             jobId: $jobId->toString(),
