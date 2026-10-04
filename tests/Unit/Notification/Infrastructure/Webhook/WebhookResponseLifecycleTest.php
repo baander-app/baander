@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Notification\Infrastructure\Webhook;
 use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Notification\Infrastructure\Doctrine\Entity\WebhookEntity;
 use App\Notification\Infrastructure\Webhook\HmacSigner;
+use App\Notification\Infrastructure\Webhook\WebhookSecretCodec;
 use App\Notification\Infrastructure\Webhook\WebhookDeliveryService;
 use App\Notification\Infrastructure\Webhook\WebhookDestinationPolicy;
 use App\Shared\Domain\Model\Uuid;
@@ -126,9 +127,8 @@ final class WebhookResponseLifecycleTest extends TestCase
 
     private function service(HttpClientInterface $client, ?Closure $onPersist = null): WebhookDeliveryService
     {
-        $webhook = new WebhookEntity(Uuid::generate());
+        $webhook = new WebhookEntity(Uuid::generate(), (new WebhookSecretCodec('test-app-secret'))->encrypt('original-secret'));
         $webhook->setUrl('https://webhook.baander.app/hook');
-        $webhook->setSecretHash('fixture secret');
         $repository = $this->createStub(EntityRepository::class);
         $repository->method('findAll')->willReturn([$webhook]);
         $entityManager = $this->createMock(EntityManagerInterface::class);
@@ -137,7 +137,7 @@ final class WebhookResponseLifecycleTest extends TestCase
         $entityManager->expects(self::once())->method('flush');
         $policy = new WebhookDestinationPolicy(dnsResolver: static fn (string $host): array => ['1.1.1.1']);
 
-        return new WebhookDeliveryService($entityManager, $client, new HmacSigner(), new NullLogger(), $policy);
+        return new WebhookDeliveryService($entityManager, $client, new HmacSigner(), new NullLogger(), $policy, new WebhookSecretCodec('test-app-secret'));
     }
 
     private function deliver(WebhookDeliveryService $service): void

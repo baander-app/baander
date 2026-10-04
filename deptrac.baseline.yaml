@@ -315,7 +315,6 @@ deptrac:
       - App\Notification\Infrastructure\Push\PushSubscriptionRepositoryInterface
     App\Notification\Interface\Controller\WebhookController:
       - App\Notification\Infrastructure\Doctrine\Entity\WebhookEntity
-      - App\Notification\Infrastructure\Webhook\HmacSigner
     App\Notification\Interface\Resource\NotificationPreferenceResource:
       - App\Notification\Domain\Model\NotificationPreference
     App\Notification\Interface\Resource\NotificationResource:

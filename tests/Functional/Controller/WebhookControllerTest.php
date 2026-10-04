@@ -271,9 +271,7 @@ final class WebhookControllerTest extends TestCase
         $this->assertNotSame($created['secret'], $rotated['secret']);
         $stored = $this->storedWebhook($created['id']);
         $this->assertSame(2, $stored->getSigningVersion());
-        $this->assertSame(hash('sha256', $rotated['secret']), $stored->getSecretHash());
         $ciphertext = $stored->getEncryptedSecret();
-        $this->assertNotNull($ciphertext);
         $this->assertNotSame($originalCiphertext, $ciphertext);
         $this->assertNotSame($rotated['secret'], $ciphertext);
         $secrets = static::getContainer()->get(WebhookSecretPortInterface::class);
@@ -284,6 +282,21 @@ final class WebhookControllerTest extends TestCase
         $this->assertArrayNotHasKey('secret', $listed[0]);
         $this->assertArrayNotHasKey('secret_hash', $listed[0]);
         $this->assertArrayNotHasKey('encrypted_secret', $listed[0]);
+    }
+
+    public function testFreshSchemaAndGeneratedMappingRequireOnlyEncryptedSecrets(): void
+    {
+        $metadata = $this->entityManager->getClassMetadata(WebhookEntity::class);
+        $sql = (new \Doctrine\ORM\Tools\SchemaTool($this->entityManager))->getCreateSchemaSql([$metadata]);
+        $ddl = implode("\n", $sql);
+        $this->assertStringContainsString('encrypted_secret TEXT NOT NULL', $ddl);
+        $this->assertStringNotContainsString('secret_hash', $ddl);
+        $this->assertStringNotContainsString('signing_version', $ddl);
+
+        $columns = $this->entityManager->getConnection()->createSchemaManager()->listTableColumns('webhooks');
+        $this->assertTrue($columns['encrypted_secret']->getNotnull());
+        $this->assertArrayNotHasKey('secret_hash', $columns);
+        $this->assertArrayNotHasKey('signing_version', $columns);
     }
 
     // ---------------------------------------------------------------

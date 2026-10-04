@@ -23,28 +23,15 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 final class WebhookPayloadFormatTest extends TestCase
 {
-    /** @return iterable<array{int}> */
-    public static function signingVersions(): iterable
-    {
-        yield 'legacy key' => [1];
-        yield 'original secret' => [2];
-    }
-
-    #[DataProvider('signingVersions')]
-    public function testPayloadPreservesJsonBytesAndSignsTheDeliveredBody(int $version): void
+    public function testPayloadPreservesJsonBytesAndSignsTheDeliveredBody(): void
     {
         $secret = 'original-secret';
         $codec = new WebhookSecretCodec('test-app-secret');
         $webhook = $this->webhook();
-        $webhook->setSecretHash(hash('sha256', $secret));
-        if ($version === 2) {
-            $webhook->setEncryptedSigningSecret($codec->encrypt($secret), hash('sha256', $secret));
-        }
-
         $entityManager = $this->entityManager($webhook);
         $entityManager->expects(self::once())->method('persist');
         $entityManager->expects(self::once())->method('flush');
-        $client = new MockHttpClient(function (string $method, string $url, array $options) use ($version, $secret): MockResponse {
+        $client = new MockHttpClient(function (string $method, string $url, array $options) use ($secret): MockResponse {
             self::assertSame('POST', $method);
             self::assertSame('https://baander.app/hook', $url);
             $payload = $options['body'];
@@ -63,9 +50,9 @@ final class WebhookPayloadFormatTest extends TestCase
 
             $headers = $options['normalized_headers'];
             self::assertSame('Content-Type: application/json', $headers['content-type'][0]);
-            self::assertSame('X-Webhook-Signature-Version: ' . $version, $headers['x-webhook-signature-version'][0]);
+            self::assertSame('X-Webhook-Signature-Version: ' . 2, $headers['x-webhook-signature-version'][0]);
             $timestamp = substr($headers['x-webhook-timestamp'][0], strlen('X-Webhook-Timestamp: '));
-            $key = $version === 1 ? hash('sha256', $secret) : $secret;
+            $key = $secret;
             $signature = 'sha256=' . hash_hmac('sha256', $timestamp . '.' . $payload, $key);
             self::assertSame('X-Webhook-Signature: ' . $signature, $headers['x-webhook-signature'][0]);
 
@@ -94,7 +81,7 @@ final class WebhookPayloadFormatTest extends TestCase
         $entityManager->expects(self::never())->method('flush');
         $client = $this->createMock(HttpClientInterface::class);
         $client->expects(self::never())->method('request');
-        $service = new WebhookDeliveryService($entityManager, $client, new HmacSigner(), new NullLogger(), $this->destinations());
+        $service = new WebhookDeliveryService($entityManager, $client, new HmacSigner(), new NullLogger(), $this->destinations(), new WebhookSecretCodec('test-app-secret'));
 
         try {
             $service->deliverAll($title, $body, NotificationCategory::Security, $notificationId, Uuid::generate());
@@ -107,9 +94,8 @@ final class WebhookPayloadFormatTest extends TestCase
 
     private function webhook(): WebhookEntity
     {
-        $webhook = new WebhookEntity(Uuid::generate());
+        $webhook = new WebhookEntity(Uuid::generate(), (new WebhookSecretCodec('test-app-secret'))->encrypt('original-secret'));
         $webhook->setUrl('https://baander.app/hook');
-        $webhook->setSecretHash(hash('sha256', 'original-secret'));
 
         return $webhook;
     }

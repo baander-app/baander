@@ -26,8 +26,8 @@ final class WebhookDeliveryService
         private readonly HttpClientInterface $httpClient,
         private readonly HmacSigner $hmacSigner,
         private readonly LoggerInterface $logger,
-        private readonly WebhookDestinationPolicy $destinations = new WebhookDestinationPolicy(),
-        private readonly ?WebhookSecretPortInterface $secrets = null,
+        private readonly WebhookDestinationPolicy $destinations,
+        private readonly WebhookSecretPortInterface $secrets,
     ) {
     }
 
@@ -134,12 +134,7 @@ final class WebhookDeliveryService
         $lastFailure = null;
 
         try {
-            $signingSecret = match ($webhook->getSigningVersion()) {
-                1 => $webhook->getSecretHash(),
-                2 => $this->secrets?->decrypt($webhook->getEncryptedSecret() ?? '')
-                    ?? throw new \RuntimeException('Webhook secret encryption is not configured.'),
-                default => throw new \RuntimeException('Unsupported webhook signature version.'),
-            };
+            $signingSecret = $this->secrets->decrypt($webhook->getEncryptedSecret());
         } catch (\Throwable $e) {
             $this->logger->error('Webhook signing secret could not be decrypted.', ['webhook_id' => $webhook->getId()->toString()]);
             $this->logDelivery($webhook, $notificationId, 'failed', null, 0);

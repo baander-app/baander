@@ -43,6 +43,7 @@ All webhook endpoints live under `/api/webhooks`.
 | `POST` | `/api/webhooks` | Create a new webhook |
 | `PUT` | `/api/webhooks/{id}` | Update a webhook |
 | `DELETE` | `/api/webhooks/{id}` | Delete a webhook |
+| `POST` | `/api/webhooks/{id}/rotate-secret` | Rotate the signing secret (returned once) |
 
 ### Creating a webhook
 
@@ -79,14 +80,33 @@ Use `PUT /api/webhooks/{id}` to change the `url` or `category_filter`. Omitting 
 
 ### HMAC signature verification
 
-Each webhook delivery includes two headers for verifying authenticity:
+Each webhook delivery uses signature protocol version 2 and includes these headers:
 
 | Header | Description |
 |--------|-------------|
+| `X-Webhook-Signature-Version` | Always `2` |
 | `X-Webhook-Timestamp` | Unix timestamp of the delivery |
 | `X-Webhook-Signature` | HMAC-SHA256 signature over `{timestamp}.{payload}` |
 
-To verify a delivery on your receiving end, compute the HMAC of the raw timestamp and body using the secret you received at creation time, then compare it with the header value.
+To verify a delivery, compute `sha256=` followed by the hexadecimal HMAC-SHA256
+of the header timestamp, a literal `.`, and the exact raw request body. Use the
+original secret returned at creation or rotation as the HMAC key. Compare the
+complete signature with a constant-time comparison. Reject timestamps outside
+your receiver's freshness window and deduplicate the `Idempotency-Key` header.
+Re-encoding the JSON changes the signed bytes.
+
+Baander stores the secret encrypted with its application secret; keep that
+application secret stable and protected. Creation and rotation return the original
+webhook secret once. Rotation takes effect after the database flush succeeds:
+configure the receiver with the new secret before sending subsequent notifications.
+
+Before upgrading a local database past migration `Version20261004010000`, use the
+previous application to rotate any webhook whose `encrypted_secret` is absent,
+and configure its receiver with the returned secret. Export or back up your local
+configuration first. The migration refuses to change the schema while such rows
+exist, because the original secret cannot be recovered from a hash. It preserves
+existing encrypted secrets and webhook identifiers; it does not generate replacement
+secrets or delete records. Fresh installations need no preparation.
 
 ### Delivery behavior
 

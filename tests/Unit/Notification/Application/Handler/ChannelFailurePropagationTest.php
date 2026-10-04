@@ -80,6 +80,8 @@ final class ChannelFailurePropagationTest extends TestCase
             $httpClient,
             new HmacSigner(),
             new NullLogger(),
+            new \App\Notification\Infrastructure\Webhook\WebhookDestinationPolicy(),
+            new \App\Notification\Infrastructure\Webhook\WebhookSecretCodec('test-app-secret'),
         );
         $handler = new SendWebhookHandler($delivery, new NullLogger());
 

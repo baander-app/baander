@@ -75,20 +75,4 @@ final class HmacSignerTest extends TestCase
 
         $this->assertFalse($this->signer->verify('{"test": false}', $signature, $secret));
     }
-
-    public function testHashSecretProducesConsistentHash(): void
-    {
-        $hash1 = $this->signer->hashSecret('my-secret');
-        $hash2 = $this->signer->hashSecret('my-secret');
-
-        $this->assertSame($hash1, $hash2);
-    }
-
-    public function testHashSecretDifferentSecretsProduceDifferentHashes(): void
-    {
-        $hash1 = $this->signer->hashSecret('secret-one');
-        $hash2 = $this->signer->hashSecret('secret-two');
-
-        $this->assertNotSame($hash1, $hash2);
-    }
 }

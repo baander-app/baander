@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Notification\Interface\Controller;
 
 use App\Notification\Infrastructure\Doctrine\Entity\WebhookEntity;
-use App\Notification\Infrastructure\Webhook\HmacSigner;
 use App\Notification\Application\Port\WebhookDestinationPortInterface;
 use App\Notification\Application\Port\WebhookSecretPortInterface;
 use App\Notification\Domain\ValueObject\NotificationCategory;
@@ -30,7 +29,6 @@ final class WebhookController
 
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
-        private readonly HmacSigner $hmacSigner,
         private readonly WebhookDestinationPortInterface $destinations,
         private readonly WebhookSecretPortInterface $secrets,
     )
@@ -111,12 +109,10 @@ final class WebhookController
         }
 
         $secret = bin2hex(random_bytes(32));
-        $secretHash = $this->hmacSigner->hashSecret($secret);
 
-        $webhook = new WebhookEntity(Uuid::generate());
+        $webhook = new WebhookEntity(Uuid::generate(), $this->secrets->encrypt($secret));
         $webhook->setUrl($url);
         $webhook->setCategoryFilter($categoryFilter);
-        $webhook->setEncryptedSigningSecret($this->secrets->encrypt($secret), $secretHash);
 
         $this->entityManager->persist($webhook);
         $this->entityManager->flush();
@@ -259,7 +255,7 @@ final class WebhookController
             return $this->notFound('Webhook not found.');
         }
         $secret = bin2hex(random_bytes(32));
-        $webhook->setEncryptedSigningSecret($this->secrets->encrypt($secret), $this->hmacSigner->hashSecret($secret));
+        $webhook->setEncryptedSigningSecret($this->secrets->encrypt($secret));
         $this->entityManager->flush();
 
         return $this->successResponse(['id' => $id, 'secret' => $secret, 'signing_version' => 2]);

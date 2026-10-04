@@ -8,6 +8,7 @@ use App\Notification\Application\Port\WebhookSecretPortInterface;
 use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Notification\Infrastructure\Doctrine\Entity\WebhookEntity;
 use App\Notification\Infrastructure\Webhook\HmacSigner;
+use App\Notification\Infrastructure\Webhook\WebhookSecretCodec;
 use App\Notification\Infrastructure\Webhook\WebhookDeliveryService;
 use App\Notification\Infrastructure\Webhook\WebhookDestinationPolicy;
 use App\Shared\Domain\Model\Uuid;
@@ -112,10 +113,15 @@ final class WebhookFailurePropagationTest extends TestCase
     public function testSecretDecryptionFailureReachesMessengerAfterHealthyDelivery(): void
     {
         $encrypted = $this->webhook('encrypted');
-        $encrypted->setEncryptedSigningSecret('invalid-ciphertext', 'hash');
+        $encrypted->setEncryptedSigningSecret('invalid-ciphertext');
         $failure = new \RuntimeException('Secret unavailable');
         $secrets = $this->createStub(WebhookSecretPortInterface::class);
-        $secrets->method('decrypt')->willThrowException($failure);
+        $secrets->method('decrypt')->willReturnCallback(static function (string $ciphertext) use ($failure): string {
+            if ($ciphertext === 'invalid-ciphertext') {
+                throw $failure;
+            }
+            return (new WebhookSecretCodec('test-app-secret'))->decrypt($ciphertext);
+        });
         $client = new MockHttpClient(static function (string $method, string $url): MockResponse {
             self::assertSame('https://healthy.baander.app/hook', $url);
             return new MockResponse('', ['http_code' => 200]);
@@ -166,9 +172,8 @@ final class WebhookFailurePropagationTest extends TestCase
 
     private function webhook(string $host): WebhookEntity
     {
-        $webhook = new WebhookEntity(Uuid::generate());
+        $webhook = new WebhookEntity(Uuid::generate(), (new WebhookSecretCodec('test-app-secret'))->encrypt('original-secret'));
         $webhook->setUrl('https://'.$host.'.baander.app/hook');
-        $webhook->setSecretHash('legacy-secret');
         return $webhook;
     }
 
@@ -180,7 +185,7 @@ final class WebhookFailurePropagationTest extends TestCase
         $em ??= $this->createStub(EntityManagerInterface::class);
         $em->method('getRepository')->willReturn($repository);
         $policy ??= new WebhookDestinationPolicy(dnsResolver: static fn (string $host): array => $host === 'blocked.baander.app' ? ['127.0.0.1'] : ['1.1.1.1']);
-        return new WebhookDeliveryService($em, $client, new HmacSigner(), new NullLogger(), $policy, $secrets);
+        return new WebhookDeliveryService($em, $client, new HmacSigner(), new NullLogger(), $policy, $secrets ?? new WebhookSecretCodec('test-app-secret'));
     }
 
     private function deliver(WebhookDeliveryService $service, string $notificationId = 'notification-1'): void

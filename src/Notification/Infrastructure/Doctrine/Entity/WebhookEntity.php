@@ -23,30 +23,27 @@ class WebhookEntity
     #[ORM\Column(type: 'json', nullable: true, options: ['jsonb' => true])]
     private ?array $categoryFilter = null;
 
+    public const SIGNING_VERSION = 2;
+
     #[ORM\Column(type: 'text')]
-    private string $secretHash;
-
-    #[ORM\Column(type: 'smallint', options: ['default' => 1])]
-    private int $signingVersion = 1;
-
-    #[ORM\Column(type: 'text', nullable: true)]
-    private ?string $encryptedSecret = null;
+    private string $encryptedSecret;
 
     public function getSigningVersion(): int
     {
-        return $this->signingVersion;
+        return self::SIGNING_VERSION;
     }
 
-    public function getEncryptedSecret(): ?string
+    public function getEncryptedSecret(): string
     {
         return $this->encryptedSecret;
     }
 
-    public function setEncryptedSigningSecret(string $encryptedSecret, string $secretHash): void
+    public function setEncryptedSigningSecret(string $encryptedSecret): void
     {
+        if ($encryptedSecret === '') {
+            throw new \InvalidArgumentException('Encrypted webhook secret must not be empty.');
+        }
         $this->encryptedSecret = $encryptedSecret;
-        $this->secretHash = $secretHash;
-        $this->signingVersion = 2;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
@@ -56,9 +53,10 @@ class WebhookEntity
     #[ORM\Column]
     private \DateTimeImmutable $updatedAt;
 
-    public function __construct(Uuid $id)
+    public function __construct(Uuid $id, string $encryptedSecret)
     {
         $this->id = $id;
+        $this->setEncryptedSigningSecret($encryptedSecret);
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
     }
@@ -88,16 +86,6 @@ class WebhookEntity
     public function setCategoryFilter(?array $categoryFilter): void
     {
         $this->categoryFilter = $categoryFilter;
-    }
-
-    public function getSecretHash(): string
-    {
-        return $this->secretHash;
-    }
-
-    public function setSecretHash(string $secretHash): void
-    {
-        $this->secretHash = $secretHash;
     }
 
     public function getCreatedAt(): \DateTimeImmutable

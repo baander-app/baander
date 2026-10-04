@@ -17,9 +17,4 @@ final class HmacSigner
 
         return hash_equals($expected, $signature);
     }
-
-    public function hashSecret(string $secret): string
-    {
-        return hash('sha256', $secret);
-    }
 }
