@@ -15,6 +15,7 @@ vi.mock('@/features/player/services/audio-service', () => ({
 }))
 
 const analysisData: AnalysisData = {
+  phase: null,
   frequencyData: new Uint8Array(8),
   timeDomainData: new Uint8Array(8),
   leftChannel: 0,

@@ -570,3 +570,45 @@ describe('stereo meter report ownership', () => {
     expect(graph.analyzerNode.getByteFrequencyData).not.toHaveBeenCalled()
   })
 })
+
+
+describe('paired phase report ownership', () => {
+  it('publishes fresh paired phase and clears it on expiry and programme reset', async () => {
+    await connect()
+    await settle()
+    processor.setPlayingState(true)
+    const meter = worklet('magic-soup-processor')
+    const phase = { samples: Float32Array.from({ length: 128 }, (_, i) => i % 2 ? -0.25 : 0.25), correlation: -1 }
+    const report = { type: 'analysis', programmeGeneration: 0, leftChannel: 25, rightChannel: 25, rms: 0.25, lufs: -15, phase }
+    meter.emit(report)
+    expect(processor.getAnalysisData().phase).toEqual(phase)
+    graph.audioContext.currentTime += 0.3
+    expect(processor.getAnalysisData().phase).toBeNull()
+    meter.emit(report)
+    processor.resetProgramme()
+    expect(processor.getAnalysisData().phase).toBeNull()
+    meter.emit(report)
+    expect(processor.getAnalysisData().phase).toBeNull()
+    meter.emit({ ...report, programmeGeneration: 1 })
+    expect(processor.getAnalysisData().phase).toEqual(phase)
+    processor.setPlayingState(false)
+    expect(processor.getAnalysisData().phase).toBeNull()
+  })
+
+  it('rejects malformed phase payloads without discarding valid meter levels', async () => {
+    await connect()
+    await settle()
+    processor.setPlayingState(true)
+    const meter = worklet('magic-soup-processor')
+    for (const phase of [undefined, null, {}, { samples: new Float32Array(126), correlation: 1 },
+      { samples: new Uint8Array(128), correlation: 1 }, { samples: new Float32Array(128).fill(NaN), correlation: 0 },
+      { samples: new Float32Array(128), correlation: 2 }, { samples: new Float32Array(128), correlation: NaN }]) {
+      meter.emit({ type: 'analysis', programmeGeneration: 0, leftChannel: 25, rightChannel: 25, rms: 0.25, lufs: -15, phase })
+      expect(processor.getAnalysisData()).toMatchObject({ phase: null, rms: 0.25 })
+    }
+    meter.emit({ type: 'analysis', programmeGeneration: 0, leftChannel: 0, rightChannel: 0, rms: 0, lufs: -60,
+      phase: { samples: new Float32Array(128), correlation: null } })
+    expect(processor.getAnalysisData().phase?.correlation).toBeNull()
+    expect(processor.getAnalysisData().phase?.samples).toHaveLength(128)
+  })
+})

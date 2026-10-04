@@ -80,3 +80,12 @@ unweighted energy estimate, not EBU R128. Both taps measure the source mix befor
 EQ and output gain. Ready worklet spectrum buffers remain authoritative during
 UI reads. Native browser tests cover mono upmix, right-only, asymmetric and
 opposite-phase stereo with the actual metering worklet and shipped WASM.
+
+
+Phase visualization uses the latest 64 paired L/R samples captured together in
+the metering worklet. Its correlation is the normalized cross-product over the
+publication interval, without mean subtraction; it is unavailable when either
+channel has zero energy. The SVG plots sum against difference (a goniometer),
+not a phase angle derived from peak frequency. Paused, expired, reset, or
+unavailable worklet data removes the trace. Separate analyser snapshots do not
+claim paired phase data. Processing uses fixed sample buffers.

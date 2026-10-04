@@ -263,6 +263,7 @@ export interface StereoAnalysisOptions {
 }
 
 export interface StereoAnalysisResult {
+  phase: { samples: number[]; correlation: number | null } | null
   before: { leftChannel: number; rightChannel: number; rms: number; lufs: number }
   after: { leftChannel: number; rightChannel: number; rms: number; lufs: number }
   workletReports: number
@@ -332,6 +333,8 @@ async function stereoAnalysis(options: StereoAnalysisOptions): Promise<StereoAna
       return { leftChannel, rightChannel, rms, lufs }
     }
     const before = read()
+    const phaseData = processor.getAnalysisData().phase
+    const phase = phaseData ? { samples: Array.from(phaseData.samples), correlation: phaseData.correlation } : null
     const beforeWorkletFrame = latestWorkletFrame
     processor.setVolume(0.1)
     processor.setMasterGain(-20)
@@ -339,7 +342,7 @@ async function stereoAnalysis(options: StereoAnalysisOptions): Promise<StereoAna
     const reportsBefore = workletReports
     await waitFor(() => context.currentTime - changed > 0.3
       && (options.mode === 'fallback' || workletReports > reportsBefore + 2))
-    return { before, after: read(), workletReports, wasmLoudnessReported, beforeWorkletFrame, afterWorkletFrame: latestWorkletFrame }
+    return { phase, before, after: read(), workletReports, wasmLoudnessReported, beforeWorkletFrame, afterWorkletFrame: latestWorkletFrame }
   } finally {
     source.stop()
     source.disconnect()

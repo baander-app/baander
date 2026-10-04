@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { PhaseAnalysis } from '@/features/player/services/audio-processor'
 import { audioService } from '@/features/player/services/audio-service'
 import { usePlayerStore } from '@/features/player/stores/player-store'
 import { EQ_BANDS, type BandConfig, type VisualizerMode, useEqBandsStore } from '../stores/eq-bands-store'
@@ -16,6 +17,8 @@ interface DisplayData {
   peakFrequency: number
   rms: number
   frequencyBars: number[]
+  phase: PhaseAnalysis | null
+  trackId: string | null
 }
 
 interface EqualizerAnalyzerProps {
@@ -174,6 +177,7 @@ const PhaseWrapper = styled.div`
 
 const PhaseCanvas = styled.div`
   flex: 1;
+  min-height: 0;
   border-radius: var(--radius-md);
   background-color: rgba(var(--color-muted-rgb, 128 128 128), 0.5);
   overflow: hidden;
@@ -183,14 +187,36 @@ const PhaseCanvas = styled.div`
   }
 `
 
-function PhaseVisualizer({ path }: { path: string }) {
+const PhaseReadout = styled.div`
+  text-align: center;
+  font-size: 11px;
+  color: var(--color-muted-foreground);
+  font-variant-numeric: tabular-nums;
+`
+
+function PhaseVisualizer({ phase }: { phase: PhaseAnalysis | null }) {
+  const points: string[] = []
+  if (phase) {
+    for (let i = 0; i < phase.samples.length; i += 2) {
+      const left = Math.max(-1, Math.min(1, phase.samples[i]))
+      const right = Math.max(-1, Math.min(1, phase.samples[i + 1]))
+      points.push(`${(50 + (left - right) * 22.5).toFixed(2)},${(50 - (left + right) * 22.5).toFixed(2)}`)
+    }
+  }
   return (
     <PhaseWrapper>
       <PhaseCanvas>
-        <svg width="100%" height="100%" viewBox="0 0 200 100" aria-hidden="true">
-          <path d={path} stroke="currentColor" strokeWidth="1.5" fill="none" opacity={0.6} />
+        <svg width="100%" height="100%" viewBox="0 0 100 100" role="img" aria-label="Stereo phase goniometer">
+          <line x1="50" y1="5" x2="50" y2="95" stroke="currentColor" strokeWidth="0.5" opacity={0.2} />
+          <line x1="5" y1="50" x2="95" y2="50" stroke="currentColor" strokeWidth="0.5" opacity={0.2} />
+          <text x="52" y="10" fill="currentColor" fontSize="5">In phase</text>
+          <text x="65" y="48" fill="currentColor" fontSize="5">Opposite phase</text>
+          {phase && <polyline aria-label="Captured stereo samples" points={points.join(' ')} stroke="currentColor" strokeWidth="0.75" fill="none" opacity={0.8} />}
         </svg>
       </PhaseCanvas>
+      <PhaseReadout>
+        {phase ? `Correlation: ${phase.correlation === null ? 'unavailable' : phase.correlation.toFixed(2)}` : 'Phase unavailable'}
+      </PhaseReadout>
     </PhaseWrapper>
   )
 }
@@ -274,6 +300,7 @@ export function EqualizerAnalyzer({ bands, masterGain, normalizationEnabled, tar
   const smoothedBarsRef = useRef(new Float32Array(64))
 
   const isPlaying = usePlayerStore((s) => s.isPlaying)
+  const trackId = usePlayerStore((s) => s.currentTrack?.publicId ?? null)
   const albumPublicId = usePlayerStore((s) => s.currentTrack?.albumPublicId)
   const visualizerMode = useEqBandsStore((s) => s.visualizerMode)
   const setVisualizerMode = useEqBandsStore((s) => s.setVisualizerMode)
@@ -285,7 +312,15 @@ export function EqualizerAnalyzer({ bands, masterGain, normalizationEnabled, tar
     peakFrequency: 0,
     rms: 0,
     frequencyBars: new Array(64).fill(0),
+    phase: null,
+    trackId: null,
   })
+
+  useEffect(() => usePlayerStore.subscribe((state, previous) => {
+    if (!state.isPlaying || state.currentTrack?.publicId !== previous.currentTrack?.publicId) {
+      setDisplayData((data) => data.phase ? { ...data, phase: null } : data)
+    }
+  }), [])
 
   // Poll analysis data from processor
   useEffect(() => {
@@ -300,7 +335,10 @@ export function EqualizerAnalyzer({ bands, masterGain, normalizationEnabled, tar
     intervalRef.current = window.setInterval(() => {
       try {
         const processor = audioService.getProcessor()
-        if (!processor) return
+        if (!processor) {
+          setDisplayData((previous) => ({ ...previous, phase: null }))
+          return
+        }
 
         const data = processor.getAnalysisData()
         if (!data) return
@@ -332,6 +370,8 @@ export function EqualizerAnalyzer({ bands, masterGain, normalizationEnabled, tar
           peakFrequency: data.peakFrequency,
           rms: data.rms,
           frequencyBars: bars,
+          phase: data.phase,
+          trackId,
         })
 
         if (normalizationEnabled && data.lufs !== 0 && !isNaN(data.lufs)) {
@@ -348,27 +388,13 @@ export function EqualizerAnalyzer({ bands, masterGain, normalizationEnabled, tar
         intervalRef.current = null
       }
     }
-  }, [isPlaying, normalizationEnabled, targetLufs])
+  }, [isPlaying, normalizationEnabled, targetLufs, trackId])
 
   const currentGain = normalizationEnabled ? targetLufs - displayData.lufs : 0
   const totalGain = (masterGain + currentGain).toFixed(1)
   const formattedPeakFreq = displayData.peakFrequency > 1000
     ? `${(displayData.peakFrequency / 1000).toFixed(1)}K`
     : `${Math.round(displayData.peakFrequency)}`
-
-  const phasePath = useMemo(() => {
-    const points = 24
-    const pf = displayData.peakFrequency || 0
-    const rms = displayData.rms || 0.1
-    let path = 'M 0,50'
-    for (let i = 0; i < points; i++) {
-      const x = (i / (points - 1)) * 200
-      const phaseCorrelation = Math.sin((pf / 1000) * i * 0.1) * 30
-      const y = Math.max(10, Math.min(90, 50 + phaseCorrelation * rms))
-      path += ` L ${x},${y}`
-    }
-    return path
-  }, [displayData.peakFrequency, displayData.rms])
 
   // Register renderers once (idempotent)
   registerVisualizerRenderers()
@@ -420,7 +446,7 @@ export function EqualizerAnalyzer({ bands, masterGain, normalizationEnabled, tar
             </MetersContent>
           )}
           {visualizerMode === 'phase' && (
-            <PhaseVisualizer path={phasePath} />
+            <PhaseVisualizer phase={isPlaying && displayData.trackId === trackId ? displayData.phase : null} />
           )}
           {isEngineMode(visualizerMode) && (
             <VisualizerHost

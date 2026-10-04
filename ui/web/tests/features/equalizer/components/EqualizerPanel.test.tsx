@@ -20,6 +20,7 @@ const {
 
 const mockProcessor = {
   getAnalysisData: vi.fn().mockReturnValue({
+    phase: null,
     frequencyData: new Uint8Array(64).fill(128),
     timeDomainData: new Uint8Array(64).fill(128),
     leftChannel: 45,
@@ -69,7 +70,10 @@ const mockPlayerState = {
 }
 
 vi.mock('@/features/player/stores/player-store', () => ({
-  usePlayerStore: (selector: (s: unknown) => unknown) => selector(mockPlayerState),
+  usePlayerStore: Object.assign(
+    (selector: (s: unknown) => unknown) => selector(mockPlayerState),
+    { subscribe: vi.fn(() => vi.fn()) },
+  ),
 }))
 
 import { EqualizerPanel } from '@/features/equalizer/components/EqualizerPanel'

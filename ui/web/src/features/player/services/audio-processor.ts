@@ -13,7 +13,15 @@ interface WasmSpectrumMessage {
   timeDomainData?: Uint8Array
 }
 
+export interface PhaseAnalysis {
+  /** 64 chronological interleaved L/R samples captured together in the worklet. */
+  samples: Float32Array
+  /** Normalized cross-product; null when either channel has no energy. */
+  correlation: number | null
+}
+
 interface MeterFrame {
+  phase: PhaseAnalysis | null
   leftChannel: number
   rightChannel: number
   rms: number
@@ -24,6 +32,7 @@ interface MeterFrame {
 // --- Analysis data shape ---
 
 export interface AnalysisData {
+  phase: PhaseAnalysis | null
   frequencyData: Uint8Array
   timeDomainData: Uint8Array
   leftChannel: number
@@ -484,6 +493,7 @@ export class AudioProcessor {
             this.latestMeterFrame = {
               leftChannel: msg.leftChannel, rightChannel: msg.rightChannel, rms: msg.rms,
               lufs: msg.lufs, receivedAt: this.audioContext.currentTime,
+              phase: this.validatePhase(msg.phase),
             }
           }
         }
@@ -496,6 +506,16 @@ export class AudioProcessor {
     } catch {
       if (this.ownsWorkletGeneration(generation)) this.setupFallbackAnalysis()
     }
+  }
+
+  private validatePhase(value: unknown): PhaseAnalysis | null {
+    if (value === null || typeof value !== 'object') return null
+    const phase = value as Partial<PhaseAnalysis>
+    if (!(phase.samples instanceof Float32Array) || phase.samples.length !== 128
+      || !phase.samples.every(Number.isFinite)
+      || !(phase.correlation === null || (typeof phase.correlation === 'number'
+        && Number.isFinite(phase.correlation) && phase.correlation >= -1 && phase.correlation <= 1))) return null
+    return { samples: phase.samples, correlation: phase.correlation }
   }
 
   private async sendDSPToWorklet(node: AudioWorkletNode, generation: number) {
@@ -822,6 +842,7 @@ export class AudioProcessor {
   getAnalysisData(): AnalysisData {
     if (this.destroyed || this.passiveMode || !this.isConnected || !this.isPlaying) {
       return {
+        phase: null,
         frequencyData: this.frequencyData,
         timeDomainData: this.timeDomainData,
         leftChannel: 0,
@@ -841,8 +862,10 @@ export class AudioProcessor {
     const frame = this.latestMeterFrame
     const age = frame ? this.audioContext.currentTime - frame.receivedAt : Infinity
     let leftChannel: number, rightChannel: number, rms: number, lufs: number
+    let phase: PhaseAnalysis | null = null
     if (frame && age >= 0 && age <= this.METER_FRAME_MAX_AGE) {
       // Worklet LUFS and RMS already have their own audio-time windows.
+      phase = frame.phase
       leftChannel = frame.leftChannel
       rightChannel = frame.rightChannel
       rms = frame.rms
@@ -863,6 +886,7 @@ export class AudioProcessor {
     }
 
     return {
+      phase,
       frequencyData: this.frequencyData,
       timeDomainData: this.timeDomainData,
       leftChannel,

@@ -118,6 +118,7 @@ test('passive mode stops native fallback analysis and keeps measurements neutral
   expect(result.elapsed).toBeGreaterThan(0.2)
   expect(result.passiveFallback).toEqual([false, false, false])
   expect(result.readings).toEqual(Array(3).fill({
+    phase: null,
     frequencySilent: true,
     timeDomainSilent: true,
     leftChannel: 0,

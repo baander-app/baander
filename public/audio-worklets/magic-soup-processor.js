@@ -15,10 +15,16 @@ class MagicSoupProcessor extends AudioWorkletProcessor {
     this.analysisFrameInterval = 16;
     this.isPlaying = false;
     this.intervalTruePeak = -Infinity;
+    this.phaseRing = new Float32Array(128);
+    this.phaseWriteIndex = 0;
+    this.intervalL2 = 0;
+    this.intervalR2 = 0;
+    this.intervalLR = 0;
     this.programmeGeneration = 0;
     this.outputMessage = {
       type: 'analysis', programmeGeneration: 0, lufs: -60, leftChannel: 0, rightChannel: 0,
       rms: 0, isPlaying: false, truePeak: -60, crestL: 0, crestR: 0,
+      phase: { samples: new Float32Array(128), correlation: null },
     };
     this.port.onmessage = event => {
       if (event.data?.type === 'init-dsp') void this.initDSPFromMessage(event.data);
@@ -38,6 +44,13 @@ class MagicSoupProcessor extends AudioWorkletProcessor {
     }
     // Pending initialization creates fresh meters; no previous programme has fed them.
     this.intervalTruePeak = -Infinity;
+    this.phaseRing.fill(0);
+    this.phaseWriteIndex = 0;
+    this.intervalL2 = 0;
+    this.intervalR2 = 0;
+    this.intervalLR = 0;
+    this.outputMessage.phase.samples.fill(0);
+    this.outputMessage.phase.correlation = null;
     this.frameCounter = 0;
     this.isPlaying = false;
     this.outputMessage.programmeGeneration = generation;
@@ -151,6 +164,7 @@ class MagicSoupProcessor extends AudioWorkletProcessor {
       else output[channel].fill(0);
     }
     this.detectPlayingState(input);
+    this.accumulatePhase(input);
     // Native meter time and envelopes must advance for every frame, including silence.
     this.performWASMAnalysis(input);
     if (++this.frameCounter % this.analysisFrameInterval === 0) {
@@ -173,10 +187,38 @@ class MagicSoupProcessor extends AudioWorkletProcessor {
         } catch (error) { this.disableMeter('dynamics', error); }
       }
       this.outputMessage.isPlaying = this.isPlaying;
+      this.publishPhase();
       this.port.postMessage(this.outputMessage);
       this.intervalTruePeak = -Infinity;
+      this.intervalL2 = 0;
+      this.intervalR2 = 0;
+      this.intervalLR = 0;
     }
     return true;
+  }
+
+  accumulatePhase(inputChannels) {
+    const left = inputChannels[0], right = inputChannels[1] || left;
+    for (let i = 0; i < left.length; i++) {
+      const l = left[i], r = right[i] ?? 0;
+      this.phaseRing[this.phaseWriteIndex] = l;
+      this.phaseRing[this.phaseWriteIndex + 1] = r;
+      this.phaseWriteIndex = (this.phaseWriteIndex + 2) % this.phaseRing.length;
+      this.intervalL2 += l * l;
+      this.intervalR2 += r * r;
+      this.intervalLR += l * r;
+    }
+  }
+
+  publishPhase() {
+    const phase = this.outputMessage.phase;
+    // The next write position is the oldest pair; startup slots remain zero.
+    for (let i = 0; i < this.phaseRing.length; i++) {
+      phase.samples[i] = this.phaseRing[(this.phaseWriteIndex + i) % this.phaseRing.length];
+    }
+    phase.correlation = this.intervalL2 > 0 && this.intervalR2 > 0
+      ? Math.max(-1, Math.min(1, this.intervalLR / Math.sqrt(this.intervalL2 * this.intervalR2)))
+      : null;
   }
 
   detectPlayingState(inputChannels) {

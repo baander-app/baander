@@ -189,9 +189,10 @@ test('programme reset clears publication interval and accepts only newer valid g
   assert.equal(f.processor.frameCounter, 0)
   assert.equal(f.processor.isPlaying, false)
   assert.equal(f.processor.intervalTruePeak, -Infinity)
-  assert.deepEqual({ ...f.processor.outputMessage }, {
+  assert.deepEqual(structuredClone(f.processor.outputMessage), {
     type: 'analysis', programmeGeneration: 4, lufs: -60, leftChannel: 0, rightChannel: 0,
     rms: 0, isPlaying: false, truePeak: -60, crestL: 0, crestR: 0,
+    phase: { samples: new Float32Array(128), correlation: null },
   })
   feed(f, new Float32Array(128).fill(0.25))
   for (const generation of [4, 3, 0, -1, 5.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, '5', undefined]) {
@@ -277,4 +278,84 @@ for (const kind of ['loudness', 'dynamics']) test(`${kind} reset trap disables o
   assert.equal(report.programmeGeneration, 1)
   assert.ok(report.rms > 0)
   assert.deepEqual(f.resets, [1, 1])
+})
+
+for (const [name, rightAt, expected] of [
+  ['in phase', i => Math.sin(i * Math.PI / 2), 1],
+  ['opposite phase', i => -Math.sin(i * Math.PI / 2), -1],
+  ['quadrature', i => Math.cos(i * Math.PI / 2), 0],
+  ['one-sided silence', () => 0, null],
+]) test(`phase correlation measures ${name} across variable render quanta`, async () => {
+  const f = await fixture(48000, undefined, { initialize: false })
+  let offset = 0
+  for (let block = 0; block < 16; block++) {
+    const count = [4, 64, 128, 260][block % 4]
+    const left = Float32Array.from({ length: count }, (_, i) => Math.sin((offset + i) * Math.PI / 2))
+    const right = Float32Array.from({ length: count }, (_, i) => rightAt(offset + i))
+    feed(f, left, right)
+    offset += count
+  }
+  const phase = f.messages.find(m => m.type === 'analysis').phase
+  assert.ok(phase.samples instanceof Float32Array)
+  assert.equal(phase.samples.length, 128)
+  if (expected === null) assert.equal(phase.correlation, null)
+  else assert.ok(Math.abs(phase.correlation - expected) < 1e-6, `${phase.correlation} should be ${expected}`)
+  assert.ok(phase.correlation === null || (phase.correlation >= -1 && phase.correlation <= 1))
+  const expectedSamples = Float32Array.from({ length: 128 }, (_, i) => {
+    const frame = offset - 64 + Math.floor(i / 2)
+    return i % 2 ? rightAt(frame) : Math.sin(frame * Math.PI / 2)
+  })
+  assert.deepEqual(phase.samples, expectedSamples, 'publish the last 64 chronological L/R pairs')
+})
+
+test('phase correlation includes every frame in the publication interval and resets each interval', async () => {
+  const f = await fixture(48000, undefined, { initialize: false })
+  const left = new Float32Array(128).fill(0.5)
+  const opposite = new Float32Array(128).fill(-0.5)
+  for (let block = 0; block < 15; block++) feed(f, left)
+  feed(f, left, opposite)
+  const first = f.messages.find(m => m.type === 'analysis').phase
+  assert.equal(first.correlation, 14 / 16, 'correlation must include earlier blocks, not just the snapshot')
+  assert.deepEqual(first.samples, Float32Array.from({ length: 128 }, (_, i) => i % 2 ? -0.5 : 0.5))
+  for (let block = 0; block < 16; block++) feed(f, left, opposite)
+  assert.equal(f.messages.filter(m => m.type === 'analysis').at(-1).phase.correlation, -1)
+  for (let block = 0; block < 16; block++) feed(f, new Float32Array(128))
+  const silent = f.messages.filter(m => m.type === 'analysis').at(-1).phase
+  assert.equal(silent.correlation, null)
+  assert.deepEqual(silent.samples, new Float32Array(128))
+  assert.equal(first.correlation, 14 / 16, 'later publication must not mutate previous message snapshots')
+  assert.equal(first.samples[0], 0.5)
+})
+
+test('mono phase samples duplicate the actual channel and pad startup with zero pairs', async () => {
+  const f = await fixture(48000, undefined, { initialize: false })
+  for (let block = 0; block < 16; block++) {
+    const mono = new Float32Array([block / 32])
+    const output = [new Float32Array(1)]
+    assert.equal(f.processor.process([[mono]], [output]), true)
+    assert.deepEqual(output[0], mono)
+  }
+  const phase = f.messages.find(m => m.type === 'analysis').phase
+  assert.equal(phase.correlation, 1)
+  const expected = new Float32Array(128)
+  for (let i = 0; i < 16; i++) expected[96 + i * 2] = expected[97 + i * 2] = i / 32
+  assert.deepEqual(phase.samples, expected)
+})
+
+test('programme reset removes phase ring samples and accumulated correlation before new publication', async () => {
+  const f = await fixture()
+  for (let block = 0; block < 15; block++) feed(f, new Float32Array(128).fill(0.75), new Float32Array(128).fill(-0.75))
+  resetProgramme(f, 1)
+  for (let block = 0; block < 16; block++) feed(f, new Float32Array([0.25]))
+  const report = f.messages.find(m => m.type === 'analysis')
+  assert.equal(report.programmeGeneration, 1)
+  assert.equal(report.phase.correlation, 1)
+  const expected = new Float32Array(128)
+  expected.fill(0.25, 96)
+  assert.deepEqual(report.phase.samples, expected, 'only new programme samples may survive the reset')
+  resetProgramme(f, 2)
+  for (let block = 0; block < 16; block++) feed(f, new Float32Array(1))
+  const silent = f.messages.filter(m => m.type === 'analysis').at(-1)
+  assert.equal(silent.phase.correlation, null)
+  assert.deepEqual(silent.phase.samples, new Float32Array(128))
 })

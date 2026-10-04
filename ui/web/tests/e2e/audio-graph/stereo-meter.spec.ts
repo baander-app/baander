@@ -14,6 +14,16 @@ for (const mode of ['fallback', 'worklet'] as const) {
         expect(Number.isFinite(reading.lufs)).toBe(true)
       }
       if (mode === 'worklet') {
+        expect(result.phase).not.toBeNull()
+        expect(result.phase!.samples).toHaveLength(128)
+        if (signal === 'right') expect(result.phase!.correlation).toBeNull()
+        else expect(result.phase!.correlation).toBeCloseTo(signal === 'antiphase' ? -1 : 1, 6)
+        expect(Math.max(...result.phase!.samples.map(Math.abs))).toBeGreaterThan(0.19)
+        for (let index = 0; index < 128; index += 2) {
+          const left = result.phase!.samples[index], right = result.phase!.samples[index + 1]
+          if (signal === 'right') expect(left).toBe(0)
+          else expect(right).toBeCloseTo(left * (signal === 'antiphase' ? -1 : signal === 'asymmetric' ? 0.5 : 1), 6)
+        }
         expect(result.workletReports).toBeGreaterThan(2)
         expect(result.wasmLoudnessReported).toBe(true)
         expect(result.before).toEqual(result.beforeWorkletFrame)

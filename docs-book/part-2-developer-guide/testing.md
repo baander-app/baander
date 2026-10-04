@@ -21,7 +21,9 @@ changes. A separate loader check serves the production TypeScript loader and
 shipped WASM to Chromium, checking instance memory and analysis-state isolation.
 Stereo metering cases additionally run the production metering worklet and WASM
 against native mono, right-only, asymmetric, and opposite-phase signals, and
-compare the independent-channel analyser fallback. Native media tests use locally generated WAV files and the
+compare the independent-channel analyser fallback. The same native cases verify
+paired phase samples and correlation; worklet tests also cover quadrature,
+silence, ring ordering, and programme reset. Native media tests use locally generated WAV files and the
 real playback hook, store, service, and processor to exercise repeated preloaded
 handoffs, crossfade overlap, promoted-element controls, and interrupted fades.
 These verify element ownership and timing, not sample-accurate gaplessness or
