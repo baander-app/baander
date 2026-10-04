@@ -545,12 +545,12 @@ COPY ./docker/dev/php.ini /usr/local/etc/php/conf.d/zzz-baander.ini
 COPY --chown=www-data:www-data . ${APP_HOME}/
 
 # Generate stub OAuth keys so PHPStan's Symfony extension can boot the kernel
-RUN mkdir -p ${APP_HOME}/config/secrets/oauth \
+RUN umask 077 && mkdir -p ${APP_HOME}/config/secrets/oauth \
     && openssl genrsa -out ${APP_HOME}/config/secrets/oauth/private.key 2048 2>/dev/null \
     && openssl rsa -in ${APP_HOME}/config/secrets/oauth/private.key -pubout -out ${APP_HOME}/config/secrets/oauth/public.key 2>/dev/null \
     && chown -R www-data:www-data ${APP_HOME}/config/secrets
 
 # Install dev dependencies
-RUN COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interaction --no-progress --ignore-platform-req=ext-swoole
+RUN COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interaction --no-progress
 
 USER www-data
