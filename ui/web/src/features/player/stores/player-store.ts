@@ -9,6 +9,11 @@ import type { SongEntry } from '@/features/catalog/types'
 const logger = createLogger('PlayerStore')
 let playbackSelectionGeneration = 0
 
+/** Read the current attempt token without subscribing to playback state. */
+export function getPlaybackSelectionGeneration(): number {
+  return playbackSelectionGeneration
+}
+
 /** Keep programme input independent of listening volume once the graph owns output. */
 export function syncPlaybackVolume(elements: HTMLAudioElement[], volume: number, muted: boolean) {
   const processor = audioService.getProcessor()

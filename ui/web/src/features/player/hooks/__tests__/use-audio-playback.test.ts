@@ -960,6 +960,77 @@ describe('useAudioPlayback', () => {
   // --- store → DOM sync ----------------------------------------------------
 
   describe('isPlaying sync', () => {
+    it.each([['resolve', 'selection'], ['reject', 'selection'], ['resolve', 'replay'], ['reject', 'replay']] as const)('ignores deferred context %s after newer same-track %s', async (outcome, transition) => {
+      const queue = seedQueue(0, 2)
+      let finishResume!: () => void
+      vi.mocked(audioService.resumeContextIfNeeded).mockReturnValueOnce(new Promise<void>((resolve, reject) => {
+        finishResume = () => outcome === 'resolve' ? resolve() : reject(new Error('Obsolete context resume failed'))
+      }))
+      renderHook(() => useAudioPlayback())
+      const [a] = capturedAudioElements
+      a.src = '/api/stream/track?id=t0'
+      act(() => { usePlayerStore.getState().setIsPlaying(true) })
+      expect(audioService.resumeContextIfNeeded).toHaveBeenCalledOnce()
+      expect(a.play).not.toHaveBeenCalled()
+      vi.mocked(a.play).mockImplementation(() => {
+        a.paused = false
+        a.ended = false
+        return Promise.resolve()
+      })
+      await act(async () => {
+        if (transition === 'selection') {
+          usePlayerStore.getState().playTrack(queue[1])
+          usePlayerStore.getState().playTrack(queue[0])
+        } else usePlayerStore.getState().replayCurrentTrack()
+      })
+      const plays = vi.mocked(a.play).mock.calls.length
+      await act(async () => { finishResume() })
+      expect(usePlayerStore.getState().currentTrack).toBe(queue[0])
+      expect(a.src).toBe('/api/stream/track?id=t0')
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+      expect(a.paused).toBe(false)
+      expect(a.play).toHaveBeenCalledTimes(plays)
+    })
+
+    it.each(['selection', 'replay'] as const)('ignores deferred native play rejection after newer %s returns to the same track', async (transition) => {
+      const queue = seedQueue(0, 2)
+      let rejectPlay!: (error: Error) => void
+      renderHook(() => useAudioPlayback())
+      const [a] = capturedAudioElements
+      a.src = '/api/stream/track?id=t0'
+      vi.mocked(a.play).mockReturnValueOnce(new Promise<void>((_, reject) => { rejectPlay = reject }))
+      await act(async () => { usePlayerStore.getState().setIsPlaying(true) })
+      expect(a.play).toHaveBeenCalledOnce()
+      vi.mocked(a.play).mockImplementation(() => {
+        a.paused = false
+        a.ended = false
+        return Promise.resolve()
+      })
+      await act(async () => {
+        if (transition === 'selection') {
+          usePlayerStore.getState().playTrack(queue[1])
+          usePlayerStore.getState().playTrack(queue[0])
+        } else usePlayerStore.getState().replayCurrentTrack()
+      })
+      await act(async () => { rejectPlay(new Error('Obsolete native resume failed')) })
+      expect(usePlayerStore.getState().currentTrack).toBe(queue[0])
+      expect(a.src).toBe('/api/stream/track?id=t0')
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+      expect(a.paused).toBe(false)
+    })
+
+    it.each(['context', 'play'] as const)('stops playback when the current owner %s resume rejects', async (failure) => {
+      seedQueue(0, 2)
+      renderHook(() => useAudioPlayback())
+      const [a] = capturedAudioElements
+      a.src = '/api/stream/track?id=t0'
+      if (failure === 'context') vi.mocked(audioService.resumeContextIfNeeded).mockRejectedValueOnce(new Error('Current context resume failed'))
+      else vi.mocked(a.play).mockRejectedValueOnce(new Error('Current native playback failed'))
+      await act(async () => { usePlayerStore.getState().setIsPlaying(true) })
+      expect(usePlayerStore.getState().isPlaying).toBe(false)
+      expect(a.pause).toHaveBeenCalled()
+    })
+
     it('pauses the active element when isPlaying flips to false', async () => {
       seedQueue(0, 1)
       usePlayerStore.setState({ isPlaying: true })

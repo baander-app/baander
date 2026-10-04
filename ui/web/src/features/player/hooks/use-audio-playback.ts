@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { audioService } from '@/features/player/services/audio-service'
-import { usePlayerStore, resolveNextIndex, buildStreamUrl, syncPlaybackVolume } from '@/features/player/stores/player-store'
+import { usePlayerStore, resolveNextIndex, buildStreamUrl, syncPlaybackVolume, getPlaybackSelectionGeneration } from '@/features/player/stores/player-store'
 import { updateTime } from '@/features/player/stores/player-time-tracker'
 import { createLogger } from '@/shared/lib/logger'
 
@@ -278,9 +278,11 @@ export function useAudioPlayback() {
     if (!audio || !audio.src) return
     const src = audio.src
     const track = usePlayerStore.getState().currentTrack
+    const generation = getPlaybackSelectionGeneration()
     let cancelled = false
     const lifetime = lifetimeRef.current
     const isActive = () => !cancelled && lifetime?.active === true
+      && getPlaybackSelectionGeneration() === generation
       && usePlayerStore.getState().audioElement === audio && audio.src === src
       && usePlayerStore.getState().currentTrack === track
     if (isPlaying && audio.paused) {

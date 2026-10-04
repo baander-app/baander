@@ -35,6 +35,7 @@ window.Audio = function (...args: ConstructorParameters<typeof Audio>) {
 } as unknown as typeof Audio
 
 const tracks = ['first', 'second', 'third'].map(publicId => ({ publicId, title: publicId }))
+let pendingResume: ((reason: Error) => void) | null = null
 export function Fixture() {
   useAudioPlayback()
   useEffect(() => { document.documentElement.dataset.ready = 'true' }, [])
@@ -73,6 +74,21 @@ const fixture = {
   notify(type: 'play' | 'ended') { usePlayerStore.getState().audioElement?.dispatchEvent(new Event(type)) },
   next() { usePlayerStore.getState().playNext() },
   previous() { usePlayerStore.getState().playPrevious() },
+  select(index: number) { usePlayerStore.getState().playTrack(tracks[index], tracks) },
+  holdNextResume() {
+    const originalResume = audioService.resumeContextIfNeeded.bind(audioService)
+    audioService.resumeContextIfNeeded = () => {
+      audioService.resumeContextIfNeeded = originalResume
+      return new Promise<void>((_resolve, reject) => { pendingResume = reject })
+    }
+  },
+  resumePending() { return pendingResume !== null },
+  rejectHeldResume() {
+    if (!pendingResume) throw new Error('No pending context resume')
+    const pending = pendingResume
+    pendingResume = null
+    pending(new Error('Obsolete context resume rejected'))
+  },
   domPause(index: number) { elements[index].pause() },
   domPlay(index: number) { return elements[index].play() },
 }

@@ -233,3 +233,30 @@ for (const repeat of [false, true]) {
     expect(await page.evaluate(() => window.playbackFixture.activity())).toEqual(before)
   })
 }
+
+test('pending context resume cannot stop newer native playback after first → third → first selection', async ({ page, origin }) => {
+  await start(page, origin)
+  await expect.poll(() => page.evaluate(() => window.playbackFixture.activity())).toEqual(['first'])
+  await page.evaluate(() => window.playbackFixture.pause())
+  await expect.poll(async () => (await snapshot(page)).elements[0].paused).toBe(true)
+  await page.evaluate(() => {
+    window.playbackFixture.holdNextResume()
+    window.playbackFixture.resume()
+  })
+  await expect.poll(() => page.evaluate(() => window.playbackFixture.resumePending())).toBe(true)
+  await page.evaluate(() => window.playbackFixture.select(2))
+  await track(page, 'third')
+  await expect.poll(() => page.evaluate(() => window.playbackFixture.activity())).toEqual(['first', 'third'])
+  await page.evaluate(() => window.playbackFixture.select(0))
+  await track(page, 'first')
+  await expect.poll(() => page.evaluate(() => window.playbackFixture.activity())).toEqual(['first', 'third', 'first'])
+  const selected = await snapshot(page)
+  expectActive(selected, 'first', 0)
+  const nativeTime = selected.elements[0].time
+  await page.evaluate(() => window.playbackFixture.rejectHeldResume())
+  await expect.poll(async () => {
+    const state = await snapshot(page)
+    return { playing: state.playing, paused: state.elements[0].paused, advanced: state.elements[0].time > nativeTime + 0.1 }
+  }).toEqual({ playing: true, paused: false, advanced: true })
+  expect(await page.evaluate(() => window.playbackFixture.activity())).toEqual(['first', 'third', 'first'])
+})

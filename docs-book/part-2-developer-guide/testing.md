@@ -26,6 +26,9 @@ paired phase samples and correlation; worklet tests also cover quadrature,
 silence, ring ordering, and programme reset. Native media tests use locally generated WAV files and the
 real playback hook, store, service, and processor to exercise repeated preloaded
 handoffs, crossfade overlap, promoted-element controls, and interrupted fades.
+One resume regression delays a context-resume rejection across track reselection
+and verifies that the newer native playback continues advancing. Hook unit tests
+also cover deferred success, native play rejection, and same-track replay.
 These verify element ownership and timing, not sample-accurate gaplessness or
 authenticated streaming. Rebuild timing and worklet graph attachment
 also have unit regressions in `audio-processor-rebuild.test.ts`. Deferred module
