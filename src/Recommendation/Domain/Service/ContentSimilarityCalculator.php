@@ -76,7 +76,7 @@ final class ContentSimilarityCalculator
      *
      * @param array<string, float> $target
      * @param array<int, array{id: string, features: array<string, float>}> $candidates
-     * @return array{string, float}[] Array of [id, similarity] sorted descending
+     * @return list<array{id: string, score: float}> Similarities sorted by descending score
      */
     public function findMostSimilar(array $target, array $candidates, int $limit = 10): array
     {

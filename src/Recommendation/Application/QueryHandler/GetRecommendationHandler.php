@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Recommendation\Application\QueryHandler;
 
 use App\Recommendation\Application\Query\GetRecommendationQuery;
+use App\Recommendation\Domain\Model\Recommendation;
 use App\Recommendation\Domain\Repository\RecommendationRepositoryInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 

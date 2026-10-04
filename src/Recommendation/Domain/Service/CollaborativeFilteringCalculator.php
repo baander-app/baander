@@ -58,7 +58,7 @@ final class CollaborativeFilteringCalculator
      *
      * @param array<string, int> $targetUserItems Target user's item => play_count
      * @param array<string, array<string, int>> $otherUsers Map of user_id => (item_id => play_count)
-     * @return array{string, float}[] Array of [item_id, predicted_score] sorted descending
+     * @return list<array{id: string, score: float}> Predictions sorted by descending score
      */
     public function recommend(array $targetUserItems, array $otherUsers, int $limit = 10): array
     {
@@ -133,7 +133,7 @@ final class CollaborativeFilteringCalculator
      *
      * @param string $itemId The source item
      * @param array<string, array<string, int>> $userHistories Map of user_id => (item_id => play_count)
-     * @return array{string, float}[] Array of [item_id, co_occurrence_score]
+     * @return list<array{id: string, score: int|float}> Normalized co-occurrence scores
      */
     public function coOccurrence(string $itemId, array $userHistories, int $limit = 10): array
     {

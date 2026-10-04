@@ -26,7 +26,7 @@ final class GenreSimilarityCalculator
         $intersection = count(array_intersect($a, $b));
         $union = count(array_unique(array_merge($a, $b)));
 
-        return $union === 0 ? 0.0 : (float) $intersection / $union;
+        return (float) $intersection / $union;
     }
 
     /**
