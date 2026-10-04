@@ -12,14 +12,20 @@ export interface AdminUser {
 
 export interface AdminUserListResponse {
   data: AdminUser[]
-  nextCursor: string | null
+  meta: { total: number; limit: number; offset: number }
+}
+
+export interface AdminUserListParams {
+  role?: string
+  disabled?: boolean
+  limit?: number
+  offset?: number
 }
 
 export const userAdminApi = {
-  list: async (params?: { role?: string; disabled?: boolean; cursor?: string }): Promise<AdminUserListResponse> => {
-    const { data: response } = await AXIOS_INSTANCE.get('/api/admin/users', { params })
-    // API returns { data: AdminUser[], meta: { total, limit, offset } }
-    return { data: response.data, nextCursor: null }
+  list: async (params?: AdminUserListParams, signal?: AbortSignal): Promise<AdminUserListResponse> => {
+    const { data } = await AXIOS_INSTANCE.get<AdminUserListResponse>('/api/admin/users', { params, signal })
+    return data
   },
 
   create: async (payload: { email: string; password: string; name: string; roles?: string[] }): Promise<AdminUser> => {

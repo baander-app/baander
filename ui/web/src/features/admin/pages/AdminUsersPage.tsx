@@ -1,7 +1,7 @@
 import styled from 'styled-components'
 import { useState } from 'react'
 import { useUsers, useToggleUser } from '../hooks/use-users'
-import { type AdminUser } from '../api/user-admin-api'
+import { type AdminUser, type AdminUserListParams } from '../api/user-admin-api'
 import { Button } from '@/shared/components/ui/button'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/shared/components/ui/select'
 import { Plus } from 'lucide-react'
@@ -21,6 +21,8 @@ type ActiveDialog =
   | { type: 'delete'; user: AdminUser }
   | null
 
+const PAGE_SIZE = 50
+
 const Container = styled.div`
   display: flex;
   flex-direction: column;
@@ -36,7 +38,14 @@ const HeaderRow = styled.div`
 const FilterRow = styled.div`
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 1rem;
+`
+
+const PaginationRow = styled.nav`
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1rem;
 `
 
 const UserCount = styled.span`
@@ -138,18 +147,27 @@ const EmptyState = styled.div`
 export function AdminUsersPage() {
   const [roleFilter, setRoleFilter] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<string>('')
+  const [offset, setOffset] = useState(0)
   const [showCreate, setShowCreate] = useState(false)
   const [activeDialog, setActiveDialog] = useState<ActiveDialog>(null)
 
   const toggleUser = useToggleUser()
 
-  const params: { role?: string; disabled?: boolean } = {}
+  const params: AdminUserListParams = { limit: PAGE_SIZE, offset }
   if (roleFilter) params.role = roleFilter
   if (statusFilter === 'active') params.disabled = false
   if (statusFilter === 'disabled') params.disabled = true
 
-  const { data, isLoading } = useUsers(Object.keys(params).length > 0 ? params : undefined)
-  const users = data?.data ?? []
+  const { data, isLoading, isFetching, isError, refetch } = useUsers(params)
+  const users = isError ? [] : data?.data ?? []
+  const meta = isError ? undefined : data?.meta
+  const total = meta?.total
+  const limit = meta?.limit ?? PAGE_SIZE
+
+  // Mutations can remove the last result on a page or shrink the filtered list.
+  if (total !== undefined && offset > 0 && offset >= total) {
+    setOffset(Math.max(0, Math.floor((total - 1) / limit) * limit))
+  }
   const activeUser = activeDialog?.user ?? null
 
   return (
@@ -162,8 +180,8 @@ export function AdminUsersPage() {
 
       {/* Filters */}
       <FilterRow>
-        <Select value={roleFilter || '_all'} onValueChange={(v) => setRoleFilter(v === '_all' ? '' : v)}>
-          <SelectTrigger style={{ height: '1.75rem', width: '8rem', fontSize: '0.8125rem' }}>
+        <Select value={roleFilter || '_all'} onValueChange={(v) => { setRoleFilter(v === '_all' ? '' : v); setOffset(0) }}>
+          <SelectTrigger aria-label="Filter by role" style={{ height: '1.75rem', width: '8rem', fontSize: '0.8125rem' }}>
             <SelectValue placeholder="All Roles" />
           </SelectTrigger>
           <SelectContent>
@@ -173,8 +191,8 @@ export function AdminUsersPage() {
             <SelectItem value="ROLE_SUPER_ADMIN">Super Admin</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={statusFilter || '_all'} onValueChange={(v) => setStatusFilter(v === '_all' ? '' : v)}>
-          <SelectTrigger style={{ height: '1.75rem', width: '8rem', fontSize: '0.8125rem' }}>
+        <Select value={statusFilter || '_all'} onValueChange={(v) => { setStatusFilter(v === '_all' ? '' : v); setOffset(0) }}>
+          <SelectTrigger aria-label="Filter by status" style={{ height: '1.75rem', width: '8rem', fontSize: '0.8125rem' }}>
             <SelectValue placeholder="All Status" />
           </SelectTrigger>
           <SelectContent>
@@ -184,12 +202,17 @@ export function AdminUsersPage() {
           </SelectContent>
         </Select>
         <UserCount>
-          {users.length} user{users.length !== 1 ? 's' : ''}
+          {meta ? `${meta.total} user${meta.total !== 1 ? 's' : ''}` : ''}
         </UserCount>
       </FilterRow>
 
       {/* Table */}
-      {isLoading ? (
+      {isError ? (
+        <EmptyState role="alert">
+          <p>Unable to load users.</p>
+          <Button size="sm" onClick={() => void refetch()} disabled={isFetching}>Retry</Button>
+        </EmptyState>
+      ) : isLoading ? (
         <SkeletonStack>
           {Array.from({ length: 5 }).map((_, i) => (
             <SkeletonRow key={i} />
@@ -232,6 +255,17 @@ export function AdminUsersPage() {
           ))}
         </DividerStack>
       )}
+
+      <PaginationRow aria-label="Users pagination">
+        <UserCount aria-live="polite">
+          {meta && users.length > 0 ? `${meta.offset + 1}–${meta.offset + users.length} of ${meta.total}` : ''}
+        </UserCount>
+        <Button size="sm" variant="outline" disabled={isFetching || offset === 0}
+          onClick={() => setOffset(Math.max(0, offset - limit))}>Previous</Button>
+        <Button size="sm" variant="outline"
+          disabled={isFetching || !meta || meta.offset + meta.limit >= meta.total}
+          onClick={() => { if (meta) setOffset(meta.offset + meta.limit) }}>Next</Button>
+      </PaginationRow>
 
       {/* Dialogs */}
       <CreateUserDialog open={showCreate} onOpenChange={setShowCreate} />

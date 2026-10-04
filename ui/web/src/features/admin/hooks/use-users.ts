@@ -1,12 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { userAdminApi } from '../api/user-admin-api'
+import { userAdminApi, type AdminUserListParams } from '../api/user-admin-api'
 
 const USERS_KEY = ['admin-users']
 
-export function useUsers(params?: { role?: string; disabled?: boolean }) {
+export function useUsers(params?: AdminUserListParams) {
   return useQuery({
     queryKey: [...USERS_KEY, params],
-    queryFn: () => userAdminApi.list(params),
+    queryFn: ({ signal }) => userAdminApi.list(params, signal),
   })
 }
 
