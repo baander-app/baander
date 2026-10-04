@@ -6,6 +6,7 @@ namespace App\Tests\Functional\Controller;
 
 use App\Catalog\Domain\Repository\AlbumRepositoryInterface;
 use App\Catalog\Domain\ValueObject\MusicbrainzId;
+use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
@@ -96,6 +97,7 @@ final class AlbumDuplicateControllerTest extends TestCase
     {
         $user = $this->createTestUser();
         $libraryId = $this->createLibraryFixture();
+        static::getContainer()->get(LibraryAccessPortInterface::class)->grant($user->getId(), $libraryId);
 
         $albumIds = $this->createDuplicateAlbumsFixture($libraryId);
         $album = $this->albumRepository->findByUuid($albumIds[0]);
@@ -139,6 +141,7 @@ final class AlbumDuplicateControllerTest extends TestCase
     {
         $user = $this->createTestUser();
         $libraryId = $this->createLibraryFixture();
+        static::getContainer()->get(LibraryAccessPortInterface::class)->grant($user->getId(), $libraryId);
 
         $albumId = $this->createSingleAlbumFixture($libraryId, 'Unique Album Title');
         $album = $this->albumRepository->findByUuid($albumId);
@@ -150,6 +153,23 @@ final class AlbumDuplicateControllerTest extends TestCase
         $data = $this->assertJsonResponse($response, 200, 'data');
         $this->assertIsArray($data['data']);
         $this->assertEmpty($data['data']);
+    }
+
+    public function testAlbumDuplicatesReturns404WithoutLibraryAccess(): void
+    {
+        $user = $this->createTestUser();
+        $libraryId = $this->createLibraryFixture();
+        $albumIds = $this->createDuplicateAlbumsFixture($libraryId);
+        $album = $this->albumRepository->findByUuid($albumIds[0]);
+        $this->assertNotNull($album);
+
+        $response = $this->authenticatedRequest(
+            'GET',
+            '/api/albums/' . $album->getPublicId()->toString() . '/duplicates',
+            $user,
+        );
+
+        $this->assertSame(404, $response->getStatusCode());
     }
 
     // --- Fixture helpers ---
