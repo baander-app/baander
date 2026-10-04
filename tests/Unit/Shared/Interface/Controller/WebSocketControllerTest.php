@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Interface\Controller;
 
+use App\Party\Application\Command\SyncPlaybackCommand;
 use App\Shared\Infrastructure\Swoole\ReconnectionTokenService;
 use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
 use App\Shared\Infrastructure\Swoole\WebSocketPusher;
@@ -15,6 +16,9 @@ use Swoole\WebSocket\Server;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\MessageBus;
+use Symfony\Component\Messenger\Handler\HandlersLocator;
+use Symfony\Component\Messenger\Middleware\HandleMessageMiddleware;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class WebSocketControllerTest extends TestCase
@@ -320,6 +324,110 @@ final class WebSocketControllerTest extends TestCase
         $this->assertCount($messageCount + 1, $this->pushedMessages);
         $this->assertLastPushMatches(1, 'error', ['message' => 'Party action denied']);
         $this->controller->onMessage(1, '{"type":"ping"}');
+        $this->assertLastPushMatches(1, 'pong');
+    }
+
+    public function testPartySyncUsesAuthenticatedUserAndReturnsTheHandledPosition(): void
+    {
+        $userId = '01900000-0000-7000-8000-000000000001';
+        $sessionId = '01900000-0000-7000-8000-000000000002';
+        $received = null;
+        $bus = new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
+            SyncPlaybackCommand::class => [static function (SyncPlaybackCommand $command) use (&$received): float {
+                $received = $command;
+
+                return 43.25;
+            }],
+        ]))]);
+        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder());
+        $controller->onOpen(1, $userId);
+
+        $controller->onMessage(1, json_encode([
+            'type' => 'party.sync',
+            'sessionId' => $sessionId,
+            'userId' => '01900000-0000-7000-8000-000000000003',
+            'position' => 42,
+            'latency' => 0.25,
+        ], JSON_THROW_ON_ERROR));
+
+        self::assertInstanceOf(SyncPlaybackCommand::class, $received);
+        self::assertSame($userId, $received->getUserId()->toString());
+        self::assertSame($sessionId, $received->getSessionId()->toString());
+        self::assertSame(42.0, $received->getClientPosition());
+        self::assertSame(0.25, $received->getClientLatency());
+        $this->assertLastPushMatches(1, 'party.sync_response', ['serverPosition' => 43.25]);
+    }
+
+    /** @return iterable<string, array{mixed, mixed}> */
+    public static function invalidPartySyncNumbers(): iterable
+    {
+        yield 'negative position' => [-1, 0];
+        yield 'text position' => ['42', 0];
+        yield 'array position' => [[], 0];
+        yield 'boolean position' => [true, 0];
+        yield 'null position' => [null, 0];
+        yield 'null latency' => [0, null];
+        yield 'negative latency' => [0, -1];
+        yield 'excessive latency' => [0, 10.01];
+        yield 'text latency' => [0, 'fast'];
+    }
+
+    #[DataProvider('invalidPartySyncNumbers')]
+    public function testPartySyncRejectsInvalidNumbersBeforeDispatch(mixed $position, mixed $latency): void
+    {
+        $this->bus->method('dispatch')->willReturnCallback(static function (): never {
+            self::fail('Invalid sync input must not reach the message bus.');
+        });
+        $this->controller->onOpen(1, '01900000-0000-7000-8000-000000000001');
+
+        $this->controller->onMessage(1, json_encode([
+            'type' => 'party.sync',
+            'sessionId' => '01900000-0000-7000-8000-000000000002',
+            'position' => $position,
+            'latency' => $latency,
+        ], JSON_THROW_ON_ERROR));
+
+        $this->assertLastPushMatches(1, 'error', ['message' => 'Invalid position or latency']);
+    }
+
+    public function testPartySyncWithoutHandledResultFailsClosed(): void
+    {
+        $this->bus->method('dispatch')->willReturnCallback(static fn (object $command): Envelope => new Envelope($command));
+        $this->controller->onOpen(1, '01900000-0000-7000-8000-000000000001');
+
+        $this->controller->onMessage(1, json_encode([
+            'type' => 'party.sync',
+            'sessionId' => '01900000-0000-7000-8000-000000000002',
+        ], JSON_THROW_ON_ERROR));
+
+        $this->assertLastPushMatches(1, 'error', ['message' => 'Sync failed']);
+    }
+
+    public function testPartySyncRejectsOverflowingJsonNumber(): void
+    {
+        $this->controller->onOpen(1, '01900000-0000-7000-8000-000000000001');
+
+        $this->controller->onMessage(1, '{"type":"party.sync","sessionId":"01900000-0000-7000-8000-000000000002","position":1e999}');
+
+        $this->assertLastPushMatches(1, 'error', ['message' => 'Invalid position or latency']);
+    }
+
+    public function testPartySyncHandlerDenialDoesNotExposeSessionData(): void
+    {
+        $bus = new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
+            SyncPlaybackCommand::class => [static function (): never {
+                throw new \Symfony\Component\Security\Core\Exception\AccessDeniedException('Private party');
+            }],
+        ]))]);
+        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder());
+        $controller->onOpen(1, '01900000-0000-7000-8000-000000000001');
+        $messageCount = count($this->pushedMessages);
+
+        $controller->onMessage(1, '{"type":"party.sync","sessionId":"01900000-0000-7000-8000-000000000002"}');
+
+        self::assertCount($messageCount + 1, $this->pushedMessages);
+        self::assertSame(['type' => 'error', 'message' => 'Sync failed'], $this->lastPushedPayload());
+        $controller->onMessage(1, '{"type":"ping"}');
         $this->assertLastPushMatches(1, 'pong');
     }
 

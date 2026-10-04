@@ -153,10 +153,30 @@ All three defects were reproduced before their fixes. Combined backend unit
 verification passes 4,397 tests with 18,509 assertions in the qualified PHP runtime.
 PHPStan now reports 1,693 diagnostics, down from 1,708, with no new diagnostics in
 the changed files. These are bounded runtime repairs; the remaining PHPStan and
-architecture findings still require remediation. The separate party-sync command
-construction mismatch remains a concrete runtime priority. Deptrac remains at 259
+architecture findings still require remediation. The party-sync command mismatch was carried into the next checkpoint below.
+Deptrac remains at 259
 violations with zero configuration errors. OpenAPI and client regeneration are
 limited to the two optional candidate identifiers; the web typecheck passes.
+
+## Party synchronization repair
+
+Party WebSocket synchronization now supplies the authenticated connection user to
+the command and reads the handled numeric position from Messenger's envelope.
+Payload user IDs cannot substitute another member. Invalid/nonfinite positions,
+invalid latency, missing handler results, and handler denial produce an error without
+session data; a rejected message leaves the connection usable.
+
+The shared playback synchronizer checks membership before reading the session or
+updating drift. Non-members are denied, while member jitter/EMA behavior is retained.
+Regression tests exercise real Messenger dispatch/result middleware and the shared
+synchronizer/handler boundary. Full HTTP OAuth/DPoP and real WebSocket network
+acceptance remain separate from these in-process tests.
+
+Verification: 4,411 backend unit tests with 18,575 assertions pass in the qualified
+PHP runtime. The final handler-test mock cleanup also passes the 115-test Party
+suite. PHPStan reports 1,690 diagnostics, down from 1,693, with no new diagnostics
+in the changed files. Deptrac remains at 259 violations and zero configuration
+errors; both release gates remain blocked.
 
 ## Recent verified checkpoints
 

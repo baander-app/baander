@@ -9,20 +9,22 @@ use App\Party\Application\CommandHandler\SyncPlaybackHandler;
 use App\Party\Application\Port\PartyMemberPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
 use App\Party\Infrastructure\PlaybackSynchronizer;
+use App\Party\Domain\Model\PartyMember;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 final class SyncPlaybackHandlerTest extends TestCase
 {
     private PartySessionPortInterface&MockObject $sessionPort;
-    private PartyMemberPortInterface $memberPort;
+    private PartyMemberPortInterface&MockObject $memberPort;
     private SyncPlaybackHandler $handler;
 
     protected function setUp(): void
     {
         $this->sessionPort = $this->createMock(PartySessionPortInterface::class);
-        $this->memberPort = $this->createStub(PartyMemberPortInterface::class);
+        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
         $this->handler = new SyncPlaybackHandler(
             new PlaybackSynchronizer($this->sessionPort, $this->memberPort),
         );
@@ -33,16 +35,28 @@ final class SyncPlaybackHandlerTest extends TestCase
         $sessionId = Uuid::v4();
         $userId = Uuid::v4();
 
-        // The synchronizer syncs the session, then looks up the member. With no
-        // member for this user it returns the server position unchanged.
         $this->sessionPort->expects($this->once())
             ->method('syncPlayback')
             ->with($sessionId, 100.5, 0.2)
             ->willReturn(101.0);
-        $this->memberPort->method('findByUserAndSession')->willReturn(null);
+        $member = PartyMember::create($userId, $sessionId);
+        $this->memberPort->expects($this->once())->method('findByUserAndSession')->with($userId, $sessionId)->willReturn($member);
+        $this->memberPort->expects($this->once())->method('save')->with($member);
 
         $result = ($this->handler)(new SyncPlaybackCommand($sessionId, $userId, 100.5, 0.2));
 
         $this->assertSame(101.0, $result);
+    }
+
+    public function testMissingMembershipRejectsSyncCommandBeforeReadingSession(): void
+    {
+        $sessionId = Uuid::v4();
+        $userId = Uuid::v4();
+        $this->sessionPort->expects($this->never())->method('syncPlayback');
+        $this->memberPort->expects($this->once())->method('findByUserAndSession')->with($userId, $sessionId)->willReturn(null);
+        $this->memberPort->expects($this->never())->method('save');
+        $this->expectException(AccessDeniedException::class);
+        $this->expectExceptionMessage('Party membership required.');
+        ($this->handler)(new SyncPlaybackCommand($sessionId, $userId, 75.0, 0.3));
     }
 }

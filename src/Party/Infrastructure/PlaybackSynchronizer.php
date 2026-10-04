@@ -7,6 +7,7 @@ namespace App\Party\Infrastructure;
 use App\Party\Application\Port\PartyMemberPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
 use App\Shared\Domain\Model\Uuid;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 final class PlaybackSynchronizer
 {
@@ -21,12 +22,12 @@ final class PlaybackSynchronizer
 
     public function synchronize(Uuid $sessionId, Uuid $userId, float $clientPosition, float $clientLatency): float
     {
-        $serverPosition = $this->sessionPort->syncPlayback($sessionId, $clientPosition, $clientLatency);
-
         $member = $this->memberPort->findByUserAndSession($userId, $sessionId);
         if ($member === null) {
-            return $serverPosition;
+            throw new AccessDeniedException('Party membership required.');
         }
+
+        $serverPosition = $this->sessionPort->syncPlayback($sessionId, $clientPosition, $clientLatency);
 
         $drift = abs($serverPosition - $clientPosition);
         $jitter = min($drift, self::MAX_JITTER);

@@ -13,6 +13,7 @@ use App\Party\Infrastructure\PlaybackSynchronizer;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 final class PlaybackSynchronizerTest extends TestCase
 {
@@ -142,38 +143,20 @@ final class PlaybackSynchronizerTest extends TestCase
         $this->synchronizer->synchronize($sessionId, $userId, $clientPosition, $clientLatency);
     }
 
-    public function testMemberNotFoundReturnsServerPositionWithoutUpdate(): void
+    public function testMissingMembershipIsRejectedBeforeSessionAccess(): void
     {
         $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
         $this->sessionPort = $this->createMock(PartySessionPortInterface::class);
         $this->synchronizer = $this->createPlaybackSynchronizerFixture();
-
         $sessionId = Uuid::v4();
         $userId = Uuid::v4();
-        $serverPosition = 80.0;
-        $clientPosition = 75.0;
-        $clientLatency = 0.3;
-
-        $this->sessionPort
-            ->expects($this->once())
-            ->method('syncPlayback')
-            ->with($sessionId, $clientPosition, $clientLatency)
-            ->willReturn($serverPosition);
-
-        $this->memberPort
-            ->expects($this->once())
-            ->method('findByUserAndSession')
-            ->with($userId, $sessionId)
-            ->willReturn(null);
-
-        // save should never be called when member is not found
-        $this->memberPort
-            ->expects($this->never())
-            ->method('save');
-
-        $result = $this->synchronizer->synchronize($sessionId, $userId, $clientPosition, $clientLatency);
-
-        $this->assertSame($serverPosition, $result);
+        $this->sessionPort->expects($this->never())->method('syncPlayback');
+        $this->memberPort->expects($this->once())
+            ->method('findByUserAndSession')->with($userId, $sessionId)->willReturn(null);
+        $this->memberPort->expects($this->never())->method('save');
+        $this->expectException(AccessDeniedException::class);
+        $this->expectExceptionMessage('Party membership required.');
+        $this->synchronizer->synchronize($sessionId, $userId, 75.0, 0.3);
     }
 
     public function testLargeDriftIsClampedToMaxJitter(): void

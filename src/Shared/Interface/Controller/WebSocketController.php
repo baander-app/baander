@@ -114,7 +114,7 @@ final class WebSocketController extends AbstractWebSocketController
             'party.join' => $this->handlePartyJoin($fd, $userId, $payload),
             'party.leave' => $this->handlePartyLeave($fd, $userId, $payload),
             'party.playback' => $this->handlePartyPlayback($fd, $userId, $payload),
-            'party.sync' => $this->handlePartySync($fd, $payload),
+            'party.sync' => $this->handlePartySync($fd, $userId, $payload),
             'session.join' => $this->handleSessionJoin($fd, $userId, $payload),
             'session.playback' => $this->handleSessionPlayback($fd, $userId, $payload),
             'session.sync' => $this->handleSessionSync($fd, $userId, $payload),
@@ -456,11 +456,11 @@ final class WebSocketController extends AbstractWebSocketController
         // when the command handler dispatches domain events.
     }
 
-    private function handlePartySync(int $fd, array $payload): void
+    private function handlePartySync(int $fd, string $userId, array $payload): void
     {
         $sessionId = $payload['sessionId'] ?? null;
-        $position = (float)($payload['position'] ?? 0.0);
-        $latency = (float)($payload['latency'] ?? 0.0);
+        $position = array_key_exists('position', $payload) ? $payload['position'] : 0.0;
+        $latency = array_key_exists('latency', $payload) ? $payload['latency'] : 0.0;
 
         if (!is_string($sessionId) || $sessionId === '') {
             $this->pusher->pushToConnection($fd, [
@@ -471,7 +471,25 @@ final class WebSocketController extends AbstractWebSocketController
             return;
         }
 
+        if (
+            (!is_int($position) && !is_float($position))
+            || !is_finite((float) $position)
+            || $position < 0
+            || (!is_int($latency) && !is_float($latency))
+            || !is_finite((float) $latency)
+            || $latency < 0
+            || $latency > 10
+        ) {
+            $this->pusher->pushToConnection($fd, [
+                'type' => 'error',
+                'message' => 'Invalid position or latency',
+            ]);
+
+            return;
+        }
+
         try {
+            $userUuid = Uuid::fromString($userId);
             $sessionUuid = Uuid::fromString($sessionId);
         } catch (InvalidArgumentException) {
             $this->pusher->pushToConnection($fd, [
@@ -483,13 +501,22 @@ final class WebSocketController extends AbstractWebSocketController
         }
 
         try {
-            $serverPosition = $this->bus->dispatch(
+            $envelope = $this->bus->dispatch(
                 new SyncPlaybackCommand(
                     $sessionUuid,
-                    $position,
-                    $latency,
+                    $userUuid,
+                    (float) $position,
+                    (float) $latency,
                 ),
             );
+            $serverPosition = $envelope->last(\Symfony\Component\Messenger\Stamp\HandledStamp::class)?->getResult();
+            if (
+                (!is_int($serverPosition) && !is_float($serverPosition))
+                || !is_finite((float) $serverPosition)
+                || $serverPosition < 0
+            ) {
+                throw new \UnexpectedValueException('Sync handler did not return a valid position.');
+            }
         } catch (Throwable) {
             $this->pusher->pushToConnection($fd, [
                 'type'    => 'error',
