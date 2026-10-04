@@ -199,8 +199,6 @@ deptrac:
       - App\Library\Domain\ValueObject\LibraryType
     App\Library\Interface\Resource\LibraryResource:
       - App\Library\Domain\Model\Library
-    App\Lyrics\Infrastructure\Doctrine\Repository\LyricsAdminRepository:
-      - App\Catalog\Application\Port\SongPortInterface
     App\Lyrics\Infrastructure\Service\LyricsService:
       - App\Catalog\Application\Port\AlbumPortInterface
       - App\Catalog\Application\Port\SongPortInterface
@@ -244,7 +242,6 @@ deptrac:
       - App\Catalog\Application\Port\ArtistPortInterface
     App\Metadata\Application\MessageHandler\SyncGenresHandler:
       - App\Catalog\Application\Port\AlbumPortInterface
-      - App\Catalog\Application\Port\SongPortInterface
     App\Metadata\Application\MessageHandler\SyncLibraryHandler:
       - App\Catalog\Application\Port\AlbumPortInterface
     App\Metadata\Application\MessageHandler\SyncSongHandler:
@@ -258,11 +255,9 @@ deptrac:
       - App\Metadata\Infrastructure\Api\Tmdb\DTO\TmdbMovieDto
       - App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter
     App\Metadata\Application\SongMetadataEnricher:
-      - App\Catalog\Application\Port\ArtistPortInterface
       - App\Catalog\Application\Port\GenrePortInterface
       - App\Catalog\Application\Port\SongPortInterface
       - App\Catalog\Domain\Model\Song
-      - App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter
       - App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter
     App\Metadata\Infrastructure\Reader\MetadataContentReader:
       - App\Catalog\Application\Port\MetadataContentReaderPortInterface

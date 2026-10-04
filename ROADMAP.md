@@ -200,26 +200,39 @@ also passes for the Swoole decorator and transport tests. Production container
 warmup passes without wiring errors; external Redis availability was not tested in
 the no-network container. Deptrac remains at 259 violations.
 
-## PHPStan remediation in progress
+## PHPStan remediation completed
 
-The sustained cleanup is reducing the 1,683-diagnostic baseline without adding
-suppressions or expanding the baseline. The latest complete snapshot reports 677
-diagnostics at the existing 512 MB analysis limit. An earlier full run exhausted
-that limit; the subsequent run completed after correcting contracts and migration
-discovery. This is progress, not a clean quality gate.
+The full configured level-6 scan of `src/` and `tests/` now passes with zero
+errors. The sustained cleanup resolved the 1,683 reported diagnostics and the
+18 EQ-profile diagnostics previously hidden in `phpstan-baseline.neon`; that
+baseline and its configuration include have been removed. No new suppressions
+or baseline entries were added. CI and Makefile analysis use a 1 GiB budget after
+512 MiB full scans intermittently exhausted memory. Deployment budgets are unchanged.
 
-Committed fixes cover secure public/token ID generation, UUID timestamp semantics,
+Runtime fixes include secure public/token ID generation, UUID timestamp semantics,
 OAuth identity reconstruction, Messenger result propagation, OpenTelemetry span
-attributes, locale/WebSocket service contracts, and truthful test doubles. Doctrine
-migration declarations are now available for symbol discovery while retaining the
-existing analysis paths. Recommendation controllers reject principals without an
-application identity. Regression checks cover each changed runtime behavior.
+attributes, service and identity contracts, metadata response serialization,
+immutable persistence dates, transcode process handling, lyrics pagination, and
+reference-compatible BlurHash encoding. Native inotify exhaustion now leaves the
+watcher retryable. Regression tests verify the changed behavior; accurate collection,
+payload, and test-double contracts account for the remaining annotation work.
 
-The current combined Shared and Recommendation unit snapshot passes 1,232 tests
-with 5,629 assertions. Auth batches pass their focused suites, including 804 Auth
-unit tests after the runtime fixes. Recent fixture changes also pass disposable
-functional tests. Full combined validation and elimination of the remaining
-PHPStan diagnostics are still in progress; Deptrac remediation remains separate.
+The combined Unit and StaticAnalysisRules suites pass 4,520 tests with 19,001
+assertions in the qualified PHP 8.5 container, with notices and skips treated as
+failures. Container wiring also passes. The final disposable functional batch
+passes 92 tests with 911 assertions against fresh PostgreSQL migrations; it uses
+the real firewall with TestAuthenticator and does not replace full OAuth/DPoP
+qualification. Focused transport and runtime gates are recorded in the preceding
+checkpoints. This completes PHPStan remediation, not the remaining integration,
+Deptrac, deployment, or registry acceptance work.
+
+The Deptrac comparison against the cleanup's starting commit has no new violation
+pairs: 257 violations remain, down from 259, with zero configuration/baseline
+errors after removing four obsolete entries. The public authenticated-identity
+contract has an exact layer allowance for its consuming controllers; Auth internals
+remain isolated. Catalog's playlist-impact helper now accepts only song UUIDs.
+Lyrics Application is still missing from Deptrac's collectors, an enforcement gap
+to address during the separate architecture remediation.
 
 ## Recent verified checkpoints
 
@@ -338,8 +351,10 @@ release, without weakening consistency or increasing the agreed host budget.
 - [ ] Reconcile documented routes, OpenAPI schemas, generated clients, and identifier
   formats together. The initial review found 24 documented paths missing from the
   checked-in specification; keep automated drift checks blocking thereafter.
-- [ ] Eliminate actual PHPStan defects and Deptrac boundary violations using
-  application ports. No blanket suppressions or inflated baselines. Verify the
+- [x] Eliminate the configured PHPStan diagnostics, including the old baseline,
+  without new suppressions; verify the full scan and combined unit/rule suites.
+- [ ] Eliminate remaining Deptrac boundary violations using application ports.
+  No blanket suppressions or inflated baselines. Verify the
   correct Symfony/Vite artifacts, Composer extensions, isolated CI networks,
   matching Redis credentials, and explicitly failing readiness timeouts.
 

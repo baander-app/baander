@@ -8,6 +8,7 @@ use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Playlist\Domain\Repository\PlaylistRepositoryInterface;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -86,7 +87,7 @@ final class AdminAlbumController
         $songs = $this->songPort->findByAlbum($album->getId(), limit: 1000);
         $totalSize = array_sum(array_map(fn($s) => $s->getSize(), $songs));
 
-        $playlistData = $this->getPlaylistDataForSongs($songs);
+        $playlistData = $this->getPlaylistDataForSongs(array_map(static fn ($song): Uuid => $song->getId(), $songs));
 
         $coverImageData = $album->getCoverImageId() !== null
             ? ['id' => $album->getCoverImageId()->toString()]
@@ -157,14 +158,14 @@ final class AdminAlbumController
     }
 
     /**
-     * @param \App\Catalog\Domain\Model\Song[] $songs
+     * @param Uuid[] $songIds
      * @return array{count: int, names: list<string>}
      */
-    private function getPlaylistDataForSongs(array $songs): array
+    private function getPlaylistDataForSongs(array $songIds): array
     {
         $allPlaylistNames = [];
-        foreach ($songs as $song) {
-            $playlists = $this->playlistRepo->findPlaylistNamesContainingSong($song->getId());
+        foreach ($songIds as $songId) {
+            $playlists = $this->playlistRepo->findPlaylistNamesContainingSong($songId);
             $allPlaylistNames = array_merge($allPlaylistNames, $playlists);
         }
 

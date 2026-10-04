@@ -2,7 +2,7 @@
 #
 # Enforces:
 #   1. Layer ordering within each context (Domain → Application → Infrastructure / Interface)
-#   2. Context isolation (no direct cross-context references except through Shared)
+#   2. Context isolation (Shared and explicitly exposed application contracts only)
 #   3. Infrastructure leak prevention (Domain/Application never depend on Infrastructure)
 #
 # Existing violations are baselined in deptrac.baseline.yaml.
@@ -30,7 +30,7 @@ deptrac:
       groups:
         Shared: ['Shared Domain', 'Shared Application', 'Shared Infrastructure', 'Shared Interface']
         Activity: ['Activity Domain', 'Activity Application', 'Activity Infrastructure', 'Activity Interface']
-        Auth: ['Auth Domain', 'Auth Application', 'Auth Infrastructure', 'Auth Interface']
+        Auth: ['Auth Domain', 'Auth Identity Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Interface']
         Catalog: ['Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Interface']
         Filesystem: ['Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
         Library: ['Library Domain', 'Library Application', 'Library Infrastructure', 'Library Interface']
@@ -102,10 +102,21 @@ deptrac:
         - type: classLike
           value: '^App\\Auth\\Domain\\'
 
-    - name: 'Auth Application'
+    # Only this security-principal contract is public across context boundaries.
+    - name: 'Auth Identity Contract'
       collectors:
         - type: classLike
-          value: '^App\\Auth\\Application\\'
+          value: '^App\\Auth\\Application\\Port\\AuthenticatedUserIdentityInterface$'
+
+    - name: 'Auth Application'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Auth\\Application\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Auth\\Application\\Port\\AuthenticatedUserIdentityInterface$'
 
     - name: 'Auth Infrastructure'
       collectors:
@@ -474,24 +485,29 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Activity Interface':
+      - 'Auth Identity Contract'
       - 'Activity Application'
       - 'Shared Domain'
       - 'Shared Application'
       - 'Shared Interface'
 
     # --- Auth ---
+    'Auth Identity Contract': []
     'Auth Domain':
       - 'Shared Domain'
     'Auth Application':
+      - 'Auth Identity Contract'
       - 'Auth Domain'
       - 'Shared Domain'
       - 'Shared Application'
     'Auth Infrastructure':
+      - 'Auth Identity Contract'
       - 'Auth Domain'
       - 'Auth Application'
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Auth Interface':
+      - 'Auth Identity Contract'
       - 'Auth Application'
       - 'Shared Domain'
       - 'Shared Application'
@@ -620,6 +636,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Party Interface':
+      - 'Auth Identity Contract'
       - 'Party Application'
       - 'Shared Domain'
       - 'Shared Application'
@@ -638,6 +655,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Playlist Interface':
+      - 'Auth Identity Contract'
       - 'Playlist Application'
       - 'Shared Domain'
       - 'Shared Application'
@@ -656,6 +674,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Recommendation Interface':
+      - 'Auth Identity Contract'
       - 'Recommendation Application'
       - 'Shared Domain'
       - 'Shared Application'
@@ -674,6 +693,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Transcode Interface':
+      - 'Auth Identity Contract'
       - 'Transcode Application'
       - 'Shared Domain'
       - 'Shared Application'
@@ -726,6 +746,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Favorites Interface':
+      - 'Auth Identity Contract'
       - 'Favorites Application'
       - 'Favorites Domain'
       - 'Shared Domain'
