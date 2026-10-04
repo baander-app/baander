@@ -75,13 +75,7 @@ final class LayoutPreferencesController
             required: true,
             content: new OA\MediaType(
                 mediaType: 'application/json',
-                schema: new OA\Schema(
-                    required: ['payload', 'version'],
-                    properties: [
-                        new OA\Property(property: 'payload', type: 'object'),
-                        new OA\Property(property: 'version', type: 'integer'),
-                    ],
-                ),
+                schema: new OA\Schema(ref: new Model(type: SaveLayoutPreferencesRequest::class)),
             ),
         ),
         responses: [

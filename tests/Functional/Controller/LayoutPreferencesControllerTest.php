@@ -6,6 +6,7 @@ namespace App\Tests\Functional\Controller;
 
 use App\Auth\Domain\Model\User;
 use App\Tests\Functional\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Functional tests for layout-preferences management.
@@ -43,7 +44,7 @@ final class LayoutPreferencesControllerTest extends TestCase
     public function testIndexReturnsSavedPreferences(): void
     {
         $user = $this->createTestUser();
-        $payload = $this->validPayload('expanded', 'albums');
+        $payload = $this->validPayload('expanded', 'details');
 
         $this->savePreferences($user, $payload, 0);
 
@@ -74,7 +75,7 @@ final class LayoutPreferencesControllerTest extends TestCase
     public function testSaveCreatesPreferencesWithVersionOne(): void
     {
         $user = $this->createTestUser();
-        $payload = $this->validPayload('compact', 'library');
+        $payload = $this->validPayload('compact', 'queue');
 
         $data = $this->assertJsonResponse($this->savePreferences($user, $payload, 0), 200, 'data');
 
@@ -86,10 +87,10 @@ final class LayoutPreferencesControllerTest extends TestCase
     {
         $user = $this->createTestUser();
 
-        $first = $this->assertJsonResponse($this->savePreferences($user, $this->validPayload('expanded', 'library'), 0), 200, 'data');
+        $first = $this->assertJsonResponse($this->savePreferences($user, $this->validPayload('expanded', 'queue'), 0), 200, 'data');
         $this->assertSame(1, $first['data']['version']);
 
-        $second = $this->assertJsonResponse($this->savePreferences($user, $this->validPayload('compact', 'library'), 1), 200, 'data');
+        $second = $this->assertJsonResponse($this->savePreferences($user, $this->validPayload('compact', 'queue'), 1), 200, 'data');
         $this->assertSame(2, $second['data']['version']);
     }
 
@@ -97,24 +98,24 @@ final class LayoutPreferencesControllerTest extends TestCase
     {
         $user = $this->createTestUser();
 
-        $this->savePreferences($user, $this->validPayload('expanded', 'library'), 0);   // → version 1
-        $stale = $this->savePreferences($user, $this->validPayload('compact', 'library'), 0); // stale version 0
+        $this->savePreferences($user, $this->validPayload('expanded', 'queue'), 0);   // → version 1
+        $stale = $this->savePreferences($user, $this->validPayload('compact', 'queue'), 0); // stale version 0
 
         $conflict = $this->assertJsonResponse($stale, 409);
         $this->assertSame(1, $conflict['error']['details']['currentVersion']);
         $saved = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/user/layout-preferences/', $user), 200, 'data');
-        $this->assertSame($this->validPayload('expanded', 'library'), $saved['data']['payload']);
+        $this->assertSame($this->validPayload('expanded', 'queue'), $saved['data']['payload']);
         $this->assertSame(1, $saved['data']['version']);
         $history = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/user/layout-preferences/history', $user), 200, 'data');
         $this->assertCount(1, $history['data']['history']);
-        $retry = $this->assertJsonResponse($this->savePreferences($user, $this->validPayload('expanded', 'library'), 1), 200, 'data');
+        $retry = $this->assertJsonResponse($this->savePreferences($user, $this->validPayload('expanded', 'queue'), 1), 200, 'data');
         $this->assertSame(2, $retry['data']['version']);
     }
 
     public function testSaveRejectsNonzeroVersionWhenAbsent(): void
     {
         $user = $this->createTestUser();
-        $conflict = $this->assertJsonResponse($this->savePreferences($user, $this->validPayload('expanded', 'library'), 3), 409);
+        $conflict = $this->assertJsonResponse($this->savePreferences($user, $this->validPayload('expanded', 'queue'), 3), 409);
         $this->assertSame(0, $conflict['error']['details']['currentVersion']);
         $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/user/layout-preferences/', $user), 404);
     }
@@ -122,10 +123,10 @@ final class LayoutPreferencesControllerTest extends TestCase
     public function testSaveRejectsStalePositiveAndFutureVersions(): void
     {
         $user = $this->createTestUser();
-        $this->assertJsonResponse($this->savePreferences($user, $this->validPayload('expanded', 'library'), 0), 200);
-        $this->assertJsonResponse($this->savePreferences($user, $this->validPayload('expanded', 'library'), 1), 200);
+        $this->assertJsonResponse($this->savePreferences($user, $this->validPayload('expanded', 'queue'), 0), 200);
+        $this->assertJsonResponse($this->savePreferences($user, $this->validPayload('expanded', 'queue'), 1), 200);
         foreach ([1, 9] as $expectedVersion) {
-            $conflict = $this->assertJsonResponse($this->savePreferences($user, $this->validPayload('expanded', 'library'), $expectedVersion), 409);
+            $conflict = $this->assertJsonResponse($this->savePreferences($user, $this->validPayload('expanded', 'queue'), $expectedVersion), 409);
             $this->assertSame(2, $conflict['error']['details']['currentVersion']);
         }
     }
@@ -134,9 +135,75 @@ final class LayoutPreferencesControllerTest extends TestCase
     {
         $user = $this->createTestUser();
 
-        $response = $this->savePreferences($user, $this->validPayload('expanded', 'library'), -1);
+        $response = $this->savePreferences($user, $this->validPayload('expanded', 'queue'), -1);
 
         $this->assertJsonResponse($response, 422);
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function supportedLayouts(): iterable
+    {
+        foreach (['compact', 'expanded'] as $mode) {
+            foreach (['queue', 'lyrics', 'details', 'info'] as $activeTab) {
+                yield $mode . ' ' . $activeTab => [$mode, $activeTab];
+            }
+        }
+    }
+
+    #[DataProvider('supportedLayouts')]
+    public function testSaveAcceptsEverySupportedLayout(string $mode, string $activeTab): void
+    {
+        $user = $this->createTestUser();
+        $payload = $this->validPayload($mode, $activeTab);
+
+        $data = $this->assertJsonResponse($this->savePreferences($user, $payload, 0), 200, 'data');
+
+        $this->assertSame($payload, $data['data']['payload']);
+        $this->assertSame(1, $data['data']['version']);
+    }
+
+    /** @return iterable<string, array{array<string, mixed>}> */
+    public static function invalidLayouts(): iterable
+    {
+        yield 'obsolete pioneer mode' => [['mode' => 'pioneer', 'activeTab' => 'queue']];
+        yield 'unknown mode' => [['mode' => 'grid', 'activeTab' => 'queue']];
+        yield 'obsolete library tab' => [['mode' => 'expanded', 'activeTab' => 'library']];
+        yield 'unknown tab' => [['mode' => 'expanded', 'activeTab' => 'unknown']];
+        yield 'blank tab' => [['mode' => 'expanded', 'activeTab' => '']];
+        yield 'missing mode' => [['activeTab' => 'queue']];
+        yield 'missing tab' => [['mode' => 'expanded']];
+        yield 'numeric mode' => [['mode' => 1, 'activeTab' => 'queue']];
+        yield 'numeric tab' => [['mode' => 'expanded', 'activeTab' => 1]];
+        yield 'extra field' => [['mode' => 'expanded', 'activeTab' => 'queue', 'extra' => true]];
+    }
+
+    #[DataProvider('invalidLayouts')]
+    public function testSaveRejectsInvalidLayoutWithoutChangingPayloadVersionOrHistory(array $invalidPayload): void
+    {
+        $user = $this->createTestUser();
+        $payload = $this->validPayload();
+        $this->assertJsonResponse($this->savePreferences($user, $payload, 0), 200);
+        $historyBefore = $this->assertJsonResponse(
+            $this->authenticatedRequest('GET', '/api/user/layout-preferences/history', $user),
+            200,
+            'data',
+        );
+
+        $this->assertJsonResponse($this->savePreferences($user, $invalidPayload, 1), 422);
+
+        $saved = $this->assertJsonResponse(
+            $this->authenticatedRequest('GET', '/api/user/layout-preferences/', $user),
+            200,
+            'data',
+        );
+        $this->assertSame($payload, $saved['data']['payload']);
+        $this->assertSame(1, $saved['data']['version']);
+        $historyAfter = $this->assertJsonResponse(
+            $this->authenticatedRequest('GET', '/api/user/layout-preferences/history', $user),
+            200,
+            'data',
+        );
+        $this->assertSame($historyBefore['data']['history'], $historyAfter['data']['history']);
     }
 
     // ---------------------------------------------------------------
@@ -154,8 +221,8 @@ final class LayoutPreferencesControllerTest extends TestCase
     {
         $user = $this->createTestUser();
 
-        $this->savePreferences($user, $this->validPayload('expanded', 'library'), 0);
-        $this->savePreferences($user, $this->validPayload('compact', 'library'), 1);
+        $this->savePreferences($user, $this->validPayload('expanded', 'queue'), 0);
+        $this->savePreferences($user, $this->validPayload('compact', 'queue'), 1);
 
         $data = $this->assertJsonResponse(
             $this->authenticatedRequest('GET', '/api/user/layout-preferences/history', $user),
@@ -180,8 +247,8 @@ final class LayoutPreferencesControllerTest extends TestCase
     public function testRollbackRestoresPreviousVersionPayload(): void
     {
         $user = $this->createTestUser();
-        $firstPayload = $this->validPayload('expanded', 'library');
-        $secondPayload = $this->validPayload('compact', 'library');
+        $firstPayload = $this->validPayload('expanded', 'queue');
+        $secondPayload = $this->validPayload('compact', 'queue');
 
         $this->savePreferences($user, $firstPayload, 0);   // version 1
         $this->savePreferences($user, $secondPayload, 1);  // version 2
@@ -209,7 +276,7 @@ final class LayoutPreferencesControllerTest extends TestCase
     // Helpers
     // ---------------------------------------------------------------
 
-    private function validPayload(string $mode = 'expanded', string $activeTab = 'library'): array
+    private function validPayload(string $mode = 'expanded', string $activeTab = 'queue'): array
     {
         return ['mode' => $mode, 'activeTab' => $activeTab];
     }

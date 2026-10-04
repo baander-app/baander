@@ -1896,6 +1896,35 @@ export interface EqDeviceProfileResource {
   updatedAt: string;
 }
 
+export type SaveLayoutPreferencesRequestPayloadMode = typeof SaveLayoutPreferencesRequestPayloadMode[keyof typeof SaveLayoutPreferencesRequestPayloadMode];
+
+
+export const SaveLayoutPreferencesRequestPayloadMode = {
+  compact: 'compact',
+  expanded: 'expanded',
+} as const;
+
+export type SaveLayoutPreferencesRequestPayloadActiveTab = typeof SaveLayoutPreferencesRequestPayloadActiveTab[keyof typeof SaveLayoutPreferencesRequestPayloadActiveTab];
+
+
+export const SaveLayoutPreferencesRequestPayloadActiveTab = {
+  queue: 'queue',
+  lyrics: 'lyrics',
+  details: 'details',
+  info: 'info',
+} as const;
+
+export type SaveLayoutPreferencesRequestPayload = {
+  mode: SaveLayoutPreferencesRequestPayloadMode;
+  activeTab: SaveLayoutPreferencesRequestPayloadActiveTab;
+};
+
+export interface SaveLayoutPreferencesRequest {
+  payload: SaveLayoutPreferencesRequestPayload;
+  /** @minimum 0 */
+  version: number;
+}
+
 export type AcceptLanguageParameter = typeof AcceptLanguageParameter[keyof typeof AcceptLanguageParameter];
 
 
@@ -5587,13 +5616,6 @@ export type GetLayoutPreferencesIndex200Payload = {
 export type GetLayoutPreferencesIndex200 = {
   payload?: GetLayoutPreferencesIndex200Payload;
   version?: number;
-};
-
-export type PutLayoutPreferencesUpdateBodyPayload = { [key: string]: unknown };
-
-export type PutLayoutPreferencesUpdateBody = {
-  payload: PutLayoutPreferencesUpdateBodyPayload;
-  version: number;
 };
 
 export type PutLayoutPreferencesUpdate200Payload = {
@@ -29473,14 +29495,14 @@ export const getPutLayoutPreferencesUpdateUrl = () => {
 /**
  * @summary Save layout preferences
  */
-export const putLayoutPreferencesUpdate = async (putLayoutPreferencesUpdateBody: PutLayoutPreferencesUpdateBody, options?: RequestInit): Promise<PutLayoutPreferencesUpdate200> => {
+export const putLayoutPreferencesUpdate = async (saveLayoutPreferencesRequest: SaveLayoutPreferencesRequest, options?: RequestInit): Promise<PutLayoutPreferencesUpdate200> => {
 
   return customInstance<PutLayoutPreferencesUpdate200>(getPutLayoutPreferencesUpdateUrl(),
   {
     ...options,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(putLayoutPreferencesUpdateBody)
+    body: JSON.stringify(saveLayoutPreferencesRequest)
   }
 );}
 
@@ -29488,8 +29510,8 @@ export const putLayoutPreferencesUpdate = async (putLayoutPreferencesUpdateBody:
 
 
 export const getPutLayoutPreferencesUpdateMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putLayoutPreferencesUpdate>>, TError,{data: BodyType<PutLayoutPreferencesUpdateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof putLayoutPreferencesUpdate>>, TError,{data: BodyType<PutLayoutPreferencesUpdateBody>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putLayoutPreferencesUpdate>>, TError,{data: BodyType<SaveLayoutPreferencesRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof putLayoutPreferencesUpdate>>, TError,{data: BodyType<SaveLayoutPreferencesRequest>}, TContext> => {
 
 const mutationKey = ['putLayoutPreferencesUpdate'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -29501,7 +29523,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putLayoutPreferencesUpdate>>, {data: BodyType<PutLayoutPreferencesUpdateBody>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putLayoutPreferencesUpdate>>, {data: BodyType<SaveLayoutPreferencesRequest>}> = (props) => {
           const {data} = props ?? {};
 
           return  putLayoutPreferencesUpdate(data,requestOptions)
@@ -29515,18 +29537,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PutLayoutPreferencesUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof putLayoutPreferencesUpdate>>>
-    export type PutLayoutPreferencesUpdateMutationBody = BodyType<PutLayoutPreferencesUpdateBody>
+    export type PutLayoutPreferencesUpdateMutationBody = BodyType<SaveLayoutPreferencesRequest>
     export type PutLayoutPreferencesUpdateMutationError = ErrorType<ApiError | ValidationError>
 
     /**
  * @summary Save layout preferences
  */
 export const usePutLayoutPreferencesUpdate = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putLayoutPreferencesUpdate>>, TError,{data: BodyType<PutLayoutPreferencesUpdateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putLayoutPreferencesUpdate>>, TError,{data: BodyType<SaveLayoutPreferencesRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof putLayoutPreferencesUpdate>>,
         TError,
-        {data: BodyType<PutLayoutPreferencesUpdateBody>},
+        {data: BodyType<SaveLayoutPreferencesRequest>},
         TContext
       > => {
       return useMutation(getPutLayoutPreferencesUpdateMutationOptions(options), queryClient);

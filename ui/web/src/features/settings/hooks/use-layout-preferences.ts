@@ -15,7 +15,14 @@ export function useLayoutPreferences(isActive?: () => boolean) {
       mode: state.mode,
       activeTab: state.activeTab,
     }),
-    fromPayload: (payload) => payload as LayoutPreferences,
+    fromPayload: (payload) => {
+      const { mode, activeTab } = payload
+      if ((mode !== 'compact' && mode !== 'expanded')
+        || (activeTab !== 'queue' && activeTab !== 'lyrics' && activeTab !== 'details' && activeTab !== 'info')) {
+        throw new Error('Invalid layout preferences')
+      }
+      return { mode, activeTab }
+    },
     onRemoteUpdate: useCallback((data) => {
       mediator.dispatch(SETTINGS_ACTIONS.APPLY_LAYOUT, {
         contextPanelMode: data.mode,

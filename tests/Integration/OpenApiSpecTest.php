@@ -29,6 +29,24 @@ final class OpenApiSpecTest extends KernelTestCase
         return $spec;
     }
 
+    public function test_layout_save_schema_documents_supported_panel_values(): void
+    {
+        $spec = $this->getSpec();
+        $body = $spec['paths']['/api/user/layout-preferences/']['put']['requestBody']['content']['application/json']['schema'];
+        self::assertSame('#/components/schemas/SaveLayoutPreferencesRequest', $body['$ref']);
+        $schema = $spec['components']['schemas']['SaveLayoutPreferencesRequest'];
+        self::assertEqualsCanonicalizing(['payload', 'version'], $schema['required']);
+        $payload = $schema['properties']['payload'];
+        self::assertSame('object', $payload['type']);
+        self::assertArrayNotHasKey('default', $payload);
+        self::assertArrayNotHasKey('default', $schema['properties']['version']);
+        self::assertEqualsCanonicalizing(['mode', 'activeTab'], $payload['required']);
+        self::assertSame(['compact', 'expanded'], $payload['properties']['mode']['enum']);
+        self::assertSame(['queue', 'lyrics', 'details', 'info'], $payload['properties']['activeTab']['enum']);
+        self::assertSame('integer', $schema['properties']['version']['type']);
+        self::assertSame(0, $schema['properties']['version']['minimum']);
+    }
+
     public function test_raw_path_stream_is_absent_from_contract(): void
     {
         $spec = $this->getSpec();

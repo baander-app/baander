@@ -34,4 +34,19 @@ describe('layout preference restoration', () => {
     await act(async () => { expect(await result.current.rollback(2)).toBe(true) })
     expect(useContextPanelStore.getState().activeTab).toBe('info')
   })
+
+  it.each([
+    { mode: 'pioneer', activeTab: 'queue' },
+    { mode: 'expanded', activeTab: 'library' },
+    { mode: 'expanded' },
+    { mode: null, activeTab: 'lyrics' },
+  ])('rejects an unsupported remote layout without changing state: %j', async (payload) => {
+    const before = useContextPanelStore.getState()
+    http.get.mockResolvedValue({ data: { data: { payload, version: 4 } } })
+    const { result } = renderHook(() => useLayoutPreferences())
+    await act(async () => { expect(await result.current.fetchFromServer()).toBe(false) })
+    expect(useContextPanelStore.getState()).toBe(before)
+    expect(result.current.versionRef.current).toBe(0)
+  })
+
 })

@@ -17651,19 +17651,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "required": [
-                                    "payload",
-                                    "version"
-                                ],
-                                "properties": {
-                                    "payload": {
-                                        "type": "object"
-                                    },
-                                    "version": {
-                                        "type": "integer"
-                                    }
-                                },
-                                "type": "object"
+                                "$ref": "#/components/schemas/SaveLayoutPreferencesRequest"
                             }
                         }
                     }
@@ -22121,6 +22109,48 @@
                         "description": "Last update timestamp",
                         "type": "string",
                         "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "SaveLayoutPreferencesRequest": {
+                "required": [
+                    "payload",
+                    "version"
+                ],
+                "properties": {
+                    "payload": {
+                        "required": [
+                            "mode",
+                            "activeTab"
+                        ],
+                        "properties": {
+                            "mode": {
+                                "type": "string",
+                                "example": "expanded",
+                                "enum": [
+                                    "compact",
+                                    "expanded"
+                                ]
+                            },
+                            "activeTab": {
+                                "type": "string",
+                                "example": "queue",
+                                "enum": [
+                                    "queue",
+                                    "lyrics",
+                                    "details",
+                                    "info"
+                                ]
+                            }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                    },
+                    "version": {
+                        "type": "integer",
+                        "example": 0,
+                        "minimum": 0
                     }
                 },
                 "type": "object"
