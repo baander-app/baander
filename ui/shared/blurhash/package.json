@@ -1,5 +1,6 @@
 {
   "name": "@baander/blurhash",
+  "license": "Apache-2.0",
   "version": "0.0.1",
   "description": "BlurHash encoding/decoding for Baander apps",
   "type": "module",

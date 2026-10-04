@@ -254,10 +254,19 @@ tests pass 26 cases with 161 assertions; schema tests pass 20 cases with 169 ass
 and the route-coverage test adds 1,164 assertions. Web typechecking and both drift
 checks pass. The full configured PHPStan scan remains clean.
 
-The full disposable functional run reached 987 tests and 7,688 assertions, but eight
-mock notices prevented a clean result. Those fixtures now use stubs and pass their
-eight focused cases. The full strict rerun is in progress; do not count the earlier
-notice-bearing run as a completed gate.
+The full disposable functional suite passes 987 tests with 7,688 assertions after
+replacing eight passive mocks with stubs. Fresh migrations and a second no-op
+migration run pass; PHPUnit notices and skipped tests fail the runner.
+
+## First-party license alignment
+
+The root license, first-party package manifests, and current project/package
+license summaries now declare Apache-2.0. The Composer lock metadata for the local
+PHPStan package was regenerated without dependency version changes. Swoole Bundle's
+MIT license and the TSDuck binding's BSD-2-Clause declaration remain intact;
+`THIRD_PARTY.md` records those boundaries. Registry files are being handled with its
+replacement. A complete packaged transitive-dependency inventory and redistribution
+check remain release work; this metadata alignment does not certify those artifacts.
 
 ## Recent verified checkpoints
 

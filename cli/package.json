@@ -1,5 +1,6 @@
 {
   "name": "baander-cli",
+  "license": "Apache-2.0",
   "version": "1.0.0",
   "description": "Baander development CLI",
   "scripts": {

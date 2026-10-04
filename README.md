@@ -150,4 +150,7 @@ outbox and producer drills to pass.
 
 ## License
 
-Proprietary.
+Baander's first-party code is licensed under [Apache-2.0](LICENSE.md).
+Copyright (C) 2025–2026 Martin Juul Christiansen and contributors.
+Third-party components retain their own licenses and notices; see
+[third-party licensing](THIRD_PARTY.md).

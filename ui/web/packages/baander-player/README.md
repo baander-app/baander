@@ -144,4 +144,4 @@ yarn typecheck    # TypeScript checking
 
 ## License
 
-Private — Baander project internal.
+Apache-2.0. See the repository [license](../../../../LICENSE.md).

@@ -3,7 +3,7 @@
 A self-contained AAC encoder/decoder library written in C++17/C11. Supports AAC-LC, HE-AAC v1 (SBR), and HE-AAC v2 (SBR + Parametric Stereo) with runtime SIMD dispatch for x86, ARM, and WebAssembly.
 
 **Version:** 0.1.0
-**License:** Proprietary
+**License:** Apache-2.0 for Baander-authored code; third-party code retains its own license.
 **Standards:** ISO 14496-3 (MPEG-4 Audio)
 
 ---

@@ -2,7 +2,7 @@
   "name": "@baander/rn",
   "version": "1.0.0",
   "private": true,
-  "license": "GPL-3.0-only",
+  "license": "Apache-2.0",
   "scripts": {
     "android": "react-native run-android",
     "android-tv": "react-native run-android",

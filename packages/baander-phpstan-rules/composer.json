@@ -2,7 +2,7 @@
     "name": "baander/phpstan-rules",
     "description": "Custom PHPStan rules for the Bånder project",
     "type": "phpstan-extension",
-    "license": "proprietary",
+    "license": "Apache-2.0",
     "require": {
         "php": "^8.4",
         "phpstan/phpstan": "^2.1"

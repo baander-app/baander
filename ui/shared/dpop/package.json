@@ -1,5 +1,6 @@
 {
   "name": "@baander/dpop",
+  "license": "Apache-2.0",
   "version": "0.0.1",
   "description": "DPoP (RFC 9449) proof generation for Baander apps",
   "type": "module",

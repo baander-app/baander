@@ -1,7 +1,7 @@
 {
   "name": "martinjuul/baander",
   "type": "project",
-  "license": "GPL-3.0-only",
+  "license": "Apache-2.0",
   "minimum-stability": "dev",
   "prefer-stable": true,
   "require": {

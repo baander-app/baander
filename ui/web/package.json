@@ -1,6 +1,6 @@
 {
   "name": "@baander/web",
-  "license": "GPL-3.0-only",
+  "license": "Apache-2.0",
   "private": true,
   "version": "0.0.0",
   "packageManager": "yarn@4.14.1",

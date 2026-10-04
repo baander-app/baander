@@ -12422,7 +12422,7 @@
             "dist": {
                 "type": "path",
                 "url": "./packages/baander-phpstan-rules",
-                "reference": "2b69b35d388af3165371910692f11a5aac01d791"
+                "reference": "b1c666e3cc77e0e2b7552454d139658f9dd833b2"
             },
             "require": {
                 "php": "^8.4",
@@ -12450,7 +12450,7 @@
                 }
             },
             "license": [
-                "proprietary"
+                "Apache-2.0"
             ],
             "description": "Custom PHPStan rules for the Bånder project",
             "transport-options": {
