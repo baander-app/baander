@@ -22,10 +22,15 @@ const mockSongs = {
     { publicId: 's1', title: 'Song A', artistName: 'Artist A', albumName: 'Album A', year: 2024, length: 180 },
     { publicId: 's2', title: 'Song B', artistName: 'Artist B', albumName: 'Album B', year: 2023, length: 240 },
   ],
-  nextCursor: null,
-  hasNextPage: false,
-  total: 2,
-  perPage: 100,
+  meta: {
+    next_cursor: null,
+    prev_cursor: null,
+    has_next_page: false,
+    has_previous_page: false,
+    total: 2,
+    stale_cursor: false,
+    per_page: 100,
+  },
 }
 
 describe('ListView', () => {
@@ -82,7 +87,7 @@ describe('ListView', () => {
 
   it('shows empty state when no songs', () => {
     mockUseGetSongIndex.mockReturnValue({
-      data: { data: [], nextCursor: null, hasNextPage: false, total: 0, perPage: 100 },
+      data: { data: [], meta: { ...mockSongs.meta, total: 0 } },
       isLoading: false,
     })
 
@@ -102,7 +107,7 @@ describe('ListView', () => {
     }))
 
     mockUseGetSongIndex.mockReturnValue({
-      data: { data: manySongs, nextCursor: null, hasNextPage: false, total: 200, perPage: 100 },
+      data: { data: manySongs, meta: { ...mockSongs.meta, total: 200 } },
       isLoading: false,
     })
 

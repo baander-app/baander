@@ -20709,10 +20709,7 @@
             "PaginatedResponse": {
                 "required": [
                     "data",
-                    "currentPage",
-                    "lastPage",
-                    "perPage",
-                    "total"
+                    "meta"
                 ],
                 "properties": {
                     "data": {
@@ -20721,17 +20718,28 @@
                             "nullable": true
                         }
                     },
-                    "currentPage": {
-                        "type": "integer"
-                    },
-                    "lastPage": {
-                        "type": "integer"
-                    },
-                    "perPage": {
-                        "type": "integer"
-                    },
-                    "total": {
-                        "type": "integer"
+                    "meta": {
+                        "required": [
+                            "current_page",
+                            "last_page",
+                            "per_page",
+                            "total"
+                        ],
+                        "properties": {
+                            "current_page": {
+                                "type": "integer"
+                            },
+                            "last_page": {
+                                "type": "integer"
+                            },
+                            "per_page": {
+                                "type": "integer"
+                            },
+                            "total": {
+                                "type": "integer"
+                            }
+                        },
+                        "type": "object"
                     }
                 },
                 "type": "object"
@@ -21131,11 +21139,7 @@
             "CursorPaginatedResponse": {
                 "required": [
                     "data",
-                    "hasNextPage",
-                    "hasPreviousPage",
-                    "total",
-                    "staleCursor",
-                    "perPage"
+                    "meta"
                 ],
                 "properties": {
                     "data": {
@@ -21144,28 +21148,42 @@
                             "nullable": true
                         }
                     },
-                    "nextCursor": {
-                        "type": "string",
-                        "nullable": true
-                    },
-                    "prevCursor": {
-                        "type": "string",
-                        "nullable": true
-                    },
-                    "hasNextPage": {
-                        "type": "boolean"
-                    },
-                    "hasPreviousPage": {
-                        "type": "boolean"
-                    },
-                    "total": {
-                        "type": "integer"
-                    },
-                    "staleCursor": {
-                        "type": "boolean"
-                    },
-                    "perPage": {
-                        "type": "integer"
+                    "meta": {
+                        "required": [
+                            "next_cursor",
+                            "prev_cursor",
+                            "has_next_page",
+                            "has_previous_page",
+                            "total",
+                            "per_page",
+                            "stale_cursor"
+                        ],
+                        "properties": {
+                            "next_cursor": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "prev_cursor": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "has_next_page": {
+                                "type": "boolean"
+                            },
+                            "has_previous_page": {
+                                "type": "boolean"
+                            },
+                            "total": {
+                                "type": "integer"
+                            },
+                            "per_page": {
+                                "type": "integer"
+                            },
+                            "stale_cursor": {
+                                "type": "boolean"
+                            }
+                        },
+                        "type": "object"
                     }
                 },
                 "type": "object"

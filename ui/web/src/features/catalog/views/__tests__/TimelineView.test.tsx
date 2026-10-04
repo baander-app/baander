@@ -113,10 +113,12 @@ describe('TimelineView', () => {
   it('renders decades with year labels', () => {
     mockConfig.data = {
       data: [makeAlbum('a1', 2024), makeAlbum('a2', 2015)],
-      currentPage: 1,
-      lastPage: 1,
-      perPage: 100,
-      total: 2,
+      meta: {
+        current_page: 1,
+        last_page: 1,
+        per_page: 100,
+        total: 2,
+      },
     }
 
     render(<SCTypedThemeProvider theme={testTheme}><TimelineView /></SCTypedThemeProvider>)
@@ -159,10 +161,12 @@ describe('TimelineView', () => {
   it('shows empty state when no albums with year', () => {
     mockConfig.data = {
       data: [],
-      currentPage: 1,
-      lastPage: 1,
-      perPage: 100,
-      total: 0,
+      meta: {
+        current_page: 1,
+        last_page: 1,
+        per_page: 100,
+        total: 0,
+      },
     }
 
     render(<SCTypedThemeProvider theme={testTheme}><TimelineView /></SCTypedThemeProvider>)

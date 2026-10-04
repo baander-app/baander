@@ -1,18 +1,8 @@
-export interface PaginatedResponse<T> {
-  data: T[]
-  currentPage: number
-  lastPage: number
-  perPage: number
-  total: number
-}
+import type {
+  PaginatedResponse as ApiPaginatedResponse,
+  CursorPaginatedResponse as ApiCursorPaginatedResponse,
+} from '@/shared/api-client/gen/endpoints'
 
-export interface CursorPaginatedResponse<T> {
-  data: T[]
-  nextCursor: string | null
-  prevCursor: string | null
-  hasNextPage: boolean
-  hasPreviousPage: boolean
-  total: number
-  staleCursor: boolean
-  perPage: number
-}
+export type PaginatedResponse<T> = Omit<ApiPaginatedResponse, 'data'> & { data: T[] }
+
+export type CursorPaginatedResponse<T> = Omit<ApiCursorPaginatedResponse, 'data'> & { data: T[] }

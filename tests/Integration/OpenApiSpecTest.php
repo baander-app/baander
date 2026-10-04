@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Shared\Interface\DTO\ApiError;
+use App\Shared\Interface\DTO\CursorPaginatedResponse;
+use App\Shared\Interface\DTO\PaginatedResponse;
 use Nelmio\ApiDocBundle\Render\RenderOpenApi;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
@@ -155,6 +158,39 @@ final class OpenApiSpecTest extends KernelTestCase
             self::assertSame([], array_diff(array_keys($payload['error']), array_keys($error['properties'])));
             self::assertSame([], array_diff($error['required'], array_keys($payload['error'])));
             self::assertSame($details !== [], array_key_exists('details', $payload['error']));
+        }
+    }
+
+    /** @return iterable<string, array{PaginatedResponse|CursorPaginatedResponse, string}> */
+    public static function paginationResponses(): iterable
+    {
+        yield 'page' => [new PaginatedResponse([['publicId' => 'item']], 2, 3, 20, 45), 'PaginatedResponse'];
+        yield 'empty page' => [new PaginatedResponse([], 1, 1, 20, 0), 'PaginatedResponse'];
+        yield 'cursor middle' => [new CursorPaginatedResponse([['publicId' => 'item']], 'next', 'previous', true, true, 45, false, 20), 'CursorPaginatedResponse'];
+        yield 'cursor empty' => [new CursorPaginatedResponse([], null, null, false, false, 0, false, 20), 'CursorPaginatedResponse'];
+    }
+
+    #[DataProvider('paginationResponses')]
+    public function test_pagination_schemas_match_runtime_envelopes(PaginatedResponse|CursorPaginatedResponse $response, string $schemaName): void
+    {
+        $spec = $this->getSpec();
+        $schema = $spec['components']['schemas'][$schemaName];
+        $payload = $response->toArray();
+        self::assertEqualsCanonicalizing(['data', 'meta'], array_keys($schema['properties']));
+        self::assertEqualsCanonicalizing(array_keys($payload), $schema['required']);
+        self::assertSame('array', $schema['properties']['data']['type']);
+        $meta = $schema['properties']['meta'];
+        self::assertSame('object', $meta['type']);
+        self::assertEqualsCanonicalizing(array_keys($payload['meta']), array_keys($meta['properties']));
+        self::assertEqualsCanonicalizing(array_keys($payload['meta']), $meta['required']);
+        foreach ($payload['meta'] as $field => $value) {
+            $property = $meta['properties'][$field];
+            if ($field === 'next_cursor' || $field === 'prev_cursor') {
+                self::assertTrue($property['nullable']);
+                self::assertSame('string', $property['type']);
+            } else {
+                self::assertSame(is_bool($value) ? 'boolean' : 'integer', $property['type']);
+            }
         }
     }
 

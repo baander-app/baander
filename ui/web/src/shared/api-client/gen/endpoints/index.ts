@@ -1042,12 +1042,16 @@ export interface LoginRequest {
   totpCode?: string | null;
 }
 
+export type PaginatedResponseMeta = {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+};
+
 export interface PaginatedResponse {
   data: (unknown | null)[];
-  currentPage: number;
-  lastPage: number;
-  perPage: number;
-  total: number;
+  meta: PaginatedResponseMeta;
 }
 
 export interface SongResource {
@@ -1302,17 +1306,21 @@ export interface MovieResource {
   updatedAt: string;
 }
 
+export type CursorPaginatedResponseMeta = {
+  /** @nullable */
+  next_cursor: string | null;
+  /** @nullable */
+  prev_cursor: string | null;
+  has_next_page: boolean;
+  has_previous_page: boolean;
+  total: number;
+  per_page: number;
+  stale_cursor: boolean;
+};
+
 export interface CursorPaginatedResponse {
   data: (unknown | null)[];
-  /** @nullable */
-  nextCursor?: string | null;
-  /** @nullable */
-  prevCursor?: string | null;
-  hasNextPage: boolean;
-  hasPreviousPage: boolean;
-  total: number;
-  staleCursor: boolean;
-  perPage: number;
+  meta: CursorPaginatedResponseMeta;
 }
 
 /**

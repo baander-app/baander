@@ -25,10 +25,12 @@ const makeAlbumsData = (count: number) => ({
     artists: [{ name: 'Radiohead', role: null }],
     coverImage: { url: `/cover/${i}.jpg`, blurhash: null },
   })),
-  currentPage: 1,
-  lastPage: 1,
-  perPage: 24,
-  total: count,
+  meta: {
+    current_page: 1,
+    last_page: 1,
+    per_page: 24,
+    total: count,
+  },
 })
 
 type MockConfig = {
@@ -90,7 +92,7 @@ vi.mock('@/features/catalog/hooks/use-artist-detail', () => {
         coverImage: (a.coverImage as Record<string, unknown>) ?? null,
         artists: (a.artists as Array<Record<string, unknown>>) ?? [],
       }))
-      const total = (albumsRaw as Record<string, unknown>).total as number
+      const total = (albumsRaw as { meta: { total: number } }).meta.total
       return {
         artist,
         albums: albumSummaries,

@@ -19,10 +19,12 @@ const makeAlbumsData = (count: number, currentPage = 1, lastPage = 1) => ({
     artistName: 'Test Artist',
     year: 2020 + i,
   })),
-  currentPage,
-  lastPage,
-  perPage: 24,
-  total: count,
+  meta: {
+    current_page: currentPage,
+    last_page: lastPage,
+    per_page: 24,
+    total: count,
+  },
 })
 
 let artistResult: Record<string, unknown> = {

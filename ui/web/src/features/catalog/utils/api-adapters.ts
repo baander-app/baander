@@ -1,3 +1,4 @@
+import type { CursorPaginatedResponse } from '../types/api'
 import type { AlbumSummary, SongSummary, CoverImage, ArtistCredit } from '../types'
 import type { ArtistSummary } from '../types'
 import type { Genre } from '../types'
@@ -298,10 +299,29 @@ export function extractPaginatedMeta(data: unknown): PaginatedMeta {
     return { currentPage: 1, lastPage: 1, perPage: 0, total: 0 }
   }
   const response = data as Record<string, unknown>
+  const meta = response.meta && typeof response.meta === 'object'
+    ? response.meta as Record<string, unknown>
+    : {}
   return {
-    currentPage: typeof response.currentPage === 'number' ? response.currentPage : 1,
-    lastPage: typeof response.lastPage === 'number' ? response.lastPage : 1,
-    perPage: typeof response.perPage === 'number' ? response.perPage : 0,
-    total: typeof response.total === 'number' ? response.total : 0,
+    currentPage: typeof meta.current_page === 'number' ? meta.current_page : 1,
+    lastPage: typeof meta.last_page === 'number' ? meta.last_page : 1,
+    perPage: typeof meta.per_page === 'number' ? meta.per_page : 0,
+    total: typeof meta.total === 'number' ? meta.total : 0,
+  }
+}
+
+
+export function extractCursorMeta(data: unknown): Pick<
+  CursorPaginatedResponse<unknown>['meta'],
+  'next_cursor' | 'has_next_page' | 'total'
+> {
+  const meta = data && typeof data === 'object' && 'meta' in data ? data.meta : undefined
+  if (!meta || typeof meta !== 'object') {
+    return { next_cursor: null, has_next_page: false, total: 0 }
+  }
+  return {
+    next_cursor: 'next_cursor' in meta && typeof meta.next_cursor === 'string' ? meta.next_cursor : null,
+    has_next_page: 'has_next_page' in meta && typeof meta.has_next_page === 'boolean' ? meta.has_next_page : false,
+    total: 'total' in meta && typeof meta.total === 'number' ? meta.total : 0,
   }
 }

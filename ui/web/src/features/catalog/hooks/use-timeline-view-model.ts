@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import type { AlbumSummary } from '../types'
+import { extractPaginatedMeta } from '../utils/api-adapters'
 
 export interface TimelineYear {
   label: string
@@ -96,14 +97,14 @@ export function useTimelineViewModel(): UseTimelineViewModelReturn {
       setError(null)
       try {
         let page = 1
-        let results: AlbumSummary[] = []
+        const results: AlbumSummary[] = []
         while (true) {
           const res = await AXIOS_INSTANCE.get('/api/albums', {
             params: { sort: 'year', order: 'asc', limit: PER_PAGE, page },
           })
           const body = res.data as Record<string, unknown>
           const items = (Array.isArray(body?.data) ? body.data : []) as Record<string, unknown>[]
-          const lastPage = typeof body?.lastPage === 'number' ? body.lastPage : 1
+          const lastPage = extractPaginatedMeta(body).lastPage
 
           for (const raw of items) {
             const coverImage = raw.coverImage as Record<string, unknown> | null | undefined
@@ -140,7 +141,7 @@ export function useTimelineViewModel(): UseTimelineViewModelReturn {
             })
           }
 
-          if (items.length < PER_PAGE || page >= lastPage) break
+          if (page >= lastPage) break
           page++
         }
 

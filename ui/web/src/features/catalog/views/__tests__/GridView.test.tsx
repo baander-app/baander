@@ -18,10 +18,12 @@ function makeAlbumData(count: number, currentPage = 1, lastPage = 2) {
       artists: [{ name: `Artist ${i}`, role: null }],
       coverImage: { url: `/cover/${i}.jpg`, blurhash: 'LEHV6nWB2yk8pyo0adR*.7kCMdnj' },
     })),
-    currentPage,
-    lastPage,
-    perPage: 24,
-    total: count * lastPage,
+    meta: {
+      current_page: currentPage,
+      last_page: lastPage,
+      per_page: 24,
+      total: count * lastPage,
+    },
   }
 }
 

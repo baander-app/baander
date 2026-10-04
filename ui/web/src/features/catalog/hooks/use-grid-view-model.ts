@@ -35,7 +35,7 @@ export function useGridViewModel({
 
   const response = data as unknown as PaginatedResponse | undefined
   const albums = response ? asAlbumsFromItems(response.data) : []
-  const hasNextPage = response ? response.currentPage < response.lastPage : false
+  const hasNextPage = response ? response.meta.current_page < response.meta.last_page : false
 
   const loadMore = useCallback(() => {
     setPage((p) => p + 1)

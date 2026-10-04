@@ -6,6 +6,7 @@ import {
 } from '@/shared/api-client/gen/endpoints'
 import type { ListSongData } from '../components/ListRow'
 import type { SortState } from '../components/ListHeader'
+import { extractCursorMeta } from '../utils/api-adapters'
 
 function parseSong(raw: Record<string, unknown>, index: number): ListSongData {
   return {
@@ -67,23 +68,24 @@ export function useSongList({ sort, pageSize = 100 }: UseSongListOptions): UseSo
   // The firstPageData effect below repopulates once the new page arrives.
   useEffect(() => {
     setAccumulated([])
+    setTotal(0)
     nextCursorRef.current = null
     hasNextPageRef.current = false
   }, [params])
 
   // When first page loads or sort changes, reset accumulated songs
   useEffect(() => {
+    if (!firstPageData) return
     const raw = parseResponseData(firstPageData)
-    if (raw.length === 0 && accumulated.length === 0) return
 
     const songs = raw.map((s, i) => parseSong(s, i + 1))
     setAccumulated(songs)
 
-    const resp = firstPageData as Record<string, unknown> | undefined
-    setTotal(typeof resp?.total === 'number' ? resp.total : songs.length)
-    nextCursorRef.current = (resp?.nextCursor as string) ?? null
-    hasNextPageRef.current = (resp?.hasNextPage as boolean) ?? false
-  }, [firstPageData]) // eslint-disable-line react-hooks/exhaustive-deps
+    const meta = extractCursorMeta(firstPageData)
+    setTotal(meta.total)
+    nextCursorRef.current = meta.next_cursor
+    hasNextPageRef.current = meta.has_next_page
+  }, [firstPageData])
 
   const fetchMore = useCallback(async () => {
     if (!hasNextPageRef.current || isFetchingMore || !nextCursorRef.current) return
@@ -95,8 +97,8 @@ export function useSongList({ sort, pageSize = 100 }: UseSongListOptions): UseSo
         cursor: nextCursorRef.current,
       }
       const response = await getSongIndex(nextParams)
-      const resp = response as Record<string, unknown>
-      const rawData = Array.isArray(resp.data) ? (resp.data as Record<string, unknown>[]) : []
+      const meta = extractCursorMeta(response)
+      const rawData = parseResponseData(response)
 
       setAccumulated((prev) => {
         const offset = prev.length
@@ -104,8 +106,9 @@ export function useSongList({ sort, pageSize = 100 }: UseSongListOptions): UseSo
         return [...prev, ...newSongs]
       })
 
-      nextCursorRef.current = (resp.nextCursor as string) ?? null
-      hasNextPageRef.current = (resp.hasNextPage as boolean) ?? false
+      setTotal(meta.total)
+      nextCursorRef.current = meta.next_cursor
+      hasNextPageRef.current = meta.has_next_page
     } finally {
       setIsFetchingMore(false)
     }

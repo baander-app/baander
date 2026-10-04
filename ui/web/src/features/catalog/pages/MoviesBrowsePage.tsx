@@ -231,13 +231,13 @@ export function MoviesBrowsePage() {
               </StyledTable>
             )}
 
-            {response && response.lastPage > 1 && (
+            {response && response.meta.last_page > 1 && (
               <PaginationRow>
-                <Button variant="ghost" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={response.currentPage <= 1}>
+                <Button variant="ghost" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={response.meta.current_page <= 1}>
                   <ChevronLeft size={14} /> Previous
                 </Button>
-                <PageInfo>{response.currentPage} / {response.lastPage}</PageInfo>
-                <Button variant="ghost" size="sm" onClick={() => setPage((p) => p + 1)} disabled={response.currentPage >= response.lastPage}>
+                <PageInfo>{response.meta.current_page} / {response.meta.last_page}</PageInfo>
+                <Button variant="ghost" size="sm" onClick={() => setPage((p) => p + 1)} disabled={response.meta.current_page >= response.meta.last_page}>
                   Next <ChevronRight size={14} />
                 </Button>
               </PaginationRow>

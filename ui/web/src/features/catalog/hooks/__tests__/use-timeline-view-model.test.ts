@@ -37,10 +37,12 @@ function makeAlbum(
 function makeResponse(albums: ReturnType<typeof makeAlbum>[]) {
   return {
     data: albums,
-    currentPage: 1,
-    lastPage: 1,
-    perPage: 100,
-    total: albums.length,
+    meta: {
+      current_page: 1,
+      last_page: 1,
+      per_page: 100,
+      total: albums.length,
+    },
   }
 }
 
@@ -183,4 +185,28 @@ describe('useTimelineViewModel', () => {
     expect(decade.years[0].label).toBe('2024')
     expect(decade.years[0].albums).toHaveLength(3)
   })
+
+  it('fetches every page declared by nested metadata, including a short first page', async () => {
+    mockGet
+      .mockResolvedValueOnce({ data: {
+        data: [makeAlbum('first', 2024)],
+        meta: { current_page: 1, last_page: 2, per_page: 100, total: 2 },
+      } })
+      .mockResolvedValueOnce({ data: {
+        data: [makeAlbum('second', 2015)],
+        meta: { current_page: 2, last_page: 2, per_page: 100, total: 2 },
+      } })
+
+    const { result } = renderHook(() => useTimelineViewModel())
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    expect(mockGet).toHaveBeenCalledTimes(2)
+    expect(mockGet).toHaveBeenNthCalledWith(2, '/api/albums', {
+      params: { sort: 'year', order: 'asc', limit: 100, page: 2 },
+    })
+    expect(result.current.decades.flatMap((decade) =>
+      decade.years.flatMap((year) => year.albums.map((album) => album.publicId)),
+    )).toEqual(['first', 'second'])
+  })
+
 })
