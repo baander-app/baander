@@ -1,74 +1,72 @@
 #include <cmath>
-#include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <algorithm>
 
 extern "C" {
 
-static int g_sr = 48000;
-static float g_att = 0.01f; // seconds
-static float g_rel = 0.10f; // seconds
-
-// State per channel
+// Rectangular, zero-padded RMS window and an instantaneous sample-peak
+// envelope. The peak falls by exp(-1) over release_ms of processed audio.
+// Neither meter depends on process_frames call boundaries. See README.md.
 struct MeterState {
-  float rms_env = 0.0f;   // smoothed RMS (linear)
-  float peak_env = 0.0f;  // smoothed peak (linear)
+  double square_sum = 0.0;
+  double peak_env = 0.0;
+  int nonzero_samples = 0;
+};
+
+struct WindowSample {
+  double left;
+  double right;
 };
 
 static MeterState gL, gR;
-static float g_a_rms_att=0, g_a_rms_rel=0, g_a_peak_att=0, g_a_peak_rel=0;
-
-static inline float dbfs_from_rms(float x) { return x > 1e-12f ? 20.0f*std::log10(x) : -200.0f; }
-static inline float lerp(float a, float b, float t) { return a + (b - a) * t; }
-
-static void recompute_coeffs() {
-  auto coeff = [&](float t)->float {
-    float a = std::exp(-1.0f / std::max(1, g_sr) / std::max(1e-6f, t));
-    return a;
-  };
-  g_a_rms_att  = coeff(std::max(1e-4f, g_att));
-  g_a_rms_rel  = coeff(std::max(1e-4f, g_rel));
-  g_a_peak_att = coeff(std::max(1e-4f, g_att*0.5f));
-  g_a_peak_rel = coeff(std::max(1e-4f, g_rel*0.5f));
-}
-
-void init_meters(float attack_ms, float release_ms, int sample_rate) {
-  g_sr = (sample_rate > 0) ? sample_rate : 48000;
-  g_att = std::max(0.0f, attack_ms * 0.001f);
-  g_rel = std::max(0.0f, release_ms * 0.001f);
-  gL = MeterState{}; gR = MeterState{};
-  recompute_coeffs();
-}
+static WindowSample* g_history = nullptr;
+static int g_window_frames = 1;
+static int g_position = 0;
+static double g_peak_decay = 0.0;
 
 void reset_meters() {
   gL = MeterState{};
   gR = MeterState{};
+  g_position = 0;
+  if (g_history) std::memset(g_history, 0, sizeof(WindowSample) * g_window_frames);
+}
+
+// rms_window_ms is rounded to the nearest frame and clamped to [1,384000].
+// A nonpositive sample rate uses 48000 Hz. A nonpositive release is immediate.
+// Allocate during initialization only; processing never allocates.
+void init_meters(float rms_window_ms, float release_ms, int sample_rate) {
+  const int sr = sample_rate > 0 ? sample_rate : 48000;
+  const double requested_frames = std::round(static_cast<double>(rms_window_ms) * sr / 1000.0);
+  g_window_frames = static_cast<int>(std::max(1.0, std::min(384000.0, requested_frames)));
+  std::free(g_history);
+  g_history = static_cast<WindowSample*>(std::calloc(g_window_frames, sizeof(WindowSample)));
+  if (!g_history) std::abort();
+  g_peak_decay = release_ms > 0
+    ? std::exp(-1000.0 / (static_cast<double>(sr) * release_ms)) : 0.0;
+  reset_meters();
+}
+
+static inline void update_channel(MeterState& state, double sample, double old_square) {
+  const double square = sample * sample;
+  state.square_sum += square - old_square;
+  state.nonzero_samples += (square > 0) - (old_square > 0);
+  // Remove floating-point residue once the last nonzero sample leaves.
+  if (state.nonzero_samples == 0) state.square_sum = 0;
+  state.peak_env = std::max(std::fabs(sample), state.peak_env * g_peak_decay);
 }
 
 static inline void process_sample_pair(float L, float R) {
-  float lrms = std::sqrt(std::max(0.0f, L*L));
-  float rrms = std::sqrt(std::max(0.0f, R*R));
-  float lpk  = std::fabs(L);
-  float rpk  = std::fabs(R);
-
-  // RMS smoothing
-  if (lrms > gL.rms_env) gL.rms_env = lerp(lrms, gL.rms_env, g_a_rms_att);
-  else                   gL.rms_env = lerp(lrms, gL.rms_env, g_a_rms_rel);
-
-  if (rrms > gR.rms_env) gR.rms_env = lerp(rrms, gR.rms_env, g_a_rms_att);
-  else                   gR.rms_env = lerp(rrms, gR.rms_env, g_a_rms_rel);
-
-  // Peak smoothing
-  if (lpk > gL.peak_env) gL.peak_env = lerp(lpk, gL.peak_env, g_a_peak_att);
-  else                   gL.peak_env = lerp(lpk, gL.peak_env, g_a_peak_rel);
-
-  if (rpk > gR.peak_env) gR.peak_env = lerp(rpk, gR.peak_env, g_a_peak_att);
-  else                   gR.peak_env = lerp(rpk, gR.peak_env, g_a_peak_rel);
+  const WindowSample old = g_history[g_position];
+  update_channel(gL, L, old.left);
+  update_channel(gR, R, old.right);
+  g_history[g_position] = {static_cast<double>(L) * L, static_cast<double>(R) * R};
+  g_position = (g_position + 1) % g_window_frames;
 }
 
-// Interleaved LR frames
+// Interleaved frames; mono is duplicated, additional channels are ignored.
 void process_frames(const float* interleavedLR, int frames, int channels) {
-  if (!interleavedLR || frames <= 0 || channels <= 0) return;
+  if (!g_history || !interleavedLR || frames <= 0 || channels <= 0) return;
   for (int i = 0; i < frames; ++i) {
     float L = interleavedLR[i*channels + 0];
     float R = (channels > 1) ? interleavedLR[i*channels + 1] : L;
@@ -76,20 +74,24 @@ void process_frames(const float* interleavedLR, int frames, int channels) {
   }
 }
 
-// Getters (linear)
-float get_rms_left()  { return gL.rms_env; }
-float get_rms_right() { return gR.rms_env; }
-float get_peak_left() { return gL.peak_env; }
-float get_peak_right(){ return gR.peak_env; }
+static float rms(const MeterState& state) {
+  return static_cast<float>(std::sqrt(std::max(0.0, state.square_sum) / g_window_frames));
+}
 
-// Crest factor = Peak/RMS in dB => 20*log10(Peak/RMS) = Peak_dB - RMS_dB
-float get_crest_left()  {
-  float pr = (gL.rms_env > 1e-12f) ? (gL.peak_env / gL.rms_env) : 0.0f;
-  return pr > 1e-12f ? 20.0f*std::log10(pr) : 0.0f;
+float get_rms_left()  { return rms(gL); }
+float get_rms_right() { return rms(gR); }
+float get_peak_left() { return static_cast<float>(gL.peak_env); }
+float get_peak_right(){ return static_cast<float>(gR.peak_env); }
+
+// Envelope ratio in dB: these numerator/denominator use different histories.
+// Return zero for a zero RMS or peak. This is not finite-window crest factor.
+static float crest(const MeterState& state) {
+  const float level = rms(state);
+  return level > 0 && state.peak_env > 0
+    ? static_cast<float>(20.0 * std::log10(state.peak_env / level)) : 0.0f;
 }
-float get_crest_right() {
-  float pr = (gR.rms_env > 1e-12f) ? (gR.peak_env / gR.rms_env) : 0.0f;
-  return pr > 1e-12f ? 20.0f*std::log10(pr) : 0.0f;
-}
+
+float get_crest_left()  { return crest(gL); }
+float get_crest_right() { return crest(gR); }
 
 } // extern "C"

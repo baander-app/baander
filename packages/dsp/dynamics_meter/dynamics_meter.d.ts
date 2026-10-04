@@ -4,17 +4,21 @@ declare interface DynamicsMeterAPI {
    * Use to create typed views for passing data to the WASM side.
    */
   memory: WebAssembly.Memory;
+  /** Allocate a caller-owned input buffer in bytes. */
+  malloc(bytes: number): number;
+  /** Free a caller-owned input buffer. */
+  free(ptr: number): void;
 
   /**
-   * Initialize meter state and time constants.
-   * @param attackMs Attack time in milliseconds.
-   * @param releaseMs Release time in milliseconds.
+   * Initialize a zero-padded rectangular RMS window and sample-peak envelope.
+   * @param rmsWindowMs RMS window duration in milliseconds, rounded to frames (1–384000).
+   * @param releaseMs Peak decay time in milliseconds (exp(-1) per time constant).
    * @param sampleRate Audio sample rate (Hz).
    */
-  init(attackMs: number, releaseMs: number, sampleRate: number): void;
+  init(rmsWindowMs: number, releaseMs: number, sampleRate: number): void;
 
   /**
-   * Reset internal meter state (RMS/Peak envelopes).
+   * Reset RMS window history and peak envelopes, preserving settings.
    */
   reset(): void;
 
@@ -28,32 +32,32 @@ declare interface DynamicsMeterAPI {
   process(inputPtr: number, frames: number, channels: number): void;
 
   /**
-   * Smoothed RMS (linear) of left channel.
+   * Rectangular-window RMS (linear) of left channel, initially zero-padded.
    */
   rmsL(): number;
 
   /**
-   * Smoothed RMS (linear) of right channel.
+   * Rectangular-window RMS (linear) of right channel, initially zero-padded.
    */
   rmsR(): number;
 
   /**
-   * Smoothed peak (linear) of left channel.
+   * Instantly captured sample-peak envelope (linear) of left channel.
    */
   peakL(): number;
 
   /**
-   * Smoothed peak (linear) of right channel.
+   * Instantly captured sample-peak envelope (linear) of right channel.
    */
   peakR(): number;
 
   /**
-   * Crest factor (dB) of left channel: 20*log10(peak/rms).
+   * Envelope ratio (dB) of left channel: 20*log10(peak/rms), zero at zero RMS.
    */
   crestL(): number;
 
   /**
-   * Crest factor (dB) of right channel: 20*log10(peak/rms).
+   * Envelope ratio (dB) of right channel: 20*log10(peak/rms), zero at zero RMS.
    */
   crestR(): number;
 }

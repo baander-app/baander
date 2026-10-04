@@ -1,356 +1,209 @@
 class MagicSoupProcessor extends AudioWorkletProcessor {
-  static get parameterDescriptors() {
-    return [];
-  }
+  static get parameterDescriptors() { return []; }
 
   constructor() {
     super();
-
-    // DSP modules for loudness and dynamics analysis
     this.loudnessAPI = null;
     this.dynamicsAPI = null;
     this.loudnessReady = false;
     this.dynamicsReady = false;
-
-    // WASM heap pointers - properly allocated per module
     this.loudnessBufferPtr = 0;
     this.dynamicsBufferPtr = 0;
-
-    // Throttling for analysis - much more conservative
+    this.initialization = null;
+    this.bufferFrames = 128;
     this.frameCounter = 0;
-    this.analysisFrameInterval = 16; // Reduced frequency
-    this.playingCheckInterval = 32;
-
-    // State tracking
+    this.analysisFrameInterval = 16;
     this.isPlaying = false;
-
-    // Pre-allocated output message to avoid object creation
+    this.intervalTruePeak = -Infinity;
     this.outputMessage = {
-      type: 'analysis',
-      lufs: -60,
-      leftChannel: 0,
-      rightChannel: 0,
-      rms: 0,
-      isPlaying: false,
-      truePeak: -60,
-      crestL: 0,
-      crestR: 0
+      type: 'analysis', lufs: -60, leftChannel: 0, rightChannel: 0,
+      rms: 0, isPlaying: false, truePeak: -60, crestL: 0, crestR: 0,
     };
-
-    // Handle initialization from main thread
-    this.port.onmessage = (event) => {
-      if (event.data?.type === 'init-dsp') {
-        this.initDSPFromMessage(event.data);
-      }
+    this.port.onmessage = event => {
+      if (event.data?.type === 'init-dsp') void this.initDSPFromMessage(event.data);
     };
-
-    // Request DSP initialization
     this.port.postMessage({ type: 'request-dsp-init' });
   }
 
   initDSPFromMessage(data) {
+    if (!data.loudnessWasm || !data.dynamicsWasm) return Promise.resolve();
+    if (!this.initialization) {
+      this.initialization = Promise.all([
+        this.initLoudnessModule(data.loudnessWasm),
+        this.initDynamicsModule(data.dynamicsWasm),
+      ]);
+    }
+    return this.initialization;
+  }
+
+  async createMeter(wasmBytes, kind) {
+    const { instance } = await WebAssembly.instantiate(wasmBytes, {});
+    const e = instance.exports;
+    e._initialize?.();
+    const pick = (...names) => names.map(name => e[name]).find(value => value !== undefined);
+    const api = {
+      memory: e.memory,
+      malloc: pick('malloc', '_malloc', 'wasm_malloc', '_wasm_malloc'),
+      free: pick('free', '_free', 'wasm_free', '_wasm_free'),
+      process: pick('process_frames', '_process_frames'),
+    };
+    const required = ['malloc', 'free', 'process'];
+    if (kind === 'loudness') {
+      Object.assign(api, {
+        init: pick('init_loudness', '_init_loudness'),
+        lufsM: pick('get_lufs_momentary', '_get_lufs_momentary'),
+        truePkDbfs: pick('get_true_peak_dbfs', '_get_true_peak_dbfs'),
+      });
+      required.push('init', 'lufsM', 'truePkDbfs');
+    } else {
+      Object.assign(api, {
+        init: pick('init_meters', '_init_meters'),
+        rmsL: pick('get_rms_left', '_get_rms_left'),
+        rmsR: pick('get_rms_right', '_get_rms_right'),
+        crestL: pick('get_crest_left', '_get_crest_left'),
+        crestR: pick('get_crest_right', '_get_crest_right'),
+      });
+      required.push('init', 'rmsL', 'rmsR', 'crestL', 'crestR');
+    }
+    if (!api.memory?.buffer || required.some(name => typeof api[name] !== 'function')) {
+      throw new Error(`Missing required ${kind} exports`);
+    }
+    if (kind === 'loudness') api.init(sampleRate, 2);
+    else api.init(10, 100, sampleRate);
+    const bytes = this.bufferFrames * 2 * Float32Array.BYTES_PER_ELEMENT;
+    const ptr = api.malloc(bytes);
+    if (!Number.isInteger(ptr) || ptr <= 0 || ptr % 4 !== 0 || ptr + bytes > api.memory.buffer.byteLength) {
+      if (ptr > 0) api.free(ptr);
+      throw new Error(`Invalid ${kind} buffer allocation`);
+    }
     try {
-      if (data.loudnessWasm && data.dynamicsWasm) {
-        this.initLoudnessModule(data.loudnessWasm);
-        this.initDynamicsModule(data.dynamicsWasm);
-      }
+      api.heap = new Float32Array(api.memory.buffer, ptr, this.bufferFrames * 2);
+      api.ptr = ptr;
+      return api;
     } catch (error) {
-      console.warn('Failed to initialize DSP from message:', error);
+      api.free(ptr);
+      throw error;
     }
   }
 
   async initLoudnessModule(wasmBytes) {
     try {
-      const { instance } = await WebAssembly.instantiate(wasmBytes, {});
-      const e = instance.exports;
-
-      // Helper to resolve export names
-      const pick = (...names) => {
-        for (const n of names) {
-          if (typeof e[n] === 'function' || typeof e[n] === 'object') return e[n];
-        }
-        return undefined;
-      };
-
-      const memory = pick('memory');
-      const malloc = pick('malloc', '_malloc', 'wasm_malloc', '_wasm_malloc');
-      const init = pick('init_loudness', '_init_loudness');
-      const process = pick('process_frames', '_process_frames');
-      const lufsM = pick('get_lufs_momentary', '_get_lufs_momentary');
-      const truePk = pick('get_true_peak_dbfs', '_get_true_peak_dbfs');
-
-      if (!memory || !init || !process || !lufsM) {
-        throw new Error('Missing required loudness exports');
-      }
-
-      this.loudnessAPI = {
-        memory,
-        malloc: malloc || (() => 0),
-        init,
-        process,
-        lufsM,
-        truePkDbfs: truePk,
-      };
-
-      // Initialize with 48kHz and 2x oversampling for true peak
-      this.loudnessAPI.init(48000, 2);
-
-      // Allocate buffer in WASM memory if malloc is available
-      if (malloc) {
-        this.loudnessBufferPtr = this.loudnessAPI.malloc(128 * 2 * 4); // 128 frames * 2 channels * 4 bytes
-      } else {
-        // Use fixed offset if malloc not available
-        this.loudnessBufferPtr = 8192; // 8KB offset
-      }
-
+      this.loudnessAPI = await this.createMeter(wasmBytes, 'loudness');
+      this.loudnessBufferPtr = this.loudnessAPI.ptr;
       this.loudnessReady = true;
-      console.log('Loudness module initialized in worklet');
-    } catch (error) {
-      console.warn('Failed to initialize loudness module:', error);
-      this.loudnessReady = false;
-    }
+    } catch (error) { console.warn('Failed to initialize loudness module:', error); }
   }
 
   async initDynamicsModule(wasmBytes) {
     try {
-      const { instance } = await WebAssembly.instantiate(wasmBytes, {});
-      const e = instance.exports;
-
-      // Helper to resolve export names
-      const pick = (...names) => {
-        for (const n of names) {
-          if (typeof e[n] === 'function' || typeof e[n] === 'object') return e[n];
-        }
-        return undefined;
-      };
-
-      const memory = pick('memory');
-      const malloc = pick('malloc', '_malloc', 'wasm_malloc', '_wasm_malloc');
-      const init = pick('init_meters', '_init_meters');
-      const process = pick('process_frames', '_process_frames');
-      const rmsL = pick('get_rms_left', '_get_rms_left');
-      const rmsR = pick('get_rms_right', '_get_rms_right');
-      const crestL = pick('get_crest_left', '_get_crest_left');
-      const crestR = pick('get_crest_right', '_get_crest_right');
-
-      if (!memory || !init || !process || !rmsL || !rmsR) {
-        throw new Error('Missing required dynamics exports');
-      }
-
-      this.dynamicsAPI = {
-        memory,
-        malloc: malloc || (() => 0),
-        init,
-        process,
-        rmsL,
-        rmsR,
-        crestL: crestL || (() => 0),
-        crestR: crestR || (() => 0),
-      };
-
-      // Initialize dynamics with 10ms attack, 100ms release at 48kHz
-      this.dynamicsAPI.init(10, 100, 48000);
-
-      // Allocate buffer in WASM memory
-      if (malloc) {
-        this.dynamicsBufferPtr = this.dynamicsAPI.malloc(128 * 2 * 4); // 128 frames * 2 channels * 4 bytes
-      } else {
-        // Use different fixed offset from loudness to avoid conflicts
-        this.dynamicsBufferPtr = 16384; // 16KB offset
-      }
-
+      this.dynamicsAPI = await this.createMeter(wasmBytes, 'dynamics');
+      this.dynamicsBufferPtr = this.dynamicsAPI.ptr;
       this.dynamicsReady = true;
-      console.log('Dynamics module initialized in worklet');
-    } catch (error) {
-      console.warn('Failed to initialize dynamics module:', error);
-      this.dynamicsReady = false;
+    } catch (error) { console.warn('Failed to initialize dynamics module:', error); }
+  }
+
+  disableMeter(kind, error) {
+    const api = this[`${kind}API`];
+    this[`${kind}Ready`] = false;
+    this[`${kind}BufferPtr`] = 0;
+    this[`${kind}API`] = null;
+    if (api?.ptr) {
+      try { api.free(api.ptr); }
+      catch (cleanupError) { console.warn(`${kind} buffer cleanup failed:`, cleanupError); }
     }
+    console.warn(`${kind} analysis disabled:`, error);
   }
 
   process(inputs, outputs) {
     const input = inputs[0];
     const output = outputs[0];
-
-    if (!input || !output || input.length === 0) {
-      return true;
+    if (!input?.[0] || !output || input[0].length === 0) return true;
+    for (let channel = 0; channel < output.length; channel++) {
+      if (input[channel]) output[channel].set(input[channel]);
+      else output[channel].fill(0);
     }
-
-    // Pass-through audio
-    const channelCount = Math.min(input.length, output.length);
-    for (let channel = 0; channel < channelCount; channel++) {
-      if (input[channel] && output[channel]) {
-        output[channel].set(input[channel]);
+    this.detectPlayingState(input);
+    // Native meter time and envelopes must advance for every frame, including silence.
+    this.performWASMAnalysis(input);
+    if (++this.frameCounter % this.analysisFrameInterval === 0) {
+      this.performFallbackAnalysis(input);
+      if (this.loudnessReady) {
+        try {
+          this.outputMessage.lufs = this.loudnessAPI.lufsM();
+          this.outputMessage.truePeak = this.intervalTruePeak;
+        } catch (error) { this.disableMeter('loudness', error); }
       }
+      if (this.dynamicsReady) {
+        try {
+          const l = this.dynamicsAPI.rmsL(), r = this.dynamicsAPI.rmsR();
+          const crestL = this.dynamicsAPI.crestL(), crestR = this.dynamicsAPI.crestR();
+          this.outputMessage.leftChannel = Math.min(100, l * 100);
+          this.outputMessage.rightChannel = Math.min(100, r * 100);
+          this.outputMessage.rms = Math.sqrt((l * l + r * r) * 0.5);
+          this.outputMessage.crestL = crestL;
+          this.outputMessage.crestR = crestR;
+        } catch (error) { this.disableMeter('dynamics', error); }
+      }
+      this.outputMessage.isPlaying = this.isPlaying;
+      this.port.postMessage(this.outputMessage);
+      this.intervalTruePeak = -Infinity;
     }
-
-    this.frameCounter++;
-
-    // Check playing state less frequently
-    if (this.frameCounter % this.playingCheckInterval === 0) {
-      this.detectPlayingState(input);
-    }
-
-    // Skip analysis if not playing or DSP not ready
-    if (!this.isPlaying || (!this.loudnessReady && !this.dynamicsReady)) {
-      return true;
-    }
-
-    // Perform analysis with heavy throttling
-    if (this.frameCounter % this.analysisFrameInterval === 0) {
-      this.performWASMAnalysis(input);
-    }
-
     return true;
   }
 
   detectPlayingState(inputChannels) {
-    if (!inputChannels || inputChannels.length === 0) {
-      this.isPlaying = false;
-      return;
-    }
-
-    const leftChannel = inputChannels[0];
-    if (!leftChannel) {
-      this.isPlaying = false;
-      return;
-    }
-
-    // Quick amplitude check with heavy decimation
-    let maxAmplitudeSq = 0;
-    const samplesToCheck = Math.min(8, leftChannel.length); // Reduced samples
-
-    for (let i = 0; i < samplesToCheck; i += 4) {
-      const sample = leftChannel[i];
-      const amplitudeSq = sample * sample;
-      if (amplitudeSq > maxAmplitudeSq) {
-        maxAmplitudeSq = amplitudeSq;
+    this.isPlaying = false;
+    for (const channel of inputChannels) {
+      for (let i = 0; i < channel.length; i++) {
+        if (Math.abs(channel[i]) > 0.001) { this.isPlaying = true; return; }
       }
     }
+  }
 
-    this.isPlaying = maxAmplitudeSq > 1e-6;
+  feedMeter(api, left, right) {
+    for (let offset = 0; offset < left.length; offset += this.bufferFrames) {
+      const count = Math.min(this.bufferFrames, left.length - offset);
+      if (api.heap.buffer !== api.memory.buffer) {
+        api.heap = new Float32Array(api.memory.buffer, api.ptr, this.bufferFrames * 2);
+      }
+      for (let i = 0; i < count; i++) {
+        api.heap[i * 2] = left[offset + i];
+        api.heap[i * 2 + 1] = right[offset + i] ?? 0;
+      }
+      api.process(api.ptr, count, 2);
+      if (api.truePkDbfs) this.intervalTruePeak = Math.max(this.intervalTruePeak, api.truePkDbfs());
+    }
   }
 
   performWASMAnalysis(inputChannels) {
-    if (!inputChannels || inputChannels.length === 0) {
-      return;
+    const left = inputChannels[0], right = inputChannels[1] || left;
+    if (this.loudnessReady) {
+      try { this.feedMeter(this.loudnessAPI, left, right); }
+      catch (error) { this.disableMeter('loudness', error); }
     }
-
-    const leftChannel = inputChannels[0];
-    const rightChannel = inputChannels[1] || leftChannel;
-
-    if (!leftChannel) {
-      return;
-    }
-
-    const frameCount = leftChannel.length;
-
-    try {
-      // Process with loudness analyzer
-      if (this.loudnessReady && this.loudnessBufferPtr > 0) {
-        const HEAPF32 = new Float32Array(this.loudnessAPI.memory.buffer);
-        const heapOffset = this.loudnessBufferPtr / 4;
-
-        // Bounds check - ensure we don't exceed memory
-        const maxFrames = Math.min(frameCount, 128);
-        if (heapOffset + maxFrames * 2 < HEAPF32.length) {
-          // Copy interleaved audio to WASM memory
-          for (let i = 0; i < maxFrames; i++) {
-            HEAPF32[heapOffset + i * 2] = leftChannel[i] || 0;
-            HEAPF32[heapOffset + i * 2 + 1] = rightChannel[i] || 0;
-          }
-
-          this.loudnessAPI.process(this.loudnessBufferPtr, maxFrames, 2);
-          this.outputMessage.lufs = this.loudnessAPI.lufsM();
-          if (this.loudnessAPI.truePkDbfs) {
-            this.outputMessage.truePeak = this.loudnessAPI.truePkDbfs();
-          }
-        }
-      }
-
-      // Process with dynamics meter
-      if (this.dynamicsReady && this.dynamicsBufferPtr > 0) {
-        const HEAPF32 = new Float32Array(this.dynamicsAPI.memory.buffer);
-        const heapOffset = this.dynamicsBufferPtr / 4;
-
-        // Bounds check
-        const maxFrames = Math.min(frameCount, 128);
-        if (heapOffset + maxFrames * 2 < HEAPF32.length) {
-          // Copy interleaved audio to WASM memory
-          for (let i = 0; i < maxFrames; i++) {
-            HEAPF32[heapOffset + i * 2] = leftChannel[i] || 0;
-            HEAPF32[heapOffset + i * 2 + 1] = rightChannel[i] || 0;
-          }
-
-          this.dynamicsAPI.process(this.dynamicsBufferPtr, maxFrames, 2);
-
-          const rmsL = this.dynamicsAPI.rmsL();
-          const rmsR = this.dynamicsAPI.rmsR();
-
-          this.outputMessage.leftChannel = Math.min(100, rmsL * 100);
-          this.outputMessage.rightChannel = Math.min(100, rmsR * 100);
-          this.outputMessage.rms = Math.sqrt((rmsL * rmsL + rmsR * rmsR) * 0.5);
-
-          if (this.dynamicsAPI.crestL) {
-            this.outputMessage.crestL = this.dynamicsAPI.crestL();
-          }
-          if (this.dynamicsAPI.crestR) {
-            this.outputMessage.crestR = this.dynamicsAPI.crestR();
-          }
-        }
-      }
-
-      this.outputMessage.isPlaying = this.isPlaying;
-      this.port.postMessage(this.outputMessage);
-    } catch (error) {
-      console.warn('WASM analysis error:', error);
-      // Fallback to basic analysis
-      this.performFallbackAnalysis(inputChannels);
+    if (this.dynamicsReady) {
+      try { this.feedMeter(this.dynamicsAPI, left, right); }
+      catch (error) { this.disableMeter('dynamics', error); }
     }
   }
 
   performFallbackAnalysis(inputChannels) {
-    const leftChannel = inputChannels[0];
-    const rightChannel = inputChannels[1] || leftChannel;
-    const frameCount = leftChannel.length;
-
-    // Basic RMS calculation with heavy decimation
-    let leftSumSq = 0;
-    let rightSumSq = 0;
-
-    for (let i = 0; i < frameCount; i += 4) {
-      const l = leftChannel[i] || 0;
-      const r = rightChannel[i] || 0;
-      leftSumSq += l * l;
-      rightSumSq += r * r;
+    const left = inputChannels[0], right = inputChannels[1] || left;
+    let l = 0, r = 0, peak = 0;
+    for (let i = 0; i < left.length; i++) {
+      l += left[i] * left[i];
+      r += (right[i] ?? 0) * (right[i] ?? 0);
+      peak = Math.max(peak, Math.abs(left[i]), Math.abs(right[i] ?? 0));
     }
-
-    const sampleCount = Math.floor(frameCount / 4);
-    if (sampleCount > 0) {
-      const leftRms = Math.sqrt(leftSumSq / sampleCount);
-      const rightRms = Math.sqrt(rightSumSq / sampleCount);
-      const totalRms = Math.sqrt((leftSumSq + rightSumSq) / (sampleCount * 2));
-
-      // Estimate LUFS
-      const lufsInstant = totalRms < 1e-6 ? -60 : -0.691 + 10 * Math.log10(totalRms * totalRms + 1e-10);
-
-      this.outputMessage.lufs = lufsInstant;
-      this.outputMessage.leftChannel = Math.min(100, leftRms * 100);
-      this.outputMessage.rightChannel = Math.min(100, rightRms * 100);
-      this.outputMessage.rms = totalRms;
-    } else {
-      // No samples to process
-      this.outputMessage.lufs = -60;
-      this.outputMessage.leftChannel = 0;
-      this.outputMessage.rightChannel = 0;
-      this.outputMessage.rms = 0;
-    }
-
-    this.outputMessage.truePeak = -60;
+    const leftRms = Math.sqrt(l / left.length), rightRms = Math.sqrt(r / left.length);
+    const rms = Math.sqrt((l + r) / (2 * left.length));
+    this.outputMessage.lufs = rms < 1e-6 ? -60 : -0.691 + 20 * Math.log10(rms);
+    this.outputMessage.truePeak = peak > 0 ? 20 * Math.log10(peak) : -60;
+    this.outputMessage.leftChannel = Math.min(100, leftRms * 100);
+    this.outputMessage.rightChannel = Math.min(100, rightRms * 100);
+    this.outputMessage.rms = rms;
     this.outputMessage.crestL = 0;
     this.outputMessage.crestR = 0;
-    this.outputMessage.isPlaying = this.isPlaying;
-
-    this.port.postMessage(this.outputMessage);
   }
 }
 

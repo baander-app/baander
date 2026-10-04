@@ -10,7 +10,7 @@ LDFLAGS := \
   -s STRICT=1 \
   -s INITIAL_MEMORY=33554432 \
   -s ALLOW_MEMORY_GROWTH=0 \
-  -s EXPORTED_FUNCTIONS='["_init_loudness","_reset_loudness","_process_frames","_get_lufs_momentary","_get_lufs_shortterm","_get_lufs_integrated","_get_lra","_get_true_peak_dbfs"]' \
+  -s EXPORTED_FUNCTIONS='["_malloc","_free","_init_loudness","_reset_loudness","_process_frames","_get_lufs_momentary","_get_lufs_shortterm","_get_lufs_integrated","_get_lra","_get_true_peak_dbfs"]' \
   -lc++ -lc++abi
 .PHONY: all build clean serve-demo
 all: build

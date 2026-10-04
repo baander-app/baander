@@ -29,6 +29,12 @@ use small fixture worklets to verify readiness and teardown; they do not replace
 tests of the production WASM algorithms. The browser suite runs as a blocking
 step in the frontend workflow.
 
+Run `bash scripts/test-dsp-analysis.sh` with Emscripten 6.0.3 to test the actual
+WASM analysis modules and production worklet code against reference signals.
+The gate rebuilds twice and checks reproducibility and shipped artifact parity.
+See [DSP qualification](../../packages/dsp/README.md) for covered contracts and
+the remaining loudness and codec qualification limits.
+
 ## Test Suites
 
 | Suite | Directory | Scope |

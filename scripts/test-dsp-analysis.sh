@@ -17,7 +17,7 @@ fi
 
 work="$(mktemp -d /tmp/baander-dsp-analysis.XXXXXXXX)"
 trap 'rm -rf "$work"' EXIT
-modules=(fft2048 spectral_features)
+modules=(fft2048 spectral_features dynamics_meter loudness_r128)
 
 for pass in 1 2; do
     output="$work/build-$pass"
@@ -44,6 +44,13 @@ for module in "${modules[@]}"; do
             exit 1
         fi
     done
+done
+
+for artifact in public/dsp/dynamics_meter.js ui/electron/public/dsp/dynamics_meter.js; do
+    if ! cmp -s packages/dsp/dynamics_meter/dynamics_meter.js "$artifact"; then
+        echo "Stale or missing wrapper: $artifact; copy packages/dsp/dynamics_meter/dynamics_meter.js." >&2
+        exit 1
+    fi
 done
 
 if ! cmp -s packages/dsp/fft2048/wasm-spectrum.js public/audio-worklets/wasm-spectrum.js; then

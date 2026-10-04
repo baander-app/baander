@@ -16,11 +16,19 @@
   import { loadDynamics } from './dynamics_meter.js';
   const api = await loadDynamics('./dynamics_meter.wasm');
   const sr = 48000, frames = 128, ch = 2;
-  api.init(10 /*att ms*/, 200 /*rel ms*/, sr);
+  api.init(10 /*RMS window ms*/, 200 /*peak release ms*/, sr);
 
   const buf = new Float32Array(frames*ch);
   const heapF32 = new Float32Array(api.memory.buffer);
-  const ptr = 1024*1024; // demo scratch
+  let ptr = api.malloc(buf.byteLength);
+  if (!ptr) throw new Error('Unable to allocate dynamics input buffer');
+  let animation = 0;
+  window.addEventListener('pagehide', () => {
+    cancelAnimationFrame(animation);
+    animation = 0;
+    if (ptr) api.free(ptr);
+    ptr = 0;
+  });
   let t = 0;
 
   function fill() {
@@ -33,6 +41,7 @@
   }
 
   function loop() {
+    if (!ptr) return;
     fill();
     heapF32.set(buf, ptr>>2);
     api.process(ptr, frames, ch);
@@ -48,9 +57,14 @@
       `PK  R: ${ (20*Math.log10(Math.max(peakR,1e-9))).toFixed(2)} dBFS\n` +
       `Crest L: ${ crestL.toFixed(2)} dB\n` +
       `Crest R: ${ crestR.toFixed(2)} dB`;
-    requestAnimationFrame(loop);
+    animation = requestAnimationFrame(loop);
   }
-  document.getElementById('start').onclick = () => requestAnimationFrame(loop);
+  document.getElementById('start').onclick = () => {
+    if (animation) return;
+    if (!ptr) ptr = api.malloc(buf.byteLength);
+    if (!ptr) throw new Error('Unable to allocate dynamics input buffer');
+    animation = requestAnimationFrame(loop);
+  };
 </script>
 </body>
 </html>

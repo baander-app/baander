@@ -28,7 +28,9 @@ export interface LoudnessModule {
 
 export interface DynamicsMeterAPI {
   memory: WebAssembly.Memory
-  init(attackMs: number, releaseMs: number, sampleRate: number): void
+  malloc(bytes: number): number
+  free(ptr: number): void
+  init(rmsWindowMs: number, releaseMs: number, sampleRate: number): void
   reset(): void
   process(inputPtr: number, frames: number, channels: number): void
   rmsL(): number

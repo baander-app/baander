@@ -43,17 +43,17 @@ struct Ring {
   std::vector<float> buf;
   size_t idx = 0;
   size_t filled = 0;
+  double total = 0.0;
 
-  void init(size_t n) { buf.assign(n, 0.0f); idx=0; filled=0; }
+  void init(size_t n) { buf.assign(n, 0.0f); idx=0; filled=0; total=0.0; }
   inline void push(float v){
     if (buf.empty()) return;
+    total += (double)v - (double)buf[idx];
     buf[idx] = v;
-    idx = (idx + 1) % buf.size();
+    if (++idx == buf.size()) idx = 0;
     if (filled < buf.size()) filled++;
   }
-  inline float sum() const {
-    float s=0; for (size_t i=0;i<filled;i++) s+=buf[i]; return s;
-  }
+  inline double sum() const { return total; }
   inline size_t size() const { return buf.size(); }
 };
 
@@ -63,6 +63,8 @@ static Ring g_s_win; // 3 s short-term
 
 // Integrated storage for gating (coarse)
 static std::vector<float> g_hist; // store block energies (e.g., 100 ms blocks)
+static std::vector<float> g_lufs_scratch;
+static std::vector<float> g_percentile_scratch;
 static size_t g_hist_max = 3000;  // ~5 minutes at 100 ms
 static int g_block_samples = 0;
 static int g_block_target = 0;
@@ -125,6 +127,10 @@ void init_loudness(int sample_rate, int truepeak_oversample) {
 
   g_hist.clear();
   g_hist.reserve(g_hist_max);
+  g_lufs_scratch.clear();
+  g_lufs_scratch.reserve(g_hist_max);
+  g_percentile_scratch.clear();
+  g_percentile_scratch.reserve(g_hist_max);
   g_block_samples = 0;
   g_block_target = std::max(1, g_sr / 10); // 100 ms blocks
 
@@ -149,6 +155,9 @@ static inline float truepeak_estimate(const float* in, int n, int ch) {
   }
   int C = ch;
   for (int c = 0; c < std::min(2,C); ++c) {
+    // Linear interpolation cannot exceed endpoints; include the final sample,
+    // including singleton buffers. This remains an approximate peak estimator.
+    tp = std::max(tp, std::abs(in[(n-1)*C + c]));
     for (int i = 0; i < n-1; ++i) {
       float s0 = in[i*C + c];
       float s1 = in[(i+1)*C + c];
@@ -169,6 +178,8 @@ void process_frames(const float* interleavedLR, int frames, int channels) {
   if (!interleavedLR || frames <= 0 || channels <= 0) return;
 
   float tp = truepeak_estimate(interleavedLR, frames, channels);
+
+  bool history_updated = false;
 
   // Per-sample processing
   for (int i = 0; i < frames; ++i) {
@@ -193,10 +204,10 @@ void process_frames(const float* interleavedLR, int frames, int channels) {
       // average energy of last 100 ms approx
       float m = g_m_win.sum() / std::max<size_t>(1, g_m_win.filled);
       // store as LUFS-like (log domain) proxy or keep energy and log later
+      // Keep capacity bounded without allocating on the render thread.
+      if (g_hist.size() == g_hist_max) g_hist.erase(g_hist.begin());
       g_hist.push_back(m);
-      if (g_hist.size() > g_hist_max) {
-        g_hist.erase(g_hist.begin(), g_hist.begin() + (g_hist.size() - g_hist_max));
-      }
+      history_updated = true;
       g_block_samples = 0;
     }
   }
@@ -208,34 +219,35 @@ void process_frames(const float* interleavedLR, int frames, int channels) {
   g_lufs_s = -0.691f + 10.0f * std::log10(std::max(Es, 1e-12f));
 
   // Integrated with simple absolute and relative gating
-  if (!g_hist.empty()) {
+  if (history_updated) {
     // Convert energies to LUFS-like per block
-    std::vector<float> lufs(g_hist.size());
+    auto& lufs = g_lufs_scratch;
+    lufs.resize(g_hist.size());
     for (size_t i=0;i<g_hist.size();++i) {
       lufs[i] = -0.691f + 10.0f * std::log10(std::max(g_hist[i], 1e-12f));
     }
     // Absolute gate -70 LUFS
-    std::vector<float> gated;
-    gated.reserve(lufs.size());
-    for (float v : lufs) if (v > -70.0f) gated.push_back(v);
+    double absolute_sum = 0;
+    size_t absolute_count = 0;
+    for (float v : lufs) if (v > -70.0f) { absolute_sum += v; ++absolute_count; }
 
     float mean = -70.0f;
-    if (!gated.empty()) {
-      double s=0; for (float v : gated) s+=v;
-      mean = (float)(s / gated.size());
+    if (absolute_count > 0) {
+      mean = (float)(absolute_sum / absolute_count);
       // Relative gate: discard blocks more than 10 LU below current mean
-      std::vector<float> gated2; gated2.reserve(gated.size());
-      for (float v : gated) if (v > mean - 10.0f) gated2.push_back(v);
-      if (!gated2.empty()) {
-        s=0; for (float v : gated2) s+=v;
-        mean = (float)(s / gated2.size());
+      double relative_sum = 0;
+      size_t relative_count = 0;
+      for (float v : lufs) if (v > -70.0f && v > mean - 10.0f) {
+        relative_sum += v; ++relative_count;
       }
+      if (relative_count > 0) mean = (float)(relative_sum / relative_count);
     }
     g_lufs_i = mean;
 
     // LRA: interpercentile range over short-term history
     if (lufs.size() >= 20) {
-      std::vector<float> tmp = lufs;
+      auto& tmp = g_percentile_scratch;
+      tmp.assign(lufs.begin(), lufs.end());
       std::sort(tmp.begin(), tmp.end());
       auto pct = [&](double p)->float{
         double x = p * (tmp.size()-1);

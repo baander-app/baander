@@ -2,6 +2,7 @@ export async function loadDynamics(url = './dynamics_meter.wasm') {
   const bytes = await (await fetch(url)).arrayBuffer();
   const { instance } = await WebAssembly.instantiate(bytes, {});
   const e = instance.exports;
+  e._initialize?.();
 
   // Helper to resolve either plain or underscored export names
   const pick = (...names) => {
@@ -12,6 +13,8 @@ export async function loadDynamics(url = './dynamics_meter.wasm') {
   };
 
   const memory = pick('memory');
+  const malloc = pick('malloc', '_malloc');
+  const free = pick('free', '_free');
 
   const init = pick('init_meters', '_init_meters');
   const reset = pick('reset_meters', '_reset_meters');
@@ -27,6 +30,8 @@ export async function loadDynamics(url = './dynamics_meter.wasm') {
   // Helpful error if something essential is missing
   const missing = [];
   if (!memory) missing.push('memory');
+  if (!malloc) missing.push('malloc');
+  if (!free) missing.push('free');
   if (!init) missing.push('init_meters');
   if (!process) missing.push('process_frames');
   if (!rmsL) missing.push('get_rms_left');
@@ -42,6 +47,8 @@ export async function loadDynamics(url = './dynamics_meter.wasm') {
 
   return {
     memory,
+    malloc,
+    free,
     init,
     reset,
     process,
