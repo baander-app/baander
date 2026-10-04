@@ -15,6 +15,9 @@ use DateTimeImmutable;
  */
 final class ListeningSessionState
 {
+    /**
+     * @param array<array-key, mixed> $queue
+     */
     public function __construct(
         public readonly Uuid $id,
         public readonly Uuid $userId,

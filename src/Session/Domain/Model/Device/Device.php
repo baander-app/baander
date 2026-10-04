@@ -9,6 +9,9 @@ use DateTimeImmutable;
 
 final class Device
 {
+    /**
+     * @var list<\App\Shared\Domain\Event\AbstractDomainEvent>
+     */
     private array $pendingEvents = [];
 
     private function __construct(

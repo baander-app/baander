@@ -9,7 +9,7 @@ use App\Shared\Domain\Model\Uuid;
 final readonly class SessionPlaybackCommand
 {
     /**
-     * @param array<string, mixed>|null $queue
+     * @param array<array-key, mixed>|null $queue
      */
     public function __construct(
         private Uuid $userId,
@@ -26,7 +26,13 @@ final readonly class SessionPlaybackCommand
     public function getDeviceId(): Uuid { return $this->deviceId; }
     public function getAction(): string { return $this->action; }
     public function getPosition(): ?float { return $this->position; }
-    public function getQueue(): ?array { return $this->queue; }
+    /**
+     * @return array<array-key, mixed>|null
+     */
+    public function getQueue(): ?array
+    {
+        return $this->queue;
+    }
     public function getCurrentTrackIndex(): ?int { return $this->currentTrackIndex; }
     public function getPlaybackState(): ?string { return $this->playbackState; }
 }

@@ -25,6 +25,9 @@ class ListeningSessionEntity
     #[ORM\Column(type: 'uuid', nullable: true)]
     private ?Uuid $activeDeviceId = null;
 
+    /**
+     * @var array<array-key, mixed>
+     */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '[]'])]
     private array $queue = [];
 
@@ -46,6 +49,9 @@ class ListeningSessionEntity
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $lastUsedAt = null;
 
+    /**
+     * @param array<array-key, mixed> $queue
+     */
     public function __construct(
         UserEntity $user,
         array $queue = [],
@@ -84,11 +90,17 @@ class ListeningSessionEntity
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /**
+     * @return array<array-key, mixed>
+     */
     public function getQueue(): array
     {
         return $this->queue;
     }
 
+    /**
+     * @param array<array-key, mixed> $queue
+     */
     public function setQueue(array $queue): void
     {
         $this->queue = $queue;

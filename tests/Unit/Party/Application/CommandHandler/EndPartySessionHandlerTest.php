@@ -6,7 +6,6 @@ namespace App\Tests\Unit\Party\Application\CommandHandler;
 
 use App\Party\Application\Command\EndPartySessionCommand;
 use App\Party\Application\CommandHandler\EndPartySessionHandler;
-use App\Party\Application\Port\PartyMemberPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
 use App\Party\Domain\Event\PartySessionEnded;
 use App\Party\Domain\Model\SyncedPartySession;
@@ -19,17 +18,15 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 final class EndPartySessionHandlerTest extends TestCase
 {
     private PartySessionPortInterface&MockObject $sessionPort;
-    private PartyMemberPortInterface $memberPort;
     private EventDispatcherInterface&MockObject $eventDispatcher;
     private EndPartySessionHandler $handler;
 
     protected function setUp(): void
     {
         $this->sessionPort = $this->createMock(PartySessionPortInterface::class);
-        $this->memberPort = $this->createStub(PartyMemberPortInterface::class);
         $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
         $this->eventDispatcher->method('dispatch')->willReturnCallback(fn (object $e) => $e);
-        $this->handler = new EndPartySessionHandler($this->sessionPort, $this->memberPort, $this->eventDispatcher);
+        $this->handler = new EndPartySessionHandler($this->sessionPort, $this->eventDispatcher);
     }
 
     public function testHostEndsSessionAndDispatchesEvent(): void

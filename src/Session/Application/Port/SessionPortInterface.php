@@ -19,7 +19,7 @@ interface SessionPortInterface
     /**
      * Sync playback state for a user's session.
      *
-     * @param array<string, mixed> $queue
+     * @param array<array-key, mixed> $queue
      *
      * @return array<string, mixed>
      */
@@ -35,7 +35,7 @@ interface SessionPortInterface
     /**
      * Create a new listening session.
      *
-     * @param array<string, mixed> $queue
+     * @param array<array-key, mixed> $queue
      *
      * @return array<string, mixed>
      */

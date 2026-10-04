@@ -19,6 +19,9 @@ final readonly class MemberJoined extends AbstractDomainEvent
         parent::__construct($occurredAt);
     }
 
+    /**
+     * @param array<string, mixed> $payload
+     */
     public static function fromPayload(array $payload): static
     {
         return new self(
@@ -29,6 +32,9 @@ final readonly class MemberJoined extends AbstractDomainEvent
         );
     }
 
+    /**
+     * @return array{session_id: string, user_id: string, role: string, occurred_at: string}
+     */
     public function toPayload(): array
     {
         return [

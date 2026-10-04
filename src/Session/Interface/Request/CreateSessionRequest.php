@@ -18,6 +18,9 @@ use Symfony\Component\Validator\Constraints as Assert;
 )]
 final readonly class CreateSessionRequest
 {
+    /**
+     * @param array<array-key, mixed> $queue
+     */
     public function __construct(
         #[Assert\NotNull(message: 'Queue is required.')]
         public array $queue = [],

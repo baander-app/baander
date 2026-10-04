@@ -12,7 +12,7 @@ final readonly class SessionCreated extends AbstractDomainEvent
 {
     /**
      * @param Uuid $userId
-     * @param array $queue
+     * @param array<array-key, mixed> $queue
      * @param DateTimeImmutable|null $occurredAt
      */
     public function __construct(
@@ -23,6 +23,9 @@ final readonly class SessionCreated extends AbstractDomainEvent
         parent::__construct($occurredAt);
     }
 
+    /**
+     * @param array<string, mixed> $payload
+     */
     public static function fromPayload(array $payload): static
     {
         return new self(
@@ -32,6 +35,9 @@ final readonly class SessionCreated extends AbstractDomainEvent
         );
     }
 
+    /**
+     * @return array{user_id: string, queue: array<array-key, mixed>, occurred_at: string}
+     */
     public function toPayload(): array
     {
         return [
@@ -51,6 +57,9 @@ final readonly class SessionCreated extends AbstractDomainEvent
         return $this->userId;
     }
 
+    /**
+     * @return array<array-key, mixed>
+     */
     public function getQueue(): array
     {
         return $this->queue;

@@ -9,7 +9,7 @@ use App\Shared\Domain\Model\Uuid;
 final readonly class CreateSessionCommand
 {
     /**
-     * @param array<string, mixed> $queue
+     * @param array<array-key, mixed> $queue
      */
     public function __construct(
         private Uuid $userId,
@@ -25,7 +25,7 @@ final readonly class CreateSessionCommand
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      */
     public function getQueue(): array
     {

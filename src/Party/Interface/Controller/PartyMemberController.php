@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Party\Interface\Controller;
 
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Party\Application\Command\TransferHostCommand;
 use App\Party\Application\Port\PartyMemberPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
@@ -31,8 +32,7 @@ final class PartyMemberController
         private readonly MessageBusInterface $commandBus,
         private readonly PartySessionPortInterface $sessionPort,
         private readonly PartyMemberPortInterface $memberPort,
-    )
-    {
+    ) {
     }
 
     #[OA\Get(
@@ -84,10 +84,13 @@ final class PartyMemberController
         ],
     )]
     #[Route('/me', name: 'update_me', methods: ['PATCH'])]
-    public function updateMe(string $uuid, #[MapRequestPayload] UpdatePartyMemberRequest $payload): JsonResponse
+    public function updateMe(
+        string $uuid,
+        #[MapRequestPayload] UpdatePartyMemberRequest $payload,
+    ): JsonResponse
     {
         $user = $this->security->getUser();
-        if ($user === null) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return $this->unauthorized();
         }
 
@@ -127,10 +130,13 @@ final class PartyMemberController
         ],
     )]
     #[Route('/transfer-host', name: 'transfer_host', methods: ['POST'])]
-    public function transferHost(string $uuid, #[MapRequestPayload] TransferHostRequest $payload): JsonResponse
+    public function transferHost(
+        string $uuid,
+        #[MapRequestPayload] TransferHostRequest $payload,
+    ): JsonResponse
     {
         $user = $this->security->getUser();
-        if ($user === null) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return $this->unauthorized();
         }
 

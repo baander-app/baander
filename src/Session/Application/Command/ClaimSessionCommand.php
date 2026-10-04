@@ -9,7 +9,7 @@ use App\Shared\Domain\Model\Uuid;
 final readonly class ClaimSessionCommand
 {
     /**
-     * @param array<string, mixed>|null $queue
+     * @param array<array-key, mixed>|null $queue
      */
     public function __construct(
         private Uuid $userId,
@@ -22,7 +22,13 @@ final readonly class ClaimSessionCommand
 
     public function getUserId(): Uuid { return $this->userId; }
     public function getDeviceId(): Uuid { return $this->deviceId; }
-    public function getQueue(): ?array { return $this->queue; }
+    /**
+     * @return array<array-key, mixed>|null
+     */
+    public function getQueue(): ?array
+    {
+        return $this->queue;
+    }
     public function getCurrentTrackIndex(): ?int { return $this->currentTrackIndex; }
     public function getPosition(): ?float { return $this->position; }
 }

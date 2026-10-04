@@ -18,6 +18,9 @@ final readonly class PartySessionEnded extends AbstractDomainEvent
         parent::__construct($occurredAt);
     }
 
+    /**
+     * @param array<string, mixed> $payload
+     */
     public static function fromPayload(array $payload): static
     {
         return new self(
@@ -27,6 +30,9 @@ final readonly class PartySessionEnded extends AbstractDomainEvent
         );
     }
 
+    /**
+     * @return array{session_id: string, host_user_id: string, occurred_at: string}
+     */
     public function toPayload(): array
     {
         return [

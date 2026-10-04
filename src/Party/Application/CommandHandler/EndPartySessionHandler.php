@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Party\Application\CommandHandler;
 
 use App\Party\Application\Command\EndPartySessionCommand;
-use App\Party\Application\Port\PartyMemberPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
 use App\Party\Domain\Event\PartySessionEnded;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -15,7 +14,6 @@ final class EndPartySessionHandler
 {
     public function __construct(
         private readonly PartySessionPortInterface $sessionPort,
-        private readonly PartyMemberPortInterface $memberPort,
         private readonly EventDispatcherInterface $eventDispatcher,
     ) {
     }

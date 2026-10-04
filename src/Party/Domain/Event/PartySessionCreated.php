@@ -20,6 +20,9 @@ final readonly class PartySessionCreated extends AbstractDomainEvent
         parent::__construct($occurredAt);
     }
 
+    /**
+     * @param array<string, mixed> $payload
+     */
     public static function fromPayload(array $payload): static
     {
         return new self(
@@ -31,6 +34,9 @@ final readonly class PartySessionCreated extends AbstractDomainEvent
         );
     }
 
+    /**
+     * @return array{session_id: string, host_user_id: string, video_id: string, max_members: int, occurred_at: string}
+     */
     public function toPayload(): array
     {
         return [

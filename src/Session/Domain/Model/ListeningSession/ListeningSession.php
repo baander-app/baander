@@ -10,6 +10,9 @@ use InvalidArgumentException;
 
 final class ListeningSession
 {
+    /**
+     * @var list<\App\Shared\Domain\Event\AbstractDomainEvent>
+     */
     private array $pendingEvents = [];
 
     private function __construct(
@@ -19,6 +22,7 @@ final class ListeningSession
 
     /**
      * Create a new ListeningSession.
+     * @param array<array-key, mixed> $queue
      */
     public static function create(
         Uuid $userId,
@@ -91,6 +95,7 @@ final class ListeningSession
 
     /**
      * Update playback state: queue, track index, position, and playback state.
+     * @param array<array-key, mixed> $queue
      */
     public function updatePlayback(array $queue, int $currentTrackIndex, float $position, string $playbackState): void
     {
@@ -172,6 +177,9 @@ final class ListeningSession
         return $this->state->activeDeviceId;
     }
 
+    /**
+     * @return array<array-key, mixed>
+     */
     public function getQueue(): array
     {
         return $this->state->queue;
