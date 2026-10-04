@@ -108,6 +108,35 @@ The player install was verified with the pinned Yarn version and immutable lockf
 The broader backend,
 security, native-media, and registry release gates remain separate milestones.
 
+## Backend authorization and publication follow-up
+
+EQ profile reads, updates, deletes, and activation now enforce ownership through
+the application port. Foreign, missing, and malformed IDs return 404, including for
+unrelated administrators. Owner deletion of a default profile remains 422. The old
+cross-user read returned 200 in the regression reproduction; the corrected disposable
+functional suite passes 33 tests with 133 assertions. It uses Symfony's firewall with
+a test authenticator, so production OAuth/DPoP acceptance remains separate.
+
+The application publisher now requires embedded-player, browser, and pinned DSP
+qualification as well as backend and web checks. Application/frontend/DSP checkouts
+verify the event SHA instead of fetching a moving branch. Local workflow regressions
+exercise failing qualification commands, branch advancement, and missing/mismatched
+commits. Live Forgejo scheduling and standalone CLI/base-image publication policies
+remain to be verified.
+
+Backend checks run in a PHP 8.5.2 container satisfying the Composer lockfile's
+extension requirements, including Swoole 6.2.0. The host PHP runtime is unsuitable.
+The PHPStan audit completed with 1,708 diagnostics (1,058 source and 650 test diagnostics),
+without runtime/bootstrap errors. Concrete undefined methods and missing classes
+precede annotation cleanup. Deptrac reports 259 violations; ten obsolete baseline
+exclusions were removed. Neither baseline was expanded. These failures still block
+application release; passing unit tests does not resolve them. The four annotation
+diagnostics in the touched functional test were subsequently corrected.
+
+Final combined backend unit verification passes 4,386 tests with 18,452 assertions,
+including 14 publication regressions and 11 EQ adapter tests. Deptrac verification
+confirms zero stale-exclusion errors after cleanup and 259 remaining violations.
+
 ## Recent verified checkpoints
 
 | Commit | Result | Verification |

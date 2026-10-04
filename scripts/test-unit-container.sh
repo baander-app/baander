@@ -9,7 +9,7 @@ cd "$(dirname "$0")/.."
 test -f vendor/autoload.php || { echo 'Install Composer dependencies first.' >&2; exit 1; }
 
 tar -cf - vendor src tests config packages migrations bin phpunit.xml.dist \
-    .env .env.test composer.json composer.lock |
+    .env .env.test composer.json composer.lock .forgejo/workflows |
     docker run --rm --privileged --network none -i --entrypoint sh \
         "${BAANDER_TEST_IMAGE:-martinjuul/baander-app:latest}" -c '
             set -eu

@@ -84,6 +84,21 @@ playback. Performance assertions use counts rather than timing-sensitive thresho
 
 ## Running Tests
 
+Use an application image that satisfies the current Composer lockfile. To build
+one locally and select it for the disposable runners:
+
+```bash
+docker buildx build --target ci --load -t baander-ci:local .
+export BAANDER_TEST_IMAGE=baander-ci:local
+```
+
+The default image reference in the runners may require registry access. An existing
+locally qualified image can be selected with the same variable. Check its PHP
+extensions and locked Swoole version; host PHP is not a substitute unless those
+requirements pass. The unit and messaging runners stream the current checkout and
+installed Composer dependencies into an isolated container. Image selection does
+not select an older copy of the application source.
+
 For strict unit and messaging checks, run from the checkout:
 
 ```bash
@@ -604,7 +619,7 @@ The functional suite covers these controllers (tests live in `tests/Functional/C
 | UserPreference | AudioPreferencesController | 14 | Versioned save, history, rollback |
 | UserPreference | LayoutPreferencesController | 13 | Strict 2-field payload |
 | UserPreference | PlayerPreferencesController | 13 | Strict 9-field payload |
-| UserPreference | EqDeviceProfileController | 20 | CRUD + activate, pins ownership gaps |
+| UserPreference | EqDeviceProfileController | 33 | CRUD + activate, ownership and safe 404 responses |
 | UserPreference | SidebarConfigController | 10 | Per-media-type config |
 | UserPreference | ThemeMoodController | 7 | GET + PUT |
 | Catalog | GenreController | 16 | CRUD, ROLE_ADMIN on write |
@@ -623,12 +638,18 @@ The functional suite has surfaced production bugs that were fixed:
 - **GenreController missing authorization** — `update()` and `destroy()` lacked `#[IsGranted('ROLE_ADMIN')]`. Any authenticated user could modify or delete genres.
 - **Missing `user_theme_moods` migration** — the ThemeMood entity had no database table.
 
+EQ profile show, update, delete, and activate now enforce ownership in the
+application port implementation. Foreign, missing, and malformed profile IDs return
+404; unrelated administrators have no bypass. Default-profile deletion by its owner
+still returns 422. The 33 functional tests exercise Symfony's firewall with the test
+authenticator, not the production OAuth/DPoP handshake. Notification mark-read and
+delete also have ownership guards and cross-user 403 regression coverage; the earlier
+ownership warning in this guide was stale.
+
 ### Design Gaps Pinned by Tests (Not Yet Fixed)
 
 Some tests document known design-level gaps by asserting the *current* behavior rather than the ideal:
 
-- **Ownership checks missing** — Notification markRead/delete and EqDeviceProfile show/update/delete have no `userId` filter; any authenticated user can access other users' resources by ID.
-- **Not-found returns 500, not 404** — EqDeviceProfile's port throws `InvalidArgumentException` for not-found, which the ExceptionSubscriber maps to HTTP 500 instead of 404.
 - **Dead-code optimistic locking** — AudioPreferences, LayoutPreferences, and PlayerPreferences controllers catch `RuntimeException` for version conflicts, but `saveForUser()` never throws it. The 409 response path is unreachable.
 - **Favorites missing Choice constraint** — `AddFavoriteRequest.entityType` has `NotBlank` but no `Choice`, so invalid types pass DTO validation and crash in `FavoriteType::from()` with a 500.
 
@@ -640,9 +661,28 @@ PHPStan runs alongside tests:
 # Run PHPStan
 make phpstan
 
-# Generate a baseline for existing errors
-make phpstan-baseline
+# Check architectural dependencies
+make exec cmd="vendor/bin/deptrac analyse --no-cache --no-progress"
 ```
+
+Run these in the application PHP runtime with the current Composer dependencies.
+Existing baselines record debt; do not regenerate or expand them to hide a failing
+check. Address runtime defects before annotation cleanup. The full application
+publisher requires both analyses to succeed, in addition to its test gates.
+
+## Application publication gates
+
+The application publisher in `.forgejo/workflows/ci.yaml` requires backend quality,
+frontend quality, and DSP qualification. Frontend qualification includes the embedded
+player and Chromium authentication, audio graph, and store-debugger suites. Checkout
+steps in the application, frontend, and DSP workflows fetch and verify the event SHA,
+so a later branch update cannot replace the source under qualification.
+
+`PublicationWorkflowTest` checks the actual YAML dependency graph, executes gate shell
+commands with failing local tools, and exercises checkouts against a local Git remote
+whose branch advances. It rejects unavailable or mismatched event commits. These are
+local contracts and shell regressions; they do not certify a live Forgejo scheduler.
+Standalone CLI and base-image publication policies need their own review.
 
 ## Frontend Testing
 

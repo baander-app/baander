@@ -146,8 +146,6 @@ deptrac:
       - App\Media\Application\Port\ImagePortInterface
       - App\Media\Application\Port\StoragePortInterface
       - App\Media\Domain\Model\Image
-    App\Catalog\Interface\Controller\ExtractCoversController:
-      - App\Metadata\Application\Command\BatchExtractCoversCommand
     App\Catalog\Interface\Controller\GenreController:
       - App\Catalog\Domain\Model\Genre
     App\Catalog\Interface\Controller\MovieController:
@@ -173,8 +171,6 @@ deptrac:
       - App\Catalog\Domain\Model\Song
     App\Catalog\Interface\Resource\VideoResource:
       - App\Catalog\Domain\Model\Video
-    App\Command\Dev\SetupCommand:
-      - App\Auth\Application\Command\User\CreateUserCommand
     App\Filesystem\Command\WatchFilesCommand:
       - App\Filesystem\Watcher\FileWatchEvent
       - App\Filesystem\Watcher\FileWatcher
@@ -221,9 +217,6 @@ deptrac:
       - App\Filesystem\Application\Port\LocalFilesystemPortInterface
     App\Media\Interface\Controller\ImageController:
       - App\Media\Infrastructure\Converter\BlurHashGenerator
-      - App\Media\Infrastructure\Storage\FlysystemStorage
-    App\Media\Interface\Controller\StreamController:
-      - App\Filesystem\Mime\MimeDetector
     App\Media\Interface\Resource\ImageResource:
       - App\Media\Domain\Model\Image
     App\Metadata\Application\AlbumMetadataEnricher:
@@ -442,16 +435,6 @@ deptrac:
       - App\Transcode\Domain\Model\TranscodeJob
     App\Transcode\Interface\Resource\TranscodeSessionResource:
       - App\Transcode\Domain\Model\TranscodeSession
-    App\UserPreference\Domain\Repository\AudioPreferencesRepositoryInterface:
-      - App\UserPreference\Infrastructure\Doctrine\Entity\AudioPreferencesEntity
-    App\UserPreference\Domain\Repository\EqDeviceProfileRepositoryInterface:
-      - App\UserPreference\Infrastructure\Doctrine\Entity\EqDeviceProfileEntity
-    App\UserPreference\Domain\Repository\LayoutPreferencesRepositoryInterface:
-      - App\UserPreference\Infrastructure\Doctrine\Entity\LayoutPreferencesEntity
-    App\UserPreference\Domain\Repository\PlayerPreferencesRepositoryInterface:
-      - App\UserPreference\Infrastructure\Doctrine\Entity\PlayerPreferencesEntity
-    App\UserPreference\Domain\Repository\PreferenceHistoryRepositoryInterface:
-      - App\UserPreference\Infrastructure\Doctrine\Entity\PreferenceHistoryEntity
     App\UserPreference\Interface\Controller\AccentColorController:
       - App\Auth\Infrastructure\Security\SecurityUser
     App\UserPreference\Interface\Controller\AudioPreferencesController:
@@ -466,5 +449,3 @@ deptrac:
       - App\Auth\Infrastructure\Security\SecurityUser
     App\UserPreference\Interface\Controller\ThemeMoodController:
       - App\Auth\Infrastructure\Security\SecurityUser
-    App\UserPreference\Interface\Resource\EqDeviceProfileResource:
-      - App\UserPreference\Infrastructure\Doctrine\Entity\EqDeviceProfileEntity

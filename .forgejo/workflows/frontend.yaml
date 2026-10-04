@@ -35,8 +35,9 @@ jobs:
                 run: |
                     git init -q
                     git remote add origin ${{ forgejo.event.repository.clone_url }}
-                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin ${{ forgejo.ref }}
-                    git checkout -q FETCH_HEAD
+                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
+                    git checkout -q --detach "${{ forgejo.sha }}"
+                    test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
 
             -   name: Restore yarn cache
                 working-directory: ui/web
@@ -92,8 +93,9 @@ jobs:
                 run: |
                     git init -q
                     git remote add origin ${{ forgejo.event.repository.clone_url }}
-                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin ${{ forgejo.ref }}
-                    git checkout -q FETCH_HEAD
+                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
+                    git checkout -q --detach "${{ forgejo.sha }}"
+                    test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
 
             -   name: Restore yarn cache
                 working-directory: ui/web
@@ -259,8 +261,9 @@ jobs:
                 run: |
                     git init -q
                     git remote add origin ${{ forgejo.event.repository.clone_url }}
-                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin ${{ forgejo.ref }}
-                    git checkout -q FETCH_HEAD
+                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
+                    git checkout -q --detach "${{ forgejo.sha }}"
+                    test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
 
             -   name: Restore yarn cache
                 working-directory: ui/web

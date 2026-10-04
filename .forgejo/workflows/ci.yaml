@@ -29,8 +29,9 @@ jobs:
                 run: |
                     git init -q
                     git remote add origin ${{ forgejo.event.repository.clone_url }}
-                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin ${{ forgejo.ref }}
-                    git checkout -q FETCH_HEAD
+                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
+                    git checkout -q --detach "${{ forgejo.sha }}"
+                    test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
 
             -   name: Login to Container Registry
                 run: echo "${{ secrets.REGISTRY_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ forgejo.actor }} --password-stdin
@@ -306,14 +307,21 @@ jobs:
                 run: |
                     git init -q
                     git remote add origin ${{ forgejo.event.repository.clone_url }}
-                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin ${{ forgejo.ref }}
-                    git checkout -q FETCH_HEAD
+                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
+                    git checkout -q --detach "${{ forgejo.sha }}"
+                    test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
             -   name: Shared checks
                 working-directory: ui/shared
                 run: |
                     yarn install --immutable
                     yarn typecheck
                     yarn test
+            -   name: Embedded player checks
+                working-directory: ui/web/packages/baander-player
+                run: |
+                    corepack yarn install --immutable
+                    corepack yarn typecheck
+                    corepack yarn test
             -   name: Web checks
                 working-directory: ui/web
                 run: |
@@ -322,10 +330,21 @@ jobs:
                     yarn test
                     yarn build
                     node scripts/verify-build.mjs
+            -   name: Install browser test runtime
+                working-directory: ui/web
+                run: yarn exec playwright install --with-deps chromium
+            -   name: Native browser authentication transport
+                working-directory: ui/web
+                run: yarn test:browser-auth
+            -   name: Native browser audio graph
+                working-directory: ui/web
+                run: yarn test:audio-graph
+            -   name: Store isolation and debugger browser workflow
+                working-directory: ui/web
+                run: yarn test:store-debug
 
-    build-and-push:
+    dsp-quality:
         runs-on: docker-cli
-        needs: [ quality-gate, frontend-quality ]
         container:
             image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
         steps:
@@ -333,8 +352,35 @@ jobs:
                 run: |
                     git init -q
                     git remote add origin ${{ forgejo.event.repository.clone_url }}
-                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin ${{ forgejo.ref }}
-                    git checkout -q FETCH_HEAD
+                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
+                    git checkout -q --detach "${{ forgejo.sha }}"
+                    test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+            -   name: Install pinned Emscripten
+                run: |
+                    git init -q /tmp/baander-dsp-emsdk
+                    git -C /tmp/baander-dsp-emsdk remote add origin https://github.com/emscripten-core/emsdk.git
+                    git -C /tmp/baander-dsp-emsdk fetch -q --depth 1 origin db04e88298d9916fc51fcd3743045ca3eb695127
+                    git -C /tmp/baander-dsp-emsdk checkout -q --detach FETCH_HEAD
+                    /tmp/baander-dsp-emsdk/emsdk install 6.0.3
+                    /tmp/baander-dsp-emsdk/emsdk activate 6.0.3
+            -   name: Build and qualify analysis modules
+                run: |
+                    . /tmp/baander-dsp-emsdk/emsdk_env.sh
+                    bash scripts/test-dsp-analysis.sh
+
+    build-and-push:
+        runs-on: docker-cli
+        needs: [ quality-gate, frontend-quality, dsp-quality ]
+        container:
+            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+        steps:
+            -   name: Checkout
+                run: |
+                    git init -q
+                    git remote add origin ${{ forgejo.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
+                    git checkout -q --detach "${{ forgejo.sha }}"
+                    test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
 
             -   name: Login to Container Registry
                 run: echo "${{ secrets.REGISTRY_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ forgejo.actor }} --password-stdin
