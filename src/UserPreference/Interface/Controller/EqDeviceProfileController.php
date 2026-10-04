@@ -7,6 +7,7 @@ namespace App\UserPreference\Interface\Controller;
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\UserPreference\Application\Exception\EqDeviceProfileNotFound;
 use App\UserPreference\Application\Port\EqDeviceProfilePortInterface;
 use App\UserPreference\Interface\Request\CreateEqDeviceProfileRequest;
 use App\UserPreference\Interface\Request\UpdateEqDeviceProfileRequest;
@@ -130,7 +131,11 @@ final class EqDeviceProfileController
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
     public function show(string $id): JsonResponse
     {
-        $profile = $this->profilePort->getProfile(Uuid::fromString($id));
+        try {
+            $profile = $this->profilePort->getProfile($this->getUserId(), $this->profileId($id));
+        } catch (EqDeviceProfileNotFound) {
+            return $this->notFound();
+        }
 
         return $this->successResponse($profile);
     }
@@ -181,14 +186,19 @@ final class EqDeviceProfileController
             return $this->validationErrorResponse($errors);
         }
 
-        $profile = $this->profilePort->updateProfile(
-            Uuid::fromString($id),
-            $dto->name,
-            $dto->icon,
-            $dto->deviceId,
-            $dto->payload,
-            $dto->sortOrder,
-        );
+        try {
+            $profile = $this->profilePort->updateProfile(
+                $this->getUserId(),
+                $this->profileId($id),
+                $dto->name,
+                $dto->icon,
+                $dto->deviceId,
+                $dto->payload,
+                $dto->sortOrder,
+            );
+        } catch (EqDeviceProfileNotFound) {
+            return $this->notFound();
+        }
 
         return $this->successResponse($profile);
     }
@@ -212,7 +222,9 @@ final class EqDeviceProfileController
     public function delete(string $id): JsonResponse
     {
         try {
-            $this->profilePort->deleteProfile(Uuid::fromString($id));
+            $this->profilePort->deleteProfile($this->getUserId(), $this->profileId($id));
+        } catch (EqDeviceProfileNotFound) {
+            return $this->notFound();
         } catch (\RuntimeException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
@@ -236,9 +248,22 @@ final class EqDeviceProfileController
     public function activate(string $id): JsonResponse
     {
         $userId = $this->getUserId();
-        $result = $this->profilePort->activateProfile($userId, Uuid::fromString($id));
+        try {
+            $result = $this->profilePort->activateProfile($userId, $this->profileId($id));
+        } catch (EqDeviceProfileNotFound) {
+            return $this->notFound();
+        }
 
         return $this->successResponse($result);
+    }
+
+    private function profileId(string $id): Uuid
+    {
+        try {
+            return Uuid::fromString($id);
+        } catch (\InvalidArgumentException) {
+            throw new EqDeviceProfileNotFound();
+        }
     }
 
     private function getUserId(): Uuid

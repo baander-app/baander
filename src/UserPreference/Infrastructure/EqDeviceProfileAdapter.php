@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\UserPreference\Infrastructure;
 
 use App\Shared\Domain\Model\Uuid;
+use App\UserPreference\Application\Exception\EqDeviceProfileNotFound;
 use App\UserPreference\Application\Port\EqDeviceProfilePortInterface;
 use App\UserPreference\Domain\Model\EqDeviceProfile;
 use App\UserPreference\Domain\Repository\EqDeviceProfileRepositoryInterface;
@@ -23,13 +24,9 @@ final class EqDeviceProfileAdapter implements EqDeviceProfilePortInterface
         return array_map(fn (EqDeviceProfile $m) => $this->toArray($m), $models);
     }
 
-    public function getProfile(Uuid $profileId): array
+    public function getProfile(Uuid $userId, Uuid $profileId): array
     {
-        $model = $this->repository->findById($profileId);
-
-        if ($model === null) {
-            throw new \InvalidArgumentException(sprintf('Profile %s not found.', $profileId->toString()));
-        }
+        $model = $this->requireOwnedProfile($userId, $profileId);
 
         return $this->toArray($model);
     }
@@ -58,13 +55,9 @@ final class EqDeviceProfileAdapter implements EqDeviceProfilePortInterface
         return $this->toArray($model);
     }
 
-    public function updateProfile(Uuid $profileId, ?string $name, ?string $icon, ?string $deviceId, ?array $payload, ?int $sortOrder): array
+    public function updateProfile(Uuid $userId, Uuid $profileId, ?string $name, ?string $icon, ?string $deviceId, ?array $payload, ?int $sortOrder): array
     {
-        $model = $this->repository->findById($profileId);
-
-        if ($model === null) {
-            throw new \InvalidArgumentException(sprintf('Profile %s not found.', $profileId->toString()));
-        }
+        $model = $this->requireOwnedProfile($userId, $profileId);
 
         $model->updateDetails(
             name: $name,
@@ -79,13 +72,9 @@ final class EqDeviceProfileAdapter implements EqDeviceProfilePortInterface
         return $this->toArray($model);
     }
 
-    public function deleteProfile(Uuid $profileId): void
+    public function deleteProfile(Uuid $userId, Uuid $profileId): void
     {
-        $model = $this->repository->findById($profileId);
-
-        if ($model === null) {
-            throw new \InvalidArgumentException(sprintf('Profile %s not found.', $profileId->toString()));
-        }
+        $model = $this->requireOwnedProfile($userId, $profileId);
 
         if ($model->isDefault()) {
             throw new \RuntimeException('Cannot delete the default profile.');
@@ -96,13 +85,19 @@ final class EqDeviceProfileAdapter implements EqDeviceProfilePortInterface
 
     public function activateProfile(Uuid $userId, Uuid $profileId): array
     {
-        $model = $this->repository->findById($profileId);
-
-        if ($model === null) {
-            throw new \InvalidArgumentException(sprintf('Profile %s not found.', $profileId->toString()));
-        }
+        $this->requireOwnedProfile($userId, $profileId);
 
         return ['activeProfileId' => $profileId->toString()];
+    }
+
+    private function requireOwnedProfile(Uuid $userId, Uuid $profileId): EqDeviceProfile
+    {
+        $profile = $this->repository->findById($profileId);
+        if ($profile === null || !$profile->getUserId()->equals($userId)) {
+            throw new EqDeviceProfileNotFound();
+        }
+
+        return $profile;
     }
 
     public function findProfileByDeviceId(Uuid $userId, string $deviceId): ?array

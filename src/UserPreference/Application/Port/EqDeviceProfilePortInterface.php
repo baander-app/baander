@@ -16,7 +16,7 @@ interface EqDeviceProfilePortInterface
     /**
      * @return array{id: string, name: string, icon: string, deviceId: string|null, payload: array, isDefault: bool, sortOrder: int, version: int, createdAt: string, updatedAt: string}
      */
-    public function getProfile(Uuid $profileId): array;
+    public function getProfile(Uuid $userId, Uuid $profileId): array;
 
     /**
      * @param array $payload
@@ -26,9 +26,9 @@ interface EqDeviceProfilePortInterface
     /**
      * @param array|null $payload
      */
-    public function updateProfile(Uuid $profileId, ?string $name, ?string $icon, ?string $deviceId, ?array $payload, ?int $sortOrder): array;
+    public function updateProfile(Uuid $userId, Uuid $profileId, ?string $name, ?string $icon, ?string $deviceId, ?array $payload, ?int $sortOrder): array;
 
-    public function deleteProfile(Uuid $profileId): void;
+    public function deleteProfile(Uuid $userId, Uuid $profileId): void;
 
     /**
      * @return array{activeProfileId: string|null}

@@ -6,6 +6,9 @@ namespace App\Tests\Functional\Controller;
 
 use App\Auth\Domain\Model\User;
 use App\Tests\Functional\TestCase;
+use App\UserPreference\Application\Port\EqDeviceProfilePortInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Functional tests for EQ device profile management.
@@ -18,11 +21,8 @@ use App\Tests\Functional\TestCase;
  *   DELETE /api/user/eq-profiles/{id}       delete (422 for default)
  *   POST   /api/user/eq-profiles/{id}/activate  activate
  *
- * Notable behaviour pinned here:
- *  - show/update/delete do NOT pass userId to the adapter — any authenticated
- *    user can access another user's profile (no ownership enforcement).
- *  - getProfile/updateProfile/deleteProfile throw InvalidArgumentException for
- *    a missing profile, which the controller does NOT catch → 500 instead of 404.
+ * Profile reads and mutations require the requesting owner; unrelated admins have
+ * no bypass. Missing, malformed, and foreign profile IDs all return 404.
  */
 final class EqDeviceProfileControllerTest extends TestCase
 {
@@ -140,32 +140,6 @@ final class EqDeviceProfileControllerTest extends TestCase
         $this->assertSame('Speakers', $data['data']['name']);
     }
 
-    public function testShowForMissingProfileReturns500(): void
-    {
-        // BUG PIN: getProfile throws InvalidArgumentException for a missing profile.
-        // The controller does not catch it, so the ExceptionSubscriber maps it to 500
-        // instead of the expected 404.
-        $user = $this->createTestUser();
-
-        $response = $this->authenticatedRequest('GET', '/api/user/eq-profiles/' . $this->zeroUuid(), $user);
-
-        $this->assertSame(500, $response->getStatusCode(), $response->getContent());
-    }
-
-    public function testShowDoesNotEnforceOwnership(): void
-    {
-        // BUG PIN: show() passes only the profileId (no userId), so any authenticated
-        // user can read another user's EQ profile.
-        $owner = $this->createTestUser();
-        $intruder = $this->createTestUser();
-
-        $created = $this->assertJsonResponse($this->createProfile($owner, 'Secret EQ', 'headphones'), 201, 'data');
-
-        $response = $this->authenticatedRequest('GET', '/api/user/eq-profiles/' . $created['data']['id'], $intruder);
-
-        $this->assertSame(200, $response->getStatusCode(), 'show has no ownership check (bug).');
-    }
-
     // ---------------------------------------------------------------
     // PUT /{id} (update)
     // ---------------------------------------------------------------
@@ -210,20 +184,6 @@ final class EqDeviceProfileControllerTest extends TestCase
         $this->assertSame($originalVersion + 1, $data['data']['version']);
     }
 
-    public function testUpdateDoesNotEnforceOwnership(): void
-    {
-        // BUG PIN: update() passes only the profileId — no ownership check.
-        $owner = $this->createTestUser();
-        $intruder = $this->createTestUser();
-        $created = $this->assertJsonResponse($this->createProfile($owner, 'Owner EQ', 'headphones'), 201, 'data');
-
-        $response = $this->authenticatedRequest('PUT', '/api/user/eq-profiles/' . $created['data']['id'], $intruder, [
-            'name' => 'Hacked',
-        ]);
-
-        $this->assertSame(200, $response->getStatusCode(), 'update has no ownership check (bug).');
-    }
-
     // ---------------------------------------------------------------
     // DELETE /{id}
     // ---------------------------------------------------------------
@@ -257,18 +217,6 @@ final class EqDeviceProfileControllerTest extends TestCase
         $this->assertSame([], $listData['data']['profiles']);
     }
 
-    public function testDeleteDoesNotEnforceOwnership(): void
-    {
-        // BUG PIN: delete() passes only the profileId — no ownership check.
-        $owner = $this->createTestUser();
-        $intruder = $this->createTestUser();
-        $created = $this->assertJsonResponse($this->createProfile($owner, 'Owner EQ', 'headphones'), 201, 'data');
-
-        $response = $this->authenticatedRequest('DELETE', '/api/user/eq-profiles/' . $created['data']['id'], $intruder);
-
-        $this->assertSame(200, $response->getStatusCode(), 'delete has no ownership check (bug).');
-    }
-
     // ---------------------------------------------------------------
     // POST /{id}/activate
     // ---------------------------------------------------------------
@@ -294,11 +242,77 @@ final class EqDeviceProfileControllerTest extends TestCase
         $this->assertSame($created['data']['id'], $data['data']['activeProfileId']);
     }
 
+    /** @return iterable<string, array{string, string, array<string, mixed>}> */
+    public static function profileOperations(): iterable
+    {
+        yield 'show' => ['GET', '', []];
+        yield 'update' => ['PUT', '', ['name' => 'Hacked', 'payload' => ['bands' => [12]]]];
+        yield 'delete' => ['DELETE', '', []];
+        yield 'activate' => ['POST', '/activate', []];
+    }
+
+    /** @return iterable<string, array{string, string, array<string, mixed>, bool}> */
+    public static function foreignProfileOperations(): iterable
+    {
+        foreach (self::profileOperations() as $operation => $arguments) {
+            yield $operation . ' ordinary user' => [...$arguments, false];
+            yield $operation . ' unrelated admin' => [...$arguments, true];
+        }
+    }
+
+    /** @param array<string, mixed> $content */
+    #[DataProvider('foreignProfileOperations')]
+    public function testForeignProfileIsNotAccessibleOrMutated(string $method, string $suffix, array $content, bool $admin): void
+    {
+        $owner = $this->createTestUser();
+        $intruder = $admin ? $this->createAdminUser() : $this->createTestUser();
+        $created = $this->assertJsonResponse($this->createProfile($owner, 'Private EQ Profile', 'headphones', 'private-device-id'), 201, 'data');
+        $uri = '/api/user/eq-profiles/' . $created['data']['id'];
+        $response = $this->authenticatedRequest($method, $uri . $suffix, $intruder, $content);
+        $error = $this->assertJsonResponse($response, 404);
+        $this->assertArrayNotHasKey('data', $error);
+        $this->assertStringNotContainsString('Private EQ Profile', $response->getContent());
+        $this->assertStringNotContainsString('private-device-id', $response->getContent());
+        $this->entityManager->clear();
+        $stored = $this->assertJsonResponse($this->authenticatedRequest('GET', $uri, $owner), 200, 'data');
+        $this->assertSame($created['data'], $stored['data']);
+    }
+
+    /** @param array<string, mixed> $content */
+    #[DataProvider('profileOperations')]
+    public function testMissingProfileReturns404(string $method, string $suffix, array $content): void
+    {
+        $user = $this->createTestUser();
+        $this->assertJsonResponse($this->authenticatedRequest($method, '/api/user/eq-profiles/' . $this->zeroUuid() . $suffix, $user, $content), 404);
+    }
+
+    /** @param array<string, mixed> $content */
+    #[DataProvider('profileOperations')]
+    public function testMalformedProfileIdReturns404(string $method, string $suffix, array $content): void
+    {
+        $user = $this->createTestUser();
+        $this->assertJsonResponse($this->authenticatedRequest($method, '/api/user/eq-profiles/invalid-id' . $suffix, $user, $content), 404);
+    }
+
+    public function testDefaultProfileDeletionRemainsOwnerOnlyAndProtected(): void
+    {
+        $owner = $this->createTestUser();
+        $admin = $this->createAdminUser();
+        $port = static::getContainer()->get(EqDeviceProfilePortInterface::class);
+        $profile = $port->createProfile($owner->getId(), 'Private Default', 'custom', null, [], isDefault: true);
+        $uri = '/api/user/eq-profiles/' . $profile['id'];
+        $this->assertJsonResponse($this->authenticatedRequest('DELETE', $uri, $admin), 404);
+        $this->assertJsonResponse($this->authenticatedRequest('DELETE', $uri, $owner), 422);
+        $this->entityManager->clear();
+        $stored = $this->assertJsonResponse($this->authenticatedRequest('GET', $uri, $owner), 200, 'data');
+        $this->assertSame($profile, $stored['data']);
+    }
+
     // ---------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------
 
-    private function createProfile(User $user, string $name, string $icon, ?string $deviceId = null)
+    private function createProfile(User $user, string $name, string $icon, ?string $deviceId = null): Response
     {
         return $this->authenticatedRequest('POST', '/api/user/eq-profiles/', $user, [
             'name' => $name,
