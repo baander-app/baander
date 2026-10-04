@@ -42,6 +42,7 @@ final class SwooleFallbackHandlerRegistrationTest extends TestCase
         }
     }
 
+    /** @return iterable<string, array{class-string, object, string|null, int}> */
     public static function handlerTransports(): iterable
     {
         $messages = [

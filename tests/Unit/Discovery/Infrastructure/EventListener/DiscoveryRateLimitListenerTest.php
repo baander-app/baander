@@ -29,7 +29,6 @@ final class DiscoveryRateLimitListenerTest extends TestCase
 
         $listener->onKernelRequest($event);
 
-        $this->assertTrue(true); // no exception, limiter not called
     }
 
     public function testAllowsRequestWithinLimit(): void

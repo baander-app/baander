@@ -44,7 +44,6 @@ final class LibraryResourceTest extends TestCase
 
         $result = LibraryResource::from($library);
 
-        $this->assertIsArray($result);
         $this->assertSame($library->getId()->toString(), $result['id']);
         $this->assertSame('My Music', $result['name']);
         $this->assertSame('my-music', $result['slug']);

@@ -18,7 +18,6 @@ final class NotificationCategoryTest extends TestCase
     public function testAdminOperationsHeaderColor(): void
     {
         $color = NotificationCategory::AdminOperations->headerColor();
-        $this->assertIsString($color);
         $this->assertStringStartsWith('#', $color);
     }
 

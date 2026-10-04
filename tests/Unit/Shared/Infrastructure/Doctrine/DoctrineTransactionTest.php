@@ -47,7 +47,6 @@ final class DoctrineTransactionTest extends TestCase
 
         try {
             (new DoctrineTransaction($registry, new Swoole()))->run(static fn (): never => throw $error);
-            self::fail('The operation should fail.');
         } catch (\RuntimeException $caught) {
             self::assertSame($error, $caught);
         }

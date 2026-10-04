@@ -10,6 +10,7 @@ use PHPUnit\Framework\TestCase;
 
 final class MetadataMatchTest extends TestCase
 {
+    /** @var array{title: string, artist: string, album: string} */
     private array $candidate;
 
     protected function setUp(): void
@@ -194,10 +195,10 @@ final class MetadataMatchTest extends TestCase
             songScore: 0.75,
         );
 
-        $this->assertIsArray($match->getCandidate());
-        $this->assertIsFloat($match->getConfidence());
-        $this->assertIsFloat($match->getArtistScore());
-        $this->assertIsFloat($match->getAlbumScore());
-        $this->assertIsFloat($match->getSongScore());
+        $this->assertSame($this->candidate, $match->getCandidate());
+        $this->assertSame(0.75, $match->getConfidence());
+        $this->assertSame(0.8, $match->getArtistScore());
+        $this->assertSame(0.7, $match->getAlbumScore());
+        $this->assertSame(0.75, $match->getSongScore());
     }
 }

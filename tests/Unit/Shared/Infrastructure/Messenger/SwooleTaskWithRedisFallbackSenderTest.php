@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Shared\Infrastructure\Messenger;
 use App\Shared\Infrastructure\Messenger\SwooleTaskDispatcherInterface;
 use App\Shared\Infrastructure\Messenger\SwooleTaskWithRedisFallbackSender;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Envelope;
@@ -14,7 +15,7 @@ use Symfony\Component\Messenger\Transport\Sender\SenderInterface;
 
 final class SwooleTaskWithRedisFallbackSenderTest extends TestCase
 {
-    private SwooleTaskDispatcherInterface $dispatcher;
+    private SwooleTaskDispatcherInterface&Stub $dispatcher;
     private SenderInterface&MockObject $redisFallback;
     private LoggerInterface&MockObject $logger;
 

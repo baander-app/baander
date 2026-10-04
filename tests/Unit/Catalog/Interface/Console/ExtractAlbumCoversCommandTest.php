@@ -56,6 +56,7 @@ final class ExtractAlbumCoversCommandTest extends TestCase
         self::assertSame([null, $ids[499], $ids[500]], $cursors);
     }
 
+    /** @return iterable<string, array{bool}> */
     public static function coverlessSetChanges(): iterable
     {
         yield 'accepted jobs immediately acquire covers' => [true];

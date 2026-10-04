@@ -80,6 +80,7 @@ abstract class TestCase extends WebTestCase
         return $user;
     }
 
+    /** @param array<string, mixed> $content */
     protected function authenticatedRequest(string $method, string $uri, User $user, array $content = []): Response
     {
         $headers = [
@@ -96,6 +97,7 @@ abstract class TestCase extends WebTestCase
         return $this->client->getResponse();
     }
 
+    /** @param array<string, mixed> $content */
     protected function anonymousRequest(string $method, string $uri, array $content = []): Response
     {
         $headers = ['CONTENT_TYPE' => 'application/json'];
@@ -109,6 +111,7 @@ abstract class TestCase extends WebTestCase
         return $this->client->getResponse();
     }
 
+    /** @return array<array-key, mixed> */
     protected function assertJsonResponse(Response $response, int $expectedStatus, ?string $expectedKey = null): array
     {
         $this->assertSame($expectedStatus, $response->getStatusCode(), $response->getContent());

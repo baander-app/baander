@@ -54,6 +54,6 @@ final class NotificationChannelTest extends TestCase
 
     public function testTryFromInvalidString(): void
     {
-        $this->assertNull(NotificationChannel::tryFrom('invalid_channel'));
+        $this->assertSame(null, NotificationChannel::tryFrom('invalid_channel'));
     }
 }

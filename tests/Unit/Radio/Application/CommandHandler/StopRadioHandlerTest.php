@@ -8,11 +8,12 @@ use App\Radio\Application\Command\StopRadioCommand;
 use App\Radio\Application\CommandHandler\StopRadioHandler;
 use App\Radio\Application\Port\RadioSessionPortInterface;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 
 final class StopRadioHandlerTest extends TestCase
 {
-    private RadioSessionPortInterface $sessionPort;
+    private RadioSessionPortInterface&Stub $sessionPort;
     private StopRadioHandler $handler;
 
     protected function setUp(): void

@@ -13,6 +13,7 @@ use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\TranscodeStatus;
 use App\Transcode\Infrastructure\Swoole\JobStatePersister;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
@@ -20,9 +21,9 @@ use Symfony\Component\Serializer\Exception\NotEncodableValueException;
 
 final class JobStatePersisterTest extends TestCase
 {
-    private TranscodeJobRepositoryInterface $jobRepository;
-    private TranscodeStoragePortInterface $storage;
-    private LoggerInterface $logger;
+    private TranscodeJobRepositoryInterface&Stub $jobRepository;
+    private TranscodeStoragePortInterface&Stub $storage;
+    private LoggerInterface&Stub $logger;
     private string $stateDir;
 
     protected function setUp(): void
@@ -184,7 +185,7 @@ final class JobStatePersisterTest extends TestCase
         // Should not throw even if the file doesn't exist
         $persister->cleanup(new PublicId());
 
-        $this->assertTrue(true); // Reached without exception
+        $this->assertSame([], glob($this->stateDir . '/*'));
     }
 
     public function testListPersistedJobsReturnsEmptyWhenNoFiles(): void

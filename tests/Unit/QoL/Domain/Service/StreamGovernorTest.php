@@ -239,6 +239,8 @@ class StreamGovernorTest extends TestCase
     /**
      * Create an Active governor with deterministic coefficients for predictable predict() output.
      * Coefficients: [intercept, heightCoef, bitrateCoef, hwaccelCoef].
+     *
+     * @param array{float, float, float, float} $coefficients
      */
     private function createActiveGovernor(
         array $coefficients,

@@ -200,7 +200,7 @@ final class JobMonitorServiceTest extends TestCase
             ->method('update')
             ->with(
                 'job_monitors',
-                $this->callback(function (array $data) use ($exception): bool {
+                $this->callback(function (array $data): bool {
                     $exceptionData = json_decode($data['exception'], true);
 
                     return $data['status'] === JobStatus::Failed->value
@@ -256,7 +256,7 @@ final class JobMonitorServiceTest extends TestCase
         $entry = ['action' => 'test', 'userId' => 'user-1'];
         $this->service->appendAuditLog('job-audit', $entry);
 
-        $log = json_decode($entity->getAuditLog(), true);
+        $log = $this->readAuditLog($entity);
         $this->assertCount(1, $log);
         $this->assertSame('test', $log[0]['action']);
         $this->assertSame('user-1', $log[0]['userId']);
@@ -283,7 +283,7 @@ final class JobMonitorServiceTest extends TestCase
         $newEntry = ['action' => 'second', 'userId' => 'user-2'];
         $this->service->appendAuditLog('job-audit-2', $newEntry);
 
-        $log = json_decode($entity->getAuditLog(), true);
+        $log = $this->readAuditLog($entity);
         $this->assertCount(2, $log);
         $this->assertSame('first', $log[0]['action']);
         $this->assertSame('second', $log[1]['action']);
@@ -329,7 +329,7 @@ final class JobMonitorServiceTest extends TestCase
 
         $this->assertTrue($entity->isRetried());
 
-        $log = json_decode($entity->getAuditLog(), true);
+        $log = $this->readAuditLog($entity);
         $this->assertCount(1, $log);
         $this->assertSame('retry', $log[0]['action']);
         $this->assertSame('new-job-456', $log[0]['newJobId']);
@@ -358,7 +358,7 @@ final class JobMonitorServiceTest extends TestCase
 
         $this->assertTrue($entity->isRetried());
 
-        $log = json_decode($entity->getAuditLog(), true);
+        $log = $this->readAuditLog($entity);
         $this->assertCount(2, $log);
         $this->assertSame('previous', $log[0]['action']);
         $this->assertSame('retry', $log[1]['action']);
@@ -378,4 +378,16 @@ final class JobMonitorServiceTest extends TestCase
 
         $this->service->markRetriedWithAudit('non-existent', 'new-job', 'user-1');
     }
+
+    /** @return array<array-key, mixed> */
+    private function readAuditLog(JobMonitorEntity $entity): array
+    {
+        $auditLog = $entity->getAuditLog();
+        self::assertNotNull($auditLog);
+        $entries = json_decode($auditLog, true, 512, JSON_THROW_ON_ERROR);
+        self::assertIsArray($entries);
+
+        return $entries;
+    }
+
 }

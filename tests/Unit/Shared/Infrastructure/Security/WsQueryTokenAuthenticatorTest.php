@@ -13,15 +13,16 @@ use App\Shared\Infrastructure\Security\WsQueryTokenAuthenticator;
 use League\OAuth2\Server\Exception\OAuthServerException;
 use League\OAuth2\Server\ResourceServer;
 use Nyholm\Psr7\Factory\Psr17Factory;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bridge\PsrHttpMessage\HttpMessageFactoryInterface;
 
 final class WsQueryTokenAuthenticatorTest extends TestCase
 {
     private WsQueryTokenAuthenticator $authenticator;
-    private ResourceServer $resourceServer;
-    private UserRepositoryInterface $userRepository;
-    private HttpMessageFactoryInterface $psrHttpFactory;
+    private ResourceServer&Stub $resourceServer;
+    private UserRepositoryInterface&Stub $userRepository;
+    private HttpMessageFactoryInterface&Stub $psrHttpFactory;
     private Psr17Factory $psr17Factory;
 
     protected function setUp(): void
@@ -44,6 +45,7 @@ final class WsQueryTokenAuthenticatorTest extends TestCase
         return $fixture;
     }
 
+    /** @param array<string, mixed> $get */
     private function createSwooleRequest(array $get = [], string $requestUri = '/api/ws'): \Swoole\Http\Request
     {
         $request = new \Swoole\Http\Request();

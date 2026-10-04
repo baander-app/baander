@@ -8,11 +8,12 @@ use App\Radio\Application\Command\StarStationCommand;
 use App\Radio\Application\CommandHandler\StarStationHandler;
 use App\Radio\Application\Port\StarredStationPortInterface;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 
 final class StarStationHandlerTest extends TestCase
 {
-    private StarredStationPortInterface $starredPort;
+    private StarredStationPortInterface&Stub $starredPort;
     private StarStationHandler $handler;
 
     protected function setUp(): void

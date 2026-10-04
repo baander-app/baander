@@ -47,7 +47,6 @@ final class LibraryTypeTest extends TestCase
     public function testAllCasesAreBackedEnums(): void
     {
         foreach (LibraryType::cases() as $case) {
-            $this->assertIsString($case->value);
             $this->assertNotEmpty($case->value);
         }
     }
@@ -68,7 +67,7 @@ final class LibraryTypeTest extends TestCase
 
     public function testTryFromReturnsNullForInvalidValue(): void
     {
-        $this->assertNull(LibraryType::tryFrom('invalid'));
+        $this->assertSame(null, LibraryType::tryFrom('invalid'));
     }
 
     public function testFromThrowsOnInvalidValue(): void

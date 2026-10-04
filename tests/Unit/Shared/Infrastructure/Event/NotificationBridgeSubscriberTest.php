@@ -13,6 +13,8 @@ use App\Shared\Domain\Event\AbstractDomainEvent;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Event\NotificationBridgeSubscriber;
+use PHPUnit\Framework\MockObject\Stub;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Envelope;
@@ -21,8 +23,8 @@ use Symfony\Component\Messenger\MessageBusInterface;
 final class NotificationBridgeSubscriberTest extends TestCase
 {
     private EventCategoryResolver $categoryResolver;
-    private MessageBusInterface $bus;
-    private LoggerInterface $logger;
+    private MessageBusInterface&MockObject $bus;
+    private LoggerInterface&Stub $logger;
 
     protected function setUp(): void
     {
@@ -43,7 +45,7 @@ final class NotificationBridgeSubscriberTest extends TestCase
     public function testMappedEventDispatchesToMessenger(): void
     {
         $userId = Uuid::generate();
-        $event = new PasswordChanged($userId, Email::fromString('test@example.com'));
+        $event = new PasswordChanged($userId, Email::fromString('test@baander.app'));
 
         $this->bus->expects($this->once())
             ->method('dispatch')
@@ -86,7 +88,7 @@ final class NotificationBridgeSubscriberTest extends TestCase
     public function testBridgeDoesNotThrowOnMappedEvent(): void
     {
         $userId = Uuid::generate();
-        $event = new PasswordChanged($userId, Email::fromString('test@example.com'));
+        $event = new PasswordChanged($userId, Email::fromString('test@baander.app'));
 
         $this->bus->expects($this->once())->method('dispatch')
             ->with($this->callback(static fn (CreateNotificationCommand $command): bool => $command->eventClass === PasswordChanged::class))

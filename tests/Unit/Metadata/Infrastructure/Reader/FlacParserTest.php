@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Metadata\Infrastructure\Reader;
 
 use App\Metadata\Infrastructure\Reader\FlacParser;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 final class FlacParserTest extends TestCase
 {
-    private LoggerInterface $logger;
+    private LoggerInterface&Stub $logger;
 
     protected function setUp(): void
     {
@@ -163,6 +164,7 @@ final class FlacParserTest extends TestCase
 
     // ---- Helpers ----
 
+    /** @param array<string, list<string>> $comments */
     private function buildFlacFile(array $comments): string
     {
         return $this->tempFile(
@@ -170,6 +172,7 @@ final class FlacParserTest extends TestCase
         );
     }
 
+    /** @param array<string, list<string>> $comments */
     private function buildFlacFileWithPicture(array $comments): string
     {
         return $this->tempFile(
@@ -195,6 +198,7 @@ final class FlacParserTest extends TestCase
     /**
      * @param array<string, list<string>> $comments
      */
+    /** @param array<string, list<string>> $comments */
     private function buildVorbisCommentBlock(array $comments, bool $isLast): string
     {
         $vendor = 'PHP Unit Test';

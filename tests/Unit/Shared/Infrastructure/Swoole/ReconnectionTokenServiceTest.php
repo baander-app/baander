@@ -24,7 +24,6 @@ final class ReconnectionTokenServiceTest extends TestCase
     {
         $token = $this->service->generate('user-1');
 
-        $this->assertIsString($token);
         $this->assertGreaterThan(0, strlen($token));
     }
 

@@ -44,8 +44,8 @@ final class ScheduledJobTest extends TestCase
         $this->assertNull($job->getLastFailureAt());
         $this->assertNull($job->getLastError());
         $this->assertNotNull($job->getNextRunAt());
-        $this->assertNotNull($job->getCreatedAt());
-        $this->assertNotNull($job->getUpdatedAt());
+        $this->assertInstanceOf(\DateTimeImmutable::class, $job->getCreatedAt());
+        $this->assertInstanceOf(\DateTimeImmutable::class, $job->getUpdatedAt());
     }
 
     public function testCreateWithOptionalFieldsNull(): void

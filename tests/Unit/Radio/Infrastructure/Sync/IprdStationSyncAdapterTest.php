@@ -206,6 +206,7 @@ final class IprdStationSyncAdapterTest extends TestCase
         $this->assertSame('German, English', $stations[0]['language']);
     }
 
+    /** @param array<array-key, mixed>|null $data */
     private function createResponse(int $statusCode, ?array $data = null): ResponseInterface
     {
         $response = $this->createStub(ResponseInterface::class);

@@ -99,6 +99,7 @@ final class RestartPolicyTest extends TestCase
         $policy->nextDelay($now);
     }
 
+    /** @return iterable<string, array{float}> */
     public static function invalidTimes(): iterable
     {
         yield 'negative' => [-1.0];
@@ -106,6 +107,7 @@ final class RestartPolicyTest extends TestCase
         yield 'not a number' => [NAN];
     }
 
+    /** @param array{maxRestarts?: int, restartWindowSeconds?: float, initialDelaySeconds?: float, maxDelaySeconds?: float, jitterRatio?: float} $configuration */
     #[DataProvider('invalidConfiguration')]
     public function testInvalidConfigurationIsRejected(array $configuration): void
     {
@@ -113,6 +115,7 @@ final class RestartPolicyTest extends TestCase
         new RestartPolicy(...$configuration);
     }
 
+    /** @return iterable<string, array{array{maxRestarts?: int, restartWindowSeconds?: float, initialDelaySeconds?: float, maxDelaySeconds?: float, jitterRatio?: float}}> */
     public static function invalidConfiguration(): iterable
     {
         yield 'no restart budget' => [['maxRestarts' => 0]];
@@ -143,6 +146,7 @@ final class RestartPolicyTest extends TestCase
         self::assertSame(0.25, $policy->nextDelay(101.0));
     }
 
+    /** @return iterable<string, array{float}> */
     public static function invalidRandomSamples(): iterable
     {
         yield 'below range' => [-0.1];

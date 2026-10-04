@@ -8,6 +8,7 @@ use App\Shared\Infrastructure\Redis\ManagedRedisConnection;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Shared\Infrastructure\Redis\RedisPoolExhaustedException;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Redis;
 
@@ -50,7 +51,8 @@ final class RedisClientFactoryTest extends TestCase
         $this->mockConnections[] = $redis;
     }
 
-    private function createMockRedis(bool $expectCalls = false): Redis
+    /** @return ($expectCalls is true ? Redis&MockObject : Redis&Stub) */
+    private function createMockRedis(bool $expectCalls = false): Redis&Stub
     {
         $redis = $expectCalls ? $this->createMock(Redis::class) : $this->createStub(Redis::class);
         $redis->method('ping')->willReturn(true);

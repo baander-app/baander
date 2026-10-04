@@ -7,13 +7,14 @@ namespace App\Tests\Unit\Metadata\Infrastructure\Reader;
 use App\Metadata\Domain\Model\CoverArt;
 use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Metadata\Infrastructure\Reader\FlacReader;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 final class FlacReaderTest extends TestCase
 {
     private FlacReader $reader;
-    private LoggerInterface $logger;
+    private LoggerInterface&Stub $logger;
 
     protected function setUp(): void
     {
@@ -153,6 +154,7 @@ final class FlacReaderTest extends TestCase
 
     // ---- Helpers (same as FlacParserTest) ----
 
+    /** @param array<string, list<string>> $comments */
     private function buildFlacFile(array $comments): string
     {
         $streamInfoBlock = $this->buildStreamInfoBlock(false);
@@ -161,6 +163,7 @@ final class FlacReaderTest extends TestCase
         return $this->tempFile("fLaC" . $streamInfoBlock . $commentBlock);
     }
 
+    /** @param array<string, list<string>> $comments */
     private function buildFlacFileWithPicture(array $comments): string
     {
         $streamInfoBlock = $this->buildStreamInfoBlock(false);
@@ -170,6 +173,7 @@ final class FlacReaderTest extends TestCase
         return $this->tempFile("fLaC" . $streamInfoBlock . $commentBlock . $pictureBlock);
     }
 
+    /** @param array<string, list<string>> $comments */
     private function buildFlacFileWithZeroSamples(array $comments): string
     {
         // STREAMINFO with 0 total samples
@@ -193,6 +197,7 @@ final class FlacReaderTest extends TestCase
         return $this->buildBlockHeader(0, $data, $isLast) . $data;
     }
 
+    /** @param array<string, list<string>> $comments */
     private function buildVorbisCommentBlock(array $comments, bool $isLast): string
     {
         $vendor = 'Test';

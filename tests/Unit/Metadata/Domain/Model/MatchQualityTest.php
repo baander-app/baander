@@ -178,7 +178,6 @@ final class MatchQualityTest extends TestCase
         );
 
         $reasons = $quality->getReasons();
-        $this->assertIsArray($reasons);
         $this->assertCount(3, $reasons);
         $this->assertSame('Artist name matches', $reasons[0]);
         $this->assertSame('Album title similar', $reasons[1]);

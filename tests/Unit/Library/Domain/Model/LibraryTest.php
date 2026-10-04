@@ -381,8 +381,8 @@ final class LibraryTest extends TestCase
         $this->assertInstanceOf(LibrarySlug::class, $library->getSlug());
         $this->assertInstanceOf(LibraryPath::class, $library->getPath());
         $this->assertInstanceOf(LibraryType::class, $library->getType());
-        $this->assertIsString($library->getName());
-        $this->assertIsInt($library->getSortOrder());
+        $this->assertSame('Music', $library->getName());
+        $this->assertSame(2, $library->getSortOrder());
         $this->assertInstanceOf(\DateTimeImmutable::class, $library->getCreatedAt());
         $this->assertInstanceOf(\DateTimeImmutable::class, $library->getUpdatedAt());
     }

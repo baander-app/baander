@@ -42,7 +42,8 @@ class TranscodeEventTest extends TestCase
         $payload = $event->toPayload();
         $restored = TranscodeJobCompleted::fromPayload($payload);
 
-        $this->assertSame(500, $restored->getJobId() !== null ? $payload['total_segments'] : 0);
+        $this->assertSame($event->getJobId()->toString(), $restored->getJobId()->toString());
+        $this->assertSame(500, $restored->getTotalSegments());
         $this->assertSame('transcode.job_completed', $event->eventName());
     }
 

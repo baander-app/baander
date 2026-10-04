@@ -82,6 +82,7 @@ final class MessengerRoutingTest extends TestCase
         $this->assertStringContainsString('%env(MESSENGER_TRANSPORT_DSN)%', $transports['async']['dsn']);
     }
 
+    /** @return array<string, mixed> */
     private function loadMessengerConfig(): array
     {
         $content = file_get_contents(self::MESSENGER_CONFIG_PATH);

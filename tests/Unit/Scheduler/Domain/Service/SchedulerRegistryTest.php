@@ -124,7 +124,7 @@ final class SchedulerRegistryTest extends TestCase
     public function testConsoleCommandIsAllowed(): void
     {
         $command = new class extends Command implements SchedulableConsoleCommandInterface {
-            public function getName(): ?string
+            public function getName(): string
             {
                 return 'app:test:run';
             }
@@ -143,7 +143,7 @@ final class SchedulerRegistryTest extends TestCase
     public function testUnknownConsoleCommandIsNotAllowed(): void
     {
         $command = new class extends Command implements SchedulableConsoleCommandInterface {
-            public function getName(): ?string
+            public function getName(): string
             {
                 return 'app:known';
             }
@@ -162,7 +162,7 @@ final class SchedulerRegistryTest extends TestCase
     public function testConsoleCommandWithNullNameIsIgnored(): void
     {
         $command = new class extends Command implements SchedulableConsoleCommandInterface {
-            public function getName(): ?string
+            public function getName(): null
             {
                 return null;
             }
@@ -181,7 +181,7 @@ final class SchedulerRegistryTest extends TestCase
     public function testGetConsoleCommandsReturnsDescriptions(): void
     {
         $command = new class extends Command implements SchedulableConsoleCommandInterface {
-            public function getName(): ?string
+            public function getName(): string
             {
                 return 'app:sync';
             }
@@ -208,7 +208,7 @@ final class SchedulerRegistryTest extends TestCase
     public function testGetConsoleParameterSchemaReturnsParameters(): void
     {
         $command = new class extends Command implements SchedulableConsoleCommandInterface {
-            public function getName(): ?string
+            public function getName(): string
             {
                 return 'app:import';
             }

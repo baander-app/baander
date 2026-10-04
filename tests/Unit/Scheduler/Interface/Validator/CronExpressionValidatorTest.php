@@ -38,6 +38,7 @@ final class CronExpressionValidatorTest extends TestCase
         $this->validator->validate($expression, $constraint);
     }
 
+    /** @return array<string, array{string}> */
     public static function validExpressionProvider(): array
     {
         return [

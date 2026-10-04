@@ -7,13 +7,14 @@ namespace App\Tests\Unit\Metadata\Infrastructure\Reader;
 use App\Metadata\Domain\Model\CoverArt;
 use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Metadata\Infrastructure\Reader\OggReader;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 final class OggReaderTest extends TestCase
 {
     private OggReader $reader;
-    private LoggerInterface $logger;
+    private LoggerInterface&Stub $logger;
 
     protected function setUp(): void
     {
@@ -156,6 +157,7 @@ final class OggReaderTest extends TestCase
 
     // ---- Helpers ----
 
+    /** @param array<string, list<string>> $comments */
     private function buildOggFile(array $comments): string
     {
         $vendor = 'Test';

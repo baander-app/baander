@@ -8,11 +8,12 @@ use App\Radio\Application\Command\UnsubscribeCountryCommand;
 use App\Radio\Application\CommandHandler\UnsubscribeCountryHandler;
 use App\Radio\Application\Port\CountrySubscriptionPortInterface;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 
 final class UnsubscribeCountryHandlerTest extends TestCase
 {
-    private CountrySubscriptionPortInterface $subscriptionPort;
+    private CountrySubscriptionPortInterface&Stub $subscriptionPort;
     private UnsubscribeCountryHandler $handler;
 
     protected function setUp(): void

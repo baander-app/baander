@@ -8,11 +8,12 @@ use App\Radio\Application\Command\SyncCountryStationsCommand;
 use App\Radio\Application\CommandHandler\SyncCountryStationsHandler;
 use App\Radio\Application\Port\RadioStationPortInterface;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 
 final class SyncCountryStationsHandlerTest extends TestCase
 {
-    private RadioStationPortInterface $stationPort;
+    private RadioStationPortInterface&Stub $stationPort;
     private SyncCountryStationsHandler $handler;
 
     protected function setUp(): void

@@ -12,7 +12,6 @@ final class CacheTagsTest extends TestCase
     public function testOauthTokenConstantIsNonEmptyString(): void
     {
         $this->assertNotEmpty(CacheTags::OAUTH_TOKEN);
-        $this->assertIsString(CacheTags::OAUTH_TOKEN);
     }
 
     public function testOauthTokenFollowsContextEntityConvention(): void

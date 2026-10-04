@@ -9,7 +9,6 @@ use App\Shared\Domain\Model\CursorDirection;
 use App\Shared\Infrastructure\Pagination\CursorPaginator;
 use App\Shared\Infrastructure\Pagination\CursorResult;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class CursorPaginatorTest extends TestCase
 {
@@ -17,9 +16,7 @@ final class CursorPaginatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->paginator = new CursorPaginator(
-            new \App\Shared\Infrastructure\Pagination\CursorCodec(new JsonEncoder()),
-        );
+        $this->paginator = new CursorPaginator();
     }
 
     // ── CursorResult DTO tests ─────────────────────────────────────────────
