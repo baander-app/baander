@@ -39,7 +39,7 @@ abstract class TestCase extends WebTestCase
 
     protected function createTestUser(?string $email = null, string $name = 'Test User', string $password = 'password123'): User
     {
-        $email ??= 'test-' . bin2hex(random_bytes(4)) . '@example.com';
+        $email ??= 'test-' . bin2hex(random_bytes(4)) . '@baander.app';
 
         $user = User::register(
             new Email($email),
@@ -54,7 +54,7 @@ abstract class TestCase extends WebTestCase
 
     protected function createAdminUser(): User
     {
-        $email = 'admin-' . bin2hex(random_bytes(4)) . '@example.com';
+        $email = 'admin-' . bin2hex(random_bytes(4)) . '@baander.app';
         $user = User::createByOperator(
             new Email($email),
             password_hash('password', PASSWORD_BCRYPT),
@@ -68,7 +68,7 @@ abstract class TestCase extends WebTestCase
 
     protected function createSuperAdminUser(): User
     {
-        $email = 'sa-' . bin2hex(random_bytes(4)) . '@example.com';
+        $email = 'sa-' . bin2hex(random_bytes(4)) . '@baander.app';
         $user = User::createByOperator(
             new Email($email),
             password_hash('password', PASSWORD_BCRYPT),
