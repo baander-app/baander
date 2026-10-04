@@ -193,7 +193,7 @@ final class Symfony63PlusBuilder implements Builder
                         }
 
                         $overriddenLoad = str_replace('.php', '__Overridden.php', $fileToLoad);
-                        require_once $overriddenLoad;
+                        require_once $this->containerDir . DIRECTORY_SEPARATOR . $overriddenLoad;
 
                         $return = parent::load($file, $lazyLoad);
                     } finally {
