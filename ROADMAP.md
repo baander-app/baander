@@ -4,6 +4,11 @@ Updated: 2026-10-04. This is the working delivery record for the remediation,
 registry, and web-state plans. Update it when scope changes or a stage is verified.
 Completed code is not proof of production or performance qualification.
 
+External acceptance: deployment access/inventory for `de`, `ca`, `sg`, `au`, and
+`fi`, and the S3 backup configuration are unavailable (user confirmed 2026-10-04).
+Continue local implementation and emulated acceptance; actual regional deployment,
+regional measurements, and backup-destination restore qualification remain pending.
+
 ## Latest verified backend batches
 
 Signed delivery now shares full-query signature validation across manifests and
@@ -34,6 +39,12 @@ dependency pairs. With the token-port repair removing four existing occurrences,
 the scan reports 376 active violations and zero configuration errors. No baseline
 entries were added. Some newly visible edges are legitimate application contracts
 requiring precise public-contract rules; others are implementation coupling to fix.
+
+Radio and session controllers now consume the existing authenticated-identity
+contract. Fourteen regressions verify contract principals, rejection of unsupported
+principals, and user-ID propagation. The related 103 tests (369 assertions) pass;
+scoped PHPStan is clean. This removes 21 active dependencies on the concrete security
+user, leaving 355 active Deptrac violations with zero configuration errors.
 
 ## Delivery horizons
 

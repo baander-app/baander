@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Session\Interface\Controller;
 
-use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Session\Application\Command\ClaimSessionCommand;
 use App\Session\Application\Command\CreateSessionCommand;
 use App\Session\Application\Command\SyncSessionCommand;
@@ -283,10 +283,10 @@ final class SessionController
         return $this->successResponse($result, Response::HTTP_CREATED);
     }
 
-    private function getCurrentSecurityUser(): ?SecurityUser
+    private function getCurrentSecurityUser(): ?AuthenticatedUserIdentityInterface
     {
         $user = $this->security->getUser();
-        if (!$user instanceof SecurityUser) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return null;
         }
 

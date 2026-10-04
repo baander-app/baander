@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Session\Interface\Controller;
 
-use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Session\Application\Exception\DeviceNotFound;
 use App\Session\Application\Port\SessionPortInterface;
 use App\Session\Interface\Request\RegisterDeviceRequest;
@@ -206,10 +206,10 @@ final class DeviceController
         return $this->successResponse(['message' => 'Device forgotten.']);
     }
 
-    private function getCurrentSecurityUser(): ?SecurityUser
+    private function getCurrentSecurityUser(): ?AuthenticatedUserIdentityInterface
     {
         $user = $this->security->getUser();
-        if (!$user instanceof SecurityUser) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return null;
         }
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Radio\Interface\Controller;
 
-use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Radio\Application\Port\CountrySubscriptionPortInterface;
 use App\Radio\Application\Port\RadioStationPortInterface;
 use App\Shared\Domain\Model\Uuid;
@@ -92,10 +92,10 @@ final class RadioStationController
         return $this->successResponse($this->stationPort->listStations($country, $query));
     }
 
-    private function getCurrentSecurityUser(): ?SecurityUser
+    private function getCurrentSecurityUser(): ?AuthenticatedUserIdentityInterface
     {
         $user = $this->security->getUser();
-        if (!$user instanceof SecurityUser) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return null;
         }
 

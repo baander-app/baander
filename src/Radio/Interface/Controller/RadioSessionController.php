@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Radio\Interface\Controller;
 
-use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Radio\Application\Command\StartRadioCommand;
 use App\Radio\Application\Command\StopRadioCommand;
 use App\Radio\Application\Port\RadioSessionPortInterface;
@@ -139,10 +139,10 @@ final class RadioSessionController
         return $this->successResponse($result);
     }
 
-    private function getCurrentSecurityUser(): ?SecurityUser
+    private function getCurrentSecurityUser(): ?AuthenticatedUserIdentityInterface
     {
         $user = $this->security->getUser();
-        if (!$user instanceof SecurityUser) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return null;
         }
 

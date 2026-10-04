@@ -1151,6 +1151,7 @@ deptrac:
       - 'Shared Interface'
 
     'Radio Interface':
+      - 'Auth Identity Contract'
       - 'Radio Application'
       - 'Radio Resources'
       - 'Shared Domain'
@@ -1209,6 +1210,7 @@ deptrac:
       - 'Shared Interface'
 
     'Session Interface':
+      - 'Auth Identity Contract'
       - 'Session Application'
       - 'Session Resources'
       - 'Shared Domain'

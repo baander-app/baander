@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Radio\Interface\Controller;
 
-use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Radio\Application\Port\RadioSourcePortInterface;
 use App\Radio\Interface\Request\CreateRadioSourceRequest;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
@@ -104,10 +104,10 @@ final class RadioSourceController
         return $this->created($result);
     }
 
-    private function getCurrentSecurityUser(): ?SecurityUser
+    private function getCurrentSecurityUser(): ?AuthenticatedUserIdentityInterface
     {
         $user = $this->security->getUser();
-        if (!$user instanceof SecurityUser) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return null;
         }
 
