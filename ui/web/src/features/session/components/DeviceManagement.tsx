@@ -153,12 +153,7 @@ export function DeviceManagement() {
   const queryClient = useQueryClient()
   const { data: devices = [], isLoading } = useGetDeviceList({
     query: {
-      select: (res): Device[] => {
-        if ('data' in res && res.data && 'data' in res.data) {
-          return (res.data as { data: Device[] }).data ?? []
-        }
-        return []
-      },
+      select: (res): Device[] => res.data ?? [],
     },
   })
 

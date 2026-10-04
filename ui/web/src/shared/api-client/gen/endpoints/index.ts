@@ -5831,30 +5831,6 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
 
-export type getAdminActivitySummaryResponse200 = {
-  data: GetAdminActivitySummary200
-  status: 200
-}
-
-export type getAdminActivitySummaryResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type getAdminActivitySummaryResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type getAdminActivitySummaryResponseSuccess = (getAdminActivitySummaryResponse200) & {
-  headers: Headers;
-};
-export type getAdminActivitySummaryResponseError = (getAdminActivitySummaryResponse400 | getAdminActivitySummaryResponse403) & {
-  headers: Headers;
-};
-
-export type getAdminActivitySummaryResponse = (getAdminActivitySummaryResponseSuccess | getAdminActivitySummaryResponseError)
-
 export const getGetAdminActivitySummaryUrl = (params?: GetAdminActivitySummaryParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -5873,9 +5849,9 @@ export const getGetAdminActivitySummaryUrl = (params?: GetAdminActivitySummaryPa
 /**
  * @summary Get activity summary statistics
  */
-export const getAdminActivitySummary = async (params?: GetAdminActivitySummaryParams, options?: RequestInit): Promise<getAdminActivitySummaryResponse> => {
+export const getAdminActivitySummary = async (params?: GetAdminActivitySummaryParams, options?: RequestInit): Promise<GetAdminActivitySummary200> => {
 
-  return customInstance<getAdminActivitySummaryResponse>(getGetAdminActivitySummaryUrl(params),
+  return customInstance<GetAdminActivitySummary200>(getGetAdminActivitySummaryUrl(params),
   {
     ...options,
     method: 'GET'
@@ -5963,30 +5939,6 @@ export function useGetAdminActivitySummary<TData = Awaited<ReturnType<typeof get
 
 
 
-export type getAdminActivityTopTracksResponse200 = {
-  data: GetAdminActivityTopTracks200
-  status: 200
-}
-
-export type getAdminActivityTopTracksResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type getAdminActivityTopTracksResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type getAdminActivityTopTracksResponseSuccess = (getAdminActivityTopTracksResponse200) & {
-  headers: Headers;
-};
-export type getAdminActivityTopTracksResponseError = (getAdminActivityTopTracksResponse400 | getAdminActivityTopTracksResponse403) & {
-  headers: Headers;
-};
-
-export type getAdminActivityTopTracksResponse = (getAdminActivityTopTracksResponseSuccess | getAdminActivityTopTracksResponseError)
-
 export const getGetAdminActivityTopTracksUrl = (params?: GetAdminActivityTopTracksParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -6005,9 +5957,9 @@ export const getGetAdminActivityTopTracksUrl = (params?: GetAdminActivityTopTrac
 /**
  * @summary Get top tracks by play count
  */
-export const getAdminActivityTopTracks = async (params?: GetAdminActivityTopTracksParams, options?: RequestInit): Promise<getAdminActivityTopTracksResponse> => {
+export const getAdminActivityTopTracks = async (params?: GetAdminActivityTopTracksParams, options?: RequestInit): Promise<GetAdminActivityTopTracks200> => {
 
-  return customInstance<getAdminActivityTopTracksResponse>(getGetAdminActivityTopTracksUrl(params),
+  return customInstance<GetAdminActivityTopTracks200>(getGetAdminActivityTopTracksUrl(params),
   {
     ...options,
     method: 'GET'
@@ -6095,30 +6047,6 @@ export function useGetAdminActivityTopTracks<TData = Awaited<ReturnType<typeof g
 
 
 
-export type getAdminActivityTopArtistsResponse200 = {
-  data: GetAdminActivityTopArtists200
-  status: 200
-}
-
-export type getAdminActivityTopArtistsResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type getAdminActivityTopArtistsResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type getAdminActivityTopArtistsResponseSuccess = (getAdminActivityTopArtistsResponse200) & {
-  headers: Headers;
-};
-export type getAdminActivityTopArtistsResponseError = (getAdminActivityTopArtistsResponse400 | getAdminActivityTopArtistsResponse403) & {
-  headers: Headers;
-};
-
-export type getAdminActivityTopArtistsResponse = (getAdminActivityTopArtistsResponseSuccess | getAdminActivityTopArtistsResponseError)
-
 export const getGetAdminActivityTopArtistsUrl = (params?: GetAdminActivityTopArtistsParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -6137,9 +6065,9 @@ export const getGetAdminActivityTopArtistsUrl = (params?: GetAdminActivityTopArt
 /**
  * @summary Get top artists by play count
  */
-export const getAdminActivityTopArtists = async (params?: GetAdminActivityTopArtistsParams, options?: RequestInit): Promise<getAdminActivityTopArtistsResponse> => {
+export const getAdminActivityTopArtists = async (params?: GetAdminActivityTopArtistsParams, options?: RequestInit): Promise<GetAdminActivityTopArtists200> => {
 
-  return customInstance<getAdminActivityTopArtistsResponse>(getGetAdminActivityTopArtistsUrl(params),
+  return customInstance<GetAdminActivityTopArtists200>(getGetAdminActivityTopArtistsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -6227,30 +6155,6 @@ export function useGetAdminActivityTopArtists<TData = Awaited<ReturnType<typeof 
 
 
 
-export type getAdminActivityEngagementResponse200 = {
-  data: GetAdminActivityEngagement200
-  status: 200
-}
-
-export type getAdminActivityEngagementResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type getAdminActivityEngagementResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type getAdminActivityEngagementResponseSuccess = (getAdminActivityEngagementResponse200) & {
-  headers: Headers;
-};
-export type getAdminActivityEngagementResponseError = (getAdminActivityEngagementResponse400 | getAdminActivityEngagementResponse403) & {
-  headers: Headers;
-};
-
-export type getAdminActivityEngagementResponse = (getAdminActivityEngagementResponseSuccess | getAdminActivityEngagementResponseError)
-
 export const getGetAdminActivityEngagementUrl = (params?: GetAdminActivityEngagementParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -6269,9 +6173,9 @@ export const getGetAdminActivityEngagementUrl = (params?: GetAdminActivityEngage
 /**
  * @summary Get user engagement metrics
  */
-export const getAdminActivityEngagement = async (params?: GetAdminActivityEngagementParams, options?: RequestInit): Promise<getAdminActivityEngagementResponse> => {
+export const getAdminActivityEngagement = async (params?: GetAdminActivityEngagementParams, options?: RequestInit): Promise<GetAdminActivityEngagement200> => {
 
-  return customInstance<getAdminActivityEngagementResponse>(getGetAdminActivityEngagementUrl(params),
+  return customInstance<GetAdminActivityEngagement200>(getGetAdminActivityEngagementUrl(params),
   {
     ...options,
     method: 'GET'
@@ -6359,30 +6263,6 @@ export function useGetAdminActivityEngagement<TData = Awaited<ReturnType<typeof 
 
 
 
-export type getActivityHistoryResponse200 = {
-  data: GetActivityHistory200
-  status: 200
-}
-
-export type getActivityHistoryResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type getActivityHistoryResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getActivityHistoryResponseSuccess = (getActivityHistoryResponse200) & {
-  headers: Headers;
-};
-export type getActivityHistoryResponseError = (getActivityHistoryResponse400 | getActivityHistoryResponse401) & {
-  headers: Headers;
-};
-
-export type getActivityHistoryResponse = (getActivityHistoryResponseSuccess | getActivityHistoryResponseError)
-
 export const getGetActivityHistoryUrl = (params?: GetActivityHistoryParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -6401,9 +6281,9 @@ export const getGetActivityHistoryUrl = (params?: GetActivityHistoryParams,) => 
 /**
  * @summary Get the authenticated user's activity history
  */
-export const getActivityHistory = async (params?: GetActivityHistoryParams, options?: RequestInit): Promise<getActivityHistoryResponse> => {
+export const getActivityHistory = async (params?: GetActivityHistoryParams, options?: RequestInit): Promise<GetActivityHistory200> => {
 
-  return customInstance<getActivityHistoryResponse>(getGetActivityHistoryUrl(params),
+  return customInstance<GetActivityHistory200>(getGetActivityHistoryUrl(params),
   {
     ...options,
     method: 'GET'
@@ -6491,35 +6371,6 @@ export function useGetActivityHistory<TData = Awaited<ReturnType<typeof getActiv
 
 
 
-export type postActivityPlayResponse200 = {
-  data: PostActivityPlay200
-  status: 200
-}
-
-export type postActivityPlayResponse201 = {
-  data: PostActivityPlay201
-  status: 201
-}
-
-export type postActivityPlayResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postActivityPlayResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postActivityPlayResponseSuccess = (postActivityPlayResponse200 | postActivityPlayResponse201) & {
-  headers: Headers;
-};
-export type postActivityPlayResponseError = (postActivityPlayResponse401 | postActivityPlayResponse422) & {
-  headers: Headers;
-};
-
-export type postActivityPlayResponse = (postActivityPlayResponseSuccess | postActivityPlayResponseError)
-
 export const getPostActivityPlayUrl = () => {
 
 
@@ -6531,9 +6382,9 @@ export const getPostActivityPlayUrl = () => {
 /**
  * @summary Record a play event for a song or movie
  */
-export const postActivityPlay = async (postActivityPlayBody: PostActivityPlayBody, options?: RequestInit): Promise<postActivityPlayResponse> => {
+export const postActivityPlay = async (postActivityPlayBody: PostActivityPlayBody, options?: RequestInit): Promise<PostActivityPlay200 | PostActivityPlay201> => {
 
-  return customInstance<postActivityPlayResponse>(getPostActivityPlayUrl(),
+  return customInstance<PostActivityPlay200 | PostActivityPlay201>(getPostActivityPlayUrl(),
   {
     ...options,
     method: 'POST',
@@ -6590,30 +6441,6 @@ export const usePostActivityPlay = <TError = ErrorType<ApiError | ValidationErro
       return useMutation(getPostActivityPlayMutationOptions(options), queryClient);
     }
 
-export type postActivityLoveResponse200 = {
-  data: PostActivityLove200
-  status: 200
-}
-
-export type postActivityLoveResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postActivityLoveResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postActivityLoveResponseSuccess = (postActivityLoveResponse200) & {
-  headers: Headers;
-};
-export type postActivityLoveResponseError = (postActivityLoveResponse401 | postActivityLoveResponse404) & {
-  headers: Headers;
-};
-
-export type postActivityLoveResponse = (postActivityLoveResponseSuccess | postActivityLoveResponseError)
-
 export const getPostActivityLoveUrl = (publicId: string,) => {
 
 
@@ -6625,9 +6452,9 @@ export const getPostActivityLoveUrl = (publicId: string,) => {
 /**
  * @summary Toggle love on an activity
  */
-export const postActivityLove = async (publicId: string, options?: RequestInit): Promise<postActivityLoveResponse> => {
+export const postActivityLove = async (publicId: string, options?: RequestInit): Promise<PostActivityLove200> => {
 
-  return customInstance<postActivityLoveResponse>(getPostActivityLoveUrl(publicId),
+  return customInstance<PostActivityLove200>(getPostActivityLoveUrl(publicId),
   {
     ...options,
     method: 'POST'
@@ -6684,25 +6511,6 @@ export const usePostActivityLove = <TError = ErrorType<ApiError>,
       return useMutation(getPostActivityLoveMutationOptions(options), queryClient);
     }
 
-export type getActivityLovedResponse200 = {
-  data: GetActivityLoved200
-  status: 200
-}
-
-export type getActivityLovedResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getActivityLovedResponseSuccess = (getActivityLovedResponse200) & {
-  headers: Headers;
-};
-export type getActivityLovedResponseError = (getActivityLovedResponse401) & {
-  headers: Headers;
-};
-
-export type getActivityLovedResponse = (getActivityLovedResponseSuccess | getActivityLovedResponseError)
-
 export const getGetActivityLovedUrl = () => {
 
 
@@ -6714,9 +6522,9 @@ export const getGetActivityLovedUrl = () => {
 /**
  * @summary Get the authenticated user's loved items
  */
-export const getActivityLoved = async ( options?: RequestInit): Promise<getActivityLovedResponse> => {
+export const getActivityLoved = async ( options?: RequestInit): Promise<GetActivityLoved200> => {
 
-  return customInstance<getActivityLovedResponse>(getGetActivityLovedUrl(),
+  return customInstance<GetActivityLoved200>(getGetActivityLovedUrl(),
   {
     ...options,
     method: 'GET'
@@ -6804,25 +6612,6 @@ export function useGetActivityLoved<TData = Awaited<ReturnType<typeof getActivit
 
 
 
-export type getUserRecentResponse200 = {
-  data: GetUserRecent200
-  status: 200
-}
-
-export type getUserRecentResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getUserRecentResponseSuccess = (getUserRecentResponse200) & {
-  headers: Headers;
-};
-export type getUserRecentResponseError = (getUserRecentResponse401) & {
-  headers: Headers;
-};
-
-export type getUserRecentResponse = (getUserRecentResponseSuccess | getUserRecentResponseError)
-
 export const getGetUserRecentUrl = (params?: GetUserRecentParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -6841,9 +6630,9 @@ export const getGetUserRecentUrl = (params?: GetUserRecentParams,) => {
 /**
  * @summary Get recently played items
  */
-export const getUserRecent = async (params?: GetUserRecentParams, options?: RequestInit): Promise<getUserRecentResponse> => {
+export const getUserRecent = async (params?: GetUserRecentParams, options?: RequestInit): Promise<GetUserRecent200> => {
 
-  return customInstance<getUserRecentResponse>(getGetUserRecentUrl(params),
+  return customInstance<GetUserRecent200>(getGetUserRecentUrl(params),
   {
     ...options,
     method: 'GET'
@@ -6931,25 +6720,6 @@ export function useGetUserRecent<TData = Awaited<ReturnType<typeof getUserRecent
 
 
 
-export type getAdminLoginBlocksListResponse200 = {
-  data: GetAdminLoginBlocksList200
-  status: 200
-}
-
-export type getAdminLoginBlocksListResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type getAdminLoginBlocksListResponseSuccess = (getAdminLoginBlocksListResponse200) & {
-  headers: Headers;
-};
-export type getAdminLoginBlocksListResponseError = (getAdminLoginBlocksListResponse400) & {
-  headers: Headers;
-};
-
-export type getAdminLoginBlocksListResponse = (getAdminLoginBlocksListResponseSuccess | getAdminLoginBlocksListResponseError)
-
 export const getGetAdminLoginBlocksListUrl = (params?: GetAdminLoginBlocksListParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -6968,9 +6738,9 @@ export const getGetAdminLoginBlocksListUrl = (params?: GetAdminLoginBlocksListPa
 /**
  * @summary List recent honeypot blocks (paginated)
  */
-export const getAdminLoginBlocksList = async (params?: GetAdminLoginBlocksListParams, options?: RequestInit): Promise<getAdminLoginBlocksListResponse> => {
+export const getAdminLoginBlocksList = async (params?: GetAdminLoginBlocksListParams, options?: RequestInit): Promise<GetAdminLoginBlocksList200> => {
 
-  return customInstance<getAdminLoginBlocksListResponse>(getGetAdminLoginBlocksListUrl(params),
+  return customInstance<GetAdminLoginBlocksList200>(getGetAdminLoginBlocksListUrl(params),
   {
     ...options,
     method: 'GET'
@@ -7058,18 +6828,6 @@ export function useGetAdminLoginBlocksList<TData = Awaited<ReturnType<typeof get
 
 
 
-export type deleteAdminLoginBlocksDeleteAllResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteAdminLoginBlocksDeleteAllResponseSuccess = (deleteAdminLoginBlocksDeleteAllResponse204) & {
-  headers: Headers;
-};
-;
-
-export type deleteAdminLoginBlocksDeleteAllResponse = (deleteAdminLoginBlocksDeleteAllResponseSuccess)
-
 export const getDeleteAdminLoginBlocksDeleteAllUrl = () => {
 
 
@@ -7081,9 +6839,9 @@ export const getDeleteAdminLoginBlocksDeleteAllUrl = () => {
 /**
  * @summary Delete all blocks
  */
-export const deleteAdminLoginBlocksDeleteAll = async ( options?: RequestInit): Promise<deleteAdminLoginBlocksDeleteAllResponse> => {
+export const deleteAdminLoginBlocksDeleteAll = async ( options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteAdminLoginBlocksDeleteAllResponse>(getDeleteAdminLoginBlocksDeleteAllUrl(),
+  return customInstance<void>(getDeleteAdminLoginBlocksDeleteAllUrl(),
   {
     ...options,
     method: 'DELETE'
@@ -7140,25 +6898,6 @@ export const useDeleteAdminLoginBlocksDeleteAll = <TError = ErrorType<unknown>,
       return useMutation(getDeleteAdminLoginBlocksDeleteAllMutationOptions(options), queryClient);
     }
 
-export type deleteAdminLoginBlocksDeleteResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteAdminLoginBlocksDeleteResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteAdminLoginBlocksDeleteResponseSuccess = (deleteAdminLoginBlocksDeleteResponse204) & {
-  headers: Headers;
-};
-export type deleteAdminLoginBlocksDeleteResponseError = (deleteAdminLoginBlocksDeleteResponse404) & {
-  headers: Headers;
-};
-
-export type deleteAdminLoginBlocksDeleteResponse = (deleteAdminLoginBlocksDeleteResponseSuccess | deleteAdminLoginBlocksDeleteResponseError)
-
 export const getDeleteAdminLoginBlocksDeleteUrl = (id: string,) => {
 
 
@@ -7170,9 +6909,9 @@ export const getDeleteAdminLoginBlocksDeleteUrl = (id: string,) => {
 /**
  * @summary Delete a single block
  */
-export const deleteAdminLoginBlocksDelete = async (id: string, options?: RequestInit): Promise<deleteAdminLoginBlocksDeleteResponse> => {
+export const deleteAdminLoginBlocksDelete = async (id: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteAdminLoginBlocksDeleteResponse>(getDeleteAdminLoginBlocksDeleteUrl(id),
+  return customInstance<void>(getDeleteAdminLoginBlocksDeleteUrl(id),
   {
     ...options,
     method: 'DELETE'
@@ -7229,25 +6968,6 @@ export const useDeleteAdminLoginBlocksDelete = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteAdminLoginBlocksDeleteMutationOptions(options), queryClient);
     }
 
-export type getAdminUsersListResponse200 = {
-  data: GetAdminUsersList200
-  status: 200
-}
-
-export type getAdminUsersListResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type getAdminUsersListResponseSuccess = (getAdminUsersListResponse200) & {
-  headers: Headers;
-};
-export type getAdminUsersListResponseError = (getAdminUsersListResponse400) & {
-  headers: Headers;
-};
-
-export type getAdminUsersListResponse = (getAdminUsersListResponseSuccess | getAdminUsersListResponseError)
-
 export const getGetAdminUsersListUrl = (params?: GetAdminUsersListParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -7266,9 +6986,9 @@ export const getGetAdminUsersListUrl = (params?: GetAdminUsersListParams,) => {
 /**
  * @summary List all users (paginated)
  */
-export const getAdminUsersList = async (params?: GetAdminUsersListParams, options?: RequestInit): Promise<getAdminUsersListResponse> => {
+export const getAdminUsersList = async (params?: GetAdminUsersListParams, options?: RequestInit): Promise<GetAdminUsersList200> => {
 
-  return customInstance<getAdminUsersListResponse>(getGetAdminUsersListUrl(params),
+  return customInstance<GetAdminUsersList200>(getGetAdminUsersListUrl(params),
   {
     ...options,
     method: 'GET'
@@ -7356,30 +7076,6 @@ export function useGetAdminUsersList<TData = Awaited<ReturnType<typeof getAdminU
 
 
 
-export type postAdminUsersCreateResponse201 = {
-  data: PostAdminUsersCreate201
-  status: 201
-}
-
-export type postAdminUsersCreateResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type postAdminUsersCreateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postAdminUsersCreateResponseSuccess = (postAdminUsersCreateResponse201) & {
-  headers: Headers;
-};
-export type postAdminUsersCreateResponseError = (postAdminUsersCreateResponse403 | postAdminUsersCreateResponse422) & {
-  headers: Headers;
-};
-
-export type postAdminUsersCreateResponse = (postAdminUsersCreateResponseSuccess | postAdminUsersCreateResponseError)
-
 export const getPostAdminUsersCreateUrl = () => {
 
 
@@ -7391,9 +7087,9 @@ export const getPostAdminUsersCreateUrl = () => {
 /**
  * @summary Create a new user
  */
-export const postAdminUsersCreate = async (adminCreateUserRequest: AdminCreateUserRequest, options?: RequestInit): Promise<postAdminUsersCreateResponse> => {
+export const postAdminUsersCreate = async (adminCreateUserRequest: AdminCreateUserRequest, options?: RequestInit): Promise<PostAdminUsersCreate201> => {
 
-  return customInstance<postAdminUsersCreateResponse>(getPostAdminUsersCreateUrl(),
+  return customInstance<PostAdminUsersCreate201>(getPostAdminUsersCreateUrl(),
   {
     ...options,
     method: 'POST',
@@ -7450,25 +7146,6 @@ export const usePostAdminUsersCreate = <TError = ErrorType<ApiError | Validation
       return useMutation(getPostAdminUsersCreateMutationOptions(options), queryClient);
     }
 
-export type deleteAdminUsersDeleteResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteAdminUsersDeleteResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteAdminUsersDeleteResponseSuccess = (deleteAdminUsersDeleteResponse204) & {
-  headers: Headers;
-};
-export type deleteAdminUsersDeleteResponseError = (deleteAdminUsersDeleteResponse404) & {
-  headers: Headers;
-};
-
-export type deleteAdminUsersDeleteResponse = (deleteAdminUsersDeleteResponseSuccess | deleteAdminUsersDeleteResponseError)
-
 export const getDeleteAdminUsersDeleteUrl = (id: string,) => {
 
 
@@ -7480,9 +7157,9 @@ export const getDeleteAdminUsersDeleteUrl = (id: string,) => {
 /**
  * @summary Delete a user
  */
-export const deleteAdminUsersDelete = async (id: string, options?: RequestInit): Promise<deleteAdminUsersDeleteResponse> => {
+export const deleteAdminUsersDelete = async (id: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteAdminUsersDeleteResponse>(getDeleteAdminUsersDeleteUrl(id),
+  return customInstance<void>(getDeleteAdminUsersDeleteUrl(id),
   {
     ...options,
     method: 'DELETE'
@@ -7539,25 +7216,6 @@ export const useDeleteAdminUsersDelete = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteAdminUsersDeleteMutationOptions(options), queryClient);
     }
 
-export type patchAdminUsersUpdateResponse200 = {
-  data: PatchAdminUsersUpdate200
-  status: 200
-}
-
-export type patchAdminUsersUpdateResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type patchAdminUsersUpdateResponseSuccess = (patchAdminUsersUpdateResponse200) & {
-  headers: Headers;
-};
-export type patchAdminUsersUpdateResponseError = (patchAdminUsersUpdateResponse404) & {
-  headers: Headers;
-};
-
-export type patchAdminUsersUpdateResponse = (patchAdminUsersUpdateResponseSuccess | patchAdminUsersUpdateResponseError)
-
 export const getPatchAdminUsersUpdateUrl = (id: string,) => {
 
 
@@ -7570,9 +7228,9 @@ export const getPatchAdminUsersUpdateUrl = (id: string,) => {
  * @summary Update a user
  */
 export const patchAdminUsersUpdate = async (id: string,
-    adminUpdateUserRequest: AdminUpdateUserRequest, options?: RequestInit): Promise<patchAdminUsersUpdateResponse> => {
+    adminUpdateUserRequest: AdminUpdateUserRequest, options?: RequestInit): Promise<PatchAdminUsersUpdate200> => {
 
-  return customInstance<patchAdminUsersUpdateResponse>(getPatchAdminUsersUpdateUrl(id),
+  return customInstance<PatchAdminUsersUpdate200>(getPatchAdminUsersUpdateUrl(id),
   {
     ...options,
     method: 'PATCH',
@@ -7629,25 +7287,6 @@ export const usePatchAdminUsersUpdate = <TError = ErrorType<ApiError>,
       return useMutation(getPatchAdminUsersUpdateMutationOptions(options), queryClient);
     }
 
-export type postAdminUsersAssignRolesResponse200 = {
-  data: PostAdminUsersAssignRoles200
-  status: 200
-}
-
-export type postAdminUsersAssignRolesResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postAdminUsersAssignRolesResponseSuccess = (postAdminUsersAssignRolesResponse200) & {
-  headers: Headers;
-};
-export type postAdminUsersAssignRolesResponseError = (postAdminUsersAssignRolesResponse404) & {
-  headers: Headers;
-};
-
-export type postAdminUsersAssignRolesResponse = (postAdminUsersAssignRolesResponseSuccess | postAdminUsersAssignRolesResponseError)
-
 export const getPostAdminUsersAssignRolesUrl = (id: string,) => {
 
 
@@ -7660,9 +7299,9 @@ export const getPostAdminUsersAssignRolesUrl = (id: string,) => {
  * @summary Assign roles to a user
  */
 export const postAdminUsersAssignRoles = async (id: string,
-    adminAssignRolesRequest: AdminAssignRolesRequest, options?: RequestInit): Promise<postAdminUsersAssignRolesResponse> => {
+    adminAssignRolesRequest: AdminAssignRolesRequest, options?: RequestInit): Promise<PostAdminUsersAssignRoles200> => {
 
-  return customInstance<postAdminUsersAssignRolesResponse>(getPostAdminUsersAssignRolesUrl(id),
+  return customInstance<PostAdminUsersAssignRoles200>(getPostAdminUsersAssignRolesUrl(id),
   {
     ...options,
     method: 'POST',
@@ -7719,25 +7358,6 @@ export const usePostAdminUsersAssignRoles = <TError = ErrorType<ApiError>,
       return useMutation(getPostAdminUsersAssignRolesMutationOptions(options), queryClient);
     }
 
-export type postAdminUsersResetPasswordResponse200 = {
-  data: PostAdminUsersResetPassword200
-  status: 200
-}
-
-export type postAdminUsersResetPasswordResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postAdminUsersResetPasswordResponseSuccess = (postAdminUsersResetPasswordResponse200) & {
-  headers: Headers;
-};
-export type postAdminUsersResetPasswordResponseError = (postAdminUsersResetPasswordResponse404) & {
-  headers: Headers;
-};
-
-export type postAdminUsersResetPasswordResponse = (postAdminUsersResetPasswordResponseSuccess | postAdminUsersResetPasswordResponseError)
-
 export const getPostAdminUsersResetPasswordUrl = (id: string,) => {
 
 
@@ -7750,9 +7370,9 @@ export const getPostAdminUsersResetPasswordUrl = (id: string,) => {
  * @summary Reset a user password
  */
 export const postAdminUsersResetPassword = async (id: string,
-    adminResetPasswordRequest: AdminResetPasswordRequest, options?: RequestInit): Promise<postAdminUsersResetPasswordResponse> => {
+    adminResetPasswordRequest: AdminResetPasswordRequest, options?: RequestInit): Promise<PostAdminUsersResetPassword200> => {
 
-  return customInstance<postAdminUsersResetPasswordResponse>(getPostAdminUsersResetPasswordUrl(id),
+  return customInstance<PostAdminUsersResetPassword200>(getPostAdminUsersResetPasswordUrl(id),
   {
     ...options,
     method: 'POST',
@@ -7809,25 +7429,6 @@ export const usePostAdminUsersResetPassword = <TError = ErrorType<ApiError>,
       return useMutation(getPostAdminUsersResetPasswordMutationOptions(options), queryClient);
     }
 
-export type postAdminUsersDisableResponse200 = {
-  data: PostAdminUsersDisable200
-  status: 200
-}
-
-export type postAdminUsersDisableResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postAdminUsersDisableResponseSuccess = (postAdminUsersDisableResponse200) & {
-  headers: Headers;
-};
-export type postAdminUsersDisableResponseError = (postAdminUsersDisableResponse404) & {
-  headers: Headers;
-};
-
-export type postAdminUsersDisableResponse = (postAdminUsersDisableResponseSuccess | postAdminUsersDisableResponseError)
-
 export const getPostAdminUsersDisableUrl = (id: string,) => {
 
 
@@ -7839,9 +7440,9 @@ export const getPostAdminUsersDisableUrl = (id: string,) => {
 /**
  * @summary Disable a user
  */
-export const postAdminUsersDisable = async (id: string, options?: RequestInit): Promise<postAdminUsersDisableResponse> => {
+export const postAdminUsersDisable = async (id: string, options?: RequestInit): Promise<PostAdminUsersDisable200> => {
 
-  return customInstance<postAdminUsersDisableResponse>(getPostAdminUsersDisableUrl(id),
+  return customInstance<PostAdminUsersDisable200>(getPostAdminUsersDisableUrl(id),
   {
     ...options,
     method: 'POST'
@@ -7898,25 +7499,6 @@ export const usePostAdminUsersDisable = <TError = ErrorType<ApiError>,
       return useMutation(getPostAdminUsersDisableMutationOptions(options), queryClient);
     }
 
-export type postAdminUsersEnableResponse200 = {
-  data: PostAdminUsersEnable200
-  status: 200
-}
-
-export type postAdminUsersEnableResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postAdminUsersEnableResponseSuccess = (postAdminUsersEnableResponse200) & {
-  headers: Headers;
-};
-export type postAdminUsersEnableResponseError = (postAdminUsersEnableResponse404) & {
-  headers: Headers;
-};
-
-export type postAdminUsersEnableResponse = (postAdminUsersEnableResponseSuccess | postAdminUsersEnableResponseError)
-
 export const getPostAdminUsersEnableUrl = (id: string,) => {
 
 
@@ -7928,9 +7510,9 @@ export const getPostAdminUsersEnableUrl = (id: string,) => {
 /**
  * @summary Enable a user
  */
-export const postAdminUsersEnable = async (id: string, options?: RequestInit): Promise<postAdminUsersEnableResponse> => {
+export const postAdminUsersEnable = async (id: string, options?: RequestInit): Promise<PostAdminUsersEnable200> => {
 
-  return customInstance<postAdminUsersEnableResponse>(getPostAdminUsersEnableUrl(id),
+  return customInstance<PostAdminUsersEnable200>(getPostAdminUsersEnableUrl(id),
   {
     ...options,
     method: 'POST'
@@ -7987,25 +7569,6 @@ export const usePostAdminUsersEnable = <TError = ErrorType<ApiError>,
       return useMutation(getPostAdminUsersEnableMutationOptions(options), queryClient);
     }
 
-export type getOauthClientsIndexResponse200 = {
-  data: GetOauthClientsIndex200
-  status: 200
-}
-
-export type getOauthClientsIndexResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getOauthClientsIndexResponseSuccess = (getOauthClientsIndexResponse200) & {
-  headers: Headers;
-};
-export type getOauthClientsIndexResponseError = (getOauthClientsIndexResponse401) & {
-  headers: Headers;
-};
-
-export type getOauthClientsIndexResponse = (getOauthClientsIndexResponseSuccess | getOauthClientsIndexResponseError)
-
 export const getGetOauthClientsIndexUrl = () => {
 
 
@@ -8017,9 +7580,9 @@ export const getGetOauthClientsIndexUrl = () => {
 /**
  * @summary List personal access clients
  */
-export const getOauthClientsIndex = async ( options?: RequestInit): Promise<getOauthClientsIndexResponse> => {
+export const getOauthClientsIndex = async ( options?: RequestInit): Promise<GetOauthClientsIndex200> => {
 
-  return customInstance<getOauthClientsIndexResponse>(getGetOauthClientsIndexUrl(),
+  return customInstance<GetOauthClientsIndex200>(getGetOauthClientsIndexUrl(),
   {
     ...options,
     method: 'GET'
@@ -8107,30 +7670,6 @@ export function useGetOauthClientsIndex<TData = Awaited<ReturnType<typeof getOau
 
 
 
-export type postOauthClientsCreateResponse201 = {
-  data: PostOauthClientsCreate201
-  status: 201
-}
-
-export type postOauthClientsCreateResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postOauthClientsCreateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postOauthClientsCreateResponseSuccess = (postOauthClientsCreateResponse201) & {
-  headers: Headers;
-};
-export type postOauthClientsCreateResponseError = (postOauthClientsCreateResponse401 | postOauthClientsCreateResponse422) & {
-  headers: Headers;
-};
-
-export type postOauthClientsCreateResponse = (postOauthClientsCreateResponseSuccess | postOauthClientsCreateResponseError)
-
 export const getPostOauthClientsCreateUrl = () => {
 
 
@@ -8142,9 +7681,9 @@ export const getPostOauthClientsCreateUrl = () => {
 /**
  * @summary Create a new personal access client
  */
-export const postOauthClientsCreate = async (postOauthClientsCreateBody: PostOauthClientsCreateBody, options?: RequestInit): Promise<postOauthClientsCreateResponse> => {
+export const postOauthClientsCreate = async (postOauthClientsCreateBody: PostOauthClientsCreateBody, options?: RequestInit): Promise<PostOauthClientsCreate201> => {
 
-  return customInstance<postOauthClientsCreateResponse>(getPostOauthClientsCreateUrl(),
+  return customInstance<PostOauthClientsCreate201>(getPostOauthClientsCreateUrl(),
   {
     ...options,
     method: 'POST',
@@ -8201,30 +7740,6 @@ export const usePostOauthClientsCreate = <TError = ErrorType<ApiError | Validati
       return useMutation(getPostOauthClientsCreateMutationOptions(options), queryClient);
     }
 
-export type deleteOauthClientsRevokeResponse200 = {
-  data: DeleteOauthClientsRevoke200
-  status: 200
-}
-
-export type deleteOauthClientsRevokeResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type deleteOauthClientsRevokeResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteOauthClientsRevokeResponseSuccess = (deleteOauthClientsRevokeResponse200) & {
-  headers: Headers;
-};
-export type deleteOauthClientsRevokeResponseError = (deleteOauthClientsRevokeResponse401 | deleteOauthClientsRevokeResponse404) & {
-  headers: Headers;
-};
-
-export type deleteOauthClientsRevokeResponse = (deleteOauthClientsRevokeResponseSuccess | deleteOauthClientsRevokeResponseError)
-
 export const getDeleteOauthClientsRevokeUrl = (publicId: string,) => {
 
 
@@ -8236,9 +7751,9 @@ export const getDeleteOauthClientsRevokeUrl = (publicId: string,) => {
 /**
  * @summary Revoke an OAuth client
  */
-export const deleteOauthClientsRevoke = async (publicId: string, options?: RequestInit): Promise<deleteOauthClientsRevokeResponse> => {
+export const deleteOauthClientsRevoke = async (publicId: string, options?: RequestInit): Promise<DeleteOauthClientsRevoke200> => {
 
-  return customInstance<deleteOauthClientsRevokeResponse>(getDeleteOauthClientsRevokeUrl(publicId),
+  return customInstance<DeleteOauthClientsRevoke200>(getDeleteOauthClientsRevokeUrl(publicId),
   {
     ...options,
     method: 'DELETE'
@@ -8295,28 +7810,6 @@ export const useDeleteOauthClientsRevoke = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteOauthClientsRevokeMutationOptions(options), queryClient);
     }
 
-export type getOauthAuthorizeResponse302 = {
-  data: void
-  status: 302
-}
-
-export type getOauthAuthorizeResponse400 = {
-  data: OAuthError
-  status: 400
-}
-
-export type getOauthAuthorizeResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-;
-export type getOauthAuthorizeResponseError = (getOauthAuthorizeResponse302 | getOauthAuthorizeResponse400 | getOauthAuthorizeResponse401) & {
-  headers: Headers;
-};
-
-export type getOauthAuthorizeResponse = (getOauthAuthorizeResponseError)
-
 export const getGetOauthAuthorizeUrl = (params: GetOauthAuthorizeParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -8335,9 +7828,9 @@ export const getGetOauthAuthorizeUrl = (params: GetOauthAuthorizeParams,) => {
 /**
  * @summary OAuth 2.0 Authorization endpoint (RFC 6749 §3.1)
  */
-export const getOauthAuthorize = async (params: GetOauthAuthorizeParams, options?: RequestInit): Promise<getOauthAuthorizeResponse> => {
+export const getOauthAuthorize = async (params: GetOauthAuthorizeParams, options?: RequestInit): Promise<unknown> => {
 
-  return customInstance<getOauthAuthorizeResponse>(getGetOauthAuthorizeUrl(params),
+  return customInstance<unknown>(getGetOauthAuthorizeUrl(params),
   {
     ...options,
     method: 'GET'
@@ -8425,28 +7918,6 @@ export function useGetOauthAuthorize<TData = Awaited<ReturnType<typeof getOauthA
 
 
 
-export type postOauthAuthorizeResponse302 = {
-  data: void
-  status: 302
-}
-
-export type postOauthAuthorizeResponse400 = {
-  data: OAuthError
-  status: 400
-}
-
-export type postOauthAuthorizeResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-;
-export type postOauthAuthorizeResponseError = (postOauthAuthorizeResponse302 | postOauthAuthorizeResponse400 | postOauthAuthorizeResponse401) & {
-  headers: Headers;
-};
-
-export type postOauthAuthorizeResponse = (postOauthAuthorizeResponseError)
-
 export const getPostOauthAuthorizeUrl = (params: PostOauthAuthorizeParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -8465,9 +7936,9 @@ export const getPostOauthAuthorizeUrl = (params: PostOauthAuthorizeParams,) => {
 /**
  * @summary OAuth 2.0 Authorization endpoint (RFC 6749 §3.1)
  */
-export const postOauthAuthorize = async (params: PostOauthAuthorizeParams, options?: RequestInit): Promise<postOauthAuthorizeResponse> => {
+export const postOauthAuthorize = async (params: PostOauthAuthorizeParams, options?: RequestInit): Promise<unknown> => {
 
-  return customInstance<postOauthAuthorizeResponse>(getPostOauthAuthorizeUrl(params),
+  return customInstance<unknown>(getPostOauthAuthorizeUrl(params),
   {
     ...options,
     method: 'POST'
@@ -8524,25 +7995,6 @@ export const usePostOauthAuthorize = <TError = ErrorType<void | OAuthError | Api
       return useMutation(getPostOauthAuthorizeMutationOptions(options), queryClient);
     }
 
-export type postOauthTokenResponse200 = {
-  data: PostOauthToken200
-  status: 200
-}
-
-export type postOauthTokenResponse400 = {
-  data: OAuthError
-  status: 400
-}
-
-export type postOauthTokenResponseSuccess = (postOauthTokenResponse200) & {
-  headers: Headers;
-};
-export type postOauthTokenResponseError = (postOauthTokenResponse400) & {
-  headers: Headers;
-};
-
-export type postOauthTokenResponse = (postOauthTokenResponseSuccess | postOauthTokenResponseError)
-
 export const getPostOauthTokenUrl = () => {
 
 
@@ -8555,9 +8007,9 @@ export const getPostOauthTokenUrl = () => {
  * Supports authorization_code, refresh_token, and client_credentials grant types.
  * @summary OAuth 2.0 Token endpoint (RFC 6749 §3.2)
  */
-export const postOauthToken = async (postOauthTokenBody: PostOauthTokenBody, options?: RequestInit): Promise<postOauthTokenResponse> => {
+export const postOauthToken = async (postOauthTokenBody: PostOauthTokenBody, options?: RequestInit): Promise<PostOauthToken200> => {
 
-  return customInstance<postOauthTokenResponse>(getPostOauthTokenUrl(),
+  return customInstance<PostOauthToken200>(getPostOauthTokenUrl(),
   {
     ...options,
     method: 'POST',
@@ -8614,25 +8066,6 @@ export const usePostOauthToken = <TError = ErrorType<OAuthError>,
       return useMutation(getPostOauthTokenMutationOptions(options), queryClient);
     }
 
-export type postOauthRevokeResponse200 = {
-  data: unknown
-  status: 200
-}
-
-export type postOauthRevokeResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postOauthRevokeResponseSuccess = (postOauthRevokeResponse200) & {
-  headers: Headers;
-};
-export type postOauthRevokeResponseError = (postOauthRevokeResponse422) & {
-  headers: Headers;
-};
-
-export type postOauthRevokeResponse = (postOauthRevokeResponseSuccess | postOauthRevokeResponseError)
-
 export const getPostOauthRevokeUrl = () => {
 
 
@@ -8644,9 +8077,9 @@ export const getPostOauthRevokeUrl = () => {
 /**
  * @summary Revoke an access or refresh token (RFC 7009)
  */
-export const postOauthRevoke = async (postOauthRevokeBody: PostOauthRevokeBody, options?: RequestInit): Promise<postOauthRevokeResponse> => {
+export const postOauthRevoke = async (postOauthRevokeBody: PostOauthRevokeBody, options?: RequestInit): Promise<unknown> => {
 
-  return customInstance<postOauthRevokeResponse>(getPostOauthRevokeUrl(),
+  return customInstance<unknown>(getPostOauthRevokeUrl(),
   {
     ...options,
     method: 'POST',
@@ -8703,25 +8136,6 @@ export const usePostOauthRevoke = <TError = ErrorType<ValidationError>,
       return useMutation(getPostOauthRevokeMutationOptions(options), queryClient);
     }
 
-export type postOauthIntrospectResponse200 = {
-  data: PostOauthIntrospect200
-  status: 200
-}
-
-export type postOauthIntrospectResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postOauthIntrospectResponseSuccess = (postOauthIntrospectResponse200) & {
-  headers: Headers;
-};
-export type postOauthIntrospectResponseError = (postOauthIntrospectResponse401) & {
-  headers: Headers;
-};
-
-export type postOauthIntrospectResponse = (postOauthIntrospectResponseSuccess | postOauthIntrospectResponseError)
-
 export const getPostOauthIntrospectUrl = () => {
 
 
@@ -8733,9 +8147,9 @@ export const getPostOauthIntrospectUrl = () => {
 /**
  * @summary Introspect an access token (RFC 7662)
  */
-export const postOauthIntrospect = async (postOauthIntrospectBody: PostOauthIntrospectBody, options?: RequestInit): Promise<postOauthIntrospectResponse> => {
+export const postOauthIntrospect = async (postOauthIntrospectBody: PostOauthIntrospectBody, options?: RequestInit): Promise<PostOauthIntrospect200> => {
 
-  return customInstance<postOauthIntrospectResponse>(getPostOauthIntrospectUrl(),
+  return customInstance<PostOauthIntrospect200>(getPostOauthIntrospectUrl(),
   {
     ...options,
     method: 'POST',
@@ -8792,30 +8206,6 @@ export const usePostOauthIntrospect = <TError = ErrorType<ApiError>,
       return useMutation(getPostOauthIntrospectMutationOptions(options), queryClient);
     }
 
-export type postOauthDeviceAuthorizeResponse200 = {
-  data: PostOauthDeviceAuthorize200
-  status: 200
-}
-
-export type postOauthDeviceAuthorizeResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postOauthDeviceAuthorizeResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postOauthDeviceAuthorizeResponseSuccess = (postOauthDeviceAuthorizeResponse200) & {
-  headers: Headers;
-};
-export type postOauthDeviceAuthorizeResponseError = (postOauthDeviceAuthorizeResponse401 | postOauthDeviceAuthorizeResponse422) & {
-  headers: Headers;
-};
-
-export type postOauthDeviceAuthorizeResponse = (postOauthDeviceAuthorizeResponseSuccess | postOauthDeviceAuthorizeResponseError)
-
 export const getPostOauthDeviceAuthorizeUrl = () => {
 
 
@@ -8827,9 +8217,9 @@ export const getPostOauthDeviceAuthorizeUrl = () => {
 /**
  * @summary Request device authorization code (RFC 8628 §3.1)
  */
-export const postOauthDeviceAuthorize = async (postOauthDeviceAuthorizeBody: PostOauthDeviceAuthorizeBody, options?: RequestInit): Promise<postOauthDeviceAuthorizeResponse> => {
+export const postOauthDeviceAuthorize = async (postOauthDeviceAuthorizeBody: PostOauthDeviceAuthorizeBody, options?: RequestInit): Promise<PostOauthDeviceAuthorize200> => {
 
-  return customInstance<postOauthDeviceAuthorizeResponse>(getPostOauthDeviceAuthorizeUrl(),
+  return customInstance<PostOauthDeviceAuthorize200>(getPostOauthDeviceAuthorizeUrl(),
   {
     ...options,
     method: 'POST',
@@ -8886,25 +8276,6 @@ export const usePostOauthDeviceAuthorize = <TError = ErrorType<ApiError | Valida
       return useMutation(getPostOauthDeviceAuthorizeMutationOptions(options), queryClient);
     }
 
-export type getOauthDeviceVerifyResponse200 = {
-  data: GetOauthDeviceVerify200
-  status: 200
-}
-
-export type getOauthDeviceVerifyResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type getOauthDeviceVerifyResponseSuccess = (getOauthDeviceVerifyResponse200) & {
-  headers: Headers;
-};
-export type getOauthDeviceVerifyResponseError = (getOauthDeviceVerifyResponse400) & {
-  headers: Headers;
-};
-
-export type getOauthDeviceVerifyResponse = (getOauthDeviceVerifyResponseSuccess | getOauthDeviceVerifyResponseError)
-
 export const getGetOauthDeviceVerifyUrl = (params: GetOauthDeviceVerifyParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -8923,9 +8294,9 @@ export const getGetOauthDeviceVerifyUrl = (params: GetOauthDeviceVerifyParams,) 
 /**
  * @summary Check device authorization status by user code (RFC 8628)
  */
-export const getOauthDeviceVerify = async (params: GetOauthDeviceVerifyParams, options?: RequestInit): Promise<getOauthDeviceVerifyResponse> => {
+export const getOauthDeviceVerify = async (params: GetOauthDeviceVerifyParams, options?: RequestInit): Promise<GetOauthDeviceVerify200> => {
 
-  return customInstance<getOauthDeviceVerifyResponse>(getGetOauthDeviceVerifyUrl(params),
+  return customInstance<GetOauthDeviceVerify200>(getGetOauthDeviceVerifyUrl(params),
   {
     ...options,
     method: 'GET'
@@ -9013,30 +8384,6 @@ export function useGetOauthDeviceVerify<TData = Awaited<ReturnType<typeof getOau
 
 
 
-export type postOauthDeviceApproveResponse200 = {
-  data: PostOauthDeviceApprove200
-  status: 200
-}
-
-export type postOauthDeviceApproveResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postOauthDeviceApproveResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postOauthDeviceApproveResponseSuccess = (postOauthDeviceApproveResponse200) & {
-  headers: Headers;
-};
-export type postOauthDeviceApproveResponseError = (postOauthDeviceApproveResponse401 | postOauthDeviceApproveResponse422) & {
-  headers: Headers;
-};
-
-export type postOauthDeviceApproveResponse = (postOauthDeviceApproveResponseSuccess | postOauthDeviceApproveResponseError)
-
 export const getPostOauthDeviceApproveUrl = () => {
 
 
@@ -9048,9 +8395,9 @@ export const getPostOauthDeviceApproveUrl = () => {
 /**
  * @summary Approve or deny a device authorization request (RFC 8628)
  */
-export const postOauthDeviceApprove = async (postOauthDeviceApproveBody: PostOauthDeviceApproveBody, options?: RequestInit): Promise<postOauthDeviceApproveResponse> => {
+export const postOauthDeviceApprove = async (postOauthDeviceApproveBody: PostOauthDeviceApproveBody, options?: RequestInit): Promise<PostOauthDeviceApprove200> => {
 
-  return customInstance<postOauthDeviceApproveResponse>(getPostOauthDeviceApproveUrl(),
+  return customInstance<PostOauthDeviceApprove200>(getPostOauthDeviceApproveUrl(),
   {
     ...options,
     method: 'POST',
@@ -9107,25 +8454,6 @@ export const usePostOauthDeviceApprove = <TError = ErrorType<ApiError | Validati
       return useMutation(getPostOauthDeviceApproveMutationOptions(options), queryClient);
     }
 
-export type getPasskeyListResponse200 = {
-  data: GetPasskeyList200
-  status: 200
-}
-
-export type getPasskeyListResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getPasskeyListResponseSuccess = (getPasskeyListResponse200) & {
-  headers: Headers;
-};
-export type getPasskeyListResponseError = (getPasskeyListResponse401) & {
-  headers: Headers;
-};
-
-export type getPasskeyListResponse = (getPasskeyListResponseSuccess | getPasskeyListResponseError)
-
 export const getGetPasskeyListUrl = () => {
 
 
@@ -9137,9 +8465,9 @@ export const getGetPasskeyListUrl = () => {
 /**
  * @summary List registered passkeys for the current user
  */
-export const getPasskeyList = async ( options?: RequestInit): Promise<getPasskeyListResponse> => {
+export const getPasskeyList = async ( options?: RequestInit): Promise<GetPasskeyList200> => {
 
-  return customInstance<getPasskeyListResponse>(getGetPasskeyListUrl(),
+  return customInstance<GetPasskeyList200>(getGetPasskeyListUrl(),
   {
     ...options,
     method: 'GET'
@@ -9227,25 +8555,6 @@ export function useGetPasskeyList<TData = Awaited<ReturnType<typeof getPasskeyLi
 
 
 
-export type postPasskeyOptionsResponse200 = {
-  data: PostPasskeyOptions200
-  status: 200
-}
-
-export type postPasskeyOptionsResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postPasskeyOptionsResponseSuccess = (postPasskeyOptionsResponse200) & {
-  headers: Headers;
-};
-export type postPasskeyOptionsResponseError = (postPasskeyOptionsResponse401) & {
-  headers: Headers;
-};
-
-export type postPasskeyOptionsResponse = (postPasskeyOptionsResponseSuccess | postPasskeyOptionsResponseError)
-
 export const getPostPasskeyOptionsUrl = () => {
 
 
@@ -9257,9 +8566,9 @@ export const getPostPasskeyOptionsUrl = () => {
 /**
  * @summary Get WebAuthn registration options
  */
-export const postPasskeyOptions = async ( options?: RequestInit): Promise<postPasskeyOptionsResponse> => {
+export const postPasskeyOptions = async ( options?: RequestInit): Promise<PostPasskeyOptions200> => {
 
-  return customInstance<postPasskeyOptionsResponse>(getPostPasskeyOptionsUrl(),
+  return customInstance<PostPasskeyOptions200>(getPostPasskeyOptionsUrl(),
   {
     ...options,
     method: 'POST'
@@ -9316,35 +8625,6 @@ export const usePostPasskeyOptions = <TError = ErrorType<ApiError>,
       return useMutation(getPostPasskeyOptionsMutationOptions(options), queryClient);
     }
 
-export type postPasskeyRegisterResponse201 = {
-  data: PostPasskeyRegister201
-  status: 201
-}
-
-export type postPasskeyRegisterResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type postPasskeyRegisterResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postPasskeyRegisterResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postPasskeyRegisterResponseSuccess = (postPasskeyRegisterResponse201) & {
-  headers: Headers;
-};
-export type postPasskeyRegisterResponseError = (postPasskeyRegisterResponse400 | postPasskeyRegisterResponse401 | postPasskeyRegisterResponse422) & {
-  headers: Headers;
-};
-
-export type postPasskeyRegisterResponse = (postPasskeyRegisterResponseSuccess | postPasskeyRegisterResponseError)
-
 export const getPostPasskeyRegisterUrl = () => {
 
 
@@ -9356,9 +8636,9 @@ export const getPostPasskeyRegisterUrl = () => {
 /**
  * @summary Register a new passkey
  */
-export const postPasskeyRegister = async (postPasskeyRegisterBody: PostPasskeyRegisterBody, options?: RequestInit): Promise<postPasskeyRegisterResponse> => {
+export const postPasskeyRegister = async (postPasskeyRegisterBody: PostPasskeyRegisterBody, options?: RequestInit): Promise<PostPasskeyRegister201> => {
 
-  return customInstance<postPasskeyRegisterResponse>(getPostPasskeyRegisterUrl(),
+  return customInstance<PostPasskeyRegister201>(getPostPasskeyRegisterUrl(),
   {
     ...options,
     method: 'POST',
@@ -9415,25 +8695,6 @@ export const usePostPasskeyRegister = <TError = ErrorType<ApiError | ValidationE
       return useMutation(getPostPasskeyRegisterMutationOptions(options), queryClient);
     }
 
-export type postPasskeyAuthenticateOptionsResponse200 = {
-  data: PostPasskeyAuthenticateOptions200
-  status: 200
-}
-
-export type postPasskeyAuthenticateOptionsResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postPasskeyAuthenticateOptionsResponseSuccess = (postPasskeyAuthenticateOptionsResponse200) & {
-  headers: Headers;
-};
-export type postPasskeyAuthenticateOptionsResponseError = (postPasskeyAuthenticateOptionsResponse422) & {
-  headers: Headers;
-};
-
-export type postPasskeyAuthenticateOptionsResponse = (postPasskeyAuthenticateOptionsResponseSuccess | postPasskeyAuthenticateOptionsResponseError)
-
 export const getPostPasskeyAuthenticateOptionsUrl = () => {
 
 
@@ -9445,9 +8706,9 @@ export const getPostPasskeyAuthenticateOptionsUrl = () => {
 /**
  * @summary Get WebAuthn authentication options
  */
-export const postPasskeyAuthenticateOptions = async (postPasskeyAuthenticateOptionsBody: PostPasskeyAuthenticateOptionsBody, options?: RequestInit): Promise<postPasskeyAuthenticateOptionsResponse> => {
+export const postPasskeyAuthenticateOptions = async (postPasskeyAuthenticateOptionsBody: PostPasskeyAuthenticateOptionsBody, options?: RequestInit): Promise<PostPasskeyAuthenticateOptions200> => {
 
-  return customInstance<postPasskeyAuthenticateOptionsResponse>(getPostPasskeyAuthenticateOptionsUrl(),
+  return customInstance<PostPasskeyAuthenticateOptions200>(getPostPasskeyAuthenticateOptionsUrl(),
   {
     ...options,
     method: 'POST',
@@ -9504,35 +8765,6 @@ export const usePostPasskeyAuthenticateOptions = <TError = ErrorType<ValidationE
       return useMutation(getPostPasskeyAuthenticateOptionsMutationOptions(options), queryClient);
     }
 
-export type postPasskeyAuthenticateResponse200 = {
-  data: PostPasskeyAuthenticate200
-  status: 200
-}
-
-export type postPasskeyAuthenticateResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type postPasskeyAuthenticateResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postPasskeyAuthenticateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postPasskeyAuthenticateResponseSuccess = (postPasskeyAuthenticateResponse200) & {
-  headers: Headers;
-};
-export type postPasskeyAuthenticateResponseError = (postPasskeyAuthenticateResponse400 | postPasskeyAuthenticateResponse401 | postPasskeyAuthenticateResponse422) & {
-  headers: Headers;
-};
-
-export type postPasskeyAuthenticateResponse = (postPasskeyAuthenticateResponseSuccess | postPasskeyAuthenticateResponseError)
-
 export const getPostPasskeyAuthenticateUrl = () => {
 
 
@@ -9545,9 +8777,9 @@ export const getPostPasskeyAuthenticateUrl = () => {
  * The main passkey login flow goes through PasskeyAuthenticator at /api/auth/login/passkey. This endpoint is an alternative for API-based flows where the frontend manages the ceremony.
  * @summary Authenticate with a passkey (API-based flow)
  */
-export const postPasskeyAuthenticate = async (postPasskeyAuthenticateBody: PostPasskeyAuthenticateBody, options?: RequestInit): Promise<postPasskeyAuthenticateResponse> => {
+export const postPasskeyAuthenticate = async (postPasskeyAuthenticateBody: PostPasskeyAuthenticateBody, options?: RequestInit): Promise<PostPasskeyAuthenticate200> => {
 
-  return customInstance<postPasskeyAuthenticateResponse>(getPostPasskeyAuthenticateUrl(),
+  return customInstance<PostPasskeyAuthenticate200>(getPostPasskeyAuthenticateUrl(),
   {
     ...options,
     method: 'POST',
@@ -9604,30 +8836,6 @@ export const usePostPasskeyAuthenticate = <TError = ErrorType<ApiError | Validat
       return useMutation(getPostPasskeyAuthenticateMutationOptions(options), queryClient);
     }
 
-export type deletePasskeyDeleteResponse200 = {
-  data: DeletePasskeyDelete200
-  status: 200
-}
-
-export type deletePasskeyDeleteResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type deletePasskeyDeleteResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deletePasskeyDeleteResponseSuccess = (deletePasskeyDeleteResponse200) & {
-  headers: Headers;
-};
-export type deletePasskeyDeleteResponseError = (deletePasskeyDeleteResponse401 | deletePasskeyDeleteResponse404) & {
-  headers: Headers;
-};
-
-export type deletePasskeyDeleteResponse = (deletePasskeyDeleteResponseSuccess | deletePasskeyDeleteResponseError)
-
 export const getDeletePasskeyDeleteUrl = (publicId: string,) => {
 
 
@@ -9639,9 +8847,9 @@ export const getDeletePasskeyDeleteUrl = (publicId: string,) => {
 /**
  * @summary Delete a passkey
  */
-export const deletePasskeyDelete = async (publicId: string, options?: RequestInit): Promise<deletePasskeyDeleteResponse> => {
+export const deletePasskeyDelete = async (publicId: string, options?: RequestInit): Promise<DeletePasskeyDelete200> => {
 
-  return customInstance<deletePasskeyDeleteResponse>(getDeletePasskeyDeleteUrl(publicId),
+  return customInstance<DeletePasskeyDelete200>(getDeletePasskeyDeleteUrl(publicId),
   {
     ...options,
     method: 'DELETE'
@@ -9698,25 +8906,6 @@ export const useDeletePasskeyDelete = <TError = ErrorType<ApiError>,
       return useMutation(getDeletePasskeyDeleteMutationOptions(options), queryClient);
     }
 
-export type postAuthPasskeyLoginPasskeyResponse200 = {
-  data: TokenResource
-  status: 200
-}
-
-export type postAuthPasskeyLoginPasskeyResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postAuthPasskeyLoginPasskeyResponseSuccess = (postAuthPasskeyLoginPasskeyResponse200) & {
-  headers: Headers;
-};
-export type postAuthPasskeyLoginPasskeyResponseError = (postAuthPasskeyLoginPasskeyResponse401) & {
-  headers: Headers;
-};
-
-export type postAuthPasskeyLoginPasskeyResponse = (postAuthPasskeyLoginPasskeyResponseSuccess | postAuthPasskeyLoginPasskeyResponseError)
-
 export const getPostAuthPasskeyLoginPasskeyUrl = () => {
 
 
@@ -9728,9 +8917,9 @@ export const getPostAuthPasskeyLoginPasskeyUrl = () => {
 /**
  * @summary Authenticate with a WebAuthn passkey
  */
-export const postAuthPasskeyLoginPasskey = async (postAuthPasskeyLoginPasskeyBody: PostAuthPasskeyLoginPasskeyBody, options?: RequestInit): Promise<postAuthPasskeyLoginPasskeyResponse> => {
+export const postAuthPasskeyLoginPasskey = async (postAuthPasskeyLoginPasskeyBody: PostAuthPasskeyLoginPasskeyBody, options?: RequestInit): Promise<TokenResource> => {
 
-  return customInstance<postAuthPasskeyLoginPasskeyResponse>(getPostAuthPasskeyLoginPasskeyUrl(),
+  return customInstance<TokenResource>(getPostAuthPasskeyLoginPasskeyUrl(),
   {
     ...options,
     method: 'POST',
@@ -9787,25 +8976,6 @@ export const usePostAuthPasskeyLoginPasskey = <TError = ErrorType<ApiError>,
       return useMutation(getPostAuthPasskeyLoginPasskeyMutationOptions(options), queryClient);
     }
 
-export type postTotpSetupResponse200 = {
-  data: PostTotpSetup200
-  status: 200
-}
-
-export type postTotpSetupResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postTotpSetupResponseSuccess = (postTotpSetupResponse200) & {
-  headers: Headers;
-};
-export type postTotpSetupResponseError = (postTotpSetupResponse401) & {
-  headers: Headers;
-};
-
-export type postTotpSetupResponse = (postTotpSetupResponseSuccess | postTotpSetupResponseError)
-
 export const getPostTotpSetupUrl = () => {
 
 
@@ -9817,9 +8987,9 @@ export const getPostTotpSetupUrl = () => {
 /**
  * @summary Generate TOTP secret and provisioning URI
  */
-export const postTotpSetup = async ( options?: RequestInit): Promise<postTotpSetupResponse> => {
+export const postTotpSetup = async ( options?: RequestInit): Promise<PostTotpSetup200> => {
 
-  return customInstance<postTotpSetupResponse>(getPostTotpSetupUrl(),
+  return customInstance<PostTotpSetup200>(getPostTotpSetupUrl(),
   {
     ...options,
     method: 'POST'
@@ -9876,35 +9046,6 @@ export const usePostTotpSetup = <TError = ErrorType<ApiError>,
       return useMutation(getPostTotpSetupMutationOptions(options), queryClient);
     }
 
-export type postTotpEnableResponse200 = {
-  data: PostTotpEnable200
-  status: 200
-}
-
-export type postTotpEnableResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type postTotpEnableResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postTotpEnableResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postTotpEnableResponseSuccess = (postTotpEnableResponse200) & {
-  headers: Headers;
-};
-export type postTotpEnableResponseError = (postTotpEnableResponse400 | postTotpEnableResponse401 | postTotpEnableResponse422) & {
-  headers: Headers;
-};
-
-export type postTotpEnableResponse = (postTotpEnableResponseSuccess | postTotpEnableResponseError)
-
 export const getPostTotpEnableUrl = () => {
 
 
@@ -9916,9 +9057,9 @@ export const getPostTotpEnableUrl = () => {
 /**
  * @summary Enable TOTP after verifying a code from the authenticator app
  */
-export const postTotpEnable = async (postTotpEnableBody: PostTotpEnableBody, options?: RequestInit): Promise<postTotpEnableResponse> => {
+export const postTotpEnable = async (postTotpEnableBody: PostTotpEnableBody, options?: RequestInit): Promise<PostTotpEnable200> => {
 
-  return customInstance<postTotpEnableResponse>(getPostTotpEnableUrl(),
+  return customInstance<PostTotpEnable200>(getPostTotpEnableUrl(),
   {
     ...options,
     method: 'POST',
@@ -9975,35 +9116,6 @@ export const usePostTotpEnable = <TError = ErrorType<ApiError | ValidationError>
       return useMutation(getPostTotpEnableMutationOptions(options), queryClient);
     }
 
-export type postTotpDisableResponse200 = {
-  data: PostTotpDisable200
-  status: 200
-}
-
-export type postTotpDisableResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type postTotpDisableResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postTotpDisableResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postTotpDisableResponseSuccess = (postTotpDisableResponse200) & {
-  headers: Headers;
-};
-export type postTotpDisableResponseError = (postTotpDisableResponse400 | postTotpDisableResponse401 | postTotpDisableResponse422) & {
-  headers: Headers;
-};
-
-export type postTotpDisableResponse = (postTotpDisableResponseSuccess | postTotpDisableResponseError)
-
 export const getPostTotpDisableUrl = () => {
 
 
@@ -10015,9 +9127,9 @@ export const getPostTotpDisableUrl = () => {
 /**
  * @summary Disable TOTP (requires current TOTP code to verify)
  */
-export const postTotpDisable = async (postTotpDisableBody: PostTotpDisableBody, options?: RequestInit): Promise<postTotpDisableResponse> => {
+export const postTotpDisable = async (postTotpDisableBody: PostTotpDisableBody, options?: RequestInit): Promise<PostTotpDisable200> => {
 
-  return customInstance<postTotpDisableResponse>(getPostTotpDisableUrl(),
+  return customInstance<PostTotpDisable200>(getPostTotpDisableUrl(),
   {
     ...options,
     method: 'POST',
@@ -10074,30 +9186,6 @@ export const usePostTotpDisable = <TError = ErrorType<ApiError | ValidationError
       return useMutation(getPostTotpDisableMutationOptions(options), queryClient);
     }
 
-export type postAuthRegisterResponse201 = {
-  data: PostAuthRegister201
-  status: 201
-}
-
-export type postAuthRegisterResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type postAuthRegisterResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postAuthRegisterResponseSuccess = (postAuthRegisterResponse201) & {
-  headers: Headers;
-};
-export type postAuthRegisterResponseError = (postAuthRegisterResponse400 | postAuthRegisterResponse422) & {
-  headers: Headers;
-};
-
-export type postAuthRegisterResponse = (postAuthRegisterResponseSuccess | postAuthRegisterResponseError)
-
 export const getPostAuthRegisterUrl = () => {
 
 
@@ -10109,9 +9197,9 @@ export const getPostAuthRegisterUrl = () => {
 /**
  * @summary Register a new user
  */
-export const postAuthRegister = async (postAuthRegisterBody: PostAuthRegisterBody, options?: RequestInit): Promise<postAuthRegisterResponse> => {
+export const postAuthRegister = async (postAuthRegisterBody: PostAuthRegisterBody, options?: RequestInit): Promise<PostAuthRegister201> => {
 
-  return customInstance<postAuthRegisterResponse>(getPostAuthRegisterUrl(),
+  return customInstance<PostAuthRegister201>(getPostAuthRegisterUrl(),
   {
     ...options,
     method: 'POST',
@@ -10168,25 +9256,6 @@ export const usePostAuthRegister = <TError = ErrorType<ApiError | ValidationErro
       return useMutation(getPostAuthRegisterMutationOptions(options), queryClient);
     }
 
-export type postAuthLogoutResponse200 = {
-  data: PostAuthLogout200
-  status: 200
-}
-
-export type postAuthLogoutResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postAuthLogoutResponseSuccess = (postAuthLogoutResponse200) & {
-  headers: Headers;
-};
-export type postAuthLogoutResponseError = (postAuthLogoutResponse401) & {
-  headers: Headers;
-};
-
-export type postAuthLogoutResponse = (postAuthLogoutResponseSuccess | postAuthLogoutResponseError)
-
 export const getPostAuthLogoutUrl = () => {
 
 
@@ -10198,9 +9267,9 @@ export const getPostAuthLogoutUrl = () => {
 /**
  * @summary Revoke the current access token
  */
-export const postAuthLogout = async ( options?: RequestInit): Promise<postAuthLogoutResponse> => {
+export const postAuthLogout = async ( options?: RequestInit): Promise<PostAuthLogout200> => {
 
-  return customInstance<postAuthLogoutResponse>(getPostAuthLogoutUrl(),
+  return customInstance<PostAuthLogout200>(getPostAuthLogoutUrl(),
   {
     ...options,
     method: 'POST'
@@ -10257,30 +9326,6 @@ export const usePostAuthLogout = <TError = ErrorType<ApiError>,
       return useMutation(getPostAuthLogoutMutationOptions(options), queryClient);
     }
 
-export type postAuthRefreshResponse200 = {
-  data: PostAuthRefresh200
-  status: 200
-}
-
-export type postAuthRefreshResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postAuthRefreshResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postAuthRefreshResponseSuccess = (postAuthRefreshResponse200) & {
-  headers: Headers;
-};
-export type postAuthRefreshResponseError = (postAuthRefreshResponse401 | postAuthRefreshResponse422) & {
-  headers: Headers;
-};
-
-export type postAuthRefreshResponse = (postAuthRefreshResponseSuccess | postAuthRefreshResponseError)
-
 export const getPostAuthRefreshUrl = () => {
 
 
@@ -10292,9 +9337,9 @@ export const getPostAuthRefreshUrl = () => {
 /**
  * @summary Refresh an access token
  */
-export const postAuthRefresh = async (postAuthRefreshBody: PostAuthRefreshBody, options?: RequestInit): Promise<postAuthRefreshResponse> => {
+export const postAuthRefresh = async (postAuthRefreshBody: PostAuthRefreshBody, options?: RequestInit): Promise<PostAuthRefresh200> => {
 
-  return customInstance<postAuthRefreshResponse>(getPostAuthRefreshUrl(),
+  return customInstance<PostAuthRefresh200>(getPostAuthRefreshUrl(),
   {
     ...options,
     method: 'POST',
@@ -10351,25 +9396,6 @@ export const usePostAuthRefresh = <TError = ErrorType<ApiError | ValidationError
       return useMutation(getPostAuthRefreshMutationOptions(options), queryClient);
     }
 
-export type postAuthPasswordResetRequestResponse200 = {
-  data: PostAuthPasswordResetRequest200
-  status: 200
-}
-
-export type postAuthPasswordResetRequestResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postAuthPasswordResetRequestResponseSuccess = (postAuthPasswordResetRequestResponse200) & {
-  headers: Headers;
-};
-export type postAuthPasswordResetRequestResponseError = (postAuthPasswordResetRequestResponse422) & {
-  headers: Headers;
-};
-
-export type postAuthPasswordResetRequestResponse = (postAuthPasswordResetRequestResponseSuccess | postAuthPasswordResetRequestResponseError)
-
 export const getPostAuthPasswordResetRequestUrl = () => {
 
 
@@ -10381,9 +9407,9 @@ export const getPostAuthPasswordResetRequestUrl = () => {
 /**
  * @summary Request a password reset email
  */
-export const postAuthPasswordResetRequest = async (postAuthPasswordResetRequestBody: PostAuthPasswordResetRequestBody, options?: RequestInit): Promise<postAuthPasswordResetRequestResponse> => {
+export const postAuthPasswordResetRequest = async (postAuthPasswordResetRequestBody: PostAuthPasswordResetRequestBody, options?: RequestInit): Promise<PostAuthPasswordResetRequest200> => {
 
-  return customInstance<postAuthPasswordResetRequestResponse>(getPostAuthPasswordResetRequestUrl(),
+  return customInstance<PostAuthPasswordResetRequest200>(getPostAuthPasswordResetRequestUrl(),
   {
     ...options,
     method: 'POST',
@@ -10440,25 +9466,6 @@ export const usePostAuthPasswordResetRequest = <TError = ErrorType<ValidationErr
       return useMutation(getPostAuthPasswordResetRequestMutationOptions(options), queryClient);
     }
 
-export type getAuthMeResponse200 = {
-  data: GetAuthMe200
-  status: 200
-}
-
-export type getAuthMeResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getAuthMeResponseSuccess = (getAuthMeResponse200) & {
-  headers: Headers;
-};
-export type getAuthMeResponseError = (getAuthMeResponse401) & {
-  headers: Headers;
-};
-
-export type getAuthMeResponse = (getAuthMeResponseSuccess | getAuthMeResponseError)
-
 export const getGetAuthMeUrl = () => {
 
 
@@ -10470,9 +9477,9 @@ export const getGetAuthMeUrl = () => {
 /**
  * @summary Get the current authenticated user profile
  */
-export const getAuthMe = async ( options?: RequestInit): Promise<getAuthMeResponse> => {
+export const getAuthMe = async ( options?: RequestInit): Promise<GetAuthMe200> => {
 
-  return customInstance<getAuthMeResponse>(getGetAuthMeUrl(),
+  return customInstance<GetAuthMe200>(getGetAuthMeUrl(),
   {
     ...options,
     method: 'GET'
@@ -10560,35 +9567,6 @@ export function useGetAuthMe<TData = Awaited<ReturnType<typeof getAuthMe>>, TErr
 
 
 
-export type putAuthMeUpdateResponse200 = {
-  data: PutAuthMeUpdate200
-  status: 200
-}
-
-export type putAuthMeUpdateResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type putAuthMeUpdateResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type putAuthMeUpdateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type putAuthMeUpdateResponseSuccess = (putAuthMeUpdateResponse200) & {
-  headers: Headers;
-};
-export type putAuthMeUpdateResponseError = (putAuthMeUpdateResponse401 | putAuthMeUpdateResponse404 | putAuthMeUpdateResponse422) & {
-  headers: Headers;
-};
-
-export type putAuthMeUpdateResponse = (putAuthMeUpdateResponseSuccess | putAuthMeUpdateResponseError)
-
 export const getPutAuthMeUpdateUrl = () => {
 
 
@@ -10600,9 +9578,9 @@ export const getPutAuthMeUpdateUrl = () => {
 /**
  * @summary Update the current user profile
  */
-export const putAuthMeUpdate = async (putAuthMeUpdateBody: PutAuthMeUpdateBody, options?: RequestInit): Promise<putAuthMeUpdateResponse> => {
+export const putAuthMeUpdate = async (putAuthMeUpdateBody: PutAuthMeUpdateBody, options?: RequestInit): Promise<PutAuthMeUpdate200> => {
 
-  return customInstance<putAuthMeUpdateResponse>(getPutAuthMeUpdateUrl(),
+  return customInstance<PutAuthMeUpdate200>(getPutAuthMeUpdateUrl(),
   {
     ...options,
     method: 'PUT',
@@ -10659,25 +9637,6 @@ export const usePutAuthMeUpdate = <TError = ErrorType<ApiError | ValidationError
       return useMutation(getPutAuthMeUpdateMutationOptions(options), queryClient);
     }
 
-export type postAuthEmailVerifyResponse200 = {
-  data: PostAuthEmailVerify200
-  status: 200
-}
-
-export type postAuthEmailVerifyResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postAuthEmailVerifyResponseSuccess = (postAuthEmailVerifyResponse200) & {
-  headers: Headers;
-};
-export type postAuthEmailVerifyResponseError = (postAuthEmailVerifyResponse422) & {
-  headers: Headers;
-};
-
-export type postAuthEmailVerifyResponse = (postAuthEmailVerifyResponseSuccess | postAuthEmailVerifyResponseError)
-
 export const getPostAuthEmailVerifyUrl = () => {
 
 
@@ -10689,9 +9648,9 @@ export const getPostAuthEmailVerifyUrl = () => {
 /**
  * @summary Verify an email address with a token
  */
-export const postAuthEmailVerify = async (postAuthEmailVerifyBody: PostAuthEmailVerifyBody, options?: RequestInit): Promise<postAuthEmailVerifyResponse> => {
+export const postAuthEmailVerify = async (postAuthEmailVerifyBody: PostAuthEmailVerifyBody, options?: RequestInit): Promise<PostAuthEmailVerify200> => {
 
-  return customInstance<postAuthEmailVerifyResponse>(getPostAuthEmailVerifyUrl(),
+  return customInstance<PostAuthEmailVerify200>(getPostAuthEmailVerifyUrl(),
   {
     ...options,
     method: 'POST',
@@ -10748,35 +9707,6 @@ export const usePostAuthEmailVerify = <TError = ErrorType<ValidationError>,
       return useMutation(getPostAuthEmailVerifyMutationOptions(options), queryClient);
     }
 
-export type putAuthMeEmailResponse200 = {
-  data: PutAuthMeEmail200
-  status: 200
-}
-
-export type putAuthMeEmailResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type putAuthMeEmailResponse409 = {
-  data: ApiError
-  status: 409
-}
-
-export type putAuthMeEmailResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type putAuthMeEmailResponseSuccess = (putAuthMeEmailResponse200) & {
-  headers: Headers;
-};
-export type putAuthMeEmailResponseError = (putAuthMeEmailResponse401 | putAuthMeEmailResponse409 | putAuthMeEmailResponse422) & {
-  headers: Headers;
-};
-
-export type putAuthMeEmailResponse = (putAuthMeEmailResponseSuccess | putAuthMeEmailResponseError)
-
 export const getPutAuthMeEmailUrl = () => {
 
 
@@ -10788,9 +9718,9 @@ export const getPutAuthMeEmailUrl = () => {
 /**
  * @summary Change the current user email
  */
-export const putAuthMeEmail = async (putAuthMeEmailBody: PutAuthMeEmailBody, options?: RequestInit): Promise<putAuthMeEmailResponse> => {
+export const putAuthMeEmail = async (putAuthMeEmailBody: PutAuthMeEmailBody, options?: RequestInit): Promise<PutAuthMeEmail200> => {
 
-  return customInstance<putAuthMeEmailResponse>(getPutAuthMeEmailUrl(),
+  return customInstance<PutAuthMeEmail200>(getPutAuthMeEmailUrl(),
   {
     ...options,
     method: 'PUT',
@@ -10847,30 +9777,6 @@ export const usePutAuthMeEmail = <TError = ErrorType<ApiError | ValidationError>
       return useMutation(getPutAuthMeEmailMutationOptions(options), queryClient);
     }
 
-export type putAuthMePasswordResponse200 = {
-  data: PutAuthMePassword200
-  status: 200
-}
-
-export type putAuthMePasswordResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type putAuthMePasswordResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type putAuthMePasswordResponseSuccess = (putAuthMePasswordResponse200) & {
-  headers: Headers;
-};
-export type putAuthMePasswordResponseError = (putAuthMePasswordResponse401 | putAuthMePasswordResponse422) & {
-  headers: Headers;
-};
-
-export type putAuthMePasswordResponse = (putAuthMePasswordResponseSuccess | putAuthMePasswordResponseError)
-
 export const getPutAuthMePasswordUrl = () => {
 
 
@@ -10882,9 +9788,9 @@ export const getPutAuthMePasswordUrl = () => {
 /**
  * @summary Change the current user password
  */
-export const putAuthMePassword = async (putAuthMePasswordBody: PutAuthMePasswordBody, options?: RequestInit): Promise<putAuthMePasswordResponse> => {
+export const putAuthMePassword = async (putAuthMePasswordBody: PutAuthMePasswordBody, options?: RequestInit): Promise<PutAuthMePassword200> => {
 
-  return customInstance<putAuthMePasswordResponse>(getPutAuthMePasswordUrl(),
+  return customInstance<PutAuthMePassword200>(getPutAuthMePasswordUrl(),
   {
     ...options,
     method: 'PUT',
@@ -10941,25 +9847,6 @@ export const usePutAuthMePassword = <TError = ErrorType<ApiError | ValidationErr
       return useMutation(getPutAuthMePasswordMutationOptions(options), queryClient);
     }
 
-export type postAuthLoginLoginResponse200 = {
-  data: TokenResource
-  status: 200
-}
-
-export type postAuthLoginLoginResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postAuthLoginLoginResponseSuccess = (postAuthLoginLoginResponse200) & {
-  headers: Headers;
-};
-export type postAuthLoginLoginResponseError = (postAuthLoginLoginResponse401) & {
-  headers: Headers;
-};
-
-export type postAuthLoginLoginResponse = (postAuthLoginLoginResponseSuccess | postAuthLoginLoginResponseError)
-
 export const getPostAuthLoginLoginUrl = () => {
 
 
@@ -10971,9 +9858,9 @@ export const getPostAuthLoginLoginUrl = () => {
 /**
  * @summary Authenticate with email and password
  */
-export const postAuthLoginLogin = async (loginRequest: LoginRequest, options?: RequestInit): Promise<postAuthLoginLoginResponse> => {
+export const postAuthLoginLogin = async (loginRequest: LoginRequest, options?: RequestInit): Promise<TokenResource> => {
 
-  return customInstance<postAuthLoginLoginResponse>(getPostAuthLoginLoginUrl(),
+  return customInstance<TokenResource>(getPostAuthLoginLoginUrl(),
   {
     ...options,
     method: 'POST',
@@ -11030,40 +9917,6 @@ export const usePostAuthLoginLogin = <TError = ErrorType<ApiError>,
       return useMutation(getPostAuthLoginLoginMutationOptions(options), queryClient);
     }
 
-export type getAdminAlbumDeletePreviewResponse200 = {
-  data: GetAdminAlbumDeletePreview200
-  status: 200
-}
-
-export type getAdminAlbumDeletePreviewResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getAdminAlbumDeletePreviewResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type getAdminAlbumDeletePreviewResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getAdminAlbumDeletePreviewResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type getAdminAlbumDeletePreviewResponseSuccess = (getAdminAlbumDeletePreviewResponse200) & {
-  headers: Headers;
-};
-export type getAdminAlbumDeletePreviewResponseError = (getAdminAlbumDeletePreviewResponse401 | getAdminAlbumDeletePreviewResponse403 | getAdminAlbumDeletePreviewResponse404 | getAdminAlbumDeletePreviewResponse422) & {
-  headers: Headers;
-};
-
-export type getAdminAlbumDeletePreviewResponse = (getAdminAlbumDeletePreviewResponseSuccess | getAdminAlbumDeletePreviewResponseError)
-
 export const getGetAdminAlbumDeletePreviewUrl = (publicId: string,) => {
 
 
@@ -11075,9 +9928,9 @@ export const getGetAdminAlbumDeletePreviewUrl = (publicId: string,) => {
 /**
  * @summary Preview what will be deleted when deleting an album
  */
-export const getAdminAlbumDeletePreview = async (publicId: string, options?: RequestInit): Promise<getAdminAlbumDeletePreviewResponse> => {
+export const getAdminAlbumDeletePreview = async (publicId: string, options?: RequestInit): Promise<GetAdminAlbumDeletePreview200> => {
 
-  return customInstance<getAdminAlbumDeletePreviewResponse>(getGetAdminAlbumDeletePreviewUrl(publicId),
+  return customInstance<GetAdminAlbumDeletePreview200>(getGetAdminAlbumDeletePreviewUrl(publicId),
   {
     ...options,
     method: 'GET'
@@ -11165,40 +10018,6 @@ export function useGetAdminAlbumDeletePreview<TData = Awaited<ReturnType<typeof 
 
 
 
-export type deleteAdminAlbumDeleteResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteAdminAlbumDeleteResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type deleteAdminAlbumDeleteResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type deleteAdminAlbumDeleteResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteAdminAlbumDeleteResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type deleteAdminAlbumDeleteResponseSuccess = (deleteAdminAlbumDeleteResponse204) & {
-  headers: Headers;
-};
-export type deleteAdminAlbumDeleteResponseError = (deleteAdminAlbumDeleteResponse401 | deleteAdminAlbumDeleteResponse403 | deleteAdminAlbumDeleteResponse404 | deleteAdminAlbumDeleteResponse422) & {
-  headers: Headers;
-};
-
-export type deleteAdminAlbumDeleteResponse = (deleteAdminAlbumDeleteResponseSuccess | deleteAdminAlbumDeleteResponseError)
-
 export const getDeleteAdminAlbumDeleteUrl = (publicId: string,
     params?: DeleteAdminAlbumDeleteParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -11219,9 +10038,9 @@ export const getDeleteAdminAlbumDeleteUrl = (publicId: string,
  * @summary Delete an album with optional file deletion
  */
 export const deleteAdminAlbumDelete = async (publicId: string,
-    params?: DeleteAdminAlbumDeleteParams, options?: RequestInit): Promise<deleteAdminAlbumDeleteResponse> => {
+    params?: DeleteAdminAlbumDeleteParams, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteAdminAlbumDeleteResponse>(getDeleteAdminAlbumDeleteUrl(publicId,params),
+  return customInstance<void>(getDeleteAdminAlbumDeleteUrl(publicId,params),
   {
     ...options,
     method: 'DELETE'
@@ -11278,40 +10097,6 @@ export const useDeleteAdminAlbumDelete = <TError = ErrorType<ApiError | Validati
       return useMutation(getDeleteAdminAlbumDeleteMutationOptions(options), queryClient);
     }
 
-export type getAdminSongDeletePreviewResponse200 = {
-  data: GetAdminSongDeletePreview200
-  status: 200
-}
-
-export type getAdminSongDeletePreviewResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getAdminSongDeletePreviewResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type getAdminSongDeletePreviewResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getAdminSongDeletePreviewResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type getAdminSongDeletePreviewResponseSuccess = (getAdminSongDeletePreviewResponse200) & {
-  headers: Headers;
-};
-export type getAdminSongDeletePreviewResponseError = (getAdminSongDeletePreviewResponse401 | getAdminSongDeletePreviewResponse403 | getAdminSongDeletePreviewResponse404 | getAdminSongDeletePreviewResponse422) & {
-  headers: Headers;
-};
-
-export type getAdminSongDeletePreviewResponse = (getAdminSongDeletePreviewResponseSuccess | getAdminSongDeletePreviewResponseError)
-
 export const getGetAdminSongDeletePreviewUrl = (publicId: string,) => {
 
 
@@ -11323,9 +10108,9 @@ export const getGetAdminSongDeletePreviewUrl = (publicId: string,) => {
 /**
  * @summary Preview what will be deleted when deleting a song
  */
-export const getAdminSongDeletePreview = async (publicId: string, options?: RequestInit): Promise<getAdminSongDeletePreviewResponse> => {
+export const getAdminSongDeletePreview = async (publicId: string, options?: RequestInit): Promise<GetAdminSongDeletePreview200> => {
 
-  return customInstance<getAdminSongDeletePreviewResponse>(getGetAdminSongDeletePreviewUrl(publicId),
+  return customInstance<GetAdminSongDeletePreview200>(getGetAdminSongDeletePreviewUrl(publicId),
   {
     ...options,
     method: 'GET'
@@ -11413,40 +10198,6 @@ export function useGetAdminSongDeletePreview<TData = Awaited<ReturnType<typeof g
 
 
 
-export type deleteAdminSongDeleteResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteAdminSongDeleteResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type deleteAdminSongDeleteResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type deleteAdminSongDeleteResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteAdminSongDeleteResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type deleteAdminSongDeleteResponseSuccess = (deleteAdminSongDeleteResponse204) & {
-  headers: Headers;
-};
-export type deleteAdminSongDeleteResponseError = (deleteAdminSongDeleteResponse401 | deleteAdminSongDeleteResponse403 | deleteAdminSongDeleteResponse404 | deleteAdminSongDeleteResponse422) & {
-  headers: Headers;
-};
-
-export type deleteAdminSongDeleteResponse = (deleteAdminSongDeleteResponseSuccess | deleteAdminSongDeleteResponseError)
-
 export const getDeleteAdminSongDeleteUrl = (publicId: string,
     params?: DeleteAdminSongDeleteParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -11467,9 +10218,9 @@ export const getDeleteAdminSongDeleteUrl = (publicId: string,
  * @summary Delete a song with optional file deletion
  */
 export const deleteAdminSongDelete = async (publicId: string,
-    params?: DeleteAdminSongDeleteParams, options?: RequestInit): Promise<deleteAdminSongDeleteResponse> => {
+    params?: DeleteAdminSongDeleteParams, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteAdminSongDeleteResponse>(getDeleteAdminSongDeleteUrl(publicId,params),
+  return customInstance<void>(getDeleteAdminSongDeleteUrl(publicId,params),
   {
     ...options,
     method: 'DELETE'
@@ -11526,18 +10277,6 @@ export const useDeleteAdminSongDelete = <TError = ErrorType<ApiError | Validatio
       return useMutation(getDeleteAdminSongDeleteMutationOptions(options), queryClient);
     }
 
-export type getAlbumIndexResponse200 = {
-  data: PaginatedResponse
-  status: 200
-}
-
-export type getAlbumIndexResponseSuccess = (getAlbumIndexResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getAlbumIndexResponse = (getAlbumIndexResponseSuccess)
-
 export const getGetAlbumIndexUrl = (params?: GetAlbumIndexParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -11556,9 +10295,9 @@ export const getGetAlbumIndexUrl = (params?: GetAlbumIndexParams,) => {
 /**
  * @summary List albums (paginated)
  */
-export const getAlbumIndex = async (params?: GetAlbumIndexParams, options?: RequestInit): Promise<getAlbumIndexResponse> => {
+export const getAlbumIndex = async (params?: GetAlbumIndexParams, options?: RequestInit): Promise<PaginatedResponse> => {
 
-  return customInstance<getAlbumIndexResponse>(getGetAlbumIndexUrl(params),
+  return customInstance<PaginatedResponse>(getGetAlbumIndexUrl(params),
   {
     ...options,
     method: 'GET'
@@ -11646,25 +10385,6 @@ export function useGetAlbumIndex<TData = Awaited<ReturnType<typeof getAlbumIndex
 
 
 
-export type getAlbumShowResponse200 = {
-  data: GetAlbumShow200
-  status: 200
-}
-
-export type getAlbumShowResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getAlbumShowResponseSuccess = (getAlbumShowResponse200) & {
-  headers: Headers;
-};
-export type getAlbumShowResponseError = (getAlbumShowResponse404) & {
-  headers: Headers;
-};
-
-export type getAlbumShowResponse = (getAlbumShowResponseSuccess | getAlbumShowResponseError)
-
 export const getGetAlbumShowUrl = (publicId: string,) => {
 
 
@@ -11676,9 +10396,9 @@ export const getGetAlbumShowUrl = (publicId: string,) => {
 /**
  * @summary Get a single album with its songs
  */
-export const getAlbumShow = async (publicId: string, options?: RequestInit): Promise<getAlbumShowResponse> => {
+export const getAlbumShow = async (publicId: string, options?: RequestInit): Promise<GetAlbumShow200> => {
 
-  return customInstance<getAlbumShowResponse>(getGetAlbumShowUrl(publicId),
+  return customInstance<GetAlbumShow200>(getGetAlbumShowUrl(publicId),
   {
     ...options,
     method: 'GET'
@@ -11766,25 +10486,6 @@ export function useGetAlbumShow<TData = Awaited<ReturnType<typeof getAlbumShow>>
 
 
 
-export type deleteAlbumDestroyResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteAlbumDestroyResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteAlbumDestroyResponseSuccess = (deleteAlbumDestroyResponse204) & {
-  headers: Headers;
-};
-export type deleteAlbumDestroyResponseError = (deleteAlbumDestroyResponse404) & {
-  headers: Headers;
-};
-
-export type deleteAlbumDestroyResponse = (deleteAlbumDestroyResponseSuccess | deleteAlbumDestroyResponseError)
-
 export const getDeleteAlbumDestroyUrl = (publicId: string,) => {
 
 
@@ -11796,9 +10497,9 @@ export const getDeleteAlbumDestroyUrl = (publicId: string,) => {
 /**
  * @summary Delete an album
  */
-export const deleteAlbumDestroy = async (publicId: string, options?: RequestInit): Promise<deleteAlbumDestroyResponse> => {
+export const deleteAlbumDestroy = async (publicId: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteAlbumDestroyResponse>(getDeleteAlbumDestroyUrl(publicId),
+  return customInstance<void>(getDeleteAlbumDestroyUrl(publicId),
   {
     ...options,
     method: 'DELETE'
@@ -11855,30 +10556,6 @@ export const useDeleteAlbumDestroy = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteAlbumDestroyMutationOptions(options), queryClient);
     }
 
-export type patchAlbumUpdateResponse200 = {
-  data: PatchAlbumUpdate200
-  status: 200
-}
-
-export type patchAlbumUpdateResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type patchAlbumUpdateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type patchAlbumUpdateResponseSuccess = (patchAlbumUpdateResponse200) & {
-  headers: Headers;
-};
-export type patchAlbumUpdateResponseError = (patchAlbumUpdateResponse404 | patchAlbumUpdateResponse422) & {
-  headers: Headers;
-};
-
-export type patchAlbumUpdateResponse = (patchAlbumUpdateResponseSuccess | patchAlbumUpdateResponseError)
-
 export const getPatchAlbumUpdateUrl = (publicId: string,) => {
 
 
@@ -11891,9 +10568,9 @@ export const getPatchAlbumUpdateUrl = (publicId: string,) => {
  * @summary Update an album
  */
 export const patchAlbumUpdate = async (publicId: string,
-    patchAlbumUpdateBody: PatchAlbumUpdateBody, options?: RequestInit): Promise<patchAlbumUpdateResponse> => {
+    patchAlbumUpdateBody: PatchAlbumUpdateBody, options?: RequestInit): Promise<PatchAlbumUpdate200> => {
 
-  return customInstance<patchAlbumUpdateResponse>(getPatchAlbumUpdateUrl(publicId),
+  return customInstance<PatchAlbumUpdate200>(getPatchAlbumUpdateUrl(publicId),
   {
     ...options,
     method: 'PATCH',
@@ -11950,23 +10627,6 @@ export const usePatchAlbumUpdate = <TError = ErrorType<ApiError | ValidationErro
       return useMutation(getPatchAlbumUpdateMutationOptions(options), queryClient);
     }
 
-export type getAlbumCoverResponse302 = {
-  data: void
-  status: 302
-}
-
-export type getAlbumCoverResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-;
-export type getAlbumCoverResponseError = (getAlbumCoverResponse302 | getAlbumCoverResponse404) & {
-  headers: Headers;
-};
-
-export type getAlbumCoverResponse = (getAlbumCoverResponseError)
-
 export const getGetAlbumCoverUrl = (publicId: string,) => {
 
 
@@ -11978,9 +10638,9 @@ export const getGetAlbumCoverUrl = (publicId: string,) => {
 /**
  * @summary Get album cover image
  */
-export const getAlbumCover = async (publicId: string, options?: RequestInit): Promise<getAlbumCoverResponse> => {
+export const getAlbumCover = async (publicId: string, options?: RequestInit): Promise<unknown> => {
 
-  return customInstance<getAlbumCoverResponse>(getGetAlbumCoverUrl(publicId),
+  return customInstance<unknown>(getGetAlbumCoverUrl(publicId),
   {
     ...options,
     method: 'GET'
@@ -12068,40 +10728,6 @@ export function useGetAlbumCover<TData = Awaited<ReturnType<typeof getAlbumCover
 
 
 
-export type postAlbumCoverUploadResponse200 = {
-  data: PostAlbumCoverUpload200
-  status: 200
-}
-
-export type postAlbumCoverUploadResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postAlbumCoverUploadResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type postAlbumCoverUploadResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postAlbumCoverUploadResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postAlbumCoverUploadResponseSuccess = (postAlbumCoverUploadResponse200) & {
-  headers: Headers;
-};
-export type postAlbumCoverUploadResponseError = (postAlbumCoverUploadResponse401 | postAlbumCoverUploadResponse403 | postAlbumCoverUploadResponse404 | postAlbumCoverUploadResponse422) & {
-  headers: Headers;
-};
-
-export type postAlbumCoverUploadResponse = (postAlbumCoverUploadResponseSuccess | postAlbumCoverUploadResponseError)
-
 export const getPostAlbumCoverUploadUrl = (publicId: string,) => {
 
 
@@ -12114,11 +10740,11 @@ export const getPostAlbumCoverUploadUrl = (publicId: string,) => {
  * @summary Upload a cover image for an album
  */
 export const postAlbumCoverUpload = async (publicId: string,
-    postAlbumCoverUploadBody: PostAlbumCoverUploadBody, options?: RequestInit): Promise<postAlbumCoverUploadResponse> => {
+    postAlbumCoverUploadBody: PostAlbumCoverUploadBody, options?: RequestInit): Promise<PostAlbumCoverUpload200> => {
     const formData = new FormData();
 formData.append(`cover`, postAlbumCoverUploadBody.cover);
 
-  return customInstance<postAlbumCoverUploadResponse>(getPostAlbumCoverUploadUrl(publicId),
+  return customInstance<PostAlbumCoverUpload200>(getPostAlbumCoverUploadUrl(publicId),
   {
     ...options,
     method: 'POST'
@@ -12175,35 +10801,6 @@ export const usePostAlbumCoverUpload = <TError = ErrorType<ApiError | Validation
       return useMutation(getPostAlbumCoverUploadMutationOptions(options), queryClient);
     }
 
-export type deleteAlbumCoverDeleteResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteAlbumCoverDeleteResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type deleteAlbumCoverDeleteResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type deleteAlbumCoverDeleteResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteAlbumCoverDeleteResponseSuccess = (deleteAlbumCoverDeleteResponse204) & {
-  headers: Headers;
-};
-export type deleteAlbumCoverDeleteResponseError = (deleteAlbumCoverDeleteResponse401 | deleteAlbumCoverDeleteResponse403 | deleteAlbumCoverDeleteResponse404) & {
-  headers: Headers;
-};
-
-export type deleteAlbumCoverDeleteResponse = (deleteAlbumCoverDeleteResponseSuccess | deleteAlbumCoverDeleteResponseError)
-
 export const getDeleteAlbumCoverDeleteUrl = (publicId: string,) => {
 
 
@@ -12215,9 +10812,9 @@ export const getDeleteAlbumCoverDeleteUrl = (publicId: string,) => {
 /**
  * @summary Delete the cover image from an album
  */
-export const deleteAlbumCoverDelete = async (publicId: string, options?: RequestInit): Promise<deleteAlbumCoverDeleteResponse> => {
+export const deleteAlbumCoverDelete = async (publicId: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteAlbumCoverDeleteResponse>(getDeleteAlbumCoverDeleteUrl(publicId),
+  return customInstance<void>(getDeleteAlbumCoverDeleteUrl(publicId),
   {
     ...options,
     method: 'DELETE'
@@ -12274,25 +10871,6 @@ export const useDeleteAlbumCoverDelete = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteAlbumCoverDeleteMutationOptions(options), queryClient);
     }
 
-export type getAlbumDuplicatesResponse200 = {
-  data: GetAlbumDuplicates200
-  status: 200
-}
-
-export type getAlbumDuplicatesResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getAlbumDuplicatesResponseSuccess = (getAlbumDuplicatesResponse200) & {
-  headers: Headers;
-};
-export type getAlbumDuplicatesResponseError = (getAlbumDuplicatesResponse404) & {
-  headers: Headers;
-};
-
-export type getAlbumDuplicatesResponse = (getAlbumDuplicatesResponseSuccess | getAlbumDuplicatesResponseError)
-
 export const getGetAlbumDuplicatesUrl = (publicId: string,) => {
 
 
@@ -12304,9 +10882,9 @@ export const getGetAlbumDuplicatesUrl = (publicId: string,) => {
 /**
  * @summary Get duplicate albums for a specific album
  */
-export const getAlbumDuplicates = async (publicId: string, options?: RequestInit): Promise<getAlbumDuplicatesResponse> => {
+export const getAlbumDuplicates = async (publicId: string, options?: RequestInit): Promise<GetAlbumDuplicates200> => {
 
-  return customInstance<getAlbumDuplicatesResponse>(getGetAlbumDuplicatesUrl(publicId),
+  return customInstance<GetAlbumDuplicates200>(getGetAlbumDuplicatesUrl(publicId),
   {
     ...options,
     method: 'GET'
@@ -12394,35 +10972,6 @@ export function useGetAlbumDuplicates<TData = Awaited<ReturnType<typeof getAlbum
 
 
 
-export type postAlbumMergeResponse200 = {
-  data: PostAlbumMerge200
-  status: 200
-}
-
-export type postAlbumMergeResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type postAlbumMergeResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postAlbumMergeResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postAlbumMergeResponseSuccess = (postAlbumMergeResponse200) & {
-  headers: Headers;
-};
-export type postAlbumMergeResponseError = (postAlbumMergeResponse400 | postAlbumMergeResponse404 | postAlbumMergeResponse422) & {
-  headers: Headers;
-};
-
-export type postAlbumMergeResponse = (postAlbumMergeResponseSuccess | postAlbumMergeResponseError)
-
 export const getPostAlbumMergeUrl = () => {
 
 
@@ -12434,9 +10983,9 @@ export const getPostAlbumMergeUrl = () => {
 /**
  * @summary Merge a source album into a target album
  */
-export const postAlbumMerge = async (mergeAlbumsRequest: MergeAlbumsRequest, options?: RequestInit): Promise<postAlbumMergeResponse> => {
+export const postAlbumMerge = async (mergeAlbumsRequest: MergeAlbumsRequest, options?: RequestInit): Promise<PostAlbumMerge200> => {
 
-  return customInstance<postAlbumMergeResponse>(getPostAlbumMergeUrl(),
+  return customInstance<PostAlbumMerge200>(getPostAlbumMergeUrl(),
   {
     ...options,
     method: 'POST',
@@ -12493,30 +11042,6 @@ export const usePostAlbumMerge = <TError = ErrorType<ApiError | ValidationError>
       return useMutation(getPostAlbumMergeMutationOptions(options), queryClient);
     }
 
-export type getAdminAlbumsDuplicatesResponse200 = {
-  data: GetAdminAlbumsDuplicates200
-  status: 200
-}
-
-export type getAdminAlbumsDuplicatesResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type getAdminAlbumsDuplicatesResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type getAdminAlbumsDuplicatesResponseSuccess = (getAdminAlbumsDuplicatesResponse200) & {
-  headers: Headers;
-};
-export type getAdminAlbumsDuplicatesResponseError = (getAdminAlbumsDuplicatesResponse400 | getAdminAlbumsDuplicatesResponse403) & {
-  headers: Headers;
-};
-
-export type getAdminAlbumsDuplicatesResponse = (getAdminAlbumsDuplicatesResponseSuccess | getAdminAlbumsDuplicatesResponseError)
-
 export const getGetAdminAlbumsDuplicatesUrl = (params: GetAdminAlbumsDuplicatesParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -12535,9 +11060,9 @@ export const getGetAdminAlbumsDuplicatesUrl = (params: GetAdminAlbumsDuplicatesP
 /**
  * @summary List all duplicate album groups in the library
  */
-export const getAdminAlbumsDuplicates = async (params: GetAdminAlbumsDuplicatesParams, options?: RequestInit): Promise<getAdminAlbumsDuplicatesResponse> => {
+export const getAdminAlbumsDuplicates = async (params: GetAdminAlbumsDuplicatesParams, options?: RequestInit): Promise<GetAdminAlbumsDuplicates200> => {
 
-  return customInstance<getAdminAlbumsDuplicatesResponse>(getGetAdminAlbumsDuplicatesUrl(params),
+  return customInstance<GetAdminAlbumsDuplicates200>(getGetAdminAlbumsDuplicatesUrl(params),
   {
     ...options,
     method: 'GET'
@@ -12625,18 +11150,6 @@ export function useGetAdminAlbumsDuplicates<TData = Awaited<ReturnType<typeof ge
 
 
 
-export type getArtistIndexResponse200 = {
-  data: PaginatedResponse
-  status: 200
-}
-
-export type getArtistIndexResponseSuccess = (getArtistIndexResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getArtistIndexResponse = (getArtistIndexResponseSuccess)
-
 export const getGetArtistIndexUrl = (params?: GetArtistIndexParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -12655,9 +11168,9 @@ export const getGetArtistIndexUrl = (params?: GetArtistIndexParams,) => {
 /**
  * @summary List artists (paginated)
  */
-export const getArtistIndex = async (params?: GetArtistIndexParams, options?: RequestInit): Promise<getArtistIndexResponse> => {
+export const getArtistIndex = async (params?: GetArtistIndexParams, options?: RequestInit): Promise<PaginatedResponse> => {
 
-  return customInstance<getArtistIndexResponse>(getGetArtistIndexUrl(params),
+  return customInstance<PaginatedResponse>(getGetArtistIndexUrl(params),
   {
     ...options,
     method: 'GET'
@@ -12745,25 +11258,6 @@ export function useGetArtistIndex<TData = Awaited<ReturnType<typeof getArtistInd
 
 
 
-export type postArtistStoreResponse201 = {
-  data: PostArtistStore201
-  status: 201
-}
-
-export type postArtistStoreResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postArtistStoreResponseSuccess = (postArtistStoreResponse201) & {
-  headers: Headers;
-};
-export type postArtistStoreResponseError = (postArtistStoreResponse422) & {
-  headers: Headers;
-};
-
-export type postArtistStoreResponse = (postArtistStoreResponseSuccess | postArtistStoreResponseError)
-
 export const getPostArtistStoreUrl = () => {
 
 
@@ -12775,9 +11269,9 @@ export const getPostArtistStoreUrl = () => {
 /**
  * @summary Create a new artist
  */
-export const postArtistStore = async (postArtistStoreBody: PostArtistStoreBody, options?: RequestInit): Promise<postArtistStoreResponse> => {
+export const postArtistStore = async (postArtistStoreBody: PostArtistStoreBody, options?: RequestInit): Promise<PostArtistStore201> => {
 
-  return customInstance<postArtistStoreResponse>(getPostArtistStoreUrl(),
+  return customInstance<PostArtistStore201>(getPostArtistStoreUrl(),
   {
     ...options,
     method: 'POST',
@@ -12834,25 +11328,6 @@ export const usePostArtistStore = <TError = ErrorType<ValidationError>,
       return useMutation(getPostArtistStoreMutationOptions(options), queryClient);
     }
 
-export type getArtistShowResponse200 = {
-  data: GetArtistShow200
-  status: 200
-}
-
-export type getArtistShowResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getArtistShowResponseSuccess = (getArtistShowResponse200) & {
-  headers: Headers;
-};
-export type getArtistShowResponseError = (getArtistShowResponse404) & {
-  headers: Headers;
-};
-
-export type getArtistShowResponse = (getArtistShowResponseSuccess | getArtistShowResponseError)
-
 export const getGetArtistShowUrl = (publicId: string,) => {
 
 
@@ -12864,9 +11339,9 @@ export const getGetArtistShowUrl = (publicId: string,) => {
 /**
  * @summary Get a single artist
  */
-export const getArtistShow = async (publicId: string, options?: RequestInit): Promise<getArtistShowResponse> => {
+export const getArtistShow = async (publicId: string, options?: RequestInit): Promise<GetArtistShow200> => {
 
-  return customInstance<getArtistShowResponse>(getGetArtistShowUrl(publicId),
+  return customInstance<GetArtistShow200>(getGetArtistShowUrl(publicId),
   {
     ...options,
     method: 'GET'
@@ -12954,25 +11429,6 @@ export function useGetArtistShow<TData = Awaited<ReturnType<typeof getArtistShow
 
 
 
-export type deleteArtistDestroyResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteArtistDestroyResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteArtistDestroyResponseSuccess = (deleteArtistDestroyResponse204) & {
-  headers: Headers;
-};
-export type deleteArtistDestroyResponseError = (deleteArtistDestroyResponse404) & {
-  headers: Headers;
-};
-
-export type deleteArtistDestroyResponse = (deleteArtistDestroyResponseSuccess | deleteArtistDestroyResponseError)
-
 export const getDeleteArtistDestroyUrl = (publicId: string,) => {
 
 
@@ -12984,9 +11440,9 @@ export const getDeleteArtistDestroyUrl = (publicId: string,) => {
 /**
  * @summary Delete an artist
  */
-export const deleteArtistDestroy = async (publicId: string, options?: RequestInit): Promise<deleteArtistDestroyResponse> => {
+export const deleteArtistDestroy = async (publicId: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteArtistDestroyResponse>(getDeleteArtistDestroyUrl(publicId),
+  return customInstance<void>(getDeleteArtistDestroyUrl(publicId),
   {
     ...options,
     method: 'DELETE'
@@ -13043,30 +11499,6 @@ export const useDeleteArtistDestroy = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteArtistDestroyMutationOptions(options), queryClient);
     }
 
-export type patchArtistUpdateResponse200 = {
-  data: PatchArtistUpdate200
-  status: 200
-}
-
-export type patchArtistUpdateResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type patchArtistUpdateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type patchArtistUpdateResponseSuccess = (patchArtistUpdateResponse200) & {
-  headers: Headers;
-};
-export type patchArtistUpdateResponseError = (patchArtistUpdateResponse404 | patchArtistUpdateResponse422) & {
-  headers: Headers;
-};
-
-export type patchArtistUpdateResponse = (patchArtistUpdateResponseSuccess | patchArtistUpdateResponseError)
-
 export const getPatchArtistUpdateUrl = (publicId: string,) => {
 
 
@@ -13079,9 +11511,9 @@ export const getPatchArtistUpdateUrl = (publicId: string,) => {
  * @summary Update an artist
  */
 export const patchArtistUpdate = async (publicId: string,
-    patchArtistUpdateBody: PatchArtistUpdateBody, options?: RequestInit): Promise<patchArtistUpdateResponse> => {
+    patchArtistUpdateBody: PatchArtistUpdateBody, options?: RequestInit): Promise<PatchArtistUpdate200> => {
 
-  return customInstance<patchArtistUpdateResponse>(getPatchArtistUpdateUrl(publicId),
+  return customInstance<PatchArtistUpdate200>(getPatchArtistUpdateUrl(publicId),
   {
     ...options,
     method: 'PATCH',
@@ -13138,30 +11570,6 @@ export const usePatchArtistUpdate = <TError = ErrorType<ApiError | ValidationErr
       return useMutation(getPatchArtistUpdateMutationOptions(options), queryClient);
     }
 
-export type postArtistAddSongResponse204 = {
-  data: void
-  status: 204
-}
-
-export type postArtistAddSongResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postArtistAddSongResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postArtistAddSongResponseSuccess = (postArtistAddSongResponse204) & {
-  headers: Headers;
-};
-export type postArtistAddSongResponseError = (postArtistAddSongResponse404 | postArtistAddSongResponse422) & {
-  headers: Headers;
-};
-
-export type postArtistAddSongResponse = (postArtistAddSongResponseSuccess | postArtistAddSongResponseError)
-
 export const getPostArtistAddSongUrl = (publicId: string,) => {
 
 
@@ -13174,9 +11582,9 @@ export const getPostArtistAddSongUrl = (publicId: string,) => {
  * @summary Add a song to an artist
  */
 export const postArtistAddSong = async (publicId: string,
-    postArtistAddSongBody: PostArtistAddSongBody, options?: RequestInit): Promise<postArtistAddSongResponse> => {
+    postArtistAddSongBody: PostArtistAddSongBody, options?: RequestInit): Promise<void> => {
 
-  return customInstance<postArtistAddSongResponse>(getPostArtistAddSongUrl(publicId),
+  return customInstance<void>(getPostArtistAddSongUrl(publicId),
   {
     ...options,
     method: 'POST',
@@ -13233,25 +11641,6 @@ export const usePostArtistAddSong = <TError = ErrorType<ApiError | ValidationErr
       return useMutation(getPostArtistAddSongMutationOptions(options), queryClient);
     }
 
-export type deleteArtistRemoveSongResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteArtistRemoveSongResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteArtistRemoveSongResponseSuccess = (deleteArtistRemoveSongResponse204) & {
-  headers: Headers;
-};
-export type deleteArtistRemoveSongResponseError = (deleteArtistRemoveSongResponse404) & {
-  headers: Headers;
-};
-
-export type deleteArtistRemoveSongResponse = (deleteArtistRemoveSongResponseSuccess | deleteArtistRemoveSongResponseError)
-
 export const getDeleteArtistRemoveSongUrl = (publicId: string,
     songId: string,) => {
 
@@ -13265,9 +11654,9 @@ export const getDeleteArtistRemoveSongUrl = (publicId: string,
  * @summary Remove a song from an artist
  */
 export const deleteArtistRemoveSong = async (publicId: string,
-    songId: string, options?: RequestInit): Promise<deleteArtistRemoveSongResponse> => {
+    songId: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteArtistRemoveSongResponse>(getDeleteArtistRemoveSongUrl(publicId,songId),
+  return customInstance<void>(getDeleteArtistRemoveSongUrl(publicId,songId),
   {
     ...options,
     method: 'DELETE'
@@ -13324,30 +11713,6 @@ export const useDeleteArtistRemoveSong = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteArtistRemoveSongMutationOptions(options), queryClient);
     }
 
-export type patchArtistUpdateSongRoleResponse204 = {
-  data: void
-  status: 204
-}
-
-export type patchArtistUpdateSongRoleResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type patchArtistUpdateSongRoleResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type patchArtistUpdateSongRoleResponseSuccess = (patchArtistUpdateSongRoleResponse204) & {
-  headers: Headers;
-};
-export type patchArtistUpdateSongRoleResponseError = (patchArtistUpdateSongRoleResponse404 | patchArtistUpdateSongRoleResponse422) & {
-  headers: Headers;
-};
-
-export type patchArtistUpdateSongRoleResponse = (patchArtistUpdateSongRoleResponseSuccess | patchArtistUpdateSongRoleResponseError)
-
 export const getPatchArtistUpdateSongRoleUrl = (publicId: string,
     songId: string,) => {
 
@@ -13362,9 +11727,9 @@ export const getPatchArtistUpdateSongRoleUrl = (publicId: string,
  */
 export const patchArtistUpdateSongRole = async (publicId: string,
     songId: string,
-    patchArtistUpdateSongRoleBody: PatchArtistUpdateSongRoleBody, options?: RequestInit): Promise<patchArtistUpdateSongRoleResponse> => {
+    patchArtistUpdateSongRoleBody: PatchArtistUpdateSongRoleBody, options?: RequestInit): Promise<void> => {
 
-  return customInstance<patchArtistUpdateSongRoleResponse>(getPatchArtistUpdateSongRoleUrl(publicId,songId),
+  return customInstance<void>(getPatchArtistUpdateSongRoleUrl(publicId,songId),
   {
     ...options,
     method: 'PATCH',
@@ -13421,30 +11786,6 @@ export const usePatchArtistUpdateSongRole = <TError = ErrorType<ApiError | Valid
       return useMutation(getPatchArtistUpdateSongRoleMutationOptions(options), queryClient);
     }
 
-export type postArtistAddAlbumResponse204 = {
-  data: void
-  status: 204
-}
-
-export type postArtistAddAlbumResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postArtistAddAlbumResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postArtistAddAlbumResponseSuccess = (postArtistAddAlbumResponse204) & {
-  headers: Headers;
-};
-export type postArtistAddAlbumResponseError = (postArtistAddAlbumResponse404 | postArtistAddAlbumResponse422) & {
-  headers: Headers;
-};
-
-export type postArtistAddAlbumResponse = (postArtistAddAlbumResponseSuccess | postArtistAddAlbumResponseError)
-
 export const getPostArtistAddAlbumUrl = (publicId: string,) => {
 
 
@@ -13457,9 +11798,9 @@ export const getPostArtistAddAlbumUrl = (publicId: string,) => {
  * @summary Add an album to an artist
  */
 export const postArtistAddAlbum = async (publicId: string,
-    postArtistAddAlbumBody: PostArtistAddAlbumBody, options?: RequestInit): Promise<postArtistAddAlbumResponse> => {
+    postArtistAddAlbumBody: PostArtistAddAlbumBody, options?: RequestInit): Promise<void> => {
 
-  return customInstance<postArtistAddAlbumResponse>(getPostArtistAddAlbumUrl(publicId),
+  return customInstance<void>(getPostArtistAddAlbumUrl(publicId),
   {
     ...options,
     method: 'POST',
@@ -13516,25 +11857,6 @@ export const usePostArtistAddAlbum = <TError = ErrorType<ApiError | ValidationEr
       return useMutation(getPostArtistAddAlbumMutationOptions(options), queryClient);
     }
 
-export type deleteArtistRemoveAlbumResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteArtistRemoveAlbumResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteArtistRemoveAlbumResponseSuccess = (deleteArtistRemoveAlbumResponse204) & {
-  headers: Headers;
-};
-export type deleteArtistRemoveAlbumResponseError = (deleteArtistRemoveAlbumResponse404) & {
-  headers: Headers;
-};
-
-export type deleteArtistRemoveAlbumResponse = (deleteArtistRemoveAlbumResponseSuccess | deleteArtistRemoveAlbumResponseError)
-
 export const getDeleteArtistRemoveAlbumUrl = (publicId: string,
     albumId: string,) => {
 
@@ -13548,9 +11870,9 @@ export const getDeleteArtistRemoveAlbumUrl = (publicId: string,
  * @summary Remove an album from an artist
  */
 export const deleteArtistRemoveAlbum = async (publicId: string,
-    albumId: string, options?: RequestInit): Promise<deleteArtistRemoveAlbumResponse> => {
+    albumId: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteArtistRemoveAlbumResponse>(getDeleteArtistRemoveAlbumUrl(publicId,albumId),
+  return customInstance<void>(getDeleteArtistRemoveAlbumUrl(publicId,albumId),
   {
     ...options,
     method: 'DELETE'
@@ -13607,30 +11929,6 @@ export const useDeleteArtistRemoveAlbum = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteArtistRemoveAlbumMutationOptions(options), queryClient);
     }
 
-export type patchArtistUpdateAlbumRoleResponse204 = {
-  data: void
-  status: 204
-}
-
-export type patchArtistUpdateAlbumRoleResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type patchArtistUpdateAlbumRoleResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type patchArtistUpdateAlbumRoleResponseSuccess = (patchArtistUpdateAlbumRoleResponse204) & {
-  headers: Headers;
-};
-export type patchArtistUpdateAlbumRoleResponseError = (patchArtistUpdateAlbumRoleResponse404 | patchArtistUpdateAlbumRoleResponse422) & {
-  headers: Headers;
-};
-
-export type patchArtistUpdateAlbumRoleResponse = (patchArtistUpdateAlbumRoleResponseSuccess | patchArtistUpdateAlbumRoleResponseError)
-
 export const getPatchArtistUpdateAlbumRoleUrl = (publicId: string,
     albumId: string,) => {
 
@@ -13645,9 +11943,9 @@ export const getPatchArtistUpdateAlbumRoleUrl = (publicId: string,
  */
 export const patchArtistUpdateAlbumRole = async (publicId: string,
     albumId: string,
-    patchArtistUpdateAlbumRoleBody: PatchArtistUpdateAlbumRoleBody, options?: RequestInit): Promise<patchArtistUpdateAlbumRoleResponse> => {
+    patchArtistUpdateAlbumRoleBody: PatchArtistUpdateAlbumRoleBody, options?: RequestInit): Promise<void> => {
 
-  return customInstance<patchArtistUpdateAlbumRoleResponse>(getPatchArtistUpdateAlbumRoleUrl(publicId,albumId),
+  return customInstance<void>(getPatchArtistUpdateAlbumRoleUrl(publicId,albumId),
   {
     ...options,
     method: 'PATCH',
@@ -13704,40 +12002,6 @@ export const usePatchArtistUpdateAlbumRole = <TError = ErrorType<ApiError | Vali
       return useMutation(getPatchArtistUpdateAlbumRoleMutationOptions(options), queryClient);
     }
 
-export type postArtistCoverUploadResponse200 = {
-  data: PostArtistCoverUpload200
-  status: 200
-}
-
-export type postArtistCoverUploadResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postArtistCoverUploadResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type postArtistCoverUploadResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postArtistCoverUploadResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postArtistCoverUploadResponseSuccess = (postArtistCoverUploadResponse200) & {
-  headers: Headers;
-};
-export type postArtistCoverUploadResponseError = (postArtistCoverUploadResponse401 | postArtistCoverUploadResponse403 | postArtistCoverUploadResponse404 | postArtistCoverUploadResponse422) & {
-  headers: Headers;
-};
-
-export type postArtistCoverUploadResponse = (postArtistCoverUploadResponseSuccess | postArtistCoverUploadResponseError)
-
 export const getPostArtistCoverUploadUrl = (publicId: string,) => {
 
 
@@ -13750,11 +12014,11 @@ export const getPostArtistCoverUploadUrl = (publicId: string,) => {
  * @summary Upload a cover image for an artist
  */
 export const postArtistCoverUpload = async (publicId: string,
-    postArtistCoverUploadBody: PostArtistCoverUploadBody, options?: RequestInit): Promise<postArtistCoverUploadResponse> => {
+    postArtistCoverUploadBody: PostArtistCoverUploadBody, options?: RequestInit): Promise<PostArtistCoverUpload200> => {
     const formData = new FormData();
 formData.append(`cover`, postArtistCoverUploadBody.cover);
 
-  return customInstance<postArtistCoverUploadResponse>(getPostArtistCoverUploadUrl(publicId),
+  return customInstance<PostArtistCoverUpload200>(getPostArtistCoverUploadUrl(publicId),
   {
     ...options,
     method: 'POST'
@@ -13811,35 +12075,6 @@ export const usePostArtistCoverUpload = <TError = ErrorType<ApiError | Validatio
       return useMutation(getPostArtistCoverUploadMutationOptions(options), queryClient);
     }
 
-export type deleteArtistCoverDeleteResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteArtistCoverDeleteResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type deleteArtistCoverDeleteResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type deleteArtistCoverDeleteResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteArtistCoverDeleteResponseSuccess = (deleteArtistCoverDeleteResponse204) & {
-  headers: Headers;
-};
-export type deleteArtistCoverDeleteResponseError = (deleteArtistCoverDeleteResponse401 | deleteArtistCoverDeleteResponse403 | deleteArtistCoverDeleteResponse404) & {
-  headers: Headers;
-};
-
-export type deleteArtistCoverDeleteResponse = (deleteArtistCoverDeleteResponseSuccess | deleteArtistCoverDeleteResponseError)
-
 export const getDeleteArtistCoverDeleteUrl = (publicId: string,) => {
 
 
@@ -13851,9 +12086,9 @@ export const getDeleteArtistCoverDeleteUrl = (publicId: string,) => {
 /**
  * @summary Delete the cover image from an artist
  */
-export const deleteArtistCoverDelete = async (publicId: string, options?: RequestInit): Promise<deleteArtistCoverDeleteResponse> => {
+export const deleteArtistCoverDelete = async (publicId: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteArtistCoverDeleteResponse>(getDeleteArtistCoverDeleteUrl(publicId),
+  return customInstance<void>(getDeleteArtistCoverDeleteUrl(publicId),
   {
     ...options,
     method: 'DELETE'
@@ -13910,30 +12145,6 @@ export const useDeleteArtistCoverDelete = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteArtistCoverDeleteMutationOptions(options), queryClient);
     }
 
-export type postExtractCoversAppCatalogInterfaceExtractcoversInvokeResponse202 = {
-  data: PostExtractCoversAppCatalogInterfaceExtractcoversInvoke202
-  status: 202
-}
-
-export type postExtractCoversAppCatalogInterfaceExtractcoversInvokeResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postExtractCoversAppCatalogInterfaceExtractcoversInvokeResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type postExtractCoversAppCatalogInterfaceExtractcoversInvokeResponseSuccess = (postExtractCoversAppCatalogInterfaceExtractcoversInvokeResponse202) & {
-  headers: Headers;
-};
-export type postExtractCoversAppCatalogInterfaceExtractcoversInvokeResponseError = (postExtractCoversAppCatalogInterfaceExtractcoversInvokeResponse401 | postExtractCoversAppCatalogInterfaceExtractcoversInvokeResponse403) & {
-  headers: Headers;
-};
-
-export type postExtractCoversAppCatalogInterfaceExtractcoversInvokeResponse = (postExtractCoversAppCatalogInterfaceExtractcoversInvokeResponseSuccess | postExtractCoversAppCatalogInterfaceExtractcoversInvokeResponseError)
-
 export const getPostExtractCoversAppCatalogInterfaceExtractcoversInvokeUrl = () => {
 
 
@@ -13946,9 +12157,9 @@ export const getPostExtractCoversAppCatalogInterfaceExtractcoversInvokeUrl = () 
  * Queues individual extraction jobs for embedded cover art from audio files for all albums without a cover image.
  * @summary Extract cover art for all albums missing one
  */
-export const postExtractCoversAppCatalogInterfaceExtractcoversInvoke = async ( options?: RequestInit): Promise<postExtractCoversAppCatalogInterfaceExtractcoversInvokeResponse> => {
+export const postExtractCoversAppCatalogInterfaceExtractcoversInvoke = async ( options?: RequestInit): Promise<PostExtractCoversAppCatalogInterfaceExtractcoversInvoke202> => {
 
-  return customInstance<postExtractCoversAppCatalogInterfaceExtractcoversInvokeResponse>(getPostExtractCoversAppCatalogInterfaceExtractcoversInvokeUrl(),
+  return customInstance<PostExtractCoversAppCatalogInterfaceExtractcoversInvoke202>(getPostExtractCoversAppCatalogInterfaceExtractcoversInvokeUrl(),
   {
     ...options,
     method: 'POST'
@@ -14005,18 +12216,6 @@ export const usePostExtractCoversAppCatalogInterfaceExtractcoversInvoke = <TErro
       return useMutation(getPostExtractCoversAppCatalogInterfaceExtractcoversInvokeMutationOptions(options), queryClient);
     }
 
-export type getGenreIndexResponse200 = {
-  data: GetGenreIndex200
-  status: 200
-}
-
-export type getGenreIndexResponseSuccess = (getGenreIndexResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getGenreIndexResponse = (getGenreIndexResponseSuccess)
-
 export const getGetGenreIndexUrl = (params?: GetGenreIndexParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -14035,9 +12234,9 @@ export const getGetGenreIndexUrl = (params?: GetGenreIndexParams,) => {
 /**
  * @summary List all genres (flat list)
  */
-export const getGenreIndex = async (params?: GetGenreIndexParams, options?: RequestInit): Promise<getGenreIndexResponse> => {
+export const getGenreIndex = async (params?: GetGenreIndexParams, options?: RequestInit): Promise<GetGenreIndex200> => {
 
-  return customInstance<getGenreIndexResponse>(getGetGenreIndexUrl(params),
+  return customInstance<GetGenreIndex200>(getGetGenreIndexUrl(params),
   {
     ...options,
     method: 'GET'
@@ -14125,25 +12324,6 @@ export function useGetGenreIndex<TData = Awaited<ReturnType<typeof getGenreIndex
 
 
 
-export type postGenreStoreResponse201 = {
-  data: PostGenreStore201
-  status: 201
-}
-
-export type postGenreStoreResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postGenreStoreResponseSuccess = (postGenreStoreResponse201) & {
-  headers: Headers;
-};
-export type postGenreStoreResponseError = (postGenreStoreResponse422) & {
-  headers: Headers;
-};
-
-export type postGenreStoreResponse = (postGenreStoreResponseSuccess | postGenreStoreResponseError)
-
 export const getPostGenreStoreUrl = () => {
 
 
@@ -14155,9 +12335,9 @@ export const getPostGenreStoreUrl = () => {
 /**
  * @summary Create a new genre
  */
-export const postGenreStore = async (postGenreStoreBody: PostGenreStoreBody, options?: RequestInit): Promise<postGenreStoreResponse> => {
+export const postGenreStore = async (postGenreStoreBody: PostGenreStoreBody, options?: RequestInit): Promise<PostGenreStore201> => {
 
-  return customInstance<postGenreStoreResponse>(getPostGenreStoreUrl(),
+  return customInstance<PostGenreStore201>(getPostGenreStoreUrl(),
   {
     ...options,
     method: 'POST',
@@ -14214,25 +12394,6 @@ export const usePostGenreStore = <TError = ErrorType<ValidationError>,
       return useMutation(getPostGenreStoreMutationOptions(options), queryClient);
     }
 
-export type getGenreShowResponse200 = {
-  data: GetGenreShow200
-  status: 200
-}
-
-export type getGenreShowResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getGenreShowResponseSuccess = (getGenreShowResponse200) & {
-  headers: Headers;
-};
-export type getGenreShowResponseError = (getGenreShowResponse404) & {
-  headers: Headers;
-};
-
-export type getGenreShowResponse = (getGenreShowResponseSuccess | getGenreShowResponseError)
-
 export const getGetGenreShowUrl = (slug: string,) => {
 
 
@@ -14244,9 +12405,9 @@ export const getGetGenreShowUrl = (slug: string,) => {
 /**
  * @summary Get a single genre with its children
  */
-export const getGenreShow = async (slug: string, options?: RequestInit): Promise<getGenreShowResponse> => {
+export const getGenreShow = async (slug: string, options?: RequestInit): Promise<GetGenreShow200> => {
 
-  return customInstance<getGenreShowResponse>(getGetGenreShowUrl(slug),
+  return customInstance<GetGenreShow200>(getGetGenreShowUrl(slug),
   {
     ...options,
     method: 'GET'
@@ -14334,25 +12495,6 @@ export function useGetGenreShow<TData = Awaited<ReturnType<typeof getGenreShow>>
 
 
 
-export type deleteGenreDestroyResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteGenreDestroyResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteGenreDestroyResponseSuccess = (deleteGenreDestroyResponse204) & {
-  headers: Headers;
-};
-export type deleteGenreDestroyResponseError = (deleteGenreDestroyResponse404) & {
-  headers: Headers;
-};
-
-export type deleteGenreDestroyResponse = (deleteGenreDestroyResponseSuccess | deleteGenreDestroyResponseError)
-
 export const getDeleteGenreDestroyUrl = (slug: string,) => {
 
 
@@ -14364,9 +12506,9 @@ export const getDeleteGenreDestroyUrl = (slug: string,) => {
 /**
  * @summary Delete a genre
  */
-export const deleteGenreDestroy = async (slug: string, options?: RequestInit): Promise<deleteGenreDestroyResponse> => {
+export const deleteGenreDestroy = async (slug: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteGenreDestroyResponse>(getDeleteGenreDestroyUrl(slug),
+  return customInstance<void>(getDeleteGenreDestroyUrl(slug),
   {
     ...options,
     method: 'DELETE'
@@ -14423,30 +12565,6 @@ export const useDeleteGenreDestroy = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteGenreDestroyMutationOptions(options), queryClient);
     }
 
-export type patchGenreUpdateResponse200 = {
-  data: PatchGenreUpdate200
-  status: 200
-}
-
-export type patchGenreUpdateResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type patchGenreUpdateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type patchGenreUpdateResponseSuccess = (patchGenreUpdateResponse200) & {
-  headers: Headers;
-};
-export type patchGenreUpdateResponseError = (patchGenreUpdateResponse404 | patchGenreUpdateResponse422) & {
-  headers: Headers;
-};
-
-export type patchGenreUpdateResponse = (patchGenreUpdateResponseSuccess | patchGenreUpdateResponseError)
-
 export const getPatchGenreUpdateUrl = (slug: string,) => {
 
 
@@ -14459,9 +12577,9 @@ export const getPatchGenreUpdateUrl = (slug: string,) => {
  * @summary Update a genre
  */
 export const patchGenreUpdate = async (slug: string,
-    patchGenreUpdateBody: PatchGenreUpdateBody, options?: RequestInit): Promise<patchGenreUpdateResponse> => {
+    patchGenreUpdateBody: PatchGenreUpdateBody, options?: RequestInit): Promise<PatchGenreUpdate200> => {
 
-  return customInstance<patchGenreUpdateResponse>(getPatchGenreUpdateUrl(slug),
+  return customInstance<PatchGenreUpdate200>(getPatchGenreUpdateUrl(slug),
   {
     ...options,
     method: 'PATCH',
@@ -14518,25 +12636,6 @@ export const usePatchGenreUpdate = <TError = ErrorType<ApiError | ValidationErro
       return useMutation(getPatchGenreUpdateMutationOptions(options), queryClient);
     }
 
-export type postGenreAddSongResponse204 = {
-  data: void
-  status: 204
-}
-
-export type postGenreAddSongResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postGenreAddSongResponseSuccess = (postGenreAddSongResponse204) & {
-  headers: Headers;
-};
-export type postGenreAddSongResponseError = (postGenreAddSongResponse404) & {
-  headers: Headers;
-};
-
-export type postGenreAddSongResponse = (postGenreAddSongResponseSuccess | postGenreAddSongResponseError)
-
 export const getPostGenreAddSongUrl = (slug: string,) => {
 
 
@@ -14549,9 +12648,9 @@ export const getPostGenreAddSongUrl = (slug: string,) => {
  * @summary Assign a genre to a song
  */
 export const postGenreAddSong = async (slug: string,
-    postGenreAddSongBody: PostGenreAddSongBody, options?: RequestInit): Promise<postGenreAddSongResponse> => {
+    postGenreAddSongBody: PostGenreAddSongBody, options?: RequestInit): Promise<void> => {
 
-  return customInstance<postGenreAddSongResponse>(getPostGenreAddSongUrl(slug),
+  return customInstance<void>(getPostGenreAddSongUrl(slug),
   {
     ...options,
     method: 'POST',
@@ -14608,25 +12707,6 @@ export const usePostGenreAddSong = <TError = ErrorType<ApiError>,
       return useMutation(getPostGenreAddSongMutationOptions(options), queryClient);
     }
 
-export type deleteGenreRemoveSongResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteGenreRemoveSongResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteGenreRemoveSongResponseSuccess = (deleteGenreRemoveSongResponse204) & {
-  headers: Headers;
-};
-export type deleteGenreRemoveSongResponseError = (deleteGenreRemoveSongResponse404) & {
-  headers: Headers;
-};
-
-export type deleteGenreRemoveSongResponse = (deleteGenreRemoveSongResponseSuccess | deleteGenreRemoveSongResponseError)
-
 export const getDeleteGenreRemoveSongUrl = (slug: string,
     songId: string,) => {
 
@@ -14640,9 +12720,9 @@ export const getDeleteGenreRemoveSongUrl = (slug: string,
  * @summary Remove a song from a genre
  */
 export const deleteGenreRemoveSong = async (slug: string,
-    songId: string, options?: RequestInit): Promise<deleteGenreRemoveSongResponse> => {
+    songId: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteGenreRemoveSongResponse>(getDeleteGenreRemoveSongUrl(slug,songId),
+  return customInstance<void>(getDeleteGenreRemoveSongUrl(slug,songId),
   {
     ...options,
     method: 'DELETE'
@@ -14699,25 +12779,6 @@ export const useDeleteGenreRemoveSong = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteGenreRemoveSongMutationOptions(options), queryClient);
     }
 
-export type postGenreAddAlbumResponse204 = {
-  data: void
-  status: 204
-}
-
-export type postGenreAddAlbumResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postGenreAddAlbumResponseSuccess = (postGenreAddAlbumResponse204) & {
-  headers: Headers;
-};
-export type postGenreAddAlbumResponseError = (postGenreAddAlbumResponse404) & {
-  headers: Headers;
-};
-
-export type postGenreAddAlbumResponse = (postGenreAddAlbumResponseSuccess | postGenreAddAlbumResponseError)
-
 export const getPostGenreAddAlbumUrl = (slug: string,) => {
 
 
@@ -14730,9 +12791,9 @@ export const getPostGenreAddAlbumUrl = (slug: string,) => {
  * @summary Assign a genre to an album
  */
 export const postGenreAddAlbum = async (slug: string,
-    postGenreAddAlbumBody: PostGenreAddAlbumBody, options?: RequestInit): Promise<postGenreAddAlbumResponse> => {
+    postGenreAddAlbumBody: PostGenreAddAlbumBody, options?: RequestInit): Promise<void> => {
 
-  return customInstance<postGenreAddAlbumResponse>(getPostGenreAddAlbumUrl(slug),
+  return customInstance<void>(getPostGenreAddAlbumUrl(slug),
   {
     ...options,
     method: 'POST',
@@ -14789,25 +12850,6 @@ export const usePostGenreAddAlbum = <TError = ErrorType<ApiError>,
       return useMutation(getPostGenreAddAlbumMutationOptions(options), queryClient);
     }
 
-export type deleteGenreRemoveAlbumResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteGenreRemoveAlbumResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteGenreRemoveAlbumResponseSuccess = (deleteGenreRemoveAlbumResponse204) & {
-  headers: Headers;
-};
-export type deleteGenreRemoveAlbumResponseError = (deleteGenreRemoveAlbumResponse404) & {
-  headers: Headers;
-};
-
-export type deleteGenreRemoveAlbumResponse = (deleteGenreRemoveAlbumResponseSuccess | deleteGenreRemoveAlbumResponseError)
-
 export const getDeleteGenreRemoveAlbumUrl = (slug: string,
     albumId: string,) => {
 
@@ -14821,9 +12863,9 @@ export const getDeleteGenreRemoveAlbumUrl = (slug: string,
  * @summary Remove an album from a genre
  */
 export const deleteGenreRemoveAlbum = async (slug: string,
-    albumId: string, options?: RequestInit): Promise<deleteGenreRemoveAlbumResponse> => {
+    albumId: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteGenreRemoveAlbumResponse>(getDeleteGenreRemoveAlbumUrl(slug,albumId),
+  return customInstance<void>(getDeleteGenreRemoveAlbumUrl(slug,albumId),
   {
     ...options,
     method: 'DELETE'
@@ -14880,18 +12922,6 @@ export const useDeleteGenreRemoveAlbum = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteGenreRemoveAlbumMutationOptions(options), queryClient);
     }
 
-export type getMovieIndexResponse200 = {
-  data: PaginatedResponse
-  status: 200
-}
-
-export type getMovieIndexResponseSuccess = (getMovieIndexResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getMovieIndexResponse = (getMovieIndexResponseSuccess)
-
 export const getGetMovieIndexUrl = (params?: GetMovieIndexParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -14910,9 +12940,9 @@ export const getGetMovieIndexUrl = (params?: GetMovieIndexParams,) => {
 /**
  * @summary List movies (paginated)
  */
-export const getMovieIndex = async (params?: GetMovieIndexParams, options?: RequestInit): Promise<getMovieIndexResponse> => {
+export const getMovieIndex = async (params?: GetMovieIndexParams, options?: RequestInit): Promise<PaginatedResponse> => {
 
-  return customInstance<getMovieIndexResponse>(getGetMovieIndexUrl(params),
+  return customInstance<PaginatedResponse>(getGetMovieIndexUrl(params),
   {
     ...options,
     method: 'GET'
@@ -15000,25 +13030,6 @@ export function useGetMovieIndex<TData = Awaited<ReturnType<typeof getMovieIndex
 
 
 
-export type getMovieShowResponse200 = {
-  data: GetMovieShow200
-  status: 200
-}
-
-export type getMovieShowResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getMovieShowResponseSuccess = (getMovieShowResponse200) & {
-  headers: Headers;
-};
-export type getMovieShowResponseError = (getMovieShowResponse404) & {
-  headers: Headers;
-};
-
-export type getMovieShowResponse = (getMovieShowResponseSuccess | getMovieShowResponseError)
-
 export const getGetMovieShowUrl = (publicId: string,) => {
 
 
@@ -15030,9 +13041,9 @@ export const getGetMovieShowUrl = (publicId: string,) => {
 /**
  * @summary Get a single movie
  */
-export const getMovieShow = async (publicId: string, options?: RequestInit): Promise<getMovieShowResponse> => {
+export const getMovieShow = async (publicId: string, options?: RequestInit): Promise<GetMovieShow200> => {
 
-  return customInstance<getMovieShowResponse>(getGetMovieShowUrl(publicId),
+  return customInstance<GetMovieShow200>(getGetMovieShowUrl(publicId),
   {
     ...options,
     method: 'GET'
@@ -15120,25 +13131,6 @@ export function useGetMovieShow<TData = Awaited<ReturnType<typeof getMovieShow>>
 
 
 
-export type deleteMovieDestroyResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteMovieDestroyResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteMovieDestroyResponseSuccess = (deleteMovieDestroyResponse204) & {
-  headers: Headers;
-};
-export type deleteMovieDestroyResponseError = (deleteMovieDestroyResponse404) & {
-  headers: Headers;
-};
-
-export type deleteMovieDestroyResponse = (deleteMovieDestroyResponseSuccess | deleteMovieDestroyResponseError)
-
 export const getDeleteMovieDestroyUrl = (publicId: string,) => {
 
 
@@ -15150,9 +13142,9 @@ export const getDeleteMovieDestroyUrl = (publicId: string,) => {
 /**
  * @summary Delete a movie
  */
-export const deleteMovieDestroy = async (publicId: string, options?: RequestInit): Promise<deleteMovieDestroyResponse> => {
+export const deleteMovieDestroy = async (publicId: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteMovieDestroyResponse>(getDeleteMovieDestroyUrl(publicId),
+  return customInstance<void>(getDeleteMovieDestroyUrl(publicId),
   {
     ...options,
     method: 'DELETE'
@@ -15209,30 +13201,6 @@ export const useDeleteMovieDestroy = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteMovieDestroyMutationOptions(options), queryClient);
     }
 
-export type patchMovieUpdateResponse200 = {
-  data: PatchMovieUpdate200
-  status: 200
-}
-
-export type patchMovieUpdateResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type patchMovieUpdateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type patchMovieUpdateResponseSuccess = (patchMovieUpdateResponse200) & {
-  headers: Headers;
-};
-export type patchMovieUpdateResponseError = (patchMovieUpdateResponse404 | patchMovieUpdateResponse422) & {
-  headers: Headers;
-};
-
-export type patchMovieUpdateResponse = (patchMovieUpdateResponseSuccess | patchMovieUpdateResponseError)
-
 export const getPatchMovieUpdateUrl = (publicId: string,) => {
 
 
@@ -15245,9 +13213,9 @@ export const getPatchMovieUpdateUrl = (publicId: string,) => {
  * @summary Update a movie
  */
 export const patchMovieUpdate = async (publicId: string,
-    patchMovieUpdateBody: PatchMovieUpdateBody, options?: RequestInit): Promise<patchMovieUpdateResponse> => {
+    patchMovieUpdateBody: PatchMovieUpdateBody, options?: RequestInit): Promise<PatchMovieUpdate200> => {
 
-  return customInstance<patchMovieUpdateResponse>(getPatchMovieUpdateUrl(publicId),
+  return customInstance<PatchMovieUpdate200>(getPatchMovieUpdateUrl(publicId),
   {
     ...options,
     method: 'PATCH',
@@ -15304,18 +13272,6 @@ export const usePatchMovieUpdate = <TError = ErrorType<ApiError | ValidationErro
       return useMutation(getPatchMovieUpdateMutationOptions(options), queryClient);
     }
 
-export type getSongIndexResponse200 = {
-  data: CursorPaginatedResponse
-  status: 200
-}
-
-export type getSongIndexResponseSuccess = (getSongIndexResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getSongIndexResponse = (getSongIndexResponseSuccess)
-
 export const getGetSongIndexUrl = (params?: GetSongIndexParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -15334,9 +13290,9 @@ export const getGetSongIndexUrl = (params?: GetSongIndexParams,) => {
 /**
  * @summary List songs (cursor-paginated)
  */
-export const getSongIndex = async (params?: GetSongIndexParams, options?: RequestInit): Promise<getSongIndexResponse> => {
+export const getSongIndex = async (params?: GetSongIndexParams, options?: RequestInit): Promise<CursorPaginatedResponse> => {
 
-  return customInstance<getSongIndexResponse>(getGetSongIndexUrl(params),
+  return customInstance<CursorPaginatedResponse>(getGetSongIndexUrl(params),
   {
     ...options,
     method: 'GET'
@@ -15424,25 +13380,6 @@ export function useGetSongIndex<TData = Awaited<ReturnType<typeof getSongIndex>>
 
 
 
-export type getSongShowResponse200 = {
-  data: GetSongShow200
-  status: 200
-}
-
-export type getSongShowResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getSongShowResponseSuccess = (getSongShowResponse200) & {
-  headers: Headers;
-};
-export type getSongShowResponseError = (getSongShowResponse404) & {
-  headers: Headers;
-};
-
-export type getSongShowResponse = (getSongShowResponseSuccess | getSongShowResponseError)
-
 export const getGetSongShowUrl = (publicId: string,) => {
 
 
@@ -15454,9 +13391,9 @@ export const getGetSongShowUrl = (publicId: string,) => {
 /**
  * @summary Get a single song
  */
-export const getSongShow = async (publicId: string, options?: RequestInit): Promise<getSongShowResponse> => {
+export const getSongShow = async (publicId: string, options?: RequestInit): Promise<GetSongShow200> => {
 
-  return customInstance<getSongShowResponse>(getGetSongShowUrl(publicId),
+  return customInstance<GetSongShow200>(getGetSongShowUrl(publicId),
   {
     ...options,
     method: 'GET'
@@ -15544,25 +13481,6 @@ export function useGetSongShow<TData = Awaited<ReturnType<typeof getSongShow>>, 
 
 
 
-export type deleteSongDestroyResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteSongDestroyResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteSongDestroyResponseSuccess = (deleteSongDestroyResponse204) & {
-  headers: Headers;
-};
-export type deleteSongDestroyResponseError = (deleteSongDestroyResponse404) & {
-  headers: Headers;
-};
-
-export type deleteSongDestroyResponse = (deleteSongDestroyResponseSuccess | deleteSongDestroyResponseError)
-
 export const getDeleteSongDestroyUrl = (publicId: string,) => {
 
 
@@ -15574,9 +13492,9 @@ export const getDeleteSongDestroyUrl = (publicId: string,) => {
 /**
  * @summary Delete a song
  */
-export const deleteSongDestroy = async (publicId: string, options?: RequestInit): Promise<deleteSongDestroyResponse> => {
+export const deleteSongDestroy = async (publicId: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteSongDestroyResponse>(getDeleteSongDestroyUrl(publicId),
+  return customInstance<void>(getDeleteSongDestroyUrl(publicId),
   {
     ...options,
     method: 'DELETE'
@@ -15633,30 +13551,6 @@ export const useDeleteSongDestroy = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteSongDestroyMutationOptions(options), queryClient);
     }
 
-export type patchSongUpdateResponse200 = {
-  data: PatchSongUpdate200
-  status: 200
-}
-
-export type patchSongUpdateResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type patchSongUpdateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type patchSongUpdateResponseSuccess = (patchSongUpdateResponse200) & {
-  headers: Headers;
-};
-export type patchSongUpdateResponseError = (patchSongUpdateResponse404 | patchSongUpdateResponse422) & {
-  headers: Headers;
-};
-
-export type patchSongUpdateResponse = (patchSongUpdateResponseSuccess | patchSongUpdateResponseError)
-
 export const getPatchSongUpdateUrl = (publicId: string,) => {
 
 
@@ -15669,9 +13563,9 @@ export const getPatchSongUpdateUrl = (publicId: string,) => {
  * @summary Update a song
  */
 export const patchSongUpdate = async (publicId: string,
-    patchSongUpdateBody: PatchSongUpdateBody, options?: RequestInit): Promise<patchSongUpdateResponse> => {
+    patchSongUpdateBody: PatchSongUpdateBody, options?: RequestInit): Promise<PatchSongUpdate200> => {
 
-  return customInstance<patchSongUpdateResponse>(getPatchSongUpdateUrl(publicId),
+  return customInstance<PatchSongUpdate200>(getPatchSongUpdateUrl(publicId),
   {
     ...options,
     method: 'PATCH',
@@ -15728,18 +13622,6 @@ export const usePatchSongUpdate = <TError = ErrorType<ApiError | ValidationError
       return useMutation(getPatchSongUpdateMutationOptions(options), queryClient);
     }
 
-export type postDiscoveryRegisterResponse201 = {
-  data: ServerInstanceResource
-  status: 201
-}
-
-export type postDiscoveryRegisterResponseSuccess = (postDiscoveryRegisterResponse201) & {
-  headers: Headers;
-};
-;
-
-export type postDiscoveryRegisterResponse = (postDiscoveryRegisterResponseSuccess)
-
 export const getPostDiscoveryRegisterUrl = () => {
 
 
@@ -15751,9 +13633,9 @@ export const getPostDiscoveryRegisterUrl = () => {
 /**
  * @summary Register a self-hosted server
  */
-export const postDiscoveryRegister = async (postDiscoveryRegisterBody: PostDiscoveryRegisterBody, options?: RequestInit): Promise<postDiscoveryRegisterResponse> => {
+export const postDiscoveryRegister = async (postDiscoveryRegisterBody: PostDiscoveryRegisterBody, options?: RequestInit): Promise<ServerInstanceResource> => {
 
-  return customInstance<postDiscoveryRegisterResponse>(getPostDiscoveryRegisterUrl(),
+  return customInstance<ServerInstanceResource>(getPostDiscoveryRegisterUrl(),
   {
     ...options,
     method: 'POST',
@@ -15810,18 +13692,6 @@ export const usePostDiscoveryRegister = <TError = ErrorType<unknown>,
       return useMutation(getPostDiscoveryRegisterMutationOptions(options), queryClient);
     }
 
-export type postDiscoveryPairingCodeResponse201 = {
-  data: PairingSessionResource
-  status: 201
-}
-
-export type postDiscoveryPairingCodeResponseSuccess = (postDiscoveryPairingCodeResponse201) & {
-  headers: Headers;
-};
-;
-
-export type postDiscoveryPairingCodeResponse = (postDiscoveryPairingCodeResponseSuccess)
-
 export const getPostDiscoveryPairingCodeUrl = () => {
 
 
@@ -15833,9 +13703,9 @@ export const getPostDiscoveryPairingCodeUrl = () => {
 /**
  * @summary Create a pairing code for a server
  */
-export const postDiscoveryPairingCode = async (postDiscoveryPairingCodeBody: PostDiscoveryPairingCodeBody, options?: RequestInit): Promise<postDiscoveryPairingCodeResponse> => {
+export const postDiscoveryPairingCode = async (postDiscoveryPairingCodeBody: PostDiscoveryPairingCodeBody, options?: RequestInit): Promise<PairingSessionResource> => {
 
-  return customInstance<postDiscoveryPairingCodeResponse>(getPostDiscoveryPairingCodeUrl(),
+  return customInstance<PairingSessionResource>(getPostDiscoveryPairingCodeUrl(),
   {
     ...options,
     method: 'POST',
@@ -15892,18 +13762,6 @@ export const usePostDiscoveryPairingCode = <TError = ErrorType<unknown>,
       return useMutation(getPostDiscoveryPairingCodeMutationOptions(options), queryClient);
     }
 
-export type getDiscoveryQrPayloadResponse200 = {
-  data: GetDiscoveryQrPayload200
-  status: 200
-}
-
-export type getDiscoveryQrPayloadResponseSuccess = (getDiscoveryQrPayloadResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getDiscoveryQrPayloadResponse = (getDiscoveryQrPayloadResponseSuccess)
-
 export const getGetDiscoveryQrPayloadUrl = (serverPublicId: string,) => {
 
 
@@ -15915,9 +13773,9 @@ export const getGetDiscoveryQrPayloadUrl = (serverPublicId: string,) => {
 /**
  * @summary Get QR payload for a pending pairing session
  */
-export const getDiscoveryQrPayload = async (serverPublicId: string, options?: RequestInit): Promise<getDiscoveryQrPayloadResponse> => {
+export const getDiscoveryQrPayload = async (serverPublicId: string, options?: RequestInit): Promise<GetDiscoveryQrPayload200> => {
 
-  return customInstance<getDiscoveryQrPayloadResponse>(getGetDiscoveryQrPayloadUrl(serverPublicId),
+  return customInstance<GetDiscoveryQrPayload200>(getGetDiscoveryQrPayloadUrl(serverPublicId),
   {
     ...options,
     method: 'GET'
@@ -16005,18 +13863,6 @@ export function useGetDiscoveryQrPayload<TData = Awaited<ReturnType<typeof getDi
 
 
 
-export type postDiscoveryCompletePairingResponse200 = {
-  data: PostDiscoveryCompletePairing200
-  status: 200
-}
-
-export type postDiscoveryCompletePairingResponseSuccess = (postDiscoveryCompletePairingResponse200) & {
-  headers: Headers;
-};
-;
-
-export type postDiscoveryCompletePairingResponse = (postDiscoveryCompletePairingResponseSuccess)
-
 export const getPostDiscoveryCompletePairingUrl = () => {
 
 
@@ -16028,9 +13874,9 @@ export const getPostDiscoveryCompletePairingUrl = () => {
 /**
  * @summary Complete a pairing session
  */
-export const postDiscoveryCompletePairing = async (postDiscoveryCompletePairingBody: PostDiscoveryCompletePairingBody, options?: RequestInit): Promise<postDiscoveryCompletePairingResponse> => {
+export const postDiscoveryCompletePairing = async (postDiscoveryCompletePairingBody: PostDiscoveryCompletePairingBody, options?: RequestInit): Promise<PostDiscoveryCompletePairing200> => {
 
-  return customInstance<postDiscoveryCompletePairingResponse>(getPostDiscoveryCompletePairingUrl(),
+  return customInstance<PostDiscoveryCompletePairing200>(getPostDiscoveryCompletePairingUrl(),
   {
     ...options,
     method: 'POST',
@@ -16087,18 +13933,6 @@ export const usePostDiscoveryCompletePairing = <TError = ErrorType<unknown>,
       return useMutation(getPostDiscoveryCompletePairingMutationOptions(options), queryClient);
     }
 
-export type getFavoritesIndexResponse200 = {
-  data: GetFavoritesIndex200
-  status: 200
-}
-
-export type getFavoritesIndexResponseSuccess = (getFavoritesIndexResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getFavoritesIndexResponse = (getFavoritesIndexResponseSuccess)
-
 export const getGetFavoritesIndexUrl = (params?: GetFavoritesIndexParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -16117,9 +13951,9 @@ export const getGetFavoritesIndexUrl = (params?: GetFavoritesIndexParams,) => {
 /**
  * @summary List user favorites
  */
-export const getFavoritesIndex = async (params?: GetFavoritesIndexParams, options?: RequestInit): Promise<getFavoritesIndexResponse> => {
+export const getFavoritesIndex = async (params?: GetFavoritesIndexParams, options?: RequestInit): Promise<GetFavoritesIndex200> => {
 
-  return customInstance<getFavoritesIndexResponse>(getGetFavoritesIndexUrl(params),
+  return customInstance<GetFavoritesIndex200>(getGetFavoritesIndexUrl(params),
   {
     ...options,
     method: 'GET'
@@ -16207,25 +14041,6 @@ export function useGetFavoritesIndex<TData = Awaited<ReturnType<typeof getFavori
 
 
 
-export type postFavoritesAddResponse201 = {
-  data: PostFavoritesAdd201
-  status: 201
-}
-
-export type postFavoritesAddResponse422 = {
-  data: void
-  status: 422
-}
-
-export type postFavoritesAddResponseSuccess = (postFavoritesAddResponse201) & {
-  headers: Headers;
-};
-export type postFavoritesAddResponseError = (postFavoritesAddResponse422) & {
-  headers: Headers;
-};
-
-export type postFavoritesAddResponse = (postFavoritesAddResponseSuccess | postFavoritesAddResponseError)
-
 export const getPostFavoritesAddUrl = () => {
 
 
@@ -16237,9 +14052,9 @@ export const getPostFavoritesAddUrl = () => {
 /**
  * @summary Add a favorite
  */
-export const postFavoritesAdd = async (postFavoritesAddBody: PostFavoritesAddBody, options?: RequestInit): Promise<postFavoritesAddResponse> => {
+export const postFavoritesAdd = async (postFavoritesAddBody: PostFavoritesAddBody, options?: RequestInit): Promise<PostFavoritesAdd201> => {
 
-  return customInstance<postFavoritesAddResponse>(getPostFavoritesAddUrl(),
+  return customInstance<PostFavoritesAdd201>(getPostFavoritesAddUrl(),
   {
     ...options,
     method: 'POST',
@@ -16296,18 +14111,6 @@ export const usePostFavoritesAdd = <TError = ErrorType<void>,
       return useMutation(getPostFavoritesAddMutationOptions(options), queryClient);
     }
 
-export type deleteFavoritesRemoveResponse200 = {
-  data: DeleteFavoritesRemove200
-  status: 200
-}
-
-export type deleteFavoritesRemoveResponseSuccess = (deleteFavoritesRemoveResponse200) & {
-  headers: Headers;
-};
-;
-
-export type deleteFavoritesRemoveResponse = (deleteFavoritesRemoveResponseSuccess)
-
 export const getDeleteFavoritesRemoveUrl = (publicId: string,) => {
 
 
@@ -16319,9 +14122,9 @@ export const getDeleteFavoritesRemoveUrl = (publicId: string,) => {
 /**
  * @summary Remove a favorite
  */
-export const deleteFavoritesRemove = async (publicId: string, options?: RequestInit): Promise<deleteFavoritesRemoveResponse> => {
+export const deleteFavoritesRemove = async (publicId: string, options?: RequestInit): Promise<DeleteFavoritesRemove200> => {
 
-  return customInstance<deleteFavoritesRemoveResponse>(getDeleteFavoritesRemoveUrl(publicId),
+  return customInstance<DeleteFavoritesRemove200>(getDeleteFavoritesRemoveUrl(publicId),
   {
     ...options,
     method: 'DELETE'
@@ -16378,30 +14181,6 @@ export const useDeleteFavoritesRemove = <TError = ErrorType<unknown>,
       return useMutation(getDeleteFavoritesRemoveMutationOptions(options), queryClient);
     }
 
-export type getLibraryIndexResponse200 = {
-  data: GetLibraryIndex200
-  status: 200
-}
-
-export type getLibraryIndexResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type getLibraryIndexResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getLibraryIndexResponseSuccess = (getLibraryIndexResponse200) & {
-  headers: Headers;
-};
-export type getLibraryIndexResponseError = (getLibraryIndexResponse400 | getLibraryIndexResponse401) & {
-  headers: Headers;
-};
-
-export type getLibraryIndexResponse = (getLibraryIndexResponseSuccess | getLibraryIndexResponseError)
-
 export const getGetLibraryIndexUrl = (params?: GetLibraryIndexParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -16420,9 +14199,9 @@ export const getGetLibraryIndexUrl = (params?: GetLibraryIndexParams,) => {
 /**
  * @summary List all libraries
  */
-export const getLibraryIndex = async (params?: GetLibraryIndexParams, options?: RequestInit): Promise<getLibraryIndexResponse> => {
+export const getLibraryIndex = async (params?: GetLibraryIndexParams, options?: RequestInit): Promise<GetLibraryIndex200> => {
 
-  return customInstance<getLibraryIndexResponse>(getGetLibraryIndexUrl(params),
+  return customInstance<GetLibraryIndex200>(getGetLibraryIndexUrl(params),
   {
     ...options,
     method: 'GET'
@@ -16510,40 +14289,6 @@ export function useGetLibraryIndex<TData = Awaited<ReturnType<typeof getLibraryI
 
 
 
-export type postLibraryStoreResponse201 = {
-  data: PostLibraryStore201
-  status: 201
-}
-
-export type postLibraryStoreResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type postLibraryStoreResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postLibraryStoreResponse409 = {
-  data: ApiError
-  status: 409
-}
-
-export type postLibraryStoreResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postLibraryStoreResponseSuccess = (postLibraryStoreResponse201) & {
-  headers: Headers;
-};
-export type postLibraryStoreResponseError = (postLibraryStoreResponse400 | postLibraryStoreResponse401 | postLibraryStoreResponse409 | postLibraryStoreResponse422) & {
-  headers: Headers;
-};
-
-export type postLibraryStoreResponse = (postLibraryStoreResponseSuccess | postLibraryStoreResponseError)
-
 export const getPostLibraryStoreUrl = () => {
 
 
@@ -16555,9 +14300,9 @@ export const getPostLibraryStoreUrl = () => {
 /**
  * @summary Create a new library
  */
-export const postLibraryStore = async (postLibraryStoreBody: PostLibraryStoreBody, options?: RequestInit): Promise<postLibraryStoreResponse> => {
+export const postLibraryStore = async (postLibraryStoreBody: PostLibraryStoreBody, options?: RequestInit): Promise<PostLibraryStore201> => {
 
-  return customInstance<postLibraryStoreResponse>(getPostLibraryStoreUrl(),
+  return customInstance<PostLibraryStore201>(getPostLibraryStoreUrl(),
   {
     ...options,
     method: 'POST',
@@ -16614,30 +14359,6 @@ export const usePostLibraryStore = <TError = ErrorType<ApiError | ValidationErro
       return useMutation(getPostLibraryStoreMutationOptions(options), queryClient);
     }
 
-export type getLibraryShowResponse200 = {
-  data: GetLibraryShow200
-  status: 200
-}
-
-export type getLibraryShowResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getLibraryShowResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getLibraryShowResponseSuccess = (getLibraryShowResponse200) & {
-  headers: Headers;
-};
-export type getLibraryShowResponseError = (getLibraryShowResponse401 | getLibraryShowResponse404) & {
-  headers: Headers;
-};
-
-export type getLibraryShowResponse = (getLibraryShowResponseSuccess | getLibraryShowResponseError)
-
 export const getGetLibraryShowUrl = (id: string,) => {
 
 
@@ -16649,9 +14370,9 @@ export const getGetLibraryShowUrl = (id: string,) => {
 /**
  * @summary Get a single library
  */
-export const getLibraryShow = async (id: string, options?: RequestInit): Promise<getLibraryShowResponse> => {
+export const getLibraryShow = async (id: string, options?: RequestInit): Promise<GetLibraryShow200> => {
 
-  return customInstance<getLibraryShowResponse>(getGetLibraryShowUrl(id),
+  return customInstance<GetLibraryShow200>(getGetLibraryShowUrl(id),
   {
     ...options,
     method: 'GET'
@@ -16739,30 +14460,6 @@ export function useGetLibraryShow<TData = Awaited<ReturnType<typeof getLibrarySh
 
 
 
-export type deleteLibraryDeleteResponse200 = {
-  data: DeleteLibraryDelete200
-  status: 200
-}
-
-export type deleteLibraryDeleteResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type deleteLibraryDeleteResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteLibraryDeleteResponseSuccess = (deleteLibraryDeleteResponse200) & {
-  headers: Headers;
-};
-export type deleteLibraryDeleteResponseError = (deleteLibraryDeleteResponse401 | deleteLibraryDeleteResponse404) & {
-  headers: Headers;
-};
-
-export type deleteLibraryDeleteResponse = (deleteLibraryDeleteResponseSuccess | deleteLibraryDeleteResponseError)
-
 export const getDeleteLibraryDeleteUrl = (id: string,) => {
 
 
@@ -16774,9 +14471,9 @@ export const getDeleteLibraryDeleteUrl = (id: string,) => {
 /**
  * @summary Delete a library
  */
-export const deleteLibraryDelete = async (id: string, options?: RequestInit): Promise<deleteLibraryDeleteResponse> => {
+export const deleteLibraryDelete = async (id: string, options?: RequestInit): Promise<DeleteLibraryDelete200> => {
 
-  return customInstance<deleteLibraryDeleteResponse>(getDeleteLibraryDeleteUrl(id),
+  return customInstance<DeleteLibraryDelete200>(getDeleteLibraryDeleteUrl(id),
   {
     ...options,
     method: 'DELETE'
@@ -16833,40 +14530,6 @@ export const useDeleteLibraryDelete = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteLibraryDeleteMutationOptions(options), queryClient);
     }
 
-export type patchLibraryUpdateResponse200 = {
-  data: PatchLibraryUpdate200
-  status: 200
-}
-
-export type patchLibraryUpdateResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type patchLibraryUpdateResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type patchLibraryUpdateResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type patchLibraryUpdateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type patchLibraryUpdateResponseSuccess = (patchLibraryUpdateResponse200) & {
-  headers: Headers;
-};
-export type patchLibraryUpdateResponseError = (patchLibraryUpdateResponse400 | patchLibraryUpdateResponse401 | patchLibraryUpdateResponse404 | patchLibraryUpdateResponse422) & {
-  headers: Headers;
-};
-
-export type patchLibraryUpdateResponse = (patchLibraryUpdateResponseSuccess | patchLibraryUpdateResponseError)
-
 export const getPatchLibraryUpdateUrl = (id: string,) => {
 
 
@@ -16879,9 +14542,9 @@ export const getPatchLibraryUpdateUrl = (id: string,) => {
  * @summary Update a library
  */
 export const patchLibraryUpdate = async (id: string,
-    patchLibraryUpdateBody: PatchLibraryUpdateBody, options?: RequestInit): Promise<patchLibraryUpdateResponse> => {
+    patchLibraryUpdateBody: PatchLibraryUpdateBody, options?: RequestInit): Promise<PatchLibraryUpdate200> => {
 
-  return customInstance<patchLibraryUpdateResponse>(getPatchLibraryUpdateUrl(id),
+  return customInstance<PatchLibraryUpdate200>(getPatchLibraryUpdateUrl(id),
   {
     ...options,
     method: 'PATCH',
@@ -16938,35 +14601,6 @@ export const usePatchLibraryUpdate = <TError = ErrorType<ApiError | ValidationEr
       return useMutation(getPatchLibraryUpdateMutationOptions(options), queryClient);
     }
 
-export type postLibraryScanResponse202 = {
-  data: PostLibraryScan202
-  status: 202
-}
-
-export type postLibraryScanResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postLibraryScanResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postLibraryScanResponse409 = {
-  data: ApiError
-  status: 409
-}
-
-export type postLibraryScanResponseSuccess = (postLibraryScanResponse202) & {
-  headers: Headers;
-};
-export type postLibraryScanResponseError = (postLibraryScanResponse401 | postLibraryScanResponse404 | postLibraryScanResponse409) & {
-  headers: Headers;
-};
-
-export type postLibraryScanResponse = (postLibraryScanResponseSuccess | postLibraryScanResponseError)
-
 export const getPostLibraryScanUrl = (id: string,) => {
 
 
@@ -16979,9 +14613,9 @@ export const getPostLibraryScanUrl = (id: string,) => {
  * Dispatches an asynchronous scan job. The scan runs in the background and progress is reported via SSE.
  * @summary Trigger a library scan
  */
-export const postLibraryScan = async (id: string, options?: RequestInit): Promise<postLibraryScanResponse> => {
+export const postLibraryScan = async (id: string, options?: RequestInit): Promise<PostLibraryScan202> => {
 
-  return customInstance<postLibraryScanResponse>(getPostLibraryScanUrl(id),
+  return customInstance<PostLibraryScan202>(getPostLibraryScanUrl(id),
   {
     ...options,
     method: 'POST'
@@ -17038,30 +14672,6 @@ export const usePostLibraryScan = <TError = ErrorType<ApiError>,
       return useMutation(getPostLibraryScanMutationOptions(options), queryClient);
     }
 
-export type getLibraryStatsResponse200 = {
-  data: GetLibraryStats200
-  status: 200
-}
-
-export type getLibraryStatsResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getLibraryStatsResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getLibraryStatsResponseSuccess = (getLibraryStatsResponse200) & {
-  headers: Headers;
-};
-export type getLibraryStatsResponseError = (getLibraryStatsResponse401 | getLibraryStatsResponse404) & {
-  headers: Headers;
-};
-
-export type getLibraryStatsResponse = (getLibraryStatsResponseSuccess | getLibraryStatsResponseError)
-
 export const getGetLibraryStatsUrl = (id: string,) => {
 
 
@@ -17073,9 +14683,9 @@ export const getGetLibraryStatsUrl = (id: string,) => {
 /**
  * @summary Get library statistics
  */
-export const getLibraryStats = async (id: string, options?: RequestInit): Promise<getLibraryStatsResponse> => {
+export const getLibraryStats = async (id: string, options?: RequestInit): Promise<GetLibraryStats200> => {
 
-  return customInstance<getLibraryStatsResponse>(getGetLibraryStatsUrl(id),
+  return customInstance<GetLibraryStats200>(getGetLibraryStatsUrl(id),
   {
     ...options,
     method: 'GET'
@@ -17163,25 +14773,6 @@ export function useGetLibraryStats<TData = Awaited<ReturnType<typeof getLibraryS
 
 
 
-export type postLibraryValidatePathResponse200 = {
-  data: PostLibraryValidatePath200
-  status: 200
-}
-
-export type postLibraryValidatePathResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postLibraryValidatePathResponseSuccess = (postLibraryValidatePathResponse200) & {
-  headers: Headers;
-};
-export type postLibraryValidatePathResponseError = (postLibraryValidatePathResponse401) & {
-  headers: Headers;
-};
-
-export type postLibraryValidatePathResponse = (postLibraryValidatePathResponseSuccess | postLibraryValidatePathResponseError)
-
 export const getPostLibraryValidatePathUrl = () => {
 
 
@@ -17194,9 +14785,9 @@ export const getPostLibraryValidatePathUrl = () => {
  * Checks whether a filesystem path exists and is readable. Use before creating a library.
  * @summary Validate a library path
  */
-export const postLibraryValidatePath = async (postLibraryValidatePathBody: PostLibraryValidatePathBody, options?: RequestInit): Promise<postLibraryValidatePathResponse> => {
+export const postLibraryValidatePath = async (postLibraryValidatePathBody: PostLibraryValidatePathBody, options?: RequestInit): Promise<PostLibraryValidatePath200> => {
 
-  return customInstance<postLibraryValidatePathResponse>(getPostLibraryValidatePathUrl(),
+  return customInstance<PostLibraryValidatePath200>(getPostLibraryValidatePathUrl(),
   {
     ...options,
     method: 'POST',
@@ -17253,25 +14844,6 @@ export const usePostLibraryValidatePath = <TError = ErrorType<ApiError>,
       return useMutation(getPostLibraryValidatePathMutationOptions(options), queryClient);
     }
 
-export type postLibraryScanAllResponse202 = {
-  data: PostLibraryScanAll202
-  status: 202
-}
-
-export type postLibraryScanAllResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postLibraryScanAllResponseSuccess = (postLibraryScanAllResponse202) & {
-  headers: Headers;
-};
-export type postLibraryScanAllResponseError = (postLibraryScanAllResponse401) & {
-  headers: Headers;
-};
-
-export type postLibraryScanAllResponse = (postLibraryScanAllResponseSuccess | postLibraryScanAllResponseError)
-
 export const getPostLibraryScanAllUrl = () => {
 
 
@@ -17284,9 +14856,9 @@ export const getPostLibraryScanAllUrl = () => {
  * Dispatches an asynchronous scan job for every library. Skips libraries already scanning.
  * @summary Trigger scan for all libraries
  */
-export const postLibraryScanAll = async ( options?: RequestInit): Promise<postLibraryScanAllResponse> => {
+export const postLibraryScanAll = async ( options?: RequestInit): Promise<PostLibraryScanAll202> => {
 
-  return customInstance<postLibraryScanAllResponse>(getPostLibraryScanAllUrl(),
+  return customInstance<PostLibraryScanAll202>(getPostLibraryScanAllUrl(),
   {
     ...options,
     method: 'POST'
@@ -17343,25 +14915,6 @@ export const usePostLibraryScanAll = <TError = ErrorType<ApiError>,
       return useMutation(getPostLibraryScanAllMutationOptions(options), queryClient);
     }
 
-export type getAdminLyricsCoverageResponse200 = {
-  data: GetAdminLyricsCoverage200
-  status: 200
-}
-
-export type getAdminLyricsCoverageResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type getAdminLyricsCoverageResponseSuccess = (getAdminLyricsCoverageResponse200) & {
-  headers: Headers;
-};
-export type getAdminLyricsCoverageResponseError = (getAdminLyricsCoverageResponse403) & {
-  headers: Headers;
-};
-
-export type getAdminLyricsCoverageResponse = (getAdminLyricsCoverageResponseSuccess | getAdminLyricsCoverageResponseError)
-
 export const getGetAdminLyricsCoverageUrl = () => {
 
 
@@ -17373,9 +14926,9 @@ export const getGetAdminLyricsCoverageUrl = () => {
 /**
  * @summary Get lyrics coverage stats
  */
-export const getAdminLyricsCoverage = async ( options?: RequestInit): Promise<getAdminLyricsCoverageResponse> => {
+export const getAdminLyricsCoverage = async ( options?: RequestInit): Promise<GetAdminLyricsCoverage200> => {
 
-  return customInstance<getAdminLyricsCoverageResponse>(getGetAdminLyricsCoverageUrl(),
+  return customInstance<GetAdminLyricsCoverage200>(getGetAdminLyricsCoverageUrl(),
   {
     ...options,
     method: 'GET'
@@ -17463,25 +15016,6 @@ export function useGetAdminLyricsCoverage<TData = Awaited<ReturnType<typeof getA
 
 
 
-export type postAdminLyricsBulkFetchResponse200 = {
-  data: PostAdminLyricsBulkFetch200
-  status: 200
-}
-
-export type postAdminLyricsBulkFetchResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type postAdminLyricsBulkFetchResponseSuccess = (postAdminLyricsBulkFetchResponse200) & {
-  headers: Headers;
-};
-export type postAdminLyricsBulkFetchResponseError = (postAdminLyricsBulkFetchResponse403) & {
-  headers: Headers;
-};
-
-export type postAdminLyricsBulkFetchResponse = (postAdminLyricsBulkFetchResponseSuccess | postAdminLyricsBulkFetchResponseError)
-
 export const getPostAdminLyricsBulkFetchUrl = () => {
 
 
@@ -17493,9 +15027,9 @@ export const getPostAdminLyricsBulkFetchUrl = () => {
 /**
  * @summary Trigger bulk lyrics fetch (SUPER_ADMIN only)
  */
-export const postAdminLyricsBulkFetch = async (postAdminLyricsBulkFetchBody?: PostAdminLyricsBulkFetchBody, options?: RequestInit): Promise<postAdminLyricsBulkFetchResponse> => {
+export const postAdminLyricsBulkFetch = async (postAdminLyricsBulkFetchBody?: PostAdminLyricsBulkFetchBody, options?: RequestInit): Promise<PostAdminLyricsBulkFetch200> => {
 
-  return customInstance<postAdminLyricsBulkFetchResponse>(getPostAdminLyricsBulkFetchUrl(),
+  return customInstance<PostAdminLyricsBulkFetch200>(getPostAdminLyricsBulkFetchUrl(),
   {
     ...options,
     method: 'POST',
@@ -17552,25 +15086,6 @@ export const usePostAdminLyricsBulkFetch = <TError = ErrorType<ApiError>,
       return useMutation(getPostAdminLyricsBulkFetchMutationOptions(options), queryClient);
     }
 
-export type getAdminLyricsSyncStatusResponse200 = {
-  data: GetAdminLyricsSyncStatus200
-  status: 200
-}
-
-export type getAdminLyricsSyncStatusResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type getAdminLyricsSyncStatusResponseSuccess = (getAdminLyricsSyncStatusResponse200) & {
-  headers: Headers;
-};
-export type getAdminLyricsSyncStatusResponseError = (getAdminLyricsSyncStatusResponse403) & {
-  headers: Headers;
-};
-
-export type getAdminLyricsSyncStatusResponse = (getAdminLyricsSyncStatusResponseSuccess | getAdminLyricsSyncStatusResponseError)
-
 export const getGetAdminLyricsSyncStatusUrl = () => {
 
 
@@ -17582,9 +15097,9 @@ export const getGetAdminLyricsSyncStatusUrl = () => {
 /**
  * @summary Get lyrics sync job status
  */
-export const getAdminLyricsSyncStatus = async ( options?: RequestInit): Promise<getAdminLyricsSyncStatusResponse> => {
+export const getAdminLyricsSyncStatus = async ( options?: RequestInit): Promise<GetAdminLyricsSyncStatus200> => {
 
-  return customInstance<getAdminLyricsSyncStatusResponse>(getGetAdminLyricsSyncStatusUrl(),
+  return customInstance<GetAdminLyricsSyncStatus200>(getGetAdminLyricsSyncStatusUrl(),
   {
     ...options,
     method: 'GET'
@@ -17672,25 +15187,6 @@ export function useGetAdminLyricsSyncStatus<TData = Awaited<ReturnType<typeof ge
 
 
 
-export type getLyricsSongLyricsResponse200 = {
-  data: GetLyricsSongLyrics200
-  status: 200
-}
-
-export type getLyricsSongLyricsResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getLyricsSongLyricsResponseSuccess = (getLyricsSongLyricsResponse200) & {
-  headers: Headers;
-};
-export type getLyricsSongLyricsResponseError = (getLyricsSongLyricsResponse404) & {
-  headers: Headers;
-};
-
-export type getLyricsSongLyricsResponse = (getLyricsSongLyricsResponseSuccess | getLyricsSongLyricsResponseError)
-
 export const getGetLyricsSongLyricsUrl = (publicId: string,) => {
 
 
@@ -17702,9 +15198,9 @@ export const getGetLyricsSongLyricsUrl = (publicId: string,) => {
 /**
  * @summary Get cached lyrics for a song
  */
-export const getLyricsSongLyrics = async (publicId: string, options?: RequestInit): Promise<getLyricsSongLyricsResponse> => {
+export const getLyricsSongLyrics = async (publicId: string, options?: RequestInit): Promise<GetLyricsSongLyrics200> => {
 
-  return customInstance<getLyricsSongLyricsResponse>(getGetLyricsSongLyricsUrl(publicId),
+  return customInstance<GetLyricsSongLyrics200>(getGetLyricsSongLyricsUrl(publicId),
   {
     ...options,
     method: 'GET'
@@ -17792,25 +15288,6 @@ export function useGetLyricsSongLyrics<TData = Awaited<ReturnType<typeof getLyri
 
 
 
-export type postLyricsSongLyricsFetchResponse200 = {
-  data: PostLyricsSongLyricsFetch200
-  status: 200
-}
-
-export type postLyricsSongLyricsFetchResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postLyricsSongLyricsFetchResponseSuccess = (postLyricsSongLyricsFetchResponse200) & {
-  headers: Headers;
-};
-export type postLyricsSongLyricsFetchResponseError = (postLyricsSongLyricsFetchResponse404) & {
-  headers: Headers;
-};
-
-export type postLyricsSongLyricsFetchResponse = (postLyricsSongLyricsFetchResponseSuccess | postLyricsSongLyricsFetchResponseError)
-
 export const getPostLyricsSongLyricsFetchUrl = (publicId: string,) => {
 
 
@@ -17822,9 +15299,9 @@ export const getPostLyricsSongLyricsFetchUrl = (publicId: string,) => {
 /**
  * @summary Fetch lyrics from LRCLIB for a song
  */
-export const postLyricsSongLyricsFetch = async (publicId: string, options?: RequestInit): Promise<postLyricsSongLyricsFetchResponse> => {
+export const postLyricsSongLyricsFetch = async (publicId: string, options?: RequestInit): Promise<PostLyricsSongLyricsFetch200> => {
 
-  return customInstance<postLyricsSongLyricsFetchResponse>(getPostLyricsSongLyricsFetchUrl(publicId),
+  return customInstance<PostLyricsSongLyricsFetch200>(getPostLyricsSongLyricsFetchUrl(publicId),
   {
     ...options,
     method: 'POST'
@@ -17881,25 +15358,6 @@ export const usePostLyricsSongLyricsFetch = <TError = ErrorType<ApiError>,
       return useMutation(getPostLyricsSongLyricsFetchMutationOptions(options), queryClient);
     }
 
-export type getLyricsSearchResponse200 = {
-  data: GetLyricsSearch200
-  status: 200
-}
-
-export type getLyricsSearchResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type getLyricsSearchResponseSuccess = (getLyricsSearchResponse200) & {
-  headers: Headers;
-};
-export type getLyricsSearchResponseError = (getLyricsSearchResponse400) & {
-  headers: Headers;
-};
-
-export type getLyricsSearchResponse = (getLyricsSearchResponseSuccess | getLyricsSearchResponseError)
-
 export const getGetLyricsSearchUrl = (params: GetLyricsSearchParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -17918,9 +15376,9 @@ export const getGetLyricsSearchUrl = (params: GetLyricsSearchParams,) => {
 /**
  * @summary Search LRCLIB for lyrics
  */
-export const getLyricsSearch = async (params: GetLyricsSearchParams, options?: RequestInit): Promise<getLyricsSearchResponse> => {
+export const getLyricsSearch = async (params: GetLyricsSearchParams, options?: RequestInit): Promise<GetLyricsSearch200> => {
 
-  return customInstance<getLyricsSearchResponse>(getGetLyricsSearchUrl(params),
+  return customInstance<GetLyricsSearch200>(getGetLyricsSearchUrl(params),
   {
     ...options,
     method: 'GET'
@@ -18008,25 +15466,6 @@ export function useGetLyricsSearch<TData = Awaited<ReturnType<typeof getLyricsSe
 
 
 
-export type postLyricsApplyResponse200 = {
-  data: PostLyricsApply200
-  status: 200
-}
-
-export type postLyricsApplyResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postLyricsApplyResponseSuccess = (postLyricsApplyResponse200) & {
-  headers: Headers;
-};
-export type postLyricsApplyResponseError = (postLyricsApplyResponse404) & {
-  headers: Headers;
-};
-
-export type postLyricsApplyResponse = (postLyricsApplyResponseSuccess | postLyricsApplyResponseError)
-
 export const getPostLyricsApplyUrl = (resultId: number,) => {
 
 
@@ -18039,9 +15478,9 @@ export const getPostLyricsApplyUrl = (resultId: number,) => {
  * @summary Apply an LRCLIB search result to a song
  */
 export const postLyricsApply = async (resultId: number,
-    applyLyricsRequest: ApplyLyricsRequest, options?: RequestInit): Promise<postLyricsApplyResponse> => {
+    applyLyricsRequest: ApplyLyricsRequest, options?: RequestInit): Promise<PostLyricsApply200> => {
 
-  return customInstance<postLyricsApplyResponse>(getPostLyricsApplyUrl(resultId),
+  return customInstance<PostLyricsApply200>(getPostLyricsApplyUrl(resultId),
   {
     ...options,
     method: 'POST',
@@ -18098,25 +15537,6 @@ export const usePostLyricsApply = <TError = ErrorType<ApiError>,
       return useMutation(getPostLyricsApplyMutationOptions(options), queryClient);
     }
 
-export type getImageShowResponse200 = {
-  data: GetImageShow200
-  status: 200
-}
-
-export type getImageShowResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getImageShowResponseSuccess = (getImageShowResponse200) & {
-  headers: Headers;
-};
-export type getImageShowResponseError = (getImageShowResponse404) & {
-  headers: Headers;
-};
-
-export type getImageShowResponse = (getImageShowResponseSuccess | getImageShowResponseError)
-
 export const getGetImageShowUrl = (publicId: string,) => {
 
 
@@ -18128,9 +15548,9 @@ export const getGetImageShowUrl = (publicId: string,) => {
 /**
  * @summary Get image metadata by public ID
  */
-export const getImageShow = async (publicId: string, options?: RequestInit): Promise<getImageShowResponse> => {
+export const getImageShow = async (publicId: string, options?: RequestInit): Promise<GetImageShow200> => {
 
-  return customInstance<getImageShowResponse>(getGetImageShowUrl(publicId),
+  return customInstance<GetImageShow200>(getGetImageShowUrl(publicId),
   {
     ...options,
     method: 'GET'
@@ -18218,25 +15638,6 @@ export function useGetImageShow<TData = Awaited<ReturnType<typeof getImageShow>>
 
 
 
-export type getImageFileResponse200 = {
-  data: void
-  status: 200
-}
-
-export type getImageFileResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getImageFileResponseSuccess = (getImageFileResponse200) & {
-  headers: Headers;
-};
-export type getImageFileResponseError = (getImageFileResponse404) & {
-  headers: Headers;
-};
-
-export type getImageFileResponse = (getImageFileResponseSuccess | getImageFileResponseError)
-
 export const getGetImageFileUrl = (publicId: string,
     params?: GetImageFileParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -18257,9 +15658,9 @@ export const getGetImageFileUrl = (publicId: string,
  * @summary Serve the image file binary data
  */
 export const getImageFile = async (publicId: string,
-    params?: GetImageFileParams, options?: RequestInit): Promise<getImageFileResponse> => {
+    params?: GetImageFileParams, options?: RequestInit): Promise<void> => {
 
-  return customInstance<getImageFileResponse>(getGetImageFileUrl(publicId,params),
+  return customInstance<void>(getGetImageFileUrl(publicId,params),
   {
     ...options,
     method: 'GET'
@@ -18353,25 +15754,6 @@ export function useGetImageFile<TData = Awaited<ReturnType<typeof getImageFile>>
 
 
 
-export type getImageBlurhashResponse200 = {
-  data: GetImageBlurhash200
-  status: 200
-}
-
-export type getImageBlurhashResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getImageBlurhashResponseSuccess = (getImageBlurhashResponse200) & {
-  headers: Headers;
-};
-export type getImageBlurhashResponseError = (getImageBlurhashResponse404) & {
-  headers: Headers;
-};
-
-export type getImageBlurhashResponse = (getImageBlurhashResponseSuccess | getImageBlurhashResponseError)
-
 export const getGetImageBlurhashUrl = (publicId: string,) => {
 
 
@@ -18383,9 +15765,9 @@ export const getGetImageBlurhashUrl = (publicId: string,) => {
 /**
  * @summary Get the blurhash representation of an image
  */
-export const getImageBlurhash = async (publicId: string, options?: RequestInit): Promise<getImageBlurhashResponse> => {
+export const getImageBlurhash = async (publicId: string, options?: RequestInit): Promise<GetImageBlurhash200> => {
 
-  return customInstance<getImageBlurhashResponse>(getGetImageBlurhashUrl(publicId),
+  return customInstance<GetImageBlurhash200>(getGetImageBlurhashUrl(publicId),
   {
     ...options,
     method: 'GET'
@@ -18473,25 +15855,6 @@ export function useGetImageBlurhash<TData = Awaited<ReturnType<typeof getImageBl
 
 
 
-export type getAdminMediaStorageStatsResponse200 = {
-  data: GetAdminMediaStorageStats200
-  status: 200
-}
-
-export type getAdminMediaStorageStatsResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type getAdminMediaStorageStatsResponseSuccess = (getAdminMediaStorageStatsResponse200) & {
-  headers: Headers;
-};
-export type getAdminMediaStorageStatsResponseError = (getAdminMediaStorageStatsResponse403) & {
-  headers: Headers;
-};
-
-export type getAdminMediaStorageStatsResponse = (getAdminMediaStorageStatsResponseSuccess | getAdminMediaStorageStatsResponseError)
-
 export const getGetAdminMediaStorageStatsUrl = () => {
 
 
@@ -18503,9 +15866,9 @@ export const getGetAdminMediaStorageStatsUrl = () => {
 /**
  * @summary Get image storage statistics
  */
-export const getAdminMediaStorageStats = async ( options?: RequestInit): Promise<getAdminMediaStorageStatsResponse> => {
+export const getAdminMediaStorageStats = async ( options?: RequestInit): Promise<GetAdminMediaStorageStats200> => {
 
-  return customInstance<getAdminMediaStorageStatsResponse>(getGetAdminMediaStorageStatsUrl(),
+  return customInstance<GetAdminMediaStorageStats200>(getGetAdminMediaStorageStatsUrl(),
   {
     ...options,
     method: 'GET'
@@ -18593,25 +15956,6 @@ export function useGetAdminMediaStorageStats<TData = Awaited<ReturnType<typeof g
 
 
 
-export type postAdminMediaPruneMissingResponse200 = {
-  data: PostAdminMediaPruneMissing200
-  status: 200
-}
-
-export type postAdminMediaPruneMissingResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type postAdminMediaPruneMissingResponseSuccess = (postAdminMediaPruneMissingResponse200) & {
-  headers: Headers;
-};
-export type postAdminMediaPruneMissingResponseError = (postAdminMediaPruneMissingResponse403) & {
-  headers: Headers;
-};
-
-export type postAdminMediaPruneMissingResponse = (postAdminMediaPruneMissingResponseSuccess | postAdminMediaPruneMissingResponseError)
-
 export const getPostAdminMediaPruneMissingUrl = () => {
 
 
@@ -18623,9 +15967,9 @@ export const getPostAdminMediaPruneMissingUrl = () => {
 /**
  * @summary Dispatch async job to prune image records whose files no longer exist on disk
  */
-export const postAdminMediaPruneMissing = async ( options?: RequestInit): Promise<postAdminMediaPruneMissingResponse> => {
+export const postAdminMediaPruneMissing = async ( options?: RequestInit): Promise<PostAdminMediaPruneMissing200> => {
 
-  return customInstance<postAdminMediaPruneMissingResponse>(getPostAdminMediaPruneMissingUrl(),
+  return customInstance<PostAdminMediaPruneMissing200>(getPostAdminMediaPruneMissingUrl(),
   {
     ...options,
     method: 'POST'
@@ -18682,25 +16026,6 @@ export const usePostAdminMediaPruneMissing = <TError = ErrorType<ApiError>,
       return useMutation(getPostAdminMediaPruneMissingMutationOptions(options), queryClient);
     }
 
-export type getAdminMediaMissingCheckResponse200 = {
-  data: GetAdminMediaMissingCheck200
-  status: 200
-}
-
-export type getAdminMediaMissingCheckResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type getAdminMediaMissingCheckResponseSuccess = (getAdminMediaMissingCheckResponse200) & {
-  headers: Headers;
-};
-export type getAdminMediaMissingCheckResponseError = (getAdminMediaMissingCheckResponse403) & {
-  headers: Headers;
-};
-
-export type getAdminMediaMissingCheckResponse = (getAdminMediaMissingCheckResponseSuccess | getAdminMediaMissingCheckResponseError)
-
 export const getGetAdminMediaMissingCheckUrl = () => {
 
 
@@ -18712,9 +16037,9 @@ export const getGetAdminMediaMissingCheckUrl = () => {
 /**
  * @summary Check how many images have missing files (dry-run)
  */
-export const getAdminMediaMissingCheck = async ( options?: RequestInit): Promise<getAdminMediaMissingCheckResponse> => {
+export const getAdminMediaMissingCheck = async ( options?: RequestInit): Promise<GetAdminMediaMissingCheck200> => {
 
-  return customInstance<getAdminMediaMissingCheckResponse>(getGetAdminMediaMissingCheckUrl(),
+  return customInstance<GetAdminMediaMissingCheck200>(getGetAdminMediaMissingCheckUrl(),
   {
     ...options,
     method: 'GET'
@@ -18802,35 +16127,6 @@ export function useGetAdminMediaMissingCheck<TData = Awaited<ReturnType<typeof g
 
 
 
-export type getStreamTrackResponse200 = {
-  data: void
-  status: 200
-}
-
-export type getStreamTrackResponse206 = {
-  data: void
-  status: 206
-}
-
-export type getStreamTrackResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getStreamTrackResponse416 = {
-  data: void
-  status: 416
-}
-
-export type getStreamTrackResponseSuccess = (getStreamTrackResponse200 | getStreamTrackResponse206) & {
-  headers: Headers;
-};
-export type getStreamTrackResponseError = (getStreamTrackResponse404 | getStreamTrackResponse416) & {
-  headers: Headers;
-};
-
-export type getStreamTrackResponse = (getStreamTrackResponseSuccess | getStreamTrackResponseError)
-
 export const getGetStreamTrackUrl = (params: GetStreamTrackParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -18849,9 +16145,9 @@ export const getGetStreamTrackUrl = (params: GetStreamTrackParams,) => {
 /**
  * @summary Stream a track by PublicId with HTTP Range support
  */
-export const getStreamTrack = async (params: GetStreamTrackParams, options?: RequestInit): Promise<getStreamTrackResponse> => {
+export const getStreamTrack = async (params: GetStreamTrackParams, options?: RequestInit): Promise<void> => {
 
-  return customInstance<getStreamTrackResponse>(getGetStreamTrackUrl(params),
+  return customInstance<void>(getGetStreamTrackUrl(params),
   {
     ...options,
     method: 'GET'
@@ -18939,25 +16235,6 @@ export function useGetStreamTrack<TData = Awaited<ReturnType<typeof getStreamTra
 
 
 
-export type getAdminMetadataSyncStatusResponse200 = {
-  data: GetAdminMetadataSyncStatus200
-  status: 200
-}
-
-export type getAdminMetadataSyncStatusResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type getAdminMetadataSyncStatusResponseSuccess = (getAdminMetadataSyncStatusResponse200) & {
-  headers: Headers;
-};
-export type getAdminMetadataSyncStatusResponseError = (getAdminMetadataSyncStatusResponse403) & {
-  headers: Headers;
-};
-
-export type getAdminMetadataSyncStatusResponse = (getAdminMetadataSyncStatusResponseSuccess | getAdminMetadataSyncStatusResponseError)
-
 export const getGetAdminMetadataSyncStatusUrl = () => {
 
 
@@ -18969,9 +16246,9 @@ export const getGetAdminMetadataSyncStatusUrl = () => {
 /**
  * @summary Get metadata sync status
  */
-export const getAdminMetadataSyncStatus = async ( options?: RequestInit): Promise<getAdminMetadataSyncStatusResponse> => {
+export const getAdminMetadataSyncStatus = async ( options?: RequestInit): Promise<GetAdminMetadataSyncStatus200> => {
 
-  return customInstance<getAdminMetadataSyncStatusResponse>(getGetAdminMetadataSyncStatusUrl(),
+  return customInstance<GetAdminMetadataSyncStatus200>(getGetAdminMetadataSyncStatusUrl(),
   {
     ...options,
     method: 'GET'
@@ -19059,25 +16336,6 @@ export function useGetAdminMetadataSyncStatus<TData = Awaited<ReturnType<typeof 
 
 
 
-export type postAdminMetadataTriggerSyncResponse200 = {
-  data: PostAdminMetadataTriggerSync200
-  status: 200
-}
-
-export type postAdminMetadataTriggerSyncResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type postAdminMetadataTriggerSyncResponseSuccess = (postAdminMetadataTriggerSyncResponse200) & {
-  headers: Headers;
-};
-export type postAdminMetadataTriggerSyncResponseError = (postAdminMetadataTriggerSyncResponse403) & {
-  headers: Headers;
-};
-
-export type postAdminMetadataTriggerSyncResponse = (postAdminMetadataTriggerSyncResponseSuccess | postAdminMetadataTriggerSyncResponseError)
-
 export const getPostAdminMetadataTriggerSyncUrl = () => {
 
 
@@ -19089,9 +16347,9 @@ export const getPostAdminMetadataTriggerSyncUrl = () => {
 /**
  * @summary Trigger metadata sync
  */
-export const postAdminMetadataTriggerSync = async (postAdminMetadataTriggerSyncBody?: PostAdminMetadataTriggerSyncBody, options?: RequestInit): Promise<postAdminMetadataTriggerSyncResponse> => {
+export const postAdminMetadataTriggerSync = async (postAdminMetadataTriggerSyncBody?: PostAdminMetadataTriggerSyncBody, options?: RequestInit): Promise<PostAdminMetadataTriggerSync200> => {
 
-  return customInstance<postAdminMetadataTriggerSyncResponse>(getPostAdminMetadataTriggerSyncUrl(),
+  return customInstance<PostAdminMetadataTriggerSync200>(getPostAdminMetadataTriggerSyncUrl(),
   {
     ...options,
     method: 'POST',
@@ -19148,25 +16406,6 @@ export const usePostAdminMetadataTriggerSync = <TError = ErrorType<ApiError>,
       return useMutation(getPostAdminMetadataTriggerSyncMutationOptions(options), queryClient);
     }
 
-export type getAdminMetadataProvidersResponse200 = {
-  data: GetAdminMetadataProviders200
-  status: 200
-}
-
-export type getAdminMetadataProvidersResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type getAdminMetadataProvidersResponseSuccess = (getAdminMetadataProvidersResponse200) & {
-  headers: Headers;
-};
-export type getAdminMetadataProvidersResponseError = (getAdminMetadataProvidersResponse403) & {
-  headers: Headers;
-};
-
-export type getAdminMetadataProvidersResponse = (getAdminMetadataProvidersResponseSuccess | getAdminMetadataProvidersResponseError)
-
 export const getGetAdminMetadataProvidersUrl = () => {
 
 
@@ -19178,9 +16417,9 @@ export const getGetAdminMetadataProvidersUrl = () => {
 /**
  * @summary List metadata providers with configuration status
  */
-export const getAdminMetadataProviders = async ( options?: RequestInit): Promise<getAdminMetadataProvidersResponse> => {
+export const getAdminMetadataProviders = async ( options?: RequestInit): Promise<GetAdminMetadataProviders200> => {
 
-  return customInstance<getAdminMetadataProvidersResponse>(getGetAdminMetadataProvidersUrl(),
+  return customInstance<GetAdminMetadataProviders200>(getGetAdminMetadataProvidersUrl(),
   {
     ...options,
     method: 'GET'
@@ -19268,25 +16507,6 @@ export function useGetAdminMetadataProviders<TData = Awaited<ReturnType<typeof g
 
 
 
-export type getMetadataBrowseArtistResponse200 = {
-  data: GetMetadataBrowseArtist200
-  status: 200
-}
-
-export type getMetadataBrowseArtistResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getMetadataBrowseArtistResponseSuccess = (getMetadataBrowseArtistResponse200) & {
-  headers: Headers;
-};
-export type getMetadataBrowseArtistResponseError = (getMetadataBrowseArtistResponse404) & {
-  headers: Headers;
-};
-
-export type getMetadataBrowseArtistResponse = (getMetadataBrowseArtistResponseSuccess | getMetadataBrowseArtistResponseError)
-
 export const getGetMetadataBrowseArtistUrl = (mbid: string,) => {
 
 
@@ -19298,9 +16518,9 @@ export const getGetMetadataBrowseArtistUrl = (mbid: string,) => {
 /**
  * @summary Browse artist details from MusicBrainz, enriched with Last.fm data
  */
-export const getMetadataBrowseArtist = async (mbid: string, options?: RequestInit): Promise<getMetadataBrowseArtistResponse> => {
+export const getMetadataBrowseArtist = async (mbid: string, options?: RequestInit): Promise<GetMetadataBrowseArtist200> => {
 
-  return customInstance<getMetadataBrowseArtistResponse>(getGetMetadataBrowseArtistUrl(mbid),
+  return customInstance<GetMetadataBrowseArtist200>(getGetMetadataBrowseArtistUrl(mbid),
   {
     ...options,
     method: 'GET'
@@ -19388,25 +16608,6 @@ export function useGetMetadataBrowseArtist<TData = Awaited<ReturnType<typeof get
 
 
 
-export type getMetadataBrowseReleaseGroupResponse200 = {
-  data: GetMetadataBrowseReleaseGroup200
-  status: 200
-}
-
-export type getMetadataBrowseReleaseGroupResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getMetadataBrowseReleaseGroupResponseSuccess = (getMetadataBrowseReleaseGroupResponse200) & {
-  headers: Headers;
-};
-export type getMetadataBrowseReleaseGroupResponseError = (getMetadataBrowseReleaseGroupResponse404) & {
-  headers: Headers;
-};
-
-export type getMetadataBrowseReleaseGroupResponse = (getMetadataBrowseReleaseGroupResponseSuccess | getMetadataBrowseReleaseGroupResponseError)
-
 export const getGetMetadataBrowseReleaseGroupUrl = (mbid: string,) => {
 
 
@@ -19418,9 +16619,9 @@ export const getGetMetadataBrowseReleaseGroupUrl = (mbid: string,) => {
 /**
  * @summary Browse release group details from MusicBrainz
  */
-export const getMetadataBrowseReleaseGroup = async (mbid: string, options?: RequestInit): Promise<getMetadataBrowseReleaseGroupResponse> => {
+export const getMetadataBrowseReleaseGroup = async (mbid: string, options?: RequestInit): Promise<GetMetadataBrowseReleaseGroup200> => {
 
-  return customInstance<getMetadataBrowseReleaseGroupResponse>(getGetMetadataBrowseReleaseGroupUrl(mbid),
+  return customInstance<GetMetadataBrowseReleaseGroup200>(getGetMetadataBrowseReleaseGroupUrl(mbid),
   {
     ...options,
     method: 'GET'
@@ -19508,25 +16709,6 @@ export function useGetMetadataBrowseReleaseGroup<TData = Awaited<ReturnType<type
 
 
 
-export type getMetadataSearchArtistResponse200 = {
-  data: GetMetadataSearchArtist200
-  status: 200
-}
-
-export type getMetadataSearchArtistResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type getMetadataSearchArtistResponseSuccess = (getMetadataSearchArtistResponse200) & {
-  headers: Headers;
-};
-export type getMetadataSearchArtistResponseError = (getMetadataSearchArtistResponse400) & {
-  headers: Headers;
-};
-
-export type getMetadataSearchArtistResponse = (getMetadataSearchArtistResponseSuccess | getMetadataSearchArtistResponseError)
-
 export const getGetMetadataSearchArtistUrl = (params: GetMetadataSearchArtistParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -19545,9 +16727,9 @@ export const getGetMetadataSearchArtistUrl = (params: GetMetadataSearchArtistPar
 /**
  * @summary Search for artists across external sources
  */
-export const getMetadataSearchArtist = async (params: GetMetadataSearchArtistParams, options?: RequestInit): Promise<getMetadataSearchArtistResponse> => {
+export const getMetadataSearchArtist = async (params: GetMetadataSearchArtistParams, options?: RequestInit): Promise<GetMetadataSearchArtist200> => {
 
-  return customInstance<getMetadataSearchArtistResponse>(getGetMetadataSearchArtistUrl(params),
+  return customInstance<GetMetadataSearchArtist200>(getGetMetadataSearchArtistUrl(params),
   {
     ...options,
     method: 'GET'
@@ -19635,25 +16817,6 @@ export function useGetMetadataSearchArtist<TData = Awaited<ReturnType<typeof get
 
 
 
-export type getMetadataSearchAlbumResponse200 = {
-  data: GetMetadataSearchAlbum200
-  status: 200
-}
-
-export type getMetadataSearchAlbumResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type getMetadataSearchAlbumResponseSuccess = (getMetadataSearchAlbumResponse200) & {
-  headers: Headers;
-};
-export type getMetadataSearchAlbumResponseError = (getMetadataSearchAlbumResponse400) & {
-  headers: Headers;
-};
-
-export type getMetadataSearchAlbumResponse = (getMetadataSearchAlbumResponseSuccess | getMetadataSearchAlbumResponseError)
-
 export const getGetMetadataSearchAlbumUrl = (params: GetMetadataSearchAlbumParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -19672,9 +16835,9 @@ export const getGetMetadataSearchAlbumUrl = (params: GetMetadataSearchAlbumParam
 /**
  * @summary Search for albums/release groups across external sources
  */
-export const getMetadataSearchAlbum = async (params: GetMetadataSearchAlbumParams, options?: RequestInit): Promise<getMetadataSearchAlbumResponse> => {
+export const getMetadataSearchAlbum = async (params: GetMetadataSearchAlbumParams, options?: RequestInit): Promise<GetMetadataSearchAlbum200> => {
 
-  return customInstance<getMetadataSearchAlbumResponse>(getGetMetadataSearchAlbumUrl(params),
+  return customInstance<GetMetadataSearchAlbum200>(getGetMetadataSearchAlbumUrl(params),
   {
     ...options,
     method: 'GET'
@@ -19762,25 +16925,6 @@ export function useGetMetadataSearchAlbum<TData = Awaited<ReturnType<typeof getM
 
 
 
-export type getMetadataSearchSongResponse200 = {
-  data: GetMetadataSearchSong200
-  status: 200
-}
-
-export type getMetadataSearchSongResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type getMetadataSearchSongResponseSuccess = (getMetadataSearchSongResponse200) & {
-  headers: Headers;
-};
-export type getMetadataSearchSongResponseError = (getMetadataSearchSongResponse400) & {
-  headers: Headers;
-};
-
-export type getMetadataSearchSongResponse = (getMetadataSearchSongResponseSuccess | getMetadataSearchSongResponseError)
-
 export const getGetMetadataSearchSongUrl = (params: GetMetadataSearchSongParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -19799,9 +16943,9 @@ export const getGetMetadataSearchSongUrl = (params: GetMetadataSearchSongParams,
 /**
  * @summary Search for songs/recordings across external sources
  */
-export const getMetadataSearchSong = async (params: GetMetadataSearchSongParams, options?: RequestInit): Promise<getMetadataSearchSongResponse> => {
+export const getMetadataSearchSong = async (params: GetMetadataSearchSongParams, options?: RequestInit): Promise<GetMetadataSearchSong200> => {
 
-  return customInstance<getMetadataSearchSongResponse>(getGetMetadataSearchSongUrl(params),
+  return customInstance<GetMetadataSearchSong200>(getGetMetadataSearchSongUrl(params),
   {
     ...options,
     method: 'GET'
@@ -19889,30 +17033,6 @@ export function useGetMetadataSearchSong<TData = Awaited<ReturnType<typeof getMe
 
 
 
-export type postMetadataExtractResponse200 = {
-  data: PostMetadataExtract200
-  status: 200
-}
-
-export type postMetadataExtractResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type postMetadataExtractResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postMetadataExtractResponseSuccess = (postMetadataExtractResponse200) & {
-  headers: Headers;
-};
-export type postMetadataExtractResponseError = (postMetadataExtractResponse400 | postMetadataExtractResponse422) & {
-  headers: Headers;
-};
-
-export type postMetadataExtractResponse = (postMetadataExtractResponseSuccess | postMetadataExtractResponseError)
-
 export const getPostMetadataExtractUrl = () => {
 
 
@@ -19924,9 +17044,9 @@ export const getPostMetadataExtractUrl = () => {
 /**
  * @summary Extract embedded metadata from a local media file
  */
-export const postMetadataExtract = async (postMetadataExtractBody: PostMetadataExtractBody, options?: RequestInit): Promise<postMetadataExtractResponse> => {
+export const postMetadataExtract = async (postMetadataExtractBody: PostMetadataExtractBody, options?: RequestInit): Promise<PostMetadataExtract200> => {
 
-  return customInstance<postMetadataExtractResponse>(getPostMetadataExtractUrl(),
+  return customInstance<PostMetadataExtract200>(getPostMetadataExtractUrl(),
   {
     ...options,
     method: 'POST',
@@ -19983,30 +17103,6 @@ export const usePostMetadataExtract = <TError = ErrorType<ApiError | ValidationE
       return useMutation(getPostMetadataExtractMutationOptions(options), queryClient);
     }
 
-export type postMetadataMatchResponse200 = {
-  data: PostMetadataMatch200
-  status: 200
-}
-
-export type postMetadataMatchResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type postMetadataMatchResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postMetadataMatchResponseSuccess = (postMetadataMatchResponse200) & {
-  headers: Headers;
-};
-export type postMetadataMatchResponseError = (postMetadataMatchResponse400 | postMetadataMatchResponse422) & {
-  headers: Headers;
-};
-
-export type postMetadataMatchResponse = (postMetadataMatchResponseSuccess | postMetadataMatchResponseError)
-
 export const getPostMetadataMatchUrl = () => {
 
 
@@ -20018,9 +17114,9 @@ export const getPostMetadataMatchUrl = () => {
 /**
  * @summary Match extracted metadata against candidate sources
  */
-export const postMetadataMatch = async (postMetadataMatchBody: PostMetadataMatchBody, options?: RequestInit): Promise<postMetadataMatchResponse> => {
+export const postMetadataMatch = async (postMetadataMatchBody: PostMetadataMatchBody, options?: RequestInit): Promise<PostMetadataMatch200> => {
 
-  return customInstance<postMetadataMatchResponse>(getPostMetadataMatchUrl(),
+  return customInstance<PostMetadataMatch200>(getPostMetadataMatchUrl(),
   {
     ...options,
     method: 'POST',
@@ -20077,25 +17173,6 @@ export const usePostMetadataMatch = <TError = ErrorType<ApiError | ValidationErr
       return useMutation(getPostMetadataMatchMutationOptions(options), queryClient);
     }
 
-export type getNotificationIndexResponse200 = {
-  data: GetNotificationIndex200
-  status: 200
-}
-
-export type getNotificationIndexResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type getNotificationIndexResponseSuccess = (getNotificationIndexResponse200) & {
-  headers: Headers;
-};
-export type getNotificationIndexResponseError = (getNotificationIndexResponse400) & {
-  headers: Headers;
-};
-
-export type getNotificationIndexResponse = (getNotificationIndexResponseSuccess | getNotificationIndexResponseError)
-
 export const getGetNotificationIndexUrl = (params?: GetNotificationIndexParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -20114,9 +17191,9 @@ export const getGetNotificationIndexUrl = (params?: GetNotificationIndexParams,)
 /**
  * @summary List notifications
  */
-export const getNotificationIndex = async (params?: GetNotificationIndexParams, options?: RequestInit): Promise<getNotificationIndexResponse> => {
+export const getNotificationIndex = async (params?: GetNotificationIndexParams, options?: RequestInit): Promise<GetNotificationIndex200> => {
 
-  return customInstance<getNotificationIndexResponse>(getGetNotificationIndexUrl(params),
+  return customInstance<GetNotificationIndex200>(getGetNotificationIndexUrl(params),
   {
     ...options,
     method: 'GET'
@@ -20204,18 +17281,6 @@ export function useGetNotificationIndex<TData = Awaited<ReturnType<typeof getNot
 
 
 
-export type getNotificationUnreadCountResponse200 = {
-  data: GetNotificationUnreadCount200
-  status: 200
-}
-
-export type getNotificationUnreadCountResponseSuccess = (getNotificationUnreadCountResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getNotificationUnreadCountResponse = (getNotificationUnreadCountResponseSuccess)
-
 export const getGetNotificationUnreadCountUrl = () => {
 
 
@@ -20227,9 +17292,9 @@ export const getGetNotificationUnreadCountUrl = () => {
 /**
  * @summary Get unread notification count
  */
-export const getNotificationUnreadCount = async ( options?: RequestInit): Promise<getNotificationUnreadCountResponse> => {
+export const getNotificationUnreadCount = async ( options?: RequestInit): Promise<GetNotificationUnreadCount200> => {
 
-  return customInstance<getNotificationUnreadCountResponse>(getGetNotificationUnreadCountUrl(),
+  return customInstance<GetNotificationUnreadCount200>(getGetNotificationUnreadCountUrl(),
   {
     ...options,
     method: 'GET'
@@ -20317,30 +17382,6 @@ export function useGetNotificationUnreadCount<TData = Awaited<ReturnType<typeof 
 
 
 
-export type patchNotificationMarkReadResponse200 = {
-  data: PatchNotificationMarkRead200
-  status: 200
-}
-
-export type patchNotificationMarkReadResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type patchNotificationMarkReadResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type patchNotificationMarkReadResponseSuccess = (patchNotificationMarkReadResponse200) & {
-  headers: Headers;
-};
-export type patchNotificationMarkReadResponseError = (patchNotificationMarkReadResponse403 | patchNotificationMarkReadResponse404) & {
-  headers: Headers;
-};
-
-export type patchNotificationMarkReadResponse = (patchNotificationMarkReadResponseSuccess | patchNotificationMarkReadResponseError)
-
 export const getPatchNotificationMarkReadUrl = (publicId: string,) => {
 
 
@@ -20352,9 +17393,9 @@ export const getPatchNotificationMarkReadUrl = (publicId: string,) => {
 /**
  * @summary Mark notification as read
  */
-export const patchNotificationMarkRead = async (publicId: string, options?: RequestInit): Promise<patchNotificationMarkReadResponse> => {
+export const patchNotificationMarkRead = async (publicId: string, options?: RequestInit): Promise<PatchNotificationMarkRead200> => {
 
-  return customInstance<patchNotificationMarkReadResponse>(getPatchNotificationMarkReadUrl(publicId),
+  return customInstance<PatchNotificationMarkRead200>(getPatchNotificationMarkReadUrl(publicId),
   {
     ...options,
     method: 'PATCH'
@@ -20411,18 +17452,6 @@ export const usePatchNotificationMarkRead = <TError = ErrorType<ApiError>,
       return useMutation(getPatchNotificationMarkReadMutationOptions(options), queryClient);
     }
 
-export type patchNotificationMarkAllReadResponse200 = {
-  data: PatchNotificationMarkAllRead200
-  status: 200
-}
-
-export type patchNotificationMarkAllReadResponseSuccess = (patchNotificationMarkAllReadResponse200) & {
-  headers: Headers;
-};
-;
-
-export type patchNotificationMarkAllReadResponse = (patchNotificationMarkAllReadResponseSuccess)
-
 export const getPatchNotificationMarkAllReadUrl = () => {
 
 
@@ -20434,9 +17463,9 @@ export const getPatchNotificationMarkAllReadUrl = () => {
 /**
  * @summary Mark all notifications as read
  */
-export const patchNotificationMarkAllRead = async ( options?: RequestInit): Promise<patchNotificationMarkAllReadResponse> => {
+export const patchNotificationMarkAllRead = async ( options?: RequestInit): Promise<PatchNotificationMarkAllRead200> => {
 
-  return customInstance<patchNotificationMarkAllReadResponse>(getPatchNotificationMarkAllReadUrl(),
+  return customInstance<PatchNotificationMarkAllRead200>(getPatchNotificationMarkAllReadUrl(),
   {
     ...options,
     method: 'PATCH'
@@ -20493,30 +17522,6 @@ export const usePatchNotificationMarkAllRead = <TError = ErrorType<unknown>,
       return useMutation(getPatchNotificationMarkAllReadMutationOptions(options), queryClient);
     }
 
-export type deleteNotificationDeleteResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteNotificationDeleteResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type deleteNotificationDeleteResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteNotificationDeleteResponseSuccess = (deleteNotificationDeleteResponse204) & {
-  headers: Headers;
-};
-export type deleteNotificationDeleteResponseError = (deleteNotificationDeleteResponse403 | deleteNotificationDeleteResponse404) & {
-  headers: Headers;
-};
-
-export type deleteNotificationDeleteResponse = (deleteNotificationDeleteResponseSuccess | deleteNotificationDeleteResponseError)
-
 export const getDeleteNotificationDeleteUrl = (publicId: string,) => {
 
 
@@ -20528,9 +17533,9 @@ export const getDeleteNotificationDeleteUrl = (publicId: string,) => {
 /**
  * @summary Delete a notification
  */
-export const deleteNotificationDelete = async (publicId: string, options?: RequestInit): Promise<deleteNotificationDeleteResponse> => {
+export const deleteNotificationDelete = async (publicId: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteNotificationDeleteResponse>(getDeleteNotificationDeleteUrl(publicId),
+  return customInstance<void>(getDeleteNotificationDeleteUrl(publicId),
   {
     ...options,
     method: 'DELETE'
@@ -20587,18 +17592,6 @@ export const useDeleteNotificationDelete = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteNotificationDeleteMutationOptions(options), queryClient);
     }
 
-export type getNotificationPreferenceIndexResponse200 = {
-  data: GetNotificationPreferenceIndex200
-  status: 200
-}
-
-export type getNotificationPreferenceIndexResponseSuccess = (getNotificationPreferenceIndexResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getNotificationPreferenceIndexResponse = (getNotificationPreferenceIndexResponseSuccess)
-
 export const getGetNotificationPreferenceIndexUrl = () => {
 
 
@@ -20611,9 +17604,9 @@ export const getGetNotificationPreferenceIndexUrl = () => {
  * Returns all category × channel preference combinations for the authenticated user.
  * @summary Get notification preferences
  */
-export const getNotificationPreferenceIndex = async ( options?: RequestInit): Promise<getNotificationPreferenceIndexResponse> => {
+export const getNotificationPreferenceIndex = async ( options?: RequestInit): Promise<GetNotificationPreferenceIndex200> => {
 
-  return customInstance<getNotificationPreferenceIndexResponse>(getGetNotificationPreferenceIndexUrl(),
+  return customInstance<GetNotificationPreferenceIndex200>(getGetNotificationPreferenceIndexUrl(),
   {
     ...options,
     method: 'GET'
@@ -20701,25 +17694,6 @@ export function useGetNotificationPreferenceIndex<TData = Awaited<ReturnType<typ
 
 
 
-export type putNotificationPreferenceUpdateResponse200 = {
-  data: PutNotificationPreferenceUpdate200
-  status: 200
-}
-
-export type putNotificationPreferenceUpdateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type putNotificationPreferenceUpdateResponseSuccess = (putNotificationPreferenceUpdateResponse200) & {
-  headers: Headers;
-};
-export type putNotificationPreferenceUpdateResponseError = (putNotificationPreferenceUpdateResponse422) & {
-  headers: Headers;
-};
-
-export type putNotificationPreferenceUpdateResponse = (putNotificationPreferenceUpdateResponseSuccess | putNotificationPreferenceUpdateResponseError)
-
 export const getPutNotificationPreferenceUpdateUrl = () => {
 
 
@@ -20731,9 +17705,9 @@ export const getPutNotificationPreferenceUpdateUrl = () => {
 /**
  * @summary Update notification preferences
  */
-export const putNotificationPreferenceUpdate = async (putNotificationPreferenceUpdateBody: PutNotificationPreferenceUpdateBody, options?: RequestInit): Promise<putNotificationPreferenceUpdateResponse> => {
+export const putNotificationPreferenceUpdate = async (putNotificationPreferenceUpdateBody: PutNotificationPreferenceUpdateBody, options?: RequestInit): Promise<PutNotificationPreferenceUpdate200> => {
 
-  return customInstance<putNotificationPreferenceUpdateResponse>(getPutNotificationPreferenceUpdateUrl(),
+  return customInstance<PutNotificationPreferenceUpdate200>(getPutNotificationPreferenceUpdateUrl(),
   {
     ...options,
     method: 'PUT',
@@ -20790,25 +17764,6 @@ export const usePutNotificationPreferenceUpdate = <TError = ErrorType<Validation
       return useMutation(getPutNotificationPreferenceUpdateMutationOptions(options), queryClient);
     }
 
-export type postPushSubscribeResponse201 = {
-  data: PostPushSubscribe201
-  status: 201
-}
-
-export type postPushSubscribeResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postPushSubscribeResponseSuccess = (postPushSubscribeResponse201) & {
-  headers: Headers;
-};
-export type postPushSubscribeResponseError = (postPushSubscribeResponse422) & {
-  headers: Headers;
-};
-
-export type postPushSubscribeResponse = (postPushSubscribeResponseSuccess | postPushSubscribeResponseError)
-
 export const getPostPushSubscribeUrl = () => {
 
 
@@ -20820,9 +17775,9 @@ export const getPostPushSubscribeUrl = () => {
 /**
  * @summary Subscribe to push notifications
  */
-export const postPushSubscribe = async (postPushSubscribeBody: PostPushSubscribeBody, options?: RequestInit): Promise<postPushSubscribeResponse> => {
+export const postPushSubscribe = async (postPushSubscribeBody: PostPushSubscribeBody, options?: RequestInit): Promise<PostPushSubscribe201> => {
 
-  return customInstance<postPushSubscribeResponse>(getPostPushSubscribeUrl(),
+  return customInstance<PostPushSubscribe201>(getPostPushSubscribeUrl(),
   {
     ...options,
     method: 'POST',
@@ -20879,18 +17834,6 @@ export const usePostPushSubscribe = <TError = ErrorType<ValidationError>,
       return useMutation(getPostPushSubscribeMutationOptions(options), queryClient);
     }
 
-export type deletePushUnsubscribeResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deletePushUnsubscribeResponseSuccess = (deletePushUnsubscribeResponse204) & {
-  headers: Headers;
-};
-;
-
-export type deletePushUnsubscribeResponse = (deletePushUnsubscribeResponseSuccess)
-
 export const getDeletePushUnsubscribeUrl = () => {
 
 
@@ -20902,9 +17845,9 @@ export const getDeletePushUnsubscribeUrl = () => {
 /**
  * @summary Unsubscribe from push notifications
  */
-export const deletePushUnsubscribe = async (deletePushUnsubscribeBody: DeletePushUnsubscribeBody, options?: RequestInit): Promise<deletePushUnsubscribeResponse> => {
+export const deletePushUnsubscribe = async (deletePushUnsubscribeBody: DeletePushUnsubscribeBody, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deletePushUnsubscribeResponse>(getDeletePushUnsubscribeUrl(),
+  return customInstance<void>(getDeletePushUnsubscribeUrl(),
   {
     ...options,
     method: 'DELETE',
@@ -20961,18 +17904,6 @@ export const useDeletePushUnsubscribe = <TError = ErrorType<unknown>,
       return useMutation(getDeletePushUnsubscribeMutationOptions(options), queryClient);
     }
 
-export type deletePushRemoveAllResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deletePushRemoveAllResponseSuccess = (deletePushRemoveAllResponse204) & {
-  headers: Headers;
-};
-;
-
-export type deletePushRemoveAllResponse = (deletePushRemoveAllResponseSuccess)
-
 export const getDeletePushRemoveAllUrl = () => {
 
 
@@ -20984,9 +17915,9 @@ export const getDeletePushRemoveAllUrl = () => {
 /**
  * @summary Remove all push subscriptions
  */
-export const deletePushRemoveAll = async ( options?: RequestInit): Promise<deletePushRemoveAllResponse> => {
+export const deletePushRemoveAll = async ( options?: RequestInit): Promise<void> => {
 
-  return customInstance<deletePushRemoveAllResponse>(getDeletePushRemoveAllUrl(),
+  return customInstance<void>(getDeletePushRemoveAllUrl(),
   {
     ...options,
     method: 'DELETE'
@@ -21043,25 +17974,6 @@ export const useDeletePushRemoveAll = <TError = ErrorType<unknown>,
       return useMutation(getDeletePushRemoveAllMutationOptions(options), queryClient);
     }
 
-export type getWebhookIndexResponse200 = {
-  data: GetWebhookIndex200
-  status: 200
-}
-
-export type getWebhookIndexResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type getWebhookIndexResponseSuccess = (getWebhookIndexResponse200) & {
-  headers: Headers;
-};
-export type getWebhookIndexResponseError = (getWebhookIndexResponse403) & {
-  headers: Headers;
-};
-
-export type getWebhookIndexResponse = (getWebhookIndexResponseSuccess | getWebhookIndexResponseError)
-
 export const getGetWebhookIndexUrl = () => {
 
 
@@ -21073,9 +17985,9 @@ export const getGetWebhookIndexUrl = () => {
 /**
  * @summary List all webhooks
  */
-export const getWebhookIndex = async ( options?: RequestInit): Promise<getWebhookIndexResponse> => {
+export const getWebhookIndex = async ( options?: RequestInit): Promise<GetWebhookIndex200> => {
 
-  return customInstance<getWebhookIndexResponse>(getGetWebhookIndexUrl(),
+  return customInstance<GetWebhookIndex200>(getGetWebhookIndexUrl(),
   {
     ...options,
     method: 'GET'
@@ -21163,30 +18075,6 @@ export function useGetWebhookIndex<TData = Awaited<ReturnType<typeof getWebhookI
 
 
 
-export type postWebhookCreateResponse201 = {
-  data: PostWebhookCreate201
-  status: 201
-}
-
-export type postWebhookCreateResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type postWebhookCreateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postWebhookCreateResponseSuccess = (postWebhookCreateResponse201) & {
-  headers: Headers;
-};
-export type postWebhookCreateResponseError = (postWebhookCreateResponse403 | postWebhookCreateResponse422) & {
-  headers: Headers;
-};
-
-export type postWebhookCreateResponse = (postWebhookCreateResponseSuccess | postWebhookCreateResponseError)
-
 export const getPostWebhookCreateUrl = () => {
 
 
@@ -21198,9 +18086,9 @@ export const getPostWebhookCreateUrl = () => {
 /**
  * @summary Create a webhook
  */
-export const postWebhookCreate = async (postWebhookCreateBody: PostWebhookCreateBody, options?: RequestInit): Promise<postWebhookCreateResponse> => {
+export const postWebhookCreate = async (postWebhookCreateBody: PostWebhookCreateBody, options?: RequestInit): Promise<PostWebhookCreate201> => {
 
-  return customInstance<postWebhookCreateResponse>(getPostWebhookCreateUrl(),
+  return customInstance<PostWebhookCreate201>(getPostWebhookCreateUrl(),
   {
     ...options,
     method: 'POST',
@@ -21257,35 +18145,6 @@ export const usePostWebhookCreate = <TError = ErrorType<ApiError | ValidationErr
       return useMutation(getPostWebhookCreateMutationOptions(options), queryClient);
     }
 
-export type putWebhookUpdateResponse200 = {
-  data: PutWebhookUpdate200
-  status: 200
-}
-
-export type putWebhookUpdateResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type putWebhookUpdateResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type putWebhookUpdateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type putWebhookUpdateResponseSuccess = (putWebhookUpdateResponse200) & {
-  headers: Headers;
-};
-export type putWebhookUpdateResponseError = (putWebhookUpdateResponse403 | putWebhookUpdateResponse404 | putWebhookUpdateResponse422) & {
-  headers: Headers;
-};
-
-export type putWebhookUpdateResponse = (putWebhookUpdateResponseSuccess | putWebhookUpdateResponseError)
-
 export const getPutWebhookUpdateUrl = (id: string,) => {
 
 
@@ -21298,9 +18157,9 @@ export const getPutWebhookUpdateUrl = (id: string,) => {
  * @summary Update a webhook
  */
 export const putWebhookUpdate = async (id: string,
-    putWebhookUpdateBody: PutWebhookUpdateBody, options?: RequestInit): Promise<putWebhookUpdateResponse> => {
+    putWebhookUpdateBody: PutWebhookUpdateBody, options?: RequestInit): Promise<PutWebhookUpdate200> => {
 
-  return customInstance<putWebhookUpdateResponse>(getPutWebhookUpdateUrl(id),
+  return customInstance<PutWebhookUpdate200>(getPutWebhookUpdateUrl(id),
   {
     ...options,
     method: 'PUT',
@@ -21357,30 +18216,6 @@ export const usePutWebhookUpdate = <TError = ErrorType<ApiError | ValidationErro
       return useMutation(getPutWebhookUpdateMutationOptions(options), queryClient);
     }
 
-export type deleteWebhookDeleteResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteWebhookDeleteResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type deleteWebhookDeleteResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteWebhookDeleteResponseSuccess = (deleteWebhookDeleteResponse204) & {
-  headers: Headers;
-};
-export type deleteWebhookDeleteResponseError = (deleteWebhookDeleteResponse403 | deleteWebhookDeleteResponse404) & {
-  headers: Headers;
-};
-
-export type deleteWebhookDeleteResponse = (deleteWebhookDeleteResponseSuccess | deleteWebhookDeleteResponseError)
-
 export const getDeleteWebhookDeleteUrl = (id: string,) => {
 
 
@@ -21392,9 +18227,9 @@ export const getDeleteWebhookDeleteUrl = (id: string,) => {
 /**
  * @summary Delete a webhook
  */
-export const deleteWebhookDelete = async (id: string, options?: RequestInit): Promise<deleteWebhookDeleteResponse> => {
+export const deleteWebhookDelete = async (id: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteWebhookDeleteResponse>(getDeleteWebhookDeleteUrl(id),
+  return customInstance<void>(getDeleteWebhookDeleteUrl(id),
   {
     ...options,
     method: 'DELETE'
@@ -21451,30 +18286,6 @@ export const useDeleteWebhookDelete = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteWebhookDeleteMutationOptions(options), queryClient);
     }
 
-export type postWebhookRotateSecretResponse200 = {
-  data: PostWebhookRotateSecret200
-  status: 200
-}
-
-export type postWebhookRotateSecretResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type postWebhookRotateSecretResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postWebhookRotateSecretResponseSuccess = (postWebhookRotateSecretResponse200) & {
-  headers: Headers;
-};
-export type postWebhookRotateSecretResponseError = (postWebhookRotateSecretResponse403 | postWebhookRotateSecretResponse404) & {
-  headers: Headers;
-};
-
-export type postWebhookRotateSecretResponse = (postWebhookRotateSecretResponseSuccess | postWebhookRotateSecretResponseError)
-
 export const getPostWebhookRotateSecretUrl = (id: string,) => {
 
 
@@ -21486,9 +18297,9 @@ export const getPostWebhookRotateSecretUrl = (id: string,) => {
 /**
  * @summary Rotate a webhook secret and upgrade to signature version 2
  */
-export const postWebhookRotateSecret = async (id: string, options?: RequestInit): Promise<postWebhookRotateSecretResponse> => {
+export const postWebhookRotateSecret = async (id: string, options?: RequestInit): Promise<PostWebhookRotateSecret200> => {
 
-  return customInstance<postWebhookRotateSecretResponse>(getPostWebhookRotateSecretUrl(id),
+  return customInstance<PostWebhookRotateSecret200>(getPostWebhookRotateSecretUrl(id),
   {
     ...options,
     method: 'POST'
@@ -21545,25 +18356,6 @@ export const usePostWebhookRotateSecret = <TError = ErrorType<ApiError>,
       return useMutation(getPostWebhookRotateSecretMutationOptions(options), queryClient);
     }
 
-export type getPartyMemberIndexResponse200 = {
-  data: GetPartyMemberIndex200
-  status: 200
-}
-
-export type getPartyMemberIndexResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getPartyMemberIndexResponseSuccess = (getPartyMemberIndexResponse200) & {
-  headers: Headers;
-};
-export type getPartyMemberIndexResponseError = (getPartyMemberIndexResponse404) & {
-  headers: Headers;
-};
-
-export type getPartyMemberIndexResponse = (getPartyMemberIndexResponseSuccess | getPartyMemberIndexResponseError)
-
 export const getGetPartyMemberIndexUrl = (uuid: string,) => {
 
 
@@ -21575,9 +18367,9 @@ export const getGetPartyMemberIndexUrl = (uuid: string,) => {
 /**
  * @summary List members for a party session
  */
-export const getPartyMemberIndex = async (uuid: string, options?: RequestInit): Promise<getPartyMemberIndexResponse> => {
+export const getPartyMemberIndex = async (uuid: string, options?: RequestInit): Promise<GetPartyMemberIndex200> => {
 
-  return customInstance<getPartyMemberIndexResponse>(getGetPartyMemberIndexUrl(uuid),
+  return customInstance<GetPartyMemberIndex200>(getGetPartyMemberIndexUrl(uuid),
   {
     ...options,
     method: 'GET'
@@ -21665,30 +18457,6 @@ export function useGetPartyMemberIndex<TData = Awaited<ReturnType<typeof getPart
 
 
 
-export type patchPartyMemberUpdateMeResponse200 = {
-  data: PatchPartyMemberUpdateMe200
-  status: 200
-}
-
-export type patchPartyMemberUpdateMeResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type patchPartyMemberUpdateMeResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type patchPartyMemberUpdateMeResponseSuccess = (patchPartyMemberUpdateMeResponse200) & {
-  headers: Headers;
-};
-export type patchPartyMemberUpdateMeResponseError = (patchPartyMemberUpdateMeResponse401 | patchPartyMemberUpdateMeResponse404) & {
-  headers: Headers;
-};
-
-export type patchPartyMemberUpdateMeResponse = (patchPartyMemberUpdateMeResponseSuccess | patchPartyMemberUpdateMeResponseError)
-
 export const getPatchPartyMemberUpdateMeUrl = (uuid: string,) => {
 
 
@@ -21701,9 +18469,9 @@ export const getPatchPartyMemberUpdateMeUrl = (uuid: string,) => {
  * @summary Update current user member preferences
  */
 export const patchPartyMemberUpdateMe = async (uuid: string,
-    patchPartyMemberUpdateMeBody: PatchPartyMemberUpdateMeBody, options?: RequestInit): Promise<patchPartyMemberUpdateMeResponse> => {
+    patchPartyMemberUpdateMeBody: PatchPartyMemberUpdateMeBody, options?: RequestInit): Promise<PatchPartyMemberUpdateMe200> => {
 
-  return customInstance<patchPartyMemberUpdateMeResponse>(getPatchPartyMemberUpdateMeUrl(uuid),
+  return customInstance<PatchPartyMemberUpdateMe200>(getPatchPartyMemberUpdateMeUrl(uuid),
   {
     ...options,
     method: 'PATCH',
@@ -21760,30 +18528,6 @@ export const usePatchPartyMemberUpdateMe = <TError = ErrorType<ApiError>,
       return useMutation(getPatchPartyMemberUpdateMeMutationOptions(options), queryClient);
     }
 
-export type postPartyMemberTransferHostResponse200 = {
-  data: PostPartyMemberTransferHost200
-  status: 200
-}
-
-export type postPartyMemberTransferHostResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postPartyMemberTransferHostResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postPartyMemberTransferHostResponseSuccess = (postPartyMemberTransferHostResponse200) & {
-  headers: Headers;
-};
-export type postPartyMemberTransferHostResponseError = (postPartyMemberTransferHostResponse401 | postPartyMemberTransferHostResponse404) & {
-  headers: Headers;
-};
-
-export type postPartyMemberTransferHostResponse = (postPartyMemberTransferHostResponseSuccess | postPartyMemberTransferHostResponseError)
-
 export const getPostPartyMemberTransferHostUrl = (uuid: string,) => {
 
 
@@ -21796,9 +18540,9 @@ export const getPostPartyMemberTransferHostUrl = (uuid: string,) => {
  * @summary Transfer host role to another member
  */
 export const postPartyMemberTransferHost = async (uuid: string,
-    postPartyMemberTransferHostBody: PostPartyMemberTransferHostBody, options?: RequestInit): Promise<postPartyMemberTransferHostResponse> => {
+    postPartyMemberTransferHostBody: PostPartyMemberTransferHostBody, options?: RequestInit): Promise<PostPartyMemberTransferHost200> => {
 
-  return customInstance<postPartyMemberTransferHostResponse>(getPostPartyMemberTransferHostUrl(uuid),
+  return customInstance<PostPartyMemberTransferHost200>(getPostPartyMemberTransferHostUrl(uuid),
   {
     ...options,
     method: 'POST',
@@ -21855,18 +18599,6 @@ export const usePostPartyMemberTransferHost = <TError = ErrorType<ApiError>,
       return useMutation(getPostPartyMemberTransferHostMutationOptions(options), queryClient);
     }
 
-export type getPartySessionIndexResponse200 = {
-  data: GetPartySessionIndex200
-  status: 200
-}
-
-export type getPartySessionIndexResponseSuccess = (getPartySessionIndexResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getPartySessionIndexResponse = (getPartySessionIndexResponseSuccess)
-
 export const getGetPartySessionIndexUrl = () => {
 
 
@@ -21878,9 +18610,9 @@ export const getGetPartySessionIndexUrl = () => {
 /**
  * @summary List active party sessions
  */
-export const getPartySessionIndex = async ( options?: RequestInit): Promise<getPartySessionIndexResponse> => {
+export const getPartySessionIndex = async ( options?: RequestInit): Promise<GetPartySessionIndex200> => {
 
-  return customInstance<getPartySessionIndexResponse>(getGetPartySessionIndexUrl(),
+  return customInstance<GetPartySessionIndex200>(getGetPartySessionIndexUrl(),
   {
     ...options,
     method: 'GET'
@@ -21968,18 +18700,6 @@ export function useGetPartySessionIndex<TData = Awaited<ReturnType<typeof getPar
 
 
 
-export type postPartySessionCreateResponse201 = {
-  data: PostPartySessionCreate201
-  status: 201
-}
-
-export type postPartySessionCreateResponseSuccess = (postPartySessionCreateResponse201) & {
-  headers: Headers;
-};
-;
-
-export type postPartySessionCreateResponse = (postPartySessionCreateResponseSuccess)
-
 export const getPostPartySessionCreateUrl = () => {
 
 
@@ -21991,9 +18711,9 @@ export const getPostPartySessionCreateUrl = () => {
 /**
  * @summary Create a new watch party session
  */
-export const postPartySessionCreate = async (postPartySessionCreateBody: PostPartySessionCreateBody, options?: RequestInit): Promise<postPartySessionCreateResponse> => {
+export const postPartySessionCreate = async (postPartySessionCreateBody: PostPartySessionCreateBody, options?: RequestInit): Promise<PostPartySessionCreate201> => {
 
-  return customInstance<postPartySessionCreateResponse>(getPostPartySessionCreateUrl(),
+  return customInstance<PostPartySessionCreate201>(getPostPartySessionCreateUrl(),
   {
     ...options,
     method: 'POST',
@@ -22050,25 +18770,6 @@ export const usePostPartySessionCreate = <TError = ErrorType<unknown>,
       return useMutation(getPostPartySessionCreateMutationOptions(options), queryClient);
     }
 
-export type getPartySessionShowResponse200 = {
-  data: GetPartySessionShow200
-  status: 200
-}
-
-export type getPartySessionShowResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getPartySessionShowResponseSuccess = (getPartySessionShowResponse200) & {
-  headers: Headers;
-};
-export type getPartySessionShowResponseError = (getPartySessionShowResponse404) & {
-  headers: Headers;
-};
-
-export type getPartySessionShowResponse = (getPartySessionShowResponseSuccess | getPartySessionShowResponseError)
-
 export const getGetPartySessionShowUrl = (uuid: string,) => {
 
 
@@ -22080,9 +18781,9 @@ export const getGetPartySessionShowUrl = (uuid: string,) => {
 /**
  * @summary Get a party session
  */
-export const getPartySessionShow = async (uuid: string, options?: RequestInit): Promise<getPartySessionShowResponse> => {
+export const getPartySessionShow = async (uuid: string, options?: RequestInit): Promise<GetPartySessionShow200> => {
 
-  return customInstance<getPartySessionShowResponse>(getGetPartySessionShowUrl(uuid),
+  return customInstance<GetPartySessionShow200>(getGetPartySessionShowUrl(uuid),
   {
     ...options,
     method: 'GET'
@@ -22170,18 +18871,6 @@ export function useGetPartySessionShow<TData = Awaited<ReturnType<typeof getPart
 
 
 
-export type deletePartySessionEndResponse200 = {
-  data: DeletePartySessionEnd200
-  status: 200
-}
-
-export type deletePartySessionEndResponseSuccess = (deletePartySessionEndResponse200) & {
-  headers: Headers;
-};
-;
-
-export type deletePartySessionEndResponse = (deletePartySessionEndResponseSuccess)
-
 export const getDeletePartySessionEndUrl = (uuid: string,) => {
 
 
@@ -22193,9 +18882,9 @@ export const getDeletePartySessionEndUrl = (uuid: string,) => {
 /**
  * @summary End a party session (host only)
  */
-export const deletePartySessionEnd = async (uuid: string, options?: RequestInit): Promise<deletePartySessionEndResponse> => {
+export const deletePartySessionEnd = async (uuid: string, options?: RequestInit): Promise<DeletePartySessionEnd200> => {
 
-  return customInstance<deletePartySessionEndResponse>(getDeletePartySessionEndUrl(uuid),
+  return customInstance<DeletePartySessionEnd200>(getDeletePartySessionEndUrl(uuid),
   {
     ...options,
     method: 'DELETE'
@@ -22252,18 +18941,6 @@ export const useDeletePartySessionEnd = <TError = ErrorType<unknown>,
       return useMutation(getDeletePartySessionEndMutationOptions(options), queryClient);
     }
 
-export type postPartySessionJoinResponse200 = {
-  data: PostPartySessionJoin200
-  status: 200
-}
-
-export type postPartySessionJoinResponseSuccess = (postPartySessionJoinResponse200) & {
-  headers: Headers;
-};
-;
-
-export type postPartySessionJoinResponse = (postPartySessionJoinResponseSuccess)
-
 export const getPostPartySessionJoinUrl = (uuid: string,) => {
 
 
@@ -22275,9 +18952,9 @@ export const getPostPartySessionJoinUrl = (uuid: string,) => {
 /**
  * @summary Join a party session
  */
-export const postPartySessionJoin = async (uuid: string, options?: RequestInit): Promise<postPartySessionJoinResponse> => {
+export const postPartySessionJoin = async (uuid: string, options?: RequestInit): Promise<PostPartySessionJoin200> => {
 
-  return customInstance<postPartySessionJoinResponse>(getPostPartySessionJoinUrl(uuid),
+  return customInstance<PostPartySessionJoin200>(getPostPartySessionJoinUrl(uuid),
   {
     ...options,
     method: 'POST'
@@ -22334,18 +19011,6 @@ export const usePostPartySessionJoin = <TError = ErrorType<unknown>,
       return useMutation(getPostPartySessionJoinMutationOptions(options), queryClient);
     }
 
-export type postPartySessionLeaveResponse200 = {
-  data: PostPartySessionLeave200
-  status: 200
-}
-
-export type postPartySessionLeaveResponseSuccess = (postPartySessionLeaveResponse200) & {
-  headers: Headers;
-};
-;
-
-export type postPartySessionLeaveResponse = (postPartySessionLeaveResponseSuccess)
-
 export const getPostPartySessionLeaveUrl = (uuid: string,) => {
 
 
@@ -22357,9 +19022,9 @@ export const getPostPartySessionLeaveUrl = (uuid: string,) => {
 /**
  * @summary Leave a party session
  */
-export const postPartySessionLeave = async (uuid: string, options?: RequestInit): Promise<postPartySessionLeaveResponse> => {
+export const postPartySessionLeave = async (uuid: string, options?: RequestInit): Promise<PostPartySessionLeave200> => {
 
-  return customInstance<postPartySessionLeaveResponse>(getPostPartySessionLeaveUrl(uuid),
+  return customInstance<PostPartySessionLeave200>(getPostPartySessionLeaveUrl(uuid),
   {
     ...options,
     method: 'POST'
@@ -22416,18 +19081,6 @@ export const usePostPartySessionLeave = <TError = ErrorType<unknown>,
       return useMutation(getPostPartySessionLeaveMutationOptions(options), queryClient);
     }
 
-export type postPartySessionSyncResponse200 = {
-  data: PostPartySessionSync200
-  status: 200
-}
-
-export type postPartySessionSyncResponseSuccess = (postPartySessionSyncResponse200) & {
-  headers: Headers;
-};
-;
-
-export type postPartySessionSyncResponse = (postPartySessionSyncResponseSuccess)
-
 export const getPostPartySessionSyncUrl = (uuid: string,) => {
 
 
@@ -22440,9 +19093,9 @@ export const getPostPartySessionSyncUrl = (uuid: string,) => {
  * @summary Synchronize playback position
  */
 export const postPartySessionSync = async (uuid: string,
-    syncPlaybackRequest: SyncPlaybackRequest, options?: RequestInit): Promise<postPartySessionSyncResponse> => {
+    syncPlaybackRequest: SyncPlaybackRequest, options?: RequestInit): Promise<PostPartySessionSync200> => {
 
-  return customInstance<postPartySessionSyncResponse>(getPostPartySessionSyncUrl(uuid),
+  return customInstance<PostPartySessionSync200>(getPostPartySessionSyncUrl(uuid),
   {
     ...options,
     method: 'POST',
@@ -22499,25 +19152,6 @@ export const usePostPartySessionSync = <TError = ErrorType<unknown>,
       return useMutation(getPostPartySessionSyncMutationOptions(options), queryClient);
     }
 
-export type getPlaylistIndexResponse200 = {
-  data: GetPlaylistIndex200
-  status: 200
-}
-
-export type getPlaylistIndexResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getPlaylistIndexResponseSuccess = (getPlaylistIndexResponse200) & {
-  headers: Headers;
-};
-export type getPlaylistIndexResponseError = (getPlaylistIndexResponse401) & {
-  headers: Headers;
-};
-
-export type getPlaylistIndexResponse = (getPlaylistIndexResponseSuccess | getPlaylistIndexResponseError)
-
 export const getGetPlaylistIndexUrl = () => {
 
 
@@ -22529,9 +19163,9 @@ export const getGetPlaylistIndexUrl = () => {
 /**
  * @summary List playlists belonging to the authenticated user
  */
-export const getPlaylistIndex = async ( options?: RequestInit): Promise<getPlaylistIndexResponse> => {
+export const getPlaylistIndex = async ( options?: RequestInit): Promise<GetPlaylistIndex200> => {
 
-  return customInstance<getPlaylistIndexResponse>(getGetPlaylistIndexUrl(),
+  return customInstance<GetPlaylistIndex200>(getGetPlaylistIndexUrl(),
   {
     ...options,
     method: 'GET'
@@ -22619,30 +19253,6 @@ export function useGetPlaylistIndex<TData = Awaited<ReturnType<typeof getPlaylis
 
 
 
-export type postPlaylistStoreResponse201 = {
-  data: PlaylistResource
-  status: 201
-}
-
-export type postPlaylistStoreResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postPlaylistStoreResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postPlaylistStoreResponseSuccess = (postPlaylistStoreResponse201) & {
-  headers: Headers;
-};
-export type postPlaylistStoreResponseError = (postPlaylistStoreResponse401 | postPlaylistStoreResponse422) & {
-  headers: Headers;
-};
-
-export type postPlaylistStoreResponse = (postPlaylistStoreResponseSuccess | postPlaylistStoreResponseError)
-
 export const getPostPlaylistStoreUrl = () => {
 
 
@@ -22654,9 +19264,9 @@ export const getPostPlaylistStoreUrl = () => {
 /**
  * @summary Create a new playlist
  */
-export const postPlaylistStore = async (postPlaylistStoreBody: PostPlaylistStoreBody, options?: RequestInit): Promise<postPlaylistStoreResponse> => {
+export const postPlaylistStore = async (postPlaylistStoreBody: PostPlaylistStoreBody, options?: RequestInit): Promise<PlaylistResource> => {
 
-  return customInstance<postPlaylistStoreResponse>(getPostPlaylistStoreUrl(),
+  return customInstance<PlaylistResource>(getPostPlaylistStoreUrl(),
   {
     ...options,
     method: 'POST',
@@ -22713,25 +19323,6 @@ export const usePostPlaylistStore = <TError = ErrorType<ApiError | ValidationErr
       return useMutation(getPostPlaylistStoreMutationOptions(options), queryClient);
     }
 
-export type getPlaylistShowResponse200 = {
-  data: GetPlaylistShow200
-  status: 200
-}
-
-export type getPlaylistShowResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getPlaylistShowResponseSuccess = (getPlaylistShowResponse200) & {
-  headers: Headers;
-};
-export type getPlaylistShowResponseError = (getPlaylistShowResponse404) & {
-  headers: Headers;
-};
-
-export type getPlaylistShowResponse = (getPlaylistShowResponseSuccess | getPlaylistShowResponseError)
-
 export const getGetPlaylistShowUrl = (publicId: string,) => {
 
 
@@ -22743,9 +19334,9 @@ export const getGetPlaylistShowUrl = (publicId: string,) => {
 /**
  * @summary Get a single playlist with its songs
  */
-export const getPlaylistShow = async (publicId: string, options?: RequestInit): Promise<getPlaylistShowResponse> => {
+export const getPlaylistShow = async (publicId: string, options?: RequestInit): Promise<GetPlaylistShow200> => {
 
-  return customInstance<getPlaylistShowResponse>(getGetPlaylistShowUrl(publicId),
+  return customInstance<GetPlaylistShow200>(getGetPlaylistShowUrl(publicId),
   {
     ...options,
     method: 'GET'
@@ -22833,30 +19424,6 @@ export function useGetPlaylistShow<TData = Awaited<ReturnType<typeof getPlaylist
 
 
 
-export type deletePlaylistDestroyResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deletePlaylistDestroyResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type deletePlaylistDestroyResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deletePlaylistDestroyResponseSuccess = (deletePlaylistDestroyResponse204) & {
-  headers: Headers;
-};
-export type deletePlaylistDestroyResponseError = (deletePlaylistDestroyResponse401 | deletePlaylistDestroyResponse404) & {
-  headers: Headers;
-};
-
-export type deletePlaylistDestroyResponse = (deletePlaylistDestroyResponseSuccess | deletePlaylistDestroyResponseError)
-
 export const getDeletePlaylistDestroyUrl = (publicId: string,) => {
 
 
@@ -22868,9 +19435,9 @@ export const getDeletePlaylistDestroyUrl = (publicId: string,) => {
 /**
  * @summary Delete a playlist
  */
-export const deletePlaylistDestroy = async (publicId: string, options?: RequestInit): Promise<deletePlaylistDestroyResponse> => {
+export const deletePlaylistDestroy = async (publicId: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deletePlaylistDestroyResponse>(getDeletePlaylistDestroyUrl(publicId),
+  return customInstance<void>(getDeletePlaylistDestroyUrl(publicId),
   {
     ...options,
     method: 'DELETE'
@@ -22927,35 +19494,6 @@ export const useDeletePlaylistDestroy = <TError = ErrorType<ApiError>,
       return useMutation(getDeletePlaylistDestroyMutationOptions(options), queryClient);
     }
 
-export type patchPlaylistUpdateResponse200 = {
-  data: PatchPlaylistUpdate200
-  status: 200
-}
-
-export type patchPlaylistUpdateResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type patchPlaylistUpdateResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type patchPlaylistUpdateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type patchPlaylistUpdateResponseSuccess = (patchPlaylistUpdateResponse200) & {
-  headers: Headers;
-};
-export type patchPlaylistUpdateResponseError = (patchPlaylistUpdateResponse401 | patchPlaylistUpdateResponse404 | patchPlaylistUpdateResponse422) & {
-  headers: Headers;
-};
-
-export type patchPlaylistUpdateResponse = (patchPlaylistUpdateResponseSuccess | patchPlaylistUpdateResponseError)
-
 export const getPatchPlaylistUpdateUrl = (publicId: string,) => {
 
 
@@ -22968,9 +19506,9 @@ export const getPatchPlaylistUpdateUrl = (publicId: string,) => {
  * @summary Update playlist metadata
  */
 export const patchPlaylistUpdate = async (publicId: string,
-    patchPlaylistUpdateBody: PatchPlaylistUpdateBody, options?: RequestInit): Promise<patchPlaylistUpdateResponse> => {
+    patchPlaylistUpdateBody: PatchPlaylistUpdateBody, options?: RequestInit): Promise<PatchPlaylistUpdate200> => {
 
-  return customInstance<patchPlaylistUpdateResponse>(getPatchPlaylistUpdateUrl(publicId),
+  return customInstance<PatchPlaylistUpdate200>(getPatchPlaylistUpdateUrl(publicId),
   {
     ...options,
     method: 'PATCH',
@@ -23027,35 +19565,6 @@ export const usePatchPlaylistUpdate = <TError = ErrorType<ApiError | ValidationE
       return useMutation(getPatchPlaylistUpdateMutationOptions(options), queryClient);
     }
 
-export type postPlaylistAddSongResponse201 = {
-  data: PostPlaylistAddSong201
-  status: 201
-}
-
-export type postPlaylistAddSongResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postPlaylistAddSongResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postPlaylistAddSongResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postPlaylistAddSongResponseSuccess = (postPlaylistAddSongResponse201) & {
-  headers: Headers;
-};
-export type postPlaylistAddSongResponseError = (postPlaylistAddSongResponse401 | postPlaylistAddSongResponse404 | postPlaylistAddSongResponse422) & {
-  headers: Headers;
-};
-
-export type postPlaylistAddSongResponse = (postPlaylistAddSongResponseSuccess | postPlaylistAddSongResponseError)
-
 export const getPostPlaylistAddSongUrl = (publicId: string,) => {
 
 
@@ -23068,9 +19577,9 @@ export const getPostPlaylistAddSongUrl = (publicId: string,) => {
  * @summary Add a song to a playlist
  */
 export const postPlaylistAddSong = async (publicId: string,
-    postPlaylistAddSongBody: PostPlaylistAddSongBody, options?: RequestInit): Promise<postPlaylistAddSongResponse> => {
+    postPlaylistAddSongBody: PostPlaylistAddSongBody, options?: RequestInit): Promise<PostPlaylistAddSong201> => {
 
-  return customInstance<postPlaylistAddSongResponse>(getPostPlaylistAddSongUrl(publicId),
+  return customInstance<PostPlaylistAddSong201>(getPostPlaylistAddSongUrl(publicId),
   {
     ...options,
     method: 'POST',
@@ -23127,30 +19636,6 @@ export const usePostPlaylistAddSong = <TError = ErrorType<ApiError | ValidationE
       return useMutation(getPostPlaylistAddSongMutationOptions(options), queryClient);
     }
 
-export type deletePlaylistRemoveSongResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deletePlaylistRemoveSongResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type deletePlaylistRemoveSongResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deletePlaylistRemoveSongResponseSuccess = (deletePlaylistRemoveSongResponse204) & {
-  headers: Headers;
-};
-export type deletePlaylistRemoveSongResponseError = (deletePlaylistRemoveSongResponse401 | deletePlaylistRemoveSongResponse404) & {
-  headers: Headers;
-};
-
-export type deletePlaylistRemoveSongResponse = (deletePlaylistRemoveSongResponseSuccess | deletePlaylistRemoveSongResponseError)
-
 export const getDeletePlaylistRemoveSongUrl = (publicId: string,
     songId: string,) => {
 
@@ -23164,9 +19649,9 @@ export const getDeletePlaylistRemoveSongUrl = (publicId: string,
  * @summary Remove a song from a playlist
  */
 export const deletePlaylistRemoveSong = async (publicId: string,
-    songId: string, options?: RequestInit): Promise<deletePlaylistRemoveSongResponse> => {
+    songId: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deletePlaylistRemoveSongResponse>(getDeletePlaylistRemoveSongUrl(publicId,songId),
+  return customInstance<void>(getDeletePlaylistRemoveSongUrl(publicId,songId),
   {
     ...options,
     method: 'DELETE'
@@ -23223,35 +19708,6 @@ export const useDeletePlaylistRemoveSong = <TError = ErrorType<ApiError>,
       return useMutation(getDeletePlaylistRemoveSongMutationOptions(options), queryClient);
     }
 
-export type postPlaylistReorderResponse200 = {
-  data: PostPlaylistReorder200
-  status: 200
-}
-
-export type postPlaylistReorderResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postPlaylistReorderResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postPlaylistReorderResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postPlaylistReorderResponseSuccess = (postPlaylistReorderResponse200) & {
-  headers: Headers;
-};
-export type postPlaylistReorderResponseError = (postPlaylistReorderResponse401 | postPlaylistReorderResponse404 | postPlaylistReorderResponse422) & {
-  headers: Headers;
-};
-
-export type postPlaylistReorderResponse = (postPlaylistReorderResponseSuccess | postPlaylistReorderResponseError)
-
 export const getPostPlaylistReorderUrl = (publicId: string,) => {
 
 
@@ -23264,9 +19720,9 @@ export const getPostPlaylistReorderUrl = (publicId: string,) => {
  * @summary Reorder songs in a playlist
  */
 export const postPlaylistReorder = async (publicId: string,
-    postPlaylistReorderBody: PostPlaylistReorderBody, options?: RequestInit): Promise<postPlaylistReorderResponse> => {
+    postPlaylistReorderBody: PostPlaylistReorderBody, options?: RequestInit): Promise<PostPlaylistReorder200> => {
 
-  return customInstance<postPlaylistReorderResponse>(getPostPlaylistReorderUrl(publicId),
+  return customInstance<PostPlaylistReorder200>(getPostPlaylistReorderUrl(publicId),
   {
     ...options,
     method: 'POST',
@@ -23323,25 +19779,6 @@ export const usePostPlaylistReorder = <TError = ErrorType<ApiError | ValidationE
       return useMutation(getPostPlaylistReorderMutationOptions(options), queryClient);
     }
 
-export type getAdminQolStatusResponse200 = {
-  data: void
-  status: 200
-}
-
-export type getAdminQolStatusResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type getAdminQolStatusResponseSuccess = (getAdminQolStatusResponse200) & {
-  headers: Headers;
-};
-export type getAdminQolStatusResponseError = (getAdminQolStatusResponse403) & {
-  headers: Headers;
-};
-
-export type getAdminQolStatusResponse = (getAdminQolStatusResponseSuccess | getAdminQolStatusResponseError)
-
 export const getGetAdminQolStatusUrl = () => {
 
 
@@ -23353,9 +19790,9 @@ export const getGetAdminQolStatusUrl = () => {
 /**
  * @summary Get stream governor status
  */
-export const getAdminQolStatus = async ( options?: RequestInit): Promise<getAdminQolStatusResponse> => {
+export const getAdminQolStatus = async ( options?: RequestInit): Promise<void> => {
 
-  return customInstance<getAdminQolStatusResponse>(getGetAdminQolStatusUrl(),
+  return customInstance<void>(getGetAdminQolStatusUrl(),
   {
     ...options,
     method: 'GET'
@@ -23443,25 +19880,6 @@ export function useGetAdminQolStatus<TData = Awaited<ReturnType<typeof getAdminQ
 
 
 
-export type getAdminQolStreamsResponse200 = {
-  data: void
-  status: 200
-}
-
-export type getAdminQolStreamsResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type getAdminQolStreamsResponseSuccess = (getAdminQolStreamsResponse200) & {
-  headers: Headers;
-};
-export type getAdminQolStreamsResponseError = (getAdminQolStreamsResponse403) & {
-  headers: Headers;
-};
-
-export type getAdminQolStreamsResponse = (getAdminQolStreamsResponseSuccess | getAdminQolStreamsResponseError)
-
 export const getGetAdminQolStreamsUrl = () => {
 
 
@@ -23473,9 +19891,9 @@ export const getGetAdminQolStreamsUrl = () => {
 /**
  * @summary List active streams with budget allocations
  */
-export const getAdminQolStreams = async ( options?: RequestInit): Promise<getAdminQolStreamsResponse> => {
+export const getAdminQolStreams = async ( options?: RequestInit): Promise<void> => {
 
-  return customInstance<getAdminQolStreamsResponse>(getGetAdminQolStreamsUrl(),
+  return customInstance<void>(getGetAdminQolStreamsUrl(),
   {
     ...options,
     method: 'GET'
@@ -23563,25 +19981,6 @@ export function useGetAdminQolStreams<TData = Awaited<ReturnType<typeof getAdmin
 
 
 
-export type patchAdminQolProfileResponse200 = {
-  data: void
-  status: 200
-}
-
-export type patchAdminQolProfileResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type patchAdminQolProfileResponseSuccess = (patchAdminQolProfileResponse200) & {
-  headers: Headers;
-};
-export type patchAdminQolProfileResponseError = (patchAdminQolProfileResponse400) & {
-  headers: Headers;
-};
-
-export type patchAdminQolProfileResponse = (patchAdminQolProfileResponseSuccess | patchAdminQolProfileResponseError)
-
 export const getPatchAdminQolProfileUrl = () => {
 
 
@@ -23593,9 +19992,9 @@ export const getPatchAdminQolProfileUrl = () => {
 /**
  * @summary Update algorithm profile
  */
-export const patchAdminQolProfile = async (patchAdminQolProfileBody?: PatchAdminQolProfileBody, options?: RequestInit): Promise<patchAdminQolProfileResponse> => {
+export const patchAdminQolProfile = async (patchAdminQolProfileBody?: PatchAdminQolProfileBody, options?: RequestInit): Promise<void> => {
 
-  return customInstance<patchAdminQolProfileResponse>(getPatchAdminQolProfileUrl(),
+  return customInstance<void>(getPatchAdminQolProfileUrl(),
   {
     ...options,
     method: 'PATCH',
@@ -23652,25 +20051,6 @@ export const usePatchAdminQolProfile = <TError = ErrorType<ApiError>,
       return useMutation(getPatchAdminQolProfileMutationOptions(options), queryClient);
     }
 
-export type postAdminQolResetResponse200 = {
-  data: void
-  status: 200
-}
-
-export type postAdminQolResetResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type postAdminQolResetResponseSuccess = (postAdminQolResetResponse200) & {
-  headers: Headers;
-};
-export type postAdminQolResetResponseError = (postAdminQolResetResponse403) & {
-  headers: Headers;
-};
-
-export type postAdminQolResetResponse = (postAdminQolResetResponseSuccess | postAdminQolResetResponseError)
-
 export const getPostAdminQolResetUrl = () => {
 
 
@@ -23682,9 +20062,9 @@ export const getPostAdminQolResetUrl = () => {
 /**
  * @summary Reset learning data and return to Learning state
  */
-export const postAdminQolReset = async ( options?: RequestInit): Promise<postAdminQolResetResponse> => {
+export const postAdminQolReset = async ( options?: RequestInit): Promise<void> => {
 
-  return customInstance<postAdminQolResetResponse>(getPostAdminQolResetUrl(),
+  return customInstance<void>(getPostAdminQolResetUrl(),
   {
     ...options,
     method: 'POST'
@@ -23741,25 +20121,6 @@ export const usePostAdminQolReset = <TError = ErrorType<ApiError>,
       return useMutation(getPostAdminQolResetMutationOptions(options), queryClient);
     }
 
-export type getRadioSubscriptionListResponse200 = {
-  data: GetRadioSubscriptionList200
-  status: 200
-}
-
-export type getRadioSubscriptionListResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getRadioSubscriptionListResponseSuccess = (getRadioSubscriptionListResponse200) & {
-  headers: Headers;
-};
-export type getRadioSubscriptionListResponseError = (getRadioSubscriptionListResponse401) & {
-  headers: Headers;
-};
-
-export type getRadioSubscriptionListResponse = (getRadioSubscriptionListResponseSuccess | getRadioSubscriptionListResponseError)
-
 export const getGetRadioSubscriptionListUrl = () => {
 
 
@@ -23771,9 +20132,9 @@ export const getGetRadioSubscriptionListUrl = () => {
 /**
  * @summary List user's country subscriptions
  */
-export const getRadioSubscriptionList = async ( options?: RequestInit): Promise<getRadioSubscriptionListResponse> => {
+export const getRadioSubscriptionList = async ( options?: RequestInit): Promise<GetRadioSubscriptionList200> => {
 
-  return customInstance<getRadioSubscriptionListResponse>(getGetRadioSubscriptionListUrl(),
+  return customInstance<GetRadioSubscriptionList200>(getGetRadioSubscriptionListUrl(),
   {
     ...options,
     method: 'GET'
@@ -23861,30 +20222,6 @@ export function useGetRadioSubscriptionList<TData = Awaited<ReturnType<typeof ge
 
 
 
-export type postRadioSubscriptionSubscribeResponse201 = {
-  data: PostRadioSubscriptionSubscribe201
-  status: 201
-}
-
-export type postRadioSubscriptionSubscribeResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postRadioSubscriptionSubscribeResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postRadioSubscriptionSubscribeResponseSuccess = (postRadioSubscriptionSubscribeResponse201) & {
-  headers: Headers;
-};
-export type postRadioSubscriptionSubscribeResponseError = (postRadioSubscriptionSubscribeResponse401 | postRadioSubscriptionSubscribeResponse422) & {
-  headers: Headers;
-};
-
-export type postRadioSubscriptionSubscribeResponse = (postRadioSubscriptionSubscribeResponseSuccess | postRadioSubscriptionSubscribeResponseError)
-
 export const getPostRadioSubscriptionSubscribeUrl = () => {
 
 
@@ -23896,9 +20233,9 @@ export const getPostRadioSubscriptionSubscribeUrl = () => {
 /**
  * @summary Subscribe to a country
  */
-export const postRadioSubscriptionSubscribe = async (postRadioSubscriptionSubscribeBody: PostRadioSubscriptionSubscribeBody, options?: RequestInit): Promise<postRadioSubscriptionSubscribeResponse> => {
+export const postRadioSubscriptionSubscribe = async (postRadioSubscriptionSubscribeBody: PostRadioSubscriptionSubscribeBody, options?: RequestInit): Promise<PostRadioSubscriptionSubscribe201> => {
 
-  return customInstance<postRadioSubscriptionSubscribeResponse>(getPostRadioSubscriptionSubscribeUrl(),
+  return customInstance<PostRadioSubscriptionSubscribe201>(getPostRadioSubscriptionSubscribeUrl(),
   {
     ...options,
     method: 'POST',
@@ -23955,25 +20292,6 @@ export const usePostRadioSubscriptionSubscribe = <TError = ErrorType<ApiError | 
       return useMutation(getPostRadioSubscriptionSubscribeMutationOptions(options), queryClient);
     }
 
-export type deleteRadioSubscriptionUnsubscribeResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteRadioSubscriptionUnsubscribeResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type deleteRadioSubscriptionUnsubscribeResponseSuccess = (deleteRadioSubscriptionUnsubscribeResponse204) & {
-  headers: Headers;
-};
-export type deleteRadioSubscriptionUnsubscribeResponseError = (deleteRadioSubscriptionUnsubscribeResponse401) & {
-  headers: Headers;
-};
-
-export type deleteRadioSubscriptionUnsubscribeResponse = (deleteRadioSubscriptionUnsubscribeResponseSuccess | deleteRadioSubscriptionUnsubscribeResponseError)
-
 export const getDeleteRadioSubscriptionUnsubscribeUrl = (countryCode: string,) => {
 
 
@@ -23985,9 +20303,9 @@ export const getDeleteRadioSubscriptionUnsubscribeUrl = (countryCode: string,) =
 /**
  * @summary Unsubscribe from a country
  */
-export const deleteRadioSubscriptionUnsubscribe = async (countryCode: string, options?: RequestInit): Promise<deleteRadioSubscriptionUnsubscribeResponse> => {
+export const deleteRadioSubscriptionUnsubscribe = async (countryCode: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteRadioSubscriptionUnsubscribeResponse>(getDeleteRadioSubscriptionUnsubscribeUrl(countryCode),
+  return customInstance<void>(getDeleteRadioSubscriptionUnsubscribeUrl(countryCode),
   {
     ...options,
     method: 'DELETE'
@@ -24044,30 +20362,6 @@ export const useDeleteRadioSubscriptionUnsubscribe = <TError = ErrorType<ApiErro
       return useMutation(getDeleteRadioSubscriptionUnsubscribeMutationOptions(options), queryClient);
     }
 
-export type postRadioSubscriptionRefreshResponse200 = {
-  data: PostRadioSubscriptionRefresh200
-  status: 200
-}
-
-export type postRadioSubscriptionRefreshResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postRadioSubscriptionRefreshResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postRadioSubscriptionRefreshResponseSuccess = (postRadioSubscriptionRefreshResponse200) & {
-  headers: Headers;
-};
-export type postRadioSubscriptionRefreshResponseError = (postRadioSubscriptionRefreshResponse401 | postRadioSubscriptionRefreshResponse404) & {
-  headers: Headers;
-};
-
-export type postRadioSubscriptionRefreshResponse = (postRadioSubscriptionRefreshResponseSuccess | postRadioSubscriptionRefreshResponseError)
-
 export const getPostRadioSubscriptionRefreshUrl = (countryCode: string,) => {
 
 
@@ -24079,9 +20373,9 @@ export const getPostRadioSubscriptionRefreshUrl = (countryCode: string,) => {
 /**
  * @summary Manual refresh of country stations
  */
-export const postRadioSubscriptionRefresh = async (countryCode: string, options?: RequestInit): Promise<postRadioSubscriptionRefreshResponse> => {
+export const postRadioSubscriptionRefresh = async (countryCode: string, options?: RequestInit): Promise<PostRadioSubscriptionRefresh200> => {
 
-  return customInstance<postRadioSubscriptionRefreshResponse>(getPostRadioSubscriptionRefreshUrl(countryCode),
+  return customInstance<PostRadioSubscriptionRefresh200>(getPostRadioSubscriptionRefreshUrl(countryCode),
   {
     ...options,
     method: 'POST'
@@ -24138,30 +20432,6 @@ export const usePostRadioSubscriptionRefresh = <TError = ErrorType<ApiError>,
       return useMutation(getPostRadioSubscriptionRefreshMutationOptions(options), queryClient);
     }
 
-export type getRadioSessionGetResponse200 = {
-  data: GetRadioSessionGet200
-  status: 200
-}
-
-export type getRadioSessionGetResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getRadioSessionGetResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getRadioSessionGetResponseSuccess = (getRadioSessionGetResponse200) & {
-  headers: Headers;
-};
-export type getRadioSessionGetResponseError = (getRadioSessionGetResponse401 | getRadioSessionGetResponse404) & {
-  headers: Headers;
-};
-
-export type getRadioSessionGetResponse = (getRadioSessionGetResponseSuccess | getRadioSessionGetResponseError)
-
 export const getGetRadioSessionGetUrl = () => {
 
 
@@ -24173,9 +20443,9 @@ export const getGetRadioSessionGetUrl = () => {
 /**
  * @summary Get current radio session
  */
-export const getRadioSessionGet = async ( options?: RequestInit): Promise<getRadioSessionGetResponse> => {
+export const getRadioSessionGet = async ( options?: RequestInit): Promise<GetRadioSessionGet200> => {
 
-  return customInstance<getRadioSessionGetResponse>(getGetRadioSessionGetUrl(),
+  return customInstance<GetRadioSessionGet200>(getGetRadioSessionGetUrl(),
   {
     ...options,
     method: 'GET'
@@ -24263,30 +20533,6 @@ export function useGetRadioSessionGet<TData = Awaited<ReturnType<typeof getRadio
 
 
 
-export type postRadioSessionStartResponse200 = {
-  data: PostRadioSessionStart200
-  status: 200
-}
-
-export type postRadioSessionStartResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postRadioSessionStartResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postRadioSessionStartResponseSuccess = (postRadioSessionStartResponse200) & {
-  headers: Headers;
-};
-export type postRadioSessionStartResponseError = (postRadioSessionStartResponse401 | postRadioSessionStartResponse422) & {
-  headers: Headers;
-};
-
-export type postRadioSessionStartResponse = (postRadioSessionStartResponseSuccess | postRadioSessionStartResponseError)
-
 export const getPostRadioSessionStartUrl = () => {
 
 
@@ -24298,9 +20544,9 @@ export const getPostRadioSessionStartUrl = () => {
 /**
  * @summary Start playing a radio station
  */
-export const postRadioSessionStart = async (postRadioSessionStartBody: PostRadioSessionStartBody, options?: RequestInit): Promise<postRadioSessionStartResponse> => {
+export const postRadioSessionStart = async (postRadioSessionStartBody: PostRadioSessionStartBody, options?: RequestInit): Promise<PostRadioSessionStart200> => {
 
-  return customInstance<postRadioSessionStartResponse>(getPostRadioSessionStartUrl(),
+  return customInstance<PostRadioSessionStart200>(getPostRadioSessionStartUrl(),
   {
     ...options,
     method: 'POST',
@@ -24357,25 +20603,6 @@ export const usePostRadioSessionStart = <TError = ErrorType<ApiError | Validatio
       return useMutation(getPostRadioSessionStartMutationOptions(options), queryClient);
     }
 
-export type postRadioSessionStopResponse200 = {
-  data: PostRadioSessionStop200
-  status: 200
-}
-
-export type postRadioSessionStopResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postRadioSessionStopResponseSuccess = (postRadioSessionStopResponse200) & {
-  headers: Headers;
-};
-export type postRadioSessionStopResponseError = (postRadioSessionStopResponse401) & {
-  headers: Headers;
-};
-
-export type postRadioSessionStopResponse = (postRadioSessionStopResponseSuccess | postRadioSessionStopResponseError)
-
 export const getPostRadioSessionStopUrl = () => {
 
 
@@ -24387,9 +20614,9 @@ export const getPostRadioSessionStopUrl = () => {
 /**
  * @summary Stop radio playback
  */
-export const postRadioSessionStop = async ( options?: RequestInit): Promise<postRadioSessionStopResponse> => {
+export const postRadioSessionStop = async ( options?: RequestInit): Promise<PostRadioSessionStop200> => {
 
-  return customInstance<postRadioSessionStopResponse>(getPostRadioSessionStopUrl(),
+  return customInstance<PostRadioSessionStop200>(getPostRadioSessionStopUrl(),
   {
     ...options,
     method: 'POST'
@@ -24446,25 +20673,6 @@ export const usePostRadioSessionStop = <TError = ErrorType<ApiError>,
       return useMutation(getPostRadioSessionStopMutationOptions(options), queryClient);
     }
 
-export type getRadioSourceListResponse200 = {
-  data: GetRadioSourceList200
-  status: 200
-}
-
-export type getRadioSourceListResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getRadioSourceListResponseSuccess = (getRadioSourceListResponse200) & {
-  headers: Headers;
-};
-export type getRadioSourceListResponseError = (getRadioSourceListResponse401) & {
-  headers: Headers;
-};
-
-export type getRadioSourceListResponse = (getRadioSourceListResponseSuccess | getRadioSourceListResponseError)
-
 export const getGetRadioSourceListUrl = () => {
 
 
@@ -24476,9 +20684,9 @@ export const getGetRadioSourceListUrl = () => {
 /**
  * @summary List all radio sources
  */
-export const getRadioSourceList = async ( options?: RequestInit): Promise<getRadioSourceListResponse> => {
+export const getRadioSourceList = async ( options?: RequestInit): Promise<GetRadioSourceList200> => {
 
-  return customInstance<getRadioSourceListResponse>(getGetRadioSourceListUrl(),
+  return customInstance<GetRadioSourceList200>(getGetRadioSourceListUrl(),
   {
     ...options,
     method: 'GET'
@@ -24566,30 +20774,6 @@ export function useGetRadioSourceList<TData = Awaited<ReturnType<typeof getRadio
 
 
 
-export type postRadioSourceCreateResponse201 = {
-  data: PostRadioSourceCreate201
-  status: 201
-}
-
-export type postRadioSourceCreateResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postRadioSourceCreateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postRadioSourceCreateResponseSuccess = (postRadioSourceCreateResponse201) & {
-  headers: Headers;
-};
-export type postRadioSourceCreateResponseError = (postRadioSourceCreateResponse401 | postRadioSourceCreateResponse422) & {
-  headers: Headers;
-};
-
-export type postRadioSourceCreateResponse = (postRadioSourceCreateResponseSuccess | postRadioSourceCreateResponseError)
-
 export const getPostRadioSourceCreateUrl = () => {
 
 
@@ -24601,9 +20785,9 @@ export const getPostRadioSourceCreateUrl = () => {
 /**
  * @summary Create a radio source (admin)
  */
-export const postRadioSourceCreate = async (postRadioSourceCreateBody: PostRadioSourceCreateBody, options?: RequestInit): Promise<postRadioSourceCreateResponse> => {
+export const postRadioSourceCreate = async (postRadioSourceCreateBody: PostRadioSourceCreateBody, options?: RequestInit): Promise<PostRadioSourceCreate201> => {
 
-  return customInstance<postRadioSourceCreateResponse>(getPostRadioSourceCreateUrl(),
+  return customInstance<PostRadioSourceCreate201>(getPostRadioSourceCreateUrl(),
   {
     ...options,
     method: 'POST',
@@ -24660,25 +20844,6 @@ export const usePostRadioSourceCreate = <TError = ErrorType<ApiError | Validatio
       return useMutation(getPostRadioSourceCreateMutationOptions(options), queryClient);
     }
 
-export type getRadioCountriesResponse200 = {
-  data: GetRadioCountries200
-  status: 200
-}
-
-export type getRadioCountriesResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getRadioCountriesResponseSuccess = (getRadioCountriesResponse200) & {
-  headers: Headers;
-};
-export type getRadioCountriesResponseError = (getRadioCountriesResponse401) & {
-  headers: Headers;
-};
-
-export type getRadioCountriesResponse = (getRadioCountriesResponseSuccess | getRadioCountriesResponseError)
-
 export const getGetRadioCountriesUrl = () => {
 
 
@@ -24690,9 +20855,9 @@ export const getGetRadioCountriesUrl = () => {
 /**
  * @summary List available countries from IPRD
  */
-export const getRadioCountries = async ( options?: RequestInit): Promise<getRadioCountriesResponse> => {
+export const getRadioCountries = async ( options?: RequestInit): Promise<GetRadioCountries200> => {
 
-  return customInstance<getRadioCountriesResponse>(getGetRadioCountriesUrl(),
+  return customInstance<GetRadioCountries200>(getGetRadioCountriesUrl(),
   {
     ...options,
     method: 'GET'
@@ -24780,25 +20945,6 @@ export function useGetRadioCountries<TData = Awaited<ReturnType<typeof getRadioC
 
 
 
-export type getRadioStationsResponse200 = {
-  data: GetRadioStations200
-  status: 200
-}
-
-export type getRadioStationsResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getRadioStationsResponseSuccess = (getRadioStationsResponse200) & {
-  headers: Headers;
-};
-export type getRadioStationsResponseError = (getRadioStationsResponse401) & {
-  headers: Headers;
-};
-
-export type getRadioStationsResponse = (getRadioStationsResponseSuccess | getRadioStationsResponseError)
-
 export const getGetRadioStationsUrl = (params?: GetRadioStationsParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -24817,9 +20963,9 @@ export const getGetRadioStationsUrl = (params?: GetRadioStationsParams,) => {
 /**
  * @summary Browse/search stations
  */
-export const getRadioStations = async (params?: GetRadioStationsParams, options?: RequestInit): Promise<getRadioStationsResponse> => {
+export const getRadioStations = async (params?: GetRadioStationsParams, options?: RequestInit): Promise<GetRadioStations200> => {
 
-  return customInstance<getRadioStationsResponse>(getGetRadioStationsUrl(params),
+  return customInstance<GetRadioStations200>(getGetRadioStationsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -24907,25 +21053,6 @@ export function useGetRadioStations<TData = Awaited<ReturnType<typeof getRadioSt
 
 
 
-export type getRadioStarredListResponse200 = {
-  data: GetRadioStarredList200
-  status: 200
-}
-
-export type getRadioStarredListResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getRadioStarredListResponseSuccess = (getRadioStarredListResponse200) & {
-  headers: Headers;
-};
-export type getRadioStarredListResponseError = (getRadioStarredListResponse401) & {
-  headers: Headers;
-};
-
-export type getRadioStarredListResponse = (getRadioStarredListResponseSuccess | getRadioStarredListResponseError)
-
 export const getGetRadioStarredListUrl = () => {
 
 
@@ -24937,9 +21064,9 @@ export const getGetRadioStarredListUrl = () => {
 /**
  * @summary List starred stations
  */
-export const getRadioStarredList = async ( options?: RequestInit): Promise<getRadioStarredListResponse> => {
+export const getRadioStarredList = async ( options?: RequestInit): Promise<GetRadioStarredList200> => {
 
-  return customInstance<getRadioStarredListResponse>(getGetRadioStarredListUrl(),
+  return customInstance<GetRadioStarredList200>(getGetRadioStarredListUrl(),
   {
     ...options,
     method: 'GET'
@@ -25027,30 +21154,6 @@ export function useGetRadioStarredList<TData = Awaited<ReturnType<typeof getRadi
 
 
 
-export type postRadioStarredStarResponse201 = {
-  data: PostRadioStarredStar201
-  status: 201
-}
-
-export type postRadioStarredStarResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postRadioStarredStarResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postRadioStarredStarResponseSuccess = (postRadioStarredStarResponse201) & {
-  headers: Headers;
-};
-export type postRadioStarredStarResponseError = (postRadioStarredStarResponse401 | postRadioStarredStarResponse422) & {
-  headers: Headers;
-};
-
-export type postRadioStarredStarResponse = (postRadioStarredStarResponseSuccess | postRadioStarredStarResponseError)
-
 export const getPostRadioStarredStarUrl = () => {
 
 
@@ -25062,9 +21165,9 @@ export const getPostRadioStarredStarUrl = () => {
 /**
  * @summary Star a station
  */
-export const postRadioStarredStar = async (postRadioStarredStarBody: PostRadioStarredStarBody, options?: RequestInit): Promise<postRadioStarredStarResponse> => {
+export const postRadioStarredStar = async (postRadioStarredStarBody: PostRadioStarredStarBody, options?: RequestInit): Promise<PostRadioStarredStar201> => {
 
-  return customInstance<postRadioStarredStarResponse>(getPostRadioStarredStarUrl(),
+  return customInstance<PostRadioStarredStar201>(getPostRadioStarredStarUrl(),
   {
     ...options,
     method: 'POST',
@@ -25121,25 +21224,6 @@ export const usePostRadioStarredStar = <TError = ErrorType<ApiError | Validation
       return useMutation(getPostRadioStarredStarMutationOptions(options), queryClient);
     }
 
-export type deleteRadioStarredUnstarResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteRadioStarredUnstarResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type deleteRadioStarredUnstarResponseSuccess = (deleteRadioStarredUnstarResponse204) & {
-  headers: Headers;
-};
-export type deleteRadioStarredUnstarResponseError = (deleteRadioStarredUnstarResponse401) & {
-  headers: Headers;
-};
-
-export type deleteRadioStarredUnstarResponse = (deleteRadioStarredUnstarResponseSuccess | deleteRadioStarredUnstarResponseError)
-
 export const getDeleteRadioStarredUnstarUrl = (stationId: string,) => {
 
 
@@ -25151,9 +21235,9 @@ export const getDeleteRadioStarredUnstarUrl = (stationId: string,) => {
 /**
  * @summary Unstar a station
  */
-export const deleteRadioStarredUnstar = async (stationId: string, options?: RequestInit): Promise<deleteRadioStarredUnstarResponse> => {
+export const deleteRadioStarredUnstar = async (stationId: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteRadioStarredUnstarResponse>(getDeleteRadioStarredUnstarUrl(stationId),
+  return customInstance<void>(getDeleteRadioStarredUnstarUrl(stationId),
   {
     ...options,
     method: 'DELETE'
@@ -25210,25 +21294,6 @@ export const useDeleteRadioStarredUnstar = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteRadioStarredUnstarMutationOptions(options), queryClient);
     }
 
-export type getAdminRecommendationsCoverageResponse200 = {
-  data: GetAdminRecommendationsCoverage200
-  status: 200
-}
-
-export type getAdminRecommendationsCoverageResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type getAdminRecommendationsCoverageResponseSuccess = (getAdminRecommendationsCoverageResponse200) & {
-  headers: Headers;
-};
-export type getAdminRecommendationsCoverageResponseError = (getAdminRecommendationsCoverageResponse403) & {
-  headers: Headers;
-};
-
-export type getAdminRecommendationsCoverageResponse = (getAdminRecommendationsCoverageResponseSuccess | getAdminRecommendationsCoverageResponseError)
-
 export const getGetAdminRecommendationsCoverageUrl = () => {
 
 
@@ -25240,9 +21305,9 @@ export const getGetAdminRecommendationsCoverageUrl = () => {
 /**
  * @summary Get recommendation coverage statistics
  */
-export const getAdminRecommendationsCoverage = async ( options?: RequestInit): Promise<getAdminRecommendationsCoverageResponse> => {
+export const getAdminRecommendationsCoverage = async ( options?: RequestInit): Promise<GetAdminRecommendationsCoverage200> => {
 
-  return customInstance<getAdminRecommendationsCoverageResponse>(getGetAdminRecommendationsCoverageUrl(),
+  return customInstance<GetAdminRecommendationsCoverage200>(getGetAdminRecommendationsCoverageUrl(),
   {
     ...options,
     method: 'GET'
@@ -25330,25 +21395,6 @@ export function useGetAdminRecommendationsCoverage<TData = Awaited<ReturnType<ty
 
 
 
-export type getAdminRecommendationsSourceQualityResponse200 = {
-  data: GetAdminRecommendationsSourceQuality200
-  status: 200
-}
-
-export type getAdminRecommendationsSourceQualityResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type getAdminRecommendationsSourceQualityResponseSuccess = (getAdminRecommendationsSourceQualityResponse200) & {
-  headers: Headers;
-};
-export type getAdminRecommendationsSourceQualityResponseError = (getAdminRecommendationsSourceQualityResponse403) & {
-  headers: Headers;
-};
-
-export type getAdminRecommendationsSourceQualityResponse = (getAdminRecommendationsSourceQualityResponseSuccess | getAdminRecommendationsSourceQualityResponseError)
-
 export const getGetAdminRecommendationsSourceQualityUrl = () => {
 
 
@@ -25360,9 +21406,9 @@ export const getGetAdminRecommendationsSourceQualityUrl = () => {
 /**
  * @summary Get recommendation source quality breakdown
  */
-export const getAdminRecommendationsSourceQuality = async ( options?: RequestInit): Promise<getAdminRecommendationsSourceQualityResponse> => {
+export const getAdminRecommendationsSourceQuality = async ( options?: RequestInit): Promise<GetAdminRecommendationsSourceQuality200> => {
 
-  return customInstance<getAdminRecommendationsSourceQualityResponse>(getGetAdminRecommendationsSourceQualityUrl(),
+  return customInstance<GetAdminRecommendationsSourceQuality200>(getGetAdminRecommendationsSourceQualityUrl(),
   {
     ...options,
     method: 'GET'
@@ -25450,25 +21496,6 @@ export function useGetAdminRecommendationsSourceQuality<TData = Awaited<ReturnTy
 
 
 
-export type getAdminRecommendationsFreshnessResponse200 = {
-  data: GetAdminRecommendationsFreshness200
-  status: 200
-}
-
-export type getAdminRecommendationsFreshnessResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type getAdminRecommendationsFreshnessResponseSuccess = (getAdminRecommendationsFreshnessResponse200) & {
-  headers: Headers;
-};
-export type getAdminRecommendationsFreshnessResponseError = (getAdminRecommendationsFreshnessResponse403) & {
-  headers: Headers;
-};
-
-export type getAdminRecommendationsFreshnessResponse = (getAdminRecommendationsFreshnessResponseSuccess | getAdminRecommendationsFreshnessResponseError)
-
 export const getGetAdminRecommendationsFreshnessUrl = () => {
 
 
@@ -25480,9 +21507,9 @@ export const getGetAdminRecommendationsFreshnessUrl = () => {
 /**
  * @summary Get recommendation freshness metrics
  */
-export const getAdminRecommendationsFreshness = async ( options?: RequestInit): Promise<getAdminRecommendationsFreshnessResponse> => {
+export const getAdminRecommendationsFreshness = async ( options?: RequestInit): Promise<GetAdminRecommendationsFreshness200> => {
 
-  return customInstance<getAdminRecommendationsFreshnessResponse>(getGetAdminRecommendationsFreshnessUrl(),
+  return customInstance<GetAdminRecommendationsFreshness200>(getGetAdminRecommendationsFreshnessUrl(),
   {
     ...options,
     method: 'GET'
@@ -25570,35 +21597,6 @@ export function useGetAdminRecommendationsFreshness<TData = Awaited<ReturnType<t
 
 
 
-export type postAdminRecommendationsGenerateResponse200 = {
-  data: PostAdminRecommendationsGenerate200
-  status: 200
-}
-
-export type postAdminRecommendationsGenerateResponse202 = {
-  data: PostAdminRecommendationsGenerate202
-  status: 202
-}
-
-export type postAdminRecommendationsGenerateResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type postAdminRecommendationsGenerateResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type postAdminRecommendationsGenerateResponseSuccess = (postAdminRecommendationsGenerateResponse200 | postAdminRecommendationsGenerateResponse202) & {
-  headers: Headers;
-};
-export type postAdminRecommendationsGenerateResponseError = (postAdminRecommendationsGenerateResponse400 | postAdminRecommendationsGenerateResponse403) & {
-  headers: Headers;
-};
-
-export type postAdminRecommendationsGenerateResponse = (postAdminRecommendationsGenerateResponseSuccess | postAdminRecommendationsGenerateResponseError)
-
 export const getPostAdminRecommendationsGenerateUrl = () => {
 
 
@@ -25611,9 +21609,9 @@ export const getPostAdminRecommendationsGenerateUrl = () => {
  * Starts a new recommendation generation job. Returns immediately with job ID for async execution, or results for synchronous execution.
  * @summary Trigger recommendation generation
  */
-export const postAdminRecommendationsGenerate = async ( options?: RequestInit): Promise<postAdminRecommendationsGenerateResponse> => {
+export const postAdminRecommendationsGenerate = async ( options?: RequestInit): Promise<PostAdminRecommendationsGenerate200 | PostAdminRecommendationsGenerate202> => {
 
-  return customInstance<postAdminRecommendationsGenerateResponse>(getPostAdminRecommendationsGenerateUrl(),
+  return customInstance<PostAdminRecommendationsGenerate200 | PostAdminRecommendationsGenerate202>(getPostAdminRecommendationsGenerateUrl(),
   {
     ...options,
     method: 'POST'
@@ -25670,30 +21668,6 @@ export const usePostAdminRecommendationsGenerate = <TError = ErrorType<ApiError>
       return useMutation(getPostAdminRecommendationsGenerateMutationOptions(options), queryClient);
     }
 
-export type getAdminRecommendationsJobStatusResponse200 = {
-  data: GetAdminRecommendationsJobStatus200
-  status: 200
-}
-
-export type getAdminRecommendationsJobStatusResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type getAdminRecommendationsJobStatusResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getAdminRecommendationsJobStatusResponseSuccess = (getAdminRecommendationsJobStatusResponse200) & {
-  headers: Headers;
-};
-export type getAdminRecommendationsJobStatusResponseError = (getAdminRecommendationsJobStatusResponse403 | getAdminRecommendationsJobStatusResponse404) & {
-  headers: Headers;
-};
-
-export type getAdminRecommendationsJobStatusResponse = (getAdminRecommendationsJobStatusResponseSuccess | getAdminRecommendationsJobStatusResponseError)
-
 export const getGetAdminRecommendationsJobStatusUrl = (publicId: string,) => {
 
 
@@ -25705,9 +21679,9 @@ export const getGetAdminRecommendationsJobStatusUrl = (publicId: string,) => {
 /**
  * @summary Get recommendation job status
  */
-export const getAdminRecommendationsJobStatus = async (publicId: string, options?: RequestInit): Promise<getAdminRecommendationsJobStatusResponse> => {
+export const getAdminRecommendationsJobStatus = async (publicId: string, options?: RequestInit): Promise<GetAdminRecommendationsJobStatus200> => {
 
-  return customInstance<getAdminRecommendationsJobStatusResponse>(getGetAdminRecommendationsJobStatusUrl(publicId),
+  return customInstance<GetAdminRecommendationsJobStatus200>(getGetAdminRecommendationsJobStatusUrl(publicId),
   {
     ...options,
     method: 'GET'
@@ -25795,30 +21769,6 @@ export function useGetAdminRecommendationsJobStatus<TData = Awaited<ReturnType<t
 
 
 
-export type deleteAdminRecommendationsJobCancelResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteAdminRecommendationsJobCancelResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type deleteAdminRecommendationsJobCancelResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteAdminRecommendationsJobCancelResponseSuccess = (deleteAdminRecommendationsJobCancelResponse204) & {
-  headers: Headers;
-};
-export type deleteAdminRecommendationsJobCancelResponseError = (deleteAdminRecommendationsJobCancelResponse403 | deleteAdminRecommendationsJobCancelResponse404) & {
-  headers: Headers;
-};
-
-export type deleteAdminRecommendationsJobCancelResponse = (deleteAdminRecommendationsJobCancelResponseSuccess | deleteAdminRecommendationsJobCancelResponseError)
-
 export const getDeleteAdminRecommendationsJobCancelUrl = (publicId: string,) => {
 
 
@@ -25830,9 +21780,9 @@ export const getDeleteAdminRecommendationsJobCancelUrl = (publicId: string,) => 
 /**
  * @summary Cancel a recommendation job
  */
-export const deleteAdminRecommendationsJobCancel = async (publicId: string, options?: RequestInit): Promise<deleteAdminRecommendationsJobCancelResponse> => {
+export const deleteAdminRecommendationsJobCancel = async (publicId: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteAdminRecommendationsJobCancelResponse>(getDeleteAdminRecommendationsJobCancelUrl(publicId),
+  return customInstance<void>(getDeleteAdminRecommendationsJobCancelUrl(publicId),
   {
     ...options,
     method: 'DELETE'
@@ -25889,35 +21839,6 @@ export const useDeleteAdminRecommendationsJobCancel = <TError = ErrorType<ApiErr
       return useMutation(getDeleteAdminRecommendationsJobCancelMutationOptions(options), queryClient);
     }
 
-export type postAdminRecommendationsJobRequeueResponse201 = {
-  data: PostAdminRecommendationsJobRequeue201
-  status: 201
-}
-
-export type postAdminRecommendationsJobRequeueResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type postAdminRecommendationsJobRequeueResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type postAdminRecommendationsJobRequeueResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postAdminRecommendationsJobRequeueResponseSuccess = (postAdminRecommendationsJobRequeueResponse201) & {
-  headers: Headers;
-};
-export type postAdminRecommendationsJobRequeueResponseError = (postAdminRecommendationsJobRequeueResponse400 | postAdminRecommendationsJobRequeueResponse403 | postAdminRecommendationsJobRequeueResponse404) & {
-  headers: Headers;
-};
-
-export type postAdminRecommendationsJobRequeueResponse = (postAdminRecommendationsJobRequeueResponseSuccess | postAdminRecommendationsJobRequeueResponseError)
-
 export const getPostAdminRecommendationsJobRequeueUrl = (publicId: string,) => {
 
 
@@ -25930,9 +21851,9 @@ export const getPostAdminRecommendationsJobRequeueUrl = (publicId: string,) => {
  * Creates a new job with the same parameters as the original
  * @summary Requeue a failed or cancelled recommendation job
  */
-export const postAdminRecommendationsJobRequeue = async (publicId: string, options?: RequestInit): Promise<postAdminRecommendationsJobRequeueResponse> => {
+export const postAdminRecommendationsJobRequeue = async (publicId: string, options?: RequestInit): Promise<PostAdminRecommendationsJobRequeue201> => {
 
-  return customInstance<postAdminRecommendationsJobRequeueResponse>(getPostAdminRecommendationsJobRequeueUrl(publicId),
+  return customInstance<PostAdminRecommendationsJobRequeue201>(getPostAdminRecommendationsJobRequeueUrl(publicId),
   {
     ...options,
     method: 'POST'
@@ -25989,25 +21910,6 @@ export const usePostAdminRecommendationsJobRequeue = <TError = ErrorType<ApiErro
       return useMutation(getPostAdminRecommendationsJobRequeueMutationOptions(options), queryClient);
     }
 
-export type getAdminRecommendationsJobsListResponse200 = {
-  data: GetAdminRecommendationsJobsList200
-  status: 200
-}
-
-export type getAdminRecommendationsJobsListResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type getAdminRecommendationsJobsListResponseSuccess = (getAdminRecommendationsJobsListResponse200) & {
-  headers: Headers;
-};
-export type getAdminRecommendationsJobsListResponseError = (getAdminRecommendationsJobsListResponse403) & {
-  headers: Headers;
-};
-
-export type getAdminRecommendationsJobsListResponse = (getAdminRecommendationsJobsListResponseSuccess | getAdminRecommendationsJobsListResponseError)
-
 export const getGetAdminRecommendationsJobsListUrl = (params?: GetAdminRecommendationsJobsListParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -26026,9 +21928,9 @@ export const getGetAdminRecommendationsJobsListUrl = (params?: GetAdminRecommend
 /**
  * @summary List recent recommendation jobs
  */
-export const getAdminRecommendationsJobsList = async (params?: GetAdminRecommendationsJobsListParams, options?: RequestInit): Promise<getAdminRecommendationsJobsListResponse> => {
+export const getAdminRecommendationsJobsList = async (params?: GetAdminRecommendationsJobsListParams, options?: RequestInit): Promise<GetAdminRecommendationsJobsList200> => {
 
-  return customInstance<getAdminRecommendationsJobsListResponse>(getGetAdminRecommendationsJobsListUrl(params),
+  return customInstance<GetAdminRecommendationsJobsList200>(getGetAdminRecommendationsJobsListUrl(params),
   {
     ...options,
     method: 'GET'
@@ -26116,25 +22018,6 @@ export function useGetAdminRecommendationsJobsList<TData = Awaited<ReturnType<ty
 
 
 
-export type getRecommendationIndexResponse200 = {
-  data: GetRecommendationIndex200
-  status: 200
-}
-
-export type getRecommendationIndexResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getRecommendationIndexResponseSuccess = (getRecommendationIndexResponse200) & {
-  headers: Headers;
-};
-export type getRecommendationIndexResponseError = (getRecommendationIndexResponse401) & {
-  headers: Headers;
-};
-
-export type getRecommendationIndexResponse = (getRecommendationIndexResponseSuccess | getRecommendationIndexResponseError)
-
 export const getGetRecommendationIndexUrl = (params?: GetRecommendationIndexParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -26153,9 +22036,9 @@ export const getGetRecommendationIndexUrl = (params?: GetRecommendationIndexPara
 /**
  * @summary Get personalized recommendations for the authenticated user
  */
-export const getRecommendationIndex = async (params?: GetRecommendationIndexParams, options?: RequestInit): Promise<getRecommendationIndexResponse> => {
+export const getRecommendationIndex = async (params?: GetRecommendationIndexParams, options?: RequestInit): Promise<GetRecommendationIndex200> => {
 
-  return customInstance<getRecommendationIndexResponse>(getGetRecommendationIndexUrl(params),
+  return customInstance<GetRecommendationIndex200>(getGetRecommendationIndexUrl(params),
   {
     ...options,
     method: 'GET'
@@ -26243,30 +22126,6 @@ export function useGetRecommendationIndex<TData = Awaited<ReturnType<typeof getR
 
 
 
-export type postRecommendationStoreResponse201 = {
-  data: PostRecommendationStore201
-  status: 201
-}
-
-export type postRecommendationStoreResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postRecommendationStoreResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postRecommendationStoreResponseSuccess = (postRecommendationStoreResponse201) & {
-  headers: Headers;
-};
-export type postRecommendationStoreResponseError = (postRecommendationStoreResponse401 | postRecommendationStoreResponse422) & {
-  headers: Headers;
-};
-
-export type postRecommendationStoreResponse = (postRecommendationStoreResponseSuccess | postRecommendationStoreResponseError)
-
 export const getPostRecommendationStoreUrl = () => {
 
 
@@ -26278,9 +22137,9 @@ export const getPostRecommendationStoreUrl = () => {
 /**
  * @summary Create a recommendation
  */
-export const postRecommendationStore = async (postRecommendationStoreBody?: PostRecommendationStoreBody, options?: RequestInit): Promise<postRecommendationStoreResponse> => {
+export const postRecommendationStore = async (postRecommendationStoreBody?: PostRecommendationStoreBody, options?: RequestInit): Promise<PostRecommendationStore201> => {
 
-  return customInstance<postRecommendationStoreResponse>(getPostRecommendationStoreUrl(),
+  return customInstance<PostRecommendationStore201>(getPostRecommendationStoreUrl(),
   {
     ...options,
     method: 'POST',
@@ -26337,25 +22196,6 @@ export const usePostRecommendationStore = <TError = ErrorType<ApiError | Validat
       return useMutation(getPostRecommendationStoreMutationOptions(options), queryClient);
     }
 
-export type getRecommendationForYouResponse200 = {
-  data: GetRecommendationForYou200
-  status: 200
-}
-
-export type getRecommendationForYouResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getRecommendationForYouResponseSuccess = (getRecommendationForYouResponse200) & {
-  headers: Headers;
-};
-export type getRecommendationForYouResponseError = (getRecommendationForYouResponse401) & {
-  headers: Headers;
-};
-
-export type getRecommendationForYouResponse = (getRecommendationForYouResponseSuccess | getRecommendationForYouResponseError)
-
 export const getGetRecommendationForYouUrl = (params?: GetRecommendationForYouParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -26375,9 +22215,9 @@ export const getGetRecommendationForYouUrl = (params?: GetRecommendationForYouPa
  * Returns aggregated recommendations with one-line explanations and per-strategy scores
  * @summary Get personalized recommendations with explanation breakdown
  */
-export const getRecommendationForYou = async (params?: GetRecommendationForYouParams, options?: RequestInit): Promise<getRecommendationForYouResponse> => {
+export const getRecommendationForYou = async (params?: GetRecommendationForYouParams, options?: RequestInit): Promise<GetRecommendationForYou200> => {
 
-  return customInstance<getRecommendationForYouResponse>(getGetRecommendationForYouUrl(params),
+  return customInstance<GetRecommendationForYou200>(getGetRecommendationForYouUrl(params),
   {
     ...options,
     method: 'GET'
@@ -26465,18 +22305,6 @@ export function useGetRecommendationForYou<TData = Awaited<ReturnType<typeof get
 
 
 
-export type getRecommendationBySourceResponse200 = {
-  data: GetRecommendationBySource200
-  status: 200
-}
-
-export type getRecommendationBySourceResponseSuccess = (getRecommendationBySourceResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getRecommendationBySourceResponse = (getRecommendationBySourceResponseSuccess)
-
 export const getGetRecommendationBySourceUrl = (sourceType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     sourceId: string,
     params?: GetRecommendationBySourceParams,) => {
@@ -26499,9 +22327,9 @@ export const getGetRecommendationBySourceUrl = (sourceType: 'song' | 'album' | '
  */
 export const getRecommendationBySource = async (sourceType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     sourceId: string,
-    params?: GetRecommendationBySourceParams, options?: RequestInit): Promise<getRecommendationBySourceResponse> => {
+    params?: GetRecommendationBySourceParams, options?: RequestInit): Promise<GetRecommendationBySource200> => {
 
-  return customInstance<getRecommendationBySourceResponse>(getGetRecommendationBySourceUrl(sourceType,sourceId,params),
+  return customInstance<GetRecommendationBySource200>(getGetRecommendationBySourceUrl(sourceType,sourceId,params),
   {
     ...options,
     method: 'GET'
@@ -26601,25 +22429,6 @@ export function useGetRecommendationBySource<TData = Awaited<ReturnType<typeof g
 
 
 
-export type deleteRecommendationDestroyBySourceResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteRecommendationDestroyBySourceResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type deleteRecommendationDestroyBySourceResponseSuccess = (deleteRecommendationDestroyBySourceResponse204) & {
-  headers: Headers;
-};
-export type deleteRecommendationDestroyBySourceResponseError = (deleteRecommendationDestroyBySourceResponse401) & {
-  headers: Headers;
-};
-
-export type deleteRecommendationDestroyBySourceResponse = (deleteRecommendationDestroyBySourceResponseSuccess | deleteRecommendationDestroyBySourceResponseError)
-
 export const getDeleteRecommendationDestroyBySourceUrl = (sourceType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     sourceId: string,) => {
 
@@ -26633,9 +22442,9 @@ export const getDeleteRecommendationDestroyBySourceUrl = (sourceType: 'song' | '
  * @summary Delete all recommendations for a source entity
  */
 export const deleteRecommendationDestroyBySource = async (sourceType: 'song' | 'album' | 'artist' | 'movie' | 'video',
-    sourceId: string, options?: RequestInit): Promise<deleteRecommendationDestroyBySourceResponse> => {
+    sourceId: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteRecommendationDestroyBySourceResponse>(getDeleteRecommendationDestroyBySourceUrl(sourceType,sourceId),
+  return customInstance<void>(getDeleteRecommendationDestroyBySourceUrl(sourceType,sourceId),
   {
     ...options,
     method: 'DELETE'
@@ -26692,18 +22501,6 @@ export const useDeleteRecommendationDestroyBySource = <TError = ErrorType<ApiErr
       return useMutation(getDeleteRecommendationDestroyBySourceMutationOptions(options), queryClient);
     }
 
-export type getRecommendationTargetingResponse200 = {
-  data: GetRecommendationTargeting200
-  status: 200
-}
-
-export type getRecommendationTargetingResponseSuccess = (getRecommendationTargetingResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getRecommendationTargetingResponse = (getRecommendationTargetingResponseSuccess)
-
 export const getGetRecommendationTargetingUrl = (targetType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     targetId: string,
     params?: GetRecommendationTargetingParams,) => {
@@ -26726,9 +22523,9 @@ export const getGetRecommendationTargetingUrl = (targetType: 'song' | 'album' | 
  */
 export const getRecommendationTargeting = async (targetType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     targetId: string,
-    params?: GetRecommendationTargetingParams, options?: RequestInit): Promise<getRecommendationTargetingResponse> => {
+    params?: GetRecommendationTargetingParams, options?: RequestInit): Promise<GetRecommendationTargeting200> => {
 
-  return customInstance<getRecommendationTargetingResponse>(getGetRecommendationTargetingUrl(targetType,targetId,params),
+  return customInstance<GetRecommendationTargeting200>(getGetRecommendationTargetingUrl(targetType,targetId,params),
   {
     ...options,
     method: 'GET'
@@ -26828,30 +22625,6 @@ export function useGetRecommendationTargeting<TData = Awaited<ReturnType<typeof 
 
 
 
-export type deleteRecommendationDestroyResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteRecommendationDestroyResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type deleteRecommendationDestroyResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteRecommendationDestroyResponseSuccess = (deleteRecommendationDestroyResponse204) & {
-  headers: Headers;
-};
-export type deleteRecommendationDestroyResponseError = (deleteRecommendationDestroyResponse401 | deleteRecommendationDestroyResponse404) & {
-  headers: Headers;
-};
-
-export type deleteRecommendationDestroyResponse = (deleteRecommendationDestroyResponseSuccess | deleteRecommendationDestroyResponseError)
-
 export const getDeleteRecommendationDestroyUrl = (uuid: string,) => {
 
 
@@ -26863,9 +22636,9 @@ export const getDeleteRecommendationDestroyUrl = (uuid: string,) => {
 /**
  * @summary Delete a recommendation
  */
-export const deleteRecommendationDestroy = async (uuid: string, options?: RequestInit): Promise<deleteRecommendationDestroyResponse> => {
+export const deleteRecommendationDestroy = async (uuid: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteRecommendationDestroyResponse>(getDeleteRecommendationDestroyUrl(uuid),
+  return customInstance<void>(getDeleteRecommendationDestroyUrl(uuid),
   {
     ...options,
     method: 'DELETE'
@@ -26922,18 +22695,6 @@ export const useDeleteRecommendationDestroy = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteRecommendationDestroyMutationOptions(options), queryClient);
     }
 
-export type getAdminSchedulerListResponse200 = {
-  data: GetAdminSchedulerList200
-  status: 200
-}
-
-export type getAdminSchedulerListResponseSuccess = (getAdminSchedulerListResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getAdminSchedulerListResponse = (getAdminSchedulerListResponseSuccess)
-
 export const getGetAdminSchedulerListUrl = () => {
 
 
@@ -26945,9 +22706,9 @@ export const getGetAdminSchedulerListUrl = () => {
 /**
  * @summary List all scheduled jobs
  */
-export const getAdminSchedulerList = async ( options?: RequestInit): Promise<getAdminSchedulerListResponse> => {
+export const getAdminSchedulerList = async ( options?: RequestInit): Promise<GetAdminSchedulerList200> => {
 
-  return customInstance<getAdminSchedulerListResponse>(getGetAdminSchedulerListUrl(),
+  return customInstance<GetAdminSchedulerList200>(getGetAdminSchedulerListUrl(),
   {
     ...options,
     method: 'GET'
@@ -27035,18 +22796,6 @@ export function useGetAdminSchedulerList<TData = Awaited<ReturnType<typeof getAd
 
 
 
-export type postAdminSchedulerCreateResponse201 = {
-  data: PostAdminSchedulerCreate201
-  status: 201
-}
-
-export type postAdminSchedulerCreateResponseSuccess = (postAdminSchedulerCreateResponse201) & {
-  headers: Headers;
-};
-;
-
-export type postAdminSchedulerCreateResponse = (postAdminSchedulerCreateResponseSuccess)
-
 export const getPostAdminSchedulerCreateUrl = () => {
 
 
@@ -27058,9 +22807,9 @@ export const getPostAdminSchedulerCreateUrl = () => {
 /**
  * @summary Create a scheduled job
  */
-export const postAdminSchedulerCreate = async (createScheduledJobRequest: CreateScheduledJobRequest, options?: RequestInit): Promise<postAdminSchedulerCreateResponse> => {
+export const postAdminSchedulerCreate = async (createScheduledJobRequest: CreateScheduledJobRequest, options?: RequestInit): Promise<PostAdminSchedulerCreate201> => {
 
-  return customInstance<postAdminSchedulerCreateResponse>(getPostAdminSchedulerCreateUrl(),
+  return customInstance<PostAdminSchedulerCreate201>(getPostAdminSchedulerCreateUrl(),
   {
     ...options,
     method: 'POST',
@@ -27117,25 +22866,6 @@ export const usePostAdminSchedulerCreate = <TError = ErrorType<unknown>,
       return useMutation(getPostAdminSchedulerCreateMutationOptions(options), queryClient);
     }
 
-export type getAdminSchedulerShowResponse200 = {
-  data: GetAdminSchedulerShow200
-  status: 200
-}
-
-export type getAdminSchedulerShowResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getAdminSchedulerShowResponseSuccess = (getAdminSchedulerShowResponse200) & {
-  headers: Headers;
-};
-export type getAdminSchedulerShowResponseError = (getAdminSchedulerShowResponse404) & {
-  headers: Headers;
-};
-
-export type getAdminSchedulerShowResponse = (getAdminSchedulerShowResponseSuccess | getAdminSchedulerShowResponseError)
-
 export const getGetAdminSchedulerShowUrl = (id: string,) => {
 
 
@@ -27147,9 +22877,9 @@ export const getGetAdminSchedulerShowUrl = (id: string,) => {
 /**
  * @summary Get a scheduled job
  */
-export const getAdminSchedulerShow = async (id: string, options?: RequestInit): Promise<getAdminSchedulerShowResponse> => {
+export const getAdminSchedulerShow = async (id: string, options?: RequestInit): Promise<GetAdminSchedulerShow200> => {
 
-  return customInstance<getAdminSchedulerShowResponse>(getGetAdminSchedulerShowUrl(id),
+  return customInstance<GetAdminSchedulerShow200>(getGetAdminSchedulerShowUrl(id),
   {
     ...options,
     method: 'GET'
@@ -27237,30 +22967,6 @@ export function useGetAdminSchedulerShow<TData = Awaited<ReturnType<typeof getAd
 
 
 
-export type putAdminSchedulerUpdateResponse200 = {
-  data: PutAdminSchedulerUpdate200
-  status: 200
-}
-
-export type putAdminSchedulerUpdateResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type putAdminSchedulerUpdateResponse409 = {
-  data: ApiError
-  status: 409
-}
-
-export type putAdminSchedulerUpdateResponseSuccess = (putAdminSchedulerUpdateResponse200) & {
-  headers: Headers;
-};
-export type putAdminSchedulerUpdateResponseError = (putAdminSchedulerUpdateResponse404 | putAdminSchedulerUpdateResponse409) & {
-  headers: Headers;
-};
-
-export type putAdminSchedulerUpdateResponse = (putAdminSchedulerUpdateResponseSuccess | putAdminSchedulerUpdateResponseError)
-
 export const getPutAdminSchedulerUpdateUrl = (id: string,) => {
 
 
@@ -27273,9 +22979,9 @@ export const getPutAdminSchedulerUpdateUrl = (id: string,) => {
  * @summary Update a scheduled job
  */
 export const putAdminSchedulerUpdate = async (id: string,
-    updateScheduledJobRequest: UpdateScheduledJobRequest, options?: RequestInit): Promise<putAdminSchedulerUpdateResponse> => {
+    updateScheduledJobRequest: UpdateScheduledJobRequest, options?: RequestInit): Promise<PutAdminSchedulerUpdate200> => {
 
-  return customInstance<putAdminSchedulerUpdateResponse>(getPutAdminSchedulerUpdateUrl(id),
+  return customInstance<PutAdminSchedulerUpdate200>(getPutAdminSchedulerUpdateUrl(id),
   {
     ...options,
     method: 'PUT',
@@ -27332,30 +23038,6 @@ export const usePutAdminSchedulerUpdate = <TError = ErrorType<ApiError>,
       return useMutation(getPutAdminSchedulerUpdateMutationOptions(options), queryClient);
     }
 
-export type deleteAdminSchedulerDeleteResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteAdminSchedulerDeleteResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteAdminSchedulerDeleteResponse409 = {
-  data: ApiError
-  status: 409
-}
-
-export type deleteAdminSchedulerDeleteResponseSuccess = (deleteAdminSchedulerDeleteResponse204) & {
-  headers: Headers;
-};
-export type deleteAdminSchedulerDeleteResponseError = (deleteAdminSchedulerDeleteResponse404 | deleteAdminSchedulerDeleteResponse409) & {
-  headers: Headers;
-};
-
-export type deleteAdminSchedulerDeleteResponse = (deleteAdminSchedulerDeleteResponseSuccess | deleteAdminSchedulerDeleteResponseError)
-
 export const getDeleteAdminSchedulerDeleteUrl = (id: string,) => {
 
 
@@ -27367,9 +23049,9 @@ export const getDeleteAdminSchedulerDeleteUrl = (id: string,) => {
 /**
  * @summary Delete a scheduled job
  */
-export const deleteAdminSchedulerDelete = async (id: string, options?: RequestInit): Promise<deleteAdminSchedulerDeleteResponse> => {
+export const deleteAdminSchedulerDelete = async (id: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteAdminSchedulerDeleteResponse>(getDeleteAdminSchedulerDeleteUrl(id),
+  return customInstance<void>(getDeleteAdminSchedulerDeleteUrl(id),
   {
     ...options,
     method: 'DELETE'
@@ -27426,30 +23108,6 @@ export const useDeleteAdminSchedulerDelete = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteAdminSchedulerDeleteMutationOptions(options), queryClient);
     }
 
-export type postAdminSchedulerPauseResponse200 = {
-  data: PostAdminSchedulerPause200
-  status: 200
-}
-
-export type postAdminSchedulerPauseResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postAdminSchedulerPauseResponse409 = {
-  data: ApiError
-  status: 409
-}
-
-export type postAdminSchedulerPauseResponseSuccess = (postAdminSchedulerPauseResponse200) & {
-  headers: Headers;
-};
-export type postAdminSchedulerPauseResponseError = (postAdminSchedulerPauseResponse404 | postAdminSchedulerPauseResponse409) & {
-  headers: Headers;
-};
-
-export type postAdminSchedulerPauseResponse = (postAdminSchedulerPauseResponseSuccess | postAdminSchedulerPauseResponseError)
-
 export const getPostAdminSchedulerPauseUrl = (id: string,) => {
 
 
@@ -27461,9 +23119,9 @@ export const getPostAdminSchedulerPauseUrl = (id: string,) => {
 /**
  * @summary Pause a scheduled job
  */
-export const postAdminSchedulerPause = async (id: string, options?: RequestInit): Promise<postAdminSchedulerPauseResponse> => {
+export const postAdminSchedulerPause = async (id: string, options?: RequestInit): Promise<PostAdminSchedulerPause200> => {
 
-  return customInstance<postAdminSchedulerPauseResponse>(getPostAdminSchedulerPauseUrl(id),
+  return customInstance<PostAdminSchedulerPause200>(getPostAdminSchedulerPauseUrl(id),
   {
     ...options,
     method: 'POST'
@@ -27520,30 +23178,6 @@ export const usePostAdminSchedulerPause = <TError = ErrorType<ApiError>,
       return useMutation(getPostAdminSchedulerPauseMutationOptions(options), queryClient);
     }
 
-export type postAdminSchedulerResumeResponse200 = {
-  data: PostAdminSchedulerResume200
-  status: 200
-}
-
-export type postAdminSchedulerResumeResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postAdminSchedulerResumeResponse409 = {
-  data: ApiError
-  status: 409
-}
-
-export type postAdminSchedulerResumeResponseSuccess = (postAdminSchedulerResumeResponse200) & {
-  headers: Headers;
-};
-export type postAdminSchedulerResumeResponseError = (postAdminSchedulerResumeResponse404 | postAdminSchedulerResumeResponse409) & {
-  headers: Headers;
-};
-
-export type postAdminSchedulerResumeResponse = (postAdminSchedulerResumeResponseSuccess | postAdminSchedulerResumeResponseError)
-
 export const getPostAdminSchedulerResumeUrl = (id: string,) => {
 
 
@@ -27555,9 +23189,9 @@ export const getPostAdminSchedulerResumeUrl = (id: string,) => {
 /**
  * @summary Resume a paused scheduled job
  */
-export const postAdminSchedulerResume = async (id: string, options?: RequestInit): Promise<postAdminSchedulerResumeResponse> => {
+export const postAdminSchedulerResume = async (id: string, options?: RequestInit): Promise<PostAdminSchedulerResume200> => {
 
-  return customInstance<postAdminSchedulerResumeResponse>(getPostAdminSchedulerResumeUrl(id),
+  return customInstance<PostAdminSchedulerResume200>(getPostAdminSchedulerResumeUrl(id),
   {
     ...options,
     method: 'POST'
@@ -27614,35 +23248,6 @@ export const usePostAdminSchedulerResume = <TError = ErrorType<ApiError>,
       return useMutation(getPostAdminSchedulerResumeMutationOptions(options), queryClient);
     }
 
-export type postAdminSchedulerTriggerResponse202 = {
-  data: PostAdminSchedulerTrigger202
-  status: 202
-}
-
-export type postAdminSchedulerTriggerResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type postAdminSchedulerTriggerResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postAdminSchedulerTriggerResponse409 = {
-  data: ApiError
-  status: 409
-}
-
-export type postAdminSchedulerTriggerResponseSuccess = (postAdminSchedulerTriggerResponse202) & {
-  headers: Headers;
-};
-export type postAdminSchedulerTriggerResponseError = (postAdminSchedulerTriggerResponse400 | postAdminSchedulerTriggerResponse404 | postAdminSchedulerTriggerResponse409) & {
-  headers: Headers;
-};
-
-export type postAdminSchedulerTriggerResponse = (postAdminSchedulerTriggerResponseSuccess | postAdminSchedulerTriggerResponseError)
-
 export const getPostAdminSchedulerTriggerUrl = (id: string,) => {
 
 
@@ -27654,9 +23259,9 @@ export const getPostAdminSchedulerTriggerUrl = (id: string,) => {
 /**
  * @summary Record a durable manual scheduled job request
  */
-export const postAdminSchedulerTrigger = async (id: string, options?: RequestInit): Promise<postAdminSchedulerTriggerResponse> => {
+export const postAdminSchedulerTrigger = async (id: string, options?: RequestInit): Promise<PostAdminSchedulerTrigger202> => {
 
-  return customInstance<postAdminSchedulerTriggerResponse>(getPostAdminSchedulerTriggerUrl(id),
+  return customInstance<PostAdminSchedulerTrigger202>(getPostAdminSchedulerTriggerUrl(id),
   {
     ...options,
     method: 'POST'
@@ -27713,30 +23318,6 @@ export const usePostAdminSchedulerTrigger = <TError = ErrorType<ApiError>,
       return useMutation(getPostAdminSchedulerTriggerMutationOptions(options), queryClient);
     }
 
-export type postAdminSchedulerEnableResponse200 = {
-  data: PostAdminSchedulerEnable200
-  status: 200
-}
-
-export type postAdminSchedulerEnableResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postAdminSchedulerEnableResponse409 = {
-  data: ApiError
-  status: 409
-}
-
-export type postAdminSchedulerEnableResponseSuccess = (postAdminSchedulerEnableResponse200) & {
-  headers: Headers;
-};
-export type postAdminSchedulerEnableResponseError = (postAdminSchedulerEnableResponse404 | postAdminSchedulerEnableResponse409) & {
-  headers: Headers;
-};
-
-export type postAdminSchedulerEnableResponse = (postAdminSchedulerEnableResponseSuccess | postAdminSchedulerEnableResponseError)
-
 export const getPostAdminSchedulerEnableUrl = (id: string,) => {
 
 
@@ -27748,9 +23329,9 @@ export const getPostAdminSchedulerEnableUrl = (id: string,) => {
 /**
  * @summary Enable a disabled scheduled job
  */
-export const postAdminSchedulerEnable = async (id: string, options?: RequestInit): Promise<postAdminSchedulerEnableResponse> => {
+export const postAdminSchedulerEnable = async (id: string, options?: RequestInit): Promise<PostAdminSchedulerEnable200> => {
 
-  return customInstance<postAdminSchedulerEnableResponse>(getPostAdminSchedulerEnableUrl(id),
+  return customInstance<PostAdminSchedulerEnable200>(getPostAdminSchedulerEnableUrl(id),
   {
     ...options,
     method: 'POST'
@@ -27807,30 +23388,6 @@ export const usePostAdminSchedulerEnable = <TError = ErrorType<ApiError>,
       return useMutation(getPostAdminSchedulerEnableMutationOptions(options), queryClient);
     }
 
-export type postAdminSchedulerDisableResponse200 = {
-  data: PostAdminSchedulerDisable200
-  status: 200
-}
-
-export type postAdminSchedulerDisableResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postAdminSchedulerDisableResponse409 = {
-  data: ApiError
-  status: 409
-}
-
-export type postAdminSchedulerDisableResponseSuccess = (postAdminSchedulerDisableResponse200) & {
-  headers: Headers;
-};
-export type postAdminSchedulerDisableResponseError = (postAdminSchedulerDisableResponse404 | postAdminSchedulerDisableResponse409) & {
-  headers: Headers;
-};
-
-export type postAdminSchedulerDisableResponse = (postAdminSchedulerDisableResponseSuccess | postAdminSchedulerDisableResponseError)
-
 export const getPostAdminSchedulerDisableUrl = (id: string,) => {
 
 
@@ -27842,9 +23399,9 @@ export const getPostAdminSchedulerDisableUrl = (id: string,) => {
 /**
  * @summary Disable a scheduled job
  */
-export const postAdminSchedulerDisable = async (id: string, options?: RequestInit): Promise<postAdminSchedulerDisableResponse> => {
+export const postAdminSchedulerDisable = async (id: string, options?: RequestInit): Promise<PostAdminSchedulerDisable200> => {
 
-  return customInstance<postAdminSchedulerDisableResponse>(getPostAdminSchedulerDisableUrl(id),
+  return customInstance<PostAdminSchedulerDisable200>(getPostAdminSchedulerDisableUrl(id),
   {
     ...options,
     method: 'POST'
@@ -27901,18 +23458,6 @@ export const usePostAdminSchedulerDisable = <TError = ErrorType<ApiError>,
       return useMutation(getPostAdminSchedulerDisableMutationOptions(options), queryClient);
     }
 
-export type getAdminSchedulerCommandsResponse200 = {
-  data: GetAdminSchedulerCommands200
-  status: 200
-}
-
-export type getAdminSchedulerCommandsResponseSuccess = (getAdminSchedulerCommandsResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getAdminSchedulerCommandsResponse = (getAdminSchedulerCommandsResponseSuccess)
-
 export const getGetAdminSchedulerCommandsUrl = () => {
 
 
@@ -27924,9 +23469,9 @@ export const getGetAdminSchedulerCommandsUrl = () => {
 /**
  * @summary List available schedulable commands
  */
-export const getAdminSchedulerCommands = async ( options?: RequestInit): Promise<getAdminSchedulerCommandsResponse> => {
+export const getAdminSchedulerCommands = async ( options?: RequestInit): Promise<GetAdminSchedulerCommands200> => {
 
-  return customInstance<getAdminSchedulerCommandsResponse>(getGetAdminSchedulerCommandsUrl(),
+  return customInstance<GetAdminSchedulerCommands200>(getGetAdminSchedulerCommandsUrl(),
   {
     ...options,
     method: 'GET'
@@ -28014,25 +23559,6 @@ export function useGetAdminSchedulerCommands<TData = Awaited<ReturnType<typeof g
 
 
 
-export type getDeviceListResponse200 = {
-  data: GetDeviceList200
-  status: 200
-}
-
-export type getDeviceListResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getDeviceListResponseSuccess = (getDeviceListResponse200) & {
-  headers: Headers;
-};
-export type getDeviceListResponseError = (getDeviceListResponse401) & {
-  headers: Headers;
-};
-
-export type getDeviceListResponse = (getDeviceListResponseSuccess | getDeviceListResponseError)
-
 export const getGetDeviceListUrl = () => {
 
 
@@ -28044,9 +23570,9 @@ export const getGetDeviceListUrl = () => {
 /**
  * @summary List all devices registered for the current user
  */
-export const getDeviceList = async ( options?: RequestInit): Promise<getDeviceListResponse> => {
+export const getDeviceList = async ( options?: RequestInit): Promise<GetDeviceList200> => {
 
-  return customInstance<getDeviceListResponse>(getGetDeviceListUrl(),
+  return customInstance<GetDeviceList200>(getGetDeviceListUrl(),
   {
     ...options,
     method: 'GET'
@@ -28134,35 +23660,6 @@ export function useGetDeviceList<TData = Awaited<ReturnType<typeof getDeviceList
 
 
 
-export type postDeviceRegisterResponse200 = {
-  data: PostDeviceRegister200
-  status: 200
-}
-
-export type postDeviceRegisterResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type postDeviceRegisterResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postDeviceRegisterResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postDeviceRegisterResponseSuccess = (postDeviceRegisterResponse200) & {
-  headers: Headers;
-};
-export type postDeviceRegisterResponseError = (postDeviceRegisterResponse400 | postDeviceRegisterResponse401 | postDeviceRegisterResponse422) & {
-  headers: Headers;
-};
-
-export type postDeviceRegisterResponse = (postDeviceRegisterResponseSuccess | postDeviceRegisterResponseError)
-
 export const getPostDeviceRegisterUrl = () => {
 
 
@@ -28174,9 +23671,9 @@ export const getPostDeviceRegisterUrl = () => {
 /**
  * @summary Register or touch a device (upsert)
  */
-export const postDeviceRegister = async (registerDeviceRequest: RegisterDeviceRequest, options?: RequestInit): Promise<postDeviceRegisterResponse> => {
+export const postDeviceRegister = async (registerDeviceRequest: RegisterDeviceRequest, options?: RequestInit): Promise<PostDeviceRegister200> => {
 
-  return customInstance<postDeviceRegisterResponse>(getPostDeviceRegisterUrl(),
+  return customInstance<PostDeviceRegister200>(getPostDeviceRegisterUrl(),
   {
     ...options,
     method: 'POST',
@@ -28233,35 +23730,6 @@ export const usePostDeviceRegister = <TError = ErrorType<ApiError | ValidationEr
       return useMutation(getPostDeviceRegisterMutationOptions(options), queryClient);
     }
 
-export type putDeviceRenameResponse200 = {
-  data: PutDeviceRename200
-  status: 200
-}
-
-export type putDeviceRenameResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type putDeviceRenameResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type putDeviceRenameResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type putDeviceRenameResponseSuccess = (putDeviceRenameResponse200) & {
-  headers: Headers;
-};
-export type putDeviceRenameResponseError = (putDeviceRenameResponse401 | putDeviceRenameResponse404 | putDeviceRenameResponse422) & {
-  headers: Headers;
-};
-
-export type putDeviceRenameResponse = (putDeviceRenameResponseSuccess | putDeviceRenameResponseError)
-
 export const getPutDeviceRenameUrl = (deviceId: string,) => {
 
 
@@ -28274,9 +23742,9 @@ export const getPutDeviceRenameUrl = (deviceId: string,) => {
  * @summary Rename a device
  */
 export const putDeviceRename = async (deviceId: string,
-    putDeviceRenameBody: PutDeviceRenameBody, options?: RequestInit): Promise<putDeviceRenameResponse> => {
+    putDeviceRenameBody: PutDeviceRenameBody, options?: RequestInit): Promise<PutDeviceRename200> => {
 
-  return customInstance<putDeviceRenameResponse>(getPutDeviceRenameUrl(deviceId),
+  return customInstance<PutDeviceRename200>(getPutDeviceRenameUrl(deviceId),
   {
     ...options,
     method: 'PUT',
@@ -28333,25 +23801,6 @@ export const usePutDeviceRename = <TError = ErrorType<ApiError | ValidationError
       return useMutation(getPutDeviceRenameMutationOptions(options), queryClient);
     }
 
-export type deleteDeviceForgetResponse200 = {
-  data: DeleteDeviceForget200
-  status: 200
-}
-
-export type deleteDeviceForgetResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type deleteDeviceForgetResponseSuccess = (deleteDeviceForgetResponse200) & {
-  headers: Headers;
-};
-export type deleteDeviceForgetResponseError = (deleteDeviceForgetResponse401) & {
-  headers: Headers;
-};
-
-export type deleteDeviceForgetResponse = (deleteDeviceForgetResponseSuccess | deleteDeviceForgetResponseError)
-
 export const getDeleteDeviceForgetUrl = (deviceId: string,) => {
 
 
@@ -28363,9 +23812,9 @@ export const getDeleteDeviceForgetUrl = (deviceId: string,) => {
 /**
  * @summary Forget (remove) a device
  */
-export const deleteDeviceForget = async (deviceId: string, options?: RequestInit): Promise<deleteDeviceForgetResponse> => {
+export const deleteDeviceForget = async (deviceId: string, options?: RequestInit): Promise<DeleteDeviceForget200> => {
 
-  return customInstance<deleteDeviceForgetResponse>(getDeleteDeviceForgetUrl(deviceId),
+  return customInstance<DeleteDeviceForget200>(getDeleteDeviceForgetUrl(deviceId),
   {
     ...options,
     method: 'DELETE'
@@ -28422,25 +23871,6 @@ export const useDeleteDeviceForget = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteDeviceForgetMutationOptions(options), queryClient);
     }
 
-export type getSessionGetResponse200 = {
-  data: GetSessionGet200
-  status: 200
-}
-
-export type getSessionGetResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getSessionGetResponseSuccess = (getSessionGetResponse200) & {
-  headers: Headers;
-};
-export type getSessionGetResponseError = (getSessionGetResponse401) & {
-  headers: Headers;
-};
-
-export type getSessionGetResponse = (getSessionGetResponseSuccess | getSessionGetResponseError)
-
 export const getGetSessionGetUrl = () => {
 
 
@@ -28452,9 +23882,9 @@ export const getGetSessionGetUrl = () => {
 /**
  * @summary Get the current listening session
  */
-export const getSessionGet = async ( options?: RequestInit): Promise<getSessionGetResponse> => {
+export const getSessionGet = async ( options?: RequestInit): Promise<GetSessionGet200> => {
 
-  return customInstance<getSessionGetResponse>(getGetSessionGetUrl(),
+  return customInstance<GetSessionGet200>(getGetSessionGetUrl(),
   {
     ...options,
     method: 'GET'
@@ -28542,30 +23972,6 @@ export function useGetSessionGet<TData = Awaited<ReturnType<typeof getSessionGet
 
 
 
-export type putSessionSyncResponse200 = {
-  data: PutSessionSync200
-  status: 200
-}
-
-export type putSessionSyncResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type putSessionSyncResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type putSessionSyncResponseSuccess = (putSessionSyncResponse200) & {
-  headers: Headers;
-};
-export type putSessionSyncResponseError = (putSessionSyncResponse401 | putSessionSyncResponse422) & {
-  headers: Headers;
-};
-
-export type putSessionSyncResponse = (putSessionSyncResponseSuccess | putSessionSyncResponseError)
-
 export const getPutSessionSyncUrl = () => {
 
 
@@ -28577,9 +23983,9 @@ export const getPutSessionSyncUrl = () => {
 /**
  * @summary Sync playback state (position, queue, playback state)
  */
-export const putSessionSync = async (putSessionSyncBody: PutSessionSyncBody, options?: RequestInit): Promise<putSessionSyncResponse> => {
+export const putSessionSync = async (putSessionSyncBody: PutSessionSyncBody, options?: RequestInit): Promise<PutSessionSync200> => {
 
-  return customInstance<putSessionSyncResponse>(getPutSessionSyncUrl(),
+  return customInstance<PutSessionSync200>(getPutSessionSyncUrl(),
   {
     ...options,
     method: 'PUT',
@@ -28636,30 +24042,6 @@ export const usePutSessionSync = <TError = ErrorType<ApiError | ValidationError>
       return useMutation(getPutSessionSyncMutationOptions(options), queryClient);
     }
 
-export type postSessionClaimResponse200 = {
-  data: PostSessionClaim200
-  status: 200
-}
-
-export type postSessionClaimResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postSessionClaimResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postSessionClaimResponseSuccess = (postSessionClaimResponse200) & {
-  headers: Headers;
-};
-export type postSessionClaimResponseError = (postSessionClaimResponse401 | postSessionClaimResponse422) & {
-  headers: Headers;
-};
-
-export type postSessionClaimResponse = (postSessionClaimResponseSuccess | postSessionClaimResponseError)
-
 export const getPostSessionClaimUrl = () => {
 
 
@@ -28671,9 +24053,9 @@ export const getPostSessionClaimUrl = () => {
 /**
  * @summary Claim the session for a specific device
  */
-export const postSessionClaim = async (postSessionClaimBody: PostSessionClaimBody, options?: RequestInit): Promise<postSessionClaimResponse> => {
+export const postSessionClaim = async (postSessionClaimBody: PostSessionClaimBody, options?: RequestInit): Promise<PostSessionClaim200> => {
 
-  return customInstance<postSessionClaimResponse>(getPostSessionClaimUrl(),
+  return customInstance<PostSessionClaim200>(getPostSessionClaimUrl(),
   {
     ...options,
     method: 'POST',
@@ -28730,30 +24112,6 @@ export const usePostSessionClaim = <TError = ErrorType<ApiError | ValidationErro
       return useMutation(getPostSessionClaimMutationOptions(options), queryClient);
     }
 
-export type postSessionNewResponse201 = {
-  data: PostSessionNew201
-  status: 201
-}
-
-export type postSessionNewResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postSessionNewResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postSessionNewResponseSuccess = (postSessionNewResponse201) & {
-  headers: Headers;
-};
-export type postSessionNewResponseError = (postSessionNewResponse401 | postSessionNewResponse422) & {
-  headers: Headers;
-};
-
-export type postSessionNewResponse = (postSessionNewResponseSuccess | postSessionNewResponseError)
-
 export const getPostSessionNewUrl = () => {
 
 
@@ -28765,9 +24123,9 @@ export const getPostSessionNewUrl = () => {
 /**
  * @summary Start a new listening session
  */
-export const postSessionNew = async (postSessionNewBody: PostSessionNewBody, options?: RequestInit): Promise<postSessionNewResponse> => {
+export const postSessionNew = async (postSessionNewBody: PostSessionNewBody, options?: RequestInit): Promise<PostSessionNew201> => {
 
-  return customInstance<postSessionNewResponse>(getPostSessionNewUrl(),
+  return customInstance<PostSessionNew201>(getPostSessionNewUrl(),
   {
     ...options,
     method: 'POST',
@@ -28824,18 +24182,6 @@ export const usePostSessionNew = <TError = ErrorType<ApiError | ValidationError>
       return useMutation(getPostSessionNewMutationOptions(options), queryClient);
     }
 
-export type getDebugConfigCheckResponse200 = {
-  data: GetDebugConfigCheck200
-  status: 200
-}
-
-export type getDebugConfigCheckResponseSuccess = (getDebugConfigCheckResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getDebugConfigCheckResponse = (getDebugConfigCheckResponseSuccess)
-
 export const getGetDebugConfigCheckUrl = () => {
 
 
@@ -28849,9 +24195,9 @@ export const getGetDebugConfigCheckUrl = () => {
  * and returns results with a summary. Used by the admin Configuration page.
  * @summary Validate application configuration
  */
-export const getDebugConfigCheck = async ( options?: RequestInit): Promise<getDebugConfigCheckResponse> => {
+export const getDebugConfigCheck = async ( options?: RequestInit): Promise<GetDebugConfigCheck200> => {
 
-  return customInstance<getDebugConfigCheckResponse>(getGetDebugConfigCheckUrl(),
+  return customInstance<GetDebugConfigCheck200>(getGetDebugConfigCheckUrl(),
   {
     ...options,
     method: 'GET'
@@ -28939,18 +24285,6 @@ export function useGetDebugConfigCheck<TData = Awaited<ReturnType<typeof getDebu
 
 
 
-export type getDebugCoroutinesResponse200 = {
-  data: GetDebugCoroutines200
-  status: 200
-}
-
-export type getDebugCoroutinesResponseSuccess = (getDebugCoroutinesResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getDebugCoroutinesResponse = (getDebugCoroutinesResponseSuccess)
-
 export const getGetDebugCoroutinesUrl = () => {
 
 
@@ -28962,9 +24296,9 @@ export const getGetDebugCoroutinesUrl = () => {
 /**
  * @summary Swoole coroutine and channel statistics
  */
-export const getDebugCoroutines = async ( options?: RequestInit): Promise<getDebugCoroutinesResponse> => {
+export const getDebugCoroutines = async ( options?: RequestInit): Promise<GetDebugCoroutines200> => {
 
-  return customInstance<getDebugCoroutinesResponse>(getGetDebugCoroutinesUrl(),
+  return customInstance<GetDebugCoroutines200>(getGetDebugCoroutinesUrl(),
   {
     ...options,
     method: 'GET'
@@ -29052,18 +24386,6 @@ export function useGetDebugCoroutines<TData = Awaited<ReturnType<typeof getDebug
 
 
 
-export type getMonitorAnalyticsSummaryResponse200 = {
-  data: GetMonitorAnalyticsSummary200
-  status: 200
-}
-
-export type getMonitorAnalyticsSummaryResponseSuccess = (getMonitorAnalyticsSummaryResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getMonitorAnalyticsSummaryResponse = (getMonitorAnalyticsSummaryResponseSuccess)
-
 export const getGetMonitorAnalyticsSummaryUrl = (params?: GetMonitorAnalyticsSummaryParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -29083,9 +24405,9 @@ export const getGetMonitorAnalyticsSummaryUrl = (params?: GetMonitorAnalyticsSum
  * Returns status counts, job type breakdown, success rate, and throughput per hour.
  * @summary Get analytics summary for a time range
  */
-export const getMonitorAnalyticsSummary = async (params?: GetMonitorAnalyticsSummaryParams, options?: RequestInit): Promise<getMonitorAnalyticsSummaryResponse> => {
+export const getMonitorAnalyticsSummary = async (params?: GetMonitorAnalyticsSummaryParams, options?: RequestInit): Promise<GetMonitorAnalyticsSummary200> => {
 
-  return customInstance<getMonitorAnalyticsSummaryResponse>(getGetMonitorAnalyticsSummaryUrl(params),
+  return customInstance<GetMonitorAnalyticsSummary200>(getGetMonitorAnalyticsSummaryUrl(params),
   {
     ...options,
     method: 'GET'
@@ -29173,18 +24495,6 @@ export function useGetMonitorAnalyticsSummary<TData = Awaited<ReturnType<typeof 
 
 
 
-export type getMonitorAnalyticsTimingResponse200 = {
-  data: GetMonitorAnalyticsTiming200
-  status: 200
-}
-
-export type getMonitorAnalyticsTimingResponseSuccess = (getMonitorAnalyticsTimingResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getMonitorAnalyticsTimingResponse = (getMonitorAnalyticsTimingResponseSuccess)
-
 export const getGetMonitorAnalyticsTimingUrl = (params?: GetMonitorAnalyticsTimingParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -29204,9 +24514,9 @@ export const getGetMonitorAnalyticsTimingUrl = (params?: GetMonitorAnalyticsTimi
  * Returns average, median, and P95 execution times and queue latency per job type.
  * @summary Get timing analytics for a time range
  */
-export const getMonitorAnalyticsTiming = async (params?: GetMonitorAnalyticsTimingParams, options?: RequestInit): Promise<getMonitorAnalyticsTimingResponse> => {
+export const getMonitorAnalyticsTiming = async (params?: GetMonitorAnalyticsTimingParams, options?: RequestInit): Promise<GetMonitorAnalyticsTiming200> => {
 
-  return customInstance<getMonitorAnalyticsTimingResponse>(getGetMonitorAnalyticsTimingUrl(params),
+  return customInstance<GetMonitorAnalyticsTiming200>(getGetMonitorAnalyticsTimingUrl(params),
   {
     ...options,
     method: 'GET'
@@ -29294,18 +24604,6 @@ export function useGetMonitorAnalyticsTiming<TData = Awaited<ReturnType<typeof g
 
 
 
-export type getMonitorAnalyticsFailuresResponse200 = {
-  data: GetMonitorAnalyticsFailures200
-  status: 200
-}
-
-export type getMonitorAnalyticsFailuresResponseSuccess = (getMonitorAnalyticsFailuresResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getMonitorAnalyticsFailuresResponse = (getMonitorAnalyticsFailuresResponseSuccess)
-
 export const getGetMonitorAnalyticsFailuresUrl = (params?: GetMonitorAnalyticsFailuresParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -29325,9 +24623,9 @@ export const getGetMonitorAnalyticsFailuresUrl = (params?: GetMonitorAnalyticsFa
  * Returns top failing job types, top exception classes, retry frequency, and recent failures.
  * @summary Get failure analytics for a time range
  */
-export const getMonitorAnalyticsFailures = async (params?: GetMonitorAnalyticsFailuresParams, options?: RequestInit): Promise<getMonitorAnalyticsFailuresResponse> => {
+export const getMonitorAnalyticsFailures = async (params?: GetMonitorAnalyticsFailuresParams, options?: RequestInit): Promise<GetMonitorAnalyticsFailures200> => {
 
-  return customInstance<getMonitorAnalyticsFailuresResponse>(getGetMonitorAnalyticsFailuresUrl(params),
+  return customInstance<GetMonitorAnalyticsFailures200>(getGetMonitorAnalyticsFailuresUrl(params),
   {
     ...options,
     method: 'GET'
@@ -29415,18 +24713,6 @@ export function useGetMonitorAnalyticsFailures<TData = Awaited<ReturnType<typeof
 
 
 
-export type getMonitorStatusResponse200 = {
-  data: GetMonitorStatus200
-  status: 200
-}
-
-export type getMonitorStatusResponseSuccess = (getMonitorStatusResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getMonitorStatusResponse = (getMonitorStatusResponseSuccess)
-
 export const getGetMonitorStatusUrl = () => {
 
 
@@ -29438,9 +24724,9 @@ export const getGetMonitorStatusUrl = () => {
 /**
  * @summary Get background job monitoring status summary
  */
-export const getMonitorStatus = async ( options?: RequestInit): Promise<getMonitorStatusResponse> => {
+export const getMonitorStatus = async ( options?: RequestInit): Promise<GetMonitorStatus200> => {
 
-  return customInstance<getMonitorStatusResponse>(getGetMonitorStatusUrl(),
+  return customInstance<GetMonitorStatus200>(getGetMonitorStatusUrl(),
   {
     ...options,
     method: 'GET'
@@ -29528,18 +24814,6 @@ export function useGetMonitorStatus<TData = Awaited<ReturnType<typeof getMonitor
 
 
 
-export type getMonitorJobsResponse200 = {
-  data: GetMonitorJobs200
-  status: 200
-}
-
-export type getMonitorJobsResponseSuccess = (getMonitorJobsResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getMonitorJobsResponse = (getMonitorJobsResponseSuccess)
-
 export const getGetMonitorJobsUrl = (params?: GetMonitorJobsParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -29558,9 +24832,9 @@ export const getGetMonitorJobsUrl = (params?: GetMonitorJobsParams,) => {
 /**
  * @summary Get background jobs with filtering, sorting, and pagination
  */
-export const getMonitorJobs = async (params?: GetMonitorJobsParams, options?: RequestInit): Promise<getMonitorJobsResponse> => {
+export const getMonitorJobs = async (params?: GetMonitorJobsParams, options?: RequestInit): Promise<GetMonitorJobs200> => {
 
-  return customInstance<getMonitorJobsResponse>(getGetMonitorJobsUrl(params),
+  return customInstance<GetMonitorJobs200>(getGetMonitorJobsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -29648,25 +24922,6 @@ export function useGetMonitorJobs<TData = Awaited<ReturnType<typeof getMonitorJo
 
 
 
-export type getMonitorJobsDetailResponse200 = {
-  data: GetMonitorJobsDetail200
-  status: 200
-}
-
-export type getMonitorJobsDetailResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getMonitorJobsDetailResponseSuccess = (getMonitorJobsDetailResponse200) & {
-  headers: Headers;
-};
-export type getMonitorJobsDetailResponseError = (getMonitorJobsDetailResponse404) & {
-  headers: Headers;
-};
-
-export type getMonitorJobsDetailResponse = (getMonitorJobsDetailResponseSuccess | getMonitorJobsDetailResponseError)
-
 export const getGetMonitorJobsDetailUrl = (jobId: string,) => {
 
 
@@ -29678,9 +24933,9 @@ export const getGetMonitorJobsDetailUrl = (jobId: string,) => {
 /**
  * @summary Get background job detail
  */
-export const getMonitorJobsDetail = async (jobId: string, options?: RequestInit): Promise<getMonitorJobsDetailResponse> => {
+export const getMonitorJobsDetail = async (jobId: string, options?: RequestInit): Promise<GetMonitorJobsDetail200> => {
 
-  return customInstance<getMonitorJobsDetailResponse>(getGetMonitorJobsDetailUrl(jobId),
+  return customInstance<GetMonitorJobsDetail200>(getGetMonitorJobsDetailUrl(jobId),
   {
     ...options,
     method: 'GET'
@@ -29768,25 +25023,6 @@ export function useGetMonitorJobsDetail<TData = Awaited<ReturnType<typeof getMon
 
 
 
-export type postMonitorPruneResponse200 = {
-  data: PostMonitorPrune200
-  status: 200
-}
-
-export type postMonitorPruneResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postMonitorPruneResponseSuccess = (postMonitorPruneResponse200) & {
-  headers: Headers;
-};
-export type postMonitorPruneResponseError = (postMonitorPruneResponse422) & {
-  headers: Headers;
-};
-
-export type postMonitorPruneResponse = (postMonitorPruneResponseSuccess | postMonitorPruneResponseError)
-
 export const getPostMonitorPruneUrl = () => {
 
 
@@ -29799,9 +25035,9 @@ export const getPostMonitorPruneUrl = () => {
  * Deletes finished, failed, and cancelled job monitors older than the specified number of days. Defaults to 7 days.
  * @summary Prune old job monitors
  */
-export const postMonitorPrune = async (postMonitorPruneBody?: PostMonitorPruneBody, options?: RequestInit): Promise<postMonitorPruneResponse> => {
+export const postMonitorPrune = async (postMonitorPruneBody?: PostMonitorPruneBody, options?: RequestInit): Promise<PostMonitorPrune200> => {
 
-  return customInstance<postMonitorPruneResponse>(getPostMonitorPruneUrl(),
+  return customInstance<PostMonitorPrune200>(getPostMonitorPruneUrl(),
   {
     ...options,
     method: 'POST',
@@ -29858,30 +25094,6 @@ export const usePostMonitorPrune = <TError = ErrorType<ValidationError>,
       return useMutation(getPostMonitorPruneMutationOptions(options), queryClient);
     }
 
-export type postMonitorJobsRetryResponse200 = {
-  data: PostMonitorJobsRetry200
-  status: 200
-}
-
-export type postMonitorJobsRetryResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postMonitorJobsRetryResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postMonitorJobsRetryResponseSuccess = (postMonitorJobsRetryResponse200) & {
-  headers: Headers;
-};
-export type postMonitorJobsRetryResponseError = (postMonitorJobsRetryResponse404 | postMonitorJobsRetryResponse422) & {
-  headers: Headers;
-};
-
-export type postMonitorJobsRetryResponse = (postMonitorJobsRetryResponseSuccess | postMonitorJobsRetryResponseError)
-
 export const getPostMonitorJobsRetryUrl = (jobId: string,) => {
 
 
@@ -29894,9 +25106,9 @@ export const getPostMonitorJobsRetryUrl = (jobId: string,) => {
  * Re-dispatches the original message payload of a failed job. The job must be in Failed status, not previously retried, and have a stored message payload.
  * @summary Retry a failed background job
  */
-export const postMonitorJobsRetry = async (jobId: string, options?: RequestInit): Promise<postMonitorJobsRetryResponse> => {
+export const postMonitorJobsRetry = async (jobId: string, options?: RequestInit): Promise<PostMonitorJobsRetry200> => {
 
-  return customInstance<postMonitorJobsRetryResponse>(getPostMonitorJobsRetryUrl(jobId),
+  return customInstance<PostMonitorJobsRetry200>(getPostMonitorJobsRetryUrl(jobId),
   {
     ...options,
     method: 'POST'
@@ -29953,30 +25165,6 @@ export const usePostMonitorJobsRetry = <TError = ErrorType<ApiError | Validation
       return useMutation(getPostMonitorJobsRetryMutationOptions(options), queryClient);
     }
 
-export type postMonitorJobsCancelResponse200 = {
-  data: PostMonitorJobsCancel200
-  status: 200
-}
-
-export type postMonitorJobsCancelResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postMonitorJobsCancelResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postMonitorJobsCancelResponseSuccess = (postMonitorJobsCancelResponse200) & {
-  headers: Headers;
-};
-export type postMonitorJobsCancelResponseError = (postMonitorJobsCancelResponse404 | postMonitorJobsCancelResponse422) & {
-  headers: Headers;
-};
-
-export type postMonitorJobsCancelResponse = (postMonitorJobsCancelResponseSuccess | postMonitorJobsCancelResponseError)
-
 export const getPostMonitorJobsCancelUrl = (jobId: string,) => {
 
 
@@ -29989,9 +25177,9 @@ export const getPostMonitorJobsCancelUrl = (jobId: string,) => {
  * Sets a cooperative cancellation flag in Redis. Handlers that implement CancellableJobInterface will detect the flag at their next checkpoint. For queued jobs, the flag is set before the worker picks up the message.
  * @summary Cancel a running or queued background job
  */
-export const postMonitorJobsCancel = async (jobId: string, options?: RequestInit): Promise<postMonitorJobsCancelResponse> => {
+export const postMonitorJobsCancel = async (jobId: string, options?: RequestInit): Promise<PostMonitorJobsCancel200> => {
 
-  return customInstance<postMonitorJobsCancelResponse>(getPostMonitorJobsCancelUrl(jobId),
+  return customInstance<PostMonitorJobsCancel200>(getPostMonitorJobsCancelUrl(jobId),
   {
     ...options,
     method: 'POST'
@@ -30048,18 +25236,6 @@ export const usePostMonitorJobsCancel = <TError = ErrorType<ApiError | Validatio
       return useMutation(getPostMonitorJobsCancelMutationOptions(options), queryClient);
     }
 
-export type getMonitorRatelimitersListResponse200 = {
-  data: GetMonitorRatelimitersList200
-  status: 200
-}
-
-export type getMonitorRatelimitersListResponseSuccess = (getMonitorRatelimitersListResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getMonitorRatelimitersListResponse = (getMonitorRatelimitersListResponseSuccess)
-
 export const getGetMonitorRatelimitersListUrl = () => {
 
 
@@ -30071,9 +25247,9 @@ export const getGetMonitorRatelimitersListUrl = () => {
 /**
  * @summary List all rate limiters with configuration
  */
-export const getMonitorRatelimitersList = async ( options?: RequestInit): Promise<getMonitorRatelimitersListResponse> => {
+export const getMonitorRatelimitersList = async ( options?: RequestInit): Promise<GetMonitorRatelimitersList200> => {
 
-  return customInstance<getMonitorRatelimitersListResponse>(getGetMonitorRatelimitersListUrl(),
+  return customInstance<GetMonitorRatelimitersList200>(getGetMonitorRatelimitersListUrl(),
   {
     ...options,
     method: 'GET'
@@ -30161,35 +25337,6 @@ export function useGetMonitorRatelimitersList<TData = Awaited<ReturnType<typeof 
 
 
 
-export type deleteMonitorRatelimitersClearResponse200 = {
-  data: DeleteMonitorRatelimitersClear200
-  status: 200
-}
-
-export type deleteMonitorRatelimitersClearResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteMonitorRatelimitersClearResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type deleteMonitorRatelimitersClearResponse503 = {
-  data: ApiError
-  status: 503
-}
-
-export type deleteMonitorRatelimitersClearResponseSuccess = (deleteMonitorRatelimitersClearResponse200) & {
-  headers: Headers;
-};
-export type deleteMonitorRatelimitersClearResponseError = (deleteMonitorRatelimitersClearResponse404 | deleteMonitorRatelimitersClearResponse422 | deleteMonitorRatelimitersClearResponse503) & {
-  headers: Headers;
-};
-
-export type deleteMonitorRatelimitersClearResponse = (deleteMonitorRatelimitersClearResponseSuccess | deleteMonitorRatelimitersClearResponseError)
-
 export const getDeleteMonitorRatelimitersClearUrl = (name: string,
     params: DeleteMonitorRatelimitersClearParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -30211,9 +25358,9 @@ export const getDeleteMonitorRatelimitersClearUrl = (name: string,
  * @summary Clear all rate limiter state
  */
 export const deleteMonitorRatelimitersClear = async (name: string,
-    params: DeleteMonitorRatelimitersClearParams, options?: RequestInit): Promise<deleteMonitorRatelimitersClearResponse> => {
+    params: DeleteMonitorRatelimitersClearParams, options?: RequestInit): Promise<DeleteMonitorRatelimitersClear200> => {
 
-  return customInstance<deleteMonitorRatelimitersClearResponse>(getDeleteMonitorRatelimitersClearUrl(name,params),
+  return customInstance<DeleteMonitorRatelimitersClear200>(getDeleteMonitorRatelimitersClearUrl(name,params),
   {
     ...options,
     method: 'DELETE'
@@ -30270,18 +25417,6 @@ export const useDeleteMonitorRatelimitersClear = <TError = ErrorType<ApiError | 
       return useMutation(getDeleteMonitorRatelimitersClearMutationOptions(options), queryClient);
     }
 
-export type getDebugStatsResponse200 = {
-  data: GetDebugStats200
-  status: 200
-}
-
-export type getDebugStatsResponseSuccess = (getDebugStatsResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getDebugStatsResponse = (getDebugStatsResponseSuccess)
-
 export const getGetDebugStatsUrl = () => {
 
 
@@ -30293,9 +25428,9 @@ export const getGetDebugStatsUrl = () => {
 /**
  * @summary Internal server diagnostics with coroutine and channel stats
  */
-export const getDebugStats = async ( options?: RequestInit): Promise<getDebugStatsResponse> => {
+export const getDebugStats = async ( options?: RequestInit): Promise<GetDebugStats200> => {
 
-  return customInstance<getDebugStatsResponse>(getGetDebugStatsUrl(),
+  return customInstance<GetDebugStats200>(getGetDebugStatsUrl(),
   {
     ...options,
     method: 'GET'
@@ -30383,18 +25518,6 @@ export function useGetDebugStats<TData = Awaited<ReturnType<typeof getDebugStats
 
 
 
-export type getDebugSpansResponse200 = {
-  data: GetDebugSpans200Item[]
-  status: 200
-}
-
-export type getDebugSpansResponseSuccess = (getDebugSpansResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getDebugSpansResponse = (getDebugSpansResponseSuccess)
-
 export const getGetDebugSpansUrl = () => {
 
 
@@ -30406,9 +25529,9 @@ export const getGetDebugSpansUrl = () => {
 /**
  * @summary Recent OpenTelemetry spans
  */
-export const getDebugSpans = async ( options?: RequestInit): Promise<getDebugSpansResponse> => {
+export const getDebugSpans = async ( options?: RequestInit): Promise<GetDebugSpans200Item[]> => {
 
-  return customInstance<getDebugSpansResponse>(getGetDebugSpansUrl(),
+  return customInstance<GetDebugSpans200Item[]>(getGetDebugSpansUrl(),
   {
     ...options,
     method: 'GET'
@@ -30496,18 +25619,6 @@ export function useGetDebugSpans<TData = Awaited<ReturnType<typeof getDebugSpans
 
 
 
-export type deleteDebugSpansClearResponse200 = {
-  data: DeleteDebugSpansClear200
-  status: 200
-}
-
-export type deleteDebugSpansClearResponseSuccess = (deleteDebugSpansClearResponse200) & {
-  headers: Headers;
-};
-;
-
-export type deleteDebugSpansClearResponse = (deleteDebugSpansClearResponseSuccess)
-
 export const getDeleteDebugSpansClearUrl = () => {
 
 
@@ -30519,9 +25630,9 @@ export const getDeleteDebugSpansClearUrl = () => {
 /**
  * @summary Clear in-memory spans
  */
-export const deleteDebugSpansClear = async ( options?: RequestInit): Promise<deleteDebugSpansClearResponse> => {
+export const deleteDebugSpansClear = async ( options?: RequestInit): Promise<DeleteDebugSpansClear200> => {
 
-  return customInstance<deleteDebugSpansClearResponse>(getDeleteDebugSpansClearUrl(),
+  return customInstance<DeleteDebugSpansClear200>(getDeleteDebugSpansClearUrl(),
   {
     ...options,
     method: 'DELETE'
@@ -30578,25 +25689,6 @@ export const useDeleteDebugSpansClear = <TError = ErrorType<unknown>,
       return useMutation(getDeleteDebugSpansClearMutationOptions(options), queryClient);
     }
 
-export type getAdminSettingsIndexResponse200 = {
-  data: GetAdminSettingsIndex200
-  status: 200
-}
-
-export type getAdminSettingsIndexResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type getAdminSettingsIndexResponseSuccess = (getAdminSettingsIndexResponse200) & {
-  headers: Headers;
-};
-export type getAdminSettingsIndexResponseError = (getAdminSettingsIndexResponse403) & {
-  headers: Headers;
-};
-
-export type getAdminSettingsIndexResponse = (getAdminSettingsIndexResponseSuccess | getAdminSettingsIndexResponseError)
-
 export const getGetAdminSettingsIndexUrl = () => {
 
 
@@ -30608,9 +25700,9 @@ export const getGetAdminSettingsIndexUrl = () => {
 /**
  * @summary Get all system settings
  */
-export const getAdminSettingsIndex = async ( options?: RequestInit): Promise<getAdminSettingsIndexResponse> => {
+export const getAdminSettingsIndex = async ( options?: RequestInit): Promise<GetAdminSettingsIndex200> => {
 
-  return customInstance<getAdminSettingsIndexResponse>(getGetAdminSettingsIndexUrl(),
+  return customInstance<GetAdminSettingsIndex200>(getGetAdminSettingsIndexUrl(),
   {
     ...options,
     method: 'GET'
@@ -30698,30 +25790,6 @@ export function useGetAdminSettingsIndex<TData = Awaited<ReturnType<typeof getAd
 
 
 
-export type patchAdminSettingsUpdateResponse200 = {
-  data: PatchAdminSettingsUpdate200
-  status: 200
-}
-
-export type patchAdminSettingsUpdateResponse400 = {
-  data: ApiError
-  status: 400
-}
-
-export type patchAdminSettingsUpdateResponse403 = {
-  data: ApiError
-  status: 403
-}
-
-export type patchAdminSettingsUpdateResponseSuccess = (patchAdminSettingsUpdateResponse200) & {
-  headers: Headers;
-};
-export type patchAdminSettingsUpdateResponseError = (patchAdminSettingsUpdateResponse400 | patchAdminSettingsUpdateResponse403) & {
-  headers: Headers;
-};
-
-export type patchAdminSettingsUpdateResponse = (patchAdminSettingsUpdateResponseSuccess | patchAdminSettingsUpdateResponseError)
-
 export const getPatchAdminSettingsUpdateUrl = () => {
 
 
@@ -30733,9 +25801,9 @@ export const getPatchAdminSettingsUpdateUrl = () => {
 /**
  * @summary Update system settings (SUPER_ADMIN only)
  */
-export const patchAdminSettingsUpdate = async (patchAdminSettingsUpdateBody: PatchAdminSettingsUpdateBody, options?: RequestInit): Promise<patchAdminSettingsUpdateResponse> => {
+export const patchAdminSettingsUpdate = async (patchAdminSettingsUpdateBody: PatchAdminSettingsUpdateBody, options?: RequestInit): Promise<PatchAdminSettingsUpdate200> => {
 
-  return customInstance<patchAdminSettingsUpdateResponse>(getPatchAdminSettingsUpdateUrl(),
+  return customInstance<PatchAdminSettingsUpdate200>(getPatchAdminSettingsUpdateUrl(),
   {
     ...options,
     method: 'PATCH',
@@ -30792,25 +25860,6 @@ export const usePatchAdminSettingsUpdate = <TError = ErrorType<ApiError>,
       return useMutation(getPatchAdminSettingsUpdateMutationOptions(options), queryClient);
     }
 
-export type getMonitorTransportStatusResponse200 = {
-  data: GetMonitorTransportStatus200
-  status: 200
-}
-
-export type getMonitorTransportStatusResponse503 = {
-  data: GetMonitorTransportStatus503
-  status: 503
-}
-
-export type getMonitorTransportStatusResponseSuccess = (getMonitorTransportStatusResponse200) & {
-  headers: Headers;
-};
-export type getMonitorTransportStatusResponseError = (getMonitorTransportStatusResponse503) & {
-  headers: Headers;
-};
-
-export type getMonitorTransportStatusResponse = (getMonitorTransportStatusResponseSuccess | getMonitorTransportStatusResponseError)
-
 export const getGetMonitorTransportStatusUrl = () => {
 
 
@@ -30823,9 +25872,9 @@ export const getGetMonitorTransportStatusUrl = () => {
  * Returns queue depths, consumer name, and consumer running status for the messenger transports.
  * @summary Get transport status
  */
-export const getMonitorTransportStatus = async ( options?: RequestInit): Promise<getMonitorTransportStatusResponse> => {
+export const getMonitorTransportStatus = async ( options?: RequestInit): Promise<GetMonitorTransportStatus200> => {
 
-  return customInstance<getMonitorTransportStatusResponse>(getGetMonitorTransportStatusUrl(),
+  return customInstance<GetMonitorTransportStatus200>(getGetMonitorTransportStatusUrl(),
   {
     ...options,
     method: 'GET'
@@ -30913,30 +25962,6 @@ export function useGetMonitorTransportStatus<TData = Awaited<ReturnType<typeof g
 
 
 
-export type postMonitorTransportFailedFlushResponse200 = {
-  data: PostMonitorTransportFailedFlush200
-  status: 200
-}
-
-export type postMonitorTransportFailedFlushResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postMonitorTransportFailedFlushResponse503 = {
-  data: ApiError
-  status: 503
-}
-
-export type postMonitorTransportFailedFlushResponseSuccess = (postMonitorTransportFailedFlushResponse200) & {
-  headers: Headers;
-};
-export type postMonitorTransportFailedFlushResponseError = (postMonitorTransportFailedFlushResponse422 | postMonitorTransportFailedFlushResponse503) & {
-  headers: Headers;
-};
-
-export type postMonitorTransportFailedFlushResponse = (postMonitorTransportFailedFlushResponseSuccess | postMonitorTransportFailedFlushResponseError)
-
 export const getPostMonitorTransportFailedFlushUrl = (params: PostMonitorTransportFailedFlushParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -30956,9 +25981,9 @@ export const getPostMonitorTransportFailedFlushUrl = (params: PostMonitorTranspo
  * Removes all messages from the failed transport. Requires ?confirm=true query parameter.
  * @summary Flush all failed messages
  */
-export const postMonitorTransportFailedFlush = async (params: PostMonitorTransportFailedFlushParams, options?: RequestInit): Promise<postMonitorTransportFailedFlushResponse> => {
+export const postMonitorTransportFailedFlush = async (params: PostMonitorTransportFailedFlushParams, options?: RequestInit): Promise<PostMonitorTransportFailedFlush200> => {
 
-  return customInstance<postMonitorTransportFailedFlushResponse>(getPostMonitorTransportFailedFlushUrl(params),
+  return customInstance<PostMonitorTransportFailedFlush200>(getPostMonitorTransportFailedFlushUrl(params),
   {
     ...options,
     method: 'POST'
@@ -31015,30 +26040,6 @@ export const usePostMonitorTransportFailedFlush = <TError = ErrorType<Validation
       return useMutation(getPostMonitorTransportFailedFlushMutationOptions(options), queryClient);
     }
 
-export type postMonitorTransportFailedRetryResponse200 = {
-  data: PostMonitorTransportFailedRetry200
-  status: 200
-}
-
-export type postMonitorTransportFailedRetryResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postMonitorTransportFailedRetryResponse500 = {
-  data: ApiError
-  status: 500
-}
-
-export type postMonitorTransportFailedRetryResponseSuccess = (postMonitorTransportFailedRetryResponse200) & {
-  headers: Headers;
-};
-export type postMonitorTransportFailedRetryResponseError = (postMonitorTransportFailedRetryResponse404 | postMonitorTransportFailedRetryResponse500) & {
-  headers: Headers;
-};
-
-export type postMonitorTransportFailedRetryResponse = (postMonitorTransportFailedRetryResponseSuccess | postMonitorTransportFailedRetryResponseError)
-
 export const getPostMonitorTransportFailedRetryUrl = (id: string,) => {
 
 
@@ -31051,9 +26052,9 @@ export const getPostMonitorTransportFailedRetryUrl = (id: string,) => {
  * Re-dispatches a specific failed message through the messenger worker.
  * @summary Retry a failed message
  */
-export const postMonitorTransportFailedRetry = async (id: string, options?: RequestInit): Promise<postMonitorTransportFailedRetryResponse> => {
+export const postMonitorTransportFailedRetry = async (id: string, options?: RequestInit): Promise<PostMonitorTransportFailedRetry200> => {
 
-  return customInstance<postMonitorTransportFailedRetryResponse>(getPostMonitorTransportFailedRetryUrl(id),
+  return customInstance<PostMonitorTransportFailedRetry200>(getPostMonitorTransportFailedRetryUrl(id),
   {
     ...options,
     method: 'POST'
@@ -31110,18 +26111,6 @@ export const usePostMonitorTransportFailedRetry = <TError = ErrorType<ApiError>,
       return useMutation(getPostMonitorTransportFailedRetryMutationOptions(options), queryClient);
     }
 
-export type getDebugWorkersResponse200 = {
-  data: GetDebugWorkers200
-  status: 200
-}
-
-export type getDebugWorkersResponseSuccess = (getDebugWorkersResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getDebugWorkersResponse = (getDebugWorkersResponseSuccess)
-
 export const getGetDebugWorkersUrl = () => {
 
 
@@ -31133,9 +26122,9 @@ export const getGetDebugWorkersUrl = () => {
 /**
  * @summary Server worker pool stats (HTTP, task, transcoding)
  */
-export const getDebugWorkers = async ( options?: RequestInit): Promise<getDebugWorkersResponse> => {
+export const getDebugWorkers = async ( options?: RequestInit): Promise<GetDebugWorkers200> => {
 
-  return customInstance<getDebugWorkersResponse>(getGetDebugWorkersUrl(),
+  return customInstance<GetDebugWorkers200>(getGetDebugWorkersUrl(),
   {
     ...options,
     method: 'GET'
@@ -31223,18 +26212,6 @@ export function useGetDebugWorkers<TData = Awaited<ReturnType<typeof getDebugWor
 
 
 
-export type getStreamMasterManifestResponseDefault = {
-  data: unknown
-  status: number
-}
-
-;
-export type getStreamMasterManifestResponseError = (getStreamMasterManifestResponseDefault) & {
-  headers: Headers;
-};
-
-export type getStreamMasterManifestResponse = (getStreamMasterManifestResponseError)
-
 export const getGetStreamMasterManifestUrl = (videoId: string,) => {
 
 
@@ -31246,9 +26223,9 @@ export const getGetStreamMasterManifestUrl = (videoId: string,) => {
 /**
  * @summary Get HLS master playlist
  */
-export const getStreamMasterManifest = async (videoId: string, options?: RequestInit): Promise<getStreamMasterManifestResponse> => {
+export const getStreamMasterManifest = async (videoId: string, options?: RequestInit): Promise<unknown> => {
 
-  return customInstance<getStreamMasterManifestResponse>(getGetStreamMasterManifestUrl(videoId),
+  return customInstance<unknown>(getGetStreamMasterManifestUrl(videoId),
   {
     ...options,
     method: 'GET'
@@ -31336,18 +26313,6 @@ export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof get
 
 
 
-export type getStreamMediaManifestResponseDefault = {
-  data: unknown
-  status: number
-}
-
-;
-export type getStreamMediaManifestResponseError = (getStreamMediaManifestResponseDefault) & {
-  headers: Headers;
-};
-
-export type getStreamMediaManifestResponse = (getStreamMediaManifestResponseError)
-
 export const getGetStreamMediaManifestUrl = (jobPublicId: string,) => {
 
 
@@ -31359,9 +26324,9 @@ export const getGetStreamMediaManifestUrl = (jobPublicId: string,) => {
 /**
  * @summary Get HLS media playlist for a specific rendition
  */
-export const getStreamMediaManifest = async (jobPublicId: string, options?: RequestInit): Promise<getStreamMediaManifestResponse> => {
+export const getStreamMediaManifest = async (jobPublicId: string, options?: RequestInit): Promise<unknown> => {
 
-  return customInstance<getStreamMediaManifestResponse>(getGetStreamMediaManifestUrl(jobPublicId),
+  return customInstance<unknown>(getGetStreamMediaManifestUrl(jobPublicId),
   {
     ...options,
     method: 'GET'
@@ -31449,18 +26414,6 @@ export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getS
 
 
 
-export type getStreamDashManifestResponseDefault = {
-  data: unknown
-  status: number
-}
-
-;
-export type getStreamDashManifestResponseError = (getStreamDashManifestResponseDefault) & {
-  headers: Headers;
-};
-
-export type getStreamDashManifestResponse = (getStreamDashManifestResponseError)
-
 export const getGetStreamDashManifestUrl = (videoId: string,) => {
 
 
@@ -31472,9 +26425,9 @@ export const getGetStreamDashManifestUrl = (videoId: string,) => {
 /**
  * @summary Get DASH manifest for a video
  */
-export const getStreamDashManifest = async (videoId: string, options?: RequestInit): Promise<getStreamDashManifestResponse> => {
+export const getStreamDashManifest = async (videoId: string, options?: RequestInit): Promise<unknown> => {
 
-  return customInstance<getStreamDashManifestResponse>(getGetStreamDashManifestUrl(videoId),
+  return customInstance<unknown>(getGetStreamDashManifestUrl(videoId),
   {
     ...options,
     method: 'GET'
@@ -31562,18 +26515,6 @@ export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getSt
 
 
 
-export type getStreamQualityLadderResponse200 = {
-  data: GetStreamQualityLadder200
-  status: 200
-}
-
-export type getStreamQualityLadderResponseSuccess = (getStreamQualityLadderResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getStreamQualityLadderResponse = (getStreamQualityLadderResponseSuccess)
-
 export const getGetStreamQualityLadderUrl = (videoId: string,) => {
 
 
@@ -31585,9 +26526,9 @@ export const getGetStreamQualityLadderUrl = (videoId: string,) => {
 /**
  * @summary Get available quality tiers for a video
  */
-export const getStreamQualityLadder = async (videoId: string, options?: RequestInit): Promise<getStreamQualityLadderResponse> => {
+export const getStreamQualityLadder = async (videoId: string, options?: RequestInit): Promise<GetStreamQualityLadder200> => {
 
-  return customInstance<getStreamQualityLadderResponse>(getGetStreamQualityLadderUrl(videoId),
+  return customInstance<GetStreamQualityLadder200>(getGetStreamQualityLadderUrl(videoId),
   {
     ...options,
     method: 'GET'
@@ -31675,18 +26616,6 @@ export function useGetStreamQualityLadder<TData = Awaited<ReturnType<typeof getS
 
 
 
-export type getStreamSubtitleManifestResponse200 = {
-  data: string
-  status: 200
-}
-
-export type getStreamSubtitleManifestResponseSuccess = (getStreamSubtitleManifestResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getStreamSubtitleManifestResponse = (getStreamSubtitleManifestResponseSuccess)
-
 export const getGetStreamSubtitleManifestUrl = (jobPublicId: string,
     language: string,) => {
 
@@ -31700,9 +26629,9 @@ export const getGetStreamSubtitleManifestUrl = (jobPublicId: string,
  * @summary Get HLS subtitle playlist for a language
  */
 export const getStreamSubtitleManifest = async (jobPublicId: string,
-    language: string, options?: RequestInit): Promise<getStreamSubtitleManifestResponse> => {
+    language: string, options?: RequestInit): Promise<string> => {
 
-  return customInstance<getStreamSubtitleManifestResponse>(getGetStreamSubtitleManifestUrl(jobPublicId,language),
+  return customInstance<string>(getGetStreamSubtitleManifestUrl(jobPublicId,language),
   {
     ...options,
     method: 'GET'
@@ -31796,35 +26725,6 @@ export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof g
 
 
 
-export type getStreamSegmentInitSegmentResponse200 = {
-  data: Blob
-  status: 200
-}
-
-export type getStreamSegmentInitSegmentResponse403 = {
-  data: GetStreamSegmentInitSegment403
-  status: 403
-}
-
-export type getStreamSegmentInitSegmentResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getStreamSegmentInitSegmentResponse503 = {
-  data: Blob
-  status: 503
-}
-
-export type getStreamSegmentInitSegmentResponseSuccess = (getStreamSegmentInitSegmentResponse200) & {
-  headers: Headers;
-};
-export type getStreamSegmentInitSegmentResponseError = (getStreamSegmentInitSegmentResponse403 | getStreamSegmentInitSegmentResponse404 | getStreamSegmentInitSegmentResponse503) & {
-  headers: Headers;
-};
-
-export type getStreamSegmentInitSegmentResponse = (getStreamSegmentInitSegmentResponseSuccess | getStreamSegmentInitSegmentResponseError)
-
 export const getGetStreamSegmentInitSegmentUrl = (jobPublicId: string,
     params: GetStreamSegmentInitSegmentParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -31845,9 +26745,9 @@ export const getGetStreamSegmentInitSegmentUrl = (jobPublicId: string,
  * @summary Get CMAF init segment
  */
 export const getStreamSegmentInitSegment = async (jobPublicId: string,
-    params: GetStreamSegmentInitSegmentParams, options?: RequestInit): Promise<getStreamSegmentInitSegmentResponse> => {
+    params: GetStreamSegmentInitSegmentParams, options?: RequestInit): Promise<Blob> => {
 
-  return customInstance<getStreamSegmentInitSegmentResponse>(getGetStreamSegmentInitSegmentUrl(jobPublicId,params),
+  return customInstance<Blob>(getGetStreamSegmentInitSegmentUrl(jobPublicId,params),
   {
     ...options,
     method: 'GET'
@@ -31941,35 +26841,6 @@ export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof
 
 
 
-export type getStreamSegmentSegmentResponse200 = {
-  data: Blob
-  status: 200
-}
-
-export type getStreamSegmentSegmentResponse202 = {
-  data: void
-  status: 202
-}
-
-export type getStreamSegmentSegmentResponse403 = {
-  data: void
-  status: 403
-}
-
-export type getStreamSegmentSegmentResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getStreamSegmentSegmentResponseSuccess = (getStreamSegmentSegmentResponse200 | getStreamSegmentSegmentResponse202) & {
-  headers: Headers;
-};
-export type getStreamSegmentSegmentResponseError = (getStreamSegmentSegmentResponse403 | getStreamSegmentSegmentResponse404) & {
-  headers: Headers;
-};
-
-export type getStreamSegmentSegmentResponse = (getStreamSegmentSegmentResponseSuccess | getStreamSegmentSegmentResponseError)
-
 export const getGetStreamSegmentSegmentUrl = (jobPublicId: string,
     params: GetStreamSegmentSegmentParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -31990,9 +26861,9 @@ export const getGetStreamSegmentSegmentUrl = (jobPublicId: string,
  * @summary Get fMP4 media segment (query-param routed)
  */
 export const getStreamSegmentSegment = async (jobPublicId: string,
-    params: GetStreamSegmentSegmentParams, options?: RequestInit): Promise<getStreamSegmentSegmentResponse> => {
+    params: GetStreamSegmentSegmentParams, options?: RequestInit): Promise<Blob | void> => {
 
-  return customInstance<getStreamSegmentSegmentResponse>(getGetStreamSegmentSegmentUrl(jobPublicId,params),
+  return customInstance<Blob | void>(getGetStreamSegmentSegmentUrl(jobPublicId,params),
   {
     ...options,
     method: 'GET'
@@ -32086,30 +26957,6 @@ export function useGetStreamSegmentSegment<TData = Awaited<ReturnType<typeof get
 
 
 
-export type getStreamSegmentSubtitleSegmentResponse200 = {
-  data: string
-  status: 200
-}
-
-export type getStreamSegmentSubtitleSegmentResponse403 = {
-  data: void
-  status: 403
-}
-
-export type getStreamSegmentSubtitleSegmentResponse404 = {
-  data: void
-  status: 404
-}
-
-export type getStreamSegmentSubtitleSegmentResponseSuccess = (getStreamSegmentSubtitleSegmentResponse200) & {
-  headers: Headers;
-};
-export type getStreamSegmentSubtitleSegmentResponseError = (getStreamSegmentSubtitleSegmentResponse403 | getStreamSegmentSubtitleSegmentResponse404) & {
-  headers: Headers;
-};
-
-export type getStreamSegmentSubtitleSegmentResponse = (getStreamSegmentSubtitleSegmentResponseSuccess | getStreamSegmentSubtitleSegmentResponseError)
-
 export const getGetStreamSegmentSubtitleSegmentUrl = (jobPublicId: string,
     language: string,
     segment: string,
@@ -32134,9 +26981,9 @@ export const getGetStreamSegmentSubtitleSegmentUrl = (jobPublicId: string,
 export const getStreamSegmentSubtitleSegment = async (jobPublicId: string,
     language: string,
     segment: string,
-    params: GetStreamSegmentSubtitleSegmentParams, options?: RequestInit): Promise<getStreamSegmentSubtitleSegmentResponse> => {
+    params: GetStreamSegmentSubtitleSegmentParams, options?: RequestInit): Promise<string> => {
 
-  return customInstance<getStreamSegmentSubtitleSegmentResponse>(getGetStreamSegmentSubtitleSegmentUrl(jobPublicId,language,segment,params),
+  return customInstance<string>(getGetStreamSegmentSubtitleSegmentUrl(jobPublicId,language,segment,params),
   {
     ...options,
     method: 'GET'
@@ -32242,30 +27089,6 @@ export function useGetStreamSegmentSubtitleSegment<TData = Awaited<ReturnType<ty
 
 
 
-export type postStreamSigningSignResponse200 = {
-  data: PostStreamSigningSign200
-  status: 200
-}
-
-export type postStreamSigningSignResponse400 = {
-  data: void
-  status: 400
-}
-
-export type postStreamSigningSignResponse503 = {
-  data: PostStreamSigningSign503
-  status: 503
-}
-
-export type postStreamSigningSignResponseSuccess = (postStreamSigningSignResponse200) & {
-  headers: Headers;
-};
-export type postStreamSigningSignResponseError = (postStreamSigningSignResponse400 | postStreamSigningSignResponse503) & {
-  headers: Headers;
-};
-
-export type postStreamSigningSignResponse = (postStreamSigningSignResponseSuccess | postStreamSigningSignResponseError)
-
 export const getPostStreamSigningSignUrl = () => {
 
 
@@ -32277,9 +27100,9 @@ export const getPostStreamSigningSignUrl = () => {
 /**
  * @summary Generate a signed URL for a stream resource
  */
-export const postStreamSigningSign = async (postStreamSigningSignBody: PostStreamSigningSignBody, options?: RequestInit): Promise<postStreamSigningSignResponse> => {
+export const postStreamSigningSign = async (postStreamSigningSignBody: PostStreamSigningSignBody, options?: RequestInit): Promise<PostStreamSigningSign200> => {
 
-  return customInstance<postStreamSigningSignResponse>(getPostStreamSigningSignUrl(),
+  return customInstance<PostStreamSigningSign200>(getPostStreamSigningSignUrl(),
   {
     ...options,
     method: 'POST',
@@ -32336,18 +27159,6 @@ export const usePostStreamSigningSign = <TError = ErrorType<void | PostStreamSig
       return useMutation(getPostStreamSigningSignMutationOptions(options), queryClient);
     }
 
-export type getTranscodeJobIndexResponse200 = {
-  data: GetTranscodeJobIndex200
-  status: 200
-}
-
-export type getTranscodeJobIndexResponseSuccess = (getTranscodeJobIndexResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getTranscodeJobIndexResponse = (getTranscodeJobIndexResponseSuccess)
-
 export const getGetTranscodeJobIndexUrl = () => {
 
 
@@ -32359,9 +27170,9 @@ export const getGetTranscodeJobIndexUrl = () => {
 /**
  * @summary List all transcode jobs
  */
-export const getTranscodeJobIndex = async ( options?: RequestInit): Promise<getTranscodeJobIndexResponse> => {
+export const getTranscodeJobIndex = async ( options?: RequestInit): Promise<GetTranscodeJobIndex200> => {
 
-  return customInstance<getTranscodeJobIndexResponse>(getGetTranscodeJobIndexUrl(),
+  return customInstance<GetTranscodeJobIndex200>(getGetTranscodeJobIndexUrl(),
   {
     ...options,
     method: 'GET'
@@ -32449,25 +27260,6 @@ export function useGetTranscodeJobIndex<TData = Awaited<ReturnType<typeof getTra
 
 
 
-export type getTranscodeJobShowResponse200 = {
-  data: GetTranscodeJobShow200
-  status: 200
-}
-
-export type getTranscodeJobShowResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getTranscodeJobShowResponseSuccess = (getTranscodeJobShowResponse200) & {
-  headers: Headers;
-};
-export type getTranscodeJobShowResponseError = (getTranscodeJobShowResponse404) & {
-  headers: Headers;
-};
-
-export type getTranscodeJobShowResponse = (getTranscodeJobShowResponseSuccess | getTranscodeJobShowResponseError)
-
 export const getGetTranscodeJobShowUrl = (publicId: string,) => {
 
 
@@ -32479,9 +27271,9 @@ export const getGetTranscodeJobShowUrl = (publicId: string,) => {
 /**
  * @summary Get a transcode job by public ID
  */
-export const getTranscodeJobShow = async (publicId: string, options?: RequestInit): Promise<getTranscodeJobShowResponse> => {
+export const getTranscodeJobShow = async (publicId: string, options?: RequestInit): Promise<GetTranscodeJobShow200> => {
 
-  return customInstance<getTranscodeJobShowResponse>(getGetTranscodeJobShowUrl(publicId),
+  return customInstance<GetTranscodeJobShow200>(getGetTranscodeJobShowUrl(publicId),
   {
     ...options,
     method: 'GET'
@@ -32569,18 +27361,6 @@ export function useGetTranscodeJobShow<TData = Awaited<ReturnType<typeof getTran
 
 
 
-export type postTranscodeJobCleanupResponse200 = {
-  data: PostTranscodeJobCleanup200
-  status: 200
-}
-
-export type postTranscodeJobCleanupResponseSuccess = (postTranscodeJobCleanupResponse200) & {
-  headers: Headers;
-};
-;
-
-export type postTranscodeJobCleanupResponse = (postTranscodeJobCleanupResponseSuccess)
-
 export const getPostTranscodeJobCleanupUrl = () => {
 
 
@@ -32592,9 +27372,9 @@ export const getPostTranscodeJobCleanupUrl = () => {
 /**
  * @summary Clean up orphaned transcode jobs (no active sessions)
  */
-export const postTranscodeJobCleanup = async ( options?: RequestInit): Promise<postTranscodeJobCleanupResponse> => {
+export const postTranscodeJobCleanup = async ( options?: RequestInit): Promise<PostTranscodeJobCleanup200> => {
 
-  return customInstance<postTranscodeJobCleanupResponse>(getPostTranscodeJobCleanupUrl(),
+  return customInstance<PostTranscodeJobCleanup200>(getPostTranscodeJobCleanupUrl(),
   {
     ...options,
     method: 'POST'
@@ -32651,25 +27431,6 @@ export const usePostTranscodeJobCleanup = <TError = ErrorType<unknown>,
       return useMutation(getPostTranscodeJobCleanupMutationOptions(options), queryClient);
     }
 
-export type getTranscodeJobMetricsResponse200 = {
-  data: TranscodeMetricsResource
-  status: 200
-}
-
-export type getTranscodeJobMetricsResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getTranscodeJobMetricsResponseSuccess = (getTranscodeJobMetricsResponse200) & {
-  headers: Headers;
-};
-export type getTranscodeJobMetricsResponseError = (getTranscodeJobMetricsResponse404) & {
-  headers: Headers;
-};
-
-export type getTranscodeJobMetricsResponse = (getTranscodeJobMetricsResponseSuccess | getTranscodeJobMetricsResponseError)
-
 export const getGetTranscodeJobMetricsUrl = (publicId: string,) => {
 
 
@@ -32681,9 +27442,9 @@ export const getGetTranscodeJobMetricsUrl = (publicId: string,) => {
 /**
  * @summary Get transcode job metrics
  */
-export const getTranscodeJobMetrics = async (publicId: string, options?: RequestInit): Promise<getTranscodeJobMetricsResponse> => {
+export const getTranscodeJobMetrics = async (publicId: string, options?: RequestInit): Promise<TranscodeMetricsResource> => {
 
-  return customInstance<getTranscodeJobMetricsResponse>(getGetTranscodeJobMetricsUrl(publicId),
+  return customInstance<TranscodeMetricsResource>(getGetTranscodeJobMetricsUrl(publicId),
   {
     ...options,
     method: 'GET'
@@ -32771,25 +27532,6 @@ export function useGetTranscodeJobMetrics<TData = Awaited<ReturnType<typeof getT
 
 
 
-export type getTranscodeJobListResponse200 = {
-  data: void
-  status: 200
-}
-
-export type getTranscodeJobListResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getTranscodeJobListResponseSuccess = (getTranscodeJobListResponse200) & {
-  headers: Headers;
-};
-export type getTranscodeJobListResponseError = (getTranscodeJobListResponse401) & {
-  headers: Headers;
-};
-
-export type getTranscodeJobListResponse = (getTranscodeJobListResponseSuccess | getTranscodeJobListResponseError)
-
 export const getGetTranscodeJobListUrl = () => {
 
 
@@ -32801,9 +27543,9 @@ export const getGetTranscodeJobListUrl = () => {
 /**
  * @summary List transcode jobs for the authenticated user
  */
-export const getTranscodeJobList = async ( options?: RequestInit): Promise<getTranscodeJobListResponse> => {
+export const getTranscodeJobList = async ( options?: RequestInit): Promise<void> => {
 
-  return customInstance<getTranscodeJobListResponse>(getGetTranscodeJobListUrl(),
+  return customInstance<void>(getGetTranscodeJobListUrl(),
   {
     ...options,
     method: 'GET'
@@ -32891,25 +27633,6 @@ export function useGetTranscodeJobList<TData = Awaited<ReturnType<typeof getTran
 
 
 
-export type getTranscodeSessionIndexResponse200 = {
-  data: GetTranscodeSessionIndex200
-  status: 200
-}
-
-export type getTranscodeSessionIndexResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getTranscodeSessionIndexResponseSuccess = (getTranscodeSessionIndexResponse200) & {
-  headers: Headers;
-};
-export type getTranscodeSessionIndexResponseError = (getTranscodeSessionIndexResponse401) & {
-  headers: Headers;
-};
-
-export type getTranscodeSessionIndexResponse = (getTranscodeSessionIndexResponseSuccess | getTranscodeSessionIndexResponseError)
-
 export const getGetTranscodeSessionIndexUrl = () => {
 
 
@@ -32921,9 +27644,9 @@ export const getGetTranscodeSessionIndexUrl = () => {
 /**
  * @summary List active transcode sessions for the authenticated user
  */
-export const getTranscodeSessionIndex = async ( options?: RequestInit): Promise<getTranscodeSessionIndexResponse> => {
+export const getTranscodeSessionIndex = async ( options?: RequestInit): Promise<GetTranscodeSessionIndex200> => {
 
-  return customInstance<getTranscodeSessionIndexResponse>(getGetTranscodeSessionIndexUrl(),
+  return customInstance<GetTranscodeSessionIndex200>(getGetTranscodeSessionIndexUrl(),
   {
     ...options,
     method: 'GET'
@@ -33011,35 +27734,6 @@ export function useGetTranscodeSessionIndex<TData = Awaited<ReturnType<typeof ge
 
 
 
-export type postTranscodeSessionCreateResponse201 = {
-  data: TranscodeSessionResource
-  status: 201
-}
-
-export type postTranscodeSessionCreateResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postTranscodeSessionCreateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postTranscodeSessionCreateResponse503 = {
-  data: PostTranscodeSessionCreate503
-  status: 503
-}
-
-export type postTranscodeSessionCreateResponseSuccess = (postTranscodeSessionCreateResponse201) & {
-  headers: Headers;
-};
-export type postTranscodeSessionCreateResponseError = (postTranscodeSessionCreateResponse401 | postTranscodeSessionCreateResponse422 | postTranscodeSessionCreateResponse503) & {
-  headers: Headers;
-};
-
-export type postTranscodeSessionCreateResponse = (postTranscodeSessionCreateResponseSuccess | postTranscodeSessionCreateResponseError)
-
 export const getPostTranscodeSessionCreateUrl = () => {
 
 
@@ -33051,9 +27745,9 @@ export const getPostTranscodeSessionCreateUrl = () => {
 /**
  * @summary Create a new transcode session
  */
-export const postTranscodeSessionCreate = async (postTranscodeSessionCreateBody: PostTranscodeSessionCreateBody, options?: RequestInit): Promise<postTranscodeSessionCreateResponse> => {
+export const postTranscodeSessionCreate = async (postTranscodeSessionCreateBody: PostTranscodeSessionCreateBody, options?: RequestInit): Promise<TranscodeSessionResource> => {
 
-  return customInstance<postTranscodeSessionCreateResponse>(getPostTranscodeSessionCreateUrl(),
+  return customInstance<TranscodeSessionResource>(getPostTranscodeSessionCreateUrl(),
   {
     ...options,
     method: 'POST',
@@ -33110,25 +27804,6 @@ export const usePostTranscodeSessionCreate = <TError = ErrorType<ApiError | Vali
       return useMutation(getPostTranscodeSessionCreateMutationOptions(options), queryClient);
     }
 
-export type getTranscodeSessionShowResponse200 = {
-  data: GetTranscodeSessionShow200
-  status: 200
-}
-
-export type getTranscodeSessionShowResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getTranscodeSessionShowResponseSuccess = (getTranscodeSessionShowResponse200) & {
-  headers: Headers;
-};
-export type getTranscodeSessionShowResponseError = (getTranscodeSessionShowResponse404) & {
-  headers: Headers;
-};
-
-export type getTranscodeSessionShowResponse = (getTranscodeSessionShowResponseSuccess | getTranscodeSessionShowResponseError)
-
 export const getGetTranscodeSessionShowUrl = (uuid: string,) => {
 
 
@@ -33140,9 +27815,9 @@ export const getGetTranscodeSessionShowUrl = (uuid: string,) => {
 /**
  * @summary Get a transcode session by UUID
  */
-export const getTranscodeSessionShow = async (uuid: string, options?: RequestInit): Promise<getTranscodeSessionShowResponse> => {
+export const getTranscodeSessionShow = async (uuid: string, options?: RequestInit): Promise<GetTranscodeSessionShow200> => {
 
-  return customInstance<getTranscodeSessionShowResponse>(getGetTranscodeSessionShowUrl(uuid),
+  return customInstance<GetTranscodeSessionShow200>(getGetTranscodeSessionShowUrl(uuid),
   {
     ...options,
     method: 'GET'
@@ -33230,25 +27905,6 @@ export function useGetTranscodeSessionShow<TData = Awaited<ReturnType<typeof get
 
 
 
-export type deleteTranscodeSessionCancelResponse200 = {
-  data: DeleteTranscodeSessionCancel200
-  status: 200
-}
-
-export type deleteTranscodeSessionCancelResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteTranscodeSessionCancelResponseSuccess = (deleteTranscodeSessionCancelResponse200) & {
-  headers: Headers;
-};
-export type deleteTranscodeSessionCancelResponseError = (deleteTranscodeSessionCancelResponse404) & {
-  headers: Headers;
-};
-
-export type deleteTranscodeSessionCancelResponse = (deleteTranscodeSessionCancelResponseSuccess | deleteTranscodeSessionCancelResponseError)
-
 export const getDeleteTranscodeSessionCancelUrl = (uuid: string,) => {
 
 
@@ -33260,9 +27916,9 @@ export const getDeleteTranscodeSessionCancelUrl = (uuid: string,) => {
 /**
  * @summary Cancel a transcode session
  */
-export const deleteTranscodeSessionCancel = async (uuid: string, options?: RequestInit): Promise<deleteTranscodeSessionCancelResponse> => {
+export const deleteTranscodeSessionCancel = async (uuid: string, options?: RequestInit): Promise<DeleteTranscodeSessionCancel200> => {
 
-  return customInstance<deleteTranscodeSessionCancelResponse>(getDeleteTranscodeSessionCancelUrl(uuid),
+  return customInstance<DeleteTranscodeSessionCancel200>(getDeleteTranscodeSessionCancelUrl(uuid),
   {
     ...options,
     method: 'DELETE'
@@ -33319,25 +27975,6 @@ export const useDeleteTranscodeSessionCancel = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteTranscodeSessionCancelMutationOptions(options), queryClient);
     }
 
-export type patchTranscodeSessionUpdateResponse200 = {
-  data: PatchTranscodeSessionUpdate200
-  status: 200
-}
-
-export type patchTranscodeSessionUpdateResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type patchTranscodeSessionUpdateResponseSuccess = (patchTranscodeSessionUpdateResponse200) & {
-  headers: Headers;
-};
-export type patchTranscodeSessionUpdateResponseError = (patchTranscodeSessionUpdateResponse404) & {
-  headers: Headers;
-};
-
-export type patchTranscodeSessionUpdateResponse = (patchTranscodeSessionUpdateResponseSuccess | patchTranscodeSessionUpdateResponseError)
-
 export const getPatchTranscodeSessionUpdateUrl = (uuid: string,) => {
 
 
@@ -33350,9 +27987,9 @@ export const getPatchTranscodeSessionUpdateUrl = (uuid: string,) => {
  * @summary Update a transcode session
  */
 export const patchTranscodeSessionUpdate = async (uuid: string,
-    patchTranscodeSessionUpdateBody: PatchTranscodeSessionUpdateBody, options?: RequestInit): Promise<patchTranscodeSessionUpdateResponse> => {
+    patchTranscodeSessionUpdateBody: PatchTranscodeSessionUpdateBody, options?: RequestInit): Promise<PatchTranscodeSessionUpdate200> => {
 
-  return customInstance<patchTranscodeSessionUpdateResponse>(getPatchTranscodeSessionUpdateUrl(uuid),
+  return customInstance<PatchTranscodeSessionUpdate200>(getPatchTranscodeSessionUpdateUrl(uuid),
   {
     ...options,
     method: 'PATCH',
@@ -33409,25 +28046,6 @@ export const usePatchTranscodeSessionUpdate = <TError = ErrorType<ApiError>,
       return useMutation(getPatchTranscodeSessionUpdateMutationOptions(options), queryClient);
     }
 
-export type patchTranscodeSessionPauseResponse200 = {
-  data: PatchTranscodeSessionPause200
-  status: 200
-}
-
-export type patchTranscodeSessionPauseResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type patchTranscodeSessionPauseResponseSuccess = (patchTranscodeSessionPauseResponse200) & {
-  headers: Headers;
-};
-export type patchTranscodeSessionPauseResponseError = (patchTranscodeSessionPauseResponse404) & {
-  headers: Headers;
-};
-
-export type patchTranscodeSessionPauseResponse = (patchTranscodeSessionPauseResponseSuccess | patchTranscodeSessionPauseResponseError)
-
 export const getPatchTranscodeSessionPauseUrl = (uuid: string,) => {
 
 
@@ -33439,9 +28057,9 @@ export const getPatchTranscodeSessionPauseUrl = (uuid: string,) => {
 /**
  * @summary Pause a transcode session
  */
-export const patchTranscodeSessionPause = async (uuid: string, options?: RequestInit): Promise<patchTranscodeSessionPauseResponse> => {
+export const patchTranscodeSessionPause = async (uuid: string, options?: RequestInit): Promise<PatchTranscodeSessionPause200> => {
 
-  return customInstance<patchTranscodeSessionPauseResponse>(getPatchTranscodeSessionPauseUrl(uuid),
+  return customInstance<PatchTranscodeSessionPause200>(getPatchTranscodeSessionPauseUrl(uuid),
   {
     ...options,
     method: 'PATCH'
@@ -33498,25 +28116,6 @@ export const usePatchTranscodeSessionPause = <TError = ErrorType<ApiError>,
       return useMutation(getPatchTranscodeSessionPauseMutationOptions(options), queryClient);
     }
 
-export type patchTranscodeSessionResumeResponse200 = {
-  data: PatchTranscodeSessionResume200
-  status: 200
-}
-
-export type patchTranscodeSessionResumeResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type patchTranscodeSessionResumeResponseSuccess = (patchTranscodeSessionResumeResponse200) & {
-  headers: Headers;
-};
-export type patchTranscodeSessionResumeResponseError = (patchTranscodeSessionResumeResponse404) & {
-  headers: Headers;
-};
-
-export type patchTranscodeSessionResumeResponse = (patchTranscodeSessionResumeResponseSuccess | patchTranscodeSessionResumeResponseError)
-
 export const getPatchTranscodeSessionResumeUrl = (uuid: string,) => {
 
 
@@ -33528,9 +28127,9 @@ export const getPatchTranscodeSessionResumeUrl = (uuid: string,) => {
 /**
  * @summary Resume a paused transcode session
  */
-export const patchTranscodeSessionResume = async (uuid: string, options?: RequestInit): Promise<patchTranscodeSessionResumeResponse> => {
+export const patchTranscodeSessionResume = async (uuid: string, options?: RequestInit): Promise<PatchTranscodeSessionResume200> => {
 
-  return customInstance<patchTranscodeSessionResumeResponse>(getPatchTranscodeSessionResumeUrl(uuid),
+  return customInstance<PatchTranscodeSessionResume200>(getPatchTranscodeSessionResumeUrl(uuid),
   {
     ...options,
     method: 'PATCH'
@@ -33587,25 +28186,6 @@ export const usePatchTranscodeSessionResume = <TError = ErrorType<ApiError>,
       return useMutation(getPatchTranscodeSessionResumeMutationOptions(options), queryClient);
     }
 
-export type getTranscodeSessionListResponse200 = {
-  data: void
-  status: 200
-}
-
-export type getTranscodeSessionListResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getTranscodeSessionListResponseSuccess = (getTranscodeSessionListResponse200) & {
-  headers: Headers;
-};
-export type getTranscodeSessionListResponseError = (getTranscodeSessionListResponse401) & {
-  headers: Headers;
-};
-
-export type getTranscodeSessionListResponse = (getTranscodeSessionListResponseSuccess | getTranscodeSessionListResponseError)
-
 export const getGetTranscodeSessionListUrl = () => {
 
 
@@ -33617,9 +28197,9 @@ export const getGetTranscodeSessionListUrl = () => {
 /**
  * @summary List all transcode sessions for the authenticated user
  */
-export const getTranscodeSessionList = async ( options?: RequestInit): Promise<getTranscodeSessionListResponse> => {
+export const getTranscodeSessionList = async ( options?: RequestInit): Promise<void> => {
 
-  return customInstance<getTranscodeSessionListResponse>(getGetTranscodeSessionListUrl(),
+  return customInstance<void>(getGetTranscodeSessionListUrl(),
   {
     ...options,
     method: 'GET'
@@ -33707,18 +28287,6 @@ export function useGetTranscodeSessionList<TData = Awaited<ReturnType<typeof get
 
 
 
-export type postTranscodeSessionPositionResponse200 = {
-  data: PostTranscodeSessionPosition200
-  status: 200
-}
-
-export type postTranscodeSessionPositionResponseSuccess = (postTranscodeSessionPositionResponse200) & {
-  headers: Headers;
-};
-;
-
-export type postTranscodeSessionPositionResponse = (postTranscodeSessionPositionResponseSuccess)
-
 export const getPostTranscodeSessionPositionUrl = (uuid: string,) => {
 
 
@@ -33731,9 +28299,9 @@ export const getPostTranscodeSessionPositionUrl = (uuid: string,) => {
  * @summary Update transcode session playback position (seek signal)
  */
 export const postTranscodeSessionPosition = async (uuid: string,
-    postTranscodeSessionPositionBody: PostTranscodeSessionPositionBody, options?: RequestInit): Promise<postTranscodeSessionPositionResponse> => {
+    postTranscodeSessionPositionBody: PostTranscodeSessionPositionBody, options?: RequestInit): Promise<PostTranscodeSessionPosition200> => {
 
-  return customInstance<postTranscodeSessionPositionResponse>(getPostTranscodeSessionPositionUrl(uuid),
+  return customInstance<PostTranscodeSessionPosition200>(getPostTranscodeSessionPositionUrl(uuid),
   {
     ...options,
     method: 'POST',
@@ -33790,25 +28358,6 @@ export const usePostTranscodeSessionPosition = <TError = ErrorType<unknown>,
       return useMutation(getPostTranscodeSessionPositionMutationOptions(options), queryClient);
     }
 
-export type getAccentColorIndexResponse200 = {
-  data: GetAccentColorIndex200
-  status: 200
-}
-
-export type getAccentColorIndexResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getAccentColorIndexResponseSuccess = (getAccentColorIndexResponse200) & {
-  headers: Headers;
-};
-export type getAccentColorIndexResponseError = (getAccentColorIndexResponse401) & {
-  headers: Headers;
-};
-
-export type getAccentColorIndexResponse = (getAccentColorIndexResponseSuccess | getAccentColorIndexResponseError)
-
 export const getGetAccentColorIndexUrl = () => {
 
 
@@ -33821,9 +28370,9 @@ export const getGetAccentColorIndexUrl = () => {
  * Returns the current accent color for the authenticated user.
  * @summary Get accent color
  */
-export const getAccentColorIndex = async ( options?: RequestInit): Promise<getAccentColorIndexResponse> => {
+export const getAccentColorIndex = async ( options?: RequestInit): Promise<GetAccentColorIndex200> => {
 
-  return customInstance<getAccentColorIndexResponse>(getGetAccentColorIndexUrl(),
+  return customInstance<GetAccentColorIndex200>(getGetAccentColorIndexUrl(),
   {
     ...options,
     method: 'GET'
@@ -33911,30 +28460,6 @@ export function useGetAccentColorIndex<TData = Awaited<ReturnType<typeof getAcce
 
 
 
-export type putAccentColorUpdateResponse200 = {
-  data: PutAccentColorUpdate200
-  status: 200
-}
-
-export type putAccentColorUpdateResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type putAccentColorUpdateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type putAccentColorUpdateResponseSuccess = (putAccentColorUpdateResponse200) & {
-  headers: Headers;
-};
-export type putAccentColorUpdateResponseError = (putAccentColorUpdateResponse401 | putAccentColorUpdateResponse422) & {
-  headers: Headers;
-};
-
-export type putAccentColorUpdateResponse = (putAccentColorUpdateResponseSuccess | putAccentColorUpdateResponseError)
-
 export const getPutAccentColorUpdateUrl = () => {
 
 
@@ -33946,9 +28471,9 @@ export const getPutAccentColorUpdateUrl = () => {
 /**
  * @summary Update accent color
  */
-export const putAccentColorUpdate = async (putAccentColorUpdateBody: PutAccentColorUpdateBody, options?: RequestInit): Promise<putAccentColorUpdateResponse> => {
+export const putAccentColorUpdate = async (putAccentColorUpdateBody: PutAccentColorUpdateBody, options?: RequestInit): Promise<PutAccentColorUpdate200> => {
 
-  return customInstance<putAccentColorUpdateResponse>(getPutAccentColorUpdateUrl(),
+  return customInstance<PutAccentColorUpdate200>(getPutAccentColorUpdateUrl(),
   {
     ...options,
     method: 'PUT',
@@ -34005,30 +28530,6 @@ export const usePutAccentColorUpdate = <TError = ErrorType<ApiError | Validation
       return useMutation(getPutAccentColorUpdateMutationOptions(options), queryClient);
     }
 
-export type getAudioPreferencesIndexResponse200 = {
-  data: GetAudioPreferencesIndex200
-  status: 200
-}
-
-export type getAudioPreferencesIndexResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getAudioPreferencesIndexResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getAudioPreferencesIndexResponseSuccess = (getAudioPreferencesIndexResponse200) & {
-  headers: Headers;
-};
-export type getAudioPreferencesIndexResponseError = (getAudioPreferencesIndexResponse401 | getAudioPreferencesIndexResponse404) & {
-  headers: Headers;
-};
-
-export type getAudioPreferencesIndexResponse = (getAudioPreferencesIndexResponseSuccess | getAudioPreferencesIndexResponseError)
-
 export const getGetAudioPreferencesIndexUrl = () => {
 
 
@@ -34041,9 +28542,9 @@ export const getGetAudioPreferencesIndexUrl = () => {
  * Returns the audio preferences for the authenticated user. Payload shape follows schema version 2 (flexible JSONB).
  * @summary Get audio preferences
  */
-export const getAudioPreferencesIndex = async ( options?: RequestInit): Promise<getAudioPreferencesIndexResponse> => {
+export const getAudioPreferencesIndex = async ( options?: RequestInit): Promise<GetAudioPreferencesIndex200> => {
 
-  return customInstance<getAudioPreferencesIndexResponse>(getGetAudioPreferencesIndexUrl(),
+  return customInstance<GetAudioPreferencesIndex200>(getGetAudioPreferencesIndexUrl(),
   {
     ...options,
     method: 'GET'
@@ -34131,35 +28632,6 @@ export function useGetAudioPreferencesIndex<TData = Awaited<ReturnType<typeof ge
 
 
 
-export type putAudioPreferencesUpdateResponse200 = {
-  data: PutAudioPreferencesUpdate200
-  status: 200
-}
-
-export type putAudioPreferencesUpdateResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type putAudioPreferencesUpdateResponse409 = {
-  data: ApiError
-  status: 409
-}
-
-export type putAudioPreferencesUpdateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type putAudioPreferencesUpdateResponseSuccess = (putAudioPreferencesUpdateResponse200) & {
-  headers: Headers;
-};
-export type putAudioPreferencesUpdateResponseError = (putAudioPreferencesUpdateResponse401 | putAudioPreferencesUpdateResponse409 | putAudioPreferencesUpdateResponse422) & {
-  headers: Headers;
-};
-
-export type putAudioPreferencesUpdateResponse = (putAudioPreferencesUpdateResponseSuccess | putAudioPreferencesUpdateResponseError)
-
 export const getPutAudioPreferencesUpdateUrl = () => {
 
 
@@ -34171,9 +28643,9 @@ export const getPutAudioPreferencesUpdateUrl = () => {
 /**
  * @summary Save audio preferences
  */
-export const putAudioPreferencesUpdate = async (putAudioPreferencesUpdateBody: PutAudioPreferencesUpdateBody, options?: RequestInit): Promise<putAudioPreferencesUpdateResponse> => {
+export const putAudioPreferencesUpdate = async (putAudioPreferencesUpdateBody: PutAudioPreferencesUpdateBody, options?: RequestInit): Promise<PutAudioPreferencesUpdate200> => {
 
-  return customInstance<putAudioPreferencesUpdateResponse>(getPutAudioPreferencesUpdateUrl(),
+  return customInstance<PutAudioPreferencesUpdate200>(getPutAudioPreferencesUpdateUrl(),
   {
     ...options,
     method: 'PUT',
@@ -34230,25 +28702,6 @@ export const usePutAudioPreferencesUpdate = <TError = ErrorType<ApiError | Valid
       return useMutation(getPutAudioPreferencesUpdateMutationOptions(options), queryClient);
     }
 
-export type getAudioPreferencesHistoryResponse200 = {
-  data: GetAudioPreferencesHistory200
-  status: 200
-}
-
-export type getAudioPreferencesHistoryResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getAudioPreferencesHistoryResponseSuccess = (getAudioPreferencesHistoryResponse200) & {
-  headers: Headers;
-};
-export type getAudioPreferencesHistoryResponseError = (getAudioPreferencesHistoryResponse401) & {
-  headers: Headers;
-};
-
-export type getAudioPreferencesHistoryResponse = (getAudioPreferencesHistoryResponseSuccess | getAudioPreferencesHistoryResponseError)
-
 export const getGetAudioPreferencesHistoryUrl = () => {
 
 
@@ -34261,9 +28714,9 @@ export const getGetAudioPreferencesHistoryUrl = () => {
  * Returns the version history for audio preferences.
  * @summary Get audio preferences history
  */
-export const getAudioPreferencesHistory = async ( options?: RequestInit): Promise<getAudioPreferencesHistoryResponse> => {
+export const getAudioPreferencesHistory = async ( options?: RequestInit): Promise<GetAudioPreferencesHistory200> => {
 
-  return customInstance<getAudioPreferencesHistoryResponse>(getGetAudioPreferencesHistoryUrl(),
+  return customInstance<GetAudioPreferencesHistory200>(getGetAudioPreferencesHistoryUrl(),
   {
     ...options,
     method: 'GET'
@@ -34351,30 +28804,6 @@ export function useGetAudioPreferencesHistory<TData = Awaited<ReturnType<typeof 
 
 
 
-export type postAudioPreferencesRollbackResponse200 = {
-  data: PostAudioPreferencesRollback200
-  status: 200
-}
-
-export type postAudioPreferencesRollbackResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postAudioPreferencesRollbackResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postAudioPreferencesRollbackResponseSuccess = (postAudioPreferencesRollbackResponse200) & {
-  headers: Headers;
-};
-export type postAudioPreferencesRollbackResponseError = (postAudioPreferencesRollbackResponse401 | postAudioPreferencesRollbackResponse422) & {
-  headers: Headers;
-};
-
-export type postAudioPreferencesRollbackResponse = (postAudioPreferencesRollbackResponseSuccess | postAudioPreferencesRollbackResponseError)
-
 export const getPostAudioPreferencesRollbackUrl = () => {
 
 
@@ -34386,9 +28815,9 @@ export const getPostAudioPreferencesRollbackUrl = () => {
 /**
  * @summary Rollback audio preferences to a previous version
  */
-export const postAudioPreferencesRollback = async (postAudioPreferencesRollbackBody: PostAudioPreferencesRollbackBody, options?: RequestInit): Promise<postAudioPreferencesRollbackResponse> => {
+export const postAudioPreferencesRollback = async (postAudioPreferencesRollbackBody: PostAudioPreferencesRollbackBody, options?: RequestInit): Promise<PostAudioPreferencesRollback200> => {
 
-  return customInstance<postAudioPreferencesRollbackResponse>(getPostAudioPreferencesRollbackUrl(),
+  return customInstance<PostAudioPreferencesRollback200>(getPostAudioPreferencesRollbackUrl(),
   {
     ...options,
     method: 'POST',
@@ -34445,25 +28874,6 @@ export const usePostAudioPreferencesRollback = <TError = ErrorType<ApiError | Va
       return useMutation(getPostAudioPreferencesRollbackMutationOptions(options), queryClient);
     }
 
-export type getEqProfilesIndexResponse200 = {
-  data: GetEqProfilesIndex200
-  status: 200
-}
-
-export type getEqProfilesIndexResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getEqProfilesIndexResponseSuccess = (getEqProfilesIndexResponse200) & {
-  headers: Headers;
-};
-export type getEqProfilesIndexResponseError = (getEqProfilesIndexResponse401) & {
-  headers: Headers;
-};
-
-export type getEqProfilesIndexResponse = (getEqProfilesIndexResponseSuccess | getEqProfilesIndexResponseError)
-
 export const getGetEqProfilesIndexUrl = () => {
 
 
@@ -34475,9 +28885,9 @@ export const getGetEqProfilesIndexUrl = () => {
 /**
  * @summary List all EQ device profiles for the authenticated user
  */
-export const getEqProfilesIndex = async ( options?: RequestInit): Promise<getEqProfilesIndexResponse> => {
+export const getEqProfilesIndex = async ( options?: RequestInit): Promise<GetEqProfilesIndex200> => {
 
-  return customInstance<getEqProfilesIndexResponse>(getGetEqProfilesIndexUrl(),
+  return customInstance<GetEqProfilesIndex200>(getGetEqProfilesIndexUrl(),
   {
     ...options,
     method: 'GET'
@@ -34565,30 +28975,6 @@ export function useGetEqProfilesIndex<TData = Awaited<ReturnType<typeof getEqPro
 
 
 
-export type postEqProfilesCreateResponse201 = {
-  data: void
-  status: 201
-}
-
-export type postEqProfilesCreateResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postEqProfilesCreateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postEqProfilesCreateResponseSuccess = (postEqProfilesCreateResponse201) & {
-  headers: Headers;
-};
-export type postEqProfilesCreateResponseError = (postEqProfilesCreateResponse401 | postEqProfilesCreateResponse422) & {
-  headers: Headers;
-};
-
-export type postEqProfilesCreateResponse = (postEqProfilesCreateResponseSuccess | postEqProfilesCreateResponseError)
-
 export const getPostEqProfilesCreateUrl = () => {
 
 
@@ -34600,9 +28986,9 @@ export const getPostEqProfilesCreateUrl = () => {
 /**
  * @summary Create a new EQ device profile
  */
-export const postEqProfilesCreate = async (postEqProfilesCreateBody: PostEqProfilesCreateBody, options?: RequestInit): Promise<postEqProfilesCreateResponse> => {
+export const postEqProfilesCreate = async (postEqProfilesCreateBody: PostEqProfilesCreateBody, options?: RequestInit): Promise<void> => {
 
-  return customInstance<postEqProfilesCreateResponse>(getPostEqProfilesCreateUrl(),
+  return customInstance<void>(getPostEqProfilesCreateUrl(),
   {
     ...options,
     method: 'POST',
@@ -34659,30 +29045,6 @@ export const usePostEqProfilesCreate = <TError = ErrorType<ApiError | Validation
       return useMutation(getPostEqProfilesCreateMutationOptions(options), queryClient);
     }
 
-export type getEqProfilesShowResponse200 = {
-  data: GetEqProfilesShow200
-  status: 200
-}
-
-export type getEqProfilesShowResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getEqProfilesShowResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getEqProfilesShowResponseSuccess = (getEqProfilesShowResponse200) & {
-  headers: Headers;
-};
-export type getEqProfilesShowResponseError = (getEqProfilesShowResponse401 | getEqProfilesShowResponse404) & {
-  headers: Headers;
-};
-
-export type getEqProfilesShowResponse = (getEqProfilesShowResponseSuccess | getEqProfilesShowResponseError)
-
 export const getGetEqProfilesShowUrl = (id: string,) => {
 
 
@@ -34694,9 +29056,9 @@ export const getGetEqProfilesShowUrl = (id: string,) => {
 /**
  * @summary Get a specific EQ device profile
  */
-export const getEqProfilesShow = async (id: string, options?: RequestInit): Promise<getEqProfilesShowResponse> => {
+export const getEqProfilesShow = async (id: string, options?: RequestInit): Promise<GetEqProfilesShow200> => {
 
-  return customInstance<getEqProfilesShowResponse>(getGetEqProfilesShowUrl(id),
+  return customInstance<GetEqProfilesShow200>(getGetEqProfilesShowUrl(id),
   {
     ...options,
     method: 'GET'
@@ -34784,35 +29146,6 @@ export function useGetEqProfilesShow<TData = Awaited<ReturnType<typeof getEqProf
 
 
 
-export type putEqProfilesUpdateResponse200 = {
-  data: PutEqProfilesUpdate200
-  status: 200
-}
-
-export type putEqProfilesUpdateResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type putEqProfilesUpdateResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type putEqProfilesUpdateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type putEqProfilesUpdateResponseSuccess = (putEqProfilesUpdateResponse200) & {
-  headers: Headers;
-};
-export type putEqProfilesUpdateResponseError = (putEqProfilesUpdateResponse401 | putEqProfilesUpdateResponse404 | putEqProfilesUpdateResponse422) & {
-  headers: Headers;
-};
-
-export type putEqProfilesUpdateResponse = (putEqProfilesUpdateResponseSuccess | putEqProfilesUpdateResponseError)
-
 export const getPutEqProfilesUpdateUrl = (id: string,) => {
 
 
@@ -34825,9 +29158,9 @@ export const getPutEqProfilesUpdateUrl = (id: string,) => {
  * @summary Update an EQ device profile
  */
 export const putEqProfilesUpdate = async (id: string,
-    putEqProfilesUpdateBody: PutEqProfilesUpdateBody, options?: RequestInit): Promise<putEqProfilesUpdateResponse> => {
+    putEqProfilesUpdateBody: PutEqProfilesUpdateBody, options?: RequestInit): Promise<PutEqProfilesUpdate200> => {
 
-  return customInstance<putEqProfilesUpdateResponse>(getPutEqProfilesUpdateUrl(id),
+  return customInstance<PutEqProfilesUpdate200>(getPutEqProfilesUpdateUrl(id),
   {
     ...options,
     method: 'PUT',
@@ -34884,35 +29217,6 @@ export const usePutEqProfilesUpdate = <TError = ErrorType<ApiError | ValidationE
       return useMutation(getPutEqProfilesUpdateMutationOptions(options), queryClient);
     }
 
-export type deleteEqProfilesDeleteResponse200 = {
-  data: DeleteEqProfilesDelete200
-  status: 200
-}
-
-export type deleteEqProfilesDeleteResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type deleteEqProfilesDeleteResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type deleteEqProfilesDeleteResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type deleteEqProfilesDeleteResponseSuccess = (deleteEqProfilesDeleteResponse200) & {
-  headers: Headers;
-};
-export type deleteEqProfilesDeleteResponseError = (deleteEqProfilesDeleteResponse401 | deleteEqProfilesDeleteResponse404 | deleteEqProfilesDeleteResponse422) & {
-  headers: Headers;
-};
-
-export type deleteEqProfilesDeleteResponse = (deleteEqProfilesDeleteResponseSuccess | deleteEqProfilesDeleteResponseError)
-
 export const getDeleteEqProfilesDeleteUrl = (id: string,) => {
 
 
@@ -34924,9 +29228,9 @@ export const getDeleteEqProfilesDeleteUrl = (id: string,) => {
 /**
  * @summary Delete an EQ device profile (cannot delete default)
  */
-export const deleteEqProfilesDelete = async (id: string, options?: RequestInit): Promise<deleteEqProfilesDeleteResponse> => {
+export const deleteEqProfilesDelete = async (id: string, options?: RequestInit): Promise<DeleteEqProfilesDelete200> => {
 
-  return customInstance<deleteEqProfilesDeleteResponse>(getDeleteEqProfilesDeleteUrl(id),
+  return customInstance<DeleteEqProfilesDelete200>(getDeleteEqProfilesDeleteUrl(id),
   {
     ...options,
     method: 'DELETE'
@@ -34983,30 +29287,6 @@ export const useDeleteEqProfilesDelete = <TError = ErrorType<ApiError | Validati
       return useMutation(getDeleteEqProfilesDeleteMutationOptions(options), queryClient);
     }
 
-export type postEqProfilesActivateResponse200 = {
-  data: PostEqProfilesActivate200
-  status: 200
-}
-
-export type postEqProfilesActivateResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postEqProfilesActivateResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type postEqProfilesActivateResponseSuccess = (postEqProfilesActivateResponse200) & {
-  headers: Headers;
-};
-export type postEqProfilesActivateResponseError = (postEqProfilesActivateResponse401 | postEqProfilesActivateResponse404) & {
-  headers: Headers;
-};
-
-export type postEqProfilesActivateResponse = (postEqProfilesActivateResponseSuccess | postEqProfilesActivateResponseError)
-
 export const getPostEqProfilesActivateUrl = (id: string,) => {
 
 
@@ -35018,9 +29298,9 @@ export const getPostEqProfilesActivateUrl = (id: string,) => {
 /**
  * @summary Set a profile as the active profile for the current user
  */
-export const postEqProfilesActivate = async (id: string, options?: RequestInit): Promise<postEqProfilesActivateResponse> => {
+export const postEqProfilesActivate = async (id: string, options?: RequestInit): Promise<PostEqProfilesActivate200> => {
 
-  return customInstance<postEqProfilesActivateResponse>(getPostEqProfilesActivateUrl(id),
+  return customInstance<PostEqProfilesActivate200>(getPostEqProfilesActivateUrl(id),
   {
     ...options,
     method: 'POST'
@@ -35077,30 +29357,6 @@ export const usePostEqProfilesActivate = <TError = ErrorType<ApiError>,
       return useMutation(getPostEqProfilesActivateMutationOptions(options), queryClient);
     }
 
-export type getLayoutPreferencesIndexResponse200 = {
-  data: GetLayoutPreferencesIndex200
-  status: 200
-}
-
-export type getLayoutPreferencesIndexResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getLayoutPreferencesIndexResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getLayoutPreferencesIndexResponseSuccess = (getLayoutPreferencesIndexResponse200) & {
-  headers: Headers;
-};
-export type getLayoutPreferencesIndexResponseError = (getLayoutPreferencesIndexResponse401 | getLayoutPreferencesIndexResponse404) & {
-  headers: Headers;
-};
-
-export type getLayoutPreferencesIndexResponse = (getLayoutPreferencesIndexResponseSuccess | getLayoutPreferencesIndexResponseError)
-
 export const getGetLayoutPreferencesIndexUrl = () => {
 
 
@@ -35113,9 +29369,9 @@ export const getGetLayoutPreferencesIndexUrl = () => {
  * Returns the layout preferences for the authenticated user.
  * @summary Get layout preferences
  */
-export const getLayoutPreferencesIndex = async ( options?: RequestInit): Promise<getLayoutPreferencesIndexResponse> => {
+export const getLayoutPreferencesIndex = async ( options?: RequestInit): Promise<GetLayoutPreferencesIndex200> => {
 
-  return customInstance<getLayoutPreferencesIndexResponse>(getGetLayoutPreferencesIndexUrl(),
+  return customInstance<GetLayoutPreferencesIndex200>(getGetLayoutPreferencesIndexUrl(),
   {
     ...options,
     method: 'GET'
@@ -35203,35 +29459,6 @@ export function useGetLayoutPreferencesIndex<TData = Awaited<ReturnType<typeof g
 
 
 
-export type putLayoutPreferencesUpdateResponse200 = {
-  data: PutLayoutPreferencesUpdate200
-  status: 200
-}
-
-export type putLayoutPreferencesUpdateResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type putLayoutPreferencesUpdateResponse409 = {
-  data: ApiError
-  status: 409
-}
-
-export type putLayoutPreferencesUpdateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type putLayoutPreferencesUpdateResponseSuccess = (putLayoutPreferencesUpdateResponse200) & {
-  headers: Headers;
-};
-export type putLayoutPreferencesUpdateResponseError = (putLayoutPreferencesUpdateResponse401 | putLayoutPreferencesUpdateResponse409 | putLayoutPreferencesUpdateResponse422) & {
-  headers: Headers;
-};
-
-export type putLayoutPreferencesUpdateResponse = (putLayoutPreferencesUpdateResponseSuccess | putLayoutPreferencesUpdateResponseError)
-
 export const getPutLayoutPreferencesUpdateUrl = () => {
 
 
@@ -35243,9 +29470,9 @@ export const getPutLayoutPreferencesUpdateUrl = () => {
 /**
  * @summary Save layout preferences
  */
-export const putLayoutPreferencesUpdate = async (putLayoutPreferencesUpdateBody: PutLayoutPreferencesUpdateBody, options?: RequestInit): Promise<putLayoutPreferencesUpdateResponse> => {
+export const putLayoutPreferencesUpdate = async (putLayoutPreferencesUpdateBody: PutLayoutPreferencesUpdateBody, options?: RequestInit): Promise<PutLayoutPreferencesUpdate200> => {
 
-  return customInstance<putLayoutPreferencesUpdateResponse>(getPutLayoutPreferencesUpdateUrl(),
+  return customInstance<PutLayoutPreferencesUpdate200>(getPutLayoutPreferencesUpdateUrl(),
   {
     ...options,
     method: 'PUT',
@@ -35302,25 +29529,6 @@ export const usePutLayoutPreferencesUpdate = <TError = ErrorType<ApiError | Vali
       return useMutation(getPutLayoutPreferencesUpdateMutationOptions(options), queryClient);
     }
 
-export type getLayoutPreferencesHistoryResponse200 = {
-  data: GetLayoutPreferencesHistory200
-  status: 200
-}
-
-export type getLayoutPreferencesHistoryResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getLayoutPreferencesHistoryResponseSuccess = (getLayoutPreferencesHistoryResponse200) & {
-  headers: Headers;
-};
-export type getLayoutPreferencesHistoryResponseError = (getLayoutPreferencesHistoryResponse401) & {
-  headers: Headers;
-};
-
-export type getLayoutPreferencesHistoryResponse = (getLayoutPreferencesHistoryResponseSuccess | getLayoutPreferencesHistoryResponseError)
-
 export const getGetLayoutPreferencesHistoryUrl = () => {
 
 
@@ -35333,9 +29541,9 @@ export const getGetLayoutPreferencesHistoryUrl = () => {
  * Returns the version history for layout preferences.
  * @summary Get layout preferences history
  */
-export const getLayoutPreferencesHistory = async ( options?: RequestInit): Promise<getLayoutPreferencesHistoryResponse> => {
+export const getLayoutPreferencesHistory = async ( options?: RequestInit): Promise<GetLayoutPreferencesHistory200> => {
 
-  return customInstance<getLayoutPreferencesHistoryResponse>(getGetLayoutPreferencesHistoryUrl(),
+  return customInstance<GetLayoutPreferencesHistory200>(getGetLayoutPreferencesHistoryUrl(),
   {
     ...options,
     method: 'GET'
@@ -35423,30 +29631,6 @@ export function useGetLayoutPreferencesHistory<TData = Awaited<ReturnType<typeof
 
 
 
-export type postLayoutPreferencesRollbackResponse200 = {
-  data: PostLayoutPreferencesRollback200
-  status: 200
-}
-
-export type postLayoutPreferencesRollbackResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postLayoutPreferencesRollbackResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postLayoutPreferencesRollbackResponseSuccess = (postLayoutPreferencesRollbackResponse200) & {
-  headers: Headers;
-};
-export type postLayoutPreferencesRollbackResponseError = (postLayoutPreferencesRollbackResponse401 | postLayoutPreferencesRollbackResponse422) & {
-  headers: Headers;
-};
-
-export type postLayoutPreferencesRollbackResponse = (postLayoutPreferencesRollbackResponseSuccess | postLayoutPreferencesRollbackResponseError)
-
 export const getPostLayoutPreferencesRollbackUrl = () => {
 
 
@@ -35458,9 +29642,9 @@ export const getPostLayoutPreferencesRollbackUrl = () => {
 /**
  * @summary Rollback layout preferences to a previous version
  */
-export const postLayoutPreferencesRollback = async (postLayoutPreferencesRollbackBody: PostLayoutPreferencesRollbackBody, options?: RequestInit): Promise<postLayoutPreferencesRollbackResponse> => {
+export const postLayoutPreferencesRollback = async (postLayoutPreferencesRollbackBody: PostLayoutPreferencesRollbackBody, options?: RequestInit): Promise<PostLayoutPreferencesRollback200> => {
 
-  return customInstance<postLayoutPreferencesRollbackResponse>(getPostLayoutPreferencesRollbackUrl(),
+  return customInstance<PostLayoutPreferencesRollback200>(getPostLayoutPreferencesRollbackUrl(),
   {
     ...options,
     method: 'POST',
@@ -35517,30 +29701,6 @@ export const usePostLayoutPreferencesRollback = <TError = ErrorType<ApiError | V
       return useMutation(getPostLayoutPreferencesRollbackMutationOptions(options), queryClient);
     }
 
-export type getPlayerPreferencesIndexResponse200 = {
-  data: GetPlayerPreferencesIndex200
-  status: 200
-}
-
-export type getPlayerPreferencesIndexResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getPlayerPreferencesIndexResponse404 = {
-  data: ApiError
-  status: 404
-}
-
-export type getPlayerPreferencesIndexResponseSuccess = (getPlayerPreferencesIndexResponse200) & {
-  headers: Headers;
-};
-export type getPlayerPreferencesIndexResponseError = (getPlayerPreferencesIndexResponse401 | getPlayerPreferencesIndexResponse404) & {
-  headers: Headers;
-};
-
-export type getPlayerPreferencesIndexResponse = (getPlayerPreferencesIndexResponseSuccess | getPlayerPreferencesIndexResponseError)
-
 export const getGetPlayerPreferencesIndexUrl = () => {
 
 
@@ -35553,9 +29713,9 @@ export const getGetPlayerPreferencesIndexUrl = () => {
  * Returns the player preferences for the authenticated user.
  * @summary Get player preferences
  */
-export const getPlayerPreferencesIndex = async ( options?: RequestInit): Promise<getPlayerPreferencesIndexResponse> => {
+export const getPlayerPreferencesIndex = async ( options?: RequestInit): Promise<GetPlayerPreferencesIndex200> => {
 
-  return customInstance<getPlayerPreferencesIndexResponse>(getGetPlayerPreferencesIndexUrl(),
+  return customInstance<GetPlayerPreferencesIndex200>(getGetPlayerPreferencesIndexUrl(),
   {
     ...options,
     method: 'GET'
@@ -35643,35 +29803,6 @@ export function useGetPlayerPreferencesIndex<TData = Awaited<ReturnType<typeof g
 
 
 
-export type putPlayerPreferencesUpdateResponse200 = {
-  data: PutPlayerPreferencesUpdate200
-  status: 200
-}
-
-export type putPlayerPreferencesUpdateResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type putPlayerPreferencesUpdateResponse409 = {
-  data: ApiError
-  status: 409
-}
-
-export type putPlayerPreferencesUpdateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type putPlayerPreferencesUpdateResponseSuccess = (putPlayerPreferencesUpdateResponse200) & {
-  headers: Headers;
-};
-export type putPlayerPreferencesUpdateResponseError = (putPlayerPreferencesUpdateResponse401 | putPlayerPreferencesUpdateResponse409 | putPlayerPreferencesUpdateResponse422) & {
-  headers: Headers;
-};
-
-export type putPlayerPreferencesUpdateResponse = (putPlayerPreferencesUpdateResponseSuccess | putPlayerPreferencesUpdateResponseError)
-
 export const getPutPlayerPreferencesUpdateUrl = () => {
 
 
@@ -35683,9 +29814,9 @@ export const getPutPlayerPreferencesUpdateUrl = () => {
 /**
  * @summary Save player preferences
  */
-export const putPlayerPreferencesUpdate = async (putPlayerPreferencesUpdateBody: PutPlayerPreferencesUpdateBody, options?: RequestInit): Promise<putPlayerPreferencesUpdateResponse> => {
+export const putPlayerPreferencesUpdate = async (putPlayerPreferencesUpdateBody: PutPlayerPreferencesUpdateBody, options?: RequestInit): Promise<PutPlayerPreferencesUpdate200> => {
 
-  return customInstance<putPlayerPreferencesUpdateResponse>(getPutPlayerPreferencesUpdateUrl(),
+  return customInstance<PutPlayerPreferencesUpdate200>(getPutPlayerPreferencesUpdateUrl(),
   {
     ...options,
     method: 'PUT',
@@ -35742,25 +29873,6 @@ export const usePutPlayerPreferencesUpdate = <TError = ErrorType<ApiError | Vali
       return useMutation(getPutPlayerPreferencesUpdateMutationOptions(options), queryClient);
     }
 
-export type getPlayerPreferencesHistoryResponse200 = {
-  data: GetPlayerPreferencesHistory200
-  status: 200
-}
-
-export type getPlayerPreferencesHistoryResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getPlayerPreferencesHistoryResponseSuccess = (getPlayerPreferencesHistoryResponse200) & {
-  headers: Headers;
-};
-export type getPlayerPreferencesHistoryResponseError = (getPlayerPreferencesHistoryResponse401) & {
-  headers: Headers;
-};
-
-export type getPlayerPreferencesHistoryResponse = (getPlayerPreferencesHistoryResponseSuccess | getPlayerPreferencesHistoryResponseError)
-
 export const getGetPlayerPreferencesHistoryUrl = () => {
 
 
@@ -35773,9 +29885,9 @@ export const getGetPlayerPreferencesHistoryUrl = () => {
  * Returns the version history for player preferences.
  * @summary Get player preferences history
  */
-export const getPlayerPreferencesHistory = async ( options?: RequestInit): Promise<getPlayerPreferencesHistoryResponse> => {
+export const getPlayerPreferencesHistory = async ( options?: RequestInit): Promise<GetPlayerPreferencesHistory200> => {
 
-  return customInstance<getPlayerPreferencesHistoryResponse>(getGetPlayerPreferencesHistoryUrl(),
+  return customInstance<GetPlayerPreferencesHistory200>(getGetPlayerPreferencesHistoryUrl(),
   {
     ...options,
     method: 'GET'
@@ -35863,30 +29975,6 @@ export function useGetPlayerPreferencesHistory<TData = Awaited<ReturnType<typeof
 
 
 
-export type postPlayerPreferencesRollbackResponse200 = {
-  data: PostPlayerPreferencesRollback200
-  status: 200
-}
-
-export type postPlayerPreferencesRollbackResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type postPlayerPreferencesRollbackResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type postPlayerPreferencesRollbackResponseSuccess = (postPlayerPreferencesRollbackResponse200) & {
-  headers: Headers;
-};
-export type postPlayerPreferencesRollbackResponseError = (postPlayerPreferencesRollbackResponse401 | postPlayerPreferencesRollbackResponse422) & {
-  headers: Headers;
-};
-
-export type postPlayerPreferencesRollbackResponse = (postPlayerPreferencesRollbackResponseSuccess | postPlayerPreferencesRollbackResponseError)
-
 export const getPostPlayerPreferencesRollbackUrl = () => {
 
 
@@ -35898,9 +29986,9 @@ export const getPostPlayerPreferencesRollbackUrl = () => {
 /**
  * @summary Rollback player preferences to a previous version
  */
-export const postPlayerPreferencesRollback = async (postPlayerPreferencesRollbackBody: PostPlayerPreferencesRollbackBody, options?: RequestInit): Promise<postPlayerPreferencesRollbackResponse> => {
+export const postPlayerPreferencesRollback = async (postPlayerPreferencesRollbackBody: PostPlayerPreferencesRollbackBody, options?: RequestInit): Promise<PostPlayerPreferencesRollback200> => {
 
-  return customInstance<postPlayerPreferencesRollbackResponse>(getPostPlayerPreferencesRollbackUrl(),
+  return customInstance<PostPlayerPreferencesRollback200>(getPostPlayerPreferencesRollbackUrl(),
   {
     ...options,
     method: 'POST',
@@ -35957,30 +30045,6 @@ export const usePostPlayerPreferencesRollback = <TError = ErrorType<ApiError | V
       return useMutation(getPostPlayerPreferencesRollbackMutationOptions(options), queryClient);
     }
 
-export type getSidebarConfigGetResponse200 = {
-  data: GetSidebarConfigGet200
-  status: 200
-}
-
-export type getSidebarConfigGetResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getSidebarConfigGetResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type getSidebarConfigGetResponseSuccess = (getSidebarConfigGetResponse200) & {
-  headers: Headers;
-};
-export type getSidebarConfigGetResponseError = (getSidebarConfigGetResponse401 | getSidebarConfigGetResponse422) & {
-  headers: Headers;
-};
-
-export type getSidebarConfigGetResponse = (getSidebarConfigGetResponseSuccess | getSidebarConfigGetResponseError)
-
 export const getGetSidebarConfigGetUrl = (mediaType: string,) => {
 
 
@@ -35993,9 +30057,9 @@ export const getGetSidebarConfigGetUrl = (mediaType: string,) => {
  * Returns the sidebar configuration for the authenticated user and given media type. Returns defaults if no custom config exists.
  * @summary Get sidebar configuration for a media type
  */
-export const getSidebarConfigGet = async (mediaType: string, options?: RequestInit): Promise<getSidebarConfigGetResponse> => {
+export const getSidebarConfigGet = async (mediaType: string, options?: RequestInit): Promise<GetSidebarConfigGet200> => {
 
-  return customInstance<getSidebarConfigGetResponse>(getGetSidebarConfigGetUrl(mediaType),
+  return customInstance<GetSidebarConfigGet200>(getGetSidebarConfigGetUrl(mediaType),
   {
     ...options,
     method: 'GET'
@@ -36083,30 +30147,6 @@ export function useGetSidebarConfigGet<TData = Awaited<ReturnType<typeof getSide
 
 
 
-export type putSidebarConfigUpdateResponse200 = {
-  data: PutSidebarConfigUpdate200
-  status: 200
-}
-
-export type putSidebarConfigUpdateResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type putSidebarConfigUpdateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type putSidebarConfigUpdateResponseSuccess = (putSidebarConfigUpdateResponse200) & {
-  headers: Headers;
-};
-export type putSidebarConfigUpdateResponseError = (putSidebarConfigUpdateResponse401 | putSidebarConfigUpdateResponse422) & {
-  headers: Headers;
-};
-
-export type putSidebarConfigUpdateResponse = (putSidebarConfigUpdateResponseSuccess | putSidebarConfigUpdateResponseError)
-
 export const getPutSidebarConfigUpdateUrl = (mediaType: string,) => {
 
 
@@ -36119,9 +30159,9 @@ export const getPutSidebarConfigUpdateUrl = (mediaType: string,) => {
  * @summary Update sidebar configuration for a media type
  */
 export const putSidebarConfigUpdate = async (mediaType: string,
-    putSidebarConfigUpdateBody: PutSidebarConfigUpdateBody, options?: RequestInit): Promise<putSidebarConfigUpdateResponse> => {
+    putSidebarConfigUpdateBody: PutSidebarConfigUpdateBody, options?: RequestInit): Promise<PutSidebarConfigUpdate200> => {
 
-  return customInstance<putSidebarConfigUpdateResponse>(getPutSidebarConfigUpdateUrl(mediaType),
+  return customInstance<PutSidebarConfigUpdate200>(getPutSidebarConfigUpdateUrl(mediaType),
   {
     ...options,
     method: 'PUT',
@@ -36178,30 +30218,6 @@ export const usePutSidebarConfigUpdate = <TError = ErrorType<ApiError | Validati
       return useMutation(getPutSidebarConfigUpdateMutationOptions(options), queryClient);
     }
 
-export type deleteSidebarConfigDeleteResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteSidebarConfigDeleteResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type deleteSidebarConfigDeleteResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type deleteSidebarConfigDeleteResponseSuccess = (deleteSidebarConfigDeleteResponse204) & {
-  headers: Headers;
-};
-export type deleteSidebarConfigDeleteResponseError = (deleteSidebarConfigDeleteResponse401 | deleteSidebarConfigDeleteResponse422) & {
-  headers: Headers;
-};
-
-export type deleteSidebarConfigDeleteResponse = (deleteSidebarConfigDeleteResponseSuccess | deleteSidebarConfigDeleteResponseError)
-
 export const getDeleteSidebarConfigDeleteUrl = (mediaType: string,) => {
 
 
@@ -36213,9 +30229,9 @@ export const getDeleteSidebarConfigDeleteUrl = (mediaType: string,) => {
 /**
  * @summary Reset sidebar configuration to defaults for a media type
  */
-export const deleteSidebarConfigDelete = async (mediaType: string, options?: RequestInit): Promise<deleteSidebarConfigDeleteResponse> => {
+export const deleteSidebarConfigDelete = async (mediaType: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<deleteSidebarConfigDeleteResponse>(getDeleteSidebarConfigDeleteUrl(mediaType),
+  return customInstance<void>(getDeleteSidebarConfigDeleteUrl(mediaType),
   {
     ...options,
     method: 'DELETE'
@@ -36272,25 +30288,6 @@ export const useDeleteSidebarConfigDelete = <TError = ErrorType<ApiError | Valid
       return useMutation(getDeleteSidebarConfigDeleteMutationOptions(options), queryClient);
     }
 
-export type getThemeMoodIndexResponse200 = {
-  data: GetThemeMoodIndex200
-  status: 200
-}
-
-export type getThemeMoodIndexResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type getThemeMoodIndexResponseSuccess = (getThemeMoodIndexResponse200) & {
-  headers: Headers;
-};
-export type getThemeMoodIndexResponseError = (getThemeMoodIndexResponse401) & {
-  headers: Headers;
-};
-
-export type getThemeMoodIndexResponse = (getThemeMoodIndexResponseSuccess | getThemeMoodIndexResponseError)
-
 export const getGetThemeMoodIndexUrl = () => {
 
 
@@ -36303,9 +30300,9 @@ export const getGetThemeMoodIndexUrl = () => {
  * Returns the current theme mood for the authenticated user.
  * @summary Get theme mood
  */
-export const getThemeMoodIndex = async ( options?: RequestInit): Promise<getThemeMoodIndexResponse> => {
+export const getThemeMoodIndex = async ( options?: RequestInit): Promise<GetThemeMoodIndex200> => {
 
-  return customInstance<getThemeMoodIndexResponse>(getGetThemeMoodIndexUrl(),
+  return customInstance<GetThemeMoodIndex200>(getGetThemeMoodIndexUrl(),
   {
     ...options,
     method: 'GET'
@@ -36393,30 +30390,6 @@ export function useGetThemeMoodIndex<TData = Awaited<ReturnType<typeof getThemeM
 
 
 
-export type putThemeMoodUpdateResponse200 = {
-  data: PutThemeMoodUpdate200
-  status: 200
-}
-
-export type putThemeMoodUpdateResponse401 = {
-  data: ApiError
-  status: 401
-}
-
-export type putThemeMoodUpdateResponse422 = {
-  data: ValidationError
-  status: 422
-}
-
-export type putThemeMoodUpdateResponseSuccess = (putThemeMoodUpdateResponse200) & {
-  headers: Headers;
-};
-export type putThemeMoodUpdateResponseError = (putThemeMoodUpdateResponse401 | putThemeMoodUpdateResponse422) & {
-  headers: Headers;
-};
-
-export type putThemeMoodUpdateResponse = (putThemeMoodUpdateResponseSuccess | putThemeMoodUpdateResponseError)
-
 export const getPutThemeMoodUpdateUrl = () => {
 
 
@@ -36428,9 +30401,9 @@ export const getPutThemeMoodUpdateUrl = () => {
 /**
  * @summary Update theme mood
  */
-export const putThemeMoodUpdate = async (putThemeMoodUpdateBody: PutThemeMoodUpdateBody, options?: RequestInit): Promise<putThemeMoodUpdateResponse> => {
+export const putThemeMoodUpdate = async (putThemeMoodUpdateBody: PutThemeMoodUpdateBody, options?: RequestInit): Promise<PutThemeMoodUpdate200> => {
 
-  return customInstance<putThemeMoodUpdateResponse>(getPutThemeMoodUpdateUrl(),
+  return customInstance<PutThemeMoodUpdate200>(getPutThemeMoodUpdateUrl(),
   {
     ...options,
     method: 'PUT',

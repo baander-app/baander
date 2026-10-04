@@ -3,7 +3,6 @@ import { render, screen } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import { ThemeProvider as SCTypedThemeProvider } from 'styled-components'
 import { resolveTheme } from '@/shared/theme/resolve-theme'
-import type { UseQueryReturnType } from '@tanstack/react-query'
 
 const testTheme = resolveTheme('dark', 'violet')
 
@@ -42,7 +41,7 @@ function mockQueryResult(data: unknown) {
     isError: false,
     error: null,
     isFetching: false,
-  } as unknown as UseQueryReturnType<unknown, Error>
+  }
 }
 
 describe('AlbumsPage', () => {
@@ -58,7 +57,7 @@ describe('AlbumsPage', () => {
       isLoading: true,
       isError: false,
       error: null,
-    } as unknown as UseQueryReturnType<unknown, Error>)
+    })
 
     renderWithProviders(<AlbumsPage />)
 
@@ -74,9 +73,7 @@ describe('AlbumsPage', () => {
           { publicId: 'alb_1', title: 'Album One', artistName: 'Artist A' },
           { publicId: 'alb_2', title: 'Album Two', artistName: 'Artist B' },
         ],
-        current_page: 1,
-        last_page: 1,
-        total: 2,
+        meta: { current_page: 1, last_page: 1, per_page: 24, total: 2 },
       }),
     )
 
@@ -89,7 +86,7 @@ describe('AlbumsPage', () => {
 
   it('shows empty state when no albums exist', () => {
     mockUseGetAlbumIndex.mockReturnValue(
-      mockQueryResult({ data: [], current_page: 1, last_page: 1, total: 0 }),
+      mockQueryResult({ data: [], meta: { current_page: 1, last_page: 1, per_page: 24, total: 0 } }),
     )
 
     renderWithProviders(<AlbumsPage />)

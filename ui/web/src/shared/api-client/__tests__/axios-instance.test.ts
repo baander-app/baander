@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('@/features/auth/stores/auth-store', () => ({
   useAuthStore: {
@@ -26,7 +26,9 @@ describe('customInstance', () => {
     mock = new MockAdapter(AXIOS_INSTANCE);
   });
 
-  it('returns body data with status and headers', async () => {
+  afterEach(() => mock.restore());
+
+  it('returns body data without transport metadata', async () => {
     const body = { data: { name: 'test', value: 42 } };
     mock.onGet('/api/test').reply(200, body, { 'x-custom': 'header-val' });
 
@@ -34,9 +36,9 @@ describe('customInstance', () => {
       method: 'GET',
     });
 
-    expect(result.status).toBe(200);
+    expect(result).toEqual(body);
     expect(result.data).toEqual({ name: 'test', value: 42 });
-    expect(result.headers).toBeDefined();
+    expect(result).not.toHaveProperty('headers');
   });
 
   it('handles backend envelope without double-nesting', async () => {
@@ -49,7 +51,7 @@ describe('customInstance', () => {
     );
 
     expect(result.data).toEqual({ challengeKey: 'abc', options: { rp: 'test' } });
-    expect(result.status).toBe(200);
+    expect(result).toEqual(body);
   });
 
   it('handles paginated response with data array', async () => {
@@ -63,17 +65,17 @@ describe('customInstance', () => {
     expect(result.data).toEqual([{ id: 1 }, { id: 2 }]);
     expect(result.current_page).toBe(1);
     expect(result.last_page).toBe(3);
-    expect(result.status).toBe(200);
+    expect(result).toEqual(body);
   });
 
   it('handles 204 No Content', async () => {
-    mock.onDelete('/api/test/1').reply(204);
+    mock.onDelete('/api/test/1').reply(204, '');
 
-    const result = await customInstance<Record<string, unknown>>('/api/test/1', {
+    const result = await customInstance<void>('/api/test/1', {
       method: 'DELETE',
     });
 
-    expect(result.status).toBe(204);
+    expect(result).toBeUndefined();
   });
 
   it('propagates error responses', async () => {
@@ -84,7 +86,7 @@ describe('customInstance', () => {
     ).rejects.toThrow();
   });
 
-  it('preserves body properties alongside status and headers', async () => {
+  it('preserves body properties without transport metadata', async () => {
     const body = { token: 'abc123', expires: 3600 };
     mock.onPost('/api/auth/refresh').reply(200, body);
 
@@ -95,7 +97,7 @@ describe('customInstance', () => {
 
     expect(result.token).toBe('abc123');
     expect(result.expires).toBe(3600);
-    expect(result.status).toBe(200);
-    expect(result.headers).toBeDefined();
+    expect(result).toEqual(body);
+    expect(result).not.toHaveProperty('headers');
   });
 });

@@ -22,8 +22,6 @@ vi.mock('@/shared/api-client/gen/endpoints', () => ({
           { publicId: 'song_2', title: 'Song Two', artistName: 'Test Artist', length: 180 },
         ],
       },
-      status: 200,
-      headers: {},
     },
     isLoading: false,
   }),

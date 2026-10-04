@@ -230,23 +230,17 @@ AXIOS_INSTANCE.interceptors.response.use(undefined, async (error) => {
   return AXIOS_INSTANCE(originalRequest);
 });
 
-export const customInstance = <T>(
-  url: string,
-  options: RequestInit,
-): Promise<T> => {
+export function customInstance<T>(url: string, options: RequestInit): Promise<T>;
+export function customInstance(url: string, options: RequestInit): Promise<unknown> {
   const {body, signal, headers, ...rest} = options;
-  return AXIOS_INSTANCE({
+  return AXIOS_INSTANCE<unknown>({
     url,
     method: rest.method as AxiosRequestConfig['method'],
     data: body as AxiosRequestConfig['data'],
     headers: headers as AxiosRequestConfig['headers'],
     signal: signal as AxiosRequestConfig['signal'],
-  }).then((response) => ({
-    ...response.data,
-    status: response.status,
-    headers: response.headers,
-  })) as Promise<T>;
-};
+  }).then((response) => response.status === 204 ? undefined : response.data);
+}
 
 export type ErrorType<Error> = AxiosError<Error>
 
