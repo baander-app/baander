@@ -3,117 +3,82 @@ class WasmSpectrumProcessor extends AudioWorkletProcessor {
 
   constructor() {
     super();
-
-    // Minimal WASM state
-    this._exp = null;
-    this._HEAPF32 = null;
-    this._HEAPU8 = null;
     this._ready = false;
-
-    // Reduced buffer sizes
-    this._monoAcc = new Float32Array(1024); // Smaller buffer
+    this._initializing = false;
+    this._monoAcc = new Float32Array(2048);
     this._monoIdx = 0;
-
-    // Smaller output buffers
-    this._freqBins = 128;  // Reduced from 256
-    this._timeBins = 256;  // Reduced from 512
-    this._freqOut = new Uint8Array(this._freqBins);
-    this._timeOut = new Uint8Array(this._timeBins);
-
-    // Less frequent posting
+    this._freqOut = new Uint8Array(1024);
+    this._timeOut = new Uint8Array(2048);
     this._spectraCounter = 0;
-    this._postEvery = 8; // Increased from 2
+    this._postEvery = 2;
 
-    this.port.onmessage = async (e) => {
-      const d = e.data || {};
-      if (d.type !== 'wasm' || !d.bytes) return;
-
+    this.port.onmessage = async (event) => {
+      const data = event.data || {};
+      if (data.type !== 'wasm' || !data.bytes || this._ready || this._initializing) return;
+      this._initializing = true;
+      const allocated = [];
+      let free;
       try {
-        const { instance } = await WebAssembly.instantiate(d.bytes, {});
+        const { instance } = await WebAssembly.instantiate(data.bytes, {});
         const exp = instance.exports;
-
-        const wasm_malloc = exp.wasm_malloc || exp._wasm_malloc || exp.malloc || exp._malloc;
-        const init_fft = exp.init_fft || exp._init_fft;
-        const process_spectrum = exp.process_spectrum || exp._process_spectrum;
-
-        if (!wasm_malloc || !init_fft || !process_spectrum) {
-          this.port.postMessage({ type: 'error', reason: 'missing-exports' });
-          return;
+        const malloc = exp.wasm_malloc || exp._wasm_malloc || exp.malloc || exp._malloc;
+        free = exp.wasm_free || exp._wasm_free || exp.free || exp._free;
+        const init = exp.init_fft || exp._init_fft;
+        const process = exp.process_spectrum || exp._process_spectrum;
+        if (!exp.memory || !malloc || !free || !init || !process) throw new Error('Missing FFT exports');
+        exp._initialize?.();
+        this._fn = { process };
+        // Native ABI: float[2048], uint8_t[1024], uint8_t[2048].
+        for (const size of [2048 * 4, 1024, 2048]) {
+          const ptr = malloc(size);
+          if (!ptr) throw new Error('FFT allocation failed');
+          allocated.push(ptr);
         }
-
-        this._fn = {
-          malloc: wasm_malloc.bind(exp),
-          init_fft: init_fft.bind(exp),
-          process: process_spectrum.bind(exp),
-        };
-
-        this._HEAPF32 = new Float32Array(exp.memory.buffer);
-        this._HEAPU8 = new Uint8Array(exp.memory.buffer);
-
-        // Smaller allocations
-        this._inPtr = this._fn.malloc(1024 * 4);
-        this._magPtr = this._fn.malloc(512);
-        this._wavePtr = this._fn.malloc(1024);
-
-        this._fn.init_fft(1);
+        [this._inPtr, this._magPtr, this._wavePtr] = allocated;
+        this._memory = exp.memory;
+        init(1);
         this._ready = true;
         this.port.postMessage({ type: 'ready' });
-
-      } catch (err) {
-        this.port.postMessage({ type: 'error', reason: 'init-failed' });
+      } catch (error) {
+        for (const ptr of allocated) free?.(ptr);
         this._ready = false;
+        this.port.postMessage({ type: 'error', reason: 'init-failed' });
+      } finally {
+        this._initializing = false;
       }
     };
   }
 
   process(inputs, outputs) {
-    // Pass-through audio
     const input = inputs[0];
     const output = outputs[0];
-    if (input && output && input[0] && output[0]) {
-      output[0].set(input[0]);
-      if (input[1] && output[1]) output[1].set(input[1]);
+    if (input && output) {
+      for (let channel = 0; channel < Math.min(input.length, output.length); channel++) {
+        if (input[channel] && output[channel]) output[channel].set(input[channel]);
+      }
     }
-
-    // Skip if not ready or no input
     if (!this._ready || !input || !input[0]) return true;
 
-    const L = input[0];
-    const R = input[1] || L;
-    const n = L.length;
+    const left = input[0];
+    const right = input[1] || left;
+    for (let i = 0; i < left.length; i++) {
+      this._monoAcc[this._monoIdx++] = (left[i] + (right[i] || 0)) * 0.5;
+      if (this._monoIdx !== 2048) continue;
 
-    // Accumulate to smaller buffer (1024 instead of 2048)
-    let idx = this._monoIdx;
-    for (let i = 0; i < n && idx < 1024; i++, idx++) {
-      this._monoAcc[idx] = (L[i] + (R[i] || 0)) * 0.5; // Average channels
-    }
-    this._monoIdx = idx;
-
-    // Process when buffer is full
-    if (this._monoIdx >= 1024) {
-      this._HEAPF32.set(this._monoAcc, this._inPtr >> 2);
+      // Refresh views so a future memory-growth build preserves the contract.
+      new Float32Array(this._memory.buffer, this._inPtr, 2048).set(this._monoAcc);
       this._fn.process(this._inPtr, this._magPtr, this._wavePtr);
-
-      // Simple decimation instead of fancy downsampling
-      const mag = new Uint8Array(this._HEAPU8.buffer, this._magPtr, 512);
-      const wav = new Uint8Array(this._HEAPU8.buffer, this._wavePtr, 1024);
-
-      for (let i = 0; i < 128; i++) this._freqOut[i] = mag[i * 4];
-      for (let i = 0; i < 256; i++) this._timeOut[i] = wav[i * 4];
-
-      // Post less frequently
-      this._spectraCounter++;
-      if ((this._spectraCounter % this._postEvery) === 0) {
-        this.port.postMessage({
-          type: 'spectrum',
-          frequencyData: this._freqOut,
-          timeDomainData: this._timeOut
-        });
-      }
-
       this._monoIdx = 0;
-    }
+      if (++this._spectraCounter % this._postEvery !== 0) continue;
 
+      this._freqOut.set(new Uint8Array(this._memory.buffer, this._magPtr, 1024));
+      this._timeOut.set(new Uint8Array(this._memory.buffer, this._wavePtr, 2048));
+      this.port.postMessage({
+        type: 'spectrum',
+        frequencyData: this._freqOut,
+        timeDomainData: this._timeOut,
+      });
+    }
     return true;
   }
 }

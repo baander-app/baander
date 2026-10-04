@@ -137,6 +137,34 @@ const connect = () => processor.connectDualAudioElements(elementA, elementB)
 const worklet = (name: string) => MockWorklet.instances.filter((node) => node.name === name).at(-1)!
 
 describe('AudioProcessor asynchronous analysis lifecycle', () => {
+
+  it('rejects malformed worklet buffers before copying data or computing features', async () => {
+    await connect()
+    await settle()
+    const inspection = processor as unknown as {
+      frequencyData: Uint8Array
+      timeDomainData: Uint8Array
+      computeSpectralFeatures(data: Uint8Array): void
+    }
+    const compute = vi.spyOn(inspection, 'computeSpectralFeatures').mockImplementation(() => {})
+    const frequencyBefore = inspection.frequencyData.slice()
+    const timeBefore = inspection.timeDomainData.slice()
+    for (const [frequencyData, timeDomainData] of [
+      [new Uint8Array(128).fill(200), new Uint8Array(2048)],
+      [new Uint8Array(1024).fill(200), new Uint8Array(256)],
+      [new Float32Array(1024), new Uint8Array(2048)],
+    ]) worklet('wasm-spectrum').emit({ type: 'spectrum', frequencyData, timeDomainData })
+    expect(compute).not.toHaveBeenCalled()
+    expect(inspection.frequencyData).toEqual(frequencyBefore)
+    expect(inspection.timeDomainData).toEqual(timeBefore)
+    worklet('wasm-spectrum').emit({
+      type: 'spectrum', frequencyData: new Uint8Array(1024).fill(200), timeDomainData: new Uint8Array(2048).fill(220),
+    })
+    expect(compute).toHaveBeenCalledOnce()
+    expect(inspection.frequencyData[0]).toBe(200)
+    expect(inspection.timeDomainData[0]).toBe(220)
+  })
+
   it.each(['disconnect', 'destroy'] as const)('ignores addModule completion after %s', async (stop) => {
     const module = deferred<void>()
     graph.audioContext.audioWorklet.addModule.mockReturnValueOnce(module.promise)

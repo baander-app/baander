@@ -1,0 +1,58 @@
+name: DSP analysis qualification
+
+on:
+    push:
+        branches: [master]
+        paths:
+            - 'packages/dsp/fft2048/**'
+            - 'packages/dsp/spectral_features/**'
+            - 'packages/dsp/tests/**'
+            - 'public/dsp/fft2048.wasm'
+            - 'public/dsp/spectral_features.wasm'
+            - 'ui/electron/public/dsp/fft2048.wasm'
+            - 'ui/electron/public/dsp/spectral_features.wasm'
+            - 'public/audio-worklets/wasm-spectrum.js'
+            - 'ui/web/src/features/player/services/audio-processor.ts'
+            - 'scripts/test-dsp-analysis.sh'
+            - '.forgejo/workflows/dsp-analysis.yaml'
+    pull_request:
+        types: [opened, synchronize, reopened]
+        paths:
+            - 'packages/dsp/fft2048/**'
+            - 'packages/dsp/spectral_features/**'
+            - 'packages/dsp/tests/**'
+            - 'public/dsp/fft2048.wasm'
+            - 'public/dsp/spectral_features.wasm'
+            - 'ui/electron/public/dsp/fft2048.wasm'
+            - 'ui/electron/public/dsp/spectral_features.wasm'
+            - 'public/audio-worklets/wasm-spectrum.js'
+            - 'ui/web/src/features/player/services/audio-processor.ts'
+            - 'scripts/test-dsp-analysis.sh'
+            - '.forgejo/workflows/dsp-analysis.yaml'
+
+jobs:
+    qualify:
+        runs-on: docker-cli
+        container:
+            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+        steps:
+            - name: Checkout
+              run: |
+                  git init -q
+                  git remote add origin ${{ forgejo.event.repository.clone_url }}
+                  git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin ${{ forgejo.ref }}
+                  git checkout -q FETCH_HEAD
+
+            - name: Install pinned Emscripten
+              run: |
+                  git init -q /tmp/baander-dsp-emsdk
+                  git -C /tmp/baander-dsp-emsdk remote add origin https://github.com/emscripten-core/emsdk.git
+                  git -C /tmp/baander-dsp-emsdk fetch -q --depth 1 origin db04e88298d9916fc51fcd3743045ca3eb695127
+                  git -C /tmp/baander-dsp-emsdk checkout -q --detach FETCH_HEAD
+                  /tmp/baander-dsp-emsdk/emsdk install 6.0.3
+                  /tmp/baander-dsp-emsdk/emsdk activate 6.0.3
+
+            - name: Build and qualify analysis modules
+              run: |
+                  . /tmp/baander-dsp-emsdk/emsdk_env.sh
+                  bash scripts/test-dsp-analysis.sh

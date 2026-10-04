@@ -23,11 +23,9 @@ static bool   g_prev_ready = false;
 void* wasm_malloc(size_t n) { return std::malloc(n); }
 void  wasm_free(void* p) { std::free(p); }
 
-static inline float bin_to_hz(int k) {
-  // bins cover [0 .. sr/2] across g_bins bins
-  if (g_bins <= 1) return 0.0f;
-  float frac = (float)k / (float)(g_bins - 1);
-  return frac * (g_sr * 0.5f);
+static inline float bin_to_hz(double k) {
+  // N/2 magnitudes omit Nyquist: bin k has frequency k * sample rate / N.
+  return (float)(k * (double)g_sr / (double)g_fft_size);
 }
 
 void init_features(int fft_size, int sample_rate) {
@@ -94,7 +92,7 @@ void compute_from_mag(const uint8_t* mag1024) {
   // Centroid
   if (sum > 1e-12) {
     double centroid_bin = weighted / sum;
-    g_centroid_hz = (float)bin_to_hz((int)(centroid_bin + 0.5));
+    g_centroid_hz = bin_to_hz(centroid_bin);
   } else {
     g_centroid_hz = 0.0f;
   }
@@ -161,8 +159,8 @@ void get_band_energies(uint8_t* out, int bands) {
     float lo_hz = std::exp(log_min + step * b);
     float hi_hz = std::exp(log_min + step * (b + 1));
     // Convert to bin range
-    int lo = (int)std::floor((lo_hz / (g_sr * 0.5f)) * (B - 1));
-    int hi = (int)std::ceil ((hi_hz / (g_sr * 0.5f)) * (B - 1));
+    int lo = (int)std::floor(lo_hz * g_fft_size / g_sr);
+    int hi = (int)std::ceil (hi_hz * g_fft_size / g_sr);
     if (lo < 0) lo = 0;
     if (hi >= B) hi = B - 1;
     if (hi < lo) hi = lo;

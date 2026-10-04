@@ -203,7 +203,9 @@ export class AudioProcessor {
         } else if (msg.type === 'error') {
           console.error('[AudioProcessor] WASM spectrum error:', msg)
           this.wasmSpectrumReady = false
-        } else if (msg.type === 'spectrum' && msg.frequencyData && msg.timeDomainData) {
+        } else if (msg.type === 'spectrum'
+          && msg.frequencyData instanceof Uint8Array && msg.frequencyData.length === this.FFT_SIZE / 2
+          && msg.timeDomainData instanceof Uint8Array && msg.timeDomainData.length === this.FFT_SIZE) {
           const freqLen = Math.min(this.frequencyData.length, msg.frequencyData.length)
           const timeLen = Math.min(this.timeDomainData.length, msg.timeDomainData.length)
           for (let i = 0; i < freqLen; i++) this.frequencyData[i] = msg.frequencyData[i]
@@ -231,10 +233,12 @@ export class AudioProcessor {
   }
 
   private computeSpectralFeatures(frequencyData: Uint8Array) {
-    if (!this.spectralAPI || !this.dspReady) return
+    if (!this.spectralAPI || !this.dspReady || frequencyData.length !== this.FFT_SIZE / 2) return
 
+    let magPtr = 0
     try {
-      const magPtr = this.spectralAPI.malloc(frequencyData.length)
+      magPtr = this.spectralAPI.malloc(frequencyData.length)
+      if (!magPtr) throw new Error('Spectral allocation failed')
       const HEAPU8 = new Uint8Array(this.spectralAPI.memory.buffer)
       HEAPU8.set(frequencyData, magPtr)
 
@@ -247,10 +251,10 @@ export class AudioProcessor {
 
       const peakIndex = this.spectralAPI.getPeakIndex()
       this.peakFrequency = (peakIndex / (this.FFT_SIZE / 2)) * (this.audioContext.sampleRate / 2)
-
-      this.spectralAPI.free(magPtr)
     } catch (error) {
       console.warn('[AudioProcessor] Spectral features computation error:', error)
+    } finally {
+      if (magPtr) this.spectralAPI.free(magPtr)
     }
   }
 

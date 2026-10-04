@@ -49,13 +49,12 @@ static void init_window(WindowType type) {
 
 // Bit-reversal permutation (11-bit reverse for N=2048)
 static inline unsigned bit_reverse11(unsigned x) {
-  x = ((x & 0x555) << 1) | ((x & 0xAAA) >> 1);
-  x = ((x & 0x333) << 2) | ((x & 0xCCC) >> 2);
-  x = ((x & 0x0F0) << 4) | ((x & 0xF00) >> 4) | (x & 0x00F);
-  unsigned low = x & 0x00F;
-  low = ((low & 0x1) << 3) | ((low & 0x2) << 1) | ((low & 0x4) >> 1) | ((low & 0x8) >> 3);
-  x = (x & ~0x00F) | low;
-  return x & 0x7FF;
+  unsigned reversed = 0;
+  for (unsigned bit = 0; bit < 11; ++bit) {
+    reversed = (reversed << 1) | (x & 1U);
+    x >>= 1;
+  }
+  return reversed;
 }
 
 // Core FFT: inplace, separate real/imag, decimation-in-time Cooley–Tukey
