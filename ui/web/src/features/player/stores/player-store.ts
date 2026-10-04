@@ -145,6 +145,31 @@ export function resolveNextIndex(
   return null
 }
 
+/** A native play result belongs only to the selection and element that requested it. */
+function requestSelectedTrackPlayback(
+  track: Track,
+  get: () => PlayerState,
+  set: (state: Partial<PlayerState>) => void,
+) {
+  const generation = ++playbackSelectionGeneration
+  const el = get().audioElement
+  set({ isPlaying: true })
+  if (!el) return
+  el.src = buildStreamUrl(track.publicId)
+  const src = el.src
+  const ownsSelection = () => generation === playbackSelectionGeneration
+    && get().audioElement === el && el.src === src && get().currentTrack === track
+  void el.play().then(() => {
+    if (!ownsSelection() || !get().isPlaying || el.paused || el.ended) return
+    // ActivityService handles its own request errors; those are not playback errors.
+    void activityService.recordPlay({ songId: track.publicId, albumId: track.albumPublicId })
+  }, (err) => {
+    if (!ownsSelection()) return
+    logger.warn('Autoplay blocked or failed:', err)
+    set({ isPlaying: false })
+  })
+}
+
 export const usePlayerStore = create<PlayerState>()(
   persist(
     (set, get) => ({
@@ -166,9 +191,7 @@ export const usePlayerStore = create<PlayerState>()(
 
       // Queue actions
       playTrack: (track, queue) => {
-        const generation = ++playbackSelectionGeneration
         const state = get()
-        const el = state.audioElement
 
         if (queue) {
           // Replace entire queue, start playing from this track
@@ -193,26 +216,7 @@ export const usePlayerStore = create<PlayerState>()(
           set({ shuffleBag: generateShuffleBag(get().queue.length, get().currentIndex) })
         }
 
-        // Start playback on audio element
-        set({ isPlaying: true })
-        if (el) {
-          el.src = buildStreamUrl(track.publicId)
-          const src = el.src
-          const ownsSelection = () => generation === playbackSelectionGeneration
-            && get().audioElement === el && el.src === src && get().currentTrack === track
-          el.play().then(() => {
-            if (!ownsSelection()) return
-            // Record activity only when playback actually starts
-            activityService.recordPlay({
-              songId: track.publicId,
-              albumId: track.albumPublicId,
-            })
-          }).catch((err) => {
-            if (!ownsSelection()) return
-            logger.warn('Autoplay blocked or failed:', err)
-            set({ isPlaying: false })
-          })
-        }
+        requestSelectedTrackPlayback(track, get, set)
       },
 
       playTrackFromList: (songs, position) => {
@@ -273,27 +277,17 @@ export const usePlayerStore = create<PlayerState>()(
       },
 
       playNext: () => {
-        const { queue, currentIndex, shuffle, repeat, audioElement, shuffleBag } = get()
+        const { queue, currentIndex, shuffle, repeat, shuffleBag } = get()
         const nextIndex = resolveNextIndex(queue, currentIndex, shuffle, repeat, shuffleBag)
         if (nextIndex === null) {
-          set({ isPlaying: false })
+          get().setIsPlaying(false)
           return
         }
 
         const track = queue[nextIndex]
-        playbackSelectionGeneration++
-        const el = audioElement
-        if (el) {
-          el.src = buildStreamUrl(track.publicId)
-          el.play().then(() => {
-            activityService.recordPlay({
-              songId: track.publicId,
-              albumId: track.albumPublicId,
-            })
-          }).catch((err) => { logger.warn('Failed to record play activity:', err) })
-        }
-        set({ currentIndex: nextIndex, currentTrack: track, isPlaying: true })
+        set({ currentIndex: nextIndex, currentTrack: track })
         updateTime(0)
+        requestSelectedTrackPlayback(track, get, set)
       },
 
       adoptPreloadedNext: (element, expectedCurrentId, expectedNextId) => {
@@ -337,19 +331,9 @@ export const usePlayerStore = create<PlayerState>()(
         }
 
         const track = queue[prevIndex]
-        playbackSelectionGeneration++
-        const el = audioElement
-        if (el) {
-          el.src = buildStreamUrl(track.publicId)
-          el.play().then(() => {
-            activityService.recordPlay({
-              songId: track.publicId,
-              albumId: track.albumPublicId,
-            })
-          }).catch((err) => { logger.warn('Failed to record play activity:', err) })
-        }
-        set({ currentIndex: prevIndex, currentTrack: track, isPlaying: true })
+        set({ currentIndex: prevIndex, currentTrack: track })
         updateTime(0)
+        requestSelectedTrackPlayback(track, get, set)
       },
 
       removeFromQueue: (index) => {
@@ -391,7 +375,10 @@ export const usePlayerStore = create<PlayerState>()(
       },
 
       // Playback actions
-      setIsPlaying: (playing) => set({ isPlaying: playing }),
+      setIsPlaying: (playing) => {
+        if (!playing && get().isPlaying) playbackSelectionGeneration++
+        set({ isPlaying: playing })
+      },
       setDuration: (duration) => set({ duration }),
 
       seekTo: (time) => {
@@ -442,7 +429,8 @@ export const usePlayerStore = create<PlayerState>()(
 
       // Audio element
       setAudioElement: (el) => {
-        const { volume, muted } = get()
+        const { volume, muted, audioElement } = get()
+        if (audioElement !== el) playbackSelectionGeneration++
         syncPlaybackVolume(el ? [el] : [], volume, muted)
         set({ audioElement: el })
       },

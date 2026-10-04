@@ -67,3 +67,8 @@ are rejected rather than relabeled as passive playback: Web Audio capture cannot
 be undone by disconnecting a node. Playback stops when no usable graph remains;
 a later load or play event can retry. An element captured by another context
 requires replacement or recovery by its owner.
+
+Next/previous failure tests return HTTP 404 for the selected WAV and assert that
+native `play()` rejection clears the playing state. Store tests resolve or reject
+superseded play promises to check selection ownership and activity reporting,
+including navigation away and back to the same track.

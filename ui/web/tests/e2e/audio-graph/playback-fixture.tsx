@@ -68,6 +68,8 @@ const fixture = {
   pause() { usePlayerStore.getState().setIsPlaying(false) },
   resume() { usePlayerStore.getState().setIsPlaying(true) },
   manual() { usePlayerStore.getState().playTrack(tracks[2]) },
+  next() { usePlayerStore.getState().playNext() },
+  previous() { usePlayerStore.getState().playPrevious() },
   domPause(index: number) { elements[index].pause() },
   domPlay(index: number) { return elements[index].play() },
 }

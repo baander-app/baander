@@ -163,3 +163,21 @@ for (const cancel of [false, true]) {
     }
   })
 }
+
+for (const action of ['next', 'previous'] as const) {
+  test(`native ${action} playback failure clears the playing state for its selected track`, async ({ page, origin }) => {
+    const failedId = action === 'next' ? 'second' : 'third'
+    await page.route('**/api/stream/track?*', async route => {
+      if (new URL(route.request().url()).searchParams.get('id') === failedId) {
+        await route.fulfill({ status: 404, body: 'Missing fixture media' })
+      } else await route.continue()
+    })
+    await start(page, origin, false)
+    await page.evaluate(action => {
+      window.playbackFixture.seek(0)
+      window.playbackFixture[action]()
+    }, action)
+    await expect.poll(async () => (await snapshot(page)).track).toBe(failedId)
+    await expect.poll(async () => (await snapshot(page)).playing).toBe(false)
+  })
+}

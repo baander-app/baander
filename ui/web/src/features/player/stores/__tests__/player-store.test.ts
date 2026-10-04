@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { audioService } from '../../services/audio-service'
 import { activityService } from '../../services/activity-service'
 import {
@@ -30,6 +30,8 @@ function makeAudioStub(): HTMLAudioElement {
     currentTime: 0,
     volume: 1,
     muted: false,
+    paused: false,
+    ended: false,
     play: vi.fn(() => Promise.resolve()),
     pause: vi.fn(),
   }
@@ -294,6 +296,122 @@ describe('player-store', () => {
   // =========================================================================
   // playNext
   // =========================================================================
+  describe.each(['playNext', 'playPrevious'] as const)('%s async ownership', (action) => {
+    beforeEach(() => { vi.spyOn(activityService, 'recordPlay').mockResolvedValue() })
+    afterEach(() => { vi.mocked(activityService.recordPlay).mockRestore() })
+
+    function prepare() {
+      const queue = seedQueue(1, 4)
+      const audio = makeAudioStub()
+      usePlayerStore.getState().setAudioElement(audio)
+      return { queue, audio, selected: queue[action === 'playNext' ? 2 : 0] }
+    }
+
+    it('publishes the selected track before native play events and records current success', async () => {
+      const { audio, selected } = prepare()
+      vi.mocked(audio.play).mockImplementationOnce(() => {
+        expect(usePlayerStore.getState().currentTrack).toBe(selected)
+        expect(usePlayerStore.getState().isPlaying).toBe(true)
+        return Promise.resolve()
+      })
+      usePlayerStore.getState()[action]()
+      await Promise.resolve()
+      expect(activityService.recordPlay).toHaveBeenCalledExactlyOnceWith({ songId: selected.publicId, albumId: selected.albumPublicId })
+    })
+
+    it('stops a currently selected playback request that rejects', async () => {
+      const { audio, selected } = prepare()
+      vi.mocked(audio.play).mockRejectedValueOnce(new Error('Current navigation playback failed'))
+      usePlayerStore.getState()[action]()
+      await Promise.resolve()
+      expect(usePlayerStore.getState().currentTrack).toBe(selected)
+      expect(usePlayerStore.getState().isPlaying).toBe(false)
+      expect(activityService.recordPlay).not.toHaveBeenCalled()
+    })
+
+    it.each(['resolve', 'reject'] as const)('ignores stale %s after manual selection or selection ABA', async (outcome) => {
+      for (const aba of [false, true]) {
+        vi.mocked(activityService.recordPlay).mockClear()
+        const { audio, queue, selected } = prepare()
+        let settle!: () => void
+        vi.mocked(audio.play).mockReturnValueOnce(new Promise<void>((resolve, reject) => {
+          settle = () => outcome === 'resolve' ? resolve() : reject(new Error('Obsolete navigation failed'))
+        }))
+        usePlayerStore.getState()[action]()
+        usePlayerStore.getState().playTrack(queue[3])
+        if (aba) usePlayerStore.getState().playTrack(selected)
+        settle()
+        await Promise.resolve()
+        expect(usePlayerStore.getState().currentTrack).toBe(aba ? selected : queue[3])
+        expect(usePlayerStore.getState().isPlaying).toBe(true)
+        expect(activityService.recordPlay).toHaveBeenCalledExactlyOnceWith({ songId: (aba ? selected : queue[3]).publicId, albumId: undefined })
+      }
+    })
+
+    it.each(['resolve', 'reject'] as const)('ignores stale %s after element replacement or element ABA', async (outcome) => {
+      for (const aba of [false, true]) {
+        vi.mocked(activityService.recordPlay).mockClear()
+        const { audio } = prepare()
+        let settle!: () => void
+        vi.mocked(audio.play).mockReturnValueOnce(new Promise<void>((resolve, reject) => {
+          settle = () => outcome === 'resolve' ? resolve() : reject(new Error('Detached media failed'))
+        }))
+        usePlayerStore.getState()[action]()
+        const replacement = makeAudioStub()
+        usePlayerStore.getState().setAudioElement(replacement)
+        if (aba) usePlayerStore.getState().setAudioElement(audio)
+        settle()
+        await Promise.resolve()
+        expect(usePlayerStore.getState().isPlaying).toBe(true)
+        expect(activityService.recordPlay).not.toHaveBeenCalled()
+      }
+    })
+
+    it.each(['resolve', 'reject'] as const)('ignores pending %s after explicit pause and resume', async (outcome) => {
+      const { audio } = prepare()
+      let settle!: () => void
+      vi.mocked(audio.play).mockReturnValueOnce(new Promise<void>((resolve, reject) => {
+        settle = () => outcome === 'resolve' ? resolve() : reject(new Error('Paused request failed late'))
+      }))
+      usePlayerStore.getState()[action]()
+      usePlayerStore.getState().setIsPlaying(false)
+      usePlayerStore.getState().setIsPlaying(true)
+      settle()
+      await Promise.resolve()
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+      expect(activityService.recordPlay).not.toHaveBeenCalled()
+    })
+
+    it.each(['resolve', 'reject'] as const)('ignores pending %s after end-of-queue stop and resume', async (outcome) => {
+      const { audio, queue } = prepare()
+      let settle!: () => void
+      vi.mocked(audio.play).mockReturnValueOnce(new Promise<void>((resolve, reject) => {
+        settle = () => outcome === 'resolve' ? resolve() : reject(new Error('Stopped queue request failed late'))
+      }))
+      usePlayerStore.getState().playTrack(queue[queue.length - 1])
+      usePlayerStore.getState().playNext()
+      expect(usePlayerStore.getState().isPlaying).toBe(false)
+      usePlayerStore.getState().setIsPlaying(true)
+      settle()
+      await Promise.resolve()
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+      expect(activityService.recordPlay).not.toHaveBeenCalled()
+    })
+
+    it.each(['pause', 'native pause', 'disconnect', 'source change'] as const)('does not record a fulfilled request after %s', async (interruption) => {
+      const { audio } = prepare()
+      let settle!: () => void
+      vi.mocked(audio.play).mockReturnValueOnce(new Promise<void>((resolve) => { settle = resolve }))
+      usePlayerStore.getState()[action]()
+      if (interruption === 'pause') usePlayerStore.getState().setIsPlaying(false)
+      if (interruption === 'native pause') Object.defineProperty(audio, 'paused', { value: true })
+      if (interruption === 'disconnect') usePlayerStore.getState().setAudioElement(null)
+      if (interruption === 'source change') audio.src = '/api/stream/track?id=other'
+      settle()
+      await Promise.resolve()
+      expect(activityService.recordPlay).not.toHaveBeenCalled()
+    })
+  })
   describe('playNext', () => {
     beforeEach(() => {
       usePlayerStore.setState({ audioElement: makeAudioStub() })
