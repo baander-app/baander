@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Shared\Interface\DTO\ApiError;
 use Nelmio\ApiDocBundle\Render\RenderOpenApi;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -139,11 +140,22 @@ final class OpenApiSpecTest extends KernelTestCase
         $spec = $this->getSpec();
         $apiError = $spec['components']['schemas']['ApiError'] ?? [];
 
-        $this->assertArrayHasKey('properties', $apiError);
+        self::assertSame(['error'], $apiError['required']);
+        self::assertSame(['error'], array_keys($apiError['properties']));
+        $error = $apiError['properties']['error'];
+        self::assertSame('object', $error['type']);
+        self::assertSame(['message', 'code'], $error['required']);
+        self::assertSame('string', $error['properties']['message']['type']);
+        self::assertSame('integer', $error['properties']['code']['type']);
+        self::assertSame('object', $error['properties']['details']['type']);
 
-        $properties = $apiError['properties'];
-        $this->assertArrayHasKey('message', $properties, 'ApiError must have a "message" property');
-        $this->assertArrayHasKey('code', $properties, 'ApiError must have a "code" property');
+        foreach ([[], ['limit' => ['Must be positive.']]] as $details) {
+            $payload = (new ApiError('Invalid query parameters.', 400, $details))->toArray();
+            self::assertSame(array_keys($apiError['properties']), array_keys($payload));
+            self::assertSame([], array_diff(array_keys($payload['error']), array_keys($error['properties'])));
+            self::assertSame([], array_diff($error['required'], array_keys($payload['error'])));
+            self::assertSame($details !== [], array_key_exists('details', $payload['error']));
+        }
     }
 
     public function test_every_path_has_at_least_one_response_with_schema(): void

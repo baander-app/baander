@@ -798,12 +798,20 @@ export interface UpdateTranscodeSessionRequest {
   audioProfile?: UpdateTranscodeSessionRequestAudioProfile;
 }
 
-export type ApiErrorDetails = {[key: string]: unknown | null};
+/**
+ * Additional error details, omitted when empty
+ */
+export type ApiErrorErrorDetails = { [key: string]: unknown };
 
-export interface ApiError {
+export type ApiErrorError = {
   message: string;
   code: number;
-  details?: ApiErrorDetails;
+  /** Additional error details, omitted when empty */
+  details?: ApiErrorErrorDetails;
+};
+
+export interface ApiError {
+  error: ApiErrorError;
 }
 
 export interface ActivityResource {

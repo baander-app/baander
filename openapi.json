@@ -20238,22 +20238,27 @@
             },
             "ApiError": {
                 "required": [
-                    "message",
-                    "code"
+                    "error"
                 ],
                 "properties": {
-                    "message": {
-                        "type": "string"
-                    },
-                    "code": {
-                        "type": "integer"
-                    },
-                    "details": {
-                        "type": "object",
-                        "default": [],
-                        "additionalProperties": {
-                            "nullable": true
-                        }
+                    "error": {
+                        "required": [
+                            "message",
+                            "code"
+                        ],
+                        "properties": {
+                            "message": {
+                                "type": "string"
+                            },
+                            "code": {
+                                "type": "integer"
+                            },
+                            "details": {
+                                "description": "Additional error details, omitted when empty",
+                                "type": "object"
+                            }
+                        },
+                        "type": "object"
                     }
                 },
                 "type": "object"
