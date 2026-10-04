@@ -9,7 +9,6 @@ use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\Port\SegmentCachePortInterface;
 use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
 use App\Transcode\Domain\Repository\TranscodeJobRepositoryInterface;
-use Psr\Log\LoggerInterface;
 
 /**
  * Decorator that caches segment data in InMemorySegmentCache.
@@ -28,7 +27,6 @@ final readonly class CachedTranscodeStreamingService implements TranscodeStreami
         private TranscodeStreamingPortInterface $inner,
         private SegmentCachePortInterface $cache,
         private TranscodeJobRepositoryInterface $jobRepository,
-        private LoggerInterface $logger,
     ) {
     }
 
@@ -97,6 +95,9 @@ final readonly class CachedTranscodeStreamingService implements TranscodeStreami
         return $this->inner->getDashManifest($videoId);
     }
 
+    /**
+     * @return list<array{name: string, height: int, width: int, bitrate: int, codec: string}>
+     */
     public function getQualityLadderForVideo(Uuid $videoId): array
     {
         return $this->inner->getQualityLadderForVideo($videoId);

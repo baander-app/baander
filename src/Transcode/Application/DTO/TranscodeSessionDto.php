@@ -8,6 +8,10 @@ use App\Transcode\Domain\Model\TranscodeSession;
 
 final readonly class TranscodeSessionDto
 {
+    /**
+     * @param array<string, mixed> $metrics
+     * @param array<string, mixed> $audioProfile
+     */
     public function __construct(
         private string $uuid,
         private string $publicId,

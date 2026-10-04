@@ -70,6 +70,9 @@ final class TranscodeProcessPool
         $this->pool->dispatch($payload, $key);
     }
 
+    /**
+     * @param array<string, mixed> $audioProfile
+     */
     public function encodeSegment(
         TranscodeJob $job,
         int $segmentIndex,

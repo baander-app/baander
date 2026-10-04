@@ -18,6 +18,9 @@ interface FFmpegPortInterface
         string $outputPath,
     ): string;
 
+    /**
+     * @param array<string, mixed> $audioProfile
+     */
     public function encodeSegment(
         string $sourcePath,
         float $startTime,
@@ -40,6 +43,7 @@ interface FFmpegPortInterface
 
     /**
      * Encode an audio-only init segment (fMP4 moov box, no video).
+     * @param array<string, mixed> $audioProfile
      */
     public function encodeAudioInitSegment(
         string $sourcePath,
@@ -49,6 +53,7 @@ interface FFmpegPortInterface
 
     /**
      * Encode an audio-only media segment (fMP4, no video).
+     * @param array<string, mixed> $audioProfile
      */
     public function encodeAudioSegment(
         string $sourcePath,

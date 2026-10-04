@@ -57,15 +57,15 @@ final class SeekSignalBroker
         $deadline = microtime(true) + $timeout;
 
         while (microtime(true) < $deadline) {
-            if (!$channel->isEmpty()) {
-                $latest = null;
-                while (!$channel->isEmpty()) {
-                    $signal = $channel->pop(0.001);
-                    if (is_array($signal)) {
-                        $latest = $signal;
-                    }
+            $latest = null;
+            while (!$channel->isEmpty()) {
+                $signal = $channel->pop(0.001);
+                if (is_array($signal)) {
+                    $latest = $signal;
                 }
+            }
 
+            if ($latest !== null) {
                 return $latest;
             }
 

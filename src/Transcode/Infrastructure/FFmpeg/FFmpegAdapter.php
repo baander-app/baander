@@ -50,6 +50,9 @@ final class FFmpegAdapter implements FFmpegPortInterface
         return $this->fmp4Writer->encodeInitSegment($sourcePath, $qualityTier, $outputPath);
     }
 
+    /**
+     * @param array<string, mixed> $audioProfile
+     */
     public function encodeSegment(
         string $sourcePath,
         float $startTime,
@@ -143,9 +146,12 @@ final class FFmpegAdapter implements FFmpegPortInterface
             ));
         }
 
-        return $this->parseLoudnormOutput($result['error'] ?? '');
+        return $this->parseLoudnormOutput($result['error']);
     }
 
+    /**
+     * @param array<string, mixed> $audioProfile
+     */
     public function encodeAudioInitSegment(
         string $sourcePath,
         array $audioProfile,
@@ -174,7 +180,7 @@ final class FFmpegAdapter implements FFmpegPortInterface
         );
 
         $result = ProcessExecutor::exec($cmd, 120);
-        if (($result['code'] ?? -1) !== 0) {
+        if ($result['code'] !== 0) {
             throw new RuntimeException(sprintf(
                 'Audio init segment encoding failed: %s',
                 $this->joinExecOutput($result),
@@ -184,6 +190,9 @@ final class FFmpegAdapter implements FFmpegPortInterface
         return $outputPath;
     }
 
+    /**
+     * @param array<string, mixed> $audioProfile
+     */
     public function encodeAudioSegment(
         string $sourcePath,
         float $startTime,
@@ -220,7 +229,7 @@ final class FFmpegAdapter implements FFmpegPortInterface
         );
 
         $result = ProcessExecutor::exec($cmd, 300);
-        if (($result['code'] ?? -1) !== 0) {
+        if ($result['code'] !== 0) {
             throw new RuntimeException(sprintf(
                 'Audio segment encoding failed: %s',
                 $this->joinExecOutput($result),
@@ -247,7 +256,7 @@ final class FFmpegAdapter implements FFmpegPortInterface
         );
 
         $result = ProcessExecutor::exec($cmd, 120);
-        if (($result['code'] ?? -1) !== 0) {
+        if ($result['code'] !== 0) {
             throw new RuntimeException(sprintf(
                 'Subtitle extraction failed for language "%s": %s',
                 $language,
@@ -261,7 +270,7 @@ final class FFmpegAdapter implements FFmpegPortInterface
      */
     private function joinExecOutput(array $result): string
     {
-        return trim(($result['output'] ?? '') . ($result['error'] ?? ''));
+        return trim(($result['output'] ?? '') . ($result['error']));
     }
 
     /**

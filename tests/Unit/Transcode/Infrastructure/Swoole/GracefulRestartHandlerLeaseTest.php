@@ -68,7 +68,7 @@ final class GracefulRestartHandlerLeaseTest extends TestCase
         $finished->markFailed();
         $session = TranscodeSession::create(Uuid::generate(), $job->getId(), $job->getVideoId(), AudioProfile::streamingStereo());
         $storage = $this->createStub(TranscodeStoragePortInterface::class);
-        $persister = new JobStatePersister($this->createStub(TranscodeJobRepositoryInterface::class), $storage, $logger, $this->directory, $json);
+        $persister = new JobStatePersister($storage, $logger, $this->directory, $json);
         $persister->persist($job);
         $jobs = $this->createMock(TranscodeJobPortInterface::class);
         $jobs->expects(self::once())->method('findByUuid')->with($job->getId())->willReturn($job);

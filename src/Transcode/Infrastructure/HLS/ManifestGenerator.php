@@ -12,8 +12,8 @@ final class ManifestGenerator
      * Generate an HLS v6 master playlist with separate audio and subtitle groups.
      *
      * @param array<string, string> $mediaManifestUrls Map of tier name => video manifest URL
-     * @param array<string, array{language: string, name: string, uri: string, channels: string, isDefault: bool}> $audioGroups Audio track definitions
-     * @param array<string, array{language: string, name: string, uri: string, isDefault: bool}> $subtitleGroups Subtitle track definitions
+     * @param list<array{language: string, name: string, uri: string, channels?: string, isDefault?: bool, groupId?: string, codec?: string}> $audioGroups Audio track definitions
+     * @param list<array{language: string, name: string, uri: string, isDefault?: bool, groupId?: string}> $subtitleGroups Subtitle track definitions
      * @param string|array<string, string>|null $videoCodecRfc6381 RFC6381 codec override (per-tier map or single string)
      */
     public function generateMasterManifest(
@@ -30,7 +30,6 @@ final class ManifestGenerator
         // Derive GROUP-IDs from group data (parameterized, not hardcoded)
         $audioGroupId = ($audioGroups[0]['groupId'] ?? 'aac');
         $subtitleGroupId = ($subtitleGroups[0]['groupId'] ?? 'subs');
-        $audioCodecRfc6381 = ($audioGroups[0]['codec'] ?? null);
 
         // Audio groups — parameterized GROUP-ID
         foreach ($audioGroups as $audio) {
@@ -73,10 +72,6 @@ final class ManifestGenerator
             // list only the video codec. Listing the audio codec here makes
             // players expect an audio track inside the video segment, which
             // causes fragment parsing errors.
-            if ($audioCodecRfc6381 !== null && empty($audioGroups)) {
-                $codecs .= ',' . $audioCodecRfc6381;
-            }
-
             $streamInf = sprintf(
                 '#EXT-X-STREAM-INF:BANDWIDTH=%d,RESOLUTION=%dx%d,CODECS="%s"',
                 $tier->videoBitrate,
@@ -140,7 +135,7 @@ final class ManifestGenerator
      * Generate an HLS v6 subtitle media playlist for a specific language.
      *
      * @param string $language BCP-47 language tag
-     * @param array<string, array{segmentName: string, duration: float}> $segments
+     * @param list<array{segmentName: string, duration: float}> $segments
      */
     public function generateSubtitleManifest(
         string $language,

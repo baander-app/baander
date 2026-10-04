@@ -8,6 +8,7 @@ use App\Transcode\Domain\Service\VideoProcessingRules;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\HardwareAccelerator;
 use App\Transcode\Domain\ValueObject\QualityTier;
+use App\Transcode\Infrastructure\FFmpeg\ProcessExecutor;
 use RuntimeException;
 
 final class FMP4SegmentWriter

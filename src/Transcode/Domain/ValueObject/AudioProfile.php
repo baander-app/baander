@@ -180,6 +180,9 @@ final readonly class AudioProfile implements JsonSerializable
         return $this->name === $other->name;
     }
 
+    /**
+     * @return array{name: string, codec: string, bitrate: int, channelLayout: string, channelCount: int, sampleRate: int, loudnessStandard: string, downmixSurround: bool, applyDrc: bool, drcRatio: float, drcThreshold: int}
+     */
     public function jsonSerialize(): array
     {
         return [

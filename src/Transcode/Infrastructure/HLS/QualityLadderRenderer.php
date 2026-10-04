@@ -35,6 +35,7 @@ final class QualityLadderRenderer
     /**
      * Get tiers that should be included based on source video resolution.
      * Only tiers at or below the source resolution are offered.
+     * @return list<QualityTier>
      */
     public function tiersForResolution(int $sourceHeight): array
     {

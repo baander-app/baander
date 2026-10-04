@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Transcode\Interface\Controller;
 
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
@@ -19,6 +20,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 #[OA\Tag(name: 'Transcode', description: 'Video transcoding management endpoints')]
 #[Route('/api/transcode/jobs', name: 'transcode_job_')]
@@ -120,9 +122,8 @@ final class TranscodeJobController
         ],
     )]
     #[Route('/list', name: 'list', methods: ['GET'])]
-    public function listJobs(TranscodeJobQueryPort $queryPort): JsonResponse
+    public function listJobs(TranscodeJobQueryPort $queryPort, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
-        $user = $this->security->getUser();
         $jobs = $queryPort->findByUser(Uuid::fromString($user->getId()));
         return $this->successResponse(array_map(fn($d) => $d->toArray(), $jobs));
     }

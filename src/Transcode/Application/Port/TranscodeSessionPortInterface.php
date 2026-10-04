@@ -12,6 +12,9 @@ use App\Transcode\Domain\ValueObject\SessionPriority;
 
 interface TranscodeSessionPortInterface
 {
+    /**
+     * @param array<array-key, string> $audioLanguages
+     */
     public function createSession(
         Uuid $userId,
         Uuid $jobId,

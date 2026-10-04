@@ -52,6 +52,9 @@ final class AudioFilterBuilder
         return $this;
     }
 
+    /**
+     * @param array<string, float> $measured
+     */
     public function loudness(LoudnessStandard $standard, array $measured = []): self
     {
         $filter = AudioProcessingRules::loudnessFilter($standard, $measured);

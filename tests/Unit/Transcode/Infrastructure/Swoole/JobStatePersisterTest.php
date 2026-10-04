@@ -8,7 +8,6 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Model\TranscodeJobState;
-use App\Transcode\Domain\Repository\TranscodeJobRepositoryInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\TranscodeStatus;
@@ -21,14 +20,12 @@ use Symfony\Component\Serializer\Exception\NotEncodableValueException;
 
 final class JobStatePersisterTest extends TestCase
 {
-    private TranscodeJobRepositoryInterface&Stub $jobRepository;
     private TranscodeStoragePortInterface&Stub $storage;
     private LoggerInterface&Stub $logger;
     private string $stateDir;
 
     protected function setUp(): void
     {
-        $this->jobRepository = $this->createStub(TranscodeJobRepositoryInterface::class);
         $this->storage = $this->createStub(TranscodeStoragePortInterface::class);
         $this->logger = $this->createStub(LoggerInterface::class);
         $this->stateDir = sys_get_temp_dir() . '/baander_test_job_state_' . uniqid();
@@ -49,7 +46,7 @@ final class JobStatePersisterTest extends TestCase
         $this->storage->method('exists')->willReturn(true);
 
         $job = $this->createInProgressJob();
-        $persister = new JobStatePersister($this->jobRepository, $this->storage, $this->logger, $this->stateDir, new JsonEncoder());
+        $persister = new JobStatePersister($this->storage, $this->logger, $this->stateDir, new JsonEncoder());
 
         $persister->persist($job);
 
@@ -69,7 +66,7 @@ final class JobStatePersisterTest extends TestCase
     {
         $job1 = $this->createInProgressJob();
         $job2 = $this->createInProgressJob();
-        $persister = new JobStatePersister($this->jobRepository, $this->storage, $this->logger, $this->stateDir, new JsonEncoder());
+        $persister = new JobStatePersister($this->storage, $this->logger, $this->stateDir, new JsonEncoder());
 
         $persister->persist($job1);
         $persister->persist($job2);
@@ -84,7 +81,7 @@ final class JobStatePersisterTest extends TestCase
     public function testCleanupRemovesStateFile(): void
     {
         $job = $this->createInProgressJob();
-        $persister = new JobStatePersister($this->jobRepository, $this->storage, $this->logger, $this->stateDir, new JsonEncoder());
+        $persister = new JobStatePersister($this->storage, $this->logger, $this->stateDir, new JsonEncoder());
 
         $persister->persist($job);
 
@@ -97,7 +94,7 @@ final class JobStatePersisterTest extends TestCase
 
     public function testLoadWithNonExistentFileReturnsNull(): void
     {
-        $persister = new JobStatePersister($this->jobRepository, $this->storage, $this->logger, $this->stateDir, new JsonEncoder());
+        $persister = new JobStatePersister($this->storage, $this->logger, $this->stateDir, new JsonEncoder());
 
         $result = $persister->load(new PublicId());
 
@@ -115,7 +112,7 @@ final class JobStatePersisterTest extends TestCase
 
         $this->logger->expects($this->never())->method('debug');
 
-        $persister = new JobStatePersister($this->jobRepository, $this->storage, $this->logger, $this->stateDir, new JsonEncoder());
+        $persister = new JobStatePersister($this->storage, $this->logger, $this->stateDir, new JsonEncoder());
         $persister->persist($job);
 
         $files = glob($this->stateDir . '/*.json');
@@ -132,7 +129,7 @@ final class JobStatePersisterTest extends TestCase
 
         $this->logger->expects($this->never())->method('debug');
 
-        $persister = new JobStatePersister($this->jobRepository, $this->storage, $this->logger, $this->stateDir, new JsonEncoder());
+        $persister = new JobStatePersister($this->storage, $this->logger, $this->stateDir, new JsonEncoder());
         $persister->persist($job);
 
         $files = glob($this->stateDir . '/*.json');
@@ -148,7 +145,7 @@ final class JobStatePersisterTest extends TestCase
 
         $this->logger->expects($this->never())->method('debug');
 
-        $persister = new JobStatePersister($this->jobRepository, $this->storage, $this->logger, $this->stateDir, new JsonEncoder());
+        $persister = new JobStatePersister($this->storage, $this->logger, $this->stateDir, new JsonEncoder());
         $persister->persist($job);
 
         $files = glob($this->stateDir . '/*.json');
@@ -157,7 +154,7 @@ final class JobStatePersisterTest extends TestCase
 
     public function testLoadThrowsOnCorruptedJsonFile(): void
     {
-        $persister = new JobStatePersister($this->jobRepository, $this->storage, $this->logger, $this->stateDir, new JsonEncoder());
+        $persister = new JobStatePersister($this->storage, $this->logger, $this->stateDir, new JsonEncoder());
         $publicId = new PublicId();
 
         // Write a corrupted JSON file
@@ -173,14 +170,14 @@ final class JobStatePersisterTest extends TestCase
     {
         $this->assertFalse(is_dir($this->stateDir));
 
-        new JobStatePersister($this->jobRepository, $this->storage, $this->logger, $this->stateDir, new JsonEncoder());
+        new JobStatePersister($this->storage, $this->logger, $this->stateDir, new JsonEncoder());
 
         $this->assertTrue(is_dir($this->stateDir));
     }
 
     public function testCleanupForNonExistentFileDoesNotThrow(): void
     {
-        $persister = new JobStatePersister($this->jobRepository, $this->storage, $this->logger, $this->stateDir, new JsonEncoder());
+        $persister = new JobStatePersister($this->storage, $this->logger, $this->stateDir, new JsonEncoder());
 
         // Should not throw even if the file doesn't exist
         $persister->cleanup(new PublicId());
@@ -190,7 +187,7 @@ final class JobStatePersisterTest extends TestCase
 
     public function testListPersistedJobsReturnsEmptyWhenNoFiles(): void
     {
-        $persister = new JobStatePersister($this->jobRepository, $this->storage, $this->logger, $this->stateDir, new JsonEncoder());
+        $persister = new JobStatePersister($this->storage, $this->logger, $this->stateDir, new JsonEncoder());
 
         $this->assertSame([], $persister->listPersistedJobs());
     }

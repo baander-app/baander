@@ -20,6 +20,9 @@ final readonly class TranscodeJobCompleted extends AbstractDomainEvent
         parent::__construct($occurredAt);
     }
 
+    /**
+     * @param array<string, mixed> $payload
+     */
     public static function fromPayload(array $payload): static
     {
         return new self(
@@ -31,6 +34,9 @@ final readonly class TranscodeJobCompleted extends AbstractDomainEvent
         );
     }
 
+    /**
+     * @return array{job_id: string, video_id: string, quality_tier: string, total_segments: int, occurred_at: string}
+     */
     public function toPayload(): array
     {
         return [

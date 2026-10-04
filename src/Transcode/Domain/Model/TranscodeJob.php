@@ -20,6 +20,9 @@ final class TranscodeJob
     {
     }
 
+    /**
+     * @param array<array-key, string> $audioTrackLanguages
+     */
     public static function create(
         Uuid $videoId,
         QualityTier $qualityTier,
@@ -92,6 +95,9 @@ final class TranscodeJob
         $this->state->updatedAt = new DateTimeImmutable();
     }
 
+    /**
+     * @param array<string, mixed> $probeData
+     */
     public function updateProbeData(array $probeData): void
     {
         $this->state->probeData = $probeData;
@@ -249,11 +255,17 @@ final class TranscodeJob
         return $this->state->probeData;
     }
 
+    /**
+     * @return array<string, float>
+     */
     public function getMeasuredLoudness(): array
     {
         return $this->state->measuredLoudness;
     }
 
+    /**
+     * @param array<string, float> $loudness
+     */
     public function setMeasuredLoudness(array $loudness): void
     {
         $this->state->measuredLoudness = $loudness;

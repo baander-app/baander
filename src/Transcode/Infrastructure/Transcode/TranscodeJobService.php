@@ -23,6 +23,9 @@ final class TranscodeJobService implements TranscodeJobPortInterface
     ) {
     }
 
+    /**
+     * @param array<array-key, string> $audioTrackLanguages
+     */
     public function getOrCreateJob(
         Uuid $videoId,
         QualityTier $qualityTier,

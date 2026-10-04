@@ -25,6 +25,9 @@ final readonly class PlaybackPositionChanged extends AbstractDomainEvent
         parent::__construct($occurredAt);
     }
 
+    /**
+     * @param array<string, mixed> $payload
+     */
     public static function fromPayload(array $payload): static
     {
         return new self(
@@ -35,6 +38,9 @@ final readonly class PlaybackPositionChanged extends AbstractDomainEvent
         );
     }
 
+    /**
+     * @return array{job_id: string, position: float, action: string, occurred_at: string}
+     */
     public function toPayload(): array
     {
         return [

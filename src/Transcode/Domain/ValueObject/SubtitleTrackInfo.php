@@ -40,6 +40,7 @@ final readonly class SubtitleTrackInfo implements JsonSerializable
 
     /**
      * Construct from a previously serialized array (JSONB deserialization).
+     * @param array<string, mixed> $data
      */
     public static function fromSerialized(array $data): self
     {
@@ -66,6 +67,9 @@ final readonly class SubtitleTrackInfo implements JsonSerializable
             && $this->isDefault === $other->isDefault;
     }
 
+    /**
+     * @return array{language: string, codec: string, title: string, isDefault: bool}
+     */
     public function jsonSerialize(): array
     {
         return [

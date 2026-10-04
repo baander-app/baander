@@ -20,6 +20,9 @@ final class TranscodeSession
     ) {
     }
 
+    /**
+     * @param array<array-key, string> $audioLanguages
+     */
     public static function create(
         Uuid $userId,
         Uuid $jobId,

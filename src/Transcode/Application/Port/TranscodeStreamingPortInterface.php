@@ -34,6 +34,9 @@ interface TranscodeStreamingPortInterface
 
     public function getDashManifest(Uuid $videoId): string;
 
+    /**
+     * @return list<array{name: string, height: int, width: int, bitrate: int, codec: string}>
+     */
     public function getQualityLadderForVideo(Uuid $videoId): array;
 
     // --- Subtitle Delivery ---

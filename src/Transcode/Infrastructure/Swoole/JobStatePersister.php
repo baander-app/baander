@@ -8,7 +8,6 @@ use App\Shared\Domain\Model\PublicId;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Model\TranscodeJobState;
-use App\Transcode\Domain\Repository\TranscodeJobRepositoryInterface;
 use App\Transcode\Domain\ValueObject\TranscodeStatus;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncode;
@@ -26,7 +25,6 @@ final class JobStatePersister
      * @param string $stateDir Absolute path to the state directory
      */
     public function __construct(
-        private readonly TranscodeJobRepositoryInterface $jobRepository,
         private readonly TranscodeStoragePortInterface $storage,
         private readonly LoggerInterface $logger,
         private readonly string $stateDir,

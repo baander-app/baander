@@ -19,6 +19,9 @@ final class TranscodeSessionService implements TranscodeSessionPortInterface
     ) {
     }
 
+    /**
+     * @param array<array-key, string> $audioLanguages
+     */
     public function createSession(
         Uuid $userId,
         Uuid $jobId,

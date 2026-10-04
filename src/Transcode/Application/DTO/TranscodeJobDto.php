@@ -8,6 +8,9 @@ use App\Transcode\Domain\Model\TranscodeJob;
 
 final readonly class TranscodeJobDto
 {
+    /**
+     * @param array<string, array{path: string, size: int, duration: float}> $segmentMap
+     */
     public function __construct(
         private string $uuid,
         private string $publicId,

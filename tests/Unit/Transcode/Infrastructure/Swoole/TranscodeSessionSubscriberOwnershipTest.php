@@ -173,7 +173,7 @@ final class TranscodeSessionSubscriberOwnershipTest extends TestCase
         $stateAtLoss = null;
         $stateDir = $this->directory . '/state';
         $stateFile = $stateDir . '/' . $job->getPublicId()->toString() . '.json';
-        $persister = new JobStatePersister($this->createStub(TranscodeJobRepositoryInterface::class), $storage, $logger, $stateDir, $json);
+        $persister = new JobStatePersister($storage, $logger, $stateDir, $json);
         file_put_contents($stateFile, 'preexisting state');
         $runtime = new class {
             public TranscodeSessionSubscriber $subscriber;

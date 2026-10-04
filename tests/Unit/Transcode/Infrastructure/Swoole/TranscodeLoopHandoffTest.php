@@ -56,7 +56,7 @@ final class TranscodeLoopHandoffTest extends TestCase
             new TranscodeProcessPool($this->pool, $logger, $json, EncoderProfile::software('libx264')),
             $ffmpeg, new SegmentEncoder($ffmpeg, $storage, EncoderProfile::software('libx264')),
             $this->createStub(VideoRepositoryInterface::class),
-            new JobStatePersister($this->createStub(TranscodeJobRepositoryInterface::class), $storage, $logger, $this->directory, $json),
+            new JobStatePersister($storage, $logger, $this->directory, $json),
             new SeekSignalBroker(), $this->createStub(EventDispatcherInterface::class), $logger, $json,
             coWrapper: new CoWrapper(new ServicePoolContainer([]), new Swoole()),
         );

@@ -48,9 +48,15 @@ class TranscodeJobEntity
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $initSegmentPath;
 
+    /**
+     * @var array<string, array{path: string, size: int, duration: float}>
+     */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '{}'])]
     private array $segmentMap;
 
+    /**
+     * @var array<string, mixed>
+     */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '{}'])]
     private array $probeData;
 
@@ -78,12 +84,21 @@ class TranscodeJobEntity
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $failReason = null;
 
+    /**
+     * @var array<string, float>
+     */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '{}'])]
     private array $measuredLoudness;
 
+    /**
+     * @var array<array-key, string>
+     */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '[]'])]
     private array $audioTrackLanguages;
 
+    /**
+     * @var array<string, array{path: string, size: int, duration: float}>
+     */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '{}'])]
     private array $audioSegmentMap;
 
@@ -137,8 +152,20 @@ class TranscodeJobEntity
     public function getCompletedSegments(): int { return $this->completedSegments; }
     public function getOutputDirectory(): string { return $this->outputDirectory; }
     public function getInitSegmentPath(): ?string { return $this->initSegmentPath; }
-    public function getSegmentMap(): array { return $this->segmentMap; }
-    public function getProbeData(): array { return $this->probeData; }
+    /**
+     * @return array<string, array{path: string, size: int, duration: float}>
+     */
+    public function getSegmentMap(): array
+    {
+        return $this->segmentMap;
+    }
+    /**
+     * @return array<string, mixed>
+     */
+    public function getProbeData(): array
+    {
+        return $this->probeData;
+    }
     public function getVideoCodec(): ?string { return $this->videoCodec; }
     public function getAudioCodec(): ?string { return $this->audioCodec; }
     public function getVideoBitrate(): int { return $this->videoBitrate; }
@@ -147,9 +174,27 @@ class TranscodeJobEntity
     public function getHeight(): int { return $this->height; }
     public function getFramerate(): float { return $this->framerate; }
     public function getFailReason(): ?string { return $this->failReason; }
-    public function getMeasuredLoudness(): array { return $this->measuredLoudness; }
-    public function getAudioTrackLanguages(): array { return $this->audioTrackLanguages; }
-    public function getAudioSegmentMap(): array { return $this->audioSegmentMap; }
+    /**
+     * @return array<string, float>
+     */
+    public function getMeasuredLoudness(): array
+    {
+        return $this->measuredLoudness;
+    }
+    /**
+     * @return array<array-key, string>
+     */
+    public function getAudioTrackLanguages(): array
+    {
+        return $this->audioTrackLanguages;
+    }
+    /**
+     * @return array<string, array{path: string, size: int, duration: float}>
+     */
+    public function getAudioSegmentMap(): array
+    {
+        return $this->audioSegmentMap;
+    }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
     public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
 
@@ -189,12 +234,18 @@ class TranscodeJobEntity
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /**
+     * @param array<string, array{path: string, size: int, duration: float}> $map
+     */
     public function setSegmentMap(array $map): void
     {
         $this->segmentMap = $map;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public function setProbeData(array $data): void
     {
         $this->probeData = $data;
@@ -249,18 +300,27 @@ class TranscodeJobEntity
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /**
+     * @param array<string, float> $loudness
+     */
     public function setMeasuredLoudness(array $loudness): void
     {
         $this->measuredLoudness = $loudness;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /**
+     * @param array<array-key, string> $languages
+     */
     public function setAudioTrackLanguages(array $languages): void
     {
         $this->audioTrackLanguages = $languages;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /**
+     * @param array<string, array{path: string, size: int, duration: float}> $map
+     */
     public function setAudioSegmentMap(array $map): void
     {
         $this->audioSegmentMap = $map;

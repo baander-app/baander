@@ -73,9 +73,10 @@ final class ProcessExecutor
         while (true) {
             $status = proc_get_status($process);
 
-            if (($status['running'] ?? false) === false) {
+            if (!$status['running']) {
                 $stdout .= stream_get_contents($pipes[1]);
                 $stderr .= stream_get_contents($pipes[2]);
+                $exitCode = $status['exitcode'];
                 break;
             }
 
@@ -111,7 +112,7 @@ final class ProcessExecutor
         fclose($pipes[2]);
 
         return [
-            'code' => (int) ($status['exitcode'] ?? -1),
+            'code' => $exitCode,
             'output' => $stdout,
             'error' => $stderr,
         ];

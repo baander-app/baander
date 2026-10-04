@@ -20,6 +20,9 @@ final readonly class TranscodeSessionAttached extends AbstractDomainEvent
         parent::__construct($occurredAt);
     }
 
+    /**
+     * @param array<string, mixed> $payload
+     */
     public static function fromPayload(array $payload): static
     {
         return new self(
@@ -31,6 +34,9 @@ final readonly class TranscodeSessionAttached extends AbstractDomainEvent
         );
     }
 
+    /**
+     * @return array{session_id: string, job_id: string, user_id: string, quality_tier: string, occurred_at: string}
+     */
     public function toPayload(): array
     {
         return [

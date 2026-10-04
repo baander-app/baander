@@ -11,6 +11,9 @@ use App\Transcode\Domain\ValueObject\QualityTier;
 
 interface TranscodeJobPortInterface
 {
+    /**
+     * @param array<array-key, string> $audioTrackLanguages
+     */
     public function getOrCreateJob(
         Uuid $videoId,
         QualityTier $qualityTier,

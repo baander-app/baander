@@ -123,6 +123,9 @@ final readonly class QualityTier implements JsonSerializable
         return $this->name === $other->name;
     }
 
+    /**
+     * @return array{name: string, height: int, width: int, videoBitrate: int, maxBitrate: int, bufferSize: int, codec: string, rfc6381Codec: string}
+     */
     public function jsonSerialize(): array
     {
         return [

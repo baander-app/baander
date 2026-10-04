@@ -38,6 +38,9 @@ class TranscodeSessionEntity
     #[ORM\Column(type: 'text', options: ['default' => 'normal'])]
     private string $priority;
 
+    /**
+     * @var array<string, mixed>
+     */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '{}'])]
     private array $audioProfile;
 
@@ -47,6 +50,9 @@ class TranscodeSessionEntity
     #[ORM\Column(type: 'float', options: ['default' => '0'])]
     private float $wallClockOffset;
 
+    /**
+     * @var array<string, mixed>
+     */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '{}'])]
     private array $metrics;
 
@@ -60,6 +66,9 @@ class TranscodeSessionEntity
     #[ORM\JoinColumn(name: 'job_id', referencedColumnName: 'id', onDelete: 'CASCADE', nullable: true)]
     private ?TranscodeJobEntity $job = null;
 
+    /**
+     * @param array<string, mixed> $audioProfile
+     */
     public function __construct(
         PublicId $publicId,
         UserEntity $user,
@@ -92,10 +101,22 @@ class TranscodeSessionEntity
     public function getVideoId(): Uuid { return $this->videoId; }
     public function getState(): string { return $this->state; }
     public function getPriority(): string { return $this->priority; }
-    public function getAudioProfile(): array { return $this->audioProfile; }
+    /**
+     * @return array<string, mixed>
+     */
+    public function getAudioProfile(): array
+    {
+        return $this->audioProfile;
+    }
     public function getCurrentSegmentIndex(): int { return $this->currentSegmentIndex; }
     public function getWallClockOffset(): float { return $this->wallClockOffset; }
-    public function getMetrics(): array { return $this->metrics; }
+    /**
+     * @return array<string, mixed>
+     */
+    public function getMetrics(): array
+    {
+        return $this->metrics;
+    }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
     public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
     public function getJob(): ?TranscodeJobEntity { return $this->job; }
@@ -112,6 +133,9 @@ class TranscodeSessionEntity
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /**
+     * @param array<string, mixed> $profile
+     */
     public function setAudioProfile(array $profile): void
     {
         $this->audioProfile = $profile;
@@ -130,6 +154,9 @@ class TranscodeSessionEntity
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /**
+     * @param array<string, mixed> $metrics
+     */
     public function setMetrics(array $metrics): void
     {
         $this->metrics = $metrics;

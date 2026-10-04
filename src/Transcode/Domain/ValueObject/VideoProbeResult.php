@@ -31,6 +31,9 @@ final readonly class VideoProbeResult implements JsonSerializable
     ) {
     }
 
+    /**
+     * @param array<string, mixed> $raw
+     */
     public static function fromProbeOutput(array $raw): self
     {
         $streams = $raw['streams'] ?? [];
@@ -111,6 +114,7 @@ final readonly class VideoProbeResult implements JsonSerializable
      *
      * Handles both legacy format (flat colorPrimaries/colorTransfer/colorMatrix
      * keys) and new format (nested colorSpace object).
+     * @param array<string, mixed> $data
      */
     public static function fromSerialized(array $data): self
     {
@@ -162,7 +166,7 @@ final readonly class VideoProbeResult implements JsonSerializable
 
         if (str_contains($rate, '/')) {
             $parts = explode('/', $rate);
-            $numerator = (float) ($parts[0] ?? 0);
+            $numerator = (float) $parts[0];
             $denominator = (float) ($parts[1] ?? 1);
 
             return $denominator > 0 ? $numerator / $denominator : 0.0;
@@ -217,6 +221,9 @@ final readonly class VideoProbeResult implements JsonSerializable
         return in_array($language, $this->getAvailableSubtitleLanguages(), true);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function jsonSerialize(): array
     {
         return [

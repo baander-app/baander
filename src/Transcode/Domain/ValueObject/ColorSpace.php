@@ -62,6 +62,7 @@ final readonly class ColorSpace implements JsonSerializable
 
     /**
      * Construct from a serialized array (jsonSerialize output).
+     * @param array<string, mixed> $data
      */
     public static function fromArray(array $data): self
     {
@@ -85,6 +86,9 @@ final readonly class ColorSpace implements JsonSerializable
             && $this->matrix === $other->matrix;
     }
 
+    /**
+     * @return array{primaries: string, transfer: string, matrix: string}
+     */
     public function jsonSerialize(): array
     {
         return [

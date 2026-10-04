@@ -273,6 +273,9 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         return $this->dashManifestGenerator->generate($renditions, [], $totalDuration);
     }
 
+    /**
+     * @return list<array{name: string, height: int, width: int, bitrate: int, codec: string}>
+     */
     public function getQualityLadderForVideo(Uuid $videoId): array
     {
         $jobs = $this->jobRepository->findActiveByVideo($videoId);
@@ -327,6 +330,9 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
 
     // --- Helpers ---
 
+    /**
+     * @return list<array{segmentName: string, duration: float}>
+     */
     private function scanSubtitleSegments(string $subtitleDir): array
     {
         if (!is_dir($subtitleDir)) {

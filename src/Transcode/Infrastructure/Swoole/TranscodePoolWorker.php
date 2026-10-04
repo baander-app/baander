@@ -37,6 +37,9 @@ final class TranscodePoolWorker implements ProcessPoolWorkerInterface
         };
     }
 
+    /**
+     * @param array<string, mixed> $job
+     */
     private function encodeSegment(array $job): string
     {
         $flagsError = $this->validateFlags($job);
@@ -64,11 +67,14 @@ final class TranscodePoolWorker implements ProcessPoolWorkerInterface
             false,
         );
 
-        $metrics = $this->parseFfmpegMetrics($result['stderr'] ?? '');
+        $metrics = $this->parseFfmpegMetrics($result['stderr']);
 
         return json_encode(['success' => true, 'output_path' => $outputPath, 'metrics' => $metrics]);
     }
 
+    /**
+     * @param array<string, mixed> $job
+     */
     private function encodeInitSegment(array $job): string
     {
         $flagsError = $this->validateFlags($job);
@@ -97,6 +103,9 @@ final class TranscodePoolWorker implements ProcessPoolWorkerInterface
         return json_encode(['success' => true, 'output_path' => $outputPath]);
     }
 
+    /**
+     * @param array<string, mixed> $job
+     */
     private function analyzeLoudness(array $job): string
     {
         $cmd = sprintf(
@@ -131,6 +140,7 @@ final class TranscodePoolWorker implements ProcessPoolWorkerInterface
     /**
      * Validate that decoder/hwaccel flags only contain safe FFmpeg option
      * characters. This prevents shell command injection via payload fields.
+     * @param array<string, mixed> $job
      */
     private function validateFlags(array $job): ?string
     {
@@ -180,10 +190,11 @@ final class TranscodePoolWorker implements ProcessPoolWorkerInterface
         while (true) {
             $status = proc_get_status($process);
 
-            if (($status['running'] ?? false) === false) {
+            if (!$status['running']) {
                 // Process exited — drain remaining output
                 $stdout .= stream_get_contents($pipes[1]);
                 $stderr .= stream_get_contents($pipes[2]);
+                $exitCode = $status['exitcode'];
                 break;
             }
 
@@ -220,7 +231,7 @@ final class TranscodePoolWorker implements ProcessPoolWorkerInterface
         fclose($pipes[1]);
         fclose($pipes[2]);
 
-        return ['code' => $status['exitcode'] ?? -1, 'output' => $stdout, 'stderr' => $stderr];
+        return ['code' => $exitCode, 'output' => $stdout, 'stderr' => $stderr];
     }
 
     /**
@@ -254,6 +265,7 @@ final class TranscodePoolWorker implements ProcessPoolWorkerInterface
      * raw -f mp4 path.
      *
      * @return array{stderr: string, duration: float}
+     * @param array<string, mixed> $job
      */
     private function encodeFmp4VideoSegment(
         string $sourcePath,
@@ -329,8 +341,8 @@ final class TranscodePoolWorker implements ProcessPoolWorkerInterface
         $this->cleanupDir($tmpDir);
 
         return [
-            'stderr' => $result['stderr'] ?? '',
-            'duration' => $this->parseDurationFromStderr($result['stderr'] ?? '', $duration),
+            'stderr' => $result['stderr'],
+            'duration' => $this->parseDurationFromStderr($result['stderr'], $duration),
         ];
     }
 
@@ -384,6 +396,9 @@ final class TranscodePoolWorker implements ProcessPoolWorkerInterface
         @rmdir($dir);
     }
 
+    /**
+     * @param array<string, mixed> $job
+     */
     private function extractSubtitles(array $job): string
     {
         $outputPath = $job['output_path'];
@@ -442,6 +457,9 @@ final class TranscodePoolWorker implements ProcessPoolWorkerInterface
         return $fallbackDuration;
     }
 
+    /**
+     * @return array<string, float>
+     */
     private function parseLoudnormOutput(string $output): array
     {
         if (!str_contains($output, '"input_i"')) {
@@ -475,57 +493,4 @@ final class TranscodePoolWorker implements ProcessPoolWorkerInterface
         ];
     }
 
-    /**
-     * Strip ftyp + moov init boxes from a standalone fragmented MP4 file.
-     *
-     * FFmpeg writes each individually-encoded segment as a complete fragmented
-     * MP4 (ftyp, moov, moof, mdat). When the playlist uses EXT-X-MAP, the
-     * segment files must contain only the movie fragment (moof + mdat). This
-     * method rewrites the file starting at the first top-level moof atom.
-     */
-    private function stripInitBoxes(string $inputPath, string $outputPath): void
-    {
-        $data = file_get_contents($inputPath);
-        if ($data === false) {
-            throw new RuntimeException('Failed to read segment for init-box stripping');
-        }
-
-        $length = strlen($data);
-        $offset = 0;
-        $moofOffset = null;
-
-        while ($offset + 8 <= $length) {
-            $size = unpack('N', substr($data, $offset, 4))[1];
-            $type = substr($data, $offset + 4, 4);
-
-            if ($size === 0) {
-                break;
-            }
-
-            if ($size === 1) {
-                // Extended size (64-bit). Rare for top-level atoms here.
-                if ($offset + 16 > $length) {
-                    break;
-                }
-                $size = unpack('J', substr($data, $offset + 8, 8))[1];
-            }
-
-            if ($type === 'moof') {
-                $moofOffset = $offset;
-                break;
-            }
-
-            $offset += $size;
-        }
-
-        if ($moofOffset === null) {
-            throw new RuntimeException('No moof atom found in encoded segment');
-        }
-
-        $fragment = substr($data, $moofOffset);
-        $written = file_put_contents($outputPath, $fragment, LOCK_EX);
-        if ($written === false) {
-            throw new RuntimeException('Failed to write stripped segment');
-        }
-    }
 }
