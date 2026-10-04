@@ -13,6 +13,7 @@ use App\Library\Domain\ValueObject\LibraryType;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Library\Domain\Model\LibraryState;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class LibraryRepository implements LibraryRepositoryInterface
@@ -20,6 +21,59 @@ final class LibraryRepository implements LibraryRepositoryInterface
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
     ) {
+    }
+
+    public function findVisible(LibraryReadScope $scope, ?LibraryType $type = null): array
+    {
+        $qb = $this->visibleQuery($scope);
+        if ($type !== null) {
+            $qb->andWhere('l.type = :type')
+                ->setParameter('type', $type->value);
+        }
+        $entities = $qb->orderBy('l.sortOrder', 'ASC')
+            ->addOrderBy('l.name', 'ASC')
+            ->getQuery()
+            ->getResult();
+        return array_map($this->toDomain(...), $entities);
+    }
+
+    public function findVisibleByUuid(Uuid $uuid, LibraryReadScope $scope): ?Library
+    {
+        $entity = $this
+            ->visibleQuery($scope)
+            ->andWhere('l.id = :id')
+            ->setParameter('id', $uuid)
+            ->getQuery()
+            ->getOneOrNullResult();
+        return $entity === null ? null : $this->toDomain($entity);
+    }
+
+    public function findVisibleBySlug(LibrarySlug $slug, LibraryReadScope $scope): ?Library
+    {
+        $entity = $this
+            ->visibleQuery($scope)
+            ->andWhere('l.slug = :slug')
+            ->setParameter('slug', $slug->toString())
+            ->getQuery()
+            ->getOneOrNullResult();
+        return $entity === null ? null : $this->toDomain($entity);
+    }
+
+    private function visibleQuery(LibraryReadScope $scope): \Doctrine\ORM\QueryBuilder
+    {
+        $qb = $this->entityManager
+            ->getRepository(LibraryEntity::class)
+            ->createQueryBuilder('l');
+        if (!$scope->isUnrestricted()) {
+            if ($scope->getLibraryIds() === []) {
+                $qb->andWhere('1 = 0');
+            } else {
+                $qb
+                    ->andWhere('l.id IN (:visible_libraries)')
+                    ->setParameter('visible_libraries', $scope->getLibraryIds());
+            }
+        }
+        return $qb;
     }
 
     public function save(Library $library): void

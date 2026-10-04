@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Interface\Controller;
 
 use App\Catalog\Application\Port\ArtistPortInterface;
+use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Catalog\Domain\Model\Artist;
 use App\Catalog\Domain\ValueObject\ArtistRole;
 use App\Catalog\Interface\Request\ArtistAlbumRequest;
@@ -36,6 +37,7 @@ final class ArtistController
     use TranslatorTrait;
     public function __construct(
         private readonly ArtistPortInterface $artistService,
+        private readonly LibraryReadScopeProviderInterface $libraryReadScopeProvider,
         private readonly ImagePortInterface $imagePort,
     ) {
     }
@@ -107,6 +109,7 @@ final class ArtistController
     #[Route('/', name: 'index', methods: ['GET'])]
     public function index(Request $request): JsonResponse
     {
+        $scope = $this->libraryReadScopeProvider->current();
         $page = max(1, (int) $request->query->get('page', 1));
         $limit = min(100, max(1, (int) $request->query->get('limit', 50)));
         $offset = ($page - 1) * $limit;
@@ -135,7 +138,7 @@ final class ArtistController
             $options = $options->withSort($sort, $order);
         }
 
-        $searchResult = $this->artistService->search($options);
+        $searchResult = $this->artistService->searchVisible($options, $scope);
 
         $results = ArtistResource::collection($searchResult->getItems());
         $total = $searchResult->getTotal();
@@ -169,13 +172,14 @@ final class ArtistController
     #[Route('/{publicId}', name: 'show', methods: ['GET'])]
     public function show(string $publicId): JsonResponse
     {
+        $scope = $this->libraryReadScopeProvider->current();
         try {
             $resolvedPublicId = PublicId::fromString($publicId);
         } catch (\Throwable) {
             return $this->errorResponse($this->trans('errors.invalid_public_id'));
         }
 
-        $artist = $this->artistService->findByPublicId($resolvedPublicId);
+        $artist = $this->artistService->findVisibleByPublicId($resolvedPublicId, $scope);
 
         if ($artist === null) {
             return $this->notFound();

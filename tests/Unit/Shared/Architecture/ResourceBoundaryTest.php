@@ -30,7 +30,13 @@ final class BoundaryResource {
 namespace App\Catalog\Interface\Controller;
 final class BoundaryController {
     public function handle(\App\Catalog\Domain\Model\BoundaryModel $model): string { return 'forbidden'; }
+    public function scope(\App\Library\Application\Port\LibraryReadScopeProviderInterface $scope): void {}
+    public function internal(\App\Library\Application\InternalApplicationService $service): void {}
 }
+namespace App\Library\Application\Port;
+interface LibraryReadScopeProviderInterface {}
+namespace App\Library\Application;
+final class InternalApplicationService {}
 SOURCE);
             $config = Yaml::parseFile($root . '/deptrac.yaml');
             unset($config['imports']);
@@ -55,12 +61,17 @@ SOURCE);
             self::assertGreaterThan(0, $report['Report']['Allowed']);
             self::assertGreaterThan(0, $report['Report']['Violations']);
             self::assertSame(0, $report['Report']['Uncovered']);
+            $violations = [];
             foreach ($report['files'] as $file) {
                 foreach ($file['messages'] as $message) {
+                    $violations[] = $message['message'];
                     self::assertStringContainsString('BoundaryController must not depend on', $message['message']);
                     self::assertStringNotContainsString('BoundaryResource', $message['message']);
+                    self::assertStringNotContainsString('LibraryReadScopeProviderInterface', $message['message']);
                 }
             }
+            self::assertStringContainsString('BoundaryModel', implode('\n', $violations));
+            self::assertStringContainsString('InternalApplicationService', implode('\n', $violations));
         } finally {
             $files->remove($directory);
         }

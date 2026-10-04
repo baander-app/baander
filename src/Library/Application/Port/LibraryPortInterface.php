@@ -8,9 +8,17 @@ use App\Library\Domain\Model\Library;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 interface LibraryPortInterface
 {
+    /** @return Library[] */
+    public function findVisible(LibraryReadScope $scope, ?LibraryType $type = null): array;
+
+    public function findVisibleByUuid(Uuid $uuid, LibraryReadScope $scope): ?Library;
+
+    public function findVisibleBySlug(LibrarySlug $slug, LibraryReadScope $scope): ?Library;
+
     public function save(Library $library): void;
 
     public function findByUuid(Uuid $uuid): ?Library;

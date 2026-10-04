@@ -11,10 +11,29 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Domain\Repository\Searchable;
 
 interface SongRepositoryInterface extends Searchable
 {
+    public function findVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): ?Song;
+
+    public function findVisibleByUuid(Uuid $uuid, LibraryReadScope $scope): ?Song;
+
+    public function searchVisible(SearchOptions $options, LibraryReadScope $scope): SearchResult;
+
+    public function countVisible(LibraryReadScope $scope): int;
+
+    public function searchVisibleWithCursor(SearchOptions $options, LibraryReadScope $scope): CursorPage;
+
+    /** @param Uuid[] $songIds
+     * @return array<string, string> */
+    public function getVisibleArtistNamesForSongs(array $songIds, LibraryReadScope $scope): array;
+
+    /** @param Uuid[] $albumIds
+     * @return array<string, string> */
+    public function getVisibleAlbumTitlesByIds(array $albumIds, LibraryReadScope $scope): array;
+
     public function save(Song $song): void;
 
     public function persist(Song $song): void;

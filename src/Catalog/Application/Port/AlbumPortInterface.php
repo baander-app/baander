@@ -10,9 +10,24 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 interface AlbumPortInterface
 {
+    public function findVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): ?Album;
+
+    public function findVisibleByUuid(Uuid $uuid, LibraryReadScope $scope): ?Album;
+
+    public function searchVisible(SearchOptions $options, LibraryReadScope $scope): SearchResult;
+
+    public function countVisible(LibraryReadScope $scope): int;
+
+    /** @return array{0: Album, 1: array<int, \App\Catalog\Domain\Model\Song>}|null */
+    public function findVisibleWithSongs(Uuid $uuid, LibraryReadScope $scope): ?array;
+
+    /** @return array<int, array{name: string, role: string|null}> */
+    public function getVisibleArtistNamesForAlbum(Uuid $albumId, LibraryReadScope $scope): array;
+
     public function findByPublicId(PublicId $publicId): ?Album;
 
     public function findByUuid(Uuid $uuid): ?Album;

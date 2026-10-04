@@ -479,6 +479,9 @@ services:
     App\Library\Application\Port\LibraryAccessPortInterface:
         alias: App\Library\Infrastructure\Doctrine\Repository\LibraryAccessRepository
         public: true
+
+    App\Library\Application\Port\LibraryReadScopeProviderInterface:
+        alias: App\Library\Infrastructure\LibraryReadScopeProvider
     App\Library\Application\Port\DirectoryScannerPortInterface:
         alias: App\Library\Infrastructure\Scanner\DirectoryScanner
 

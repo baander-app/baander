@@ -11,12 +11,33 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 final class MovieService implements MoviePortInterface
 {
     public function __construct(
         private readonly MovieRepositoryInterface $movieRepository,
     ) {
+    }
+
+    public function findVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): ?Movie
+    {
+        return $this->movieRepository->findVisibleByPublicId($publicId, $scope);
+    }
+
+    public function findVisibleByUuid(Uuid $uuid, LibraryReadScope $scope): ?Movie
+    {
+        return $this->movieRepository->findVisibleByUuid($uuid, $scope);
+    }
+
+    public function searchVisible(SearchOptions $options, LibraryReadScope $scope): SearchResult
+    {
+        return $this->movieRepository->searchVisible($options, $scope);
+    }
+
+    public function countVisible(LibraryReadScope $scope): int
+    {
+        return $this->movieRepository->countVisible($scope);
     }
 
     public function findByPublicId(PublicId $publicId): ?Movie

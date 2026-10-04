@@ -10,12 +10,28 @@ use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 final class LibraryService implements LibraryPortInterface
 {
     public function __construct(
         private readonly LibraryRepositoryInterface $libraryRepository,
     ) {
+    }
+
+    public function findVisible(LibraryReadScope $scope, ?LibraryType $type = null): array
+    {
+        return $this->libraryRepository->findVisible($scope, $type);
+    }
+
+    public function findVisibleByUuid(Uuid $uuid, LibraryReadScope $scope): ?Library
+    {
+        return $this->libraryRepository->findVisibleByUuid($uuid, $scope);
+    }
+
+    public function findVisibleBySlug(LibrarySlug $slug, LibraryReadScope $scope): ?Library
+    {
+        return $this->libraryRepository->findVisibleBySlug($slug, $scope);
     }
 
     public function save(Library $library): void

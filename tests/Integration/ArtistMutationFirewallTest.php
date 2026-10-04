@@ -161,6 +161,8 @@ final class ArtistMutationFirewallTest extends TestCase
 
     public function testAnonymousCannotMutateAndLibraryMemberCanStillReadArtist(): void
     {
+        $this->manager->persist(new ArtistSongEntity($this->artist, $this->song, 'primary'));
+        $this->manager->flush();
         $before = $this->catalogState();
         foreach (self::mutations() as [$action, $admin]) {
             if ($admin) {

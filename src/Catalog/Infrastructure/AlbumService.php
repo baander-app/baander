@@ -16,6 +16,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 final class AlbumService implements AlbumPortInterface
 {
@@ -25,6 +26,38 @@ final class AlbumService implements AlbumPortInterface
         private readonly StoragePortInterface $storage,
         private readonly ImagePortInterface $imagePort,
     ) {
+    }
+
+    public function findVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): ?Album
+    {
+        return $this->albumRepository->findVisibleByPublicId($publicId, $scope);
+    }
+
+    public function findVisibleByUuid(Uuid $uuid, LibraryReadScope $scope): ?Album
+    {
+        return $this->albumRepository->findVisibleByUuid($uuid, $scope);
+    }
+
+    public function searchVisible(SearchOptions $options, LibraryReadScope $scope): SearchResult
+    {
+        return $this->albumRepository->searchVisible($options, $scope);
+    }
+
+    public function countVisible(LibraryReadScope $scope): int
+    {
+        return $this->albumRepository->countVisible($scope);
+    }
+
+    /** @return array{0: Album, 1: array<int, \App\Catalog\Domain\Model\Song>}|null */
+    public function findVisibleWithSongs(Uuid $uuid, LibraryReadScope $scope): ?array
+    {
+        return $this->albumRepository->findVisibleWithSongs($uuid, $scope);
+    }
+
+    /** @return array<int, array{name: string, role: string|null}> */
+    public function getVisibleArtistNamesForAlbum(Uuid $albumId, LibraryReadScope $scope): array
+    {
+        return $this->albumRepository->getVisibleArtistNamesForAlbum($albumId, $scope);
     }
 
     public function findByPublicId(PublicId $publicId): ?Album

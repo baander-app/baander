@@ -8,6 +8,8 @@ use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Library\Application\PathValidator;
 use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Application\Port\LibraryPortInterface;
+use App\Library\Application\Port\LibraryReadScopeProviderInterface;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Library\Application\Query\LibraryStatsQueryPort;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\ValueObject\LibraryPath;
@@ -30,6 +32,13 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 
 final class LibraryIdentityAuthorizationTest extends TestCase
 {
+    private function readScopes(): LibraryReadScopeProviderInterface
+    {
+        $provider = $this->createStub(LibraryReadScopeProviderInterface::class);
+        $provider->method('current')->willReturn(LibraryReadScope::unrestricted());
+        return $provider;
+    }
+
     /** @param list<string> $roles */
     #[DataProvider('identities')]
     public function testUpdatePreservesAdminAndLibraryAccessAuthorization(array $roles, bool $hasAccess, bool $hasIdentity, int $expectedStatus): void
@@ -74,6 +83,7 @@ final class LibraryIdentityAuthorizationTest extends TestCase
             statsQuery: $this->createStub(LibraryStatsQueryPort::class),
             pathValidator: new PathValidator(),
             commandBus: $this->createStub(MessageBusInterface::class),
+            readScopes: $this->readScopes(),
             security: new Security($container),
             libraryAccess: $access,
         );
@@ -101,7 +111,7 @@ final class LibraryIdentityAuthorizationTest extends TestCase
         $container->set('security.token_storage', $storage);
         $service = $this->createMock(LibraryPortInterface::class);
         $service->expects($expectedStatus === 202 ? $this->once() : $this->never())
-            ->method('findAllOrdered')->willReturn([]);
+            ->method('findVisible')->willReturn([]);
         $service->expects($this->never())->method('save');
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($this->never())->method('dispatch');
@@ -110,6 +120,7 @@ final class LibraryIdentityAuthorizationTest extends TestCase
             statsQuery: $this->createStub(LibraryStatsQueryPort::class),
             pathValidator: new PathValidator(),
             commandBus: $bus,
+            readScopes: $this->readScopes(),
             security: new Security($container),
         );
 
@@ -149,6 +160,7 @@ final class LibraryIdentityAuthorizationTest extends TestCase
             statsQuery: $this->createStub(LibraryStatsQueryPort::class),
             pathValidator: new PathValidator(),
             commandBus: $this->createStub(MessageBusInterface::class),
+            readScopes: $this->readScopes(),
             security: $security,
             libraryAccess: $access,
         );

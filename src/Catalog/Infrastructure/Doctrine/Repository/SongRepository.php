@@ -11,6 +11,7 @@ use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistSongEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
+use App\Catalog\Infrastructure\Doctrine\Query\CatalogReadScopeQuery;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Shared\Domain\Model\Cursor;
 use App\Shared\Domain\Model\CursorDirection;
@@ -19,6 +20,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Doctrine\Repository\PgroongaSearchTrait;
 use App\Shared\Infrastructure\Pagination\CursorCodec;
 use App\Shared\Infrastructure\Pagination\CursorPaginator;
@@ -38,6 +40,77 @@ final class SongRepository implements SongRepositoryInterface
         private readonly CursorPaginator $cursorPaginator,
         private readonly CursorCodec $cursorCodec,
     ) {
+    }
+
+    public function findVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): ?Song
+    {
+        $entity = $this
+            ->visibleQuery($scope)
+            ->andWhere('visible.publicId = :publicId')
+            ->setParameter('publicId', $publicId)
+            ->getQuery()
+            ->getOneOrNullResult();
+        return $entity === null ? null : $this->toDomain($entity);
+    }
+
+    public function findVisibleByUuid(Uuid $uuid, LibraryReadScope $scope): ?Song
+    {
+        $entity = $this
+            ->visibleQuery($scope)
+            ->andWhere('visible.id = :id')
+            ->setParameter('id', $uuid)
+            ->getQuery()
+            ->getOneOrNullResult();
+        return $entity === null ? null : $this->toDomain($entity);
+    }
+
+    public function countVisible(LibraryReadScope $scope): int
+    {
+        return (int) $this
+            ->visibleQuery($scope)
+            ->select('COUNT(visible.id)')
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    private function visibleQuery(LibraryReadScope $scope): \Doctrine\ORM\QueryBuilder
+    {
+        $qb = $this->entityManager
+            ->getRepository(SongEntity::class)
+            ->createQueryBuilder('visible');
+        CatalogReadScopeQuery::apply($qb, $scope, 'song', 'visible');
+        return $qb;
+    }
+
+    public function getVisibleArtistNamesForSongs(array $songIds, LibraryReadScope $scope): array
+    {
+        if ($songIds === []) {
+            return [];
+        }
+        $entities = $this
+            ->visibleQuery($scope)
+            ->andWhere('visible.id IN (:songIds)')
+            ->setParameter('songIds', $songIds)
+            ->getQuery()
+            ->getResult();
+        return $this->getArtistNamesForSongs(array_map(static fn (SongEntity $entity): Uuid => $entity->getId(), $entities));
+    }
+
+    public function getVisibleAlbumTitlesByIds(array $albumIds, LibraryReadScope $scope): array
+    {
+        if ($albumIds === []) {
+            return [];
+        }
+        $qb = $this->entityManager
+            ->getRepository(AlbumEntity::class)
+            ->createQueryBuilder('visible');
+        CatalogReadScopeQuery::apply($qb, $scope, 'album', 'visible');
+        $entities = $qb
+            ->andWhere('visible.id IN (:albumIds)')
+            ->setParameter('albumIds', $albumIds)
+            ->getQuery()
+            ->getResult();
+        return $this->getAlbumTitlesByIds(array_map(static fn (AlbumEntity $entity): Uuid => $entity->getId(), $entities));
     }
 
     public function save(Song $song): void
@@ -172,16 +245,25 @@ final class SongRepository implements SongRepositoryInterface
 
     public function search(SearchOptions $options): SearchResult
     {
+        return $this->searchVisible($options, LibraryReadScope::unrestricted());
+    }
+
+    public function searchVisible(SearchOptions $options, LibraryReadScope $scope): SearchResult
+    {
         if (!$options->hasQuery()) {
             return SearchResult::empty();
         }
 
-        $result = $this->buildScoredQuery(
+        $predicate = CatalogReadScopeQuery::native($scope, 'song', $options);
+        $result = $this->buildScopedScoredQuery(
             $options,
             $this->entityManager,
             SongEntity::class,
             'songs',
             'title',
+            $predicate['predicate'],
+            $predicate['parameters'],
+            $predicate['types'],
         );
 
         $songs = array_map(
@@ -194,9 +276,16 @@ final class SongRepository implements SongRepositoryInterface
 
     public function searchWithCursor(SearchOptions $options): CursorPage
     {
+        return $this->searchVisibleWithCursor($options, LibraryReadScope::unrestricted());
+    }
+
+    public function searchVisibleWithCursor(SearchOptions $options, LibraryReadScope $scope): CursorPage
+    {
         $qb = $this->entityManager
             ->getRepository(SongEntity::class)
             ->createQueryBuilder('s');
+
+        CatalogReadScopeQuery::apply($qb, $scope, 'song', 's');
 
         $applyFilters = function (\Doctrine\ORM\QueryBuilder $qb, array $filters): void {
             foreach ($filters as $filter) {

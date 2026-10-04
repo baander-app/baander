@@ -10,6 +10,7 @@ use App\Media\Application\Port\ImagePortInterface;
 use App\Catalog\Domain\Service\AlbumDuplicateDetector;
 use App\Catalog\Domain\ValueObject\DuplicateGroup;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Catalog\Interface\Resource\AlbumResource;
 
 final class AlbumDuplicateService implements AlbumDuplicatePortInterface
@@ -19,6 +20,17 @@ final class AlbumDuplicateService implements AlbumDuplicatePortInterface
         private readonly AlbumPortInterface $albumService,
         private readonly ImagePortInterface $imagePort,
     ) {
+    }
+
+    public function findVisibleDuplicatesForAlbum(Uuid $albumId, LibraryReadScope $scope): array
+    {
+        $album = $this->albumService->findVisibleByUuid($albumId, $scope);
+        if ($album === null) {
+            return [];
+        }
+
+        // Duplicate detection is restricted to this already authorized library.
+        return $this->findDuplicatesForAlbum($album->getId());
     }
 
     public function findDuplicates(Uuid $libraryId): array

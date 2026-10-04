@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Interface\Controller;
 
 use App\Catalog\Application\Port\AlbumPortInterface;
+use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Catalog\Application\Port\AlbumDuplicatePortInterface;
 use App\Catalog\Application\Port\AlbumMergePortInterface;
 use App\Catalog\Domain\Model\Album;
@@ -40,6 +41,7 @@ final class AlbumController
 
     public function __construct(
         private readonly AlbumPortInterface $albumService,
+        private readonly LibraryReadScopeProviderInterface $libraryReadScopeProvider,
         private readonly ImagePortInterface $imagePort,
         private readonly AlbumDuplicatePortInterface $duplicatePort,
         private readonly AlbumMergePortInterface $mergePort,
@@ -69,6 +71,7 @@ final class AlbumController
     #[Route('/', name: 'index', methods: ['GET'])]
     public function index(Request $request): JsonResponse
     {
+        $scope = $this->libraryReadScopeProvider->current();
         $page = max(1, (int)$request->query->get('page', 1));
         $limit = min(100, max(1, (int)$request->query->get('limit', 50)));
         $offset = ($page - 1) * $limit;
@@ -106,7 +109,7 @@ final class AlbumController
             $options = $options->withSort($sort, $order);
         }
 
-        $searchResult = $this->albumService->search($options);
+        $searchResult = $this->albumService->searchVisible($options, $scope);
 
         $albums = $searchResult->getItems();
         $coverImageIds = array_values(array_filter(
@@ -119,8 +122,8 @@ final class AlbumController
         $results = array_map(
             fn(Album $album) => AlbumResource::fromWithCoverAndArtists(
                 $album,
-                $images[$album->getCoverImageId()?->toString()] ?? null,
-                $this->albumService->getArtistNamesForAlbum($album->getId()),
+                $images[$album->getCoverImageId()?->toString() ?? ''] ?? null,
+                $this->albumService->getVisibleArtistNamesForAlbum($album->getId(), $scope),
                 $baseUrl,
             ),
             $albums,
@@ -173,19 +176,20 @@ final class AlbumController
     #[Route('/{publicId}', name: 'show', methods: ['GET'])]
     public function show(string $publicId, Request $request): JsonResponse
     {
+        $scope = $this->libraryReadScopeProvider->current();
         try {
             $resolvedPublicId = PublicId::fromString($publicId);
         } catch (Throwable) {
             return $this->errorResponse($this->trans('errors.invalid_public_id'));
         }
 
-        $album = $this->albumService->findByPublicId($resolvedPublicId);
+        $album = $this->albumService->findVisibleByPublicId($resolvedPublicId, $scope);
 
         if ($album === null) {
             return $this->notFound();
         }
 
-        $result = $this->albumService->findWithSongs($album->getId());
+        $result = $this->albumService->findVisibleWithSongs($album->getId(), $scope);
 
         $songs = [];
         if ($result !== null) {
@@ -202,7 +206,7 @@ final class AlbumController
             AlbumResource::fromWithCoverAndArtists(
                 $album,
                 $coverImage,
-                $this->albumService->getArtistNamesForAlbum($album->getId()),
+                $this->albumService->getVisibleArtistNamesForAlbum($album->getId(), $scope),
                 $request->getSchemeAndHttpHost(),
             ),
             ['songs' => $songs],
@@ -226,13 +230,14 @@ final class AlbumController
     #[Route('/{publicId}/cover', name: 'cover', methods: ['GET'])]
     public function cover(string $publicId, Request $request): \Symfony\Component\HttpFoundation\RedirectResponse|\Symfony\Component\HttpFoundation\JsonResponse
     {
+        $scope = $this->libraryReadScopeProvider->current();
         try {
             $resolvedPublicId = PublicId::fromString($publicId);
         } catch (Throwable) {
             return $this->errorResponse($this->trans('errors.invalid_public_id'), 404);
         }
 
-        $album = $this->albumService->findByPublicId($resolvedPublicId);
+        $album = $this->albumService->findVisibleByPublicId($resolvedPublicId, $scope);
 
         if ($album === null) {
             return $this->notFound();
@@ -277,19 +282,20 @@ final class AlbumController
     #[Route('/{publicId}/duplicates', name: 'duplicates', methods: ['GET'])]
     public function duplicates(string $publicId): JsonResponse
     {
+        $scope = $this->libraryReadScopeProvider->current();
         try {
             $resolvedPublicId = PublicId::fromString($publicId);
         } catch (Throwable) {
             return $this->errorResponse($this->trans('errors.invalid_public_id'), 404);
         }
 
-        $album = $this->albumService->findByPublicId($resolvedPublicId);
+        $album = $this->albumService->findVisibleByPublicId($resolvedPublicId, $scope);
 
         if ($album === null) {
             return $this->notFound();
         }
 
-        $groups = $this->duplicatePort->findDuplicatesForAlbum($album->getId());
+        $groups = $this->duplicatePort->findVisibleDuplicatesForAlbum($album->getId(), $scope);
 
         return $this->successResponse(array_map(
             fn($group) => DuplicateGroupResource::from($group),

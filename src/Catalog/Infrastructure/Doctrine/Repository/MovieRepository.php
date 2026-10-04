@@ -10,11 +10,13 @@ use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
+use App\Catalog\Infrastructure\Doctrine\Query\CatalogReadScopeQuery;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Doctrine\Repository\PgroongaSearchTrait;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -28,6 +30,46 @@ final class MovieRepository implements MovieRepositoryInterface
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
     ) {
+    }
+
+    public function findVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): ?Movie
+    {
+        $entity = $this
+            ->visibleQuery($scope)
+            ->andWhere('visible.publicId = :publicId')
+            ->setParameter('publicId', $publicId)
+            ->getQuery()
+            ->getOneOrNullResult();
+        return $entity === null ? null : $this->toDomain($entity);
+    }
+
+    public function findVisibleByUuid(Uuid $uuid, LibraryReadScope $scope): ?Movie
+    {
+        $entity = $this
+            ->visibleQuery($scope)
+            ->andWhere('visible.id = :id')
+            ->setParameter('id', $uuid)
+            ->getQuery()
+            ->getOneOrNullResult();
+        return $entity === null ? null : $this->toDomain($entity);
+    }
+
+    public function countVisible(LibraryReadScope $scope): int
+    {
+        return (int) $this
+            ->visibleQuery($scope)
+            ->select('COUNT(visible.id)')
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    private function visibleQuery(LibraryReadScope $scope): \Doctrine\ORM\QueryBuilder
+    {
+        $qb = $this->entityManager
+            ->getRepository(MovieEntity::class)
+            ->createQueryBuilder('visible');
+        CatalogReadScopeQuery::apply($qb, $scope, 'movie', 'visible');
+        return $qb;
     }
 
     public function save(Movie $movie): void
@@ -106,21 +148,38 @@ final class MovieRepository implements MovieRepositoryInterface
 
     public function search(SearchOptions $options): SearchResult
     {
+        return $this->searchVisible($options, LibraryReadScope::unrestricted());
+    }
+
+    public function searchVisible(SearchOptions $options, LibraryReadScope $scope): SearchResult
+    {
         if (!$options->hasQuery()) {
-            $repo = $this->entityManager->getRepository(MovieEntity::class);
-            $total = (int) $repo->count([]);
-            $entities = $repo->findBy([], ['title' => 'ASC'], $options->getLimit(), $options->getOffset());
+            $qb = $this->visibleQuery($scope);
+            $total = (int) (clone $qb)->select('COUNT(visible.id)')->getQuery()->getSingleScalarResult();
+            $entities = $qb
+                ->orderBy('visible.title', 'ASC')
+                ->addOrderBy('visible.id', 'ASC')
+                ->setMaxResults($options
+                ->getLimit())
+                ->setFirstResult($options
+                ->getOffset())
+                ->getQuery()
+                ->getResult();
             $movies = array_map(fn (MovieEntity $entity) => $this->toDomain($entity), $entities);
 
             return SearchResult::create($movies, $total);
         }
 
-        $result = $this->buildScoredQuery(
+        $predicate = CatalogReadScopeQuery::native($scope, 'movie', $options);
+        $result = $this->buildScopedScoredQuery(
             $options,
             $this->entityManager,
             MovieEntity::class,
             'movies',
             'title',
+            $predicate['predicate'],
+            $predicate['parameters'],
+            $predicate['types'],
         );
 
         $movies = array_map(fn (MovieEntity $entity) => $this->toDomain($entity), $result['entities']);

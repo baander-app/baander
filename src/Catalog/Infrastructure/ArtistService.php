@@ -12,12 +12,33 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 final class ArtistService implements ArtistPortInterface
 {
     public function __construct(
         private readonly ArtistRepositoryInterface $artistRepository,
     ) {
+    }
+
+    public function findVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): ?Artist
+    {
+        return $this->artistRepository->findVisibleByPublicId($publicId, $scope);
+    }
+
+    public function findVisibleByUuid(Uuid $uuid, LibraryReadScope $scope): ?Artist
+    {
+        return $this->artistRepository->findVisibleByUuid($uuid, $scope);
+    }
+
+    public function searchVisible(SearchOptions $options, LibraryReadScope $scope): SearchResult
+    {
+        return $this->artistRepository->searchVisible($options, $scope);
+    }
+
+    public function countVisible(LibraryReadScope $scope): int
+    {
+        return $this->artistRepository->countVisible($scope);
     }
 
     public function findByPublicId(PublicId $publicId): ?Artist

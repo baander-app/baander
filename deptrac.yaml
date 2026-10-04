@@ -33,7 +33,7 @@ deptrac:
         Auth: ['Auth Domain', 'Auth Identity Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
         Catalog: ['Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Resources', 'Catalog Interface']
         Filesystem: ['Filesystem Infrastructure', 'Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
-        Library: ['Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
+        Library: ['Library Read Scope Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
         Lyrics: ['Lyrics Domain', 'Lyrics Application', 'Lyrics Infrastructure', 'Lyrics Resources', 'Lyrics Interface']
         Media: ['Media Domain', 'Media Application', 'Media Infrastructure', 'Media Resources', 'Media Interface']
         Metadata: ['Metadata Domain', 'Metadata Application', 'Metadata Infrastructure', 'Metadata Interface']
@@ -216,10 +216,20 @@ deptrac:
         - type: classLike
           value: '^App\\Library\\Domain\\'
 
-    - name: 'Library Application'
+    - name: 'Library Read Scope Contract'
       collectors:
         - type: classLike
-          value: '^App\\Library\\Application\\'
+          value: '^App\\Library\\Application\\Port\\LibraryReadScopeProviderInterface$'
+
+    - name: 'Library Application'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Library\\Application\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Library\\Application\\Port\\LibraryReadScopeProviderInterface$'
 
     - name: 'Library Infrastructure'
       collectors:
@@ -828,6 +838,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Catalog Interface':
+      - 'Library Read Scope Contract'
       - 'Catalog Resources'
       - 'Catalog Application'
       - 'Shared Domain'
@@ -847,13 +858,18 @@ deptrac:
       - 'Shared Domain'
 
     # --- Library ---
+    'Library Read Scope Contract':
+      - 'Shared Domain'
     'Library Domain':
       - 'Shared Domain'
     'Library Application':
+      - 'Library Read Scope Contract'
       - 'Library Domain'
       - 'Shared Domain'
       - 'Shared Application'
     'Library Infrastructure':
+      - 'Auth Identity Contract'
+      - 'Library Read Scope Contract'
       - 'Shared Application'
       - 'Library Domain'
       - 'Library Application'
@@ -866,6 +882,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Library Interface':
+      - 'Library Read Scope Contract'
       - 'Library Resources'
       - 'Auth Identity Contract'
       - 'Library Application'

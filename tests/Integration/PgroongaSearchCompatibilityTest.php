@@ -126,12 +126,12 @@ final class PgroongaSearchCompatibilityTest extends TestCase
         $plan = $this->connection->fetchFirstColumn("EXPLAIN SELECT * FROM genres WHERE name &@~ 'Jaz*'");
         self::assertStringContainsString('idx_genres_name_pgroonga', implode("\n", $plan));
 
-        $result = $this->probe->scored(SearchOptions::create('Jaz'));
+        $result = $this->probe->scored(SearchOptions::create('Jaz*'));
         self::assertSame(2, $result['total']);
         self::assertSame(['Jazz fusion', "O'Brien Jazz"], $this->names($result['entities']));
         self::assertGreaterThan(0.0, $result['highestScore']);
 
-        $page = $this->probe->scored(SearchOptions::create('Jaz', limit: 1, offset: 1));
+        $page = $this->probe->scored(SearchOptions::create('Jaz*', limit: 1, offset: 1));
         self::assertSame(2, $page['total']);
         self::assertCount(1, $page['entities']);
         self::assertGreaterThan(0.0, $page['highestScore']);

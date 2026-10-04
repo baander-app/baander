@@ -7,6 +7,7 @@ namespace App\Library\Interface\Controller;
 use App\Library\Application\Command\ScanLibraryCommand;
 use App\Library\Application\PathValidator;
 use App\Library\Application\Port\LibraryPortInterface;
+use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Library\Application\Query\LibraryStatsQueryPort;
 use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Domain\Model\Library;
@@ -43,6 +44,7 @@ final class LibraryController
         private readonly LibraryStatsQueryPort $statsQuery,
         private readonly PathValidator $pathValidator,
         private readonly MessageBusInterface $commandBus,
+        private readonly LibraryReadScopeProviderInterface $readScopes,
         private readonly ?Security $security = null,
         private readonly ?LibraryAccessPortInterface $libraryAccess = null,
     ) {
@@ -70,12 +72,12 @@ final class LibraryController
         if ($typeFilter !== null) {
             try {
                 $type = LibraryType::from($typeFilter);
-                $libraries = $this->libraryService->findByType($type);
+                $libraries = $this->libraryService->findVisible($this->readScopes->current(), $type);
             } catch (\ValueError) {
                 return $this->errorResponse($this->trans('errors.invalid_type', domain: 'library'), Response::HTTP_BAD_REQUEST);
             }
         } else {
-            $libraries = $this->libraryService->findAllOrdered();
+            $libraries = $this->libraryService->findVisible($this->readScopes->current());
         }
 
         return $this->successResponse(LibraryResource::collection($libraries));
@@ -188,7 +190,7 @@ final class LibraryController
             return $this->errorResponse($this->trans('errors.invalid_id', domain: 'library'), Response::HTTP_BAD_REQUEST);
         }
 
-        $library = $this->libraryService->findByUuid($uuid);
+        $library = $this->libraryService->findVisibleByUuid($uuid, $this->readScopes->current());
 
         if ($library === null) {
             return $this->notFound($this->trans('errors.not_found', domain: 'library'));
@@ -377,7 +379,7 @@ final class LibraryController
             return $this->errorResponse($this->trans('errors.invalid_id', domain: 'library'), Response::HTTP_BAD_REQUEST);
         }
 
-        $library = $this->libraryService->findByUuid($uuid);
+        $library = $this->libraryService->findVisibleByUuid($uuid, $this->readScopes->current());
 
         if ($library === null) {
             return $this->notFound($this->trans('errors.not_found', domain: 'library'));
@@ -469,7 +471,7 @@ final class LibraryController
             return $this->forbidden();
         }
 
-        $libraries = $this->libraryService->findAllOrdered();
+        $libraries = $this->libraryService->findVisible($this->readScopes->current());
         $dispatched = 0;
         $skipped = 0;
 

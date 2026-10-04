@@ -9,9 +9,18 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 interface MoviePortInterface
 {
+    public function findVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): ?Movie;
+
+    public function findVisibleByUuid(Uuid $uuid, LibraryReadScope $scope): ?Movie;
+
+    public function searchVisible(SearchOptions $options, LibraryReadScope $scope): SearchResult;
+
+    public function countVisible(LibraryReadScope $scope): int;
+
     public function findByPublicId(PublicId $publicId): ?Movie;
 
     public function findByUuid(Uuid $uuid): ?Movie;

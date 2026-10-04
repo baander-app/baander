@@ -68,9 +68,21 @@ describes these options and distinct text/varchar full-text operator classes.
 
 [PgroongaMatch](../../../../src/Shared/Infrastructure/Doctrine/DQL/PgroongaMatch.php)
 emits `&@~`. [PgroongaSearchTrait](../../../../src/Shared/Infrastructure/Doctrine/Repository/PgroongaSearchTrait.php)
-has both DQL filtering and native scored SQL using `pgroonga_score(tableoid, ctid)`;
-the scored path appends `*` to the query whereas the DQL path passes it unchanged.
-Review both consumers, result hydration, empty queries, pagination and ranking.
+has both DQL filtering and parameterized native scored SQL using
+`pgroonga_score(tableoid, ctid)`. Both pass the query expression unchanged;
+prefix matching requires an explicit suffix `*`, such as `Jaz*`, following the
+[PGroonga v2 query operator contract](https://pgroonga.github.io/reference/operators/query-v2.html).
+Appending `*` automatically changes the expression and can miss stemmed terms.
+Scoped catalog queries apply the same library predicate to native counts and rows
+before pagination; the DQL cursor path adds matching with `AND` to preserve scope.
+On 2026-10-04, the disposable functional runner (PostgreSQL 18.4, PGroonga 4.0.5)
+passed [catalog scope checks](../../../../tests/Functional/Catalog/Infrastructure/Doctrine/Repository/CatalogReadScopeRepositoryTest.php)
+for native counts/results, cursor reads, shared artists, and related metadata;
+[compatibility coverage](../../../../tests/Integration/PgroongaSearchCompatibilityTest.php)
+verified explicit prefix matching, indexed tuple scores, and pagination.
+The scope fixture also runs EXPLAIN with existing indexes; its small dataset is
+not a performance benchmark. Review both consumers, result hydration, empty
+queries, pagination and ranking.
 Do not replace PGroonga with LIKE/ILIKE/trigrams or reinterpret query syntax as
 a mechanical SQL cleanup. Test representative supported languages, normalization,
 stemming, punctuation, prefix queries and relevance before changing search behavior.

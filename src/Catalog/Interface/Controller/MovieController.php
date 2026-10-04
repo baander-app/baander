@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Interface\Controller;
 
 use App\Catalog\Application\Port\MoviePortInterface;
+use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Catalog\Interface\Request\UpdateMovieRequest;
 use App\Catalog\Interface\Resource\MovieResource;
@@ -30,6 +31,7 @@ final class MovieController
     use TranslatorTrait;
     public function __construct(
         private readonly MoviePortInterface $movieService,
+        private readonly LibraryReadScopeProviderInterface $libraryReadScopeProvider,
         private readonly VideoRepositoryInterface $videoRepository,
     ) {
     }
@@ -52,13 +54,14 @@ final class MovieController
     #[Route('/', name: 'index', methods: ['GET'])]
     public function index(Request $request): JsonResponse
     {
+        $scope = $this->libraryReadScopeProvider->current();
         $page = max(1, (int) $request->query->get('page', 1));
         $limit = min(100, max(1, (int) $request->query->get('limit', 50)));
         $offset = ($page - 1) * $limit;
         $query = (string) $request->query->get('q', '');
 
         $options = SearchOptions::create($query, $limit, $offset);
-        $searchResult = $this->movieService->search($options);
+        $searchResult = $this->movieService->searchVisible($options, $scope);
 
         $results = MovieResource::collection($searchResult->getItems());
         $total = $searchResult->getTotal();
@@ -92,13 +95,14 @@ final class MovieController
     #[Route('/{publicId}', name: 'show', methods: ['GET'])]
     public function show(string $publicId): JsonResponse
     {
+        $scope = $this->libraryReadScopeProvider->current();
         try {
             $resolvedPublicId = PublicId::fromString($publicId);
         } catch (\Throwable) {
             return $this->errorResponse($this->trans('errors.invalid_public_id'));
         }
 
-        $movie = $this->movieService->findByPublicId($resolvedPublicId);
+        $movie = $this->movieService->findVisibleByPublicId($resolvedPublicId, $scope);
 
         if ($movie === null) {
             return $this->notFound();

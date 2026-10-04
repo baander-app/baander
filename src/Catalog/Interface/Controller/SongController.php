@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Interface\Controller;
 
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Interface\Request\UpdateSongRequest;
 use App\Catalog\Interface\Resource\SongResource;
@@ -31,6 +32,7 @@ final class SongController
     use TranslatorTrait;
     public function __construct(
         private readonly SongPortInterface $songService,
+        private readonly LibraryReadScopeProviderInterface $libraryReadScopeProvider,
         private readonly CursorCodec $cursorCodec,
     ) {
     }
@@ -59,6 +61,7 @@ final class SongController
     #[Route('/', name: 'index', methods: ['GET'])]
     public function index(Request $request): JsonResponse
     {
+        $scope = $this->libraryReadScopeProvider->current();
         $limit = min(100, max(1, (int) $request->query->get('limit', 50)));
         $query = (string) $request->query->get('q', '');
 
@@ -70,14 +73,14 @@ final class SongController
 
         $options = $this->buildSearchOptions($request, $query, $limit, $cursor);
 
-        $page = $this->songService->searchWithCursor($options);
+        $page = $this->songService->searchVisibleWithCursor($options, $scope);
         $songs = $page->getItems();
 
         $songIds = array_map(fn (Song $s) => $s->getId(), $songs);
         $albumIds = array_map(fn (Song $s) => $s->getAlbumId(), $songs);
 
-        $artistNames = $this->songService->getArtistNamesForSongs($songIds);
-        $albumTitles = $this->songService->getAlbumTitlesByIds($albumIds);
+        $artistNames = $this->songService->getVisibleArtistNamesForSongs($songIds, $scope);
+        $albumTitles = $this->songService->getVisibleAlbumTitlesByIds($albumIds, $scope);
 
         return $this->cursorPaginatedResponse(CursorPaginatedResponse::fromPage($page, SongResource::collectionWithMeta($songs, $artistNames, $albumTitles)));
     }
@@ -102,20 +105,21 @@ final class SongController
     #[Route('/{publicId}', name: 'show', methods: ['GET'])]
     public function show(string $publicId): JsonResponse
     {
+        $scope = $this->libraryReadScopeProvider->current();
         try {
             $resolvedPublicId = PublicId::fromString($publicId);
         } catch (\Throwable) {
             return $this->errorResponse($this->trans('errors.invalid_public_id'));
         }
 
-        $song = $this->songService->findByPublicId($resolvedPublicId);
+        $song = $this->songService->findVisibleByPublicId($resolvedPublicId, $scope);
 
         if ($song === null) {
             return $this->notFound();
         }
 
-        $artistNames = $this->songService->getArtistNamesForSongs([$song->getId()]);
-        $albumTitles = $this->songService->getAlbumTitlesByIds([$song->getAlbumId()]);
+        $artistNames = $this->songService->getVisibleArtistNamesForSongs([$song->getId()], $scope);
+        $albumTitles = $this->songService->getVisibleAlbumTitlesByIds([$song->getAlbumId()], $scope);
 
         return $this->successResponse(SongResource::fromWithMeta($song, $artistNames, $albumTitles));
     }

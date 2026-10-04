@@ -6,16 +6,19 @@ namespace App\Catalog\Infrastructure\Doctrine\Repository;
 
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\AlbumState;
+use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\AlbumRepositoryInterface;
 use App\Catalog\Domain\ValueObject\MusicbrainzId;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistAlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
+use App\Catalog\Infrastructure\Doctrine\Query\CatalogReadScopeQuery;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Doctrine\Repository\PgroongaSearchTrait;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -30,6 +33,62 @@ final class AlbumRepository implements AlbumRepositoryInterface
         private readonly EntityManagerInterface $entityManager,
     )
     {
+    }
+
+    public function findVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): ?Album
+    {
+        $entity = $this
+            ->visibleQuery($scope)
+            ->andWhere('visible.publicId = :publicId')
+            ->setParameter('publicId', $publicId)
+            ->getQuery()
+            ->getOneOrNullResult();
+        return $entity === null ? null : $this->toDomain($entity);
+    }
+
+    public function findVisibleByUuid(Uuid $uuid, LibraryReadScope $scope): ?Album
+    {
+        $entity = $this
+            ->visibleQuery($scope)
+            ->andWhere('visible.id = :id')
+            ->setParameter('id', $uuid)
+            ->getQuery()
+            ->getOneOrNullResult();
+        return $entity === null ? null : $this->toDomain($entity);
+    }
+
+    public function countVisible(LibraryReadScope $scope): int
+    {
+        return (int) $this
+            ->visibleQuery($scope)
+            ->select('COUNT(visible.id)')
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    private function visibleQuery(LibraryReadScope $scope): \Doctrine\ORM\QueryBuilder
+    {
+        $qb = $this->entityManager
+            ->getRepository(AlbumEntity::class)
+            ->createQueryBuilder('visible');
+        CatalogReadScopeQuery::apply($qb, $scope, 'album', 'visible');
+        return $qb;
+    }
+
+    public function findVisibleWithSongs(Uuid $uuid, LibraryReadScope $scope): ?array
+    {
+        if ($this->findVisibleByUuid($uuid, $scope) === null) {
+            return null;
+        }
+        return $this->findWithSongs($uuid);
+    }
+
+    public function getVisibleArtistNamesForAlbum(Uuid $albumId, LibraryReadScope $scope): array
+    {
+        if ($this->findVisibleByUuid($albumId, $scope) === null) {
+            return [];
+        }
+        return $this->getArtistNamesForAlbum($albumId);
     }
 
     public function save(Album $album): void
@@ -196,12 +255,18 @@ final class AlbumRepository implements AlbumRepositoryInterface
 
     public function search(SearchOptions $options): SearchResult
     {
+        return $this->searchVisible($options, LibraryReadScope::unrestricted());
+    }
+
+    public function searchVisible(SearchOptions $options, LibraryReadScope $scope): SearchResult
+    {
         if (!$options->hasQuery()) {
             // Listing mode: return all albums with offset/limit pagination
             $qb = $this->entityManager
                 ->getRepository(AlbumEntity::class)
                 ->createQueryBuilder('a');
 
+            CatalogReadScopeQuery::apply($qb, $scope, 'album', 'a');
             $this->applyAlbumFilters($qb, $options->getFilters());
 
             $countQb = clone $qb;
@@ -223,12 +288,16 @@ final class AlbumRepository implements AlbumRepositoryInterface
             return SearchResult::create($albums, $total);
         }
 
-        $result = $this->buildScoredQuery(
+        $predicate = CatalogReadScopeQuery::native($scope, 'album', $options);
+        $result = $this->buildScopedScoredQuery(
             $options,
             $this->entityManager,
             AlbumEntity::class,
             'albums',
             'title',
+            $predicate['predicate'],
+            $predicate['parameters'],
+            $predicate['types'],
         );
 
         $albums = array_map(fn(AlbumEntity $entity) => $this->toDomain($entity), $result['entities']);
@@ -434,12 +503,14 @@ final class AlbumRepository implements AlbumRepositoryInterface
             return;
         }
 
-        $qb->innerJoin(
-            ArtistAlbumEntity::class,
-            'aa_filter',
-            'WITH',
-            'aa_filter.album = a.id AND aa_filter.artist = :artist_filter_id',
-        )->setParameter('artist_filter_id', $artistEntity->getId());
+        $qb->andWhere(<<<'DQL'
+            EXISTS (
+                SELECT aa_filter.id
+                FROM App\Catalog\Infrastructure\Doctrine\Entity\ArtistAlbumEntity aa_filter
+                WHERE aa_filter.album = a.id AND aa_filter.artist = :artist_filter_id
+            )
+            DQL)
+            ->setParameter('artist_filter_id', $artistEntity->getId());
     }
 
     private function applyGenreFilter(\Doctrine\ORM\QueryBuilder $qb, string $genreSlug): void

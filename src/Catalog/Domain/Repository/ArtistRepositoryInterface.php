@@ -10,10 +10,19 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Domain\Repository\Searchable;
 
 interface ArtistRepositoryInterface extends Searchable
 {
+    public function findVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): ?Artist;
+
+    public function findVisibleByUuid(Uuid $uuid, LibraryReadScope $scope): ?Artist;
+
+    public function searchVisible(SearchOptions $options, LibraryReadScope $scope): SearchResult;
+
+    public function countVisible(LibraryReadScope $scope): int;
+
     public function save(Artist $artist): void;
 
     public function persist(Artist $artist): void;

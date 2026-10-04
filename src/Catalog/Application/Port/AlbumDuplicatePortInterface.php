@@ -6,12 +6,16 @@ namespace App\Catalog\Application\Port;
 
 use App\Catalog\Domain\ValueObject\DuplicateGroup;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 /**
  * Port for album duplicate detection and resolution operations.
  */
 interface AlbumDuplicatePortInterface
 {
+    /** @return DuplicateGroup[] */
+    public function findVisibleDuplicatesForAlbum(Uuid $albumId, LibraryReadScope $scope): array;
+
     /**
      * Finds all duplicate album groups within a library.
      *

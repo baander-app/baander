@@ -8,6 +8,8 @@ use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Library\Application\PathValidator;
 use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Application\Port\LibraryPortInterface;
+use App\Library\Application\Port\LibraryReadScopeProviderInterface;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Library\Application\Query\LibraryStatsQueryPort;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\ValueObject\LibraryPath;
@@ -57,12 +59,20 @@ final class LibraryControllerSecurityTest extends TestCase
             statsQuery: $this->statsQuery,
             pathValidator: $this->pathValidator,
             commandBus: $this->commandBus,
+            readScopes: $this->readScopes(),
         );
 
         $translator = $this->createStub(TranslatorInterface::class);
         $translator->method('trans')->willReturnArgument(0);
         $fixture->setTranslator($translator);
         return $fixture;
+    }
+
+    private function readScopes(): LibraryReadScopeProviderInterface
+    {
+        $provider = $this->createStub(LibraryReadScopeProviderInterface::class);
+        $provider->method('current')->willReturn(LibraryReadScope::none());
+        return $provider;
     }
 
     public function testStoreGrantsCreatorAccess(): void
@@ -85,7 +95,7 @@ final class LibraryControllerSecurityTest extends TestCase
         $security = $this->createStub(Security::class);
         $security->method('getUser')->willReturn(new SecurityUser(
             id: $userId->toString(),
-            email: 'creator@example.com',
+            email: 'creator@baander.app',
             password: 'password',
         ));
 
@@ -94,6 +104,7 @@ final class LibraryControllerSecurityTest extends TestCase
             statsQuery: $this->statsQuery,
             pathValidator: $this->pathValidator,
             commandBus: $this->commandBus,
+            readScopes: $this->readScopes(),
             security: $security,
             libraryAccess: $libraryAccess,
         );
@@ -130,6 +141,7 @@ final class LibraryControllerSecurityTest extends TestCase
             statsQuery: $this->statsQuery,
             pathValidator: $this->pathValidator,
             commandBus: $this->commandBus,
+            readScopes: $this->readScopes(),
             security: null,
             libraryAccess: $libraryAccess,
         );
@@ -197,7 +209,7 @@ final class LibraryControllerSecurityTest extends TestCase
         $libraries->expects($this->once())->method('delete')->with($library);
         $security = $this->createStub(Security::class);
         $security->method('getUser')->willReturn(new SecurityUser(Uuid::v7()->toString(), 'admin@baander.app', 'hash', ['ROLE_ADMIN']));
-        $controller = new LibraryController($libraries, $this->statsQuery, $this->pathValidator, $this->commandBus, $security);
+        $controller = new LibraryController($libraries, $this->statsQuery, $this->pathValidator, $this->commandBus, $this->readScopes(), $security);
 
         $response = $controller->destroy($library->getId()->toString());
 
