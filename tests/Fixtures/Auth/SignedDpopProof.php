@@ -16,22 +16,24 @@ final readonly class SignedDpopProof
     /** @var array{kty: string, crv: string, x: string, y: string} */
     private array $jwk;
 
-    public function __construct()
+    public function __construct(?string $privateKey = null)
     {
-        $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
-        if ($key === false || !openssl_pkey_export($key, $privateKey)) {
+        $key = $privateKey === null
+            ? openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1'])
+            : openssl_pkey_get_private($privateKey);
+        if ($key === false || !openssl_pkey_export($key, $exportedPrivateKey)) {
             throw new RuntimeException('Cannot generate disposable DPoP key.');
         }
         $details = openssl_pkey_get_details($key);
         if ($details === false) {
             throw new RuntimeException('Cannot read disposable DPoP public key.');
         }
-        $this->privateKey = $privateKey;
+        $this->privateKey = $exportedPrivateKey;
         $this->jwk = [
             'kty' => 'EC',
             'crv' => 'P-256',
-            'x' => self::encode($details['ec']['x']),
-            'y' => self::encode($details['ec']['y']),
+            'x' => self::encode(str_pad($details['ec']['x'], 32, "\0", STR_PAD_LEFT)),
+            'y' => self::encode(str_pad($details['ec']['y'], 32, "\0", STR_PAD_LEFT)),
         ];
     }
 
@@ -40,9 +42,10 @@ final readonly class SignedDpopProof
         return DpopJwkThumbprint::compute($this->jwk);
     }
 
-    public function create(string $method, string $uri, string $accessToken): string
+    /** @param array<string, mixed>|null $jwk Override only for deliberately malformed proof fixtures. */
+    public function create(string $method, string $uri, string $accessToken, ?array $jwk = null): string
     {
-        $header = ['typ' => 'dpop+jwt', 'alg' => 'ES256', 'jwk' => $this->jwk];
+        $header = ['typ' => 'dpop+jwt', 'alg' => 'ES256', 'jwk' => $jwk ?? $this->jwk];
         $claims = [
             'jti' => bin2hex(random_bytes(16)),
             'htm' => $method,

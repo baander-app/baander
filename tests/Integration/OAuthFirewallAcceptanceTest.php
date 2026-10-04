@@ -13,6 +13,7 @@ use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
+use App\Tests\Fixtures\Auth\LeadingZeroDpopKey;
 use App\Tests\Fixtures\Auth\ProductionOAuthKernel;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -24,6 +25,8 @@ use Symfony\Component\HttpFoundation\Response;
 /** Production firewall/authenticators/listeners and actual PostgreSQL/Redis; no TestAuthenticator. */
 final class OAuthFirewallAcceptanceTest extends TestCase
 {
+    private static string $sharedDirectory;
+    private static string $sharedPrivateKey;
     private string $directory;
     private string $privateKey;
     private ProductionOAuthKernel $kernel;
@@ -33,24 +36,36 @@ final class OAuthFirewallAcceptanceTest extends TestCase
     private AccessTokenEntity $token;
     private SignedDpopProof $proof;
 
+    public static function tearDownAfterClass(): void
+    {
+        if (isset(self::$sharedDirectory)) {
+            (new Filesystem())->remove(self::$sharedDirectory);
+        }
+        parent::tearDownAfterClass();
+    }
+
     protected function setUp(): void
     {
         $url = getenv('OUTBOX_TEST_DATABASE_URL');
         if ($url === false || $url === '') {
             self::markTestSkipped('Disposable PostgreSQL and Redis services are required.');
         }
-        $this->directory = sys_get_temp_dir() . '/baander-oauth-firewall-' . bin2hex(random_bytes(8));
-        self::assertTrue(mkdir($this->directory, 0700));
-        $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_RSA, 'private_key_bits' => 2048]);
-        self::assertNotFalse($key);
-        self::assertTrue(openssl_pkey_export($key, $privateKey));
-        $this->privateKey = $privateKey;
-        $details = openssl_pkey_get_details($key);
-        self::assertIsArray($details);
-        self::assertSame(strlen($privateKey), file_put_contents($this->directory . '/private.pem', $privateKey));
-        self::assertSame(strlen($details['key']), file_put_contents($this->directory . '/public.pem', $details['key']));
-        self::assertTrue(chmod($this->directory . '/private.pem', 0600));
-        self::assertTrue(chmod($this->directory . '/public.pem', 0600));
+        if (!isset(self::$sharedDirectory)) {
+            self::$sharedDirectory = sys_get_temp_dir() . '/baander-oauth-firewall-' . bin2hex(random_bytes(8));
+            self::assertTrue(mkdir(self::$sharedDirectory, 0700));
+            $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_RSA, 'private_key_bits' => 2048]);
+            self::assertNotFalse($key);
+            self::assertTrue(openssl_pkey_export($key, $privateKey));
+            self::$sharedPrivateKey = $privateKey;
+            $details = openssl_pkey_get_details($key);
+            self::assertIsArray($details);
+            self::assertSame(strlen($privateKey), file_put_contents(self::$sharedDirectory . '/private.pem', $privateKey));
+            self::assertSame(strlen($details['key']), file_put_contents(self::$sharedDirectory . '/public.pem', $details['key']));
+            self::assertTrue(chmod(self::$sharedDirectory . '/private.pem', 0600));
+            self::assertTrue(chmod(self::$sharedDirectory . '/public.pem', 0600));
+        }
+        $this->directory = self::$sharedDirectory;
+        $this->privateKey = self::$sharedPrivateKey;
         $this->kernel = new ProductionOAuthKernel($this->directory, $url);
         $this->kernel->boot();
         $container = $this->kernel->getContainer();
@@ -88,9 +103,6 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         if (isset($this->kernel)) {
             $this->kernel->shutdown();
         }
-        if (isset($this->directory)) {
-            (new Filesystem())->remove($this->directory);
-        }
         parent::tearDown();
     }
 
@@ -102,6 +114,26 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         self::assertSame(200, $response->getStatusCode(), $response->getContent());
         $data = json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR);
         self::assertSame($this->user->getEmail(), $data['data']['email']);
+    }
+
+    public function testLeadingZeroEcCoordinateWorksThroughProductionFirewall(): void
+    {
+        $this->proof = new SignedDpopProof(LeadingZeroDpopKey::PEM);
+        $this->token->setDpopJkt($this->proof->thumbprint());
+        $this->manager->flush();
+        $jwt = $this->accessJwt();
+        $response = $this->request($jwt, $this->proof->create('GET', 'https://baander.app/api/auth/me', $jwt));
+
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+    }
+
+    public function testMalformedEcPointIsRejectedWith403ThroughProductionFirewall(): void
+    {
+        $jwt = $this->accessJwt();
+        $jwk = ['kty' => 'EC', 'crv' => 'P-256', 'x' => SignedDpopProof::encode("\x01"), 'y' => SignedDpopProof::encode("\x02")];
+        $response = $this->request($jwt, $this->proof->create('GET', 'https://baander.app/api/auth/me', $jwt, $jwk));
+
+        self::assertSame(403, $response->getStatusCode(), (string) $response->getContent());
     }
 
     /** @return iterable<string, array{string, int}> */

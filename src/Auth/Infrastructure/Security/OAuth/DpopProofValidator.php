@@ -192,13 +192,14 @@ final class DpopProofValidator
 
         try {
             $verificationKey = $this->jwkToVerificationKey($jwk, $alg);
+            $verified = $signer->verify($this->base64urlDecode($token->signature()->toString()), $token->payload(), $verificationKey);
         } catch (Throwable $e) {
-            $this->logger->debug('DPoP proof jwk to key conversion failed', ['exception' => $e]);
+            $this->logger->debug('DPoP proof verification key is invalid', ['exception' => $e]);
 
             return DpopValidationResult::invalid('invalid_dpop_proof', 'DPoP proof jwk is invalid or unsupported.');
         }
 
-        if (!$signer->verify($this->base64urlDecode($token->signature()->toString()), $token->payload(), $verificationKey)) {
+        if (!$verified) {
             return DpopValidationResult::invalid('invalid_dpop_proof', 'DPoP proof signature verification failed.');
         }
 
